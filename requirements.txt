@@ -1,0 +1,12 @@
+langgraph
+langchain
+langchain-openai
+sentence-transformers
+faiss-cpu
+streamlit
+streamlit-authenticator
+pandas
+python-dotenv
+pyyaml
+mlflow
+pytest

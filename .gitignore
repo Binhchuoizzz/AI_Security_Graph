@@ -1,0 +1,7 @@
+__pycache__/
+.venv/
+data/raw/
+knowledge_base/faiss_index/
+logs/
+.env
+mlruns/
