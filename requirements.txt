@@ -1,12 +1,38 @@
-langgraph
-langchain
-langchain-openai
-sentence-transformers
-faiss-cpu
-streamlit
-streamlit-authenticator
-pandas
-python-dotenv
-pyyaml
-mlflow
-pytest
+# ==========================================
+# 1. CORE AI & AGENT (Lõi Suy luận LangGraph)
+# ==========================================
+langgraph>=0.0.26
+langchain>=0.1.0
+langchain-openai>=0.0.5     # Dùng để gọi Oobabooga API (tương thích OpenAI)
+langchain-community>=0.0.13 # Hỗ trợ các công cụ phụ trợ cho Langchain
+pydantic>=2.0.0             # Xác thực cấu trúc JSON đầu ra của LLM
+
+# ==========================================
+# 2. RAG & KNOWLEDGE BASE (Tri thức AI)
+# ==========================================
+sentence-transformers>=2.2.2 # Mô hình nhúng (Embedding) cho dữ liệu MITRE/ISO
+faiss-cpu>=1.7.4             # Vector Database chạy local nhẹ nhàng (Không cần GPU)
+
+# ==========================================
+# 3. DATA PROCESSING (Xử lý Log/Dữ liệu)
+# ==========================================
+pandas>=2.0.0                # Đọc, cắt và tiền xử lý file CSV (CICIDS2017)
+numpy>=1.24.0                # Xử lý ma trận dữ liệu
+
+# ==========================================
+# 4. USER INTERFACE (Giao diện HITL)
+# ==========================================
+streamlit>=1.30.0            # Xây dựng Dashboard SOC
+streamlit-authenticator>=0.3.1 # Tạo màn hình Login & Phân quyền RBAC
+
+# ==========================================
+# 5. MLOPS & TRACKING (Vận hành & Theo dõi)
+# ==========================================
+mlflow>=2.10.0               # Tracking log thực nghiệm, lưu lịch sử Benchmark
+python-dotenv>=1.0.0         # Đọc biến môi trường từ file .env
+PyYAML>=6.0.1                # Đọc file cấu hình config.yaml
+
+# ==========================================
+# 6. TESTING & GUARDRAILS (Kiểm thử)
+# ==========================================
+pytest>=8.0.0                # Chạy các kịch bản test tự động

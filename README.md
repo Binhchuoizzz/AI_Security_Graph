@@ -35,6 +35,7 @@ Data flows through a comprehensive, production-grade pipeline:
 ## 🛠 Prerequisites
 
 To run this project, ensure you have the following installed and configured:
+- **Python 3.10.x** (Strictly recommended for local execution to avoid dependency conflicts)
 - **Docker & Docker Compose**
 - **Git LFS** (for fetching large SQLite and CSV files)
 - **Local LLM Backend:** Ensure `text-generation-webui` (Oobabooga) is running locally on port 5000, serving the Gemma 26B model with the API extension enabled.
