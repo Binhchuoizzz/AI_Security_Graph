@@ -10,8 +10,10 @@ services:
       - .:/app
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - mlflow
+      - redis
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.10.0
@@ -25,3 +27,9 @@ services:
       --backend-store-uri sqlite:///mlruns/mlflow.db
       --default-artifact-root /mlruns
       --host 0.0.0.0
+
+  redis:
+    image: redis:alpine
+    container_name: redis_queue
+    ports:
+      - "6379:6379"

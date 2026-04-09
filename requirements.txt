@@ -36,3 +36,4 @@ PyYAML>=6.0.1                # Đọc file cấu hình config.yaml
 # 6. TESTING & GUARDRAILS (Kiểm thử)
 # ==========================================
 pytest>=8.0.0                # Chạy các kịch bản test tự động
+redis>=5.0.1                 # Tương tác với Redis Queue Streaming
