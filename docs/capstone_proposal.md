@@ -1,61 +1,61 @@
-# ĐỀ CƯƠNG DỰ ÁN TỐT NGHIỆP (CAPSTONE PROJECT PROPOSAL)
+# CAPSTONE PROJECT PROPOSAL
 
-**Tên đề tài:** Xây dựng hệ thống phát hiện và tự động hóa phản ứng an ninh (IDS/SOAR) dựa trên AI Agent đa nguồn kết hợp LangGraph, RAG và cơ chế bảo vệ Guardrails.
+**Project Title:** Autonomous AI Security Agent for Multi-source Log Correlation and Intrusion Response using LangGraph, Dual-RAG, and Adversarial Guardrails.
+*(Hệ thống phát hiện và phản ứng an ninh tự động dựa trên AI Agent đa nguồn kết hợp LangGraph, Dual-RAG và cơ chế phòng thủ Guardrails).*
 
-## 1. GIỚI THIỆU VÀ BỐI CẢNH (Introduction and Background)
+## 1. Introduction and Background
 
-### 1.1. Mô tả vấn đề (Problem Description)
-Các Trung tâm Điều hành An ninh (SOC) hiện đại đang đối mặt với ba thách thức lớn:
-1.  **Quá tải cảnh báo (Alert Fatigue):** Hệ thống IDS truyền thống tạo ra quá nhiều báo động giả, làm giảm khả năng tập trung vào các mối đe dọa thực sự.
-2.  **Phân tích rời rạc:** Việc thiếu sự liên kết giữa các nguồn log (Web, Auth, Network) dẫn đến việc bỏ sót các cuộc tấn công chuỗi (multi-stage attacks).
-3.  **An toàn cho chính AI (Securing the AI):** Các hệ thống dựa trên LLM dễ bị tấn công bởi Prompt Injection thông qua dữ liệu log độc hại, gây ra rủi ro sai lệch quyết định của Agent.
+**1.1. Problem Description**
+Các Trung tâm Điều hành An ninh (SOC) hiện đại đang đối mặt với "Nghịch lý Dữ liệu lớn": Khối lượng sự kiện trên giây (EPS - Events Per Second) khổng lồ dẫn đến tình trạng "quá tải cảnh báo" (alert fatigue) cho các chuyên gia phân tích (Analyst). Các hệ thống phát hiện xâm nhập (IDS) và quản lý log (SIEM) truyền thống thường phân tích các nguồn dữ liệu (Web, Firewall, Auth) một cách rời Một cách rời rạc, làm giảm khả năng phát hiện các chuỗi tấn công tinh vi (Multi-stage/APT attacks). 
 
-### 1.2. Mục tiêu nghiên cứu (Research Objectives - SMART)
-Xây dựng một hệ thống AI Security Agent có khả năng tự động liên kết log đa nguồn, giải thích mối đe dọa theo chuẩn quốc tế và tự bảo vệ trước các tấn công nội tại (adversarial attacks) trong vòng 6 tháng.
-* **RQ1:** Làm thế nào để thiết kế một Log Correlation Engine hiệu quả nhằm gom nhóm dữ liệu đa nguồn phục vụ cho việc suy luận của AI? (Trả lời tại Chương 2).
-* **RQ2:** Kiến trúc LangGraph tích hợp RAG (MITRE ATT&CK & ISO 27001) và lớp bảo vệ Guardrails được thiết kế như thế nào để đảm bảo tính giải thích và an toàn? (Trả lời tại Chương 3).
-* **RQ3:** Hiệu năng của hệ thống so với các phương pháp truyền thống và giá trị của cơ chế Human-in-the-Loop (HITL) được định lượng ra sao? (Trả lời tại Chương 4).
+Bên cạnh đó, việc ứng dụng Mô hình Ngôn ngữ Lớn (LLM) trực tiếp vào phân tích log an ninh sinh ra hai lỗ hổng chí mạng: (1) Độ trễ suy luận (Reasoning Latency) quá cao không đáp ứng được luồng dữ liệu thời gian thực (Streaming Data) và (2) Rủi ro AI bị thao túng bởi các đòn tấn công chèn mã độc (Prompt Injection) ẩn bên trong log của kẻ tấn công. 
 
-### 1.3. Phạm vi dự án (Scope)
-* **Bao gồm:** Xây dựng Agentic Workflow (LangGraph); Module RAG đa nguồn; Lớp bảo vệ Guardrails (chống Prompt Injection); Giao diện HITL (Streamlit) tích hợp MLflow tracking.
-* **Dữ liệu:** Sử dụng 3 bộ dataset chuẩn (CICIDS2017, UNSW-NB15, MAWILab) được giả lập luồng log đa nguồn.
-* **Mô hình LLM:** Gemma 26B/27B chạy cục bộ qua Oobabooga API nhằm đảm bảo tính bảo mật dữ liệu.
+**1.2. Research Objectives**
+Nghiên cứu này hướng tới việc xây dựng và đánh giá một nguyên mẫu (prototype) AI Security Agent có khả năng liên kết log đa nguồn theo thời gian thực, có khả năng tự bảo vệ, và hỗ trợ ra quyết định thông qua cơ chế Human-in-the-Loop (HITL). Các câu hỏi nghiên cứu (Research Questions - RQ) bao gồm:
+* **RQ1:** Kiến trúc xử lý luồng 2 tầng (2-Tier Architecture: Rule-based + LLM Agent) tối ưu hóa độ trễ suy luận (Reasoning Latency) như thế nào so với việc sử dụng LLM đơn thuần trên tập dữ liệu tốc độ cao?
+* **RQ2:** Cơ chế Adversarial Guardrails (Lọc Prompt & Quản lý State) có tác động ra sao đến tỷ lệ phòng ngự thành công (Defeat Rate) trước các đòn tấn công tiêm nhiễm log?
+* **RQ3:** Việc kết hợp Dual-RAG (MITRE ATT&CK và ISO 27001) trong đồ thị LangGraph cải thiện khả năng giải thích (Context Relevance) và hỗ trợ quyết định cho HITL như thế nào?
 
-## 2. GIẢI PHÁP ĐỀ XUẤT (Proposed Solution)
+**1.3. Scope of the Project**
+* **In-scope:** Xây dựng Data Streaming Pipeline bằng Redis; Phát triển Tier-1 Rule-based Filter; Cài đặt LangGraph Agent với cấu hình RAG cục bộ; Triển khai hệ thống Guardrails và giao diện Streamlit (HITL). Hệ thống được đóng gói theo chuẩn MLOps (Docker, MLflow).
+* **Out-of-scope:** Tinh chỉnh (Fine-tuning) kiến trúc lõi của Foundation Model (Gemma 26B); Triển khai cụm Apache Kafka vật lý (sử dụng Redis để giả lập streaming); Ngăn chặn tấn công DDoS ở tầng hạ tầng mạng (Layer 3/4).
 
-### 2.1. Mô tả giải pháp
-Dự án áp dụng phương pháp luận **Design Science Research (DSR)** để xây dựng một "Artifact" phần mềm thông minh. Hệ thống không chỉ phát hiện tấn công mà còn đóng vai trò một chuyên gia tư vấn (Analyst) thông qua:
-* **Log Correlation Engine:** Gom nhóm log theo [IP + Time-window 5 phút] để tạo ngữ cảnh đầy đủ.
-* **Adversarial Guardrails:** Lọc dữ liệu log trước khi đưa vào LLM để ngăn chặn tiêm mã lệnh (Prompt Injection).
-* **Dual-RAG:** Ánh xạ hành vi tấn công vào kỹ thuật MITRE ATT&CK và đối chiếu với chính sách ISO 27001 để đề xuất phản ứng phù hợp.
+## 2. Proposed Solution
 
-### 2.2. Kiến trúc Hệ thống (Architecture)
-Hệ thống được thiết kế theo mô hình Container hóa (Docker) bao gồm:
-1.  **Data Ingestion Layer:** Phân tách và định dạng log đa nguồn.
-2.  **AI Safety Layer (Guardrails):** Kiểm soát tính toàn vẹn của dữ liệu và prompt.
-3.  **Reasoning Core (LangGraph):** Điều phối các Node phân tích, truy xuất tri thức và định tuyến quyết định.
-4.  **HITL Dashboard:** Giao diện phê duyệt tích hợp phân quyền (RBAC) cho SOC Analyst và Manager.
+**2.1. Solution Description**
+Dự án áp dụng phương pháp luận nghiên cứu khoa học thiết kế (**Design Science Research - DSR**). Giải pháp đề xuất là một kiến trúc Agentic Workflow bảo mật cao, hoạt động theo cơ chế Phễu lọc (Funneling Mechanism):
+* **Cơ chế Streaming & Tier-1 Filter:** Luồng log thô được đẩy liên tục qua Message Queue (Redis). Một engine Rule-based (Tier 1) sẽ đóng vai trò tiền xử lý tốc độ cao (mili-giây), tự động drop các traffic sạch và chỉ định tuyến các IP có dấu hiệu bất thường (Anomalies) vào Tier 2.
+* **Tier-2 LangGraph & Guardrails:** Trước khi dữ liệu đến LLM, lớp Guardrails sẽ thực hiện "làm sạch" (Sanitize) và kiểm soát Context Window. LangGraph sẽ gom nhóm các sự kiện theo [IP + Khung 5 phút], sau đó sử dụng Dual-RAG để ánh xạ hành vi tấn công vào ma trận MITRE ATT&CK và đối chiếu với tiêu chuẩn ISO 27001. 
+* **Human-in-the-Loop (HITL):** Thay vì tự động chặn hoàn toàn, hệ thống sẽ bảo lưu trạng thái (State) và tạm dừng đồ thị, yêu cầu SOC Analyst phê duyệt lệnh thông qua Dashboard.
 
-## 3. KẾ HOẠCH TRIỂN KHAI (Implementation Plan)
+**2.2. Software Architecture**
+Kiến trúc phần mềm tuân thủ nguyên tắc vi dịch vụ (Microservices) và được container hóa (Docker). Môi trường vận hành sử dụng mô hình LLM cục bộ (Gemma 26B qua Oobabooga API) nhằm đảm bảo nguyên tắc Data Privacy (Không đưa log nhạy cảm lên Cloud). Toàn bộ tham số hệ thống và chỉ số thực nghiệm được tracking tự động bởi MLflow.
 
-### 3.1. Phương pháp thực nghiệm (Methodology & Datasets)
-Dựa trên **ABC Framework**, dự án ưu tiên Độ chính xác (Precision) và Tính thực tế (Realism) thông qua Lab Experiment trên 3 tập dữ liệu:
-* **CICIDS2017:** Thiết lập baseline cho các tấn công phổ biến.
-* **UNSW-NB15:** Kiểm thử với các kỹ thuật tấn công hiện đại và đa dạng hơn.
-* **MAWILab:** Đánh giá năng lực liên kết luồng dữ liệu (Flow correlation) chuyên sâu.
+## 3. Implementation Plan
 
-### 3.2. Lộ trình thực hiện (Schedule)
-* **Giai đoạn 1 (Tuần 1-2):** Thiết lập môi trường MLOps (Docker, MLflow, Oobabooga) và tiền xử lý dữ liệu.
-* **Giai đoạn 2 (Tuần 3-6):** Xây dựng lõi LangGraph, Module RAG và lớp bảo vệ Guardrails.
-* **Giai đoạn 3 (Tuần 7-8):** Phát triển Dashboard HITL và tích hợp Logic phản ứng (Response).
-* **Giai đoạn 4 (Tuần 9-10):** Chạy thực nghiệm (Ablation Study), thu thập metrics và hoàn thiện luận văn.
+**3.1. Methodology & Datasets**
+Nghiên cứu sử dụng chiến lược **Lab Experiment** kết hợp với **Adversarial Testing**. Để đảm bảo tính tổng quát và thực tế, dữ liệu thực nghiệm được hợp nhất từ 3 bộ dataset chuẩn mực quốc tế:
+1.  **CICIDS2017:** Đo lường hiệu năng Baseline (DoS, Brute Force).
+2.  **UNSW-NB15:** Đánh giá khả năng phát hiện tấn công đa hình, phân tán.
+3.  **MAWILab:** Phục vụ kiểm thử năng lực liên kết log đa nguồn (Log Correlation).
+Toàn bộ log tĩnh từ dataset sẽ được mô phỏng thành luồng dữ liệu thời gian thực (Real-time stream) thông qua Data Publisher script và Redis Queue.
 
-## 4. KẾT QUẢ MONG ĐỢI (Expected Results)
-1.  **Hệ thống phần mềm:** Prototype AI Security Agent đạt chuẩn Production-ready với đầy đủ tính năng giám sát và phản ứng.
-2.  **Báo cáo thực nghiệm:** Chứng minh sự sụt giảm đáng kể tỷ lệ báo động giả (False Positives) khi có sự can thiệp của RAG và HITL.
-3.  **Đóng góp học thuật:** Đề xuất một quy trình vận hành Agentic SOC an toàn, có khả năng tự bảo vệ trước các tấn công nhắm vào AI.
+**3.2. Schedule (Gantt Chart for 1-Month Intensive Plan)**
+* **Week 1 (Foundation):** Xác định mục tiêu, hoàn thành Literature Review (Chương 1 & 2); Thiết lập hạ tầng Docker, MLflow và Oobabooga API.
+* **Week 2 (Core Development):** Xây dựng Redis Streaming Pipeline và Tier-1 Filter. Lập trình luồng LangGraph Agent, tích hợp FAISS Vector DB (Dual-RAG).
+* **Week 3 (Guardrails & UI):** Lập trình module Adversarial Guardrails. Hoàn thiện giao diện điều hành Streamlit (Dashboard) tích hợp RBAC cho cơ chế HITL.
+* **Week 4 (Evaluation & Reporting):** Chạy Benchmark tự động (Ablation Study) bằng MLflow. Thực hiện tấn công Lab (Red Teaming) để đo đạc Defeat Rate. Hoàn thiện báo cáo luận văn (Chương 3, 4, 5).
 
-## 5. KẾ HOẠCH ĐÁNH GIÁ (Evaluation Plan)
-* **Định lượng:** Đo lường Precision, Recall, F1-Score, FPR trên 3 tập dataset.
-* **Đánh giá an toàn:** Thực hiện "Adversarial Testing" nhét mã độc vào log để kiểm chứng hiệu quả của lớp Guardrails.
-* **Nghiên cứu cắt lớp (Ablation Study):** So sánh hiệu quả của hệ thống khi có và không có RAG/Guardrails/HITL để khẳng định giá trị của từng thành phần thiết kế.
+**3.3. Feasibility Assessment**
+Dự án có tính khả thi cao nhờ việc giới hạn phạm vi mô phỏng Streaming bằng Redis thay vì Kafka, và sử dụng Rule-based Filter thay vì huấn luyện mới mô hình Deep Learning cho Tier 1. Tài nguyên phần cứng (RAM/VRAM) đáp ứng được mô hình Gemma 26B quantized. Các rủi ro về xung đột thư viện được triệt tiêu hoàn toàn nhờ cấu trúc Docker-compose đồng nhất.
+
+## 4. Expected Results
+1.  **Mã nguồn & Artifact:** Một hệ thống SOC Agent hoàn chỉnh (Codebase) tuân thủ kiến trúc MLOps, có khả năng tái lập (reproducible) bằng 1 lệnh khởi chạy duy nhất.
+2.  **Báo cáo Thực nghiệm:** Hồ sơ log từ MLflow chứng minh sự tối ưu về Reasoning Latency của cấu trúc 2-Tier so với hệ thống 1-Tier.
+3.  **Đóng góp Tri thức:** Mô hình lý thuyết về việc áp dụng Guardrails để bảo vệ LLM Agent trong môi trường an toàn thông tin khép kín.
+
+## 5. Evaluation Plan
+Khác với các hệ thống phân loại truyền thống chỉ dựa vào độ chính xác, hệ thống Agent sẽ được đánh giá qua bộ tiêu chí 3 chiều (3D Evaluation Framework):
+1.  **Classification Metrics:** Đo lường Precision, Recall, F1-Score trên 3 tập dataset (So sánh với Baseline).
+2.  **Operational Metrics:** Đo lường **Reasoning Latency** (Độ trễ suy luận tính bằng giây/sự cố) để chứng minh khả năng xử lý Streaming.
+3.  **Robustness Metrics (Tính bền bỉ):** Tính toán **Guardrail Effectiveness (Defeat Rate)** thông qua bài kiểm tra "tiêm mã độc" vào 100 dòng log giả lập, đo lường số lần LLM bị thao túng thành công (Bypass) so với số lần bị chặn (Blocked). Kết quả RAG được đánh giá thủ công qua chỉ số Context Relevance.
