@@ -84,7 +84,7 @@ Modern Security Operations Centers (SOCs) face the ``Big Data Paradox'': an over
 
 To address these challenges, this study proposes \textbf{SENTINEL} (\textbf{S}treaming \textbf{E}vents \textbf{N}etwork for \textbf{T}hreat \textbf{I}ntelligence, \textbf{N}eutralization, \textbf{E}scalation and \textbf{L}og-correlation)---a 2-Tier autonomous AI Security Agent that integrates Session-Aware Behavioral Baselining (Tier~1) with a LangGraph-based reasoning agent powered by Dual-RAG (MITRE ATT\&CK + ISO~27001) and multi-layered Adversarial Guardrails featuring Dynamic Randomized Delimiters (Tier~2). The system resolves the fundamental paradox of \textit{``preserving attack-payload variables for analysis without triggering Prompt Injection''} through Delimited Data Encapsulation---analogous to Parameterized Queries in SQL Injection prevention.
 
-The proposed system is evaluated on three benchmark datasets: CICIDS2017, UNSW-NB15, and MAWILab. Evaluation employs a 4D Framework encompassing Classification Metrics (F1-Score), Operational Metrics (Reasoning Latency, Semantic Cache Hit Rate), Robustness Metrics (Guardrail Defeat Rate across 1,000+ adversarial samples), and Context Quality Metrics (RAGAS with 200 static Ground Truth samples + LLM-as-a-Judge using an Oracle Model to avoid Self-Evaluation Bias) \citep{zheng2023}.
+The proposed system is evaluated on two benchmark datasets: CICIDS2017 and UNSW-NB15. Evaluation employs a 4D Framework encompassing Classification Metrics (F1-Score), Operational Metrics (Reasoning Latency, Semantic Cache Hit Rate), Robustness Metrics (evaluating structural defenses and Semantic Confusion baselines across 1,000+ adversarial samples), and Context Quality Metrics (RAGAS with 200 static Ground Truth samples + LLM-as-a-Judge evaluating a Stratified Sample of 5,000 incidents using an Oracle Model to avoid Self-Evaluation Bias) \citep{zheng2023}.
 
 % --- TABLE OF CONTENTS ---
 \newpage
@@ -124,9 +124,9 @@ This study designs, implements, and evaluates a prototype AI Security Agent capa
 
 \begin{itemize}[leftmargin=2cm]
     \item[\textbf{RQ1:}] How does a 2-Tier architecture (Rule-based + LLM Agent) with Session-Aware Behavioral Baselining and Semantic Cache optimize Reasoning Latency compared to a 1-Tier (LLM-only) approach?
-    \item[\textbf{RQ2:}] To what extent does Delimited Data Encapsulation with Dynamic Randomized Delimiters reduce the Defeat Rate against Prompt Injection attacks via log data?
+    \item[\textbf{RQ2:}] To what extent does Delimited Data Encapsulation defeat structural Prompt Injection attacks (Delimiter Smuggling, Encoding Bypass), and what is the security baseline against Semantic Confusion?
     \item[\textbf{RQ3:}] How does Dual-RAG (MITRE ATT\&CK + ISO~27001) improve Context Relevance and support HITL decision-making?
-    \item[\textbf{RQ4:}] How effectively does the Feedback Loop (Agent-generated Dynamic Rules for Tier~1) enable adaptation to zero-day attacks?
+    \item[\textbf{RQ4:}] Does securing the Feedback Loop with a HITL Quarantine prevent Adversarial Rule Injection, enabling safe adaptation to zero-day attacks?
 \end{itemize}
 
 \subsection{Scope of the Study}
@@ -190,8 +190,8 @@ Events are grouped by [IP~$+$~5-minute window] and processed through Dual-RAG, w
 
 The agent's state is managed through a \textit{Structured MemoryObject} that combats Semantic Drift by separating: (1)~\texttt{narrative\_summary}---general context that the LLM may summarize; and (2)~\texttt{extracted\_iocs}---an immutable, append-only JSON registry of IOCs (IPs, ports, hashes) that the LLM may \textit{never} overwrite or condense.
 
-\textbf{D. Feedback Loop.}
-When the LangGraph Agent confirms a new attack pattern, it generates a detection rule (field, pattern, score) that flows through \texttt{feedback\_listener.py} to persist in \texttt{system\_settings.yaml}. The Rule Engine hot-reloads dynamic rules, making them immediately enforceable at Tier~1 in the next evaluation cycle.
+\textbf{D. Feedback Loop with HITL Quarantine.}
+When the LangGraph Agent identifies a new attack pattern, it generates a detection rule. To prevent \textit{Adversarial Rule Injection} (e.g., an attacker manipulating the Agent into blocking an admin IP), these rules default to a \texttt{Pending Approval} (Quarantine) status. They are only persisted to \texttt{system\_settings.yaml} and hot-reloaded by the Tier~1 Rule Engine after explicit approval by an L3~Manager via the HITL Dashboard.
 
 \textbf{E. Human-in-the-Loop (HITL).}
 A Streamlit dashboard with RBAC (L1~Analyst: view-only; L3~Manager: approve/block) and SQLite Audit Trail provides human oversight for high-impact decisions.
@@ -238,15 +238,14 @@ Audit & SQLite \\
 
 \subsection{Main Development Stages}
 
-\textbf{Datasets.} The study employs three benchmark datasets:
+\textbf{Datasets.} The study employs two benchmark datasets:
 
 \begin{enumerate}
-    \item \textbf{CICIDS2017} \citep{sharafaldin2018}: Baseline benchmark (DoS, Brute Force, Web Attack). Selected as the primary dataset because it remains the most widely cited benchmark in SOC literature, enabling direct comparison with prior research.
+    \item \textbf{CICIDS2017} \citep{sharafaldin2018}: Baseline benchmark (DoS, Brute Force, Web Attack). Selected as the primary dataset because it remains the most widely cited benchmark in SOC literature, enabling direct comparison with prior research. To demonstrate \textit{multi-source log correlation}, distinct traffic flows within CICIDS2017 are preprocessed and simulated as separate log sources (e.g., separating HTTP traffic as Web Logs and other connections as Firewall/Zeek Logs).
     \item \textbf{UNSW-NB15} \citep{moustafa2015}: Polymorphic and distributed attack scenarios (9 attack families, 49 features).
-    \item \textbf{MAWILab} \citep{fontugne2010}: Packet traffic preprocessed into tabular CSV format for multi-source log correlation testing.
 \end{enumerate}
 
-\textbf{Synthetic Adversarial Generation:} Gemma~26B generates 1,000+ Log Injection scenarios across four attack vectors: Direct Injection, Indirect Injection, Encoding Bypass, and Context Manipulation.
+\textbf{Synthetic Adversarial Generation:} Gemma~26B generates 1,000+ Log Injection scenarios across four attack vectors: Direct Injection, Indirect Injection, Encoding Bypass, and Semantic Confusion.
 
 \textbf{Schedule (8-Week Realistic Plan):}
 \begin{itemize}
@@ -302,12 +301,13 @@ The study defines a \textbf{4D Evaluation Framework}:
     
     \item \textbf{Operational Metrics:} Reasoning Latency (sec/incident), including Embedding Latency. Semantic Cache Hit Rate measured to demonstrate RAG query optimization. Comparison of 2-Tier vs. 1-Tier.
     
-    \item \textbf{Robustness Metrics:} Guardrail Defeat Rate across 1,000+ adversarial samples, categorized by 4 attack vectors (Direct Injection, Indirect Injection, Encoding Bypass, Context Manipulation). Comparison of Full Encapsulation vs. No Encapsulation (Baseline~C).
+    \item \textbf{Robustness Metrics:} Guardrail Defeat Rate across 1,000+ adversarial samples. Focuses on measuring the complete elimination of structural bypasses (Smuggling/Encoding) via Encapsulation, and evaluating the baseline vulnerability against Semantic Confusion (linguistic manipulation). Comparison of Full Encapsulation vs. No Encapsulation (Baseline~C).
     
-    \item \textbf{Context Quality Metrics:} Dual evaluation methodology:
+    \item \textbf{Context Quality Metrics \& Evaluation Scoping:}
     \begin{itemize}
-        \item \textit{RAGAS (200 static Ground Truth samples):} 200 representative incidents from 3 datasets, manually labeled (expected MITRE technique, ISO control, action). Computes Context Precision + Answer Relevancy.
-        \item \textit{LLM-as-a-Judge (full dataset, no Ground Truth required):} \textbf{Gemma~26B serves as Oracle Model} (independent judge) scoring Context Relevance (1--5 scale) per \citet{zheng2023}. \textbf{Not the same model as the Primary Agent (9B)} to avoid Confirmation Bias / Self-Evaluation Bias. Run sequentially (unload 9B $\rightarrow$ load 26B) due to VRAM constraints.
+        \item \textit{VRAM Evaluation Optimization (Stratified Sampling):} While the Tier~1 Rule Engine processes the entire $\sim$2.8 million records of CICIDS2017 to evaluate latency, the LLM-as-a-Judge evaluation using the 26B Oracle is strictly bounded to a \textbf{Stratified Sample of 5,000 representative incidents} (proportionally containing all attack classes). This sample size provides statistical validity while making sequential model loading feasible on a consumer RTX 4060 Ti.
+        \item \textit{RAGAS (200 static Ground Truth samples):} 200 representative incidents randomly drawn from the stratified sample, manually labeled. Computes Context Precision + Answer Relevancy.
+        \item \textit{LLM-as-a-Judge (5,000 Stratified Samples):} \textbf{Gemma~26B serves as Oracle Model} (independent judge) scoring Context Relevance (1--5 scale) per \citet{zheng2023} on the bounded sample. \textbf{Separated from the Primary Agent (9B)} to avoid Self-Evaluation Bias.
         \item Compression Ratio from Semantic Pruning.
     \end{itemize}
 \end{enumerate}
@@ -323,7 +323,7 @@ The study defines a \textbf{4D Evaluation Framework}:
 \begin{enumerate}
     \item \textbf{SENTINEL Source Code:} An MLOps-ready codebase, fully reproducible via \texttt{docker-compose up}. The system implements a complete pipeline from CSV ingestion $\rightarrow$ Redis streaming $\rightarrow$ Tier-1 filtering $\rightarrow$ Guardrails $\rightarrow$ LangGraph Agent $\rightarrow$ HITL Dashboard.
     
-    \item \textbf{Experimental Report:} MLflow logs demonstrating: (a)~2-Tier architecture reduces Reasoning Latency compared to 1-Tier; (b)~Template Mining achieves significant Compression Ratio; (c)~Delimited Encapsulation with Dynamic Delimiters defeats $>$95\% of adversarial injection attempts (Baseline~C comparison); (d)~Semantic Cache achieves $>$80\% hit rate for repetitive attack patterns.
+    \item \textbf{Experimental Report:} MLflow logs demonstrating: (a)~2-Tier architecture reduces Reasoning Latency compared to 1-Tier; (b)~Template Mining achieves significant Compression Ratio; (c)~Delimited Encapsulation successfully defeats structural adversarial injection attempts (Baseline~C comparison) while establishing a Semantic Confusion baseline; (d)~Semantic Cache achieves $>$80\% hit rate for repetitive attack patterns.
     
     \item \textbf{Knowledge Contribution:} The SENTINEL architectural model---resolving the paradox of \textit{``preserving variables for analysis without triggering Prompt Injection''} through Delimited Data Encapsulation, analogous to Parameterized Queries preventing SQL Injection by separating data from commands.
 \end{enumerate}
@@ -334,7 +334,7 @@ From an academic perspective, this research makes three primary contributions:
 
 \textbf{First}, the proposal of the SENTINEL architecture---a novel \textit{Dual-Tier Containerized Monolith} that integrates Session-Aware Baselining, Dynamic Delimited Data Encapsulation, Structured MemoryObject, Semantic Cache, and Dual-RAG into a closed-loop system with a real-time Feedback Loop. This architectural composition has not been documented in existing published literature.
 
-\textbf{Second}, empirical validation through comparative experiments on three benchmark datasets (CICIDS2017, UNSW-NB15, MAWILab) using a rigorous 4-configuration Ablation Study and 1,000+ synthetic adversarial scenarios. The evaluation results provide quantitative evidence for the effectiveness of each architectural component.
+\textbf{Second}, empirical validation through comparative experiments on two benchmark datasets (CICIDS2017, UNSW-NB15) using a rigorous 4-configuration Ablation Study and 1,000+ synthetic adversarial scenarios. The evaluation results provide quantitative evidence for the effectiveness of each architectural component.
 
 \textbf{Third}, the establishment of a standardized, reproducible pipeline for LLM-based SOC automation that runs entirely on local hardware (RTX~4060~Ti 16\,GB), demonstrating that enterprise-grade AI security agents do not require cloud API dependence---a critical consideration for organizations with strict data sovereignty requirements.
 
@@ -368,10 +368,7 @@ Moustafa, N. and Slay, J. (2015).
 \newblock UNSW-NB15: A Comprehensive Data Set for Network Intrusion Detection Systems.
 \newblock In {\em Proceedings of MilCIS 2015}.
 
-\bibitem[Fontugne et~al., 2010]{fontugne2010}
-Fontugne, R., Borgnat, P., Abry, P., and Fukuda, K. (2010).
-\newblock MAWILab: Combining Diverse Anomaly Detectors for Automated Anomaly Labeling and Performance Benchmarking.
-\newblock In {\em Proceedings of CoNEXT 2010}.
+
 
 \bibitem[He et~al., 2017]{he2017}
 He, P., Zhu, J., Zheng, Z., and Lyu, M.~R. (2017).

@@ -31,9 +31,9 @@ Tính mới (Novelty) của SENTINEL không nằm ở việc tạo ra thuật to
 Nghiên cứu này xây dựng và đánh giá nguyên mẫu AI Security Agent có khả năng liên kết log đa nguồn theo thời gian thực, tự bảo vệ trước adversarial attacks, và hỗ trợ ra quyết định qua HITL. Các câu hỏi nghiên cứu:
 
 - **RQ1:** Kiến trúc 2-Tier (Rule-based + LLM Agent) với Session-Aware Behavioral Baselining + Semantic Cache tối ưu Reasoning Latency như thế nào so với 1-Tier (LLM-only)?
-- **RQ2:** Cơ chế Delimited Data Encapsulation (Dynamic Randomized Delimiters) có tác động ra sao đến Defeat Rate trước các đòn tấn công Prompt Injection?
+- **RQ2:** Cơ chế Delimited Data Encapsulation (Dynamic Randomized Delimiters) có tác động ra sao đến Defeat Rate trước các đòn tấn công cấu trúc (Delimiter Smuggling & Encoding Bypass), và ngưỡng cơ sở (baseline) an toàn trước đòn tấn công bằng ngôn từ (Semantic Confusion) là gì?
 - **RQ3:** Dual-RAG (MITRE ATT&CK + ISO 27001) cải thiện Context Relevance và hỗ trợ quyết định HITL như thế nào?
-- **RQ4:** Feedback Loop (Agent sinh Dynamic Rules cho Tier 1) giúp hệ thống thích ứng với Zero-day attacks hiệu quả ra sao?
+- **RQ4:** Tích hợp HITL Quarantine vào Feedback Loop có ngăn chặn được rủi ro Adversarial Rule Injection để đảm bảo Agents thích ứng an toàn với Zero-day attacks hay không?
 
 ### 1.4. Scope of the Project
 
@@ -89,7 +89,9 @@ Triết lý: Log data trở thành DATA trong prompt, không phải INSTRUCTION 
 
   Lý do: Summary Memory thuần túy sẽ dẫn đến Semantic Drift — các IOCs chi tiết dần bị làm mờ qua mỗi vòng tóm tắt.
 
-**D. Feedback Loop (Data Flow cụ thể)**
+**D. Feedback Loop (Data Flow với HITL Quarantine chống Adversarial Rule Injection)**
+
+Nếu Agent bị tấn công Prompt Injection thành công và sinh ra một luật độc hại (ví dụ: `Block Admin IP`), việc load thẳng vào Tier 1 sẽ triệt hạ hệ thống. Giải pháp:
 
 ```
 LangGraph Agent xác nhận mẫu tấn công mới
@@ -98,13 +100,16 @@ LangGraph Agent xác nhận mẫu tấn công mới
 feedback_listener.py nhận rule (field, pattern, score)
         │
         ▼
+Tạo Database Record với trạng thái: PENDING_APPROVAL (Quarantine)
+        │
+        ▼
+HITL Dashboard (L3 Manager) phê duyệt (Approve) rule mới
+        │
+        ▼
 Persist vào config/system_settings.yaml → tier1.dynamic_rules[]
         │
         ▼
-RuleEngine.reload_dynamic_rules() (hot-reload)
-        │
-        ▼
-Rule mới áp dụng ngay trong evaluate() tiếp theo
+RuleEngine.reload_dynamic_rules() (hot-reload cho Tier 1)
 ```
 
 **E. Human-in-the-Loop (HITL)**
@@ -153,10 +158,13 @@ CSV Datasets ──▶ Redis Queue ──▶ Tier 1 (Session Baselining + TTL Ev
                        LangGraph Agent (9B)                 │
                        (Structured MemoryObject)            │
                                   │                         │
-                          ┌───────┴───────┐                 │
-                          ▼               ▼                 │
-                    HITL Dashboard   Feedback Loop ──────────┘
-                    (Approve/Reject)  (Dynamic Rule → Tier 1)
+                           ┌───────┴───────┐                 │
+                           ▼               ▼                 │
+                     HITL Dashboard   Feedback Loop ─────────┤
+                    (Approve/Reject)  (Quarantine Pending)   │
+                           │               │                 │
+                           └───────────────┴─────────────────┘
+                                     (Manager Approval)
 ```
 
 ---
@@ -167,11 +175,10 @@ CSV Datasets ──▶ Redis Queue ──▶ Tier 1 (Session Baselining + TTL Ev
 
 Chiến lược **Lab Experiment** + **Adversarial Testing**. Datasets:
 
-1. **CICIDS2017:** Baseline benchmark (DoS, Brute Force). Tuy đã ra mắt nhiều năm, dataset này vẫn được chọn làm trọng tâm vì nó là chuẩn mực phổ biến nhất trong literature SOC hiện tại, cho phép đối chiếu trực tiếp kết quả của SENTINEL với các nghiên cứu trước đó một cách minh bạch (thay vì các dataset nội bộ khó kiểm chứng).
+1. **CICIDS2017:** Baseline benchmark (DoS, Brute Force, Web Attack). Tuy đã ra mắt nhiều năm, dataset này vẫn được chọn làm trọng tâm vì là chuẩn mực phổ biến nhất trong literature SOC. Để chứng minh khả năng **liên kết log đa nguồn (Multi-source Correlation)**, các luồng traffic khác nhau trong CICIDS2017 sẽ được giả lập và tách thành các file log riêng biệt ở quá trình tiền xử lý (ví dụ: tách HTTP traffic thành Apache Web Logs, và các kết nối khác thành Firewall/Zeek Logs).
 2. **UNSW-NB15:** Thử nghiệm tấn công đa hình, phân tán.
-3. **MAWILab:** Packet traffic được tiền xử lý thành dạng CSV tabular nhằm thử nghiệm khả năng Log Correlation đa nguồn.
 
-**Synthetic Adversarial Generation:** Dùng Gemma 26B sinh 1,000+ kịch bản Log Injection gồm 4 loại: Direct Injection, Indirect Injection, Encoding Bypass, Context Manipulation.
+**Synthetic Adversarial Generation:** Dùng Gemma 26B sinh 1,000+ kịch bản Log Injection gồm 4 loại: Direct Injection, Indirect Injection, Encoding Bypass, và **Semantic Confusion**.
 
 ### 3.2. Ablation Study Design
 
@@ -218,10 +225,11 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 
 1. **Classification Metrics:** Precision, Recall, F1-Score trên 3 datasets. So sánh 4 cấu hình Ablation.
 2. **Operational Metrics:** Reasoning Latency (sec/incident), bao gồm cả Embedding Latency. Semantic Cache Hit Rate được đo để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier vs 1-Tier.
-3. **Robustness Metrics:** Guardrail Defeat Rate qua 1,000+ adversarial samples, phân loại 4 vector: Direct Injection, Indirect Injection, Encoding Bypass, Context Manipulation. So sánh Full Encapsulation vs No Encapsulation (Baseline C).
-4. **Context Quality Metrics:** Đánh giá bằng phương pháp kép:
-   - **RAGAS (200 mẫu Ground Truth tĩnh):** Trích xuất 200 sự cố đại diện từ 3 datasets, gán nhãn thủ công (expected MITRE technique, ISO control, action). Tính Context Precision + Answer Relevancy.
-   - **LLM-as-a-Judge (toàn bộ dataset, không cần GT):** Dùng **Gemma 26B làm Oracle Model** (trọng tài độc lập) chấm điểm Context Relevance (thang 1-5) theo phương pháp Zheng et al. (2023). **Không dùng cùng model với Primary Agent (9B) để tránh Confirmation Bias / Self-Evaluation Bias** — model có xu hướng đánh giá cao chính cách hành văn của nó. Chạy tuần tự (unload 9B → load 26B) do giới hạn VRAM.
+3. **Robustness Metrics:** Guardrail Defeat Rate qua 1,000+ adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
+4. **Context Quality Metrics & Eval Scoping:**
+   - **Tối ưu VRAM Eval (Stratified Sampling):** Chạy code Python của Tier 1 trên toàn bộ ~2.8 triệu bản ghi CICIDS2017 để đánh giá Routing/Latencies. Tuy nhiên, tầng đánh giá LLM-as-a-Judge bằng Oracle 26B sẽ chỉ chạy trên một **mẫu phân tầng (Stratified Sample) gồm 5,000 sự kiện đại diện** (chứa tỷ lệ chuẩn mực cho cả 14 họ tấn công) thay vì toàn bộ dataset để khả thi về thời gian chạy trên tài nguyên RTX 4060 Ti 16GB.
+   - **RAGAS (200 mẫu Ground Truth tĩnh):** Tính Context Precision + Answer Relevancy.
+   - **LLM-as-a-Judge (Oracle Evaluation):** Dùng **Gemma 26B làm Oracle Model** (trọng tài độc lập) chấm điểm Context Relevance (thang 1-5) theo phương pháp Zheng et al. (2023) trên 5,000 log phân tầng. Mọi phân tích bằng 26B tách rời khỏi model Agent chính (9B) để tránh Self-Evaluation Bias.
    - Compression Ratio của Semantic Pruning.
 
 ---
@@ -230,7 +238,6 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 
 1. Sharafaldin et al. (2018) — CICIDS2017: Intrusion Detection Evaluation Dataset.
 2. Moustafa & Slay (2015) — UNSW-NB15: Network IDS Dataset.
-3. Fontugne et al. (2010) — MAWILab: Combining Diverse Anomaly Detectors.
 4. He et al. (2017) — Drain: An Online Log Parsing Approach with Fixed Depth Tree.
 5. OWASP Foundation (2025) — OWASP Top 10 for LLM Applications.
 6. MITRE Corporation — MITRE ATT&CK Framework & MITRE ATLAS.
