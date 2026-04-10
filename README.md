@@ -8,22 +8,22 @@ Autonomous AI Security Agent (IDS/SOAR) utilizing LangGraph, Dual-RAG, and Adver
 
 SENTINEL uses a **2-Tier Funneling Architecture** with strict **Separation of Concerns**:
 
-```
-CSV Dataset ──▶ Redis ──▶ Tier 1 (Session Baselining) ──▶ Template Miner ──▶ Prompt Filter ──▶ LangGraph ──▶ HITL
-                             │         ▲                   (Compression)   (Encapsulation)     Agent       Dashboard
-                             │         │                                                         │
-                             │         └─────────── Feedback Loop (Dynamic Rules) ◀──────────────┘
-                             ▼
-                        DROP (Clean)
+```text
+CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner → Prompt Filter → Semantic Cache → FAISS RAG → Agent(9B) → HITL
+                                 │         ▲                (Compression)   (Dyn.Delimiters)  (Cache Hit?)    (Dual-RAG)                 Dashboard
+                                 │         └──────────────── Feedback Loop (Dynamic Rules) ◀────────────────────────────┘
+                                 ▼
+                            DROP (Clean)
 ```
 
-**Tier 1 (Speed Layer):** Session-Aware Behavioral Baselining — tracks per-IP behavior, escalates on statistical deviation. No random sampling (preserves APT kill-chain).
+**Tier 1 (Speed Layer):** Session-Aware Behavioral Baselining + TTL eviction. No random sampling.
 
 **Guardrails (Two separate modules):**
-- `template_miner.py` — Volume Compression ONLY (Drain3). Variables preserved.
-- `prompt_filter.py` — Injection Defense ONLY (Delimited Data Encapsulation).
 
-**Tier 2 (Intelligence Layer):** LangGraph Agent with Dual-RAG (MITRE ATT&CK + ISO 27001) powered by local Gemma 26B LLM.
+- `template_miner.py` — Volume Compression ONLY (Drain3). Variables preserved.
+- `prompt_filter.py` — Injection Defense ONLY (Dynamic Randomized Delimiters).
+
+**Tier 2 (Intelligence Layer):** LangGraph Agent (Gemma 2 9B Q6_K) + Semantic Cache + Dual-RAG (MITRE ATT&CK + ISO 27001). Gemma 26B as Oracle Judge for evaluation.
 
 ## Key Features
 
@@ -35,14 +35,29 @@ CSV Dataset ──▶ Redis ──▶ Tier 1 (Session Baselining) ──▶ Temp
 - Purpose: Fit data into Context Window. Does NOT defend against injection.
 
 **Injection Defense (`prompt_filter.py`):**
+
 - **Pattern Detection:** Flags known injection strings. Does NOT redact (preserves evidence).
 - **Encoding Neutralization:** Defeats Base64/Hex/Unicode bypass tricks.
-- **Delimited Data Encapsulation:** Wraps all log data inside `<<<SENTINEL_LOG_DATA_BEGIN>>>` delimiters. System prompt instructs LLM to treat delimited content as DATA, not INSTRUCTION. Analogous to Parameterized Queries preventing SQL Injection.
+- **Dynamic Randomized Delimiters:** Each request generates a new delimiter using `secrets.token_hex()`. Attacker cannot predict the hash → prevents Delimiter Smuggling. Raw data sanitized before encapsulation.
 
 ### Session Baselining (replaces Random Sampling)
+
 - Tier 1 maintains behavioral profile per Source IP (request count, unique ports, packet volume).
 - Escalates on **statistical deviation**, not random chance.
 - 100% of traffic is baselined — APT kill-chain evidence is never destroyed.
+- **TTL Eviction:** Inactive IPs auto-purged after 600s — prevents RAM OOM on large datasets.
+
+### Semantic Cache (Embedding Latency Optimization)
+
+- LRU + TTL cache for RAG vector queries. Key = template pattern hash.
+- Bypasses embedding + FAISS search for previously-seen attack patterns.
+- Expected hit rate: >90% for DDoS, >80% for Brute Force.
+
+### Data Publisher (CSV → Redis)
+
+- **3 timing modes:** `replay` (real-time), `accelerated` (compressed x50), `burst` (max throughput).
+- **Chunked reading:** Never loads entire CSV into RAM (5,000 rows/chunk).
+- **Backpressure control:** Pauses publishing when Redis queue exceeds depth limit.
 
 ### Feedback Loop (Explicit Data Flow)
 - `LangGraph Agent` → `feedback_listener.py` → `system_settings.yaml` → `RuleEngine.reload_dynamic_rules()`.

@@ -72,6 +72,7 @@ Triết lý: Log data trở thành DATA trong prompt, không phải INSTRUCTION 
 **C. Tier 2 — Intelligence Layer (LangGraph Agent + Dual-RAG)**
 
 - Gom nhóm sự kiện theo [IP + 5-phút window], sử dụng Dual-RAG ánh xạ vào MITRE ATT&CK và ISO 27001
+- **Semantic Cache (Redis):** Cache vector query results trước FAISS để bypass embedding/query lại các payload trùng lặp. Key = template pattern hash từ LogTemplateMiner. Dự kiến cache hit rate: >90% DDoS, >80% Brute Force.
 - **Structured MemoryObject (chống Semantic Drift):** State của LangGraph chia làm 2 phần tách biệt:
   1. `narrative_summary`: Bối cảnh chung dạng text (LLM được phép tóm tắt)
   2. `extracted_iocs`: Mảng JSON cứng lưu IOCs — IP, Port, Hash (LLM CHỈ được APPEND, KHÔNG được tóm tắt đè lên)
@@ -102,15 +103,18 @@ Rule mới áp dụng ngay trong evaluate() tiếp theo
 
 ### 2.2. Software Architecture
 
-Kiến trúc Containerized Modular Architecture (Docker). ***Primary LLM: Gemma 2 9B Q6_K*** (~7GB VRAM) qua Oobabooga API trên RTX 4060 Ti 16GB VRAM, 32GB RAM. Chọn 9B thay vì 26B vì:
-- Gemma 26B Q4_K_M chiếm ~15GB VRAM → chỉ còn 0.5-1.5GB cho KV Cache → CUDA OOM khi load System Prompt + RAG + Memory + Logs cùng lúc
-- Gemma 2 9B Q6_K chiếm ~7GB VRAM → còn 9GB cho KV Cache → xử lý mượt mà toàn bộ pipeline
-- Gemma 26B được giữ lại như optional heavy model cho Ablation Study so sánh chất lượng suy luận
+Kiến trúc Containerized Modular Architecture (Docker).
+
+- **Primary Agent LLM:** Gemma 2 9B Q6_K (~7GB VRAM) — xử lý suy luận và phân tích log.
+- **Oracle Judge LLM:** Gemma 26B Q4_K_M (~15GB VRAM) — chấm điểm Context Quality (LLM-as-a-Judge). **Không** dùng cùng model với Agent để tránh Confirmation Bias.
+- **Ablation:** 26B cũng dùng để so sánh chất lượng suy luận (batch_size=1, short context).
+
+VRAM Budget: RTX 4060 Ti 16GB. Chạy 9B (primary) + 26B (judge) tuần tự, không song song. Config trung tâm: `system_settings.yaml`. MLflow tracking tự động.
 
 ### 2.3. Data Flow Diagram
 
-```
-CSV Datasets ──▶ Redis Queue ──▶ Tier 1 (Session Baselining)
+```text
+CSV Datasets ──▶ Redis Queue ──▶ Tier 1 (Session Baselining + TTL Eviction)
                                    │
                           ┌────────┼────────────────────────┐
                           │        │                        │
@@ -123,12 +127,21 @@ CSV Datasets ──▶ Redis Queue ──▶ Tier 1 (Session Baselining)
                                   │                         │
                                   ▼                         │
                        prompt_filter.py                     │
-                       (Injection Defense:                  │
+                       (Dynamic Delimiters +                │
                         Detect → Neutralize → Encapsulate)  │
                                   │                         │
                                   ▼                         │
-                       LangGraph Agent                      │
-                       (Dual-RAG + Reasoning)               │
+                       Semantic Cache (Redis)               │
+                       (Bypass embedding cho                │
+                        payload trùng lặp)                   │
+                                  │                         │
+                                  ▼                         │
+                       Dual-RAG (FAISS)                     │
+                       (MITRE ATT&CK + ISO 27001)           │
+                                  │                         │
+                                  ▼                         │
+                       LangGraph Agent (9B)                 │
+                       (Structured MemoryObject)            │
                                   │                         │
                           ┌───────┴───────┐                 │
                           ▼               ▼                 │
@@ -198,7 +211,7 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 3. **Robustness Metrics:** Guardrail Defeat Rate qua 1,000+ adversarial samples, phân loại 4 vector: Direct Injection, Indirect Injection, Encoding Bypass, Context Manipulation. So sánh Full Encapsulation vs No Encapsulation (Baseline C).
 4. **Context Quality Metrics:** Đánh giá bằng phương pháp kép:
    - **RAGAS (200 mẫu Ground Truth tĩnh):** Trích xuất 200 sự cố đại diện từ 3 datasets, gán nhãn thủ công (expected MITRE technique, ISO control, action). Tính Context Precision + Answer Relevancy.
-   - **LLM-as-a-Judge (toàn bộ dataset, không cần GT):** Dùng Gemma 9B làm trọng tài độc lập chấm điểm Context Relevance (thang 1-5) theo phương pháp Zheng et al. (2023). Đảm bảo không cần gán nhãn thủ công cho toàn bộ dataset.
+   - **LLM-as-a-Judge (toàn bộ dataset, không cần GT):** Dùng **Gemma 26B làm Oracle Model** (trọng tài độc lập) chấm điểm Context Relevance (thang 1-5) theo phương pháp Zheng et al. (2023). **Không dùng cùng model với Primary Agent (9B) để tránh Confirmation Bias / Self-Evaluation Bias** — model có xu hướng đánh giá cao chính cách hành văn của nó. Chạy tuần tự (unload 9B → load 26B) do giới hạn VRAM.
    - Compression Ratio của Semantic Pruning.
 
 ---
