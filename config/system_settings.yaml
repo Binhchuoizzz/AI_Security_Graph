@@ -6,12 +6,21 @@
 # =============================================================
 
 # --- LLM Configuration ---
+# PRIMARY MODEL: Gemma 2 9B Q6_K (~7GB VRAM) → Stable, leaves 9GB for KV Cache
+# REASON: Gemma 26B Q4 (~15GB VRAM) chỉ chừa 0.5-1.5GB cho KV Cache
+#   → CUDA OOM ngay từ inference round 2-3 khi load System Prompt + RAG + Memory + Logs
+#   → Chuyển sang 9B để đảm bảo stability + chứng minh Latency sòng phẳng
+# OPTIONAL HEAVY: Gemma 26B Q4_K_M cho benchmark so sánh (batch_size=1, short context)
 llm:
   base_url: "http://host.docker.internal:5000/v1"
-  model_name: "gemma-4-26B-A4B-it-UD-Q4_K_M"
+  # Primary (stable, recommended)
+  model_name: "gemma-2-9b-it-Q6_K"
+  # Alternative heavy model (for ablation study comparison only)
+  # model_name: "gemma-4-26B-A4B-it-UD-Q4_K_M"
   max_context_tokens: 8192
   temperature: 0.1
   request_timeout_seconds: 120
+  estimated_vram_gb: 7           # Primary: ~7GB, Heavy: ~15GB
 
 # --- Tier 1 Filter (Session-Aware Behavioral Baselining) ---
 # LƯU Ý: KHÔNG dùng Random Sampling (phá hủy kill-chain APT).
@@ -71,6 +80,14 @@ rag:
 correlation:
   time_window_minutes: 5
   min_events_to_correlate: 3
+
+# --- Agent Memory (Structured MemoryObject — chống Semantic Drift) ---
+agent:
+  memory:
+    max_iocs: 100                # Giới hạn IOC registry (append-only, FIFO khi vượt)
+    max_iocs_in_prompt: 20       # Số IOC đưa vào prompt (tiết kiệm token)
+    max_narrative_tokens: 500    # Token budget cho narrative_summary
+    max_decisions_in_prompt: 3   # Số quyết định gần nhất đưa vào prompt
 
 # --- Redis Streaming ---
 redis:

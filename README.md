@@ -157,10 +157,11 @@ SENTINEL is evaluated across 4 dimensions, not just classification accuracy:
 
 | Layer | Technology |
 |---|---|
-| LLM | Gemma 26B Q4_K_M (Local, Oobabooga API) |
-| Agent Framework | LangGraph |
-| RAG | Sentence-Transformers + FAISS |
-| Guardrails | Drain3 + Custom Entropy/Token Budget |
+| LLM (Primary) | Gemma 2 9B Q6_K (~7GB VRAM, Local via Oobabooga API) |
+| LLM (Ablation) | Gemma 26B Q4_K_M (optional, for quality comparison) |
+| Agent Framework | LangGraph (Structured MemoryObject with IOC Registry) |
+| RAG | Sentence-Transformers + FAISS (Dual: MITRE ATT&CK + ISO 27001) |
+| Guardrails | Drain3 (compression) + Dynamic Delimiters (injection defense) |
 | Streaming | Redis |
 | Dashboard | Streamlit + streamlit-authenticator |
 | MLOps | Docker Compose + MLflow |
@@ -186,12 +187,14 @@ docker-compose up --build
 
 ## Hardware Requirements
 
-| Component | Minimum |
-|---|---|
-| GPU | NVIDIA RTX 4060 Ti 16GB VRAM (or equivalent) |
-| RAM | 32GB |
-| Storage | 50GB SSD |
-| OS | Ubuntu 22.04+ |
+| Component | Minimum | VRAM Usage |
+|---|---|---|
+| GPU | NVIDIA RTX 4060 Ti 16GB VRAM | ~7GB model + ~9GB KV Cache |
+| RAM | 32GB | |
+| Storage | 50GB SSD | |
+| OS | Ubuntu 22.04+ | |
+
+> **Why 9B instead of 26B?** Gemma 26B Q4 uses ~15GB VRAM, leaving only 0.5-1.5GB for KV Cache → CUDA OOM when loading System Prompt + RAG + Memory + Logs simultaneously. Gemma 2 9B Q6 uses ~7GB, leaving 9GB — sufficient for the full SENTINEL pipeline.
 
 ## License
 
