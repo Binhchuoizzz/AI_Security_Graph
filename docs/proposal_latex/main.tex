@@ -245,7 +245,7 @@ Audit & SQLite \\
     \item \textbf{UNSW-NB15} \citep{moustafa2015}: Polymorphic and distributed attack scenarios (9 attack families, 49 features).
 \end{enumerate}
 
-\textbf{Synthetic Adversarial Generation:} Gemma~26B generates 1,000+ Log Injection scenarios across four attack vectors: Direct Injection, Indirect Injection, Encoding Bypass, and Semantic Confusion.
+\textbf{Synthetic Adversarial Generation:} Gemma~26B generates 1,000+ Log Injection scenarios across four attack vectors: Direct Injection, Indirect Injection, Encoding Bypass, and Semantic Confusion (\textit{linguistic manipulation through natural language --- attacker embeds malicious intent in grammatically correct, instruction-like prose that bypasses structural filters but influences LLM reasoning}).
 
 \textbf{Schedule (8-Week Realistic Plan):}
 \begin{itemize}
@@ -297,7 +297,7 @@ SENTINEL (Full) & \checkmark & \checkmark\ Full & \checkmark & Complete system \
 The study defines a \textbf{4D Evaluation Framework}:
 
 \begin{enumerate}
-    \item \textbf{Classification Metrics:} Precision, Recall, F1-Score across 3 datasets. Comparison of all 4 Ablation configurations.
+    \item \textbf{Classification Metrics:} Precision, Recall, F1-Score across 2 datasets. Comparison of all 4 Ablation configurations.
     
     \item \textbf{Operational Metrics:} Reasoning Latency (sec/incident), including Embedding Latency. Semantic Cache Hit Rate measured to demonstrate RAG query optimization. Comparison of 2-Tier vs. 1-Tier.
     
@@ -344,7 +344,7 @@ From an academic perspective, this research makes three primary contributions:
 \newpage
 \section{Conclusion}
 
-This study proposes SENTINEL---a Dual-Tier autonomous AI Security Agent architecture that addresses three fundamental challenges in LLM-based SOC automation: reasoning latency, adversarial robustness, and context quality. The architecture integrates Session-Aware Behavioral Baselining with TTL eviction (Tier~1), multi-layered Guardrails with Dynamic Randomized Delimiters (Guardrails Layer), a LangGraph-based reasoning agent with Dual-RAG and Structured MemoryObject (Tier~2), and a real-time Feedback Loop enabling the agent to self-generate detection rules.
+This study proposes SENTINEL---a Dual-Tier autonomous AI Security Agent architecture that addresses three fundamental challenges in LLM-based SOC automation: reasoning latency, adversarial robustness, and context quality. The architecture integrates Session-Aware Behavioral Baselining with TTL eviction (Tier~1), multi-layered Guardrails with Dynamic Randomized Delimiters (Guardrails Layer), a LangGraph-based reasoning agent with Dual-RAG and Structured MemoryObject (Tier~2), and analyst-supervised adaptive rule generation via HITL Quarantine.
 
 The main contributions include: (i)~proposing a novel Dual-Tier architecture with strict Separation of Concerns for LLM-based security agents; (ii)~introducing Dynamic Delimited Data Encapsulation as a defense against Prompt Injection and Delimiter Smuggling; (iii)~designing a dual evaluation methodology (RAGAS + Oracle Model LLM-as-a-Judge) that eliminates Self-Evaluation Bias; and (iv)~providing a fully reproducible, local-hardware implementation suitable for data-sovereign environments.
 

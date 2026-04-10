@@ -178,7 +178,7 @@ Chiến lược **Lab Experiment** + **Adversarial Testing**. Datasets:
 1. **CICIDS2017:** Baseline benchmark (DoS, Brute Force, Web Attack). Tuy đã ra mắt nhiều năm, dataset này vẫn được chọn làm trọng tâm vì là chuẩn mực phổ biến nhất trong literature SOC. Để chứng minh khả năng **liên kết log đa nguồn (Multi-source Correlation)**, các luồng traffic khác nhau trong CICIDS2017 sẽ được giả lập và tách thành các file log riêng biệt ở quá trình tiền xử lý (ví dụ: tách HTTP traffic thành Apache Web Logs, và các kết nối khác thành Firewall/Zeek Logs).
 2. **UNSW-NB15:** Thử nghiệm tấn công đa hình, phân tán.
 
-**Synthetic Adversarial Generation:** Dùng Gemma 26B sinh 1,000+ kịch bản Log Injection gồm 4 loại: Direct Injection, Indirect Injection, Encoding Bypass, và **Semantic Confusion**.
+**Synthetic Adversarial Generation:** Dùng Gemma 26B sinh 1,000+ kịch bản Log Injection gồm 4 loại: Direct Injection, Indirect Injection, Encoding Bypass, và **Semantic Confusion** (thao túng ngôn từ tự nhiên — kẻ tấn công nhúng ý đồ độc hại vào một đoạn văn đúng ngữ pháp, có tính chất như một chỉ thị độc lập để vượt qua các bộ lọc cấu trúc và thao túng suy luận của LLM).
 
 ### 3.2. Ablation Study Design
 
@@ -223,7 +223,7 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 
 **4D Evaluation Framework:**
 
-1. **Classification Metrics:** Precision, Recall, F1-Score trên 3 datasets. So sánh 4 cấu hình Ablation.
+1. **Classification Metrics:** Precision, Recall, F1-Score trên 2 datasets. So sánh 4 cấu hình Ablation.
 2. **Operational Metrics:** Reasoning Latency (sec/incident), bao gồm cả Embedding Latency. Semantic Cache Hit Rate được đo để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier vs 1-Tier.
 3. **Robustness Metrics:** Guardrail Defeat Rate qua 1,000+ adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
 4. **Context Quality Metrics & Eval Scoping:**

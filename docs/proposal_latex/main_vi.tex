@@ -253,7 +253,7 @@ Nhật ký kiểm toán & SQLite \\
     \item \textbf{UNSW-NB15} \citep{moustafa2015}: Kịch bản tấn công đa hình, phân tán (9 họ tấn công, 49 đặc trưng).
 \end{enumerate}
 
-\textbf{Sinh mẫu Adversarial tổng hợp:} Gemma~26B sinh 1.000+ kịch bản Log Injection thuộc 4 loại vector tấn công: Direct Injection, Indirect Injection, Encoding Bypass, và Semantic Confusion.
+\textbf{Sinh mẫu Adversarial tổng hợp:} Gemma~26B sinh 1.000+ kịch bản Log Injection thuộc 4 loại vector tấn công: Direct Injection, Indirect Injection, Encoding Bypass, và Semantic Confusion (\textit{thao túng ngôn từ tự nhiên --- kẻ tấn công nhúng ý đồ độc hại vào một đoạn văn đúng ngữ pháp, có tính chất như một chỉ thị độc lập để vượt qua các bộ lọc cấu trúc và thao túng suy luận của LLM}).
 
 \textbf{Lộ trình (Kế hoạch thực tế 8 tuần):}
 \begin{itemize}
@@ -305,7 +305,7 @@ SENTINEL (Đầy đủ) & $\checkmark$ & $\checkmark$ Đầy đủ & $\checkmark
 Nghiên cứu định nghĩa \textbf{Khung Đánh giá 4 Chiều (4D Evaluation Framework)}:
 
 \begin{enumerate}
-    \item \textbf{Chỉ số Phân loại:} Precision, Recall, F1-Score trên 3 bộ dữ liệu. So sánh 4 cấu hình Ablation.
+    \item \textbf{Chỉ số Phân loại:} Precision, Recall, F1-Score trên 2 bộ dữ liệu. So sánh 4 cấu hình Ablation.
     
     \item \textbf{Chỉ số Vận hành:} Reasoning Latency (giây/sự cố), bao gồm Embedding Latency. Tỷ lệ Cache Hit của Semantic Cache để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier với 1-Tier.
     
@@ -352,7 +352,7 @@ Từ góc độ học thuật, nghiên cứu đóng góp ba điểm chính:
 \newpage
 \section{Kết luận}
 
-Nghiên cứu này đề xuất SENTINEL --- kiến trúc AI Security Agent tự trị 2 tầng giải quyết ba thách thức cốt lõi trong tự động hóa SOC dựa trên LLM: độ trễ suy luận, kháng tấn công adversarial, và chất lượng ngữ cảnh. Kiến trúc tích hợp Session-Aware Behavioral Baselining với TTL eviction (Tier~1), Guardrails đa tầng với Dynamic Randomized Delimiters (tầng Guardrails), LangGraph Agent với Dual-RAG và Structured MemoryObject (Tier~2), cùng Feedback Loop thời gian thực cho phép agent tự sinh detection rule.
+Nghiên cứu này đề xuất SENTINEL --- kiến trúc AI Security Agent tự trị 2 tầng giải quyết ba thách thức cốt lõi trong tự động hóa SOC dựa trên LLM: độ trễ suy luận, kháng tấn công adversarial, và chất lượng ngữ cảnh. Kiến trúc tích hợp Session-Aware Behavioral Baselining với TTL eviction (Tier~1), Guardrails đa tầng với Dynamic Randomized Delimiters (tầng Guardrails), LangGraph Agent với Dual-RAG và Structured MemoryObject (Tier~2), cùng cơ chế sinh quy tắc thích ứng có sự giám sát của phân tích viên thông qua HITL Quarantine.
 
 Các đóng góp chính bao gồm: (i)~đề xuất kiến trúc Dual-Tier với Separation of Concerns nghiêm ngặt cho LLM-based security agents; (ii)~giới thiệu Dynamic Delimited Data Encapsulation phòng thủ Prompt Injection và Delimiter Smuggling; (iii)~thiết kế phương pháp đánh giá kép (RAGAS + Oracle Model LLM-as-a-Judge) loại bỏ Self-Evaluation Bias; và (iv)~cung cấp triển khai hoàn chỉnh, tái tạo được trên phần cứng cục bộ, phù hợp cho môi trường có yêu cầu chủ quyền dữ liệu.
 
