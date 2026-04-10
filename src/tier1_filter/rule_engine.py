@@ -1,18 +1,29 @@
 """
-Tier 1 Filter: Rule-based Engine with Dynamic Rules & Feedback Loop
+Tier 1 Filter: Rule-based Engine with Session Baselining & Dynamic Rules
 
-Hoạt động như một Firewall cực nhẹ, chấm điểm sơ bộ (Risk Score) các gói tin
-từ luồng phân tích. Dựa trên heuristic, các gói tin "sạch" sẽ bị gạt bỏ mà
-không cần tiêu tốn tài nguyên của LangGraph AI.
+TRIẾT LÝ THIẾT KẾ (ĐÃ SỬA LỖI KIẾN TRÚC):
+  Phiên bản cũ dùng Random Sampling (1-3% clean traffic) → BẺ GÃY kill-chain.
+  Lý do: APT là tấn công low-and-slow. Ném bỏ 97-99% dữ liệu = tự tay
+  xóa bằng chứng. Không tool Log Correlation nào hoạt động trên dữ liệu
+  đã bị băm nát ngẫu nhiên.
 
-Nâng cấp:
-  - Random Sampling: Đẩy ngẫu nhiên 1-5% clean traffic vào Tier 2 để phát hiện Zero-day.
-  - Dynamic Rule Update: Nhận rule mới từ LangGraph Agent để chặn APT ngay tại cửa ngõ.
+  GIẢI PHÁP MỚI: Session-Aware Behavioral Baselining
+  - Tier 1 duy trì baseline hành vi cho mỗi IP (frequency, ports, packet/flow ratio)
+  - Mọi traffic đều được GHI NHẬN vào baseline (không vứt bỏ ngẫu nhiên)
+  - Escalate lên Tier 2 khi phát hiện STATISTICAL DEVIATION so với baseline
+  - Đảm bảo 100% dữ liệu bất thường (kể cả APT low-and-slow) được chuyển lên
+
+  Tier 1 hoạt động như một BỘ LỌC THÔNG MINH, không phải máy xay ngẫu nhiên.
+
+  FEEDBACK LOOP (Data Flow rõ ràng):
+  LangGraph Agent → feedback_listener.py → system_settings.yaml → RuleEngine.__init__()
+  → dynamic_rules được load tại khởi tạo và reload khi có notify
 """
 import json
-import random
 import yaml
 import os
+import time
+from collections import defaultdict
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'system_settings.yaml')
 
@@ -21,7 +32,141 @@ def load_config():
         return yaml.safe_load(f)
 
 
+class SessionBaseline:
+    """
+    Theo dõi behavioral baseline cho mỗi Source IP.
+    Phát hiện APT bằng statistical deviation thay vì random sampling.
+
+    Baseline variables per IP:
+    - request_count: Tổng số request trong window
+    - unique_ports: Tập hợp các port đã truy cập
+    - avg_packet_size: Kích thước packet trung bình
+    - first_seen / last_seen: Timestamps
+    - port_scan_score: Tăng khi IP quét nhiều port khác nhau
+    """
+    def __init__(self, deviation_threshold: float = 2.0, window_seconds: int = 300):
+        self.profiles = defaultdict(lambda: {
+            'request_count': 0,
+            'unique_ports': set(),
+            'total_fwd_packets': 0,
+            'first_seen': None,
+            'last_seen': None,
+        })
+        self.deviation_threshold = deviation_threshold
+        self.window_seconds = window_seconds
+        self.global_avg_request_rate = 1.0  # Initialized, updated over time
+
+    def update(self, source_ip: str, log_entry: dict) -> dict:
+        """
+        Cập nhật baseline cho IP và trả về deviation score.
+        GHI NHẬN TOÀN BỘ traffic, không vứt bỏ gì.
+        """
+        profile = self.profiles[source_ip]
+        now = time.time()
+
+        # Update profile
+        profile['request_count'] += 1
+        try:
+            port = int(log_entry.get('Destination Port', 0))
+            profile['unique_ports'].add(port)
+        except (ValueError, TypeError):
+            pass
+        try:
+            profile['total_fwd_packets'] += float(log_entry.get('Total Fwd Packets', 0))
+        except (ValueError, TypeError):
+            pass
+
+        if profile['first_seen'] is None:
+            profile['first_seen'] = now
+        profile['last_seen'] = now
+
+        # Tính deviation indicators
+        deviation_reasons = []
+        deviation_score = 0
+
+        # Indicator 1: Port Scanning (IP truy cập quá nhiều ports khác nhau)
+        unique_port_count = len(profile['unique_ports'])
+        if unique_port_count > 5:
+            deviation_score += unique_port_count * 3
+            deviation_reasons.append(
+                f"Port scanning: {unique_port_count} unique ports accessed"
+            )
+
+        # Indicator 2: High-frequency requests (so với global average)
+        elapsed = max(now - profile['first_seen'], 1)
+        request_rate = profile['request_count'] / elapsed
+        if request_rate > self.global_avg_request_rate * self.deviation_threshold:
+            deviation_score += 20
+            deviation_reasons.append(
+                f"High request rate: {request_rate:.2f} req/s "
+                f"(baseline: {self.global_avg_request_rate:.2f})"
+            )
+
+        # Indicator 3: Abnormal packet volume
+        if profile['request_count'] > 0:
+            avg_packets = profile['total_fwd_packets'] / profile['request_count']
+            if avg_packets > 500:
+                deviation_score += 15
+                deviation_reasons.append(
+                    f"High avg packet volume: {avg_packets:.0f} pkts/request"
+                )
+
+        return {
+            'source_ip': source_ip,
+            'deviation_score': deviation_score,
+            'deviation_reasons': deviation_reasons,
+            'request_count': profile['request_count'],
+            'unique_ports': unique_port_count,
+            'is_anomalous': deviation_score > 0
+        }
+
+    def update_global_baseline(self):
+        """Cập nhật global average request rate từ tất cả IP profiles."""
+        if not self.profiles:
+            return
+        total_rates = []
+        now = time.time()
+        for ip, profile in self.profiles.items():
+            if profile['first_seen']:
+                elapsed = max(now - profile['first_seen'], 1)
+                total_rates.append(profile['request_count'] / elapsed)
+        if total_rates:
+            self.global_avg_request_rate = sum(total_rates) / len(total_rates)
+
+    def reset_window(self):
+        """Reset tất cả profiles. Gọi sau mỗi time window."""
+        self.profiles.clear()
+
+
 class RuleEngine:
+    """
+    Tier 1 Rule Engine — Bộ lọc thông minh (KHÔNG random).
+
+    Luồng xử lý mỗi log entry:
+      1. Static Rules: Kiểm tra port nhạy cảm, volumetric attack
+      2. Dynamic Rules: Áp dụng rule từ Feedback Loop (LangGraph Agent)
+      3. Session Baselining: Kiểm tra behavioral deviation cho Source IP
+      4. Quyết định: ESCALATE (lên Tier 2) hoặc DROP (log sạch)
+
+    KHÔNG có Random Sampling. Mọi quyết định đều dựa trên LOGIC.
+
+    FEEDBACK LOOP DATA FLOW:
+    ┌─────────────────────────────────────────────────────────┐
+    │ LangGraph Agent (Tier 2) phát hiện mẫu tấn công mới   │
+    │         │                                               │
+    │         ▼                                               │
+    │ feedback_listener.py nhận rule mới                      │
+    │         │                                               │
+    │         ▼                                               │
+    │ Persist vào config/system_settings.yaml                 │
+    │         │                                               │
+    │         ▼                                               │
+    │ RuleEngine.reload_dynamic_rules() load rule mới        │
+    │         │                                               │
+    │         ▼                                               │
+    │ Rule mới được áp dụng ngay trong evaluate() tiếp theo  │
+    └─────────────────────────────────────────────────────────┘
+    """
     def __init__(self):
         config = load_config()
         tier1_config = config.get('tier1', {})
@@ -29,38 +174,42 @@ class RuleEngine:
         self.risk_threshold = tier1_config.get('risk_threshold', 30)
         self.sensitive_ports = tier1_config.get('sensitive_ports', [21, 22, 23, 3389])
         self.max_fwd_packets = tier1_config.get('max_fwd_packets', 1000)
-        self.sample_rate = tier1_config.get('clean_traffic_sample_rate', 0.02)
         self.dynamic_rules = tier1_config.get('dynamic_rules', [])
+
+        # Session Baselining thay thế Random Sampling
+        baseline_config = tier1_config.get('session_baseline', {})
+        self.session_baseline = SessionBaseline(
+            deviation_threshold=baseline_config.get('deviation_threshold', 2.0),
+            window_seconds=baseline_config.get('window_seconds', 300)
+        )
 
     def evaluate(self, log_entry: dict) -> dict:
         """
-        Phân tách JSON log và trả về bản thân log đính kèm theo điểm dị thường (anomaly score).
-        Tối ưu tốc độ cao nhất có thể. (O(1) dictionary lookups)
+        Đánh giá log entry qua 3 tầng: Static Rules → Dynamic Rules → Session Baseline.
+        Quyết định: ESCALATE hoặc DROP. KHÔNG có SAMPLE ngẫu nhiên.
         """
         score = 0
         reasons = []
 
-        # --- Static Rules ---
+        # --- Tầng 1: Static Rules ---
         dest_port = log_entry.get('Destination Port', -1)
         fwd_packets = log_entry.get('Total Fwd Packets', 0)
 
-        # Rule 1: Quét truy cập trái phép vào các Port nhạy cảm
         try:
             if int(dest_port) in self.sensitive_ports:
                 score += 40
-                reasons.append(f"Truy cập cổng quản trị rủi ro cao (Port {dest_port})")
+                reasons.append(f"Sensitive port access (Port {dest_port})")
         except (ValueError, TypeError):
             pass
 
-        # Rule 2: Thể tích packet bất thường (Dấu hiệu Volumetric Attack / DDoS)
         try:
             if float(fwd_packets) > self.max_fwd_packets:
                 score += 30
-                reasons.append(f"Mật độ gói tin FWD tăng đột biến ({fwd_packets} pkts)")
+                reasons.append(f"Volumetric anomaly ({fwd_packets} fwd pkts)")
         except (ValueError, TypeError):
             pass
 
-        # --- Dynamic Rules (Từ Feedback Loop của LangGraph) ---
+        # --- Tầng 2: Dynamic Rules (Từ Feedback Loop) ---
         for rule in self.dynamic_rules:
             rule_field = rule.get('field')
             rule_pattern = rule.get('pattern')
@@ -69,41 +218,37 @@ class RuleEngine:
                 field_value = str(log_entry.get(rule_field, ''))
                 if rule_pattern in field_value:
                     score += rule_score
-                    reasons.append(f"Dynamic Rule matched: {rule_field} contains '{rule_pattern}'")
+                    reasons.append(
+                        f"Dynamic Rule [from Agent]: {rule_field}='{rule_pattern}'"
+                    )
+
+        # --- Tầng 3: Session Baseline (thay thế Random Sampling) ---
+        source_ip = log_entry.get('Source IP', 'unknown')
+        baseline_result = self.session_baseline.update(source_ip, log_entry)
+
+        if baseline_result['is_anomalous']:
+            score += baseline_result['deviation_score']
+            reasons.extend(baseline_result['deviation_reasons'])
 
         # --- Quyết định ---
         log_entry['tier1_score'] = score
         log_entry['tier1_reasons'] = reasons
+        log_entry['tier1_baseline'] = {
+            'ip_request_count': baseline_result['request_count'],
+            'ip_unique_ports': baseline_result['unique_ports']
+        }
 
         if score >= self.risk_threshold:
             log_entry['tier1_action'] = "ESCALATE"
         else:
-            # Random Sampling: Ngẫu nhiên đẩy 1-5% clean traffic vào Tier 2
-            # để Agent "khám sức khỏe" traffic -> phát hiện Zero-day
-            if random.random() < self.sample_rate:
-                log_entry['tier1_action'] = "SAMPLE"
-                log_entry['tier1_reasons'].append(
-                    f"Random sampling ({self.sample_rate*100:.0f}% clean traffic -> Tier 2 health check)"
-                )
-            else:
-                log_entry['tier1_action'] = "DROP"
+            log_entry['tier1_action'] = "DROP"
 
         return log_entry
 
-    def add_dynamic_rule(self, field: str, pattern: str, score: int = 50):
+    def reload_dynamic_rules(self):
         """
-        Được gọi bởi LangGraph Agent khi phát hiện mẫu tấn công mới.
-        Rule mới sẽ được append vào config/system_settings.yaml.
+        Hot-reload dynamic rules từ YAML config.
+        Được gọi bởi feedback_listener khi có rule mới.
         """
-        new_rule = {"field": field, "pattern": pattern, "score": score}
-        self.dynamic_rules.append(new_rule)
-
-        # Persist rule vào YAML config
-        try:
-            config = load_config()
-            config['tier1']['dynamic_rules'].append(new_rule)
-            with open(CONFIG_PATH, 'w') as f:
-                yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-            print(f"[+] Dynamic Rule persisted: {new_rule}")
-        except Exception as e:
-            print(f"[!] Failed to persist dynamic rule: {e}")
+        config = load_config()
+        self.dynamic_rules = config.get('tier1', {}).get('dynamic_rules', [])

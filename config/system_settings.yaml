@@ -1,35 +1,42 @@
 # =============================================================
-# AI Security Agent - System Settings (Central Configuration)
+# SENTINEL Framework - System Settings (Central Configuration)
 # =============================================================
-# File này là "bộ não trung tâm" cấu hình toàn bộ tham số
-# của hệ thống. Mọi module đều đọc config từ đây.
+# Mọi module đều đọc config từ file này.
+# Version: 2.0 (Post-Architecture Review)
 # =============================================================
 
 # --- LLM Configuration ---
 llm:
   base_url: "http://host.docker.internal:5000/v1"
   model_name: "gemma-4-26B-A4B-it-UD-Q4_K_M"
-  max_context_tokens: 8192       # Context window tối đa của model
-  temperature: 0.1               # Giữ thấp để output ổn định (deterministic)
+  max_context_tokens: 8192
+  temperature: 0.1
   request_timeout_seconds: 120
 
-# --- Tier 1 Filter ---
+# --- Tier 1 Filter (Session-Aware Behavioral Baselining) ---
+# LƯU Ý: KHÔNG dùng Random Sampling (phá hủy kill-chain APT).
+# Thay bằng Session Baselining — quyết định dựa trên logic, không random.
 tier1:
-  risk_threshold: 30             # Ngưỡng điểm để ESCALATE lên Tier 2
+  risk_threshold: 30
   sensitive_ports: [21, 22, 23, 3389, 445, 1433, 3306, 5432]
-  max_fwd_packets: 1000          # Ngưỡng volumetric attack
-  # Feedback Loop: Lấy mẫu ngẫu nhiên traffic sạch để Agent khám định kỳ
-  clean_traffic_sample_rate: 0.02  # 2% clean traffic sẽ được đẩy vào Tier 2
-  # Dynamic Rules: Các rule được Agent tự động sinh ra sẽ append vào đây
+  max_fwd_packets: 1000
+  # Session Baseline (thay thế random sampling)
+  session_baseline:
+    deviation_threshold: 2.0     # Bao nhiêu lần std dev thì coi là anomaly
+    window_seconds: 300          # Time window cho baseline (5 phút)
+  # Dynamic Rules: Agent tự sinh rule → feedback_listener.py → persist tại đây
+  # Data Flow: LangGraph Agent → feedback_listener.py → YAML → RuleEngine.reload()
   dynamic_rules: []
 
-# --- Guardrails (Semantic Pruning & Token Budgeting) ---
+# --- Guardrails ---
+# PHÂN TÁCH RÕ TRÁCH NHIỆM:
+#   template_miner.py: CHỈ nén volume (Drain3 compression)
+#   prompt_filter.py:  CHỈ phòng thủ injection (Delimited Encapsulation)
+#   Hai module này TÁCH BIỆT, không lẫn lộn chức năng.
 guardrails:
-  # Token Budget: Ngân sách token tối đa dành cho dữ liệu log trong prompt
+  # Token Budget cho dữ liệu log trong prompt
   token_budget: 4000
-  # Top-K Sampling: Khi vượt ngân sách, chỉ lấy K mẫu quan trọng nhất mỗi Template
-  top_k_samples: 5
-  # Prompt Injection Detection
+  # Prompt Injection Detection (Pattern-based, Tầng 1 của prompt_filter.py)
   injection_patterns:
     - "ignore previous instructions"
     - "you are now"
@@ -39,33 +46,38 @@ guardrails:
     - "DROP TABLE"
     - "UNION SELECT"
     - "; exec"
-  # Entropy threshold: Log có entropy > ngưỡng này được ưu tiên cao (khả năng chứa payload)
+    - "forget everything"
+    - "act as"
+    - "new instructions"
+  # Entropy threshold: Log có entropy > ngưỡng → ưu tiên giữ raw trong Token Budget
+  # (Dùng cho PRIORITIZATION, không dùng cho injection defense)
   entropy_threshold: 4.5
-  # Drain3 Log Template Mining
+  # Drain3 Log Template Mining (CHỈ cho volume compression)
   drain3:
-    depth: 4                     # Độ sâu cây parse
-    similarity_threshold: 0.4    # Ngưỡng similarity để gom template
-    max_clusters: 100            # Số lượng template tối đa
+    depth: 4
+    similarity_threshold: 0.4
+    max_clusters: 100
+    max_samples_per_template: 3  # Giữ 3 sample GỐC (bao gồm cả injection payload)
 
 # --- RAG Configuration ---
 rag:
-  embedding_model: "all-MiniLM-L6-v2"    # Model nhúng nhẹ, chạy trên CPU
+  embedding_model: "all-MiniLM-L6-v2"
   faiss_index_path: "knowledge_base/faiss_index"
   mitre_attack_path: "knowledge_base/mitre_attack.json"
   iso_27001_path: "knowledge_base/iso_27001_controls.json"
-  top_k_results: 3              # Số lượng document trả về từ FAISS
+  top_k_results: 3
 
 # --- Correlation Engine ---
 correlation:
-  time_window_minutes: 5        # Khung thời gian gom nhóm sự kiện theo IP
-  min_events_to_correlate: 3    # Số sự kiện tối thiểu để kích hoạt correlation
+  time_window_minutes: 5
+  min_events_to_correlate: 3
 
 # --- Redis Streaming ---
 redis:
   url: "redis://localhost:6379/0"
   queue_name: "security_logs_stream"
-  escalated_queue: "escalated_logs"  # Queue riêng cho log đã qua Tier 1
-  publisher_delay_seconds: 0.5       # Độ trễ giữa các dòng log khi publish
+  escalated_queue: "escalated_logs"
+  publisher_delay_seconds: 0.5
 
 # --- HITL Dashboard ---
 dashboard:
@@ -75,7 +87,7 @@ dashboard:
 # --- MLflow Tracking ---
 mlflow:
   tracking_uri: "http://localhost:5001"
-  experiment_name: "ai_security_agent"
+  experiment_name: "sentinel_framework"
 
 # --- Logging ---
 logging:

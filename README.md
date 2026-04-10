@@ -6,35 +6,47 @@ Autonomous AI Security Agent (IDS/SOAR) utilizing LangGraph, Dual-RAG, and Adver
 
 ## Architecture Overview
 
-SENTINEL uses a **2-Tier Funneling Architecture** with a **Feedback Loop**, designed as a Containerized Modular system:
+SENTINEL uses a **2-Tier Funneling Architecture** with strict **Separation of Concerns**:
 
 ```
-CSV Dataset ──▶ Redis Queue ──▶ Tier 1 (Rule Engine) ──▶ Guardrails ──▶ LangGraph Agent ──▶ HITL Dashboard
-                                   │         ▲                              │
-                                   │         │                              │
-                                   │         └──── Feedback Loop ◀──────────┘
-                                   │                (Dynamic Rules)
-                                   ▼
-                              DROP (Clean Traffic)
+CSV Dataset ──▶ Redis ──▶ Tier 1 (Session Baselining) ──▶ Template Miner ──▶ Prompt Filter ──▶ LangGraph ──▶ HITL
+                             │         ▲                   (Compression)   (Encapsulation)     Agent       Dashboard
+                             │         │                                                         │
+                             │         └─────────── Feedback Loop (Dynamic Rules) ◀──────────────┘
+                             ▼
+                        DROP (Clean)
 ```
 
-**Tier 1 (Speed Layer):** Rule-based filter with dynamic rules and random sampling (2% clean traffic for Zero-day detection).
+**Tier 1 (Speed Layer):** Session-Aware Behavioral Baselining — tracks per-IP behavior, escalates on statistical deviation. No random sampling (preserves APT kill-chain).
 
-**Tier 2 (Intelligence Layer):** LangGraph Agent with Dual-RAG (MITRE ATT&CK + ISO 27001) powered by local Gemma 26B LLM via Oobabooga API.
+**Guardrails (Two separate modules):**
+- `template_miner.py` — Volume Compression ONLY (Drain3). Variables preserved.
+- `prompt_filter.py` — Injection Defense ONLY (Delimited Data Encapsulation).
+
+**Tier 2 (Intelligence Layer):** LangGraph Agent with Dual-RAG (MITRE ATT&CK + ISO 27001) powered by local Gemma 26B LLM.
 
 ## Key Features
 
-### Adversarial Guardrails (AI Self-Defense)
-- **Prompt Injection Detection:** Regex + heuristic scanning of all log fields before LLM ingestion.
-- **Semantic Pruning (Drain3):** Compresses thousands of duplicate logs into representative Templates with frequency counts.
-- **Token Budgeting:** Hard cap at 4,000 tokens for log data. Automatic Top-K sampling when budget is exceeded.
-- **Feature Extraction:** DDoS behavioral summarization (~50 tokens instead of 10,000 raw log lines).
-- **Context Overflow Guard:** Prevents VRAM exhaustion by monitoring total prompt + log token count.
-- **Entropy Scoring:** Prioritizes logs with high character entropy (likely SQLi/XSS payloads).
+### Guardrails — Separation of Concerns
 
-### Feedback Loop (Adaptive Defense)
-- Agent auto-generates new Tier 1 rules when novel attack patterns are confirmed.
-- Rules are persisted to `config/system_settings.yaml` for immediate enforcement.
+**Volume Compression (`template_miner.py`):**
+- Drain3 compresses thousands of duplicate logs into Templates + frequency.
+- Variables (dynamic params containing attack payloads) are **PRESERVED in raw samples**.
+- Purpose: Fit data into Context Window. Does NOT defend against injection.
+
+**Injection Defense (`prompt_filter.py`):**
+- **Pattern Detection:** Flags known injection strings. Does NOT redact (preserves evidence).
+- **Encoding Neutralization:** Defeats Base64/Hex/Unicode bypass tricks.
+- **Delimited Data Encapsulation:** Wraps all log data inside `<<<SENTINEL_LOG_DATA_BEGIN>>>` delimiters. System prompt instructs LLM to treat delimited content as DATA, not INSTRUCTION. Analogous to Parameterized Queries preventing SQL Injection.
+
+### Session Baselining (replaces Random Sampling)
+- Tier 1 maintains behavioral profile per Source IP (request count, unique ports, packet volume).
+- Escalates on **statistical deviation**, not random chance.
+- 100% of traffic is baselined — APT kill-chain evidence is never destroyed.
+
+### Feedback Loop (Explicit Data Flow)
+- `LangGraph Agent` → `feedback_listener.py` → `system_settings.yaml` → `RuleEngine.reload_dynamic_rules()`.
+- Agent auto-generates new rules, which are **immediately enforceable** at Tier 1.
 
 ### Human-in-the-Loop (HITL)
 - Streamlit Dashboard with RBAC (L1 Analyst: view-only, L3 Manager: can block IP).
