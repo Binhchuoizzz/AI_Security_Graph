@@ -46,6 +46,7 @@ Giải pháp thay thế: **Session Baselining** — Tier 1 duy trì behavioral p
 - Ghi nhận 100% traffic vào baseline (request_count, unique_ports, avg_packet_size)
 - Escalate lên Tier 2 khi phát hiện Statistical Deviation so với baseline (port scanning, high-frequency bursts, volumetric anomaly)
 - Mọi quyết định dựa trên LOGIC, không có random — đảm bảo toàn bộ APT evidence chain được bảo toàn
+- **Sliding Window TTL:** IP sessions inactive quá 10 phút tự động evict — chống RAM/Redis OOM khi chạy CICIDS2017 (~2.8M records)
 
 **B. Guardrails Layer — Hai module TÁCH BIỆT**
 
@@ -193,9 +194,12 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 **4D Evaluation Framework:**
 
 1. **Classification Metrics:** Precision, Recall, F1-Score trên 3 datasets. So sánh 4 cấu hình Ablation.
-2. **Operational Metrics:** Reasoning Latency (sec/incident). So sánh 2-Tier vs 1-Tier.
+2. **Operational Metrics:** Reasoning Latency (sec/incident), bao gồm cả Embedding Latency. Semantic Cache Hit Rate được đo để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier vs 1-Tier.
 3. **Robustness Metrics:** Guardrail Defeat Rate qua 1,000+ adversarial samples, phân loại 4 vector: Direct Injection, Indirect Injection, Encoding Bypass, Context Manipulation. So sánh Full Encapsulation vs No Encapsulation (Baseline C).
-4. **Context Quality Metrics:** RAG Context Relevance (RAGAS framework). Semantic Pruning Compression Ratio.
+4. **Context Quality Metrics:** Đánh giá bằng phương pháp kép:
+   - **RAGAS (200 mẫu Ground Truth tĩnh):** Trích xuất 200 sự cố đại diện từ 3 datasets, gán nhãn thủ công (expected MITRE technique, ISO control, action). Tính Context Precision + Answer Relevancy.
+   - **LLM-as-a-Judge (toàn bộ dataset, không cần GT):** Dùng Gemma 9B làm trọng tài độc lập chấm điểm Context Relevance (thang 1-5) theo phương pháp Zheng et al. (2023). Đảm bảo không cần gán nhãn thủ công cho toàn bộ dataset.
+   - Compression Ratio của Semantic Pruning.
 
 ---
 
@@ -209,3 +213,4 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 6. MITRE Corporation — MITRE ATT&CK Framework & MITRE ATLAS.
 7. LangGraph Documentation — State Management for LLM Workflows.
 8. Agent Security Bench (ASB) (2024) — Benchmarking Attacks and Defenses for LLM-based Agents.
+9. Zheng et al. (2023) — Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.

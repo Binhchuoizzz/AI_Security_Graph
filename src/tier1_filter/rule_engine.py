@@ -37,14 +37,19 @@ class SessionBaseline:
     Theo dõi behavioral baseline cho mỗi Source IP.
     Phát hiện APT bằng statistical deviation thay vì random sampling.
 
+    CHỐNG REDIS/RAM OOM:
+      Cơ chế Sliding Window TTL: IP sessions inactive quá ttl_seconds
+      sẽ tự động bị evict. Đảm bảo RAM không cạn kiệt khi chạy
+      CICIDS2017 (~2.8M records) hoặc dataset lớn hơn.
+
     Baseline variables per IP:
     - request_count: Tổng số request trong window
     - unique_ports: Tập hợp các port đã truy cập
-    - avg_packet_size: Kích thước packet trung bình
+    - total_fwd_packets: Tổng packet forwarded
     - first_seen / last_seen: Timestamps
-    - port_scan_score: Tăng khi IP quét nhiều port khác nhau
     """
-    def __init__(self, deviation_threshold: float = 2.0, window_seconds: int = 300):
+    def __init__(self, deviation_threshold: float = 2.0,
+                 window_seconds: int = 300, ttl_seconds: int = 600):
         self.profiles = defaultdict(lambda: {
             'request_count': 0,
             'unique_ports': set(),
@@ -54,13 +59,34 @@ class SessionBaseline:
         })
         self.deviation_threshold = deviation_threshold
         self.window_seconds = window_seconds
-        self.global_avg_request_rate = 1.0  # Initialized, updated over time
+        self.ttl_seconds = ttl_seconds  # IP inactive > TTL → evict
+        self.global_avg_request_rate = 1.0
+        self._update_counter = 0  # Đếm để trigger eviction định kỳ
+
+    def _evict_stale_profiles(self):
+        """
+        Dọn dẹp IP profiles đã inactive vượt TTL.
+        Chạy mỗi 100 updates để không ảnh hưởng performance.
+        Đây là cơ chế chống RAM OOM khi xử lý dataset lớn.
+        """
+        now = time.time()
+        stale_ips = [
+            ip for ip, profile in self.profiles.items()
+            if profile['last_seen'] and (now - profile['last_seen']) > self.ttl_seconds
+        ]
+        for ip in stale_ips:
+            del self.profiles[ip]
 
     def update(self, source_ip: str, log_entry: dict) -> dict:
         """
         Cập nhật baseline cho IP và trả về deviation score.
-        GHI NHẬN TOÀN BỘ traffic, không vứt bỏ gì.
+        GHI NHẬN TOÀN BỘ traffic, evict stale profiles định kỳ.
         """
+        # Eviction check mỗi 100 updates
+        self._update_counter += 1
+        if self._update_counter % 100 == 0:
+            self._evict_stale_profiles()
+
         profile = self.profiles[source_ip]
         now = time.time()
 
@@ -117,7 +143,8 @@ class SessionBaseline:
             'deviation_reasons': deviation_reasons,
             'request_count': profile['request_count'],
             'unique_ports': unique_port_count,
-            'is_anomalous': deviation_score > 0
+            'is_anomalous': deviation_score > 0,
+            'active_profiles': len(self.profiles)  # Metric cho monitoring
         }
 
     def update_global_baseline(self):
@@ -136,6 +163,7 @@ class SessionBaseline:
     def reset_window(self):
         """Reset tất cả profiles. Gọi sau mỗi time window."""
         self.profiles.clear()
+        self._update_counter = 0
 
 
 class RuleEngine:

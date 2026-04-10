@@ -33,6 +33,8 @@ tier1:
   session_baseline:
     deviation_threshold: 2.0     # Bao nhiêu lần std dev thì coi là anomaly
     window_seconds: 300          # Time window cho baseline (5 phút)
+    ttl_seconds: 600             # IP inactive > 10 phút → evict (chống RAM OOM)
+    eviction_interval: 100       # Chạy eviction mỗi N updates
   # Dynamic Rules: Agent tự sinh rule → feedback_listener.py → persist tại đây
   # Data Flow: LangGraph Agent → feedback_listener.py → YAML → RuleEngine.reload()
   dynamic_rules: []
@@ -75,6 +77,20 @@ rag:
   mitre_attack_path: "knowledge_base/mitre_attack.json"
   iso_27001_path: "knowledge_base/iso_27001_controls.json"
   top_k_results: 3
+  # Semantic Cache (chống Embedding Latency bottleneck)
+  # Cache key = template pattern hash → cache hit cao khi DDoS/BruteForce
+  semantic_cache:
+    max_size: 500                # Số query tối đa trong cache (LRU eviction)
+    ttl_seconds: 1800            # Cache entry hết hạn sau 30 phút
+
+# --- Evaluation (Context Quality) ---
+evaluation:
+  ground_truth_path: "experiments/ground_truth.json"  # 200 mẫu GT tĩnh
+  # Lựa chọn phương pháp đánh giá Context Quality:
+  #   "ragas"        → Dùng 200 GT mẫu, tính Context Precision + Answer Relevancy
+  #   "llm_as_judge" → Dùng Gemma 9B làm trọng tài, không cần GT (scale 1-5)
+  #   "both"         → Chạy cả 2 phương pháp (khuyến nghị)
+  method: "both"
 
 # --- Correlation Engine ---
 correlation:
