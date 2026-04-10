@@ -53,8 +53,7 @@ sentinel/
 │   ├── system_settings.yaml          # Central config (LLM, Tier1, Guardrails, RAG, Redis)
 │   └── rbac_policies.json            # RBAC roles (L1_Analyst, L3_Manager)
 ├── data/
-│   ├── raw/                          # Original CSV datasets (CICIDS2017, UNSW-NB15, MAWILab)
-│   └── processed/                    # Cleaned/transformed data
+│   └── raw/                          # Original CSV datasets only (logs stream directly into RAM via Redis)
 ├── docs/
 │   ├── capstone_proposal.md          # Full thesis proposal
 │   ├── architecture.md               # SENTINEL architecture diagram + RQ mapping
