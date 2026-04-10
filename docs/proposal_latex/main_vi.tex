@@ -1,0 +1,445 @@
+% =============================================================================
+% SENTINEL — Đề cương Luận văn Thạc sĩ (Bản Tiếng Việt)
+% Khung mẫu: FPT University MSE Proposal Format
+% Tác giả: Nguyễn Đức Bình
+% =============================================================================
+\documentclass[12pt,a4paper]{article}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese,english]{babel}
+\usepackage{times}
+\usepackage{geometry}
+\geometry{left=3cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage{natbib}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{indentfirst}
+
+% --- Formatting ---
+\setstretch{1.3}
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{1cm}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue,
+}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+
+% --- Vietnamese captions ---
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\refname}{Tài liệu tham khảo}
+
+% =============================================================================
+\begin{document}
+
+% --- TRANG BÌA ---
+\begin{titlepage}
+\centering
+
+\vspace*{1cm}
+{\large\textbf{TRƯỜNG ĐẠI HỌC FPT}}\\[0.3cm]
+{\normalsize Viện Đào tạo Sau Đại học}\\[0.3cm]
+{\normalsize Ngành: Kỹ thuật Phần mềm}\\[2cm]
+
+\rule{\textwidth}{0.5pt}\\[0.5cm]
+{\LARGE\textbf{SENTINEL --- Hệ thống Phát hiện và Phản ứng\\An ninh Tự động dựa trên AI Agent\\Đa nguồn kết hợp LangGraph,\\Dual-RAG và Cơ chế Phòng thủ Guardrails}}\\[0.5cm]
+\rule{\textwidth}{0.5pt}\\[1cm]
+
+{\large\textit{Đề cương Luận văn Thạc sĩ}}\\[2cm]
+
+\begin{tabular}{rl}
+\textbf{Học viên:} & Nguyễn Đức Bình \\
+\textbf{MSSV:} & [Mã số sinh viên] \\[0.5cm]
+\textbf{Giảng viên hướng dẫn:} & [Tên GVHD] \\
+\end{tabular}
+
+\vfill
+{\normalsize Thành phố Hồ Chí Minh, 2025}
+
+\end{titlepage}
+
+% --- TÓM TẮT ---
+\newpage
+\section*{Tóm tắt}
+\addcontentsline{toc}{section}{Tóm tắt}
+
+Các Trung tâm Điều hành An ninh (SOC) hiện đại đang đối mặt với ``Nghịch lý Dữ liệu lớn'': khối lượng sự kiện trên giây khổng lồ dẫn đến tình trạng quá tải cảnh báo (alert fatigue), với trung bình hơn 11.000 cảnh báo mỗi ngày mà hơn 45\% là dương tính giả \citep{ponemon2023}. Các hệ thống IDS/SIEM truyền thống phân tích dữ liệu từng nguồn riêng lẻ, làm giảm khả năng phát hiện chuỗi tấn công tinh vi (APT). Việc ứng dụng LLM trực tiếp vào phân tích log tạo ra hai lỗ hổng chí mạng: (1)~độ trễ suy luận quá cao, và (2)~rủi ro bị thao túng bởi Prompt Injection ẩn trong log \citep{owasp2025}.
+
+Để giải quyết các thách thức trên, nghiên cứu này đề xuất \textbf{SENTINEL} (\textbf{S}treaming \textbf{E}vents \textbf{N}etwork for \textbf{T}hreat \textbf{I}ntelligence, \textbf{N}eutralization, \textbf{E}scalation and \textbf{L}og-correlation) --- một AI Security Agent tự trị theo kiến trúc 2 tầng (2-Tier), tích hợp Session-Aware Behavioral Baselining (Tier~1) với LangGraph Agent sử dụng Dual-RAG (MITRE ATT\&CK + ISO~27001) và cơ chế phòng thủ Guardrails đa tầng với Dynamic Randomized Delimiters (Tier~2). Hệ thống giải quyết nghịch lý cốt lõi: \textit{``giữ nguyên biến chứa payload tấn công để phân tích mà không kích hoạt Prompt Injection''} thông qua cơ chế Delimited Data Encapsulation --- tương tự Parameterized Query trong phòng chống SQL Injection.
+
+Hệ thống được đánh giá trên ba bộ dữ liệu chuẩn: CICIDS2017, UNSW-NB15 và MAWILab. Phương pháp đánh giá sử dụng Khung 4 chiều (4D Framework): Chỉ số Phân loại (F1-Score), Chỉ số Vận hành (Độ trễ suy luận, Tỷ lệ Cache Hit), Chỉ số Kháng tấn công (Defeat Rate trên 1.000+ mẫu adversarial), và Chỉ số Chất lượng Ngữ cảnh (RAGAS với 200 mẫu Ground Truth + LLM-as-a-Judge sử dụng Oracle Model để tránh Self-Evaluation Bias) \citep{zheng2023}.
+
+% --- MỤC LỤC ---
+\newpage
+\tableofcontents
+
+% =============================================================================
+% CHƯƠNG 1: GIỚI THIỆU VÀ BỐI CẢNH
+% =============================================================================
+\newpage
+\section{Giới thiệu và Bối cảnh}
+
+\subsection{Mô tả Vấn đề}
+
+Các Trung tâm Điều hành An ninh (SOC) hiện đại đang bị nhấn chìm bởi lượng sự kiện an ninh khổng lồ. Theo báo cáo của Viện Ponemon \citep{ponemon2023}, trung bình một phân tích viên SOC xử lý hơn 11.000 cảnh báo mỗi ngày, trong đó hơn 45\% là dương tính giả. Hiện tượng ``quá tải cảnh báo'' (alert fatigue) khiến các mối đe dọa thực sự bị bỏ sót. Các hệ thống IDS/SIEM truyền thống phân tích từng nguồn dữ liệu (Web log, Firewall log, Authentication log) một cách rời rạc, làm giảm nghiêm trọng khả năng phát hiện chuỗi tấn công đa giai đoạn như Advanced Persistent Threats (APT).
+
+Việc ứng dụng Mô hình Ngôn ngữ Lớn (LLM) vào phân tích log tự động tạo ra hai lỗ hổng chí mạng. Thứ nhất, \textit{độ trễ suy luận} (reasoning latency) quá cao đối với môi trường streaming thời gian thực --- một lần suy luận có thể mất vài giây, trong khi hàng nghìn sự kiện đến mỗi giây. Thứ hai, LLM dễ bị thao túng bởi \textit{Prompt Injection} ẩn trong dữ liệu log: kẻ tấn công chèn chỉ thị độc vào các trường động như User-Agent, Referer, HTTP Payload mà LLM sẽ xử lý như một phần ngữ cảnh đầu vào \citep{owasp2025, greshake2023}.
+
+Một nghịch lý cốt lõi xuất hiện: phân tích viên an ninh \textit{cần} giữ nguyên các biến động (chứa payload tấn công) để phân tích pháp y, nhưng chính các biến này có thể chiếm quyền suy luận của LLM khi nằm trong Context Window. Nghịch lý này --- giữ bằng chứng payload mà không kích hoạt Prompt Injection --- vẫn chưa được giải quyết triệt để trong nghiên cứu tự động hóa SOC hiện tại.
+
+\subsection{Tổng quan Nghiên cứu (Literature Review)}
+
+Mặc dù ứng dụng AI tạo sinh (Generative AI) trong an ninh mạng đang phát triển mạnh, vẫn tồn tại nhiều khoảng trống lớn khi triển khai thực tế.
+
+\textbf{LLM Agent cho Tự động hóa SOC.} Các nghiên cứu gần đây (ví dụ: \citet{oniagbi2024}; Audit-LLM) chủ yếu sử dụng API đám mây (GPT-4), vi phạm chính sách bảo mật dữ liệu của tổ chức. Chưa có nghiên cứu nào tích hợp LLM \textit{cục bộ} (local) với cơ chế tự phòng thủ tấn công tại biên suy luận. Tổng quan của \citet{habibzadeh2025} phân loại tích hợp LLM vào các chức năng SOC (phân loại cảnh báo, tóm tắt log, phản ứng sự cố) nhưng thừa nhận thiếu kiến trúc giải quyết đồng thời cả độ trễ và kháng tấn công.
+
+\textbf{RAG trong An ninh mạng.} Các hệ thống như RAG-ATT\&CK \citep{ragattack2024} và AgCyRAG đã áp dụng Knowledge Graph cho threat intelligence. Tuy nhiên, chưa framework nào kết hợp \textit{chuẩn chiến thuật} (MITRE ATT\&CK) với \textit{chuẩn phòng thủ} (ISO~27001) trong cùng một pipeline Dual-RAG.
+
+\textbf{Xử lý Log cho LLM.} Thuật toán Drain3 \citep{he2017} được sử dụng rộng rãi cho template mining trực tuyến. SENTINEL nâng cấp vai trò của Drain3: đặt nó trong Guardrails Layer như cơ chế \textit{Token Budgeting} --- nén volume nhưng giữ nguyên các biến quan trọng --- thay vì chỉ dùng cho tiền xử lý. Nghiên cứu LILAC \citep{jiang2024} cho thấy giá trị của adaptive caching cho log parsing, khái niệm tương đồng với Semantic Cache của SENTINEL.
+
+\textbf{Phòng thủ Prompt Injection.} Mặc dù Agent Security Bench (ASB) \citep{zhang2024asb} chỉ ra rằng tỷ lệ tấn công thành công vào LLM Agent vượt 84\%, các framework phòng thủ hiện tại chưa đề xuất \textit{Delimited Data Encapsulation} với Dynamic Delimiters sử dụng mã hóa băm (cryptographic hash) để ngăn chặn tấn công Delimiter Smuggling.
+
+\textbf{Tính mới của SENTINEL} không nằm ở việc tạo ra thuật toán đơn lẻ mới, mà nằm ở \textit{Tư duy Thiết kế Kiến trúc Hệ thống}: ghép nối các công nghệ trên thành một \textbf{Dual-Tier Containerized Monolith} hoạt động khép kín với Feedback Loop thời gian thực --- kiến trúc chưa xuất hiện trong các công trình đã công bố.
+
+\subsection{Mục tiêu Nghiên cứu}
+
+Nghiên cứu này thiết kế, triển khai và đánh giá nguyên mẫu AI Security Agent có khả năng liên kết log đa nguồn theo thời gian thực, tự bảo vệ trước tấn công adversarial, và hỗ trợ ra quyết định qua giao diện Human-in-the-Loop (HITL). Bốn câu hỏi nghiên cứu:
+
+\begin{itemize}[leftmargin=2cm]
+    \item[\textbf{RQ1:}] Kiến trúc 2-Tier (Rule-based + LLM Agent) với Session-Aware Behavioral Baselining và Semantic Cache tối ưu Reasoning Latency như thế nào so với kiến trúc 1-Tier (chỉ dùng LLM)?
+    \item[\textbf{RQ2:}] Cơ chế Delimited Data Encapsulation với Dynamic Randomized Delimiters có tác động ra sao đến Defeat Rate trước các đòn tấn công Prompt Injection qua log?
+    \item[\textbf{RQ3:}] Dual-RAG (MITRE ATT\&CK + ISO~27001) cải thiện Context Relevance và hỗ trợ quyết định HITL như thế nào?
+    \item[\textbf{RQ4:}] Feedback Loop (Agent tự sinh Dynamic Rules cho Tier~1) giúp hệ thống thích ứng với tấn công Zero-day hiệu quả ra sao?
+\end{itemize}
+
+\subsection{Phạm vi Nghiên cứu}
+
+\textbf{Trong phạm vi:} Data Streaming Pipeline (Redis); Tier-1 Rule Engine với Session Baselining, TTL Eviction và Feedback Loop; LangGraph Agent với Dual-RAG cục bộ; Guardrails gồm Volume Compression (Drain3 Template Mining) tách biệt với Injection Defense (Dynamic Delimited Data Encapsulation); Streamlit HITL Dashboard với RBAC; Hạ tầng MLOps (Docker Compose, MLflow, SQLite Audit Trail).
+
+\textbf{Ngoài phạm vi:} Fine-tuning Foundation Model; triển khai Apache Kafka vật lý; chống DDoS tầng~3/4; mở rộng scale ngang ở mức production.
+
+\subsection{Cấu trúc Luận văn}
+
+Luận văn được tổ chức thành sáu chương: (i)~Giới thiệu và Bối cảnh; (ii)~Tổng quan Nghiên cứu; (iii)~Giải pháp Đề xuất và Phương pháp Nghiên cứu; (iv)~Kế hoạch Triển khai và Đánh giá; (v)~Kết quả Kỳ vọng và Đóng góp Khoa học; và (vi)~Kết luận và Hướng phát triển.
+
+% =============================================================================
+% CHƯƠNG 2: TỔNG QUAN NGHIÊN CỨU
+% =============================================================================
+\newpage
+\section{Tổng quan Nghiên cứu}
+
+\subsection{Các phương pháp Nền tảng}
+
+Các hệ thống Phát hiện Xâm nhập (IDS) thế hệ đầu dựa trên đối sánh chữ ký (signature-based) như Snort, Suricata hoặc phát hiện bất thường thống kê. Các hệ thống này hoạt động xác định (deterministic) nhưng có hạn chế cốt lõi: không thể phát hiện mẫu tấn công chưa biết và sinh ra quá nhiều dương tính giả khi gặp bất thường lành tính.
+
+Sự xuất hiện của học sâu (deep learning) đã đưa vào các kiến trúc mạng thần kinh như CNN, LSTM và hybrid CNN-LSTM trên các bộ dữ liệu chuẩn CICIDS2017 \citep{sharafaldin2018} và UNSW-NB15 \citep{moustafa2015}. Mặc dù đạt độ chính xác cao (thường $>$96\%), các phương pháp này yêu cầu dữ liệu huấn luyện có nhãn và không thể \textit{giải thích} quyết định --- hạn chế nghiêm trọng đối với phân tích viên SOC cần chứng minh hành động chặn.
+
+Sự ra đời của Mô hình Ngôn ngữ Lớn (LLM) mở ra mô hình hoàn toàn mới: thay vì huấn luyện bộ phân loại chuyên biệt, LLM có thể \textit{suy luận} về sự kiện an ninh bằng ngôn ngữ tự nhiên, ánh xạ vào framework tấn công (MITRE ATT\&CK), và sinh báo cáo sự cố dạng văn bản. Tuy nhiên, khả năng này cũng tạo ra các bề mặt tấn công mới mà mô hình ML truyền thống không gặp --- quan trọng nhất là \textit{Prompt Injection} qua đầu vào adversarial.
+
+Template mining cho log, được tiên phong bởi thuật toán Drain \citep{he2017}, cung cấp cầu nối giữa log thô khối lượng lớn và phân tích có cấu trúc. Drain xây dựng Fixed Depth Tree để phân tách log thành template (cấu trúc tĩnh) và biến (tham số động) với độ phức tạp $O(n)$, phù hợp cho streaming thời gian thực. Trong kiến trúc SENTINEL, Drain3 phục vụ \textit{duy nhất} vai trò \textit{nén volume}, được tách biệt hoàn toàn khỏi phòng thủ injection theo nguyên tắc Separation of Concerns.
+
+\subsection{Các Công trình Liên quan}
+
+\textbf{Tự động hóa SOC dựa trên LLM.} Tổng quan của \citet{habibzadeh2025} phân loại tích hợp LLM vào SOC theo các chức năng: phân loại cảnh báo, làm giàu threat intelligence, và phản ứng tự động. Các hệ thống như Audit-LLM và autonomous SecOps agent chứng minh tiềm năng của AI tác vụ tự trị (Agentic AI) nhưng chủ yếu phụ thuộc API đám mây (GPT-4), gây lo ngại về chủ quyền dữ liệu. SENTINEL giải quyết khoảng trống này bằng cách triển khai LLM \textit{cục bộ} (Gemma~2 9B) với phòng thủ adversarial tích hợp sẵn.
+
+\textbf{RAG cho Threat Intelligence.} RAG-ATT\&CK \citep{ragattack2024} tự động hóa ánh xạ threat intelligence phi cấu trúc sang kỹ thuật MITRE. AgCyRAG kết hợp suy luận Knowledge Graph với truy vấn vector cho phân tích an ninh có thể giải thích. GraphCyRAG (PNNL) tận dụng Neo4j để duyệt quan hệ CVE/CWE/CAPEC/ATT\&CK. SENTINEL mở rộng bằng \textit{Dual-RAG} --- kết hợp tri thức chiến thuật (MITRE ATT\&CK) với kiểm soát phòng thủ (ISO~27001) trong cùng một pipeline truy vấn, bổ sung thêm lớp Semantic Cache loại bỏ tính toán embedding trùng lặp.
+
+\textbf{Prompt Injection và An ninh LLM.} \citet{greshake2023} định nghĩa chính thức indirect prompt injection, trong đó chỉ thị độc được nhúng vào nội dung truy xuất. Agent Security Bench \citep{zhang2024asb} đánh giá 27 phương pháp tấn công trên 10 loại agent, cho thấy tỷ lệ tấn công thành công vượt 84\%. Các phòng thủ hiện tại gồm NeMo Guardrails, Instruction Hierarchy \citep{wallace2024}, và mô hình Dual LLM (privileged vs. quarantined). SENTINEL đóng góp phòng thủ mới: \textit{Dynamic Randomized Delimiters} sử dụng mã hóa băm, khiến tấn công Delimiter Smuggling bất khả thi về mặt tính toán.
+
+\textbf{Phương pháp Đánh giá LLM.} \citet{zheng2023} thiết lập mô hình LLM-as-a-Judge, chứng minh mức đồng thuận $>$80\% với đánh giá viên con người. Nghiên cứu cũng chỉ ra các thiên kiến cần loại bỏ (Position Bias, Verbosity Bias, Self-Enhancement Bias). SENTINEL xử lý Self-Enhancement Bias bằng cách sử dụng \textit{Oracle Model} riêng biệt (Gemma~26B) làm trọng tài, thay vì dùng chính model agent (Gemma~9B) tự chấm.
+
+% =============================================================================
+% CHƯƠNG 3: GIẢI PHÁP ĐỀ XUẤT VÀ PHƯƠNG PHÁP NGHIÊN CỨU
+% =============================================================================
+\newpage
+\section{Giải pháp Đề xuất và Phương pháp Nghiên cứu}
+
+\subsection{Giải pháp Đề xuất: Kiến trúc SENTINEL}
+
+Framework SENTINEL được thiết kế theo nguyên tắc \textbf{Separation of Concerns} nghiêm ngặt --- mỗi module giải quyết đúng một bài toán, không lẫn lộn chức năng. Kiến trúc gồm năm tầng:
+
+\textbf{A. Tier~1 --- Tầng Tốc độ (Session-Aware Behavioral Baselining).}
+Tier~1 duy trì hồ sơ hành vi cho mỗi Source~IP, ghi nhận 100\% lưu lượng vào baseline (request count, unique ports, avg packet size). Escalation lên Tier~2 khi phát hiện \textit{độ lệch thống kê} so với baseline (quét port, burst tần suất cao, bất thường volume). Mọi quyết định dựa trên logic, không có yếu tố ngẫu nhiên --- đảm bảo bảo toàn toàn bộ chuỗi bằng chứng APT. Cơ chế \textit{Sliding Window TTL} tự động loại bỏ các phiên IP không hoạt động quá 600 giây, ngăn chặn tràn bộ nhớ RAM/Redis khi xử lý bộ dữ liệu lớn như CICIDS2017 ($\sim$2,8 triệu bản ghi).
+
+\textbf{B. Tầng Guardrails --- Hai Module TÁCH BIỆT.}
+Tầng Guardrails thực thi nguyên tắc thiết kế then chốt: \textit{nén volume và phòng thủ injection là hai bài toán riêng biệt cần giải pháp riêng biệt.}
+
+\textit{B1. Nén Volume} (\texttt{template\_miner.py}, Drain3): Nén hơn 10.000 dòng log thành $N$ template để vừa Context Window của LLM. Các biến (IP, payload) được giữ nguyên trong mẫu gốc. Mục đích duy nhất: nén dữ liệu --- module này \textit{không} phòng thủ injection.
+
+\textit{B2. Phòng thủ Injection} (\texttt{prompt\_filter.py}, Delimited Data Encapsulation): Giải quyết nghịch lý cốt lõi: \textit{``Làm sao giữ biến chứa payload để phân tích mà không kích hoạt Prompt Injection?''} Cơ chế 3 tầng: (1)~\textit{Phát hiện Mẫu}: đánh dấu chuỗi injection đã biết mà không xóa bằng chứng; (2)~\textit{Vô hiệu hóa Mã hóa}: phá vỡ kỹ thuật bypass Base64/Hex/Unicode; (3)~\textit{Đóng gói Dữ liệu với Delimiter Ngẫu nhiên Động}: mỗi request sinh delimiter \textit{mới} bằng \texttt{secrets.token\_hex()} (ví dụ: \texttt{<<<DATA\_BEGIN\_a7f3c9e2>>>}). Kẻ tấn công không thể đoán trước mã hóa băm, khiến Delimiter Smuggling bất khả thi. Bước tiền xử lý bổ sung: loại bỏ mọi chuỗi dạng \texttt{<<<...>>>} trong dữ liệu thô trước khi đóng gói.
+
+\textbf{C. Tier~2 --- Tầng Trí tuệ (LangGraph Agent + Dual-RAG).}
+Sự kiện được gom nhóm theo [IP~$+$~cửa sổ 5 phút] và xử lý qua Dual-RAG (truy vấn đồng thời MITRE ATT\&CK và ISO~27001 qua FAISS). \textit{Semantic Cache} (Redis) lưu kết quả truy vấn RAG trước đó, key = hash từ template pattern, đạt tỷ lệ cache hit $>$90\% trong tấn công DDoS và $>$80\% trong Brute Force.
+
+Trạng thái agent được quản lý qua \textit{Structured MemoryObject} chống Semantic Drift: (1)~\texttt{narrative\_summary} --- ngữ cảnh chung dạng text (LLM được phép tóm tắt); (2)~\texttt{extracted\_iocs} --- mảng JSON cứng lưu IOCs gồm IP, Port, Hash (LLM \textit{chỉ} được APPEND, \textit{không} được tóm tắt đè lên).
+
+\textbf{D. Feedback Loop (Vòng phản hồi).}
+Khi LangGraph Agent xác nhận mẫu tấn công mới, nó sinh detection rule (field, pattern, score) gửi qua \texttt{feedback\_listener.py} để lưu vào \texttt{system\_settings.yaml}. Rule Engine hot-reload quy tắc động, áp dụng ngay tại Tier~1 trong chu kỳ đánh giá tiếp theo.
+
+\textbf{E. Human-in-the-Loop (HITL).}
+Dashboard Streamlit với RBAC (L1~Analyst: chỉ xem; L3~Manager: phê duyệt/chặn) và SQLite Audit Trail cung cấp giám sát con người cho các quyết định tác động cao.
+
+\subsection{Kiến trúc Phần mềm}
+
+Hệ thống sử dụng kiến trúc \textit{Containerized Modular Architecture} (Docker Compose) với cấu hình hai LLM:
+
+\begin{itemize}
+    \item \textbf{LLM Agent chính:} Gemma~2 9B Q6\_K ($\sim$7\,GB VRAM) --- xử lý suy luận và phân tích log.
+    \item \textbf{LLM Oracle Judge:} Gemma~26B Q4\_K\_M ($\sim$15\,GB VRAM) --- chấm điểm Context Quality theo LLM-as-a-Judge. \textit{Không} dùng cùng model với Agent để tránh Confirmation Bias.
+    \item \textbf{Thí nghiệm loại bỏ (Ablation):} 26B cũng dùng so sánh chất lượng suy luận (batch\_size=1, ngữ cảnh ngắn).
+\end{itemize}
+
+Ngân sách VRAM: RTX~4060~Ti 16\,GB. Hai model chạy tuần tự (unload 9B $\rightarrow$ load 26B), không chạy đồng thời. Cấu hình trung tâm qua \texttt{system\_settings.yaml}. Theo dõi thực nghiệm tự động qua MLflow.
+
+\subsection{Công nghệ và Công cụ}
+
+\begin{table}[H]
+\centering
+\caption{Bộ công nghệ sử dụng}
+\begin{tabular}{ll}
+\toprule
+\textbf{Tầng} & \textbf{Công nghệ} \\
+\midrule
+LLM (Chính) & Gemma~2 9B Q6\_K (Cục bộ, Oobabooga API) \\
+LLM (Trọng tài / Ablation) & Gemma~26B Q4\_K\_M \\
+Agent Framework & LangGraph (Structured MemoryObject) \\
+RAG & Sentence-Transformers + FAISS (Dual Index) \\
+Guardrails & Drain3 (nén) + Dynamic Delimiters (phòng thủ) \\
+Streaming & Redis \\
+Dashboard & Streamlit + streamlit-authenticator \\
+MLOps & Docker Compose + MLflow \\
+Nhật ký kiểm toán & SQLite \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =============================================================================
+% CHƯƠNG 4: KẾ HOẠCH TRIỂN KHAI VÀ ĐÁNH GIÁ
+% =============================================================================
+\newpage
+\section{Kế hoạch Triển khai và Đánh giá}
+
+\subsection{Các Giai đoạn Phát triển Chính}
+
+\textbf{Bộ dữ liệu.} Nghiên cứu sử dụng ba bộ dữ liệu chuẩn quốc tế:
+
+\begin{enumerate}
+    \item \textbf{CICIDS2017} \citep{sharafaldin2018}: Benchmark chuẩn (DoS, Brute Force, Web Attack). Được chọn làm trọng tâm vì là chuẩn mực được trích dẫn nhiều nhất trong các nghiên cứu SOC, cho phép đối chiếu trực tiếp với các công trình trước.
+    \item \textbf{UNSW-NB15} \citep{moustafa2015}: Kịch bản tấn công đa hình, phân tán (9 họ tấn công, 49 đặc trưng).
+    \item \textbf{MAWILab} \citep{fontugne2010}: Lưu lượng packet được tiền xử lý thành dạng CSV tabullar để thử nghiệm liên kết log đa nguồn.
+\end{enumerate}
+
+\textbf{Sinh mẫu Adversarial tổng hợp:} Gemma~26B sinh 1.000+ kịch bản Log Injection thuộc 4 loại vector tấn công: Direct Injection, Indirect Injection, Encoding Bypass, và Context Manipulation.
+
+\textbf{Lộ trình (Kế hoạch thực tế 8 tuần):}
+\begin{itemize}
+    \item \textbf{Tuần 1--2 (Nền tảng):} Tổng quan tài liệu, hạ tầng Docker/MLflow/Oobabooga. Viết Chương~1--2 song song.
+    \item \textbf{Tuần 3--4 (Lõi):} Redis Streaming + Session Baselining Tier-1 + Feedback Loop. LangGraph Agent + FAISS Dual-RAG. Viết Chương~3.
+    \item \textbf{Tuần 5--6 (Guardrails \& Giao diện):} Template Miner + Prompt Filter (Dynamic Encapsulation). Streamlit Dashboard (RBAC, HITL).
+    \item \textbf{Tuần 7--8 (Đánh giá):} Ablation Study + 1.000+ Adversarial Testing + MLflow metrics. Viết Chương~4--5.
+\end{itemize}
+
+\textbf{Đánh giá Tính khả thi --- Phân tích Ngân sách VRAM:}
+
+\begin{table}[H]
+\centering
+\caption{So sánh Ngân sách VRAM}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Thành phần} & \textbf{Gemma 26B Q4} & \textbf{Gemma 2 9B Q6} \\
+\midrule
+Trọng số model & $\sim$15\,GB & $\sim$7\,GB \\
+KV Cache khả dụng & 0,5--1,5\,GB (nguy cơ OOM) & $\sim$9\,GB (Ổn định) \\
+System Prompt + RAG + Memory & $\sim$2--3\,GB & $\sim$2--3\,GB \\
+\midrule
+\textbf{Kết luận} & \textbf{Không đủ cho production} & \textbf{Đủ cho streaming pipeline} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Thiết kế Thí nghiệm Loại bỏ (Ablation Study)}
+
+Để đánh giá nghiêm ngặt đóng góp của từng thành phần, nghiên cứu thiết kế 4 cấu hình so sánh:
+
+\begin{table}[H]
+\centering
+\caption{Các cấu hình Ablation Study}
+\begin{tabular}{lcccp{4.5cm}}
+\toprule
+\textbf{Cấu hình} & \textbf{Tier~1} & \textbf{Guardrails} & \textbf{LLM Agent} & \textbf{Mục đích} \\
+\midrule
+Baseline A: Chỉ Rule & $\checkmark$ & $\times$ & $\times$ & Chứng minh LLM có giá trị thực \\
+Baseline B: Chỉ LLM & $\times$ & $\times$ & $\checkmark$ & Chứng minh 2-Tier tối ưu Latency \\
+Baseline C: Không Encapsulation & $\checkmark$ & Chỉ Drain3 & $\checkmark$ & Chứng minh Encapsulation chặn Injection \\
+SENTINEL (Đầy đủ) & $\checkmark$ & $\checkmark$ Đầy đủ & $\checkmark$ & Hệ thống hoàn chỉnh \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Kế hoạch Đánh giá}
+
+Nghiên cứu định nghĩa \textbf{Khung Đánh giá 4 Chiều (4D Evaluation Framework)}:
+
+\begin{enumerate}
+    \item \textbf{Chỉ số Phân loại:} Precision, Recall, F1-Score trên 3 bộ dữ liệu. So sánh 4 cấu hình Ablation.
+    
+    \item \textbf{Chỉ số Vận hành:} Reasoning Latency (giây/sự cố), bao gồm Embedding Latency. Tỷ lệ Cache Hit của Semantic Cache để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier với 1-Tier.
+    
+    \item \textbf{Chỉ số Kháng tấn công:} Guardrail Defeat Rate trên 1.000+ mẫu adversarial, phân loại theo 4 vector tấn công (Direct, Indirect, Encoding Bypass, Context Manipulation). So sánh Full Encapsulation với No Encapsulation (Baseline~C).
+    
+    \item \textbf{Chỉ số Chất lượng Ngữ cảnh:} Phương pháp kép:
+    \begin{itemize}
+        \item \textit{RAGAS (200 mẫu Ground Truth tĩnh):} 200 sự cố đại diện từ 3 dataset, gán nhãn thủ công (kỹ thuật MITRE, kiểm soát ISO, hành động). Tính Context Precision + Answer Relevancy.
+        \item \textit{LLM-as-a-Judge (toàn bộ dataset, không cần GT):} \textbf{Gemma~26B làm Oracle Model} (trọng tài độc lập) chấm điểm Context Relevance (thang 1--5) theo \citet{zheng2023}. \textbf{Không dùng cùng model với Agent (9B)} để tránh Confirmation Bias / Self-Evaluation Bias. Chạy tuần tự (unload 9B $\rightarrow$ load 26B) do giới hạn VRAM.
+        \item Tỷ lệ Nén (Compression Ratio) từ Semantic Pruning.
+    \end{itemize}
+\end{enumerate}
+
+% =============================================================================
+% CHƯƠNG 5: KẾT QUẢ KỲ VỌNG VÀ ĐÓNG GÓP KHOA HỌC
+% =============================================================================
+\newpage
+\section{Kết quả Kỳ vọng và Đóng góp Khoa học}
+
+\subsection{Kết quả Kỳ vọng}
+
+\begin{enumerate}
+    \item \textbf{Mã nguồn SENTINEL:} Codebase MLOps-ready, có thể tái tạo hoàn toàn bằng \texttt{docker-compose up}. Hệ thống cài đặt pipeline hoàn chỉnh: nạp CSV $\rightarrow$ Redis streaming $\rightarrow$ lọc Tier-1 $\rightarrow$ Guardrails $\rightarrow$ LangGraph Agent $\rightarrow$ HITL Dashboard.
+    
+    \item \textbf{Báo cáo Thực nghiệm:} MLflow logs chứng minh: (a)~kiến trúc 2-Tier giảm Reasoning Latency so với 1-Tier; (b)~Template Mining đạt Compression Ratio đáng kể; (c)~Delimited Encapsulation với Dynamic Delimiters đánh bại $>$95\% mẫu adversarial (so sánh Baseline~C); (d)~Semantic Cache đạt tỷ lệ hit $>$80\% cho mẫu tấn công lặp lại.
+    
+    \item \textbf{Đóng góp Tri thức:} Mô hình kiến trúc SENTINEL --- giải quyết nghịch lý \textit{``giữ biến payload để phân tích mà không kích hoạt Prompt Injection''} qua Delimited Data Encapsulation, tương tự Parameterized Query ngăn SQL Injection bằng cách tách dữ liệu khỏi lệnh.
+\end{enumerate}
+
+\subsection{Đóng góp Khoa học}
+
+Từ góc độ học thuật, nghiên cứu đóng góp ba điểm chính:
+
+\textbf{Thứ nhất}, đề xuất kiến trúc SENTINEL --- một \textit{Dual-Tier Containerized Monolith} mới lạ, tích hợp Session-Aware Baselining, Dynamic Delimited Data Encapsulation, Structured MemoryObject, Semantic Cache và Dual-RAG trong hệ thống khép kín với Feedback Loop thời gian thực. Cấu trúc kiến trúc kết hợp này chưa được ghi nhận trong bất kỳ công trình nào đã công bố.
+
+\textbf{Thứ hai}, thực chứng qua thí nghiệm so sánh trên ba bộ dữ liệu chuẩn (CICIDS2017, UNSW-NB15, MAWILab) sử dụng Ablation Study 4 cấu hình nghiêm ngặt và 1.000+ kịch bản adversarial tổng hợp. Kết quả đánh giá cung cấp bằng chứng định lượng cho hiệu quả của từng thành phần kiến trúc.
+
+\textbf{Thứ ba}, thiết lập pipeline chuẩn hóa, tái tạo được cho tự động hóa SOC dựa trên LLM chạy hoàn toàn trên phần cứng cục bộ (RTX~4060~Ti 16\,GB), chứng minh rằng AI Agent an ninh cấp doanh nghiệp không cần phụ thuộc API đám mây --- yếu tố then chốt cho các tổ chức có yêu cầu nghiêm ngặt về chủ quyền dữ liệu.
+
+% =============================================================================
+% CHƯƠNG 6: KẾT LUẬN
+% =============================================================================
+\newpage
+\section{Kết luận}
+
+Nghiên cứu này đề xuất SENTINEL --- kiến trúc AI Security Agent tự trị 2 tầng giải quyết ba thách thức cốt lõi trong tự động hóa SOC dựa trên LLM: độ trễ suy luận, kháng tấn công adversarial, và chất lượng ngữ cảnh. Kiến trúc tích hợp Session-Aware Behavioral Baselining với TTL eviction (Tier~1), Guardrails đa tầng với Dynamic Randomized Delimiters (tầng Guardrails), LangGraph Agent với Dual-RAG và Structured MemoryObject (Tier~2), cùng Feedback Loop thời gian thực cho phép agent tự sinh detection rule.
+
+Các đóng góp chính bao gồm: (i)~đề xuất kiến trúc Dual-Tier với Separation of Concerns nghiêm ngặt cho LLM-based security agents; (ii)~giới thiệu Dynamic Delimited Data Encapsulation phòng thủ Prompt Injection và Delimiter Smuggling; (iii)~thiết kế phương pháp đánh giá kép (RAGAS + Oracle Model LLM-as-a-Judge) loại bỏ Self-Evaluation Bias; và (iv)~cung cấp triển khai hoàn chỉnh, tái tạo được trên phần cứng cục bộ, phù hợp cho môi trường có yêu cầu chủ quyền dữ liệu.
+
+Hướng phát triển tương lai có thể mở rộng theo ba chiều: (1)~tích hợp thêm nguồn dữ liệu (NetFlow, Windows Event Logs) để tăng cường liên kết đa nguồn; (2)~khám phá RAG dựa trên đồ thị (GraphRAG) cho suy luận đa bước qua chuỗi kill chain MITRE ATT\&CK; và (3)~nghiên cứu mô hình triển khai liên bang (federated deployment) trong đó nhiều instance SENTINEL chia sẻ threat intelligence giữa các tổ chức mà vẫn bảo toàn quyền riêng tư dữ liệu.
+
+% =============================================================================
+% TÀI LIỆU THAM KHẢO
+% =============================================================================
+\newpage
+\begin{thebibliography}{99}
+
+\bibitem[Sharafaldin và cộng sự, 2018]{sharafaldin2018}
+Sharafaldin, I., Lashkari, A.~H., and Ghorbani, A.~A. (2018).
+\newblock Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization.
+\newblock Trong {\em Kỷ yếu ICISSP 2018}.
+
+\bibitem[Moustafa và Slay, 2015]{moustafa2015}
+Moustafa, N. and Slay, J. (2015).
+\newblock UNSW-NB15: A Comprehensive Data Set for Network Intrusion Detection Systems.
+\newblock Trong {\em Kỷ yếu MilCIS 2015}.
+
+\bibitem[Fontugne và cộng sự, 2010]{fontugne2010}
+Fontugne, R., Borgnat, P., Abry, P., and Fukuda, K. (2010).
+\newblock MAWILab: Combining Diverse Anomaly Detectors for Automated Anomaly Labeling and Performance Benchmarking.
+\newblock Trong {\em Kỷ yếu CoNEXT 2010}.
+
+\bibitem[He và cộng sự, 2017]{he2017}
+He, P., Zhu, J., Zheng, Z., and Lyu, M.~R. (2017).
+\newblock Drain: An Online Log Parsing Approach with Fixed Depth Tree.
+\newblock Trong {\em Kỷ yếu ICWS 2017}.
+
+\bibitem[OWASP, 2025]{owasp2025}
+OWASP Foundation (2025).
+\newblock OWASP Top 10 for LLM Applications.
+\newblock \url{https://owasp.org/www-project-top-10-for-large-language-model-applications/}
+
+\bibitem[MITRE, 2024]{mitre2024}
+MITRE Corporation (2024).
+\newblock MITRE ATT\&CK Framework \& MITRE ATLAS.
+\newblock \url{https://attack.mitre.org/}
+
+\bibitem[LangGraph, 2024]{langgraph2024}
+LangChain Inc. (2024).
+\newblock LangGraph Documentation: State Management for LLM Workflows.
+\newblock \url{https://langchain-ai.github.io/langgraph/}
+
+\bibitem[Zhang và cộng sự, 2024]{zhang2024asb}
+Zhang, H. và cộng sự (2024).
+\newblock Agent Security Bench (ASB): Formalizing and Benchmarking Attacks and Defenses in LLM-based Agents.
+\newblock Trong {\em Kỷ yếu ICLR 2025}. arXiv:2410.02644.
+
+\bibitem[Zheng và cộng sự, 2023]{zheng2023}
+Zheng, L., Chiang, W.-L., và cộng sự (2023).
+\newblock Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.
+\newblock Trong {\em Kỷ yếu NeurIPS 2023 Datasets and Benchmarks Track}.
+
+\bibitem[Viện Ponemon, 2023]{ponemon2023}
+Ponemon Institute (2023).
+\newblock The State of Security Operations and the Role of AI.
+
+\bibitem[Oniagbi và cộng sự, 2024]{oniagbi2024}
+Oniagbi, O. và cộng sự (2024).
+\newblock Generative AI in Cybersecurity: A Comprehensive Review.
+
+\bibitem[Greshake và cộng sự, 2023]{greshake2023}
+Greshake, K. và cộng sự (2023).
+\newblock Not What You've Signed Up For: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection.
+\newblock arXiv:2302.12173.
+
+\bibitem[Habibzadeh và cộng sự, 2025]{habibzadeh2025}
+Habibzadeh, M. và cộng sự (2025).
+\newblock Large Language Models for Security Operations Centers: A Comprehensive Survey.
+
+\bibitem[RAG-ATT\&CK, 2024]{ragattack2024}
+University of Twente (2024).
+\newblock RAG-ATT\&CK: Automated MITRE Mapping with Retrieval-Augmented Generation.
+
+\bibitem[Jiang và cộng sự, 2024]{jiang2024}
+Jiang, Z. và cộng sự (2024).
+\newblock LILAC: Log Parsing using LLMs with Adaptive Parsing Cache.
+\newblock Concordia University.
+
+\bibitem[Wallace và cộng sự, 2024]{wallace2024}
+Wallace, E. và cộng sự (2024).
+\newblock Instruction Hierarchy: Training LLMs to Prioritize Privileged Instructions.
+\newblock OpenAI. arXiv:2404.13208.
+
+\end{thebibliography}
+
+\end{document}
