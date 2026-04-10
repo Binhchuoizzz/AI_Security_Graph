@@ -5,3 +5,11 @@ knowledge_base/faiss_index/
 logs/
 .env
 mlruns/
+docs/proposal_latex/*.aux
+docs/proposal_latex/*.log
+docs/proposal_latex/*.out
+docs/proposal_latex/*.toc
+docs/proposal_latex/*.fls
+docs/proposal_latex/*.fdb_latexmk
+docs/proposal_latex/*.synctex*
+docs/Template/proposalmau.txt
