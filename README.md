@@ -1,93 +1,188 @@
-# Autonomous AI Security Agent for Multi-source Log Correlation 🛡️
+# SENTINEL Framework
 
-*A Master's Thesis Project: Leveraging LangGraph, RAG, and Human-in-the-Loop for Next-Generation SOC Automation*
+> **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence, **N**eutralization, **E**scalation and **L**og-correlation
 
-![Python 3.10](https://img.shields.io/badge/Python-3.10-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)
-![Streamlit](https://img.shields.io/badge/UI-Streamlit-FF4B4B.svg)
-![MLflow](https://img.shields.io/badge/Tracking-MLflow-0194E2.svg)
+Autonomous AI Security Agent (IDS/SOAR) utilizing LangGraph, Dual-RAG, and Adversarial Guardrails for real-time multi-source log correlation. Built as a Master's Thesis in AI Security Engineering.
 
-## 📖 Overview
+## Architecture Overview
 
-Modern Security Operations Centers (SOCs) are plagued by alert fatigue and isolated log analysis. Security analysts are overwhelmed by high volumes of false positives, struggling to correlate complex multi-stage attacks across disjointed defense systems. 
+SENTINEL uses a **2-Tier Funneling Architecture** with a **Feedback Loop**, designed as a Containerized Modular system:
 
-This Master's Thesis project introduces an **Autonomous AI Security Agent** designed to automate the initial triage, correlation, and response recommendation phases of a SOC. By utilizing an Agentic Workflow equipped with stateful reasoning (LangGraph), the system intelligently correlates multi-source logs, retrieves contextual threat intelligence, and bridges the gap between machine speed reasoning and human oversight with explainable, actionable insights.
+```
+CSV Dataset ──▶ Redis Queue ──▶ Tier 1 (Rule Engine) ──▶ Guardrails ──▶ LangGraph Agent ──▶ HITL Dashboard
+                                   │         ▲                              │
+                                   │         │                              │
+                                   │         └──── Feedback Loop ◀──────────┘
+                                   │                (Dynamic Rules)
+                                   ▼
+                              DROP (Clean Traffic)
+```
 
-## ⚙️ Core Architecture
+**Tier 1 (Speed Layer):** Rule-based filter with dynamic rules and random sampling (2% clean traffic for Zero-day detection).
 
-Data flows through a comprehensive, production-grade pipeline:
+**Tier 2 (Intelligence Layer):** LangGraph Agent with Dual-RAG (MITRE ATT&CK + ISO 27001) powered by local Gemma 26B LLM via Oobabooga API.
 
-1. **Ingestion:** Parses and normalizes diverse log sources (Web, Auth, Firewall).
-2. **Correlation:** Groups discrete events using a sliding 5-minute time-window per IP address.
-3. **Adversarial Guardrails:** Sanitizes inputs and monitors state to block Prompt Injections and context overflow.
-4. **RAG Retrieval:** Queries a FAISS vector database to fetch relevant MITRE ATT&CK tactics and ISO 27001 compliance controls.
-5. **LLM Reasoning:** A local Gemma 26B model uses LangGraph to evaluate threat severity, map attack vectors, and formulate a response plan.
-6. **HITL (Streamlit):** Presents the correlated attack narrative to a Human Analyst (L1/L3) for approval.
-7. **Response:** Simulates mitigation executions (e.g., firewall block rules) based on analyst authorization.
+## Key Features
 
-## ✨ Key Features
+### Adversarial Guardrails (AI Self-Defense)
+- **Prompt Injection Detection:** Regex + heuristic scanning of all log fields before LLM ingestion.
+- **Semantic Pruning (Drain3):** Compresses thousands of duplicate logs into representative Templates with frequency counts.
+- **Token Budgeting:** Hard cap at 4,000 tokens for log data. Automatic Top-K sampling when budget is exceeded.
+- **Feature Extraction:** DDoS behavioral summarization (~50 tokens instead of 10,000 raw log lines).
+- **Context Overflow Guard:** Prevents VRAM exhaustion by monitoring total prompt + log token count.
+- **Entropy Scoring:** Prioritizes logs with high character entropy (likely SQLi/XSS payloads).
 
-- **Human-in-the-Loop (HITL):** Enforces Role-Based Access Control (RBAC), ensuring that critical mitigation commands are governed by human analysts before execution.
-- **Dual-RAG Intelligence:** Simultaneously grounds LLM reasoning in technical threat frameworks (MITRE ATT&CK) and governance standards (ISO 27001).
-- **Adversarial Guardrails:** Custom AI safety layers explicitly engineered to defend the agent against prompt poisoning and malicious log injections.
-- **MLflow Tracking:** Logs experiment parameters, ablation studies (performance with/without RAG), and accuracy metrics for rigorous academic evaluation.
+### Feedback Loop (Adaptive Defense)
+- Agent auto-generates new Tier 1 rules when novel attack patterns are confirmed.
+- Rules are persisted to `config/system_settings.yaml` for immediate enforcement.
 
-## 🛠 Prerequisites
+### Human-in-the-Loop (HITL)
+- Streamlit Dashboard with RBAC (L1 Analyst: view-only, L3 Manager: can block IP).
+- Agent pauses LangGraph state and awaits human approval for high-impact actions.
 
-To run this project, ensure you have the following installed and configured:
-- **Python 3.10.x** (Strictly recommended for local execution to avoid dependency conflicts)
-- **Docker & Docker Compose**
-- **Git LFS** (for fetching large SQLite and CSV files)
-- **Local LLM Backend:** Ensure `text-generation-webui` (Oobabooga) is running locally on port 5000, serving the Gemma 26B model with the API extension enabled.
+### MLOps
+- Docker Compose orchestration (UI + MLflow + Redis).
+- MLflow experiment tracking for Ablation Studies.
+- SQLite Audit Trail for forensic analysis.
 
-## 🚀 Quick Start / Installation
+## Project Structure
 
-**1. Clone the repository:**
+```
+sentinel/
+├── config/
+│   ├── system_settings.yaml          # Central config (LLM, Tier1, Guardrails, RAG, Redis)
+│   └── rbac_policies.json            # RBAC roles (L1_Analyst, L3_Manager)
+├── data/
+│   ├── raw/                          # Original CSV datasets (CICIDS2017, UNSW-NB15, MAWILab)
+│   └── processed/                    # Cleaned/transformed data
+├── docs/
+│   ├── capstone_proposal.md          # Full thesis proposal
+│   ├── architecture.md               # SENTINEL architecture diagram + RQ mapping
+│   └── literature_review/            # Literature review notes (20 citations)
+├── knowledge_base/
+│   ├── mitre_attack.json             # MITRE ATT&CK techniques
+│   ├── iso_27001_controls.json       # ISO 27001 controls
+│   └── faiss_index/                  # FAISS vector index (generated at runtime)
+├── src/
+│   ├── streaming/                    # Data Engineering Pipeline
+│   │   ├── publisher.py              # CSV → Redis Queue (real-time simulation)
+│   │   └── subscriber.py            # Redis → Tier 1 (blocking pop)
+│   ├── tier1_filter/                 # Speed Layer
+│   │   └── rule_engine.py            # Static + Dynamic rules, Random Sampling
+│   ├── guardrails/                   # AI Safety Layer
+│   │   ├── prompt_filter.py          # Injection detection, Entropy, Template Mining, Token Budget
+│   │   ├── state_monitor.py          # Overflow Guard, Loop Detector, Audit Logger
+│   │   └── data_validator.py         # Schema validation, Type coercion
+│   ├── rag/                          # Knowledge Retrieval
+│   │   ├── embedder.py               # Sentence-Transformers → FAISS indexing
+│   │   └── retriever.py              # FAISS search → MITRE/ISO context
+│   ├── agent/                        # Reasoning Core (Tier 2)
+│   │   ├── state.py                  # LangGraph state schema
+│   │   ├── prompts.py                # System/analysis prompt templates
+│   │   ├── nodes.py                  # Graph nodes (correlate, analyze, decide)
+│   │   └── workflow.py               # LangGraph graph definition & compilation
+│   ├── response/                     # Action Execution
+│   │   └── executor.py               # Block IP, Alert, Log actions
+│   └── ui/                           # HITL Dashboard
+│       ├── app.py                    # Streamlit main app
+│       ├── auth.py                   # RBAC authentication
+│       └── components.py             # Dashboard UI components
+├── experiments/
+│   ├── evaluate_accuracy.py          # F1, Precision, Recall on 3 datasets
+│   ├── evaluate_latency.py           # Reasoning Latency (2-Tier vs 1-Tier)
+│   ├── evaluate_guardrails.py        # Defeat Rate (1,000+ adversarial samples)
+│   └── baselines/                    # Ablation Study baselines
+│       ├── baseline_rule_only.py     # Tier 1 only (no LLM)
+│       └── baseline_llm_only.py      # LLM only (no Tier 1)
+├── tests/
+│   ├── unit/                         # Unit tests per module
+│   │   ├── test_prompt_filter.py
+│   │   ├── test_data_validator.py
+│   │   ├── test_entropy_scorer.py
+│   │   └── test_template_miner.py
+│   ├── integration/                  # End-to-end pipeline tests
+│   │   ├── test_end_to_end.py
+│   │   └── test_streaming_pipeline.py
+│   ├── test_tier1_filter.py
+│   ├── test_adversarial.py
+│   └── conftest.py                   # Pytest shared fixtures
+├── logs/
+│   ├── audit_trail.db                # SQLite audit log
+│   └── system_debug.log              # Debug output
+├── mlruns/                           # MLflow tracking data
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   │   └── bug_report.md
+│   └── PULL_REQUEST_TEMPLATE.md
+├── .env                              # Environment variables
+├── .gitignore
+├── .gitattributes
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml                # 3 services: agent_ui, mlflow, redis
+├── SECURITY.md
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+└── main.py                          # Application entry point
+```
+
+## 4D Evaluation Framework
+
+SENTINEL is evaluated across 4 dimensions, not just classification accuracy:
+
+| Dimension | Metric | Tool |
+|---|---|---|
+| **Classification** | Precision, Recall, F1-Score | MLflow + 3 datasets |
+| **Operational** | Reasoning Latency (sec/incident) | 2-Tier vs 1-Tier comparison |
+| **Robustness** | Guardrail Defeat Rate | 1,000+ Synthetic Adversarial logs |
+| **Context Quality** | RAG Context Relevance, Compression Ratio | Semantic Pruning evaluation |
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| LLM | Gemma 26B Q4_K_M (Local, Oobabooga API) |
+| Agent Framework | LangGraph |
+| RAG | Sentence-Transformers + FAISS |
+| Guardrails | Drain3 + Custom Entropy/Token Budget |
+| Streaming | Redis |
+| Dashboard | Streamlit + streamlit-authenticator |
+| MLOps | Docker Compose + MLflow |
+| Database | SQLite (Audit Trail) |
+
+## Quick Start
+
 ```bash
+# Clone the repository
 git clone https://github.com/Binhchuoizzz/AI_Security_Graph.git
 cd AI_Security_Graph
+
+# Configure environment
+cp .env.example .env  # Edit with your settings
+
+# Start all services
+docker-compose up --build
+
+# Access
+# UI:     http://localhost:8501
+# MLflow: http://localhost:5001
 ```
 
-**2. Configure Environment Variables:**
-Create a `.env` file in the root directory (or modify the existing one):
-```env
-OLLAMA_BASE_URL=http://host.docker.internal:5000/v1
-MODEL_NAME=gemma-26b
-MLFLOW_TRACKING_URI=http://mlflow:5000
-```
+## Hardware Requirements
 
-**3. Build and launch with Docker Compose:**
-```bash
-docker-compose up --build -d
-```
+| Component | Minimum |
+|---|---|
+| GPU | NVIDIA RTX 4060 Ti 16GB VRAM (or equivalent) |
+| RAM | 32GB |
+| Storage | 50GB SSD |
+| OS | Ubuntu 22.04+ |
 
-## 💻 Usage / Demo Scenario
+## License
 
-Once the containers are running, access the agentic environments:
-- **Streamlit SOC Dashboard:** Navigate to `http://localhost:8501`. Log in using your assigned RBAC credentials.
-- **Analyst Workflow:** View the real-time incident queue. Select a correlated incident to view the AI's gathered evidence, MITRE mappings, and proposed mitigation. Click **Approve** to execute the simulated firewall block or **Reject** to dismiss false positives.
-- **MLflow Tracking:** Navigate to `http://localhost:5001` to view benchmarking metrics and ablation study results.
+MIT License. See [LICENSE](LICENSE) for details.
 
-## 📂 Project Structure
+## Author
 
-```text
-ai_security_agent/
-├── config/           # RBAC policies and system settings
-├── data/             # Raw CSV datasets and processed logs
-├── experiments/      # MLflow ablation studies and metric calculations
-├── knowledge_base/   # MITRE & ISO structured JSON and FAISS indices
-├── logs/             # Audit trails and debug outputs
-├── src/
-│   ├── ingestion/    # Data parsing and formatting pipeline
-│   ├── correlation/  # Time-window clustering logic
-│   ├── rag/          # Vector embedding and retrieval
-│   ├── guardrails/   # Prompt filters and context overflow protection
-│   ├── agent/        # LangGraph state definitions and nodal workflow
-│   ├── response/     # Simulated mitigation executor
-│   └── ui/           # Streamlit app and components
-└── tests/            # Pytest suites for correlation and adversarial defenses
-```
-
-## ⚠️ Disclaimer
-
-This software is an academic prototype developed for a Master's Thesis. While it implements security best practices regarding LLM guardrails, it is **not intended for deployment in a production network environment** without significant code review, hardening, and sandbox integration.
+**Nguyễn Đức Bình** — Master's Thesis in AI & Machine Learning

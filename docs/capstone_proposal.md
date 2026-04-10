@@ -1,7 +1,9 @@
 # CAPSTONE PROJECT PROPOSAL
 
-**Project Title:** Autonomous AI Security Agent for Multi-source Log Correlation and Intrusion Response using LangGraph, Dual-RAG, and Adversarial Guardrails.
-*(Hệ thống phát hiện và phản ứng an ninh tự động dựa trên AI Agent đa nguồn kết hợp LangGraph, Dual-RAG và cơ chế phòng thủ Guardrails).*
+**Project Title:** SENTINEL — Autonomous AI Security Agent for Multi-source Log Correlation and Intrusion Response using LangGraph, Dual-RAG, and Adversarial Guardrails.
+*(SENTINEL: Hệ thống phát hiện và phản ứng an ninh tự động dựa trên AI Agent đa nguồn kết hợp LangGraph, Dual-RAG và cơ chế phòng thủ Guardrails).*
+
+> **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence, **N**eutralization, **E**scalation and **L**og-correlation
 
 ## 1. Introduction and Background
 
@@ -36,7 +38,7 @@ Dự án áp dụng phương pháp luận nghiên cứu khoa học thiết kế 
 * **Human-in-the-Loop (HITL):** Thay vì tự động chặn hoàn toàn, hệ thống sẽ bảo lưu trạng thái (State) và tạm dừng đồ thị, yêu cầu SOC Analyst phê duyệt lệnh thông qua Dashboard.
 
 **2.2. Software Architecture**
-Kiến trúc phần mềm tuân thủ nguyên tắc vi dịch vụ (Microservices) và được container hóa (Docker). Môi trường vận hành sử dụng mô hình LLM cục bộ (Gemma 26B qua Oobabooga API) nhằm đảm bảo nguyên tắc Data Privacy (Không đưa log nhạy cảm lên Cloud). Toàn bộ tham số hệ thống và chỉ số thực nghiệm được tracking tự động bởi MLflow.
+Kiến trúc phần mềm tuân thủ nguyên tắc module hóa đóng gói (Containerized Modular Architecture) và được container hóa (Docker). Môi trường vận hành sử dụng mô hình LLM cục bộ (Gemma 26B qua Oobabooga API) nhằm đảm bảo nguyên tắc Data Privacy (Không đưa log nhạy cảm lên Cloud). Toàn bộ tham số hệ thống và chỉ số thực nghiệm được tracking tự động bởi MLflow.
 
 ## 3. Implementation Plan
 
