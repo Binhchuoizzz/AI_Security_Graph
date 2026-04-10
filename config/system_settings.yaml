@@ -1,0 +1,84 @@
+# =============================================================
+# AI Security Agent - System Settings (Central Configuration)
+# =============================================================
+# File này là "bộ não trung tâm" cấu hình toàn bộ tham số
+# của hệ thống. Mọi module đều đọc config từ đây.
+# =============================================================
+
+# --- LLM Configuration ---
+llm:
+  base_url: "http://host.docker.internal:5000/v1"
+  model_name: "gemma-4-26B-A4B-it-UD-Q4_K_M"
+  max_context_tokens: 8192       # Context window tối đa của model
+  temperature: 0.1               # Giữ thấp để output ổn định (deterministic)
+  request_timeout_seconds: 120
+
+# --- Tier 1 Filter ---
+tier1:
+  risk_threshold: 30             # Ngưỡng điểm để ESCALATE lên Tier 2
+  sensitive_ports: [21, 22, 23, 3389, 445, 1433, 3306, 5432]
+  max_fwd_packets: 1000          # Ngưỡng volumetric attack
+  # Feedback Loop: Lấy mẫu ngẫu nhiên traffic sạch để Agent khám định kỳ
+  clean_traffic_sample_rate: 0.02  # 2% clean traffic sẽ được đẩy vào Tier 2
+  # Dynamic Rules: Các rule được Agent tự động sinh ra sẽ append vào đây
+  dynamic_rules: []
+
+# --- Guardrails (Semantic Pruning & Token Budgeting) ---
+guardrails:
+  # Token Budget: Ngân sách token tối đa dành cho dữ liệu log trong prompt
+  token_budget: 4000
+  # Top-K Sampling: Khi vượt ngân sách, chỉ lấy K mẫu quan trọng nhất mỗi Template
+  top_k_samples: 5
+  # Prompt Injection Detection
+  injection_patterns:
+    - "ignore previous instructions"
+    - "you are now"
+    - "system prompt"
+    - "disregard"
+    - "<script>"
+    - "DROP TABLE"
+    - "UNION SELECT"
+    - "; exec"
+  # Entropy threshold: Log có entropy > ngưỡng này được ưu tiên cao (khả năng chứa payload)
+  entropy_threshold: 4.5
+  # Drain3 Log Template Mining
+  drain3:
+    depth: 4                     # Độ sâu cây parse
+    similarity_threshold: 0.4    # Ngưỡng similarity để gom template
+    max_clusters: 100            # Số lượng template tối đa
+
+# --- RAG Configuration ---
+rag:
+  embedding_model: "all-MiniLM-L6-v2"    # Model nhúng nhẹ, chạy trên CPU
+  faiss_index_path: "knowledge_base/faiss_index"
+  mitre_attack_path: "knowledge_base/mitre_attack.json"
+  iso_27001_path: "knowledge_base/iso_27001_controls.json"
+  top_k_results: 3              # Số lượng document trả về từ FAISS
+
+# --- Correlation Engine ---
+correlation:
+  time_window_minutes: 5        # Khung thời gian gom nhóm sự kiện theo IP
+  min_events_to_correlate: 3    # Số sự kiện tối thiểu để kích hoạt correlation
+
+# --- Redis Streaming ---
+redis:
+  url: "redis://localhost:6379/0"
+  queue_name: "security_logs_stream"
+  escalated_queue: "escalated_logs"  # Queue riêng cho log đã qua Tier 1
+  publisher_delay_seconds: 0.5       # Độ trễ giữa các dòng log khi publish
+
+# --- HITL Dashboard ---
+dashboard:
+  port: 8501
+  session_timeout_minutes: 30
+
+# --- MLflow Tracking ---
+mlflow:
+  tracking_uri: "http://localhost:5001"
+  experiment_name: "ai_security_agent"
+
+# --- Logging ---
+logging:
+  level: "INFO"
+  audit_db_path: "logs/audit_trail.db"
+  debug_log_path: "logs/system_debug.log"
