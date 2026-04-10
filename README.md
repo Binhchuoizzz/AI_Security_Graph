@@ -67,16 +67,18 @@ sentinel/
 │   │   ├── publisher.py              # CSV → Redis Queue (real-time simulation)
 │   │   └── subscriber.py            # Redis → Tier 1 (blocking pop)
 │   ├── tier1_filter/                 # Speed Layer
-│   │   └── rule_engine.py            # Static + Dynamic rules, Random Sampling
+│   │   ├── rule_engine.py            # Static + Dynamic rules, Random Sampling
+│   │   └── feedback_listener.py      # Receives new rules from Agent (Feedback Loop)
 │   ├── guardrails/                   # AI Safety Layer
-│   │   ├── prompt_filter.py          # Injection detection, Entropy, Template Mining, Token Budget
+│   │   ├── prompt_filter.py          # Injection detection, Feature Extraction
+│   │   ├── template_miner.py         # Log Template Mining + Entropy + Token Budget
 │   │   ├── state_monitor.py          # Overflow Guard, Loop Detector, Audit Logger
 │   │   └── data_validator.py         # Schema validation, Type coercion
 │   ├── rag/                          # Knowledge Retrieval
 │   │   ├── embedder.py               # Sentence-Transformers → FAISS indexing
 │   │   └── retriever.py              # FAISS search → MITRE/ISO context
 │   ├── agent/                        # Reasoning Core (Tier 2)
-│   │   ├── state.py                  # LangGraph state schema
+│   │   ├── state.py                  # LangGraph state schema + Summary Memory
 │   │   ├── prompts.py                # System/analysis prompt templates
 │   │   ├── nodes.py                  # Graph nodes (correlate, analyze, decide)
 │   │   └── workflow.py               # LangGraph graph definition & compilation
@@ -89,7 +91,8 @@ sentinel/
 ├── experiments/
 │   ├── evaluate_accuracy.py          # F1, Precision, Recall on 3 datasets
 │   ├── evaluate_latency.py           # Reasoning Latency (2-Tier vs 1-Tier)
-│   ├── evaluate_guardrails.py        # Defeat Rate (1,000+ adversarial samples)
+│   ├── evaluate_guardrails.py        # Guardrails unit effectiveness
+│   ├── evaluate_robustness.py        # Defeat Rate (1,000+ adversarial samples)
 │   └── baselines/                    # Ablation Study baselines
 │       ├── baseline_rule_only.py     # Tier 1 only (no LLM)
 │       └── baseline_llm_only.py      # LLM only (no Tier 1)
