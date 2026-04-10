@@ -12,20 +12,30 @@
 
 ### 1.1. Problem Description
 
-Các Trung tâm Điều hành An ninh (SOC) hiện đại đang đối mặt với "Nghịch lý Dữ liệu lớn": Khối lượng sự kiện trên giây (EPS) khổng lồ dẫn đến tình trạng "quá tải cảnh báo" (alert fatigue). Theo báo cáo Ponemon Institute, trung bình một SOC analyst xử lý hơn 11,000 cảnh báo mỗi ngày, trong đó hơn 45% là dương tính giả. Các hệ thống IDS/SIEM truyền thống phân tích các nguồn dữ liệu (Web, Firewall, Auth) một cách rời rạc, làm giảm khả năng phát hiện chuỗi tấn công tinh vi (Multi-stage/APT attacks).
+Các Trung tâm Điều hành An ninh (SOC) hiện đại đang đối mặt với "Nghịch lý Dữ liệu lớn": Khối lượng sự kiện trên giây (EPS) khổng lồ dẫn đến tình trạng "quá tải cảnh báo" (alert fatigue). Theo báo cáo của Ponemon Institute (2023), trung bình một SOC analyst xử lý hơn 11,000 cảnh báo mỗi ngày, trong đó hơn 45% là dương tính giả. Các hệ thống IDS/SIEM truyền thống phân tích các nguồn dữ liệu (Web, Firewall, Auth) một cách rời rạc, làm giảm khả năng phát hiện chuỗi tấn công tinh vi (Multi-stage/APT attacks).
 
 Việc ứng dụng LLM trực tiếp vào phân tích log sinh ra hai lỗ hổng chí mạng: (1) Độ trễ suy luận (Reasoning Latency) quá cao không đáp ứng được luồng dữ liệu thời gian thực, và (2) Rủi ro AI bị thao túng bởi Prompt Injection ẩn bên trong log — kẻ tấn công chèn chỉ thị độc vào các trường dynamic (User-Agent, Referer, Payload) mà LLM sẽ xử lý (OWASP Top 10 for LLM Applications, 2025). Đặc biệt, nghịch lý giữa việc cần giữ variables chứa payload để phân tích nhưng không để chúng kích hoạt Injection trong Context Window — là bài toán chưa ai giải quyết triệt để trong bối cảnh SOC tự động hóa.
 
-### 1.2. Research Objectives
+### 1.2. Literature Review (Tổng quan nghiên cứu)
+
+Mặc dù việc sử dụng Generative AI trong Cyber Security đang phát triển mạnh, các nghiên cứu vẫn tồn tại khoảng trống lớn khi triển khai thực tế:
+- **LLM Agent cho SOC Automation:** Các nghiên cứu gần đây (ví dụ: Oniagbi et al., 2024; Audit-LLM) chủ yếu gọi API đám mây (GPT-4), vi phạm chính sách Data Privacy của tổ chức. Chưa có nghiên cứu nào tích hợp Local LLM với cơ chế tự phòng thủ (Adversarial Defense) ngay tại rìa.
+- **RAG trong Security:** Các hệ thống như RAG-ATT&CK đã ứng dụng Knowledge Graph. Tuy nhiên, việc kết hợp **Chuẩn chiến thuật (MITRE)** và **Chuẩn phòng thủ (ISO 27001)** trong cùng một Pipeline (Dual-RAG) vẫn là một điểm mới.
+- **Xử lý Log cho LLM:** Thuật toán Drain3 (He et al., 2017) được dùng rộng rãi để tiền xử lý log. SENTINEL nâng cấp việc này: ghép nối Drain3 vào Guardrails Layer như một cơ chế **Token Budgeting**, nhường chỗ cho các variables quan trọng.
+- **Prompt Injection Response:** Dù Agent Security Bench (ASB, 2024) đã cảnh báo về rủi ro này, các framework hiện tại chưa đề xuất cơ chế đóng gói dữ liệu (Delimited Data Encapsulation) chống được đòn Delimiter Smuggling thông qua Cryptographic Hash.
+
+Tính mới (Novelty) của SENTINEL không nằm ở việc tạo ra thuật toán đơn lẻ mới, mà nằm ở **Tư duy Kiến trúc Hệ thống (System Architecture Design)**: Ghép nối các công nghệ trên thành một **Dual-Tier Containerized Monolith** hoạt động khép kín với Feedback Loop thời gian thực.
+
+### 1.3. Research Objectives
 
 Nghiên cứu này xây dựng và đánh giá nguyên mẫu AI Security Agent có khả năng liên kết log đa nguồn theo thời gian thực, tự bảo vệ trước adversarial attacks, và hỗ trợ ra quyết định qua HITL. Các câu hỏi nghiên cứu:
 
-- **RQ1:** Kiến trúc 2-Tier (Rule-based + LLM Agent) với Session-Aware Behavioral Baselining tối ưu Reasoning Latency như thế nào so với 1-Tier (LLM-only)?
-- **RQ2:** Cơ chế Delimited Data Encapsulation (tách biệt log data khỏi LLM instruction space) có tác động ra sao đến Defeat Rate trước các đòn tấn công Prompt Injection qua log?
+- **RQ1:** Kiến trúc 2-Tier (Rule-based + LLM Agent) với Session-Aware Behavioral Baselining + Semantic Cache tối ưu Reasoning Latency như thế nào so với 1-Tier (LLM-only)?
+- **RQ2:** Cơ chế Delimited Data Encapsulation (Dynamic Randomized Delimiters) có tác động ra sao đến Defeat Rate trước các đòn tấn công Prompt Injection?
 - **RQ3:** Dual-RAG (MITRE ATT&CK + ISO 27001) cải thiện Context Relevance và hỗ trợ quyết định HITL như thế nào?
 - **RQ4:** Feedback Loop (Agent sinh Dynamic Rules cho Tier 1) giúp hệ thống thích ứng với Zero-day attacks hiệu quả ra sao?
 
-### 1.3. Scope of the Project
+### 1.4. Scope of the Project
 
 - **In-scope:** Data Streaming Pipeline (Redis); Tier-1 Rule Engine với Session Baselining và Feedback Loop; LangGraph Agent với Dual-RAG cục bộ; Guardrails đa tầng gồm Volume Compression (Drain3 Template Mining) tách biệt với Injection Defense (Delimited Data Encapsulation); Streamlit HITL Dashboard với RBAC; MLOps (Docker, MLflow, SQLite Audit Trail).
 - **Out-of-scope:** Fine-tuning Foundation Model; Apache Kafka vật lý; DDoS Layer 3/4 mitigation.
@@ -157,9 +167,9 @@ CSV Datasets ──▶ Redis Queue ──▶ Tier 1 (Session Baselining + TTL Ev
 
 Chiến lược **Lab Experiment** + **Adversarial Testing**. Datasets:
 
-1. **CICIDS2017:** Baseline benchmark (DoS, Brute Force). Phổ biến nhất trong literature, cho phép so sánh trực tiếp với nghiên cứu trước.
-2. **UNSW-NB15:** Tấn công đa hình, phân tán.
-3. **MAWILab:** Log Correlation đa nguồn.
+1. **CICIDS2017:** Baseline benchmark (DoS, Brute Force). Tuy đã ra mắt nhiều năm, dataset này vẫn được chọn làm trọng tâm vì nó là chuẩn mực phổ biến nhất trong literature SOC hiện tại, cho phép đối chiếu trực tiếp kết quả của SENTINEL với các nghiên cứu trước đó một cách minh bạch (thay vì các dataset nội bộ khó kiểm chứng).
+2. **UNSW-NB15:** Thử nghiệm tấn công đa hình, phân tán.
+3. **MAWILab:** Packet traffic được tiền xử lý thành dạng CSV tabular nhằm thử nghiệm khả năng Log Correlation đa nguồn.
 
 **Synthetic Adversarial Generation:** Dùng Gemma 26B sinh 1,000+ kịch bản Log Injection gồm 4 loại: Direct Injection, Indirect Injection, Encoding Bypass, Context Manipulation.
 
@@ -227,3 +237,5 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 7. LangGraph Documentation — State Management for LLM Workflows.
 8. Agent Security Bench (ASB) (2024) — Benchmarking Attacks and Defenses for LLM-based Agents.
 9. Zheng et al. (2023) — Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena.
+10. Ponemon Institute (2023) — The State of Security Operations and the Role of AI.
+11. Oniagbi et al. (2024) — Generative AI in Cybersecurity: A Comprehensive Review.
