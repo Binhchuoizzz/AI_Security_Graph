@@ -1,12 +1,12 @@
-# Ablation Study — 6 Configuration Design
+# Ablation Study — 6 Configuration Design & Statistical Framework
 
 > **Status:** SKELETON
-> **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và ISO-only RAG)
-> **Trả lời câu hỏi:** "Mỗi component contribute gì? ISO RAG có thực sự cần thiết không?"
+> **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và ISO-only RAG) và bổ sung Statistical Validity Framework.
+> **Trả lời câu hỏi:** "Mỗi component contribute gì? Sự khác biệt có ý nghĩa thống kê (statistically significant) không?"
 
 ---
 
-## Configuration Matrix
+## 1. Configuration Matrix
 
 | Config | Tier 1 | Guardrails (Drain3) | Guardrails (Encapsulation) | LLM Agent | RAG | Mục đích chính |
 |---|---|---|---|---|---|---|
@@ -19,16 +19,31 @@
 
 ---
 
-## Expected Results & Hypotheses
+## 2. Statistical Validity Framework (New)
+
+Để đảm bảo kết quả đánh giá không phải do yếu tố ngẫu nhiên, các metric sẽ được kiểm định thống kê:
+
+| Đối tượng so sánh | Metric đo lường | Phương pháp kiểm định (Statistical Test) | Ngưỡng ý nghĩa (Threshold) |
+|---|---|---|---|
+| Hiệu năng mô hình (A vs F, D vs E vs F) | F1-Score, Precision, Recall | Paired t-test hoặc McNemar's test (cho dữ liệu phân loại) | p < 0.05 |
+| Độ trễ hệ thống (2-Tier vs 1-Tier) | Reasoning Latency | Mann-Whitney U test (non-parametric vì latency thường skewed) | p < 0.05 |
+| Độ chính xác Mapping (MITRE Accuracy) | Mapping Accuracy (trên 30 cases) | Binomial Proportion Confidence Interval | 95% CI |
+| Tối ưu hiệu năng Embedding | Semantic Cache Hit Rate | Không kiểm định (Report Mean ± Std) | Report CI 95% |
+
+*Tất cả kết quả báo cáo p-value cụ thể. P-value < 0.05 được coi là statistically significant.*
+
+---
+
+## 3. Expected Results & Hypotheses
 
 ### Classification Metrics (F1/Precision/Recall)
-- F > D > E > A : Dual-RAG > Single-RAG > No-LLM
+- F > D > E > A : Dual-RAG > Single-RAG > No-LLM (với p < 0.05)
 - B ≈ F for F1, BUT B >> F for latency : LLM-only accurate but slow
 - C < F for Robustness : No Encapsulation = vulnerable to injection
 
 ### Operational Metrics (Latency)
 - A << B : Rule-only extremely fast, LLM-only very slow
-- F < B : 2-Tier filters 70%+ traffic, reducing LLM calls
+- F < B : 2-Tier filters 70%+ traffic, reducing LLM calls (với p < 0.05 bằng Mann-Whitney U)
 - F ≈ D ≈ E : RAG type doesn't significantly affect latency
 
 ### Robustness Metrics (Adversarial)
@@ -48,7 +63,7 @@
 
 ---
 
-## Ablation Run Plan
+## 4. Ablation Run Plan
 
 | Run | Config | Dataset | Sample Size | Estimated GPU Time |
 |---|---|---|---|---|
@@ -62,7 +77,7 @@
 
 ---
 
-## Implementation Notes
+## 5. Implementation Notes
 
 ### Switching RAG configs
 ```python
