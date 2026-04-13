@@ -11,178 +11,85 @@ SENTINEL uses a **2-Tier Funneling Architecture** with strict **Separation of Co
 ```text
 CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner → Prompt Filter → Semantic Cache → FAISS RAG → Agent(9B) → HITL
                                  │         ▲                (Compression)   (Dyn.Delimiters)  (Cache Hit?)    (Dual-RAG)                 Dashboard
-                                 │         └──────────────── Feedback Loop (Dynamic Rules) ◀────────────────────────────┘
+                                 │         └──────────────── Feedback Loop (Pending Approval / Quarantine) ◀─────────────────────────────┘
                                  ▼
                             DROP (Clean)
 ```
 
-**Tier 1 (Speed Layer):** Session-Aware Behavioral Baselining + TTL eviction. No random sampling.
+**Tier 1 (Speed Layer):** Session-Aware Behavioral Baselining + TTL eviction. 
 
 **Guardrails (Two separate modules):**
-
 - `template_miner.py` — Volume Compression ONLY (Drain3). Variables preserved.
-- `prompt_filter.py` — Injection Defense ONLY (Dynamic Randomized Delimiters).
+- `prompt_filter.py` — Injection Defense ONLY (Dynamic Randomized Delimiters + Encoding Neutralization).
 
-**Tier 2 (Intelligence Layer):** LangGraph Agent (Gemma 2 9B Q6_K) + Semantic Cache + Dual-RAG (MITRE ATT&CK + ISO 27001). Gemma 26B as Oracle Judge for evaluation.
+**Tier 2 (Intelligence Layer):** LangGraph Agent (Gemma 2 9B Q6_K) + Semantic Cache + Dual-RAG (MITRE ATT&CK + ISO 27001). 
 
-## Key Features
+## 🛡️ Core Novelty & Defenses
 
-### Guardrails — Separation of Concerns
+### Delimited Data Encapsulation (Adversarial Defense)
+- **Dynamic Randomized Delimiters:** Each request generates a new delimiter using cryptographically secure `secrets.token_hex()`. Prevents *Delimiter Smuggling*.
+- **Encoding Neutralization:** Intercepts and decodes Base64/Hex/Unicode before inference.
+- **Quantified Limitations:** The Threat Model acknowledges and actively measures the baseline vulnerability against *Semantic Confusion* (an open problem in the field).
 
-**Volume Compression (`template_miner.py`):**
-- Drain3 compresses thousands of duplicate logs into Templates + frequency.
-- Variables (dynamic params containing attack payloads) are **PRESERVED in raw samples**.
-- Purpose: Fit data into Context Window. Does NOT defend against injection.
+### HITL Quarantine (Adversarial Rule Injection Defense)
+- Agent auto-generates new rules based on context, but they are placed in **Quarantine (Pending Approval)**.
+- Streamlit Dashboard with RBAC securely routes rules to an L3 Manager for approval before hot-reloading into the Tier 1 Rule Engine.
+- Prevents the agent from being manipulated into blocking legitimate infrastructure.
 
-**Injection Defense (`prompt_filter.py`):**
+## 📊 Evaluation & Methodology
 
-- **Pattern Detection:** Flags known injection strings. Does NOT redact (preserves evidence).
-- **Encoding Neutralization:** Defeats Base64/Hex/Unicode bypass tricks.
-- **Dynamic Randomized Delimiters:** Each request generates a new delimiter using `secrets.token_hex()`. Attacker cannot predict the hash → prevents Delimiter Smuggling. Raw data sanitized before encapsulation.
+SENTINEL employs a rigorous thesis-grade methodology built for reproducibility and continuous validation.
 
-### Session Baselining (replaces Random Sampling)
+### 4D Evaluation Framework
+| Dimension | Metric | Method / Dataset |
+|---|---|---|
+| **Classification** | F1, Precision, Recall | CICIDS2017 & UNSW-NB15 across 6 Ablation Configs |
+| **Operational** | Reasoning Latency | 2-Tier vs 1-Tier comparison (Mann-Whitney U Test) |
+| **Robustness** | Guardrail Defeat Rate | 1,000+ Synthetic Adversarial logs (Structural + Semantic) |
+| **Context Quality** | RAG Relevance, MITRE Acc | RAGAS + Gemma 26B Oracle + 30 Ground Truth cases |
 
-- Tier 1 maintains behavioral profile per Source IP (request count, unique ports, packet volume).
-- Escalates on **statistical deviation**, not random chance.
-- 100% of traffic is baselined — APT kill-chain evidence is never destroyed.
-- **TTL Eviction:** Inactive IPs auto-purged after 600s — prevents RAM OOM on large datasets.
+### Statistical Validity
+All main comparisons are backed by statistical tests to ensure results are not derived from random chance:
+- **Paired t-tests / McNemar's tests** for F1-score variance across 6 ablation configurations.
+- **Mann-Whitney U tests** for skewed latency distributions.
+- **95% Confidence Intervals** for cache hit rates and accuracy mapped via 30 manually labeled reasoning cases.
 
-### Semantic Cache (Embedding Latency Optimization)
+### Reproducibility Package
+This project is engineered for complete scientific reproducibility:
+1. `config/ablation/` contains exactly 6 `.yaml` configurations covering the full Ablation Study (from Rule-only to Full-SENTINEL).
+2. `experiments/` provides structured Ground Truth sets for validation independent of Circular Model Bias. 
+3. Controlled environment orchestration is fully containerized via `docker-compose`.
 
-- LRU + TTL cache for RAG vector queries. Key = template pattern hash.
-- Bypasses embedding + FAISS search for previously-seen attack patterns.
-- Expected hit rate: >90% for DDoS, >80% for Brute Force.
-
-### Data Publisher (CSV → Redis)
-
-- **3 timing modes:** `replay` (real-time), `accelerated` (compressed x50), `burst` (max throughput).
-- **Chunked reading:** Never loads entire CSV into RAM (5,000 rows/chunk).
-- **Backpressure control:** Pauses publishing when Redis queue exceeds depth limit.
-
-### Feedback Loop (Explicit Data Flow)
-- `LangGraph Agent` → `feedback_listener.py` → `system_settings.yaml` → `RuleEngine.reload_dynamic_rules()`.
-- Agent auto-generates new rules, which are **immediately enforceable** at Tier 1.
-
-### Human-in-the-Loop (HITL)
-- Streamlit Dashboard with RBAC (L1 Analyst: view-only, L3 Manager: can block IP).
-- Agent pauses LangGraph state and awaits human approval for high-impact actions.
-
-### MLOps
-- Docker Compose orchestration (UI + MLflow + Redis).
-- MLflow experiment tracking for Ablation Studies.
-- SQLite Audit Trail for forensic analysis.
-
-## Project Structure
+## 📁 Key Project Structure
 
 ```
 sentinel/
 ├── config/
 │   ├── system_settings.yaml          # Central config (LLM, Tier1, Guardrails, RAG, Redis)
-│   └── rbac_policies.json            # RBAC roles (L1_Analyst, L3_Manager)
-├── data/
-│   └── raw/                          # Original CSV datasets only (logs stream directly into RAM via Redis)
+│   └── ablation/                     # 6 Ablation Study configs (A through F)
 ├── docs/
 │   ├── capstone_proposal.md          # Full thesis proposal
-│   ├── architecture.md               # SENTINEL architecture diagram + RQ mapping
-│   └── literature_review/            # Literature review notes (20 citations)
-├── knowledge_base/
-│   ├── mitre_attack.json             # MITRE ATT&CK techniques
-│   ├── iso_27001_controls.json       # ISO 27001 controls
-│   └── faiss_index/                  # FAISS vector index (generated at runtime)
-├── src/
-│   ├── streaming/                    # Data Engineering Pipeline
-│   │   ├── publisher.py              # CSV → Redis Queue (real-time simulation)
-│   │   └── subscriber.py            # Redis → Tier 1 (blocking pop)
-│   ├── tier1_filter/                 # Speed Layer
-│   │   ├── rule_engine.py            # Static + Dynamic rules, Random Sampling
-│   │   └── feedback_listener.py      # Receives new rules from Agent (Feedback Loop)
-│   ├── guardrails/                   # AI Safety Layer
-│   │   ├── prompt_filter.py          # Injection detection, Feature Extraction
-│   │   ├── template_miner.py         # Log Template Mining + Entropy + Token Budget
-│   │   ├── state_monitor.py          # Overflow Guard, Loop Detector, Audit Logger
-│   │   └── data_validator.py         # Schema validation, Type coercion
-│   ├── rag/                          # Knowledge Retrieval
-│   │   ├── embedder.py               # Sentence-Transformers → FAISS indexing
-│   │   └── retriever.py              # FAISS search → MITRE/ISO context
-│   ├── agent/                        # Reasoning Core (Tier 2)
-│   │   ├── state.py                  # LangGraph state schema + Summary Memory
-│   │   ├── prompts.py                # System/analysis prompt templates
-│   │   ├── nodes.py                  # Graph nodes (correlate, analyze, decide)
-│   │   └── workflow.py               # LangGraph graph definition & compilation
-│   ├── response/                     # Action Execution
-│   │   └── executor.py               # Block IP, Alert, Log actions
-│   └── ui/                           # HITL Dashboard
-│       ├── app.py                    # Streamlit main app
-│       ├── auth.py                   # RBAC authentication
-│       └── components.py             # Dashboard UI components
+│   ├── literature_review/            # PRISMA-ScR Systematic Review
+│   ├── threat_model.md               # Adversary profiles & Defense limit matrix
+│   └── REPRODUCIBILITY.md            # Execution framework guidelines
 ├── experiments/
-│   ├── evaluate_accuracy.py          # F1, Precision, Recall on 3 datasets
-│   ├── evaluate_latency.py           # Reasoning Latency (2-Tier vs 1-Tier)
-│   ├── evaluate_guardrails.py        # Guardrails unit effectiveness
-│   ├── evaluate_robustness.py        # Defeat Rate (1,000+ adversarial samples)
-│   └── baselines/                    # Ablation Study baselines
-│       ├── baseline_rule_only.py     # Tier 1 only (no LLM)
-│       └── baseline_llm_only.py      # LLM only (no Tier 1)
-├── tests/
-│   ├── unit/                         # Unit tests per module
-│   │   ├── test_prompt_filter.py
-│   │   ├── test_data_validator.py
-│   │   ├── test_entropy_scorer.py
-│   │   └── test_template_miner.py
-│   ├── integration/                  # End-to-end pipeline tests
-│   │   ├── test_end_to_end.py
-│   │   └── test_streaming_pipeline.py
-│   ├── test_tier1_filter.py
-│   ├── test_adversarial.py
-│   └── conftest.py                   # Pytest shared fixtures
-├── logs/
-│   ├── audit_trail.db                # SQLite audit log
-│   └── system_debug.log              # Debug output
-├── mlruns/                           # MLflow tracking data
-├── .github/
-│   ├── ISSUE_TEMPLATE/
-│   │   └── bug_report.md
-│   └── PULL_REQUEST_TEMPLATE.md
-├── .env                              # Environment variables
-├── .gitignore
-├── .gitattributes
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml                # 3 services: agent_ui, mlflow, redis
-├── SECURITY.md
-├── CODE_OF_CONDUCT.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-└── main.py                          # Application entry point
+│   ├── adversarial/                  # ~1000 Independent attack samples
+│   ├── baselines/                    # Rule-only and LLM-only runner setups
+│   ├── ground_truth.json             # 200 static RAGAS samples
+│   ├── reasoning_ground_truth.json   # 30 manually curated MITRE labeled cases
+│   ├── ablation_design.md            # Statistical Hypothesis matrix
+│   └── vram_benchmark/               # Empirical hardware validation bounds
+├── src/
+│   ├── streaming/                    # Pipeline: pub/sub architecture
+│   ├── tier1_filter/                 # Speed Layer + Feedback Listener & Firewall
+│   ├── guardrails/                   # Compression, Validators & Monitor guards
+│   ├── rag/                          # Dual-Database Vector retrieval & Cache
+│   ├── agent/                        # LangGraph Stateful Reasoning Nodes
+│   └── ui/                           # RBAC + Streamlit Dashboard
+└── tests/                            # Pytest suites
 ```
 
-## 4D Evaluation Framework
-
-SENTINEL is evaluated across 4 dimensions, not just classification accuracy:
-
-| Dimension | Metric | Tool |
-|---|---|---|
-| **Classification** | Precision, Recall, F1-Score | MLflow + 3 datasets |
-| **Operational** | Reasoning Latency (sec/incident) | 2-Tier vs 1-Tier comparison |
-| **Robustness** | Guardrail Defeat Rate | 1,000+ Synthetic Adversarial logs |
-| **Context Quality** | RAG Context Relevance, Compression Ratio | Semantic Pruning evaluation |
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| LLM (Primary) | Gemma 2 9B Q6_K (~7GB VRAM, Local via Oobabooga API) |
-| LLM (Ablation) | Gemma 26B Q4_K_M (optional, for quality comparison) |
-| Agent Framework | LangGraph (Structured MemoryObject with IOC Registry) |
-| RAG | Sentence-Transformers + FAISS (Dual: MITRE ATT&CK + ISO 27001) |
-| Guardrails | Drain3 (compression) + Dynamic Delimiters (injection defense) |
-| Streaming | Redis |
-| Dashboard | Streamlit + streamlit-authenticator |
-| MLOps | Docker Compose + MLflow |
-| Database | SQLite (Audit Trail) |
-
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 # Clone the repository
@@ -190,31 +97,29 @@ git clone https://github.com/Binhchuoizzz/AI_Security_Graph.git
 cd AI_Security_Graph
 
 # Configure environment
-cp .env.example .env  # Edit with your settings
+cp .env.example .env  # Edit with your API endpoints if necessary
 
-# Start all services
+# Start all core services
 docker-compose up --build
 
 # Access
-# UI:     http://localhost:8501
-# MLflow: http://localhost:5001
+# UI Dashboard: http://localhost:8501
+# MLflow Metrics: http://localhost:5001
 ```
 
-## Hardware Requirements
+## 💻 Hardware Requirements
 
-| Component | Minimum | VRAM Usage |
+| Component | Minimum | VRAM Target Details |
 |---|---|---|
-| GPU | NVIDIA RTX 4060 Ti 16GB VRAM | ~7GB model + ~9GB KV Cache |
-| RAM | 32GB | |
-| Storage | 50GB SSD | |
-| OS | Ubuntu 22.04+ | |
+| GPU | NVIDIA RTX 4060 Ti 16GB VRAM | Base Model (~7GB) + Context/KV Cache (~9GB) |
+| RAM | 32GB | For streaming cache overhead |
+| Storage | 50GB SSD | Dataset caching + DB logging |
+| OS | Linux (Ubuntu 22.04+) | - |
 
-> **Why 9B instead of 26B?** Gemma 26B Q4 uses ~15GB VRAM, leaving only 0.5-1.5GB for KV Cache → CUDA OOM when loading System Prompt + RAG + Memory + Logs simultaneously. Gemma 2 9B Q6 uses ~7GB, leaving 9GB — sufficient for the full SENTINEL pipeline.
+> **VRAM Design Consideration**: The system runs Gemma 2 **9B** (Q6_K) instead of 26B, allowing 9GB of safety margin exclusively for KV Cache, avoiding OOM issues observed with deep system prompts + contextual RAG history memory loads on consumer GPU hardware.
 
-## License
+## 📝 License & Authorship
 
 MIT License. See [LICENSE](LICENSE) for details.
 
-## Author
-
-**Nguyễn Đức Bình** — Master's Thesis in AI & Machine Learning
+**Author**: Nguyễn Đức Bình — Master's Candidate in AI & Machine Learning.
