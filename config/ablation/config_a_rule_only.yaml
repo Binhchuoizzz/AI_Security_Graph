@@ -1,0 +1,18 @@
+# Ablation Config A: Rule-Only (No LLM, No Guardrails)
+# Purpose: Baseline — prove LLM Agent adds value over pure rule-based IDS
+
+tier1:
+  enabled: true
+
+guardrails:
+  template_miner: false
+  encapsulation: false
+
+agent:
+  enabled: false
+
+rag:
+  enabled_sources: []
+
+evaluation:
+  tag: "ablation_A_rule_only"

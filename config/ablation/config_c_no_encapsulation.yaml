@@ -1,0 +1,18 @@
+# Ablation Config C: No Encapsulation (Drain3 only, no injection defense)
+# Purpose: Prove Delimited Data Encapsulation defends against injection
+
+tier1:
+  enabled: true
+
+guardrails:
+  template_miner: true
+  encapsulation: false      # <-- KEY: No Encapsulation
+
+agent:
+  enabled: true
+
+rag:
+  enabled_sources: ["mitre", "iso"]
+
+evaluation:
+  tag: "ablation_C_no_encapsulation"

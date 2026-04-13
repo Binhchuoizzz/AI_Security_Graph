@@ -1,0 +1,19 @@
+# Ablation Config D: MITRE-Only RAG
+# Purpose: Isolate ISO 27001 RAG contribution.
+#          IF D ≈ F → ISO RAG adds nothing → drop Dual-RAG claim
+
+tier1:
+  enabled: true
+
+guardrails:
+  template_miner: true
+  encapsulation: true
+
+agent:
+  enabled: true
+
+rag:
+  enabled_sources: ["mitre"]    # <-- KEY: MITRE only, no ISO
+
+evaluation:
+  tag: "ablation_D_mitre_only_rag"

@@ -1,0 +1,19 @@
+# Ablation Config E: ISO-Only RAG
+# Purpose: Isolate MITRE ATT&CK RAG contribution.
+#          Expect: D > E for technique mapping, E > D for response recommendations
+
+tier1:
+  enabled: true
+
+guardrails:
+  template_miner: true
+  encapsulation: true
+
+agent:
+  enabled: true
+
+rag:
+  enabled_sources: ["iso"]      # <-- KEY: ISO only, no MITRE
+
+evaluation:
+  tag: "ablation_E_iso_only_rag"

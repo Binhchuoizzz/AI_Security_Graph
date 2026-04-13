@@ -1,0 +1,18 @@
+# Ablation Config B: LLM-Only (No Tier 1 filter)
+# Purpose: Prove 2-Tier architecture reduces latency vs sending everything to LLM
+
+tier1:
+  enabled: false
+
+guardrails:
+  template_miner: false
+  encapsulation: false
+
+agent:
+  enabled: true
+
+rag:
+  enabled_sources: ["mitre", "iso"]
+
+evaluation:
+  tag: "ablation_B_llm_only"

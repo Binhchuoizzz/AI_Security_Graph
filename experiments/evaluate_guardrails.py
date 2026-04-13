@@ -1,37 +1,44 @@
+# Context Quality Evaluation (RAGAS + LLM-as-Judge)
+# TODO: Implement dual evaluation methodology
+
 """
-Experiment: Evaluate RAG Context Quality
+Context Quality Evaluation — Dual Methodology:
 
-VẤN ĐỀ PHƯƠNG PHÁP LUẬN:
-  RAGAS framework yêu cầu Ground Truth (đáp án tham chiếu chuẩn)
-  để tính Context Precision, Answer Relevancy.
-  Với 3 bộ dataset (CICIDS2017, UNSW-NB15, MAWILab), việc tự gán nhãn
-  Ground Truth thủ công là BẤT KHẢ THI trong 8 tuần.
+=== TẦNG 1: RAGAS (200 static Ground Truth samples) ===
+  Input: experiments/ground_truth.json (200 labeled incidents)
+  Process:
+    1. Run SENTINEL pipeline on each GT incident
+    2. Capture RAG context retrieved + Agent answer
+    3. Compute RAGAS metrics:
+       - Context Precision: % retrieved chunks relevant to GT
+       - Answer Relevancy: Agent answer aligns with expected decision
+       - Faithfulness: Agent answer grounded in retrieved context
+  Output: RAGAS score per incident, aggregated metrics
 
-GIẢI PHÁP 2 TẦNG:
-  1. TẦNG 1 — Ground Truth tĩnh (200 sự cố):
-     Trích xuất 200 sự cố đại diện từ 3 datasets, mỗi sự cố gán:
-     - expected_mitre_technique: Kỹ thuật ATT&CK đúng
-     - expected_iso_control: Điều khoản ISO 27001 phù hợp
-     - expected_decision: Hành động lý tưởng (BLOCK/ALERT/LOG)
-     Lưu trong file JSON tĩnh để RAGAS tính toán.
+=== TẦNG 2: LLM-as-a-Judge (5,000 stratified samples) ===
+  Oracle Model: Gemma 2 26B Q4_K_M (independent judge, different from 9B agent)
+  Process:
+    1. Sequential model swap: unload 9B agent → load 26B judge
+    2. For each of 5,000 stratified samples:
+       a. Present: original log + RAG context retrieved + Agent decision
+       b. Judge prompt: "Rate context relevance 1-5. Is the decision appropriate?"
+       c. Record: relevance_score, decision_appropriateness, reasoning
+    3. Compare with stratified sample distribution to validate representativeness
+  Output: Mean relevance score, decision accuracy, confidence intervals
 
-  2. TẦNG 2 — LLM-as-a-Judge (toàn bộ dataset):
-     Dùng Gemma 9B (hoặc 26B nếu có thời gian) làm "trọng tài độc lập"
-     để chấm điểm Context Relevance không cần Ground Truth.
-     Prompt đánh giá: "Cho bối cảnh RAG này, mức độ liên quan 1-5?"
-     Đây là phương pháp được chấp nhận rộng rãi trong literature
-     (Zheng et al., 2023 — "Judging LLM-as-a-Judge").
+=== TẦNG 2.5: Agent Reasoning Accuracy (30 cases) ===    <-- NEW (Fix #2)
+  Input: experiments/reasoning_ground_truth.json (30 MITRE-labeled cases)
+  Process:
+    1. Run Agent on each case
+    2. Extract MITRE technique from Agent output
+    3. Exact match vs GT technique → MITRE Mapping Accuracy
+    4. Tactic-level match → Tactic Accuracy
+    5. Benign cases with technique assigned → Hallucination Rate
+  Output: Accuracy %, Hallucination %, confusion matrix
 
-METRICS ĐẦU RA:
-  - Context Precision (RAGAS, cần Ground Truth → dùng 200 mẫu)
-  - Answer Relevancy (RAGAS, cần Ground Truth → dùng 200 mẫu)
-  - Context Relevance Score (LLM-as-Judge, 1-5 scale, không cần GT)
-  - Semantic Cache Hit Rate (từ SemanticCache.get_stats())
-  - Compression Ratio (từ LogTemplateMiner.get_compression_ratio())
+Depends on:
+  - experiments/ground_truth.json (200 samples)
+  - experiments/reasoning_ground_truth.json (30 samples)
+  - src/rag/retriever.py (Dual-RAG)
+  - src/agent/workflow.py (LangGraph Agent)
 """
-# TODO: Implement evaluation runner
-# 1. Load ground_truth.json (200 labeled incidents)
-# 2. Run SENTINEL pipeline trên 200 mẫu
-# 3. Compute RAGAS metrics với Ground Truth
-# 4. Run LLM-as-Judge trên toàn bộ escalated events
-# 5. Log tất cả metrics vào MLflow

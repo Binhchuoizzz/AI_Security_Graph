@@ -1,19 +1,35 @@
+# Adversarial Evaluation Runner
+# TODO: Orchestrates all adversarial experiments across 3 categories
+
 """
-Experiment: Evaluate Robustness (Adversarial Guardrails Testing)
+Adversarial Evaluation Pipeline:
 
-Chạy 1,000+ kịch bản Log Injection đa dạng (Synthetic Adversarial Generation)
-để đo lường Guardrail Effectiveness (Defeat Rate).
+1. Load adversarial samples from:
+   - experiments/adversarial/structural_attacks/    (300 samples)
+   - experiments/adversarial/encoding_bypass/       (200 samples)
+   - experiments/adversarial/semantic_confusion/    (500 samples)
 
-Metrics đầu ra:
-  - Defeat Rate = (Số lần LLM bị bypass) / (Tổng mẫu tấn công)
-  - Block Rate = 1 - Defeat Rate
-  - Phân loại theo loại tấn công: Direct Injection, Indirect Injection,
-    Encoding Bypass, Context Manipulation
+2. For each sample:
+   a. Inject payload into log entry (specified field)
+   b. Pass through Guardrails pipeline (Encapsulation + Pattern Matching)
+   c. If not blocked → pass to LLM Agent
+   d. Compare Agent decision vs Ground Truth
+   e. Record: blocked_by_guardrail, agent_decision_correct, bypass_succeeded
 
-Kết quả được log vào MLflow để phục vụ Chương 4 (Ablation Study).
+3. Compute metrics per category:
+   - Structural: Defeat Rate (expect ~0%)
+   - Encoding: Defeat Rate (expect ~0%)
+   - Semantic Confusion: Bypass Rate (expect X% — quantified limitation)
+
+4. Compute comparative metrics:
+   - Full Encapsulation (Config F) vs No Encapsulation (Config C)
+   - Semantic Confusion bypass WITH vs WITHOUT Encapsulation (expect similar)
+
+5. Log all results to MLflow: experiment=sentinel_adversarial
+
+Depends on:
+   - src/guardrails/prompt_filter.py (DelimitedDataEncapsulator)
+   - src/agent/workflow.py (LangGraph Agent)
+   - config/ablation/config_c_no_encapsulation.yaml
+   - config/ablation/config_f_full.yaml
 """
-# TODO: Implement adversarial test runner
-# 1. Load/generate 1,000+ adversarial log samples
-# 2. Push through Guardrails pipeline
-# 3. Measure bypass rate
-# 4. Log results to MLflow

@@ -1,0 +1,18 @@
+# Ablation Config F: SENTINEL Full (Complete System)
+# Purpose: Full system benchmark — all components enabled
+
+tier1:
+  enabled: true
+
+guardrails:
+  template_miner: true
+  encapsulation: true
+
+agent:
+  enabled: true
+
+rag:
+  enabled_sources: ["mitre", "iso"]   # Dual-RAG
+
+evaluation:
+  tag: "ablation_F_sentinel_full"
