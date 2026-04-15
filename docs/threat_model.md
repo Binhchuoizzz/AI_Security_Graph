@@ -72,19 +72,36 @@ suy luận của LLM.
 - Semantic Confusion nằm **trong** data boundary — nội dung hợp lệ về cấu trúc
 - Không vi phạm delimiter, không encode, không chứa injection keyword
 
-### 4.3 Experiment Design
-- **Test set:** 500 Semantic Confusion samples (xem `experiments/adversarial/semantic_confusion/`)
-- **Metric:** Bypass Rate = (Agent bị dẫn dắt ra quyết định sai) / (Tổng sample)
-- **Baseline comparison:** Bypass Rate WITH Encapsulation vs WITHOUT Encapsulation
-  → Kỳ vọng: gần bằng nhau (chứng minh Encapsulation không giúp gì cho semantic attacks)
+### 4.3 Experiment Design — Cross-Family Generation (Option C)
+
+**Ba vai trò được phân tách rõ ràng để tránh Circular Evaluation Bias:**
+
+| Vai trò | Model | Model Family | Lý do chọn |
+|---|---|---|---|
+| **Attack Generator** | Meta Llama 3 8B Instruct | Meta AI | Khác ecosystem so với Agent |
+| **System Under Test** | Gemma 2 9B Q6_K | Google DeepMind | SENTINEL Agent chính |
+| **Oracle Judge** | Gemma 2 26B Q4_K_M | Google DeepMind | Oracle có năng lực cao hơn Agent |
+
+**Tại sao Option C thay vì tự generate bằng Gemma?**
+- Nếu Gemma 26B sinh attack + làm Judge → Circular: cùng model family, cùng training bias.
+- Option C: Llama 3 (Meta) sinh attack, Gemma 26B (Google) judge → khác pretraining corpus, khác RLHF alignment → không còn circular cùng ecosystem.
+
+**Residual bias phải acknowledge với hội đồng:**
+Cả Llama 3 và Gemma 26B đều là RLHF-aligned instruction-tuned models. Cả hai đều có xu hướng tránh tạo/đánh giá payload quá rõ ràng độc hại. Bypass rate đo được có thể thấp hơn human red-teamers trong thực tế — cần ghi rõ trong Section Limitations.
+
+**Test set:** 500 Semantic Confusion samples, 10 attack pattern templates × 50 Llama 3 variants  
+**Metric:** Bypass Rate = (Gemma 26B judge xác nhận Agent bị dẫn dắt) / 500  
+**Baseline comparison:** Bypass Rate WITH Encapsulation (Config F) vs WITHOUT (Config C)  
+→ Kỳ vọng: gần bằng nhau → chứng minh Encapsulation không giúp gì cho semantic attacks
 
 ### 4.4 Kết quả
-TODO — Điền sau khi chạy experiments
+TODO — Điền sau khi chạy experiments (xem `experiments/evaluate_robustness.py`)
 
 ### 4.5 Implications
 - SENTINEL effectively defends against **structural attacks** (100% category)
-- SENTINEL provides **quantified baseline** for Semantic Confusion vulnerability
-- Future work: Semantic-level defense (output classifier, chain-of-thought verification)
+- SENTINEL provides a **quantified baseline** for Semantic Confusion vulnerability (Bypass Rate = X%)
+- Methodology sử dụng cross-family generation → defensible trước hội đồng, không circular
+- Future work: Semantic-level defense (output classifier, chain-of-thought verification, semantic firewall)
 
 ---
 
