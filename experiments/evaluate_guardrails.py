@@ -1,5 +1,5 @@
-# Context Quality Evaluation (RAGAS + LLM-as-Judge)
-# TODO: Implement dual evaluation methodology
+# Đánh giá chất lượng Context (RAGAS + LLM-as-Judge)
+# TODO: Triển khai phương pháp đánh giá kép
 
 """
 Context Quality Evaluation — Dual Methodology:

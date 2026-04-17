@@ -1,5 +1,5 @@
-# Ablation Runner
-# TODO: Orchestrates all 6 ablation configurations
+# Chạy đánh giá Ablation
+# TODO: Quản lý 6 cấu hình ablation
 
 """
 Ablation Study Runner:

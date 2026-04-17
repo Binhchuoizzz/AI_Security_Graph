@@ -1,5 +1,5 @@
-# Baseline A: Rule-Only IDS (No LLM)
-# TODO: Implement for Ablation Config A
+# Baseline A: IDS thuần luật (Không dùng LLM)
+# TODO: Triển khai cho Cấu hình Ablation A
 
 """
 Baseline A — Rule-Only IDS

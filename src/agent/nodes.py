@@ -112,9 +112,9 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
     action = latest_decision.get("action", "UNKNOWN")
     
     if action == "BLOCK_IP":
-        logger.warning(f"🚨 [FIREWALL API MOCK] BLOCKING IP based on decision: {latest_decision.get('reasoning')}")
+        logger.warning(f"🚨 [MOCK API TƯỜNG LỬA] ĐANG CHẶN IP dựa trên quyết định: {latest_decision.get('reasoning')}")
     elif action == "ALERT":
-        logger.info(f"⚠️ [SIEM MOCK] Raising ALERT to dashboard: {latest_decision.get('reasoning')}")
+        logger.info(f"⚠️ [MOCK SIEM] Đẩy CẢNH BÁO lên dashboard: {latest_decision.get('reasoning')}")
         
     return {}
 
@@ -125,7 +125,7 @@ def node_human_in_the_loop(state: SentinelState) -> Dict[str, Any]:
     """
     logger.info("--- NODE: HUMAN IN THE LOOP (AWAIT_HITL) ---")
     latest_decision = state.decisions[-1] if state.decisions else {}
-    logger.warning(f"⏸️ [SOC ANALYST QUEUE] Requires human review: {latest_decision.get('reasoning')}")
+    logger.warning(f"⏸️ [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {latest_decision.get('reasoning')}")
     return {}
 
 

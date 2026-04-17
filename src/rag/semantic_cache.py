@@ -39,7 +39,7 @@ class SemanticCache:
         self.cache = OrderedDict()  # {hash_key: {"result": ..., "timestamp": ...}}
         self.max_size = max_size
         self.ttl_seconds = ttl_seconds
-        # Metrics cho MLflow tracking
+        # Lưu số liệu (Metrics) cho MLflow tracking
         self.stats = {
             'hits': 0,
             'misses': 0,
@@ -75,12 +75,12 @@ class SemanticCache:
             entry = self.cache[key]
             # Kiểm tra TTL
             if (time.time() - entry['timestamp']) <= self.ttl_seconds:
-                # Move to end (LRU: most recently used)
+                # Đưa lên đầu (LRU: phần tử được sử dụng gần nhất)
                 self.cache.move_to_end(key)
                 self.stats['hits'] += 1
                 return {"hit": True, "result": entry['result']}
             else:
-                # Expired
+                # Đã hết hạn (Expired)
                 del self.cache[key]
                 self.stats['evictions'] += 1
 
@@ -94,7 +94,7 @@ class SemanticCache:
         """
         key = self._make_key(query_text)
 
-        # Nếu key đã tồn tại, update
+        # Nếu key đã tồn tại, cập nhật lại
         if key in self.cache:
             self.cache.move_to_end(key)
             self.cache[key] = {
@@ -103,9 +103,9 @@ class SemanticCache:
             }
             return
 
-        # Evict LRU nếu cache đầy
+        # Xóa phần tử cũ nhất (LRU) nếu cache đầy
         while len(self.cache) >= self.max_size:
-            self.cache.popitem(last=False)  # Remove oldest
+            self.cache.popitem(last=False)  # Xóa phần tử cũ nhất
             self.stats['evictions'] += 1
 
         self.cache[key] = {

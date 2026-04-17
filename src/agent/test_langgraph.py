@@ -29,7 +29,7 @@ def run_test():
     )
 
     print("\n" + "="*50)
-    print("STARTING LANGGRAPH WORKFLOW")
+    print("BẮT ĐẦU LUỒNG LANGGRAPH")
     print("="*50)
     
     # Chạy graph
@@ -39,16 +39,16 @@ def run_test():
         final_state = agent_app.invoke(initial_state)
         
         print("\n" + "="*50)
-        print("WORKFLOW COMPLETED. FINAL STATE:")
+        print("LUỒNG KẾT THÚC. TRẠNG THÁI CUỐI:")
         print("="*50)
-        print(f"Narrative Summary:\n{final_state.get('narrative_summary', '')}")
-        print("\nLatest Decision:")
+        print(f"Tóm tắt Bối cảnh (Narrative Summary):\n{final_state.get('narrative_summary', '')}")
+        print("\nQuyết định Mới nhất:")
         pprint(final_state.get('decisions', [{}])[-1])
-        print("\nExtracted IOCs:")
+        print("\nCác IOC đã Trích xuất:")
         pprint(final_state.get('extracted_iocs', []))
         
     except Exception as e:
-        print(f"\n[ERROR] Graph execution failed: {e}")
+        print(f"\n[LỖI] Thực thi luồng thất bại: {e}")
 
 if __name__ == "__main__":
     run_test()

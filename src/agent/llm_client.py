@@ -17,13 +17,13 @@ from typing import List, Dict, Any, Optional
 try:
     import openai
 except ImportError:
-    raise ImportError("Missing dependency: pip install openai")
+    raise ImportError("Thiếu thư viện yêu cầu: hãy chạy pip install openai")
 
 logger = logging.getLogger(__name__)
 
 # Oobabooga OpenAI-compatible endpoint
 API_BASE_URL = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
-API_KEY = "sk-111111111111111111111111111111111111111111111111"  # Dummy key for local
+API_KEY = "sk-111111111111111111111111111111111111111111111111"  # Key giả định cho local testing
 
 # Tuning parameters cho Security Agent
 DEFAULT_MAX_TOKENS = 1024

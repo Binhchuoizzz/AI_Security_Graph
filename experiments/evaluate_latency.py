@@ -1,5 +1,5 @@
-# Latency Benchmark Runner
-# TODO: Measures operational performance across configurations
+# Chạy đánh giá độ trễ (Latency Benchmark)
+# TODO: Đo lường hiệu năng hoạt động trên các cấu hình
 
 """
 Latency Benchmark:

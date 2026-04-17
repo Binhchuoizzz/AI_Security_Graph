@@ -1,5 +1,5 @@
-# Baseline B: LLM-Only (No Tier 1 Pre-filter)
-# TODO: Implement for Ablation Config B
+# Baseline B: Thuần LLM (Không có bộ lọc Tier 1)
+# TODO: Triển khai cho Cấu hình Ablation B
 
 """
 Baseline B — LLM-Only IDS

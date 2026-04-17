@@ -27,10 +27,10 @@ from src.rag.security import structural_sanitize, log_tokenizer
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-# Paths
+# Khai báo đường dẫn
 INDEX_DIR = os.path.join(BASE_DIR, 'knowledge_base', 'faiss_index')
 
-# Defaults
+# Cấu hình mặc định
 DEFAULT_TOP_K = 5
 MIN_SCORE_THRESHOLD = 0.15  # Cho FAISS dense search
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
@@ -51,11 +51,11 @@ class DualRetriever:
         self.top_k = top_k
         self.faiss = faiss
 
-        # Load embedding model
+        # Load mô hình embedding
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
         self.model = SentenceTransformer(EMBEDDING_MODEL)
 
-        # Load FAISS indexes, BM25 corpuses, and metadata
+        # Load FAISS indexes, BM25 corpuses, và file metadata
         self.faiss_indexes = {}
         self.bm25_indexes = {}
         self.metadata = {}
@@ -66,7 +66,7 @@ class DualRetriever:
         if "iso" in self.enabled_sources:
             self._load_indexes("iso", "iso_27001")
 
-        # Semantic Cache
+        # Khởi tạo Bộ nhớ đệm ngữ nghĩa (Semantic Cache)
         self.cache = None
         if use_cache:
             from src.rag.semantic_cache import SemanticCache
@@ -108,13 +108,13 @@ class DualRetriever:
         bm25 = self.bm25_indexes[source_key]
         scores = bm25.get_scores(tokenized_query)
         
-        # Get top fetch_k indices
+        # Lấy ra fetch_k chỉ số (indices) đứng đầu
         top_indices = np.argsort(scores)[::-1][:fetch_k]
         
         results = {}
         rank = 1
         for idx in top_indices:
-            if scores[idx] > 0:  # Only keep matches
+            if scores[idx] > 0:  # Chỉ giữ lại các kết quả có điểm hợp lệ
                 results[idx] = {'score': float(scores[idx]), 'rank': rank}
                 rank += 1
         return results
@@ -128,17 +128,17 @@ class DualRetriever:
         total_docs = len(meta)
         fetch_k = min(self.top_k * 3, total_docs)
 
-        # 1. Dense Search
+        # 1. Tìm kiếm Vector Ngữ nghĩa (Dense Search)
         query_embedding = self.model.encode([query_text], normalize_embeddings=True).astype('float32')
         dense_results = self._dense_search(query_embedding, source_key, fetch_k)
 
-        # 2. Sparse Search
+        # 2. Tìm kiếm Từ khóa Chính xác (Sparse Search)
         tokenized_query = log_tokenizer(query_text)
         sparse_results = self._sparse_search(tokenized_query, source_key, fetch_k)
 
-        # 3. Reciprocal Rank Fusion (RRF)
-        # Formula: RRF_score = 1 / (k + rank_dense) + 1 / (k + rank_sparse)
-        # Using standard k=60
+        # 3. Thuật toán dung hòa điểm số (Reciprocal Rank Fusion - RRF)
+        # Công thức: RRF_score = 1 / (k + rank_dense) + 1 / (k + rank_sparse)
+        # Sử dụng hằng số chuẩn k=60
         RRF_K = 60
         rrf_scores = {}
 
@@ -155,7 +155,7 @@ class DualRetriever:
                 
             rrf_scores[idx] = rrf_score
 
-        # Sort by RRF score
+        # Sắp xếp kết quả theo điểm RRF giảm dần
         sorted_indices = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
 
         candidates = []
@@ -181,7 +181,7 @@ class DualRetriever:
 
     def retrieve(self, query_text: str) -> dict:
         """Main retrieval function."""
-        # Check cache first
+        # Kiểm tra Cache trước tiên
         if self.cache:
             cached = self.cache.get(query_text)
             if cached['hit']:
@@ -190,15 +190,15 @@ class DualRetriever:
                 result['cache_hit'] = True
                 return result
 
-        # Hybrid Search both indexes
+        # Thực hiện Hybrid Search trên cả 2 tập dữ liệu
         mitre_results = self._hybrid_search(query_text, "mitre")
         iso_results = self._hybrid_search(query_text, "iso")
 
-        # Format context strings
+        # Định dạng kết quả thành chuỗi văn bản ngữ cảnh
         mitre_context = self._format_context(mitre_results, "MITRE ATT&CK")
         iso_context = self._format_context(iso_results, "ISO 27001")
 
-        # Build combined prompt section
+        # Tạo đoạn prompt tổng hợp
         combined_prompt = self._build_combined_prompt(mitre_context, iso_context)
 
         result = {
@@ -210,7 +210,7 @@ class DualRetriever:
             'cache_hit': False,
         }
 
-        # Cache result
+        # Lưu kết quả vào Cache
         if self.cache:
             self.cache.put(query_text, result)
 

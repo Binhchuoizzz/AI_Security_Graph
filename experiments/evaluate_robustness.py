@@ -1,5 +1,5 @@
-# Adversarial Evaluation Runner
-# TODO: Orchestrates all adversarial experiments across 3 attack categories
+# Chạy đánh giá đối kháng (Adversarial)
+# TODO: Quản lý các thử nghiệm đối kháng trên 3 loại tấn công
 
 """
 Adversarial Evaluation Pipeline

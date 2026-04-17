@@ -9,13 +9,13 @@ from src.agent.prompts import TRIAGE_SYSTEM_PROMPT
 from src.rag.retriever import DualRetriever
 
 def calculate_budget():
-    # Use cl100k_base which is standard for OpenAI / similar to llama/gemma tokenizer lengths
+    # Sử dụng cl100k_base (chuẩn của OpenAI / tương tự độ dài tokenizer của llama/gemma)
     enc = tiktoken.get_encoding("cl100k_base")
     
     system_prompt_tokens = len(enc.encode(TRIAGE_SYSTEM_PROMPT))
     print(f"System Prompt Size: {system_prompt_tokens} tokens")
     
-    # Retrieve mock RAG context
+    # Truy xuất RAG context giả lập
     retriever = DualRetriever(use_cache=False)
     result = retriever.retrieve("brute force SSH port 22")
     rag_context = result['combined_prompt']
@@ -23,7 +23,7 @@ def calculate_budget():
     rag_context_tokens = len(enc.encode(rag_context))
     print(f"RAG Context Size (Top 5 MITRE + Top 5 ISO): {rag_context_tokens} tokens")
     
-    # Mock Log Data
+    # Dữ liệu log giả lập
     log_data = "192.168.1.1 GET /api?id=1 HTTP/1.1 200\n" * 10
     log_data_tokens = len(enc.encode(log_data))
     print(f"Mock Log Data Size (10 lines): {log_data_tokens} tokens")

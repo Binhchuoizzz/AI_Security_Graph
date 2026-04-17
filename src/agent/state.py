@@ -54,8 +54,8 @@ class AgentDecision:
     confidence: float   # 0.0 - 1.0
     reasoning: str      # Giải thích ngắn gọn
     mitre_technique: str = ""  # VD: "T1110.003 - Brute Force: Password Spraying"
-    iso_control: str = ""      # VD: "A.9.4.2 - Secure log-on procedures"
-    hitl_status: str = "N/A"   # "PENDING", "APPROVED", "REJECTED", "N/A"
+    iso_control: str = ""      # Ví dụ: "A.9.4.2 - Secure log-on procedures"
+    hitl_status: str = "N/A"   # Các trạng thái: "PENDING", "APPROVED", "REJECTED", "N/A"
 
     def to_dict(self) -> dict:
         return {
@@ -146,10 +146,10 @@ class SentinelState:
         """
         Thêm IOC mới vào registry. Kiểm tra trùng lặp trước khi append.
         """
-        # Duplicate check: không thêm IOC trùng (type + value)
+        # Kiểm tra trùng lặp: không thêm IOC đã tồn tại (cùng type + value)
         for existing in self.extracted_iocs:
             if existing.get('ioc_type') == ioc_type and existing.get('value') == value:
-                return  # Skip duplicate
+                return  # Bỏ qua nếu đã tồn tại
 
         ioc = IOCEntry(
             ioc_type=ioc_type,
@@ -206,15 +206,15 @@ class SentinelState:
         """
         parts = []
 
-        # Part 1: Narrative (có thể bị tóm tắt)
+        # Phần 1: Tóm tắt Bối cảnh (có thể bị LLM tóm tắt lại)
         if self.narrative_summary:
             parts.append(f"=== Session Context ===\n{self.narrative_summary}")
 
-        # Part 2: IOCs (KHÔNG BAO GIỜ bị tóm tắt)
+        # Phần 2: Danh sách IOC (KHÔNG BAO GIỜ bị tóm tắt)
         iocs_text = self.get_iocs_summary_for_prompt()
         parts.append(f"=== Extracted IOCs (IMMUTABLE) ===\n{iocs_text}")
 
-        # Part 3: Recent decisions (3 gần nhất)
+        # Phần 3: Quyết định gần đây (Lấy 3 cái gần nhất)
         if self.decisions:
             recent = self.decisions[-3:]
             decision_lines = ["=== Recent Decisions ==="]

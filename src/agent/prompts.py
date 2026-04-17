@@ -76,5 +76,5 @@ Please analyze the following network event:
     ]
 
 
-# 2. IOC Extraction Prompt (Dự phòng nếu muốn tách node riêng)
+# 2. IOC Extraction Prompt (Dự phòng nếu muốn tách riêng trạm xử lý)
 # Hiện tại Triage Prompt đã gộp chung chức năng extract IOCs.

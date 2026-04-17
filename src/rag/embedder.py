@@ -36,14 +36,14 @@ from src.rag.security import log_tokenizer
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-# Paths
+# Khai báo đường dẫn
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KB_DIR = os.path.join(BASE_DIR, 'knowledge_base')
 INDEX_DIR = os.path.join(KB_DIR, 'faiss_index')
 MITRE_JSON = os.path.join(KB_DIR, 'mitre_attack.json')
 ISO_JSON = os.path.join(KB_DIR, 'iso_27001_controls.json')
 
-# Model
+# Khởi tạo mô hình
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 EMBEDDING_DIM = 384
 
@@ -59,7 +59,7 @@ def load_mitre_chunks() -> list[dict]:
 
     chunks = []
     for tech in data.get('techniques', []):
-        # Build rich text chunk cho embedding
+        # Xây dựng đoạn văn bản (chunk) giàu ngữ nghĩa để nhúng (embedding)
         text_parts = [
             f"{tech['id']} - {tech['name']} ({tech.get('tactic', 'Unknown')})",
             f"Description: {tech.get('description', '')}",
@@ -146,12 +146,12 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
         logger.error(f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu rank_bm25")
         raise
 
-    # Reuse model nếu đã load, tránh load lại lần thứ 2
+    # Sử dụng lại model nếu đã load, tránh load lại lần thứ 2
     if model is None:
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
         model = SentenceTransformer(EMBEDDING_MODEL)
 
-    # 1. Build Dense Index (FAISS)
+    # 1. Build Dense Index (FAISS - Tìm kiếm vector ngữ nghĩa)
     texts = [chunk['text'] for chunk in chunks]
     logger.info(f"Building Dense Embeddings ({len(texts)} chunks) for [{index_name}]...")
     
@@ -160,7 +160,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
     logger.info(f"Embeddings shape: {embeddings.shape}")
 
-    # Build FAISS index (Inner Product = cosine similarity khi normalized)
+    # Xây dựng FAISS index (Inner Product = cosine similarity khi được chuẩn hóa)
     index = faiss.IndexFlatIP(EMBEDDING_DIM)
     index.add(embeddings)
 
@@ -169,7 +169,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
     faiss.write_index(index, index_path)
     logger.info(f"Saved FAISS index: {index_path} ({index.ntotal} vectors)")
 
-    # 2. Build Sparse Index (BM25)
+    # 2. Build Sparse Index (BM25 - Tìm kiếm từ khóa chính xác)
     logger.info(f"Building Sparse Index (BM25) for [{index_name}]...")
     tokenized_corpus = [log_tokenizer(text) for text in texts]
     bm25 = BM25Okapi(tokenized_corpus)
@@ -179,7 +179,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
         pickle.dump(bm25, f)
     logger.info(f"Saved BM25 corpus: {bm25_path}")
 
-    # Save metadata (map position → chunk info)
+    # Lưu siêu dữ liệu metadata (ánh xạ vị trí → thông tin chunk)
     metadata = []
     for i, chunk in enumerate(chunks):
         metadata.append({
@@ -212,11 +212,11 @@ def build_all_indexes():
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL} (shared instance)")
     shared_model = SentenceTransformer(EMBEDDING_MODEL)
 
-    # MITRE ATT&CK
+    # MITRE ATT&CK (Khung tham chiếu kỹ thuật tấn công)
     mitre_chunks = load_mitre_chunks()
     build_indexes(mitre_chunks, 'mitre_attack', model=shared_model)
 
-    # ISO 27001
+    # ISO 27001 (Khung tiêu chuẩn kiểm soát bảo mật)
     iso_chunks = load_iso_chunks()
     build_indexes(iso_chunks, 'iso_27001', model=shared_model)
 
