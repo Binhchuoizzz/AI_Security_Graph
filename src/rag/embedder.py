@@ -25,6 +25,13 @@ import json
 import os
 import logging
 import numpy as np
+import pickle
+import sys
+
+# Đảm bảo import được src.rag.security
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(BASE_DIR)
+from src.rag.security import log_tokenizer
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
@@ -115,25 +122,28 @@ def load_iso_chunks() -> list[dict]:
     return chunks
 
 
-def build_faiss_index(chunks: list[dict], index_name: str, model=None):
+def build_indexes(chunks: list[dict], index_name: str, model=None):
     """
-    Embed text chunks → build FAISS IndexFlatIP (Inner Product = cosine similarity
-    khi vectors đã normalized).
+    Build 2 loại Index cho Hybrid Search:
+    1. FAISS IndexFlatIP (Dense Retrieval)
+    2. BM25Okapi (Sparse Retrieval)
 
     Args:
         chunks: List of {text, metadata} dicts to embed.
         index_name: Name prefix for saved files.
-        model: Pre-loaded SentenceTransformer instance (tránh load lại 2 lần).
+        model: Pre-loaded SentenceTransformer instance.
 
     Lưu:
       - FAISS index file: {index_name}.index
-      - Metadata JSON: {index_name}_metadata.json (map index position → chunk info)
+      - BM25 corpus file: {index_name}_bm25.pkl
+      - Metadata JSON: {index_name}_metadata.json
     """
     try:
         from sentence_transformers import SentenceTransformer
         import faiss
+        from rank_bm25 import BM25Okapi
     except ImportError as e:
-        logger.error(f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu")
+        logger.error(f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu rank_bm25")
         raise
 
     # Reuse model nếu đã load, tránh load lại lần thứ 2
@@ -141,11 +151,10 @@ def build_faiss_index(chunks: list[dict], index_name: str, model=None):
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
         model = SentenceTransformer(EMBEDDING_MODEL)
 
-    # Extract text for embedding
+    # 1. Build Dense Index (FAISS)
     texts = [chunk['text'] for chunk in chunks]
-    logger.info(f"Embedding {len(texts)} chunks for [{index_name}]...")
-
-    # Embed
+    logger.info(f"Building Dense Embeddings ({len(texts)} chunks) for [{index_name}]...")
+    
     embeddings = model.encode(texts, show_progress_bar=True, normalize_embeddings=True)
     embeddings = np.array(embeddings, dtype='float32')
 
@@ -155,11 +164,20 @@ def build_faiss_index(chunks: list[dict], index_name: str, model=None):
     index = faiss.IndexFlatIP(EMBEDDING_DIM)
     index.add(embeddings)
 
-    # Save index
     os.makedirs(INDEX_DIR, exist_ok=True)
     index_path = os.path.join(INDEX_DIR, f'{index_name}.index')
     faiss.write_index(index, index_path)
     logger.info(f"Saved FAISS index: {index_path} ({index.ntotal} vectors)")
+
+    # 2. Build Sparse Index (BM25)
+    logger.info(f"Building Sparse Index (BM25) for [{index_name}]...")
+    tokenized_corpus = [log_tokenizer(text) for text in texts]
+    bm25 = BM25Okapi(tokenized_corpus)
+    
+    bm25_path = os.path.join(INDEX_DIR, f'{index_name}_bm25.pkl')
+    with open(bm25_path, 'wb') as f:
+        pickle.dump(bm25, f)
+    logger.info(f"Saved BM25 corpus: {bm25_path}")
 
     # Save metadata (map position → chunk info)
     metadata = []
@@ -196,11 +214,11 @@ def build_all_indexes():
 
     # MITRE ATT&CK
     mitre_chunks = load_mitre_chunks()
-    build_faiss_index(mitre_chunks, 'mitre_attack', model=shared_model)
+    build_indexes(mitre_chunks, 'mitre_attack', model=shared_model)
 
     # ISO 27001
     iso_chunks = load_iso_chunks()
-    build_faiss_index(iso_chunks, 'iso_27001', model=shared_model)
+    build_indexes(iso_chunks, 'iso_27001', model=shared_model)
 
     logger.info("=" * 60)
     logger.info(f"All indexes built successfully in: {INDEX_DIR}")
