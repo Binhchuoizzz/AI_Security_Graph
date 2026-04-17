@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 INDEX_DIR = os.path.join(BASE_DIR, 'knowledge_base', 'faiss_index')
 
 # Defaults
-DEFAULT_TOP_K = 3
+DEFAULT_TOP_K = 5
 MIN_SCORE_THRESHOLD = 0.15  # Cho FAISS dense search
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 
@@ -175,21 +175,9 @@ class DualRetriever:
                 'name': entry.get('name', ''),
             })
 
-        # Sub-technique dedup cho MITRE
-        if source_key == 'mitre':
-            candidates = self._dedup_subtechniques(candidates)
-
         return candidates[:self.top_k]
 
-    @staticmethod
-    def _dedup_subtechniques(results: list[dict]) -> list[dict]:
-        """Dedup MITRE sub-techniques based on RRF score."""
-        best_per_parent = {}
-        for r in results:
-            parent = r['id'].split('.')[0]
-            if parent not in best_per_parent or r['rrf_score'] > best_per_parent[parent]['rrf_score']:
-                best_per_parent[parent] = r
-        return sorted(best_per_parent.values(), key=lambda x: x['rrf_score'], reverse=True)
+
 
     def retrieve(self, query_text: str) -> dict:
         """Main retrieval function."""
