@@ -36,6 +36,7 @@ INDEX_DIR = os.path.join(BASE_DIR, 'knowledge_base', 'faiss_index')
 
 # Defaults
 DEFAULT_TOP_K = 3
+MIN_SCORE_THRESHOLD = 0.15  # Lọc kết quả score quá thấp (< 0.15 = không liên quan)
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 
 
@@ -110,7 +111,9 @@ class DualRetriever:
     def _search_single(self, query_embedding: np.ndarray, source_key: str) -> list[dict]:
         """
         Search một FAISS index, trả top_k results.
-        Returns list of {text, score, metadata}.
+        Áp dụng:
+          1. Score threshold: lọc kết quả score < MIN_SCORE_THRESHOLD
+          2. Sub-technique dedup (MITRE only): T1110 + T1110.001 → giữ score cao nhất
         """
         if source_key not in self.indexes:
             return []
@@ -118,15 +121,18 @@ class DualRetriever:
         index = self.indexes[source_key]
         meta = self.metadata[source_key]
 
-        # Search
-        scores, indices = index.search(query_embedding, min(self.top_k, index.ntotal))
+        # Fetch nhiều hơn top_k để còn room sau khi filter + dedup
+        fetch_k = min(self.top_k * 3, index.ntotal)
+        scores, indices = index.search(query_embedding, fetch_k)
 
-        results = []
+        candidates = []
         for score, idx in zip(scores[0], indices[0]):
-            if idx == -1:  # FAISS returns -1 for empty slots
+            if idx == -1:
                 continue
+            if float(score) < MIN_SCORE_THRESHOLD:
+                continue  # Lọc kết quả không liên quan
             entry = meta[idx]
-            results.append({
+            candidates.append({
                 'text': entry['text'],
                 'score': float(score),
                 'source': source_key,
@@ -134,7 +140,24 @@ class DualRetriever:
                 'name': entry.get('name', ''),
             })
 
-        return results
+        # Sub-technique dedup cho MITRE: T1110, T1110.001, T1110.003 → giữ score cao nhất
+        if source_key == 'mitre':
+            candidates = self._dedup_subtechniques(candidates)
+
+        return candidates[:self.top_k]
+
+    @staticmethod
+    def _dedup_subtechniques(results: list[dict]) -> list[dict]:
+        """
+        Dedup MITRE sub-techniques: giữ lại technique có score cao nhất
+        trong cùng parent (ví dụ: T1110.001 và T1110 → giữ cái score cao hơn).
+        """
+        best_per_parent = {}  # {parent_id: best_result}
+        for r in results:
+            parent = r['id'].split('.')[0]  # T1110.001 → T1110
+            if parent not in best_per_parent or r['score'] > best_per_parent[parent]['score']:
+                best_per_parent[parent] = r
+        return sorted(best_per_parent.values(), key=lambda x: x['score'], reverse=True)
 
     def retrieve(self, query_text: str) -> dict:
         """

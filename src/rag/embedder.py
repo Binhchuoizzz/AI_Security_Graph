@@ -115,10 +115,15 @@ def load_iso_chunks() -> list[dict]:
     return chunks
 
 
-def build_faiss_index(chunks: list[dict], index_name: str):
+def build_faiss_index(chunks: list[dict], index_name: str, model=None):
     """
     Embed text chunks → build FAISS IndexFlatIP (Inner Product = cosine similarity
     khi vectors đã normalized).
+
+    Args:
+        chunks: List of {text, metadata} dicts to embed.
+        index_name: Name prefix for saved files.
+        model: Pre-loaded SentenceTransformer instance (tránh load lại 2 lần).
 
     Lưu:
       - FAISS index file: {index_name}.index
@@ -131,13 +136,14 @@ def build_faiss_index(chunks: list[dict], index_name: str):
         logger.error(f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu")
         raise
 
-    # Load embedding model
-    logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-    model = SentenceTransformer(EMBEDDING_MODEL)
+    # Reuse model nếu đã load, tránh load lại lần thứ 2
+    if model is None:
+        logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
+        model = SentenceTransformer(EMBEDDING_MODEL)
 
     # Extract text for embedding
     texts = [chunk['text'] for chunk in chunks]
-    logger.info(f"Embedding {len(texts)} chunks...")
+    logger.info(f"Embedding {len(texts)} chunks for [{index_name}]...")
 
     # Embed
     embeddings = model.encode(texts, show_progress_bar=True, normalize_embeddings=True)
@@ -174,17 +180,27 @@ def build_faiss_index(chunks: list[dict], index_name: str):
 
 def build_all_indexes():
     """Build cả 2 FAISS indexes: MITRE ATT&CK + ISO 27001."""
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as e:
+        logger.error(f"Missing dependency: {e}")
+        raise
+
     logger.info("=" * 60)
     logger.info("SENTINEL Knowledge Base Indexer")
     logger.info("=" * 60)
 
+    # Load model MỘT LẦN DUY NHẤT, dùng chung cho cả 2 indexes
+    logger.info(f"Loading embedding model: {EMBEDDING_MODEL} (shared instance)")
+    shared_model = SentenceTransformer(EMBEDDING_MODEL)
+
     # MITRE ATT&CK
     mitre_chunks = load_mitre_chunks()
-    build_faiss_index(mitre_chunks, 'mitre_attack')
+    build_faiss_index(mitre_chunks, 'mitre_attack', model=shared_model)
 
     # ISO 27001
     iso_chunks = load_iso_chunks()
-    build_faiss_index(iso_chunks, 'iso_27001')
+    build_faiss_index(iso_chunks, 'iso_27001', model=shared_model)
 
     logger.info("=" * 60)
     logger.info(f"All indexes built successfully in: {INDEX_DIR}")
