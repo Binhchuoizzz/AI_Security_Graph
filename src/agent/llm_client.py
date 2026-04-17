@@ -94,9 +94,13 @@ class LLMClient:
                 logger.warning(f"LLM Rate Limit (attempt {retries+1}/{self.max_retries}): Model is busy.")
                 if retries == self.max_retries:
                     raise
+            except openai.APIStatusError as e:
+                logger.error(f"LLM API Status Error (e.g. 500 Internal Server Error): {e}")
+                # Trả về chuỗi rỗng để kích hoạt lớp Hard Fallback (AWAIT_HITL)
+                return ""
             except Exception as e:
                 logger.error(f"LLM Unexpected Error: {e}")
-                raise  # Các lỗi khác (vd: parse error) thì fail fast luôn
+                raise  # Các lỗi khác (vd: code logic error) thì fail fast luôn
 
             # Retry logic
             retries += 1
