@@ -33,3 +33,4 @@ services:
     container_name: redis_queue
     ports:
       - "6379:6379"
+    command: redis-server --requirepass "SentinelSecurePass2026!"

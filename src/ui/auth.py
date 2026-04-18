@@ -14,18 +14,26 @@ def login_screen():
     - L3 Manager (Được duyệt Rule): `manager` / `password`
     """)
 
+    import hashlib
+
+    # Demo Credentials (Hashed with SHA-256 for Security Hardening)
+    # Plain: "password"
+    DEMO_PASSWORD_HASH = hashlib.sha256("password".encode()).hexdigest()
+
     with st.form("login_form"):
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         submit = st.form_submit_button("Đăng nhập")
 
         if submit:
-            if username == "analyst" and password == "password":
+            input_hash = hashlib.sha256(password.encode()).hexdigest()
+            
+            if username == "analyst" and input_hash == DEMO_PASSWORD_HASH:
                 st.session_state['authenticated'] = True
                 st.session_state['role'] = 'L1_Analyst'
                 st.session_state['username'] = username
                 st.rerun()
-            elif username == "manager" and password == "password":
+            elif username == "manager" and input_hash == DEMO_PASSWORD_HASH:
                 st.session_state['authenticated'] = True
                 st.session_state['role'] = 'L3_Manager'
                 st.session_state['username'] = username

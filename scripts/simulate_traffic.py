@@ -3,6 +3,9 @@ import redis
 import time
 import os
 import random
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # QUEUE_NAME is replaced by a routing logic

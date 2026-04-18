@@ -12,6 +12,9 @@ import subprocess
 import time
 import logging
 
+from dotenv import load_dotenv
+load_dotenv()  # Load environment variables (Security Hardening)
+
 from src.streaming.subscriber import start_listening
 from src.agent.workflow import agent_app
 from src.agent.state import SentinelState

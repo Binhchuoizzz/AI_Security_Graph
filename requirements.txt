@@ -42,3 +42,4 @@ mlflow==3.11.1
 mlflow-skinny==3.11.1
 mlflow-tracing==3.11.1
 streamlit-autorefresh==1.0.1
+python-dotenv==1.2.2
