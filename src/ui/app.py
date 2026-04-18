@@ -18,7 +18,7 @@ from src.tier1_filter.feedback_listener import FeedbackListener
 # Cấu hình trang
 st.set_page_config(
     page_title="SENTINEL AI Security",
-    page_icon="🛡️",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -35,9 +35,9 @@ def main_dashboard():
     
     # Sidebar
     with st.sidebar:
-        st.markdown(f"### 👤 User: `{st.session_state.get('username')}`")
-        st.markdown(f"### 🔑 Role: `{st.session_state.get('role')}`")
-        if st.button("🚪 Đăng xuất"):
+        st.markdown(f"###  User: `{st.session_state.get('username')}`")
+        st.markdown(f"###  Role: `{st.session_state.get('role')}`")
+        if st.button(" Đăng xuất"):
             logout()
             
         st.markdown("---")
@@ -45,7 +45,7 @@ def main_dashboard():
         st.info("Hệ thống phát hiện xâm nhập thông minh sử dụng **Advanced Hybrid RAG** và **LangGraph Agent**.")
         st.caption(f"Refreshes: {count}")
 
-    st.title("🛡️ SENTINEL AI Security Operations Center")
+    st.title(" SENTINEL AI Security Operations Center")
 
     # Lấy dữ liệu
     alerts = get_audit_trail(limit=20)
@@ -54,7 +54,7 @@ def main_dashboard():
 
     render_metrics_header(len(alerts), len(pending_rules), len(active_rules))
 
-    tab1, tab2 = st.tabs(["🔴 SIEM & Audit Trail", "⚖️ HITL Rule Approval"])
+    tab1, tab2 = st.tabs([" SIEM & Audit Trail", " HITL Rule Approval"])
 
     with tab1:
         st.subheader("Cảnh báo & Hành động Gần đây")
@@ -78,13 +78,13 @@ def main_dashboard():
                     if st.session_state.get('role') == 'L3_Manager':
                         col1, col2 = st.columns([1, 1])
                         with col1:
-                            if st.button("✅ Phê duyệt (Approve)", key=f"app_{rule.get('pattern')}"):
+                            if st.button(" Phê duyệt (Approve)", key=f"app_{rule.get('pattern')}"):
                                 feedback_mgr.approve_rule(rule.get('pattern'))
                                 st.success(f"Đã duyệt luật {rule.get('pattern')}")
                                 time.sleep(0.5)
                                 st.rerun()
                         with col2:
-                            if st.button("❌ Từ chối (Reject)", key=f"rej_{rule.get('pattern')}"):
+                            if st.button(" Từ chối (Reject)", key=f"rej_{rule.get('pattern')}"):
                                 feedback_mgr.reject_rule(rule.get('pattern'))
                                 st.warning(f"Đã từ chối luật {rule.get('pattern')}")
                                 time.sleep(0.5)

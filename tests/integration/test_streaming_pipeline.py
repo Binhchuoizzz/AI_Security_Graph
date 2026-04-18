@@ -71,7 +71,7 @@ class TestRuleEngineIntegration:
         
         results = [engine.evaluate(log) for log in batch]
         
-        # SSH with high packets should escalate
+        # SSH với nhiều gói tin sẽ bị escalate
         assert results[0]["tier1_action"] == "ESCALATE"
         # Normal HTTP should drop
         assert results[1]["tier1_action"] == "DROP"
@@ -113,10 +113,10 @@ class TestRedisConnectivity:
         for q in queues:
             redis_client.delete(q)
         
-        # Push to WAF queue
+        # Đẩy vào WAF queue
         redis_client.rpush("test_q_waf", json.dumps({"event": "sql_injection"}))
         
-        # BLPOP should pick from WAF
+        # BLPOP phải lấy từ WAF queue
         result = redis_client.blpop(queues, timeout=1)
         assert result is not None
         assert result[0] == "test_q_waf"

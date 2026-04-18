@@ -27,7 +27,7 @@ LOCKOUT_SECONDS = 60
 
 def login_screen():
     """Hiển thị màn hình đăng nhập chuyên nghiệp (không lộ credentials)."""
-    st.title("🔐 SENTINEL — Security Operations Center")
+    st.title(" SENTINEL — Security Operations Center")
     st.caption("Authorized personnel only. All access is logged and monitored.")
 
     # Kiểm tra lockout
@@ -37,13 +37,13 @@ def login_screen():
 
     if time.time() < st.session_state.get('lockout_until', 0):
         remaining = int(st.session_state['lockout_until'] - time.time())
-        st.error(f"⛔ Account locked due to too many failed attempts. Try again in {remaining}s.")
+        st.error(f" Account locked due to too many failed attempts. Try again in {remaining}s.")
         return
 
     with st.form("login_form"):
         username = st.text_input("Username", placeholder="Enter your SOC username")
         password = st.text_input("Password", type="password", placeholder="Enter your password")
-        submit = st.form_submit_button("🔑 Sign In")
+        submit = st.form_submit_button(" Sign In")
 
         if submit:
             input_hash = hashlib.sha256(password.encode()).hexdigest()
@@ -61,9 +61,9 @@ def login_screen():
 
                 if remaining_attempts <= 0:
                     st.session_state['lockout_until'] = time.time() + LOCKOUT_SECONDS
-                    st.error(f"⛔ Too many failed attempts. Account locked for {LOCKOUT_SECONDS}s.")
+                    st.error(f" Too many failed attempts. Account locked for {LOCKOUT_SECONDS}s.")
                 else:
-                    st.error(f"❌ Invalid credentials. {remaining_attempts} attempts remaining.")
+                    st.error(f" Invalid credentials. {remaining_attempts} attempts remaining.")
 
 
 def require_auth():

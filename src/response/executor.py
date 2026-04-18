@@ -44,15 +44,15 @@ def _log_to_db(action: str, target: str, reason: str):
         logger.error(f"Lỗi ghi audit trail: {e}")
 
 def block_ip(ip: str, reason: str):
-    logger.warning(f"🚨 [FIREWALL MOCK] BLOCKING IP: {ip} | Lý do: {reason}")
+    logger.warning(f" [FIREWALL MOCK] BLOCKING IP: {ip} | Lý do: {reason}")
     _log_to_db("BLOCK_IP", ip, reason)
 
 def quarantine_host(host: str, reason: str):
-    logger.warning(f"🛡️ [EDR MOCK] QUARANTINE HOST: {host} | Lý do: {reason}")
+    logger.warning(f" [EDR MOCK] QUARANTINE HOST: {host} | Lý do: {reason}")
     _log_to_db("QUARANTINE", host, reason)
 
 def raise_alert(msg: str, reason: str):
-    logger.info(f"⚠️ [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
+    logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
     _log_to_db("ALERT", msg, reason)
 
 def get_audit_trail(limit=50):

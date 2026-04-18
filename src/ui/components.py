@@ -20,16 +20,16 @@ def render_alert_card(alert):
     reason = html_lib.escape(str(alert.get("reason", "N/A")))
     
     color = "grey"
-    icon = "ℹ️"
+    icon = ""
     if action == "BLOCK_IP":
         color = "red"
-        icon = "🚨"
+        icon = ""
     elif action == "QUARANTINE":
         color = "orange"
-        icon = "🛡️"
+        icon = ""
     elif action == "ALERT":
         color = "yellow"
-        icon = "⚠️"
+        icon = ""
 
     st.markdown(f"""
     <div style="border:1px solid {color}; border-left: 5px solid {color}; border-radius: 5px; padding: 10px; margin-bottom: 10px; background-color: rgba(255,255,255,0.05);">

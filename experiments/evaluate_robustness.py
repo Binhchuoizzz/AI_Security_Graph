@@ -166,7 +166,7 @@ def print_report(results: dict):
         # Chi tiết bypassed samples
         bypassed_details = [d for d in stats["details"] if not d["overall_blocked"]]
         if bypassed_details:
-            print(f"\n  ⚠ Bypassed samples:")
+            print(f"\n   Bypassed samples:")
             for d in bypassed_details:
                 print(f"    - {d['id']} ({d['attack_type']})")
     
@@ -214,7 +214,7 @@ if __name__ == "__main__":
     
     summary = print_report(results)
     
-    # Save results to JSON
+    # Lưu kết quả vào JSON
     output_path = os.path.join(os.path.dirname(__file__), "robustness_results.json")
     with open(output_path, 'w') as f:
         json.dump({

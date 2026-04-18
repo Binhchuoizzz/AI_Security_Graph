@@ -48,7 +48,7 @@ def run_evaluation():
             # Trích xuất quyết định cuối
             decisions = final_state.get('decisions', [])
             if not decisions:
-                print("  [❌] Lỗi: LLM không đưa ra quyết định nào.")
+                print("  [] Lỗi: LLM không đưa ra quyết định nào.")
                 continue
                 
             latest_decision = decisions[-1]
@@ -65,11 +65,11 @@ def run_evaluation():
             if match_action:
                 correct_action += 1
                 
-            print(f"  Expected MITRE: {sample['expected_mitre_technique']} | Predicted: {pred_mitre} -> {'✅' if match_mitre else '❌'}")
-            print(f"  Expected Action: {sample['expected_action']} | Predicted: {pred_action} -> {'✅' if match_action else '❌'}\n")
+            print(f"  Expected MITRE: {sample['expected_mitre_technique']} | Predicted: {pred_mitre} -> {'' if match_mitre else ''}")
+            print(f"  Expected Action: {sample['expected_action']} | Predicted: {pred_action} -> {'' if match_action else ''}\n")
 
         except Exception as e:
-            print(f"  [❌] Exception khi chạy graph: {e}\n")
+            print(f"  [] Exception khi chạy graph: {e}\n")
 
     print("=" * 40)
     print("KẾT QUẢ ĐÁNH GIÁ (MINIMAL VIABLE)")

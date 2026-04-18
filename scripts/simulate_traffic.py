@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-# QUEUE_NAME is replaced by a routing logic
+# Tên hàng đợi được thay thế bởi logic định tuyến
 GROUND_TRUTH_FILE = "experiments/ground_truth.json"
 BATCH_DELAY_SECONDS = 0.5  # Simulate processing interval
 
@@ -17,7 +17,7 @@ def map_keys_to_cicids(network_layer, application_layer):
     Map the normalized keys from ground_truth.json back to what Tier 1 RuleEngine expects,
     plus injecting application layer payloads so Guardrails can detect them.
     """
-    # Base mapping for RuleEngine
+    # Mapping cơ bản cho RuleEngine
     mapped = {
         "Source IP": network_layer.get("src_ip", "0.0.0.0"),
         "Destination Port": network_layer.get("dst_port", 0),
@@ -27,7 +27,7 @@ def map_keys_to_cicids(network_layer, application_layer):
         "Label": "Simulated", # Mark as simulated
     }
     
-    # Inject Application Layer Data (for Tier 2 Guardrails & LLM)
+    # Tiêm dữ liệu tầng Application (cho Tier 2 Guardrails & LLM)
     if application_layer:
         mapped["user_agent"] = application_layer.get("user_agent", "")
         mapped["payload"] = application_layer.get("payload_snippet", "")

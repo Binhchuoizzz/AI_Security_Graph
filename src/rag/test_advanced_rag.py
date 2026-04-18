@@ -29,9 +29,9 @@ def run_tests():
     print(f"Top 3 MITRE IDs: {top_ids}")
     
     if "T1190" in top_ids and "T1212" in top_ids:
-        print("✅ PASSED: Both CVE-mapped techniques (T1190, T1212) appear in top 3")
+        print(" PASSED: Both CVE-mapped techniques (T1190, T1212) appear in top 3")
     else:
-        print(f"❌ FAILED: Expected T1190 and T1212 in top 3, but got {top_ids}")
+        print(f" FAILED: Expected T1190 and T1212 in top 3, but got {top_ids}")
 
     print("\n[Test 2] Sanitization không làm hỏng log hợp lệ")
     clean_log = "192.168.1.1 GET /api?id=1 HTTP/1.1 200"
@@ -39,12 +39,12 @@ def run_tests():
     print(f"Original: {clean_log}")
     print(f"Sanitized: {sanitized_log}")
     if sanitized_log == clean_log:
-        print("✅ PASSED: Clean log remains unchanged")
+        print(" PASSED: Clean log remains unchanged")
     else:
-        print("❌ FAILED: Sanitizer altered clean log")
+        print(" FAILED: Sanitizer altered clean log")
 
     print("\n[Test 3] RRF tie-breaking")
-    # Simulate scores to show how RRF balances
+    # Giả lập điểm số để xem cách RRF cân bằng kết quả
     RRF_K = 60
     # Case A: FAISS rank 1, BM25 rank 50
     score_A = (1.0 / (RRF_K + 1)) + (1.0 / (RRF_K + 50))
@@ -54,9 +54,9 @@ def run_tests():
     print(f"Case A (Dense Rank 1, Sparse Rank 50): {score_A:.4f}")
     print(f"Case B (Dense Rank 5, Sparse Rank 5):  {score_B:.4f}")
     if score_B > score_A:
-        print("✅ PASSED: Consistent Top 5 in both wins over extreme outlier (Rank 1 + Rank 50)")
+        print(" PASSED: Consistent Top 5 in both wins over extreme outlier (Rank 1 + Rank 50)")
     else:
-        print("❌ FAILED: Extreme outlier wins")
+        print(" FAILED: Extreme outlier wins")
 
     print("\n[Test 4] Adversarial: Unicode homoglyph evasion")
     # Sử dụng ký tự Cyrillic 'С' (U+0421) thay vì Latin 'C' (U+0043)
@@ -76,9 +76,9 @@ def run_tests():
     print(f"Zero-width original length: {len(zero_width_log)}")
     print(f"Sanitized length: {len(sanitized_zw)}")
     if sanitized_zw == "CVE-2014-0160":
-        print("✅ PASSED: Zero-width characters successfully stripped")
+        print(" PASSED: Zero-width characters successfully stripped")
     else:
-        print(f"❌ FAILED: Result was {repr(sanitized_zw)}")
+        print(f" FAILED: Result was {repr(sanitized_zw)}")
 
 
 if __name__ == '__main__':

@@ -188,7 +188,7 @@ def node_human_in_the_loop(state: SentinelState) -> Dict[str, Any]:
     """
     logger.info("--- NODE: HUMAN IN THE LOOP (AWAIT_HITL) ---")
     latest_decision = state.decisions[-1] if state.decisions else {}
-    logger.warning(f"⏸️ [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {latest_decision.get('reasoning')}")
+    logger.warning(f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {latest_decision.get('reasoning')}")
     return {}
 
 
