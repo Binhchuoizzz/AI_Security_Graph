@@ -29,7 +29,7 @@ CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner 
 ### Delimited Data Encapsulation (Adversarial Defense)
 - **Dynamic Randomized Delimiters:** Each request generates a new delimiter using cryptographically secure `secrets.token_hex()`. Prevents *Delimiter Smuggling*.
 - **Encoding Neutralization:** Intercepts and decodes Base64/Hex/Unicode before inference.
-- **Quantified Limitations:** The Threat Model acknowledges and actively measures the baseline vulnerability against *Semantic Confusion* (an open problem in the field).
+- **Quantified Limitations:** The Threat Model acknowledges and actively measures the baseline vulnerability against *Semantic Confusion* (an open problem in the field). Recent evaluations measure this semantic bypass rate at **86.7%**, while successfully blocking **93.3%** of structural attacks and **53.3%** of encoding bypasses.
 
 ### HITL Quarantine (Adversarial Rule Injection Defense)
 - Agent auto-generates new rules based on context, but they are placed in **Quarantine (Pending Approval)**.
@@ -45,7 +45,7 @@ SENTINEL employs a rigorous thesis-grade methodology built for reproducibility a
 |---|---|---|
 | **Classification** | F1, Precision, Recall | CICIDS2017 & UNSW-NB15 across 6 Ablation Configs |
 | **Operational** | Reasoning Latency | 2-Tier vs 1-Tier comparison (Mann-Whitney U Test) |
-| **Robustness** | Guardrail Defeat Rate | 1,000+ Synthetic Adversarial logs (Structural + Semantic) |
+| **Robustness** | Guardrail Defeat Rate | 45 Curated Adversarial samples (Structural, Encoding, Semantic) |
 | **Context Quality** | RAG Relevance, MITRE Acc | RAGAS + Gemma 26B Oracle + 30 Ground Truth cases |
 
 ### Statistical Validity
@@ -53,6 +53,7 @@ All main comparisons are backed by statistical tests to ensure results are not d
 - **Paired t-tests / McNemar's tests** for F1-score variance across 6 ablation configurations.
 - **Mann-Whitney U tests** for skewed latency distributions.
 - **95% Confidence Intervals** for cache hit rates and accuracy mapped via 30 manually labeled reasoning cases.
+- **E2E Test Coverage**: 38/38 comprehensive unit and integration tests passed, ensuring robust multi-source routing and adversarial defense validation.
 
 ### Reproducibility Package
 This project is engineered for complete scientific reproducibility:
@@ -73,7 +74,7 @@ sentinel/
 │   ├── threat_model.md               # Adversary profiles & Defense limit matrix
 │   └── REPRODUCIBILITY.md            # Execution framework guidelines
 ├── experiments/
-│   ├── adversarial/                  # ~1000 Independent attack samples
+│   ├── adversarial/                  # 45 Curated attack samples (Structural, Encoding, Semantic)
 │   ├── baselines/                    # Rule-only and LLM-only runner setups
 │   ├── ground_truth.json             # 200 static RAGAS samples
 │   ├── reasoning_ground_truth.json   # 30 manually curated MITRE labeled cases
