@@ -12,36 +12,34 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'audit_trail.db')
 
 def _init_db():
-    """Khởi tạo SQLite Database cho audit trail nếu chưa có."""
+    """Khoi tao SQLite Database cho audit trail neu chua co."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS audit_trail (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            action TEXT,
-            target TEXT,
-            reason TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
+    with sqlite3.connect(DB_PATH) as conn:
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS audit_trail (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                action TEXT,
+                target TEXT,
+                reason TEXT
+            )
+        ''')
+        conn.commit()
 
 _init_db()
 
 def _log_to_db(action: str, target: str, reason: str):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute(
-            "INSERT INTO audit_trail (timestamp, action, target, reason) VALUES (?, ?, ?, ?)",
-            (datetime.utcnow().isoformat(), action, target, reason)
-        )
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute(
+                "INSERT INTO audit_trail (timestamp, action, target, reason) VALUES (?, ?, ?, ?)",
+                (datetime.utcnow().isoformat(), action, target, reason)
+            )
+            conn.commit()
     except Exception as e:
-        logger.error(f"Lỗi ghi audit trail: {e}")
+        logger.error(f"Loi ghi audit trail: {e}")
 
 def block_ip(ip: str, reason: str):
     logger.warning(f" [FIREWALL MOCK] BLOCKING IP: {ip} | Lý do: {reason}")
@@ -57,11 +55,10 @@ def raise_alert(msg: str, reason: str):
 
 def get_audit_trail(limit=50):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT timestamp, action, target, reason FROM audit_trail ORDER BY id DESC LIMIT ?", (limit,))
-        rows = c.fetchall()
-        conn.close()
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute("SELECT timestamp, action, target, reason FROM audit_trail ORDER BY id DESC LIMIT ?", (limit,))
+            rows = c.fetchall()
         return [{"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]} for r in rows]
     except Exception:
         return []

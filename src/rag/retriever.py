@@ -84,6 +84,10 @@ class DualRetriever:
             return
 
         self.faiss_indexes[source_key] = self.faiss.read_index(faiss_path)
+        # SECURITY: pickle.load co the thuc thi ma doc neu file bi tamper (CWE-502).
+        # Trong moi truong nay, BM25 index duoc sinh noi bo boi embedder.py va
+        # luu trong thu muc read-only mount. Rui ro thap vi khong nhan file tu ben ngoai.
+        # TODO (Production): Them HMAC integrity check truoc khi load.
         with open(bm25_path, 'rb') as f:
             self.bm25_indexes[source_key] = pickle.load(f)
         with open(metadata_path, 'r', encoding='utf-8') as f:

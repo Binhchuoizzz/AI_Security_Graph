@@ -82,7 +82,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             print("\n[*] Subscriber offline (Shutdown).")
             break
         except json.JSONDecodeError:
-            print("[!] Malformed JSON Log received via Redis. Skiping.")
+            print("[!] Malformed JSON Log received via Redis. Skipping.")
         except Exception as e:
             print(f"[!] Critical Error in stream processing: {e}")
 
