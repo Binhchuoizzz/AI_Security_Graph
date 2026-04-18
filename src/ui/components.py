@@ -3,18 +3,21 @@ Các component giao diện dùng lại cho Streamlit Dashboard.
 """
 import streamlit as st
 import pandas as pd
+import html as html_lib
 from datetime import datetime
 
 def render_alert_card(alert):
-    """Hiển thị một cảnh báo bảo mật từ audit_trail."""
+    """Hiển thị một cảnh báo bảo mật từ audit_trail (XSS-safe)."""
     timestamp = alert.get("timestamp", "")
     try:
         dt = datetime.fromisoformat(timestamp)
         formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
-    except:
-        formatted_time = timestamp
+    except Exception:
+        formatted_time = html_lib.escape(str(timestamp))
 
-    action = alert.get("action", "UNKNOWN")
+    action = html_lib.escape(str(alert.get("action", "UNKNOWN")))
+    target = html_lib.escape(str(alert.get("target", "N/A")))
+    reason = html_lib.escape(str(alert.get("reason", "N/A")))
     
     color = "grey"
     icon = "ℹ️"
@@ -31,8 +34,8 @@ def render_alert_card(alert):
     st.markdown(f"""
     <div style="border:1px solid {color}; border-left: 5px solid {color}; border-radius: 5px; padding: 10px; margin-bottom: 10px; background-color: rgba(255,255,255,0.05);">
         <h4 style="margin-top: 0; color: {color}">{icon} {action} - {formatted_time}</h4>
-        <b>Target:</b> {alert.get('target', 'N/A')}<br/>
-        <b>Reasoning:</b> {alert.get('reason', 'N/A')}
+        <b>Target:</b> {target}<br/>
+        <b>Reasoning:</b> {reason}
     </div>
     """, unsafe_allow_html=True)
 

@@ -3,9 +3,12 @@ import json
 import time
 import os
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-QUEUE_NAME = "security_logs_stream"
+QUEUE_NAME = "queue_waf"  # Default to WAF queue for CSV-based ingestion
 BATCH_DELAY_SECONDS = 0.5  # Simulate processing interval
 
 def stream_logs_to_redis(csv_path: str):

@@ -46,13 +46,6 @@ def main_dashboard():
         st.caption(f"Refreshes: {count}")
 
     st.title("🛡️ SENTINEL AI Security Operations Center")
-    
-    # Auto-refresh mechanism (cứ mỗi 5s load lại data)
-    # Lưu ý: Trong Streamlit hiện đại có thể dùng st_autorefresh, 
-    # nhưng ta dùng nút bấm thủ công cho đơn giản và ổn định
-    col_refresh, _ = st.columns([1, 8])
-    with col_refresh:
-        st.button("🔄 Tải lại dữ liệu")
 
     # Lấy dữ liệu
     alerts = get_audit_trail(limit=20)

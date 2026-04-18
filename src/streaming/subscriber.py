@@ -39,7 +39,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         return
 
     # Ngưỡng (Threshold) = 30 là mức nhạy khá, dễ dính chùm port 22
-    engine = RuleEngine(risk_threshold=30)
+    engine = RuleEngine()
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
     print(f"[*] Subscribed and listening on multiple queues: {QUEUES}...")
 

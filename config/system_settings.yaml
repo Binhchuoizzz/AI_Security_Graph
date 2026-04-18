@@ -71,7 +71,7 @@ tier1:
       the IP address mitigates the immediate threat.
     score: 100
     source: langgraph_agent
-    status: PENDING_APPROVAL
+    status: ACTIVE
   max_fwd_packets: 1000
   risk_threshold: 30
   sensitive_ports:

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Oobabooga OpenAI-compatible endpoint
 API_BASE_URL = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
-API_KEY = "sk-111111111111111111111111111111111111111111111111"  # Key giả định cho local testing
+API_KEY = os.getenv("LLM_API_KEY", "sk-placeholder-local-only")  # Placeholder cho Local LLM
 
 # Tuning parameters cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
