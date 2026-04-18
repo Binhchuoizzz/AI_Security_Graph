@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 import streamlit as st
 import time
+from streamlit_autorefresh import st_autorefresh
 
 from src.ui.auth import require_auth, logout
 from src.ui.components import render_alert_card, render_metrics_header
@@ -28,6 +29,10 @@ require_auth()
 feedback_mgr = FeedbackListener()
 
 def main_dashboard():
+    # Tự động refresh trang mỗi 3000ms (3 giây)
+    # Giúp dashboard tự cập nhật log mới theo thời gian thực (SIEM style)
+    count = st_autorefresh(interval=3000, limit=10000, key="siem_dashboard_refresh")
+    
     # Sidebar
     with st.sidebar:
         st.markdown(f"### 👤 User: `{st.session_state.get('username')}`")
@@ -38,6 +43,7 @@ def main_dashboard():
         st.markdown("---")
         st.markdown("## Về SENTINEL")
         st.info("Hệ thống phát hiện xâm nhập thông minh sử dụng **Advanced Hybrid RAG** và **LangGraph Agent**.")
+        st.caption(f"Refreshes: {count}")
 
     st.title("🛡️ SENTINEL AI Security Operations Center")
     

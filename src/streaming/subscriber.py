@@ -17,7 +17,8 @@ from src.tier1_filter.rule_engine import RuleEngine
 
 # Nhận config theo chuẩn OS Env
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-QUEUE_NAME = "security_logs_stream"
+# Hỗ trợ cấu trúc Multi-source cho Log Correlation (MAWILab)
+QUEUES = ["queue_firewall", "queue_waf", "queue_sysmon"]
 
 import time
 
@@ -37,7 +38,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     # Ngưỡng (Threshold) = 30 là mức nhạy khá, dễ dính chùm port 22
     engine = RuleEngine(risk_threshold=30)
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
-    print(f"[*] Subscribed and listening on {QUEUE_NAME}...")
+    print(f"[*] Subscribed and listening on multiple queues: {QUEUES}...")
 
     # Incident-Level Aggregation Buffers
     batch_buffer = []
@@ -45,17 +46,21 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
 
     while True:
         try:
-            # BLPOP sẽ nằm im chờ đợi không ăn CPU, khi có data nó nhả qua ngay lập tức
+            # BLPOP lắng nghe trên nhiều queue cùng lúc.
             # item sẽ là một tuple: ('tên_queue', 'giá_trị_chuyển_vào')
-            item = r.blpop(QUEUE_NAME, timeout=1) # timeout 1s để vòng lặp có thể xử lý timeout aggregation
+            item = r.blpop(QUEUES, timeout=1) 
             if item:
+                source_queue = item[0]
                 raw_log = json.loads(item[1])
+                
+                # Gắn nhãn Provenance (Nguồn gốc) để phục vụ SIEM Correlation
+                raw_log['log_source'] = source_queue
                 
                 # Gọi ngay Tier 1 Rule Engine để cân nhắc
                 evaluated_log = engine.evaluate(raw_log)
                 
                 if evaluated_log['tier1_action'] == "ESCALATE":
-                    alert_msg = f"[!] ESCALATE TO AI | Risk: {evaluated_log['tier1_score']} | Vi phạm: {evaluated_log['tier1_reasons']}"
+                    alert_msg = f"[!] ESCALATE TO AI | Source: {source_queue} | Risk: {evaluated_log['tier1_score']} | Vi phạm: {evaluated_log['tier1_reasons']}"
                     print(alert_msg)
                     batch_buffer.append(evaluated_log)
                 else:

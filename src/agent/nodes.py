@@ -4,6 +4,7 @@ LangGraph Nodes for SENTINEL Agent
 Chứa logic của từng trạm xử lý trong StateGraph.
 Tuân thủ Batching Strategy: Incident-Level Aggregation (1 Batch = 1 Quyết định).
 """
+import os
 import json
 import logging
 from typing import Dict, Any
@@ -77,14 +78,17 @@ def node_rag_context(state: SentinelState) -> Dict[str, Any]:
     }
 
 
+import mlflow
+import time
+
 def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     """
     LLM Triage Node: Phân tích toàn bộ cụm log (Incident-Level) và đưa ra 1 quyết định duy nhất.
+    Tích hợp MLflow để theo dõi Reasoning Latency và Performance Metrics (RQ1, RQ4).
     """
     logger.info("--- NODE: LLM TRIAGE ---")
     
     # 1. Đóng gói Raw Logs (kết hợp với Guardrails Encapsulation)
-    # Lấy dữ liệu đã được nén và bọc bằng tag từ Guardrails Node
     raw_logs_str = state.current_batch_encapsulated
     if not raw_logs_str:
         raw_logs_str = "\n".join([str(log) for log in state.current_batch_logs])
@@ -93,36 +97,53 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     rag_combined = f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nISO 27001:\n{state.rag_iso_context}"
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_combined)
     
-    # Nếu có narrative_summary (bối cảnh cũ), nhét thêm vào System Prompt để giữ context
     if state.narrative_summary:
         messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
 
-    # 3. Gọi LLM qua Oobabooga API
+    # 3. Gọi LLM và Đo lường Latency với MLflow
+    start_time = time.time()
+    
     raw_response = llm_client.invoke(messages=messages, temperature=0.1)
+    
+    end_time = time.time()
+    latency_sec = end_time - start_time
     
     # 4. Parse JSON an toàn (3-Layer Fallback)
     decision_json = llm_client.parse_llm_response(raw_response)
     
     # 5. Cập nhật State
     action = decision_json.get("action", "AWAIT_HITL")
+    confidence = decision_json.get("confidence", 0.0)
     reasoning = decision_json.get("reasoning", "No reasoning provided.")
     new_iocs = decision_json.get("extracted_iocs", [])
     
+    # Ghi nhận vào MLflow (Tracking)
+    try:
+        # Tự động set URI nếu chạy trong Docker, nếu chạy ngoài thì localhost
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
+        mlflow.set_experiment("Sentinel_Reasoning_Latency")
+        with mlflow.start_run(run_name=f"Triage_Cycle_{state.cycle_count}"):
+            mlflow.log_metric("reasoning_latency_sec", latency_sec)
+            mlflow.log_metric("confidence_score", confidence)
+            mlflow.log_param("action_taken", action)
+            mlflow.log_param("batch_size", len(state.current_batch_logs))
+    except Exception as e:
+        logger.warning(f"MLflow tracking failed (Ignored in dev mode): {e}")
+    
     decision_entry = {
         "action": action,
-        "confidence": decision_json.get("confidence", 0.0),
+        "confidence": confidence,
         "reasoning": reasoning,
         "mitre_technique": decision_json.get("mitre_technique", ""),
         "iso_control": decision_json.get("iso_control", ""),
         "cycle_count": state.cycle_count + 1
     }
 
-    # Cập nhật narrative_summary để giữ bối cảnh cho batch tiếp theo
     new_narrative = f"Last Incident: {action} based on RAG - {decision_json.get('mitre_technique', 'None')}. Reasoning: {reasoning}"
 
     return {
-        "decisions": [decision_entry],  # Sẽ được reducer append
-        "extracted_iocs": new_iocs,     # Sẽ được reducer append
+        "decisions": [decision_entry],
+        "extracted_iocs": new_iocs,
         "narrative_summary": new_narrative,
         "cycle_count": state.cycle_count + 1
     }

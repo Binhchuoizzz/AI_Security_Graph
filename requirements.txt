@@ -38,3 +38,7 @@ PyYAML>=6.0.1                # Đọc file cấu hình config.yaml
 pytest>=8.0.0                # Chạy các kịch bản test tự động
 redis>=5.0.1                 # Tương tác với Redis Queue Streaming
 drain3>=0.9.11               # Log Template Mining (Semantic Pruning trong Guardrails)
+mlflow==3.11.1
+mlflow-skinny==3.11.1
+mlflow-tracing==3.11.1
+streamlit-autorefresh==1.0.1

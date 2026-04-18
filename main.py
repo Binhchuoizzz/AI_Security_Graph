@@ -66,13 +66,11 @@ def main():
     logger.info(" SENTINEL SYSTEM INITIALIZING ")
     logger.info("=" * 60)
     
-    # 1. Khởi chạy Publisher trên một thread riêng (tùy chọn, để dễ demo)
-    # Nếu chạy thật, DataPublisher chạy ở server riêng. 
-    # Trong mô hình này ta gộp chung cho tiện demo End-to-End.
-    publisher_thread = threading.Thread(target=run_publisher, daemon=True)
-    publisher_thread.start()
+    # 1. Khởi chạy Publisher trên một thread riêng (Đã chuyển sang chạy thủ công ở Terminal riêng)
+    # publisher_thread = threading.Thread(target=run_publisher, daemon=True)
+    # publisher_thread.start()
     
-    # Đợi 2 giây cho Publisher và Redis khởi động ổn định
+    # Đợi 2 giây cho Redis khởi động ổn định
     time.sleep(2)
     
     # 2. Chạy Subscriber (Vòng lặp chính, block thread này)

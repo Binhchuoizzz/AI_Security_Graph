@@ -1,129 +1,90 @@
-# =============================================================
-# SENTINEL Framework - System Settings (Central Configuration)
-# =============================================================
-# Mọi module đều đọc config từ file này.
-# Version: 2.0 (Post-Architecture Review)
-# =============================================================
-
-# --- LLM Configuration ---
-# PRIMARY MODEL: Gemma 2 9B Q6_K (~7GB VRAM) → Stable, leaves 9GB for KV Cache
-# REASON: Gemma 26B Q4 (~15GB VRAM) chỉ chừa 0.5-1.5GB cho KV Cache
-#   → CUDA OOM ngay từ inference round 2-3 khi load System Prompt + RAG + Memory + Logs
-#   → Chuyển sang 9B để đảm bảo stability + chứng minh Latency sòng phẳng
-# OPTIONAL HEAVY: Gemma 26B Q4_K_M cho benchmark so sánh (batch_size=1, short context)
-llm:
-  base_url: "http://host.docker.internal:5000/v1"
-  # Primary (stable, recommended)
-  model_name: "gemma-2-9b-it-Q6_K"
-  # Alternative heavy model (for ablation study comparison only)
-  # model_name: "gemma-4-26B-A4B-it-UD-Q4_K_M"
-  max_context_tokens: 8192
-  temperature: 0.1
-  request_timeout_seconds: 120
-  estimated_vram_gb: 7           # Primary: ~7GB, Heavy: ~15GB
-
-# --- Tier 1 Filter (Session-Aware Behavioral Baselining) ---
-# LƯU Ý: KHÔNG dùng Random Sampling (phá hủy kill-chain APT).
-# Thay bằng Session Baselining — quyết định dựa trên logic, không random.
-tier1:
-  risk_threshold: 30
-  sensitive_ports: [21, 22, 23, 3389, 445, 1433, 3306, 5432]
-  max_fwd_packets: 1000
-  # Session Baseline (thay thế random sampling)
-  session_baseline:
-    deviation_threshold: 2.0     # Bao nhiêu lần std dev thì coi là anomaly
-    window_seconds: 300          # Time window cho baseline (5 phút)
-    ttl_seconds: 600             # IP inactive > 10 phút → evict (chống RAM OOM)
-    eviction_interval: 100       # Chạy eviction mỗi N updates
-  # Dynamic Rules: Agent tự sinh rule → feedback_listener.py → persist tại đây
-  # Data Flow: LangGraph Agent → feedback_listener.py → YAML → RuleEngine.reload()
-  dynamic_rules: []
-
-# --- Guardrails ---
-# PHÂN TÁCH RÕ TRÁCH NHIỆM:
-#   template_miner.py: CHỈ nén volume (Drain3 compression)
-#   prompt_filter.py:  CHỈ phòng thủ injection (Delimited Encapsulation)
-#   Hai module này TÁCH BIỆT, không lẫn lộn chức năng.
-guardrails:
-  # Token Budget cho dữ liệu log trong prompt
-  token_budget: 4000
-  # Prompt Injection Detection (Pattern-based, Tầng 1 của prompt_filter.py)
-  injection_patterns:
-    - "ignore previous instructions"
-    - "you are now"
-    - "system prompt"
-    - "disregard"
-    - "<script>"
-    - "DROP TABLE"
-    - "UNION SELECT"
-    - "; exec"
-    - "forget everything"
-    - "act as"
-    - "new instructions"
-  # Entropy threshold: Log có entropy > ngưỡng → ưu tiên giữ raw trong Token Budget
-  # (Dùng cho PRIORITIZATION, không dùng cho injection defense)
-  entropy_threshold: 4.5
-  # Drain3 Log Template Mining (CHỈ cho volume compression)
-  drain3:
-    depth: 4
-    similarity_threshold: 0.4
-    max_clusters: 100
-    max_samples_per_template: 3  # Giữ 3 sample GỐC (bao gồm cả injection payload)
-
-# --- RAG Configuration ---
-rag:
-  embedding_model: "all-MiniLM-L6-v2"
-  faiss_index_path: "knowledge_base/faiss_index"
-  mitre_attack_path: "knowledge_base/mitre_attack.json"
-  iso_27001_path: "knowledge_base/iso_27001_controls.json"
-  top_k_results: 3
-  # Semantic Cache (chống Embedding Latency bottleneck)
-  # Cache key = template pattern hash → cache hit cao khi DDoS/BruteForce
-  semantic_cache:
-    max_size: 500                # Số query tối đa trong cache (LRU eviction)
-    ttl_seconds: 1800            # Cache entry hết hạn sau 30 phút
-
-# --- Evaluation (Context Quality) ---
-evaluation:
-  ground_truth_path: "experiments/ground_truth.json"  # 200 mẫu GT tĩnh
-  # Lựa chọn phương pháp đánh giá Context Quality:
-  #   "ragas"        → Dùng 200 GT mẫu, tính Context Precision + Answer Relevancy
-  #   "llm_as_judge" → Dùng Gemma 9B làm trọng tài, không cần GT (scale 1-5)
-  #   "both"         → Chạy cả 2 phương pháp (khuyến nghị)
-  method: "both"
-
-# --- Correlation Engine ---
-correlation:
-  time_window_minutes: 5
-  min_events_to_correlate: 3
-
-# --- Agent Memory (Structured MemoryObject — chống Semantic Drift) ---
 agent:
   memory:
-    max_iocs: 100                # Giới hạn IOC registry (append-only, FIFO khi vượt)
-    max_iocs_in_prompt: 20       # Số IOC đưa vào prompt (tiết kiệm token)
-    max_narrative_tokens: 500    # Token budget cho narrative_summary
-    max_decisions_in_prompt: 3   # Số quyết định gần nhất đưa vào prompt
-
-# --- Redis Streaming ---
-redis:
-  url: "redis://localhost:6379/0"
-  queue_name: "security_logs_stream"
-  escalated_queue: "escalated_logs"
-  publisher_delay_seconds: 0.5
-
-# --- HITL Dashboard ---
+    max_decisions_in_prompt: 3
+    max_iocs: 100
+    max_iocs_in_prompt: 20
+    max_narrative_tokens: 500
+correlation:
+  min_events_to_correlate: 3
+  time_window_minutes: 5
 dashboard:
   port: 8501
   session_timeout_minutes: 30
-
-# --- MLflow Tracking ---
-mlflow:
-  tracking_uri: "http://localhost:5001"
-  experiment_name: "sentinel_framework"
-
-# --- Logging ---
+evaluation:
+  ground_truth_path: experiments/ground_truth.json
+  method: both
+guardrails:
+  drain3:
+    depth: 4
+    max_clusters: 100
+    max_samples_per_template: 3
+    similarity_threshold: 0.4
+  entropy_threshold: 4.5
+  injection_patterns:
+  - ignore previous instructions
+  - you are now
+  - system prompt
+  - disregard
+  - <script>
+  - DROP TABLE
+  - UNION SELECT
+  - ; exec
+  - forget everything
+  - act as
+  - new instructions
+  token_budget: 4000
+llm:
+  base_url: http://host.docker.internal:5000/v1
+  estimated_vram_gb: 7
+  max_context_tokens: 8192
+  model_name: gemma-2-9b-it-Q6_K
+  request_timeout_seconds: 120
+  temperature: 0.1
 logging:
-  level: "INFO"
-  audit_db_path: "logs/audit_trail.db"
-  debug_log_path: "logs/system_debug.log"
+  audit_db_path: logs/audit_trail.db
+  debug_log_path: logs/system_debug.log
+  level: INFO
+mlflow:
+  experiment_name: sentinel_framework
+  tracking_uri: http://localhost:5001
+rag:
+  embedding_model: all-MiniLM-L6-v2
+  faiss_index_path: knowledge_base/faiss_index
+  iso_27001_path: knowledge_base/iso_27001_controls.json
+  mitre_attack_path: knowledge_base/mitre_attack.json
+  semantic_cache:
+    max_size: 500
+    ttl_seconds: 1800
+  top_k_results: 3
+redis:
+  escalated_queue: escalated_logs
+  publisher_delay_seconds: 0.5
+  queue_name: security_logs_stream
+  url: redis://localhost:6379/0
+tier1:
+  dynamic_rules:
+  - created_at: '2026-04-18T02:49:47.345963'
+    field: Source IP
+    pattern: UNKNOWN_IP
+    reason: Multiple failed login attempts from the same IP address targeting common
+      usernames (root, admin, user) on port 22 indicate a brute force attack. Blocking
+      the IP address mitigates the immediate threat.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  max_fwd_packets: 1000
+  risk_threshold: 30
+  sensitive_ports:
+  - 21
+  - 22
+  - 23
+  - 3389
+  - 445
+  - 1433
+  - 3306
+  - 5432
+  session_baseline:
+    deviation_threshold: 2.0
+    eviction_interval: 100
+    ttl_seconds: 600
+    window_seconds: 300
