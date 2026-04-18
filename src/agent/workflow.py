@@ -13,6 +13,7 @@ except ImportError:
 
 from src.agent.state import SentinelState
 from src.agent.nodes import (
+    node_guardrails,
     node_rag_context,
     node_llm_triage,
     node_action_executor,
@@ -28,14 +29,18 @@ def create_agent_workflow() -> StateGraph:
     workflow = StateGraph(SentinelState)
 
     # 2. Thêm các Trạm xử lý (Nodes)
+    workflow.add_node("guardrails", node_guardrails)
     workflow.add_node("rag_context", node_rag_context)
     workflow.add_node("llm_triage", node_llm_triage)
     workflow.add_node("action_executor", node_action_executor)
     workflow.add_node("human_in_the_loop", node_human_in_the_loop)
 
     # 3. Nối các Cạnh (Edges) - Luồng chính
-    # Bắt đầu luồng bằng việc lấy RAG Context
-    workflow.set_entry_point("rag_context")
+    # Bắt đầu luồng bằng việc lọc qua Guardrails
+    workflow.set_entry_point("guardrails")
+    
+    # Guardrails xong -> RAG Context
+    workflow.add_edge("guardrails", "rag_context")
     
     # RAG lấy xong -> Gửi cho LLM Triage
     workflow.add_edge("rag_context", "llm_triage")

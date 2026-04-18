@@ -12,11 +12,51 @@ from src.agent.state import SentinelState
 from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
 from src.rag.retriever import DualRetriever
+from src.guardrails.template_miner import TemplateMiner
+from src.guardrails.prompt_filter import PromptFilter
+from src.response.executor import block_ip, quarantine_host, raise_alert
+from src.tier1_filter.feedback_listener import FeedbackListener
 
 logger = logging.getLogger(__name__)
 
 # Khởi tạo Retriever (Singleton)
 retriever = DualRetriever(use_cache=True)
+
+# Khởi tạo Guardrails (Singleton)
+template_miner = TemplateMiner()
+prompt_filter = PromptFilter()
+
+
+def node_guardrails(state: SentinelState) -> Dict[str, Any]:
+    """
+    Guardrails Node: Nén log và làm sạch trước khi đưa vào RAG/LLM.
+    """
+    logger.info("--- NODE: GUARDRAILS (MINING & FILTERING) ---")
+    
+    if not state.current_batch_logs:
+        return {"current_batch_encapsulated": ""}
+
+    # 1. Template Mining (Nén log)
+    mined_results = template_miner.mine_batch(state.current_batch_logs)
+    
+    # 2. Xây dựng Data Delimiters String (Tách biệt dữ liệu và lệnh)
+    # Chúng ta ghép các extracted variables thành một chuỗi
+    compressed_str_list = []
+    for res in mined_results:
+        # Nếu nén thành công, chỉ lấy variables
+        if "extracted_variables" in res and res["extracted_variables"]:
+            compressed_str_list.append(json.dumps(res["extracted_variables"]))
+        else:
+            compressed_str_list.append(json.dumps(res.get("original", "")))
+            
+    raw_payload = "\n".join(compressed_str_list)
+    
+    # 3. Prompt Filter (Loại bỏ ký tự độc hại và Encapsulate)
+    encapsulated_data = prompt_filter.sanitize_and_encapsulate(raw_payload)
+
+    return {
+        "current_batch_encapsulated": encapsulated_data
+    }
 
 
 def node_rag_context(state: SentinelState) -> Dict[str, Any]:
@@ -59,10 +99,11 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     logger.info("--- NODE: LLM TRIAGE ---")
     
     # 1. Đóng gói Raw Logs (kết hợp với Guardrails Encapsulation)
-    # Vì State có lưu `current_batch_encapsulated` từ trước (nếu đi qua guardrails node),
-    # nhưng ở đây ta cứ lấy thô rồi tự format lại cho chắc.
-    raw_logs_str = "\n".join([str(log) for log in state.current_batch_logs])
-    
+    # Lấy dữ liệu đã được nén và bọc bằng tag từ Guardrails Node
+    raw_logs_str = state.current_batch_encapsulated
+    if not raw_logs_str:
+        raw_logs_str = "\n".join([str(log) for log in state.current_batch_logs])
+        
     # 2. Xây dựng Prompt
     rag_combined = f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nISO 27001:\n{state.rag_iso_context}"
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_combined)
@@ -112,9 +153,15 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
     action = latest_decision.get("action", "UNKNOWN")
     
     if action == "BLOCK_IP":
-        logger.warning(f"🚨 [MOCK API TƯỜNG LỬA] ĐANG CHẶN IP dựa trên quyết định: {latest_decision.get('reasoning')}")
+        block_ip(latest_decision.get('target', 'UNKNOWN_IP'), latest_decision.get('reasoning'))
+        
+        # Nếu LLM phân tích ra rule chặn động, đẩy về Tier 1
+        rule_pattern = latest_decision.get('target', 'UNKNOWN_IP')
+        # Gọi feedback listener
+        FeedbackListener().receive_new_rule("Source IP", rule_pattern, score=100, reason=latest_decision.get('reasoning'))
+        
     elif action == "ALERT":
-        logger.info(f"⚠️ [MOCK SIEM] Đẩy CẢNH BÁO lên dashboard: {latest_decision.get('reasoning')}")
+        raise_alert(latest_decision.get('target', 'UNKNOWN_TARGET'), latest_decision.get('reasoning'))
         
     return {}
 

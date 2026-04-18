@@ -22,7 +22,7 @@ CSV → DataPublisher → Redis → Subscriber → Tier1 RuleEngine → ESCALATE
 
 - [ ] **1.1** Populate `knowledge_base/mitre_attack.json` — tối thiểu 30-50 techniques có liên quan (DoS, Brute Force, Recon, Web Attack, Lateral Movement). Download từ MITRE STIX official hoặc hand-pick.
 - [ ] **1.2** Populate `knowledge_base/iso_27001_controls.json` — tối thiểu 20-30 controls từ Annex A.
-- [ ] **1.3** Implement `src/rag/embedder.py` — load JSON, embed bằng `sentence-transformers/all-MiniLM-L6-v2`, build FAISS index riêng cho MITRE và ISO, save index file.
+- [ ] **1.3** Implement `src/rag/embedder.py` — load JSON, embed bằng `sentence-transformers/all-MiniLM-L7-v2`, build FAISS index riêng cho MITRE và ISO, save index file.
 - [ ] **1.4** Implement `src/rag/retriever.py` — load FAISS index, nhận query string, trả top-k chunks từ cả hai index, tích hợp SemanticCache.
 - [ ] **1.5** Test manual: `python -c "from src.rag.retriever import DualRetriever; r=DualRetriever(); print(r.retrieve('brute force ssh port 22'))"` → phải trả context MITRE T1110 + ISO A.9.4.2
 

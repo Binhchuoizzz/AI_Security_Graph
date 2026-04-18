@@ -19,7 +19,12 @@ from src.tier1_filter.rule_engine import RuleEngine
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 QUEUE_NAME = "security_logs_stream"
 
-def start_listening():
+import time
+
+def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
+    """
+    on_batch_ready: Hàm callback được gọi khi đủ batch size hoặc hết timeout.
+    """
     print(f"[*] Connecting Subscriber to Redis: {REDIS_URL}")
     try:
         r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
@@ -34,11 +39,15 @@ def start_listening():
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
     print(f"[*] Subscribed and listening on {QUEUE_NAME}...")
 
+    # Incident-Level Aggregation Buffers
+    batch_buffer = []
+    last_batch_time = time.time()
+
     while True:
         try:
             # BLPOP sẽ nằm im chờ đợi không ăn CPU, khi có data nó nhả qua ngay lập tức
             # item sẽ là một tuple: ('tên_queue', 'giá_trị_chuyển_vào')
-            item = r.blpop(QUEUE_NAME, timeout=0)
+            item = r.blpop(QUEUE_NAME, timeout=1) # timeout 1s để vòng lặp có thể xử lý timeout aggregation
             if item:
                 raw_log = json.loads(item[1])
                 
@@ -46,13 +55,20 @@ def start_listening():
                 evaluated_log = engine.evaluate(raw_log)
                 
                 if evaluated_log['tier1_action'] == "ESCALATE":
-                    # Đây là nhánh sẽ kích hoạt việc gọi Agent LangGraph sau này!
                     alert_msg = f"[!] ESCALATE TO AI | Risk: {evaluated_log['tier1_score']} | Vi phạm: {evaluated_log['tier1_reasons']}"
                     print(alert_msg)
+                    batch_buffer.append(evaluated_log)
                 else:
-                    # Bỏ comment này nếu muốn nhìn thấy các traffic lành tính "chảy" qua
-                    # print(f"[.] DROP: Normal benign traffic ignored.")
                     pass
+
+            # Kiểm tra xem có cần trigger batch không
+            current_time = time.time()
+            if batch_buffer and (len(batch_buffer) >= batch_size or (current_time - last_batch_time) > timeout_sec):
+                if on_batch_ready:
+                    print(f"[*] Triggering Agent Workflow for batch of {len(batch_buffer)} logs...")
+                    on_batch_ready(batch_buffer)
+                batch_buffer = []
+                last_batch_time = time.time()
 
         except KeyboardInterrupt:
             print("\n[*] Subscriber offline (Shutdown).")
