@@ -12,8 +12,8 @@ from src.agent.state import SentinelState
 from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
 from src.rag.retriever import DualRetriever
-from src.guardrails.template_miner import TemplateMiner
-from src.guardrails.prompt_filter import PromptFilter
+from src.guardrails.template_miner import LogTemplateMiner
+from src.guardrails.prompt_filter import GuardrailsPipeline, DelimitedDataEncapsulator
 from src.response.executor import block_ip, quarantine_host, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
 
@@ -23,8 +23,7 @@ logger = logging.getLogger(__name__)
 retriever = DualRetriever(use_cache=True)
 
 # Khởi tạo Guardrails (Singleton)
-template_miner = TemplateMiner()
-prompt_filter = PromptFilter()
+guardrails_pipeline = GuardrailsPipeline()
 
 
 def node_guardrails(state: SentinelState) -> Dict[str, Any]:
@@ -36,26 +35,12 @@ def node_guardrails(state: SentinelState) -> Dict[str, Any]:
     if not state.current_batch_logs:
         return {"current_batch_encapsulated": ""}
 
-    # 1. Template Mining (Nén log)
-    mined_results = template_miner.mine_batch(state.current_batch_logs)
+    # Đối với batch hiện tại, ta dùng GuardrailsPipeline để xử lý và đóng gói
+    # GuardrailsPipeline.process_batch trả về một dictionary chứa kết quả
+    processed_data = guardrails_pipeline.process_batch(state.current_batch_logs)
     
-    # 2. Xây dựng Data Delimiters String (Tách biệt dữ liệu và lệnh)
-    # Chúng ta ghép các extracted variables thành một chuỗi
-    compressed_str_list = []
-    for res in mined_results:
-        # Nếu nén thành công, chỉ lấy variables
-        if "extracted_variables" in res and res["extracted_variables"]:
-            compressed_str_list.append(json.dumps(res["extracted_variables"]))
-        else:
-            compressed_str_list.append(json.dumps(res.get("original", "")))
-            
-    raw_payload = "\n".join(compressed_str_list)
-    
-    # 3. Prompt Filter (Loại bỏ ký tự độc hại và Encapsulate)
-    encapsulated_data = prompt_filter.sanitize_and_encapsulate(raw_payload)
-
     return {
-        "current_batch_encapsulated": encapsulated_data
+        "current_batch_encapsulated": processed_data['batch_encapsulated']
     }
 
 
