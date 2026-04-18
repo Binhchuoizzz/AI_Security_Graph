@@ -41,7 +41,8 @@ def node_guardrails(state: SentinelState) -> Dict[str, Any]:
     processed_data = guardrails_pipeline.process_batch(state.current_batch_logs)
     
     return {
-        "current_batch_encapsulated": processed_data['batch_encapsulated']
+        "current_batch_encapsulated": processed_data['batch_encapsulated'],
+        "_guardrails_system_instruction": processed_data['system_instruction']
     }
 
 
@@ -65,8 +66,8 @@ def node_rag_context(state: SentinelState) -> Dict[str, Any]:
     else:
         query_text = "suspicious network activity"
 
-    # Chỉ lấy 50 ký tự đầu tiên để search, tránh query RAG quá dài làm nhiễu FAISS
-    query_text = query_text[:50]
+    # Lấy đủ context (200 chars) để query RAG chính xác cho multi-source correlation
+    query_text = query_text.strip()[:200]
     
     # Truy xuất RAG
     results = retriever.retrieve(query_text)
@@ -91,11 +92,20 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     # 1. Đóng gói Raw Logs (kết hợp với Guardrails Encapsulation)
     raw_logs_str = state.current_batch_encapsulated
     if not raw_logs_str:
-        raw_logs_str = "\n".join([str(log) for log in state.current_batch_logs])
+        # SAFETY: Nếu encapsulated rỗng, wrap thủ công thay vì bypass guardrails
+        from src.guardrails.prompt_filter import DelimitedDataEncapsulator
+        emergency_enc = DelimitedDataEncapsulator()
+        raw_content = "\n".join([str(log) for log in state.current_batch_logs])
+        raw_logs_str = emergency_enc.encapsulate(raw_content)
         
-    # 2. Xây dựng Prompt
+    # 2. Xây dựng Prompt (inject Guardrails system_instruction vào LLM)
     rag_combined = f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nISO 27001:\n{state.rag_iso_context}"
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_combined)
+    
+    # CRITICAL: Inject Guardrails system instruction vào system prompt
+    guardrails_instruction = getattr(state, '_guardrails_system_instruction', '')
+    if guardrails_instruction:
+        messages[0]["content"] = guardrails_instruction + "\n\n" + messages[0]["content"]
     
     if state.narrative_summary:
         messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
