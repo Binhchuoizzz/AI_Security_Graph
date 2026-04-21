@@ -3,6 +3,7 @@ Unit Test cho module EntropyScorer (src/guardrails/template_miner.py).
 
 Kiểm tra khả năng tính Shannon Entropy và phân loại log bất thường.
 """
+
 import pytest
 from src.guardrails.template_miner import EntropyScorer
 
@@ -52,7 +53,9 @@ class TestEntropyScorer:
         # Chuỗi đơn giản -> False
         assert self.scorer.is_high_entropy("aaabbb") is False
         # Chuỗi phức tạp nhiều ký tự -> True
-        complex_str = "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ0123456789!@#$%"
+        complex_str = (
+            "aAbBcCdDeEfFgGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ0123456789!@#$%"
+        )
         assert self.scorer.is_high_entropy(complex_str) is True
 
     def test_score_returns_priority(self):

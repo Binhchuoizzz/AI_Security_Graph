@@ -1,7 +1,7 @@
 """
 RAG Security Layer: Structural Sanitization & Defense
 
-Threat Model: 
+Threat Model:
 Indirect Prompt Injection via RAG (RAG Poisoning).
 Attacker nhúng payload thao túng (ví dụ: IGNORE INSTRUCTIONS) vào log (User-Agent, URI).
 Khi RAG retrieve các chunk này và đưa vào LLM prompt, LLM sẽ bị thao túng.
@@ -12,8 +12,10 @@ Giải pháp:
   chuẩn hóa unicode, giới hạn độ dài.
 - Tương lai có thể mở rộng thêm Document Provenance Tracking.
 """
+
 import re
 import unicodedata
+
 
 def structural_sanitize(text: str, max_length: int = 1500) -> str:
     """
@@ -23,17 +25,22 @@ def structural_sanitize(text: str, max_length: int = 1500) -> str:
         return ""
 
     # 1. Normalize Unicode (chống Unicode homoglyph attacks)
-    text = unicodedata.normalize('NFKC', text)
+    text = unicodedata.normalize("NFKC", text)
 
     # 2. Xóa các ký tự điều khiển (control characters) và tàng hình
     # Giữ lại \n, \t, \r
-    text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202f\u2060-\u206f]', '', text)
+    text = re.sub(
+        r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202f\u2060-\u206f]",
+        "",
+        text,
+    )
 
     # 3. Truncate (chặn buffer overflow / context window exhaustion)
     if len(text) > max_length:
         text = text[:max_length] + "... [TRUNCATED FOR SECURITY]"
 
     return text
+
 
 def log_tokenizer(text: str) -> list[str]:
     """
@@ -44,5 +51,5 @@ def log_tokenizer(text: str) -> list[str]:
     - Port/Protocol/Hash/Words thông thường
     """
     # Regex bắt CVE, IPv4, và các từ thông thường
-    tokens = re.findall(r'CVE-\d{4}-\d+|(?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9_.-]+', text)
+    tokens = re.findall(r"CVE-\d{4}-\d+|(?:\d{1,3}\.){3}\d{1,3}|[a-zA-Z0-9_.-]+", text)
     return [t.lower() for t in tokens if t.strip()]

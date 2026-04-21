@@ -3,6 +3,7 @@ LangGraph StateGraph Workflow cho SENTINEL Agent
 
 Lắp ráp các Node thành một quy trình (Workflow) khép kín.
 """
+
 import sys
 import os
 
@@ -18,8 +19,9 @@ from src.agent.nodes import (
     node_llm_triage,
     node_action_executor,
     node_human_in_the_loop,
-    route_triage_decision
+    route_triage_decision,
 )
+
 
 def create_agent_workflow() -> StateGraph:
     """
@@ -38,10 +40,10 @@ def create_agent_workflow() -> StateGraph:
     # 3. Nối các Cạnh (Edges) - Luồng chính
     # Bắt đầu luồng bằng việc lọc qua Guardrails
     workflow.set_entry_point("guardrails")
-    
+
     # Guardrails xong -> RAG Context
     workflow.add_edge("guardrails", "rag_context")
-    
+
     # RAG lấy xong -> Gửi cho LLM Triage
     workflow.add_edge("rag_context", "llm_triage")
 
@@ -53,8 +55,8 @@ def create_agent_workflow() -> StateGraph:
         {
             "execute_action": "action_executor",
             "await_hitl": "human_in_the_loop",
-            "end_cycle": END  # Hành động LOG/benign thì kết thúc luôn
-        }
+            "end_cycle": END,  # Hành động LOG/benign thì kết thúc luôn
+        },
     )
 
     # 5. Kết thúc các luồng hành động
@@ -63,8 +65,9 @@ def create_agent_workflow() -> StateGraph:
 
     # Biên dịch (Compile) Graph
     app = workflow.compile()
-    
+
     return app
+
 
 # Singleton App để export
 agent_app = create_agent_workflow()

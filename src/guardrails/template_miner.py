@@ -21,6 +21,7 @@ QUAN TRỌNG - RANH GIỚI TRÁCH NHIỆM:
   Variables ĐƯỢC GIỮ LẠI dưới dạng Samples (3 samples/template).
   Chúng sẽ được đóng gói bởi DelimitedDataEncapsulator trước khi vào LLM.
 """
+
 import re
 import math
 from collections import Counter
@@ -42,6 +43,7 @@ class LogTemplateMiner:
     Đây là BY DESIGN — LLM cần thấy payload để phân tích.
     Prompt Injection defense xảy ra ở tầng SAU (Encapsulation).
     """
+
     def __init__(self, max_samples: int = 3):
         self.templates = {}
         self.max_samples = max_samples
@@ -57,13 +59,13 @@ class LogTemplateMiner:
         """
         generalized = []
         for token in tokens:
-            if re.match(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', token):
+            if re.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", token):
                 generalized.append("<IP>")
-            elif re.match(r'^[a-f0-9]{8,}$', token, re.IGNORECASE):
+            elif re.match(r"^[a-f0-9]{8,}$", token, re.IGNORECASE):
                 generalized.append("<HASH>")
-            elif re.match(r'^\d+(\.\d+)?$', token):
+            elif re.match(r"^\d+(\.\d+)?$", token):
                 generalized.append("<NUM>")
-            elif re.search(r'\d', token):
+            elif re.search(r"\d", token):
                 generalized.append("<VAR>")
             else:
                 generalized.append(token)
@@ -80,7 +82,7 @@ class LogTemplateMiner:
                 "template": template_key,
                 "count": 0,
                 "samples": [],  # Giữ log GỐC (bao gồm cả injection payload)
-                "time_range": [float('inf'), float('-inf')]
+                "time_range": [float("inf"), float("-inf")],
             }
 
         entry = self.templates[template_key]
@@ -96,12 +98,21 @@ class LogTemplateMiner:
 
     def add_log_dict(self, log_entry: dict):
         """Thêm log dạng dict từ Redis stream."""
-        key_fields = ['Source IP', 'Destination Port', 'Protocol',
-                       'Total Fwd Packets', 'Flow Duration']
-        parts = [f"{f}={log_entry.get(f)}" for f in key_fields if log_entry.get(f) is not None]
+        key_fields = [
+            "Source IP",
+            "Destination Port",
+            "Protocol",
+            "Total Fwd Packets",
+            "Flow Duration",
+        ]
+        parts = [
+            f"{f}={log_entry.get(f)}"
+            for f in key_fields
+            if log_entry.get(f) is not None
+        ]
         log_str = " ".join(parts) if parts else str(log_entry)
 
-        timestamp = log_entry.get('Timestamp', log_entry.get('Flow Duration'))
+        timestamp = log_entry.get("Timestamp", log_entry.get("Flow Duration"))
         try:
             timestamp = float(timestamp) if timestamp else None
         except (ValueError, TypeError):
@@ -127,18 +138,22 @@ class LogTemplateMiner:
         lines = []
         for i, tmpl in enumerate(self.get_summary(), 1):
             time_str = ""
-            if tmpl["time_range"][0] != float('inf'):
-                time_str = (f", Time: {tmpl['time_range'][0]:.1f}s"
-                            f"-{tmpl['time_range'][1]:.1f}s")
+            if tmpl["time_range"][0] != float("inf"):
+                time_str = (
+                    f", Time: {tmpl['time_range'][0]:.1f}s"
+                    f"-{tmpl['time_range'][1]:.1f}s"
+                )
             lines.append(
                 f"[Template {i}] {tmpl['template']} "
                 f"(Count: {tmpl['count']}{time_str})"
             )
             for sample in tmpl["samples"]:
                 lines.append(f"  Sample: {sample}")
-        lines.append(f"\n[Stats] Total: {self.total_logs_processed} logs → "
-                      f"{len(self.templates)} templates "
-                      f"(Compression: {self.get_compression_ratio():.0f}x)")
+        lines.append(
+            f"\n[Stats] Total: {self.total_logs_processed} logs → "
+            f"{len(self.templates)} templates "
+            f"(Compression: {self.get_compression_ratio():.0f}x)"
+        )
         return "\n".join(lines)
 
     def reset(self):
@@ -155,6 +170,7 @@ class EntropyScorer:
     Dùng để UU TIÊN (prioritize) log nào cần giữ nguyên trong Token Budget,
     KHÔNG dùng để "lọc" hay "bảo vệ" chống injection.
     """
+
     def __init__(self, threshold: float = 4.5):
         self.threshold = threshold
 
@@ -174,7 +190,7 @@ class EntropyScorer:
         return {
             "entropy": round(entropy, 3),
             "is_high_entropy": entropy > self.threshold,
-            "priority": "HIGH" if entropy > self.threshold else "NORMAL"
+            "priority": "HIGH" if entropy > self.threshold else "NORMAL",
         }
 
 
@@ -187,6 +203,7 @@ class TokenBudgetManager:
       2. Top-K Templates theo frequency (cao = nguy hiểm/phổ biến nhất)
       3. Truncate phần còn lại + ghi chú số patterns bị cắt
     """
+
     def __init__(self, budget: int = 4000):
         self.budget = budget
 
@@ -194,8 +211,7 @@ class TokenBudgetManager:
     def estimate_tokens(text: str) -> int:
         return len(text) // 4
 
-    def fit_to_budget(self, template_text: str,
-                       high_entropy_logs: list = None) -> str:
+    def fit_to_budget(self, template_text: str, high_entropy_logs: list = None) -> str:
         """
         Cắt tỉa cho vừa ngân sách.
         Output sẽ được chuyển tiếp qua DelimitedDataEncapsulator.
@@ -216,7 +232,7 @@ class TokenBudgetManager:
 
         # Priority 2: Template summaries (remaining 60%)
         output_lines.append("--- COMPRESSED TEMPLATES ---")
-        for line in template_text.split('\n'):
+        for line in template_text.split("\n"):
             t = self.estimate_tokens(line)
             if current_tokens + t > self.budget:
                 output_lines.append("[TRUNCATED due to token budget]")

@@ -3,6 +3,7 @@ Unit Test cho module DataValidator (src/guardrails/data_validator.py).
 
 Kiểm tra khả năng validate schema, ép kiểu và xử lý null/NaN.
 """
+
 import pytest
 import math
 from src.guardrails.data_validator import DataValidator
@@ -76,7 +77,7 @@ class TestDataValidator:
             "Source IP": "10.0.0.1",
             "Destination Port": 80,
             "Protocol": 6,
-            "Flow Duration": float('nan'),
+            "Flow Duration": float("nan"),
         }
         result = self.validator.validate(log)
         assert result["Flow Duration"] == ""

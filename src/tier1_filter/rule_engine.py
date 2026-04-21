@@ -19,16 +19,20 @@ TRIẾT LÝ THIẾT KẾ (ĐÃ SỬA LỖI KIẾN TRÚC):
   LangGraph Agent → feedback_listener.py → system_settings.yaml → RuleEngine.__init__()
   → dynamic_rules được load tại khởi tạo và reload khi có notify
 """
+
 import json
 import yaml
 import os
 import time
 from collections import defaultdict
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'system_settings.yaml')
+CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+)
+
 
 def load_config():
-    with open(CONFIG_PATH, 'r') as f:
+    with open(CONFIG_PATH, "r") as f:
         return yaml.safe_load(f)
 
 
@@ -48,15 +52,22 @@ class SessionBaseline:
     - total_fwd_packets: Tổng packet forwarded
     - first_seen / last_seen: Timestamps
     """
-    def __init__(self, deviation_threshold: float = 2.0,
-                 window_seconds: int = 300, ttl_seconds: int = 600):
-        self.profiles = defaultdict(lambda: {
-            'request_count': 0,
-            'unique_ports': set(),
-            'total_fwd_packets': 0,
-            'first_seen': None,
-            'last_seen': None,
-        })
+
+    def __init__(
+        self,
+        deviation_threshold: float = 2.0,
+        window_seconds: int = 300,
+        ttl_seconds: int = 600,
+    ):
+        self.profiles = defaultdict(
+            lambda: {
+                "request_count": 0,
+                "unique_ports": set(),
+                "total_fwd_packets": 0,
+                "first_seen": None,
+                "last_seen": None,
+            }
+        )
         self.deviation_threshold = deviation_threshold
         self.window_seconds = window_seconds
         self.ttl_seconds = ttl_seconds  # IP inactive > TTL → evict
@@ -71,8 +82,9 @@ class SessionBaseline:
         """
         now = time.time()
         stale_ips = [
-            ip for ip, profile in self.profiles.items()
-            if profile['last_seen'] and (now - profile['last_seen']) > self.ttl_seconds
+            ip
+            for ip, profile in self.profiles.items()
+            if profile["last_seen"] and (now - profile["last_seen"]) > self.ttl_seconds
         ]
         for ip in stale_ips:
             del self.profiles[ip]
@@ -91,27 +103,27 @@ class SessionBaseline:
         now = time.time()
 
         # Update profile
-        profile['request_count'] += 1
+        profile["request_count"] += 1
         try:
-            port = int(log_entry.get('Destination Port', 0))
-            profile['unique_ports'].add(port)
+            port = int(log_entry.get("Destination Port", 0))
+            profile["unique_ports"].add(port)
         except (ValueError, TypeError):
             pass
         try:
-            profile['total_fwd_packets'] += float(log_entry.get('Total Fwd Packets', 0))
+            profile["total_fwd_packets"] += float(log_entry.get("Total Fwd Packets", 0))
         except (ValueError, TypeError):
             pass
 
-        if profile['first_seen'] is None:
-            profile['first_seen'] = now
-        profile['last_seen'] = now
+        if profile["first_seen"] is None:
+            profile["first_seen"] = now
+        profile["last_seen"] = now
 
         # Tính deviation indicators
         deviation_reasons = []
         deviation_score = 0
 
         # Indicator 1: Port Scanning (IP truy cập quá nhiều ports khác nhau)
-        unique_port_count = len(profile['unique_ports'])
+        unique_port_count = len(profile["unique_ports"])
         if unique_port_count > 5:
             deviation_score += unique_port_count * 3
             deviation_reasons.append(
@@ -119,8 +131,8 @@ class SessionBaseline:
             )
 
         # Indicator 2: High-frequency requests (so với global average)
-        elapsed = max(now - profile['first_seen'], 1)
-        request_rate = profile['request_count'] / elapsed
+        elapsed = max(now - profile["first_seen"], 1)
+        request_rate = profile["request_count"] / elapsed
         if request_rate > self.global_avg_request_rate * self.deviation_threshold:
             deviation_score += 20
             deviation_reasons.append(
@@ -129,8 +141,8 @@ class SessionBaseline:
             )
 
         # Indicator 3: Abnormal packet volume
-        if profile['request_count'] > 0:
-            avg_packets = profile['total_fwd_packets'] / profile['request_count']
+        if profile["request_count"] > 0:
+            avg_packets = profile["total_fwd_packets"] / profile["request_count"]
             if avg_packets > 500:
                 deviation_score += 15
                 deviation_reasons.append(
@@ -138,13 +150,13 @@ class SessionBaseline:
                 )
 
         return {
-            'source_ip': source_ip,
-            'deviation_score': deviation_score,
-            'deviation_reasons': deviation_reasons,
-            'request_count': profile['request_count'],
-            'unique_ports': unique_port_count,
-            'is_anomalous': deviation_score > 0,
-            'active_profiles': len(self.profiles)  # Metric cho monitoring
+            "source_ip": source_ip,
+            "deviation_score": deviation_score,
+            "deviation_reasons": deviation_reasons,
+            "request_count": profile["request_count"],
+            "unique_ports": unique_port_count,
+            "is_anomalous": deviation_score > 0,
+            "active_profiles": len(self.profiles),  # Metric cho monitoring
         }
 
     def update_global_baseline(self):
@@ -154,9 +166,9 @@ class SessionBaseline:
         total_rates = []
         now = time.time()
         for ip, profile in self.profiles.items():
-            if profile['first_seen']:
-                elapsed = max(now - profile['first_seen'], 1)
-                total_rates.append(profile['request_count'] / elapsed)
+            if profile["first_seen"]:
+                elapsed = max(now - profile["first_seen"], 1)
+                total_rates.append(profile["request_count"] / elapsed)
         if total_rates:
             self.global_avg_request_rate = sum(total_rates) / len(total_rates)
 
@@ -195,20 +207,21 @@ class RuleEngine:
     │ Rule mới được áp dụng ngay trong evaluate() tiếp theo  │
     └─────────────────────────────────────────────────────────┘
     """
+
     def __init__(self):
         config = load_config()
-        tier1_config = config.get('tier1', {})
+        tier1_config = config.get("tier1", {})
 
-        self.risk_threshold = tier1_config.get('risk_threshold', 30)
-        self.sensitive_ports = tier1_config.get('sensitive_ports', [21, 22, 23, 3389])
-        self.max_fwd_packets = tier1_config.get('max_fwd_packets', 1000)
-        self.dynamic_rules = tier1_config.get('dynamic_rules', [])
+        self.risk_threshold = tier1_config.get("risk_threshold", 30)
+        self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
+        self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
+        self.dynamic_rules = tier1_config.get("dynamic_rules", [])
 
         # Session Baselining thay thế Random Sampling
-        baseline_config = tier1_config.get('session_baseline', {})
+        baseline_config = tier1_config.get("session_baseline", {})
         self.session_baseline = SessionBaseline(
-            deviation_threshold=baseline_config.get('deviation_threshold', 2.0),
-            window_seconds=baseline_config.get('window_seconds', 300)
+            deviation_threshold=baseline_config.get("deviation_threshold", 2.0),
+            window_seconds=baseline_config.get("window_seconds", 300),
         )
 
     def evaluate(self, log_entry: dict) -> dict:
@@ -221,24 +234,24 @@ class RuleEngine:
 
         # Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
         KEY_ALIASES = {
-            'dst_port': 'Destination Port',
-            'src_port': 'Source Port',
-            'src_ip': 'Source IP',
-            'dst_ip': 'Destination IP',
-            'fwd_packets': 'Total Fwd Packets',
-            'bwd_packets': 'Total Backward Packets',
-            'fwd_bytes': 'Total Length of Fwd Packets',
-            'bwd_bytes': 'Total Length of Bwd Packets',
-            'flow_duration_ms': 'Flow Duration',
-            'protocol': 'Protocol',
+            "dst_port": "Destination Port",
+            "src_port": "Source Port",
+            "src_ip": "Source IP",
+            "dst_ip": "Destination IP",
+            "fwd_packets": "Total Fwd Packets",
+            "bwd_packets": "Total Backward Packets",
+            "fwd_bytes": "Total Length of Fwd Packets",
+            "bwd_bytes": "Total Length of Bwd Packets",
+            "flow_duration_ms": "Flow Duration",
+            "protocol": "Protocol",
         }
         for alias, canonical in KEY_ALIASES.items():
             if alias in log_entry and canonical not in log_entry:
                 log_entry[canonical] = log_entry[alias]
 
         # --- Tầng 1: Static Rules ---
-        dest_port = log_entry.get('Destination Port', -1)
-        fwd_packets = log_entry.get('Total Fwd Packets', 0)
+        dest_port = log_entry.get("Destination Port", -1)
+        fwd_packets = log_entry.get("Total Fwd Packets", 0)
 
         try:
             if int(dest_port) in self.sensitive_ports:
@@ -256,11 +269,11 @@ class RuleEngine:
 
         # --- Tầng 2: Dynamic Rules (Từ Feedback Loop) ---
         for rule in self.dynamic_rules:
-            rule_field = rule.get('field')
-            rule_pattern = rule.get('pattern')
-            rule_score = rule.get('score', 50)
+            rule_field = rule.get("field")
+            rule_pattern = rule.get("pattern")
+            rule_score = rule.get("score", 50)
             if rule_field and rule_pattern:
-                field_value = str(log_entry.get(rule_field, ''))
+                field_value = str(log_entry.get(rule_field, ""))
                 if rule_pattern in field_value:
                     score += rule_score
                     reasons.append(
@@ -268,25 +281,25 @@ class RuleEngine:
                     )
 
         # --- Tầng 3: Session Baseline (thay thế Random Sampling) ---
-        source_ip = log_entry.get('Source IP', 'unknown')
+        source_ip = log_entry.get("Source IP", "unknown")
         baseline_result = self.session_baseline.update(source_ip, log_entry)
 
-        if baseline_result['is_anomalous']:
-            score += baseline_result['deviation_score']
-            reasons.extend(baseline_result['deviation_reasons'])
+        if baseline_result["is_anomalous"]:
+            score += baseline_result["deviation_score"]
+            reasons.extend(baseline_result["deviation_reasons"])
 
         # --- Quyết định ---
-        log_entry['tier1_score'] = score
-        log_entry['tier1_reasons'] = reasons
-        log_entry['tier1_baseline'] = {
-            'ip_request_count': baseline_result['request_count'],
-            'ip_unique_ports': baseline_result['unique_ports']
+        log_entry["tier1_score"] = score
+        log_entry["tier1_reasons"] = reasons
+        log_entry["tier1_baseline"] = {
+            "ip_request_count": baseline_result["request_count"],
+            "ip_unique_ports": baseline_result["unique_ports"],
         }
 
         if score >= self.risk_threshold:
-            log_entry['tier1_action'] = "ESCALATE"
+            log_entry["tier1_action"] = "ESCALATE"
         else:
-            log_entry['tier1_action'] = "DROP"
+            log_entry["tier1_action"] = "DROP"
 
         return log_entry
 
@@ -296,4 +309,4 @@ class RuleEngine:
         Được gọi bởi feedback_listener khi có rule mới.
         """
         config = load_config()
-        self.dynamic_rules = config.get('tier1', {}).get('dynamic_rules', [])
+        self.dynamic_rules = config.get("tier1", {}).get("dynamic_rules", [])

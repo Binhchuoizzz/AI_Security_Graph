@@ -8,7 +8,7 @@ Tích hợp Data Delimiters để chống Prompt Injection.
 # ==============================================================================
 # DELIMITERS (Chống Direct Prompt Injection)
 # ==============================================================================
-# Bọc dữ liệu (Log) bằng các tag XML khó đoán để LLM phân biệt đâu là 
+# Bọc dữ liệu (Log) bằng các tag XML khó đoán để LLM phân biệt đâu là
 # lệnh (instructions) và đâu là dữ liệu (data).
 LOG_START_TAG = "<escalated_log_data_v1>"
 LOG_END_TAG = "</escalated_log_data_v1>"
@@ -56,6 +56,7 @@ You MUST respond in pure JSON format matching this exact schema:
 Ensure the JSON is perfectly valid and contains no markdown formatting (like ```json).
 """
 
+
 def build_triage_prompt(log_data: str, rag_context: str) -> list[dict]:
     """
     Build messages array for OpenAI client.
@@ -73,7 +74,7 @@ Please analyze the following network event:
 """
     return [
         {"role": "system", "content": TRIAGE_SYSTEM_PROMPT},
-        {"role": "user", "content": user_message}
+        {"role": "user", "content": user_message},
     ]
 
 

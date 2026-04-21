@@ -7,6 +7,7 @@ CHỨC NĂNG:
 - Implement Retry logic, Exponential Backoff, và Timeout handling để đảm bảo
   Agent không bị crash khi model đang bận tính toán.
 """
+
 import os
 import time
 import logging
@@ -23,7 +24,9 @@ logger = logging.getLogger(__name__)
 
 # Oobabooga OpenAI-compatible endpoint
 API_BASE_URL = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
-API_KEY = os.getenv("LLM_API_KEY", "sk-placeholder-local-only")  # Placeholder cho Local LLM
+API_KEY = os.getenv(
+    "LLM_API_KEY", "sk-placeholder-local-only"
+)  # Placeholder cho Local LLM
 
 # Tuning parameters cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
@@ -32,31 +35,31 @@ DEFAULT_MODEL = "gemma-2-9b-it"
 
 
 class LLMClient:
-    def __init__(self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 60):
+    def __init__(
+        self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 60
+    ):
         """
         Khởi tạo OpenAI Client trỏ về Local Oobabooga.
         """
-        self.client = openai.OpenAI(
-            base_url=base_url,
-            api_key=API_KEY,
-            timeout=timeout
-        )
+        self.client = openai.OpenAI(base_url=base_url, api_key=API_KEY, timeout=timeout)
         self.max_retries = max_retries
 
-    def invoke(self, 
-               messages: List[Dict[str, str]], 
-               temperature: float = DEFAULT_TEMPERATURE,
-               max_tokens: int = DEFAULT_MAX_TOKENS,
-               response_format: Optional[Dict[str, str]] = None) -> str:
+    def invoke(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = DEFAULT_TEMPERATURE,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        response_format: Optional[Dict[str, str]] = None,
+    ) -> str:
         """
         Gọi LLM với Retry Logic.
-        
+
         Args:
             messages: List of dict [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
             temperature: Độ sáng tạo của model. 0.1 cho Security Analysis.
             max_tokens: Số token output tối đa.
             response_format: Định dạng output (vd: {"type": "json_object"} nếu model hỗ trợ)
-            
+
         Returns:
             Text output từ LLM.
         """
@@ -72,30 +75,38 @@ class LLMClient:
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 }
-                
+
                 # Oobabooga API hỗ trợ JSON mode cho một số model
                 if response_format:
                     kwargs["response_format"] = response_format
 
                 response = self.client.chat.completions.create(**kwargs)
-                
+
                 # Trả về text
                 return response.choices[0].message.content
 
             except openai.APIConnectionError as e:
-                logger.error(f"LLM Connection Error: {e}. Is Oobabooga running on port 5000?")
+                logger.error(
+                    f"LLM Connection Error: {e}. Is Oobabooga running on port 5000?"
+                )
                 if retries == self.max_retries:
                     raise
             except openai.APITimeoutError as e:
-                logger.warning(f"LLM Timeout (attempt {retries+1}/{self.max_retries}): {e}")
+                logger.warning(
+                    f"LLM Timeout (attempt {retries+1}/{self.max_retries}): {e}"
+                )
                 if retries == self.max_retries:
                     raise
             except openai.RateLimitError as e:
-                logger.warning(f"LLM Rate Limit (attempt {retries+1}/{self.max_retries}): Model is busy.")
+                logger.warning(
+                    f"LLM Rate Limit (attempt {retries+1}/{self.max_retries}): Model is busy."
+                )
                 if retries == self.max_retries:
                     raise
             except openai.APIStatusError as e:
-                logger.error(f"LLM API Status Error (e.g. 500 Internal Server Error): {e}")
+                logger.error(
+                    f"LLM API Status Error (e.g. 500 Internal Server Error): {e}"
+                )
                 # Trả về chuỗi rỗng để kích hoạt lớp Hard Fallback (AWAIT_HITL)
                 return ""
             except Exception as e:
@@ -118,26 +129,28 @@ class LLMClient:
         trailing commas, hoặc chữ text kẹp chung với JSON).
         """
         # Strip markdown fences nếu có
-        clean = re.sub(r'```json|```', '', raw).strip()
+        clean = re.sub(r"```json|```", "", raw).strip()
         try:
             return json.loads(clean)
         except json.JSONDecodeError:
-            logger.warning(f"JSON Decode failed, attempting regex fallback. Raw: {raw[:100]}...")
+            logger.warning(
+                f"JSON Decode failed, attempting regex fallback. Raw: {raw[:100]}..."
+            )
             # Fallback: extract JSON block bằng regex
-            match = re.search(r'\{.*\}', clean, re.DOTALL)
+            match = re.search(r"\{.*\}", clean, re.DOTALL)
             if match:
                 try:
                     return json.loads(match.group())
                 except json.JSONDecodeError:
                     pass
-            
+
             # Hard fallback: trả về safe default thay vì crash
             logger.error("All JSON parse attempts failed. Using safe default.")
             return {
-                "action": "AWAIT_HITL", 
+                "action": "AWAIT_HITL",
                 "confidence": 0.0,
-                "error": "parse_failed", 
-                "raw": raw[:200]
+                "error": "parse_failed",
+                "raw": raw[:200],
             }
 
     def check_health(self) -> bool:
@@ -148,6 +161,7 @@ class LLMClient:
             return True
         except Exception:
             return False
+
 
 # Singleton instance
 llm_client = LLMClient()

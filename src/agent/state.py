@@ -16,6 +16,7 @@ CHỐNG SEMANTIC DRIFT:
   - IP, Port, Hash nghi ngờ KHÔNG BAO GIỜ bị làm mờ qua tóm tắt (iocs)
   - Metrics token luôn nằm trong tầm kiểm soát
 """
+
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -27,12 +28,13 @@ class IOCEntry:
     Indicator of Compromise — lưu cứng, không bao giờ bị tóm tắt.
     Agent chỉ được APPEND vào list, không được sửa/xóa entries cũ.
     """
-    ioc_type: str       # "ip", "port", "hash", "domain", "user_agent", "uri"
-    value: str          # Giá trị cụ thể: "192.168.1.100", "445", "abc123..."
-    severity: str       # "low", "medium", "high", "critical"
-    source_template: str = ""   # Template ID nơi phát hiện IOC này
-    first_seen: str = ""        # Timestamp ISO format
-    context: str = ""           # Ghi chú ngắn: "Port scanning 12 ports"
+
+    ioc_type: str  # "ip", "port", "hash", "domain", "user_agent", "uri"
+    value: str  # Giá trị cụ thể: "192.168.1.100", "445", "abc123..."
+    severity: str  # "low", "medium", "high", "critical"
+    source_template: str = ""  # Template ID nơi phát hiện IOC này
+    first_seen: str = ""  # Timestamp ISO format
+    context: str = ""  # Ghi chú ngắn: "Port scanning 12 ports"
 
     def to_dict(self) -> dict:
         return {
@@ -41,21 +43,22 @@ class IOCEntry:
             "severity": self.severity,
             "source_template": self.source_template,
             "first_seen": self.first_seen,
-            "context": self.context
+            "context": self.context,
         }
 
 
 @dataclass
 class AgentDecision:
     """Lịch sử quyết định của Agent — phục vụ audit trail."""
+
     timestamp: str
-    action: str         # "ESCALATE", "BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"
-    target: str         # IP, Host, User bị tác động
-    confidence: float   # 0.0 - 1.0
-    reasoning: str      # Giải thích ngắn gọn
+    action: str  # "ESCALATE", "BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"
+    target: str  # IP, Host, User bị tác động
+    confidence: float  # 0.0 - 1.0
+    reasoning: str  # Giải thích ngắn gọn
     mitre_technique: str = ""  # VD: "T1110.003 - Brute Force: Password Spraying"
-    iso_control: str = ""      # Ví dụ: "A.9.4.2 - Secure log-on procedures"
-    hitl_status: str = "N/A"   # Các trạng thái: "PENDING", "APPROVED", "REJECTED", "N/A"
+    iso_control: str = ""  # Ví dụ: "A.9.4.2 - Secure log-on procedures"
+    hitl_status: str = "N/A"  # Các trạng thái: "PENDING", "APPROVED", "REJECTED", "N/A"
 
     def to_dict(self) -> dict:
         return {
@@ -66,7 +69,7 @@ class AgentDecision:
             "reasoning": self.reasoning,
             "mitre_technique": self.mitre_technique,
             "iso_control": self.iso_control,
-            "hitl_status": self.hitl_status
+            "hitl_status": self.hitl_status,
         }
 
 
@@ -144,14 +147,20 @@ class SentinelState:
 
     # === HELPER METHODS ===
 
-    def add_ioc(self, ioc_type: str, value: str, severity: str = "medium",
-                source_template: str = "", context: str = ""):
+    def add_ioc(
+        self,
+        ioc_type: str,
+        value: str,
+        severity: str = "medium",
+        source_template: str = "",
+        context: str = "",
+    ):
         """
         Thêm IOC mới vào registry. Kiểm tra trùng lặp trước khi append.
         """
         # Kiểm tra trùng lặp: không thêm IOC đã tồn tại (cùng type + value)
         for existing in self.extracted_iocs:
-            if existing.get('ioc_type') == ioc_type and existing.get('value') == value:
+            if existing.get("ioc_type") == ioc_type and existing.get("value") == value:
                 return  # Bỏ qua nếu đã tồn tại
 
         ioc = IOCEntry(
@@ -160,13 +169,20 @@ class SentinelState:
             severity=severity,
             source_template=source_template,
             first_seen=datetime.utcnow().isoformat(),
-            context=context
+            context=context,
         )
         self.extracted_iocs.append(ioc.to_dict())
 
-    def add_decision(self, action: str, target: str, confidence: float,
-                      reasoning: str, mitre_technique: str = "",
-                      iso_control: str = "", hitl_status: str = "N/A"):
+    def add_decision(
+        self,
+        action: str,
+        target: str,
+        confidence: float,
+        reasoning: str,
+        mitre_technique: str = "",
+        iso_control: str = "",
+        hitl_status: str = "N/A",
+    ):
         """Ghi nhận quyết định mới vào audit trail."""
         decision = AgentDecision(
             timestamp=datetime.utcnow().isoformat(),
@@ -176,13 +192,13 @@ class SentinelState:
             reasoning=reasoning,
             mitre_technique=mitre_technique,
             iso_control=iso_control,
-            hitl_status=hitl_status
+            hitl_status=hitl_status,
         )
         self.decisions.append(decision.to_dict())
 
     def get_iocs_by_severity(self, severity: str) -> list:
         """Lọc IOCs theo mức severity."""
-        return [ioc for ioc in self.extracted_iocs if ioc.get('severity') == severity]
+        return [ioc for ioc in self.extracted_iocs if ioc.get("severity") == severity]
 
     def get_iocs_summary_for_prompt(self, max_iocs: int = 20) -> str:
         """

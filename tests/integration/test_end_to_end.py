@@ -4,11 +4,14 @@ Integration Test: End-to-End Pipeline (Tier 1 -> Guardrails -> LangGraph Agent).
 Kiểm tra toàn bộ luồng xử lý từ log đầu vào đến quyết định cuối cùng,
 không cần kết nối Redis hay LLM thực (dùng mock).
 """
+
 import pytest
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.append(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 from src.tier1_filter.rule_engine import RuleEngine
 from src.guardrails.data_validator import DataValidator
@@ -72,7 +75,7 @@ class TestEndToEndGuardrails:
 
         # Đóng gói bằng Guardrails
         result = pipeline.process({"log_summary": summary})
-        output = result['encapsulated_text']
+        output = result["encapsulated_text"]
         assert "<<<DATA_BEGIN_" in output
         assert "<<<DATA_END_" in output
 
@@ -86,9 +89,11 @@ class TestEndToEndGuardrails:
         }
         result = pipeline.process(malicious)
         # Pipeline phải phát hiện pattern injection
-        assert result.get('injection_detected', False) is True or \
-               result.get('pattern_matched', False) is True or \
-               "<<<DATA_BEGIN_" in result.get('encapsulated_text', '')
+        assert (
+            result.get("injection_detected", False) is True
+            or result.get("pattern_matched", False) is True
+            or "<<<DATA_BEGIN_" in result.get("encapsulated_text", "")
+        )
 
 
 class TestEndToEndSecurityLayer:

@@ -15,17 +15,20 @@ Luồng hoạt động:
   Tier 1 (lọc) → Tier 2 (phân tích) → Feedback Loop → Tier 1 (cập nhật luật mới)
 
 *Conscious Design Decision (Dành cho Hội đồng):*
-- State Machine chỉ có 1 chiều: PENDING_APPROVAL -> ACTIVE hoặc REJECTED. 
+- State Machine chỉ có 1 chiều: PENDING_APPROVAL -> ACTIVE hoặc REJECTED.
 - Các rule bị REJECTED sẽ không được re-submit trong cùng phiên làm việc để tránh spam L3 Manager.
 - Hiện tại các ACTIVE rules không có TTL (sống mãi mãi trong file cấu hình) nhằm phục vụ demo tính ổn định. Trong môi trường production thực tế, một eviction policy (LRU hoặc Fixed TTL 24h) phải được áp dụng để đảm bảo RuleEngine không bị tràn bộ nhớ.
 """
+
 import yaml
 import os
 import json
 import logging
 from datetime import datetime
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'system_settings.yaml')
+CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +38,18 @@ class FeedbackListener:
     Nhận và xử lý feedback từ LangGraph Agent.
     Persist các dynamic rules mới vào YAML config.
     """
+
     def __init__(self):
         self.feedback_log = []  # Lịch sử feedback để audit
 
-    def receive_new_rule(self, field: str, pattern: str, score: int = 50,
-                          source: str = "langgraph_agent", reason: str = "") -> dict:
+    def receive_new_rule(
+        self,
+        field: str,
+        pattern: str,
+        score: int = 50,
+        source: str = "langgraph_agent",
+        reason: str = "",
+    ) -> dict:
         """
         Nhận luật mới từ Agent và persist vào config.
 
@@ -60,31 +70,39 @@ class FeedbackListener:
             "created_at": datetime.utcnow().isoformat(),
             "source": source,
             "reason": reason,
-            "status": "PENDING_APPROVAL"  # Trạng thái chờ kiểm duyệt
+            "status": "PENDING_APPROVAL",  # Trạng thái chờ kiểm duyệt
         }
 
         # Persist vào YAML
         try:
-            with open(CONFIG_PATH, 'r') as f:
+            with open(CONFIG_PATH, "r") as f:
                 config = yaml.safe_load(f)
 
-            if 'tier1' not in config:
-                config['tier1'] = {}
-            if 'dynamic_rules' not in config['tier1']:
-                config['tier1']['dynamic_rules'] = []
+            if "tier1" not in config:
+                config["tier1"] = {}
+            if "dynamic_rules" not in config["tier1"]:
+                config["tier1"]["dynamic_rules"] = []
 
             # Kiểm tra trùng lặp trước khi thêm
-            existing_patterns = [r.get('pattern') for r in config['tier1']['dynamic_rules']]
+            existing_patterns = [
+                r.get("pattern") for r in config["tier1"]["dynamic_rules"]
+            ]
             if pattern in existing_patterns:
                 logger.warning(f"[Feedback] Duplicate rule skipped: {pattern}")
-                return {"status": "SKIPPED", "reason": "Duplicate pattern", "rule": new_rule}
+                return {
+                    "status": "SKIPPED",
+                    "reason": "Duplicate pattern",
+                    "rule": new_rule,
+                }
 
-            config['tier1']['dynamic_rules'].append(new_rule)
+            config["tier1"]["dynamic_rules"].append(new_rule)
 
-            with open(CONFIG_PATH, 'w') as f:
+            with open(CONFIG_PATH, "w") as f:
                 yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
 
-            logger.info(f"[Feedback] New dynamic rule persisted: {field} contains '{pattern}'")
+            logger.info(
+                f"[Feedback] New dynamic rule persisted: {field} contains '{pattern}'"
+            )
 
             # Ghi vào feedback log
             self.feedback_log.append(new_rule)
@@ -102,38 +120,38 @@ class FeedbackListener:
     def get_active_dynamic_rules(self) -> list:
         """Đọc danh sách dynamic rules hiện đang ACTIVE từ config."""
         try:
-            with open(CONFIG_PATH, 'r') as f:
+            with open(CONFIG_PATH, "r") as f:
                 config = yaml.safe_load(f)
-            rules = config.get('tier1', {}).get('dynamic_rules', [])
-            return [r for r in rules if r.get('status', 'ACTIVE') == 'ACTIVE']
+            rules = config.get("tier1", {}).get("dynamic_rules", [])
+            return [r for r in rules if r.get("status", "ACTIVE") == "ACTIVE"]
         except Exception:
             return []
 
     def get_pending_rules(self) -> list:
         """Lấy danh sách các rule đang chờ phê duyệt."""
         try:
-            with open(CONFIG_PATH, 'r') as f:
+            with open(CONFIG_PATH, "r") as f:
                 config = yaml.safe_load(f)
-            rules = config.get('tier1', {}).get('dynamic_rules', [])
-            return [r for r in rules if r.get('status') == 'PENDING_APPROVAL']
+            rules = config.get("tier1", {}).get("dynamic_rules", [])
+            return [r for r in rules if r.get("status") == "PENDING_APPROVAL"]
         except Exception:
             return []
 
     def update_rule_status(self, pattern: str, new_status: str) -> bool:
         """Cập nhật trạng thái của rule (ACTIVE hoặc REJECTED)."""
         try:
-            with open(CONFIG_PATH, 'r') as f:
+            with open(CONFIG_PATH, "r") as f:
                 config = yaml.safe_load(f)
-            
-            rules = config.get('tier1', {}).get('dynamic_rules', [])
+
+            rules = config.get("tier1", {}).get("dynamic_rules", [])
             updated = False
             for rule in rules:
-                if rule.get('pattern') == pattern:
-                    rule['status'] = new_status
+                if rule.get("pattern") == pattern:
+                    rule["status"] = new_status
                     updated = True
-            
+
             if updated:
-                with open(CONFIG_PATH, 'w') as f:
+                with open(CONFIG_PATH, "w") as f:
                     yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
                 logger.info(f"[Feedback] Rule '{pattern}' updated to {new_status}")
             return updated
@@ -150,10 +168,10 @@ class FeedbackListener:
     def clear_all_dynamic_rules(self):
         """Reset toàn bộ dynamic rules (dùng khi chạy experiment mới)."""
         try:
-            with open(CONFIG_PATH, 'r') as f:
+            with open(CONFIG_PATH, "r") as f:
                 config = yaml.safe_load(f)
-            config['tier1']['dynamic_rules'] = []
-            with open(CONFIG_PATH, 'w') as f:
+            config["tier1"]["dynamic_rules"] = []
+            with open(CONFIG_PATH, "w") as f:
                 yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
             self.feedback_log = []
             logger.info("[Feedback] All dynamic rules cleared.")

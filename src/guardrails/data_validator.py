@@ -7,7 +7,8 @@ Kiểm tra tính toàn vẹn dữ liệu trước khi đưa vào pipeline LangGr
   - Null/NaN Handling: Làm sạch giá trị rỗng.
 """
 
-REQUIRED_FIELDS = ['Source IP', 'Destination Port', 'Protocol']
+REQUIRED_FIELDS = ["Source IP", "Destination Port", "Protocol"]
+
 
 class DataValidator:
     def __init__(self, required_fields: list = None):
@@ -26,21 +27,25 @@ class DataValidator:
                 errors.append(f"Missing required field: {field}")
 
         # Type coercion cho các trường số
-        numeric_fields = ['Destination Port', 'Total Fwd Packets', 'Flow Duration']
+        numeric_fields = ["Destination Port", "Total Fwd Packets", "Flow Duration"]
         for field in numeric_fields:
             if field in log_entry:
                 try:
                     log_entry[field] = float(log_entry[field])
                 except (ValueError, TypeError):
                     log_entry[field] = 0
-                    errors.append(f"Invalid numeric value for '{field}', defaulted to 0")
+                    errors.append(
+                        f"Invalid numeric value for '{field}', defaulted to 0"
+                    )
 
         # Null/NaN handling
         for key, value in log_entry.items():
-            if value is None or (isinstance(value, float) and value != value):  # NaN check
+            if value is None or (
+                isinstance(value, float) and value != value
+            ):  # NaN check
                 log_entry[key] = ""
 
-        log_entry['_validation_errors'] = errors
-        log_entry['_is_valid'] = len(errors) == 0
+        log_entry["_validation_errors"] = errors
+        log_entry["_is_valid"] = len(errors) == 0
 
         return log_entry

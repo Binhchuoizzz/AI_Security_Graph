@@ -21,6 +21,7 @@ GIẢI PHÁP: Semantic Cache
   Template Mining không chỉ nén volume, mà còn tạo ra cache key
   chất lượng cao cho Semantic Cache.
 """
+
 import hashlib
 import time
 from collections import OrderedDict
@@ -35,15 +36,16 @@ class SemanticCache:
     Dùng OrderedDict để implement LRU eviction khi cache đầy.
     TTL đảm bảo cache không bị stale.
     """
+
     def __init__(self, max_size: int = 500, ttl_seconds: int = 1800):
         self.cache = OrderedDict()  # {hash_key: {"result": ..., "timestamp": ...}}
         self.max_size = max_size
         self.ttl_seconds = ttl_seconds
         # Lưu số liệu (Metrics) cho MLflow tracking
         self.stats = {
-            'hits': 0,
-            'misses': 0,
-            'evictions': 0,
+            "hits": 0,
+            "misses": 0,
+            "evictions": 0,
         }
 
     def _make_key(self, query_text: str) -> str:
@@ -57,12 +59,13 @@ class SemanticCache:
         """Xóa entries quá TTL."""
         now = time.time()
         expired_keys = [
-            key for key, entry in self.cache.items()
-            if (now - entry['timestamp']) > self.ttl_seconds
+            key
+            for key, entry in self.cache.items()
+            if (now - entry["timestamp"]) > self.ttl_seconds
         ]
         for key in expired_keys:
             del self.cache[key]
-            self.stats['evictions'] += 1
+            self.stats["evictions"] += 1
 
     def get(self, query_text: str) -> dict:
         """
@@ -74,17 +77,17 @@ class SemanticCache:
         if key in self.cache:
             entry = self.cache[key]
             # Kiểm tra TTL
-            if (time.time() - entry['timestamp']) <= self.ttl_seconds:
+            if (time.time() - entry["timestamp"]) <= self.ttl_seconds:
                 # Đưa lên đầu (LRU: phần tử được sử dụng gần nhất)
                 self.cache.move_to_end(key)
-                self.stats['hits'] += 1
-                return {"hit": True, "result": entry['result']}
+                self.stats["hits"] += 1
+                return {"hit": True, "result": entry["result"]}
             else:
                 # Đã hết hạn (Expired)
                 del self.cache[key]
-                self.stats['evictions'] += 1
+                self.stats["evictions"] += 1
 
-        self.stats['misses'] += 1
+        self.stats["misses"] += 1
         return {"hit": False}
 
     def put(self, query_text: str, result: dict):
@@ -97,39 +100,33 @@ class SemanticCache:
         # Nếu key đã tồn tại, cập nhật lại
         if key in self.cache:
             self.cache.move_to_end(key)
-            self.cache[key] = {
-                'result': result,
-                'timestamp': time.time()
-            }
+            self.cache[key] = {"result": result, "timestamp": time.time()}
             return
 
         # Xóa phần tử cũ nhất (LRU) nếu cache đầy
         while len(self.cache) >= self.max_size:
             self.cache.popitem(last=False)  # Xóa phần tử cũ nhất
-            self.stats['evictions'] += 1
+            self.stats["evictions"] += 1
 
-        self.cache[key] = {
-            'result': result,
-            'timestamp': time.time()
-        }
+        self.cache[key] = {"result": result, "timestamp": time.time()}
 
     def get_hit_rate(self) -> float:
         """Tính cache hit rate (metric cho MLflow)."""
-        total = self.stats['hits'] + self.stats['misses']
+        total = self.stats["hits"] + self.stats["misses"]
         if total == 0:
             return 0.0
-        return self.stats['hits'] / total
+        return self.stats["hits"] / total
 
     def get_stats(self) -> dict:
         """Trả về toàn bộ stats cho MLflow logging."""
         return {
             **self.stats,
-            'hit_rate': self.get_hit_rate(),
-            'cache_size': len(self.cache),
-            'max_size': self.max_size
+            "hit_rate": self.get_hit_rate(),
+            "cache_size": len(self.cache),
+            "max_size": self.max_size,
         }
 
     def clear(self):
         """Reset cache. Dùng khi chạy experiment mới."""
         self.cache.clear()
-        self.stats = {'hits': 0, 'misses': 0, 'evictions': 0}
+        self.stats = {"hits": 0, "misses": 0, "evictions": 0}
