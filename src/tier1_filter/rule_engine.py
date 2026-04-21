@@ -219,6 +219,23 @@ class RuleEngine:
         score = 0
         reasons = []
 
+        # Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
+        KEY_ALIASES = {
+            'dst_port': 'Destination Port',
+            'src_port': 'Source Port',
+            'src_ip': 'Source IP',
+            'dst_ip': 'Destination IP',
+            'fwd_packets': 'Total Fwd Packets',
+            'bwd_packets': 'Total Backward Packets',
+            'fwd_bytes': 'Total Length of Fwd Packets',
+            'bwd_bytes': 'Total Length of Bwd Packets',
+            'flow_duration_ms': 'Flow Duration',
+            'protocol': 'Protocol',
+        }
+        for alias, canonical in KEY_ALIASES.items():
+            if alias in log_entry and canonical not in log_entry:
+                log_entry[canonical] = log_entry[alias]
+
         # --- Tầng 1: Static Rules ---
         dest_port = log_entry.get('Destination Port', -1)
         fwd_packets = log_entry.get('Total Fwd Packets', 0)

@@ -58,7 +58,7 @@ def run_ablation():
             pred_a = 0
             for log in logs:
                 result = rule_engine.evaluate(log)
-                if result.get("action") == "ESCALATE":
+                if result.get("tier1_action") == "ESCALATE":
                     pred_a = 1
                     break
             latency_a = time.time() - start_time_a
@@ -73,7 +73,7 @@ def run_ablation():
             needs_llm = False
             for log in logs:
                 result = rule_engine.evaluate(log)
-                if result.get("action") == "ESCALATE":
+                if result.get("tier1_action") == "ESCALATE":
                     needs_llm = True
                     break
 
@@ -126,9 +126,6 @@ def run_ablation():
         mlflow.log_metric("Config_F_Precision", prec_f)
         mlflow.log_metric("Config_F_Recall", rec_f)
         mlflow.log_metric("Config_F_Latency_Mean", float(np.mean(results["Config_F"]["latencies"])))
-
-        # Log file ket qua lam artifact cua MLflow
-        mlflow.log_artifact(out_path)
 
         print(f"\n[+] Config A: F1={f1_a:.4f} | Prec={prec_a:.4f} | Rec={rec_a:.4f}")
         print(f"[+] Config F: F1={f1_f:.4f} | Prec={prec_f:.4f} | Rec={rec_f:.4f}")
