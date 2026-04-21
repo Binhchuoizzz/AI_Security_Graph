@@ -73,7 +73,7 @@ tier1:
     source: langgraph_agent
     status: ACTIVE
   max_fwd_packets: 1000
-  risk_threshold: 30
+  risk_threshold: 15
   sensitive_ports:
   - 21
   - 22

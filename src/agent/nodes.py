@@ -152,10 +152,20 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"MLflow tracking failed (Ignored in dev mode): {e}")
 
+    target = "UNKNOWN_TARGET"
+    if new_iocs and isinstance(new_iocs, list) and len(new_iocs) > 0:
+        target = new_iocs[0].get("value", "UNKNOWN_TARGET")
+    
+    if target == "UNKNOWN_TARGET" and state.current_batch_logs:
+        # Fallback to Source IP or src_ip if no IOC was explicitly extracted
+        log_entry = state.current_batch_logs[0]
+        target = log_entry.get("Source IP") or log_entry.get("src_ip", "UNKNOWN_TARGET")
+
     decision_entry = {
         "action": action,
         "confidence": confidence,
         "reasoning": reasoning,
+        "target": target,
         "mitre_technique": decision_json.get("mitre_technique", ""),
         "iso_control": decision_json.get("iso_control", ""),
         "cycle_count": state.cycle_count + 1,

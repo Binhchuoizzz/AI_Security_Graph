@@ -58,6 +58,6 @@ def stream_logs_to_redis(csv_path: str):
 
 
 if __name__ == "__main__":
-    MOCK_CSV = "data/raw/sample_logs.csv"
+    MOCK_CSV = "data/raw/Friday-DDos.csv"
     # Bạn sẽ tạo một sample_logs.csv giả lập hoặc trích từ CICIDS2017
     stream_logs_to_redis(MOCK_CSV)

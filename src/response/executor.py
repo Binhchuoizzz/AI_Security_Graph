@@ -41,7 +41,7 @@ def _log_to_db(action: str, target: str, reason: str):
             c = conn.cursor()
             c.execute(
                 "INSERT INTO audit_trail (timestamp, action, target, reason) VALUES (?, ?, ?, ?)",
-                (datetime.utcnow().isoformat(), action, target, reason),
+                (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), action, target, reason),
             )
             conn.commit()
     except Exception as e:
