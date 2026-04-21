@@ -104,6 +104,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     
     # CRITICAL: Inject Guardrails system instruction vào system prompt
     guardrails_instruction = getattr(state, '_guardrails_system_instruction', '')
+    logger.info(f"Guardrails instruction length: {len(guardrails_instruction)}")
     if guardrails_instruction:
         messages[0]["content"] = guardrails_instruction + "\n\n" + messages[0]["content"]
     

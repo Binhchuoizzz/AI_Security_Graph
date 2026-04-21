@@ -178,7 +178,7 @@ Chiến lược **Lab Experiment** + **Adversarial Testing**. Datasets:
 1. **CICIDS2017:** Baseline benchmark (DoS, Brute Force, Web Attack). Tuy đã ra mắt nhiều năm, dataset này vẫn được chọn làm trọng tâm vì là chuẩn mực phổ biến nhất trong literature SOC. Để chứng minh khả năng **liên kết log đa nguồn (Multi-source Correlation)**, các luồng traffic khác nhau trong CICIDS2017 sẽ được giả lập và tách thành các file log riêng biệt ở quá trình tiền xử lý (ví dụ: tách HTTP traffic thành Apache Web Logs, và các kết nối khác thành Firewall/Zeek Logs).
 2. **UNSW-NB15:** Thử nghiệm tấn công đa hình, phân tán.
 
-**Synthetic Adversarial Generation:** Dùng Gemma 26B sinh 1,000+ kịch bản Log Injection gồm 4 loại: Direct Injection, Indirect Injection, Encoding Bypass, và **Semantic Confusion** (thao túng ngôn từ tự nhiên — kẻ tấn công nhúng ý đồ độc hại vào một đoạn văn đúng ngữ pháp, có tính chất như một chỉ thị độc lập để vượt qua các bộ lọc cấu trúc và thao túng suy luận của LLM).
+**Synthetic Adversarial Generation:** Xây dựng 45 mẫu curated Log Injection đặc thù, tập trung vào chất lượng thay vì số lượng (Quality over quantity), gồm 3 loại: Structural Injection, Encoding Bypass, và **Semantic Confusion** (thao túng ngôn từ tự nhiên — kẻ tấn công nhúng ý đồ độc hại vào một đoạn văn đúng ngữ pháp, có tính chất như một chỉ thị độc lập để vượt qua các bộ lọc cấu trúc và thao túng suy luận của LLM).
 
 ### 3.2. Ablation Study Design
 
@@ -194,7 +194,7 @@ Chiến lược **Lab Experiment** + **Adversarial Testing**. Datasets:
 - **Week 1-2 (Foundation):** Literature Review, hạ tầng Docker/MLflow/Oobabooga. Viết Chương 1-2 song song.
 - **Week 3-4 (Core):** Redis Streaming + Tier-1 Session Baselining + Feedback Loop. LangGraph Agent + FAISS Dual-RAG. Viết Chương 3.
 - **Week 5-6 (Guardrails & UI):** Template Miner + Prompt Filter (Delimited Encapsulation). Streamlit Dashboard (RBAC, HITL).
-- **Week 7-8 (Evaluation):** Ablation Study + 1,000+ Adversarial Testing + MLflow metrics. Viết Chương 4-5.
+- **Week 7-8 (Evaluation):** Ablation Study + Curated Adversarial Testing + MLflow metrics. Viết Chương 4-5.
 
 ### 3.4. Feasibility Assessment
 
@@ -225,7 +225,7 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 
 1. **Classification Metrics:** Precision, Recall, F1-Score trên 2 datasets. So sánh 4 cấu hình Ablation.
 2. **Operational Metrics:** Reasoning Latency (sec/incident), bao gồm cả Embedding Latency. Semantic Cache Hit Rate được đo để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier vs 1-Tier.
-3. **Robustness Metrics:** Guardrail Defeat Rate qua 1,000+ adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
+3. **Robustness Metrics:** Guardrail Defeat Rate qua 45 curated adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
 4. **Context Quality Metrics & Eval Scoping:**
    - **Tối ưu VRAM Eval (Stratified Sampling):** Chạy code Python của Tier 1 trên toàn bộ ~2.8 triệu bản ghi CICIDS2017 để đánh giá Routing/Latencies. Tuy nhiên, tầng đánh giá LLM-as-a-Judge bằng Oracle 26B sẽ chỉ chạy trên một **mẫu phân tầng (Stratified Sample) gồm 5,000 sự kiện đại diện** (chứa tỷ lệ chuẩn mực cho cả 14 họ tấn công) thay vì toàn bộ dataset để khả thi về thời gian chạy trên tài nguyên RTX 4060 Ti 16GB.
    - **RAGAS (200 mẫu Ground Truth tĩnh):** Tính Context Precision + Answer Relevancy.

@@ -27,6 +27,7 @@ import os
 import html
 import base64
 import secrets
+import urllib.parse
 from collections import Counter
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'config', 'system_settings.yaml')
@@ -116,9 +117,26 @@ class EncodingNeutralizer:
         Chuẩn hóa unicode tricks: ⁱᵍⁿᵒʳᵉ → ignore
         Kẻ tấn công dùng Unicode homoglyphs để bypass detection.
         """
-        # Loại bỏ zero-width characters
-        cleaned = re.sub(r'[\u200b\u200c\u200d\ufeff\u00ad]', '', text)
+        # Loại bỏ zero-width characters và null bytes
+        cleaned = re.sub(r'[\u200b\u200c\u200d\ufeff\u00ad\x00]', '', text)
         return cleaned
+
+    @staticmethod
+    def decode_url_and_hex(text: str) -> str:
+        """Decode URL encoding và Hex escape (\\xNN)."""
+        # 1. URL Decode (%20 -> space)
+        decoded = urllib.parse.unquote(text)
+        
+        # 2. Hex escape decode (\\x41 -> A)
+        # Thay thế \\xNN thành ký tự ASCII tương ứng nếu hợp lệ
+        def hex_repl(match):
+            try:
+                return chr(int(match.group(1), 16))
+            except ValueError:
+                return match.group(0)
+                
+        decoded = re.sub(r'\\x([0-9a-fA-F]{2})', hex_repl, decoded)
+        return decoded
 
     def neutralize(self, log_entry: dict) -> dict:
         """Chạy toàn bộ pipeline neutralization trên log entry."""
@@ -129,6 +147,7 @@ class EncodingNeutralizer:
                 continue
             str_value = str(value)
             str_value = self.normalize_unicode(str_value)
+            str_value = self.decode_url_and_hex(str_value)
             str_value = self.decode_if_base64(str_value)
             str_value = self.neutralize_html_entities(str_value)
             neutralized[key] = str_value

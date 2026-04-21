@@ -115,6 +115,9 @@ class SentinelState:
     current_batch_encapsulated: str = ""
     """Text đã đóng gói bởi DelimitedDataEncapsulator — sẵn sàng cho LLM."""
 
+    _guardrails_system_instruction: str = ""
+    """System prompt sinh động từ Guardrails (chứa dynamic delimiters)."""
+
     current_batch_size: int = 0
     """Số log trong batch hiện tại."""
 
