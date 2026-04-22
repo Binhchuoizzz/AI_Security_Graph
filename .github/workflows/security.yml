@@ -7,6 +7,10 @@ on:
     # Chạy tự động vào 00:00 UTC mỗi thứ Hai
     - cron: '0 0 * * 1'
 
+concurrency:
+  group: security-audit-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write

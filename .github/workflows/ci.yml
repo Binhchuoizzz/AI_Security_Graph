@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Ngăn chặn việc chạy nhiều pipeline chồng chéo khi push liên tục
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
