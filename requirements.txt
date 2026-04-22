@@ -1,10 +1,10 @@
 # ==========================================
 # 1. CORE AI & AGENT (Lõi Suy luận LangGraph)
 # ==========================================
-langgraph==0.3.34
+langgraph==1.0.10rc1
 langchain==0.3.25
-langchain-openai==0.3.21
-langchain-community==0.3.21
+langchain-openai==1.1.14
+langchain-community==0.3.27
 pydantic==2.13.3
 
 # ==========================================
@@ -38,6 +38,6 @@ PyYAML==6.0.2
 # ==========================================
 # 6. TESTING & GUARDRAILS (Kiểm thử)
 # ==========================================
-pytest==8.3.5
+pytest==9.0.3
 redis==6.2.0
 drain3==0.9.11
