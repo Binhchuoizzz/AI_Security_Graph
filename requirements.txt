@@ -1,45 +1,43 @@
 # ==========================================
 # 1. CORE AI & AGENT (Lõi Suy luận LangGraph)
 # ==========================================
-langgraph>=0.0.26
-langchain>=0.1.0
-langchain-openai>=0.0.5     # Dùng để gọi Oobabooga API (tương thích OpenAI)
-langchain-community>=0.0.13 # Hỗ trợ các công cụ phụ trợ cho Langchain
-pydantic>=2.0.0             # Xác thực cấu trúc JSON đầu ra của LLM
+langgraph==0.3.34
+langchain==0.3.25
+langchain-openai==0.3.21
+langchain-community==0.3.21
+pydantic==2.13.3
 
 # ==========================================
 # 2. RAG & KNOWLEDGE BASE (Tri thức AI)
 # ==========================================
-sentence-transformers>=2.2.2 # Mô hình nhúng (Embedding) cho dữ liệu MITRE/ISO
-faiss-cpu>=1.7.4             # Vector Database chạy local nhẹ nhàng (Không cần GPU)
+sentence-transformers==4.1.0
+faiss-cpu==1.11.0
 
 # ==========================================
 # 3. DATA PROCESSING (Xử lý Log/Dữ liệu)
 # ==========================================
-pandas>=2.0.0                # Đọc, cắt và tiền xử lý file CSV (CICIDS2017)
-numpy>=1.24.0                # Xử lý ma trận dữ liệu
+pandas==2.2.3
+numpy==2.2.5
 
 # ==========================================
 # 4. USER INTERFACE (Giao diện HITL)
 # ==========================================
-streamlit>=1.30.0            # Xây dựng Dashboard SOC
-streamlit-authenticator>=0.3.1 # Tạo màn hình Login & Phân quyền RBAC
+streamlit==1.44.1
+streamlit-authenticator==0.4.2
+streamlit-autorefresh==1.0.1
 
 # ==========================================
 # 5. MLOPS & TRACKING (Vận hành & Theo dõi)
 # ==========================================
-mlflow>=2.10.0               # Tracking log thực nghiệm, lưu lịch sử Benchmark
-python-dotenv>=1.0.0         # Đọc biến môi trường từ file .env
-PyYAML>=6.0.1                # Đọc file cấu hình config.yaml
+mlflow==3.11.1
+mlflow-skinny==3.11.1
+mlflow-tracing==3.11.1
+python-dotenv==1.2.2
+PyYAML==6.0.2
 
 # ==========================================
 # 6. TESTING & GUARDRAILS (Kiểm thử)
 # ==========================================
-pytest>=8.0.0                # Chạy các kịch bản test tự động
-redis>=5.0.1                 # Tương tác với Redis Queue Streaming
-drain3>=0.9.11               # Log Template Mining (Semantic Pruning trong Guardrails)
-mlflow==3.11.1
-mlflow-skinny==3.11.1
-mlflow-tracing==3.11.1
-streamlit-autorefresh==1.0.1
-python-dotenv==1.2.2
+pytest==8.3.5
+redis==6.2.0
+drain3==0.9.11

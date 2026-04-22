@@ -1,0 +1,22 @@
+# Security: Prevent sensitive files from being copied into Docker image
+.env
+.git
+.github
+.gitignore
+.venv
+.pytest_cache
+__pycache__
+
+# Large files not needed in container
+mlruns/
+logs/
+data/raw/
+docs/
+experiments/plots/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.gemini/

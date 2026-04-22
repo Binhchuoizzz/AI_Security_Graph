@@ -1,0 +1,49 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    # Chạy tự động vào 00:00 UTC mỗi thứ Hai
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pip-audit safety
+        pip install -r requirements.txt
+        
+    - name: Run pip-audit (CVE scan)
+      run: pip-audit --strict --desc
+      continue-on-error: true
+
+    - name: Run Safety check
+      run: safety check --full-report
+      continue-on-error: true
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for secret scanning
+
+    - name: Scan for hardcoded secrets
+      uses: trufflesecurity/trufflehog@main
+      with:
+        extra_args: --only-verified
