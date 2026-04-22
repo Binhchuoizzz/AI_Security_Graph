@@ -10,7 +10,7 @@ pydantic==2.13.3
 # ==========================================
 # 2. RAG & KNOWLEDGE BASE (Tri thức AI)
 # ==========================================
-sentence-transformers==4.1.0
+sentence-transformers==5.4.1
 faiss-cpu==1.11.0
 
 # ==========================================
