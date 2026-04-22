@@ -15,12 +15,22 @@ import hashlib
 import os
 import time
 
-# Doc hash tu bien moi truong. Neu khong co, dung pre-computed hash mac dinh.
-# De thay doi mat khau:
-#   export SENTINEL_ANALYST_HASH=$(python -c "import hashlib; print(hashlib.sha256(b'YOUR_PASS').hexdigest())")
-#   export SENTINEL_MANAGER_HASH=$(python -c "import hashlib; print(hashlib.sha256(b'YOUR_PASS').hexdigest())")
-DEFAULT_ANALYST_HASH = hashlib.sha256(b"sentinel_analyst_2026").hexdigest()
-DEFAULT_MANAGER_HASH = hashlib.sha256(b"sentinel_manager_2026").hexdigest()
+# Password Hashing Strategy: PBKDF2-HMAC-SHA256 (NIST Approved)
+# Salt co dinh cho demo, trong Production nen dung unique salt moi user.
+SALT = b"sentinel_security_2026_salt"
+ITERATIONS = 100000
+
+def hash_password(password: str) -> str:
+    """Hash password dung PBKDF2 de chong brute-force/GPU cracking."""
+    return hashlib.pbkdf2_hmac(
+        'sha256', 
+        password.encode(), 
+        SALT, 
+        ITERATIONS
+    ).hex()
+
+DEFAULT_ANALYST_HASH = hash_password("sentinel_analyst_2026")
+DEFAULT_MANAGER_HASH = hash_password("sentinel_manager_2026")
 
 USERS = {
     "analyst": {
@@ -63,7 +73,7 @@ def login_screen():
         submit = st.form_submit_button("Sign In")
 
         if submit:
-            input_hash = hashlib.sha256(password.encode()).hexdigest()
+            input_hash = hash_password(password)
             user = USERS.get(username)
 
             if user and _constant_time_compare(input_hash, user["password_hash"]):

@@ -33,12 +33,7 @@ jobs:
         pip install -r requirements.txt
         
     - name: Run pip-audit (CVE scan)
-      run: pip-audit --strict --desc
-      continue-on-error: true
-
-    - name: Run Safety check
-      run: safety check --full-report
-      continue-on-error: true
+      run: pip-audit --desc
 
   secrets-scan:
     runs-on: ubuntu-latest
