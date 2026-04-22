@@ -15,3 +15,5 @@ docs/proposal_latex/*.synctex*
 docs/Template/proposalmau.txt
 knowledge_base/faiss_index/*.index
 knowledge_base/faiss_index/*_metadata.json
+*.db
+*.log
