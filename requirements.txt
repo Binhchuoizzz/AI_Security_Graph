@@ -2,7 +2,7 @@
 # 1. CORE AI & AGENT (Lõi Suy luận LangGraph)
 # ==========================================
 langgraph==0.3.34
-langchain==0.3.25
+langchain==1.2.15
 langchain-openai==0.3.21
 langchain-community==0.3.21
 pydantic==2.13.3
