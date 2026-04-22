@@ -1,0 +1,8 @@
+# This file automatically assigns reviews to code owners
+
+# Set default owner for everything
+*       @Binhchuoizzz
+
+# Set specific owners for some parts
+/docs/  @Binhchuoizzz
+/src/   @Binhchuoizzz
