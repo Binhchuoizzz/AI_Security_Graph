@@ -1,4 +1,4 @@
-# Hướng Dẫn Vận Hành Hệ Thống SENTINEL v3 (Cập nhật 22/04)
+# Hướng Dẫn Vận Hành Hệ Thống SENTINEL v4 (Cập nhật 22/04/2026)
 
 Tài liệu này không chỉ hướng dẫn chạy code, mà còn **giải thích rõ ràng mạch tư duy bảo vệ luận văn**, trả lời trực tiếp những câu hỏi phản biện hóc búa nhất của Hội đồng.
 
@@ -73,28 +73,64 @@ python src/streaming/publisher.py
 
 ---
 
-## IV. TIMELINE CHẠY CHẤM ĐIỂM (Dành cho Slide báo cáo)
+## IV. TIMELINE CHẠY CHẤM ĐIỂM (5D Evaluation Framework v2_5D)
 
-Đánh giá gồm 2 Pha: **Classification Accuracy** (Toán học) + **Reasoning Quality** (LLM-as-Judge).
+Hệ thống đánh giá gồm **4 Pha tuần tự**, output tất cả đều đẩy lên **MLflow Dashboard**.
 
-### Pha 1: Statistical Evaluation (Gemma 9B loaded)
+### Pha 1: Classification + Operational Metrics (Gemma 9B loaded)
 
 ```bash
-# 1. Chạy bài test 101 mẫu (đợi khoảng 15-20 phút cho Oobabooga trả lời hết)
+source .venv/bin/activate
+
+# 1. Chạy bài test 101 mẫu — sinh 5D metrics:
+#    F1, Precision, Recall, FPR, MTTD_Proxy, MTTR_Proxy,
+#    HITL_Escalation_Rate, RAG_Cache_Hit_Rate
 python experiments/run_ablation_study.py
 
-# 2. Sinh ra điểm thống kê P-Value (Chứng minh AI không đoán mò)
+# 2. Sinh ra điểm thống kê P-Value
 python experiments/statistical_tests.py
 ```
 
-### Pha 2: Reasoning Quality (Chuyển sang Llama 3 8B)
+> ⚠️ **DISCLAIMER:** MTTD/MTTR hiển thị trong output là Processing Latency proxy. Thời gian ingestion và human review thực tế trong SOC không được bao gồm.
+
+### Pha 2: Reasoning Quality — RAGAS-inspired LLM-as-Judge (Chuyển sang Llama 3 8B)
 
 ```bash
 # 3. Trên Oobabooga: Unload Gemma 9B → Load Llama 3 8B Instruct
-# 4. Chạy LLM-as-Judge (Llama 3 chấm điểm Gemma 9B)
+# 4. Chạy LLM-as-Judge (4 chiều RAGAS-inspired + Audit Completeness)
 python experiments/evaluate_reasoning.py
 ```
 
 > 💡 **Tại sao cần 2 model?** Gemma 9B không thể tự chấm điểm chính mình (Self-Enhancement Bias — Zheng et al., 2023). Llama 3 (Meta) khác model family với Gemma (Google) → đánh giá khách quan.
+>
+> 💡 **RAGAS-inspired:** Metrics Context Precision, Answer Relevancy, Faithfulness, Context Recall được đánh giá qua LLM-as-Judge prompt, **không phải** thư viện `ragas` gốc (NLI decomposition). MLflow ghi rõ `disclaimer="RAGAS-inspired proxy metrics"`.
+
+### Pha 3: Adversarial Robustness (Không cần LLM)
+
+```bash
+# 5. Chạy 45 adversarial samples qua Guardrails pipeline
+python experiments/evaluate_robustness.py
+```
+
+### Pha 4: Xem kết quả
+
+```bash
+# 6. Sinh biểu đồ cho Luận văn
+python experiments/plot_results.py
+```
 
 Sau đó vào `http://localhost:5001` (MLflow) để chụp ảnh màn hình các thông số dán vào Luận văn!
+
+### Tóm tắt 5D Metrics trên MLflow
+
+| MLflow Metric | Chiều | Ý nghĩa |
+|---|---|---|
+| `Config_A_F1`, `Config_F_F1` | Classification | F1-Score 2 cấu hình |
+| `Config_A_FPR`, `Config_F_FPR` | Classification | False Positive Rate |
+| `MTTD_Proxy_Tier1_sec` | Operational | Processing latency Tier 1 (proxy) |
+| `MTTR_Proxy_Tier2_sec` | Operational | Processing latency Tier 2 (proxy) |
+| `HITL_Escalation_Rate_pct` | Operational | % cases cần con người can thiệp |
+| `RAG_Cache_Hit_Rate_pct` | Operational | Cache hit rate của Semantic Cache |
+| `Context_Precision_Mean` | Context Quality | MITRE mapping accuracy (RAGAS-inspired) |
+| `Faithfulness_Mean` | Context Quality | Anti-hallucination score (RAGAS-inspired) |
+| `Audit_Completeness_Rate_pct` | Explainability | % audit fields present (deterministic) |

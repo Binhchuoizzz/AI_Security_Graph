@@ -1,4 +1,5 @@
 __pycache__/
+*.pyc
 .venv/
 data/raw/
 knowledge_base/faiss_index/
@@ -17,3 +18,4 @@ knowledge_base/faiss_index/*.index
 knowledge_base/faiss_index/*_metadata.json
 *.db
 *.log
+.gemini/

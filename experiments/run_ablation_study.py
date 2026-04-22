@@ -10,13 +10,14 @@ import sys
 import time
 import mlflow
 import numpy as np
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.tier1_filter.rule_engine import RuleEngine
 from src.agent.workflow import agent_app
 from src.agent.state import SentinelState
+from src.agent.nodes import retriever
 
 GROUND_TRUTH_PATH = os.path.join(os.path.dirname(__file__), "ground_truth.json")
 
@@ -39,6 +40,7 @@ def run_ablation():
             "y_pred": [],
             "latencies": [],
             "reasoning_outputs": [],
+            "actions": [],
         },
     }
 
@@ -115,7 +117,9 @@ def run_ablation():
                     reasoning_output["decisions"] = decisions
                     if decisions:
                         latest = decisions[-1]
-                        if latest.get("action") in [
+                        action = latest.get("action", "UNKNOWN")
+                        results["Config_F"]["actions"].append(action)
+                        if action in [
                             "BLOCK_IP",
                             "ALERT",
                             "AWAIT_HITL",
@@ -125,6 +129,9 @@ def run_ablation():
                 except Exception as e:
                     print(f"Loi chay Config F cho mau {sample['id']}: {e}")
                     pred_f = 0
+                    results["Config_F"]["actions"].append("ERROR")
+            else:
+                results["Config_F"]["actions"].append("TIER1_LOG")
 
             latency_f = time.time() - start_time_f
 
@@ -176,22 +183,47 @@ def run_ablation():
             zero_division=0,
         )
 
+        # Tính toán False Positive Rate (FPR)
+        def calc_fpr(y_true, y_pred):
+            try:
+                tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+                return fp / (fp + tn) if (fp + tn) > 0 else 0.0
+            except ValueError:
+                # Tránh lỗi nếu chỉ có 1 class trong y_true/y_pred
+                return 0.0
+
+        fpr_a = calc_fpr(results["Config_A"]["y_true"], results["Config_A"]["y_pred"])
+        fpr_f = calc_fpr(results["Config_F"]["y_true"], results["Config_F"]["y_pred"])
+
+        # Tính toán HITL Ratio (Tỷ lệ cần con người can thiệp)
+        total_f = len(results["Config_F"]["actions"])
+        hitl_count = results["Config_F"]["actions"].count("AWAIT_HITL")
+        hitl_ratio = (hitl_count / total_f) * 100 if total_f > 0 else 0.0
+
+        # Lấy Cache Hit Rate từ Retriever
+        cache_stats = retriever.cache.get_stats() if hasattr(retriever, "cache") and retriever.cache else {"hit_rate": 0.0}
+        cache_hit_rate = cache_stats.get("hit_rate", 0.0)
+
+        # Log metrics lên MLflow
         mlflow.log_metric("Config_A_F1", f1_a)
         mlflow.log_metric("Config_A_Precision", prec_a)
         mlflow.log_metric("Config_A_Recall", rec_a)
-        mlflow.log_metric(
-            "Config_A_Latency_Mean", float(np.mean(results["Config_A"]["latencies"]))
-        )
+        mlflow.log_metric("Config_A_FPR", fpr_a)
+        mlflow.log_metric("MTTD_Proxy_Tier1_sec", float(np.mean(results["Config_A"]["latencies"])))
 
         mlflow.log_metric("Config_F_F1", f1_f)
         mlflow.log_metric("Config_F_Precision", prec_f)
         mlflow.log_metric("Config_F_Recall", rec_f)
-        mlflow.log_metric(
-            "Config_F_Latency_Mean", float(np.mean(results["Config_F"]["latencies"]))
-        )
+        mlflow.log_metric("Config_F_FPR", fpr_f)
+        mlflow.log_metric("MTTR_Proxy_Tier2_sec", float(np.mean(results["Config_F"]["latencies"])))
+        mlflow.log_metric("HITL_Escalation_Rate_pct", hitl_ratio)
+        mlflow.log_metric("RAG_Cache_Hit_Rate_pct", cache_hit_rate)
 
-        print(f"\n[+] Config A: F1={f1_a:.4f} | Prec={prec_a:.4f} | Rec={rec_a:.4f}")
-        print(f"[+] Config F: F1={f1_f:.4f} | Prec={prec_f:.4f} | Rec={rec_f:.4f}")
+        print(f"\n[+] Config A: F1={f1_a:.4f} | Prec={prec_a:.4f} | Rec={rec_a:.4f} | FPR={fpr_a:.4f} | MTTD_Proxy={np.mean(results['Config_A']['latencies']):.3f}s")
+        print(f"[+] Config F: F1={f1_f:.4f} | Prec={prec_f:.4f} | Rec={rec_f:.4f} | FPR={fpr_f:.4f} | MTTR_Proxy={np.mean(results['Config_F']['latencies']):.3f}s")
+        print(f"[+] Operational: RAG Cache Hit Rate = {cache_hit_rate:.1f}% | HITL Ratio = {hitl_ratio:.1f}%")
+        print("[!] DISCLAIMER: Processing Latency is used as a proxy for MTTD/MTTR under offline dataset constraints.")
+        print("                Real-world ingestion and human review times are not included.")
         print("[+] Da ghi metrics len MLflow.")
 
 

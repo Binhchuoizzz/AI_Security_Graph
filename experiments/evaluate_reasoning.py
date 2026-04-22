@@ -10,11 +10,13 @@ WORKFLOW:
   3. Chạy script này → Llama 3 chấm điểm reasoning quality
   4. Kết quả: reasoning_eval_results.json + MLflow metrics
 
-EVALUATION RUBRIC (4 chiều, thang 1-5):
-  - MITRE Mapping Accuracy: LLM có xác định đúng kỹ thuật tấn công?
-  - Action Correctness: Hành động đề xuất có phù hợp với mối đe dọa?
-  - Reasoning Coherence: Phân tích có logic, rõ ràng, có căn cứ?
-  - Context Utilization: Có sử dụng RAG context (MITRE/ISO) hiệu quả?
+EVALUATION RUBRIC (4 chiều RAGAS-aligned, thang 1-5):
+  - Context Precision: Xác định đúng kỹ thuật tấn công (MITRE)?
+  - Answer Relevancy: Hành động đề xuất có giải quyết đúng mối đe dọa?
+  - Faithfulness: Phân tích dựa trên sự thật, không bịa đặt (hallucinate)?
+  - Context Recall: Trích xuất và sử dụng đúng context ISO/MITRE?
+
+EVAL_SCHEMA_VERSION = "v2_5D"
 """
 
 import json
@@ -61,28 +63,28 @@ JUDGE_USER_TEMPLATE = """## EVALUATION TASK
 
 Rate each dimension (1-5):
 
-**1. MITRE Mapping Accuracy (1-5)**
+**1. Context Precision (1-5)**
 - 5: Correctly identified exact MITRE technique (e.g., T1110.001)
 - 3: Identified correct tactic but wrong technique
 - 1: Completely wrong or no MITRE mapping
 
-**2. Action Correctness (1-5)**
+**2. Answer Relevancy (1-5)**
 - 5: Action matches expected action perfectly
 - 3: Partially correct (e.g., ALERT when BLOCK expected)
 - 1: Completely wrong action (e.g., LOG when BLOCK expected)
 
-**3. Reasoning Coherence (1-5)**
-- 5: Clear logical chain from evidence to conclusion
-- 3: Some reasoning but gaps or unsupported claims
-- 1: No reasoning or completely illogical
+**3. Faithfulness (1-5)**
+- 5: Reasoning is derived purely from logs and context (0% hallucination)
+- 3: Mostly factual but includes some unsupported assumptions
+- 1: Significant hallucination or completely illogical
 
-**4. Context Utilization (1-5)**
-- 5: Effectively used MITRE/ISO context in analysis
+**4. Context Recall (1-5)**
+- 5: Extracted and effectively used MITRE/ISO context in analysis
 - 3: Mentioned context but didn't integrate well
 - 1: Ignored available context entirely
 
 Respond ONLY in this JSON format:
-{{"mitre_accuracy": <int>, "action_correctness": <int>, "reasoning_coherence": <int>, "context_utilization": <int>, "justification": "<brief explanation>"}}"""
+{{"context_precision": <int>, "answer_relevancy": <int>, "faithfulness": <int>, "context_recall": <int>, "justification": "<brief explanation>"}}"""
 
 
 def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
@@ -117,19 +119,19 @@ def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
     except json.JSONDecodeError:
         print(f"  [!] JSON parse error. Raw response: {content[:200]}")
         return {
-            "mitre_accuracy": 1,
-            "action_correctness": 1,
-            "reasoning_coherence": 1,
-            "context_utilization": 1,
+            "context_precision": 1,
+            "answer_relevancy": 1,
+            "faithfulness": 1,
+            "context_recall": 1,
             "justification": "PARSE_ERROR",
         }
     except Exception as e:
         print(f"  [!] LLM call error: {e}")
         return {
-            "mitre_accuracy": 1,
-            "action_correctness": 1,
-            "reasoning_coherence": 1,
-            "context_utilization": 1,
+            "context_precision": 1,
+            "answer_relevancy": 1,
+            "faithfulness": 1,
+            "context_recall": 1,
             "justification": f"API_ERROR: {str(e)}",
         }
 
@@ -194,10 +196,11 @@ def run_judge_evaluation():
         "aggregate": {},
     }
 
-    all_mitre = []
-    all_action = []
-    all_coherence = []
-    all_context = []
+    all_precision = []
+    all_relevancy = []
+    all_faithfulness = []
+    all_recall = []
+    all_audit_completeness = []
 
     for idx, sample in enumerate(escalated):
         print(f"[{idx+1}/{len(escalated)}] Judging {sample['sample_id']}...", end=" ")
@@ -217,58 +220,74 @@ def run_judge_evaluation():
         scores = call_llm_judge(JUDGE_SYSTEM_PROMPT, user_prompt)
         elapsed = time.time() - start
 
+        # Calculate Deterministic Audit Trail Completeness Rate
+        latest_decision = sample.get("decisions", [{}])[-1] if sample.get("decisions") else {}
+        required_fields = ["action", "confidence", "reasoning", "target", "mitre_technique"]
+        present_fields = sum(1 for f in required_fields if latest_decision.get(f) not in [None, "", "UNKNOWN_TARGET", "N/A"])
+        audit_completeness = (present_fields / len(required_fields)) * 100
+
         result_entry = {
             "sample_id": sample["sample_id"],
             "scores": scores,
+            "audit_completeness_pct": audit_completeness,
             "judge_latency_s": round(elapsed, 2),
+            "schema_version": "v2_5D"
         }
         eval_results["scores"].append(result_entry)
 
-        all_mitre.append(scores.get("mitre_accuracy", 1))
-        all_action.append(scores.get("action_correctness", 1))
-        all_coherence.append(scores.get("reasoning_coherence", 1))
-        all_context.append(scores.get("context_utilization", 1))
+        all_precision.append(scores.get("context_precision", 1))
+        all_relevancy.append(scores.get("answer_relevancy", 1))
+        all_faithfulness.append(scores.get("faithfulness", 1))
+        all_recall.append(scores.get("context_recall", 1))
+        all_audit_completeness.append(audit_completeness)
 
         print(
-            f"MITRE={scores.get('mitre_accuracy', '?')}/5  "
-            f"Action={scores.get('action_correctness', '?')}/5  "
-            f"Coherence={scores.get('reasoning_coherence', '?')}/5  "
-            f"Context={scores.get('context_utilization', '?')}/5  "
+            f"Precision={scores.get('context_precision', '?')}/5  "
+            f"Relevancy={scores.get('answer_relevancy', '?')}/5  "
+            f"Faithful={scores.get('faithfulness', '?')}/5  "
+            f"Recall={scores.get('context_recall', '?')}/5  "
+            f"Audit_Comp={audit_completeness:.0f}%  "
             f"({elapsed:.1f}s)"
         )
 
     # Aggregate statistics
-    if all_mitre:
+    if all_precision:
         eval_results["aggregate"] = {
-            "mitre_accuracy": {
-                "mean": round(float(np.mean(all_mitre)), 2),
-                "std": round(float(np.std(all_mitre)), 2),
-                "min": int(min(all_mitre)),
-                "max": int(max(all_mitre)),
+            "context_precision": {
+                "mean": round(float(np.mean(all_precision)), 2),
+                "std": round(float(np.std(all_precision)), 2),
+                "min": int(min(all_precision)),
+                "max": int(max(all_precision)),
             },
-            "action_correctness": {
-                "mean": round(float(np.mean(all_action)), 2),
-                "std": round(float(np.std(all_action)), 2),
-                "min": int(min(all_action)),
-                "max": int(max(all_action)),
+            "answer_relevancy": {
+                "mean": round(float(np.mean(all_relevancy)), 2),
+                "std": round(float(np.std(all_relevancy)), 2),
+                "min": int(min(all_relevancy)),
+                "max": int(max(all_relevancy)),
             },
-            "reasoning_coherence": {
-                "mean": round(float(np.mean(all_coherence)), 2),
-                "std": round(float(np.std(all_coherence)), 2),
-                "min": int(min(all_coherence)),
-                "max": int(max(all_coherence)),
+            "faithfulness": {
+                "mean": round(float(np.mean(all_faithfulness)), 2),
+                "std": round(float(np.std(all_faithfulness)), 2),
+                "min": int(min(all_faithfulness)),
+                "max": int(max(all_faithfulness)),
             },
-            "context_utilization": {
-                "mean": round(float(np.mean(all_context)), 2),
-                "std": round(float(np.std(all_context)), 2),
-                "min": int(min(all_context)),
-                "max": int(max(all_context)),
+            "context_recall": {
+                "mean": round(float(np.mean(all_recall)), 2),
+                "std": round(float(np.std(all_recall)), 2),
+                "min": int(min(all_recall)),
+                "max": int(max(all_recall)),
+            },
+            "audit_completeness": {
+                "mean": round(float(np.mean(all_audit_completeness)), 2),
+                "std": round(float(np.std(all_audit_completeness)), 2),
+                "min": float(min(all_audit_completeness)),
+                "max": float(max(all_audit_completeness)),
             },
             "overall_mean": round(
                 float(
                     np.mean(
-                        [np.mean(all_mitre), np.mean(all_action),
-                         np.mean(all_coherence), np.mean(all_context)]
+                        [np.mean(all_precision), np.mean(all_relevancy),
+                         np.mean(all_faithfulness), np.mean(all_recall)]
                     )
                 ),
                 2,
@@ -284,12 +303,13 @@ def run_judge_evaluation():
     print(f"{'='*60}")
     if eval_results["aggregate"]:
         agg = eval_results["aggregate"]
-        print(f"  MITRE Mapping Accuracy:  {agg['mitre_accuracy']['mean']}/5 (±{agg['mitre_accuracy']['std']})")
-        print(f"  Action Correctness:      {agg['action_correctness']['mean']}/5 (±{agg['action_correctness']['std']})")
-        print(f"  Reasoning Coherence:     {agg['reasoning_coherence']['mean']}/5 (±{agg['reasoning_coherence']['std']})")
-        print(f"  Context Utilization:     {agg['context_utilization']['mean']}/5 (±{agg['context_utilization']['std']})")
+        print(f"  Context Precision (MITRE): {agg['context_precision']['mean']}/5 (±{agg['context_precision']['std']})")
+        print(f"  Answer Relevancy (Action): {agg['answer_relevancy']['mean']}/5 (±{agg['answer_relevancy']['std']})")
+        print(f"  Faithfulness (No Halluc):  {agg['faithfulness']['mean']}/5 (±{agg['faithfulness']['std']})")
+        print(f"  Context Recall (RAG Use):  {agg['context_recall']['mean']}/5 (±{agg['context_recall']['std']})")
+        print(f"  Audit Completeness Rate:   {agg['audit_completeness']['mean']}% (±{agg['audit_completeness']['std']}%)")
         print(f"  ---")
-        print(f"  Overall Mean:            {agg['overall_mean']}/5")
+        print(f"  Overall LLM Mean Score:    {agg['overall_mean']}/5")
     print(f"{'='*60}")
     print(f"[+] Results saved to: {OUTPUT_PATH}")
 
@@ -305,12 +325,15 @@ def run_judge_evaluation():
             mlflow.log_param("judge_model", "Llama 3 8B Instruct")
             mlflow.log_param("agent_model", "Gemma 2 9B Q6_K")
             mlflow.log_param("escalated_samples", len(escalated))
+            mlflow.log_param("disclaimer", "RAGAS-inspired proxy metrics")
+            mlflow.log_param("schema_version", "v2_5D")
             if eval_results["aggregate"]:
                 agg = eval_results["aggregate"]
-                mlflow.log_metric("MITRE_Accuracy_Mean", agg["mitre_accuracy"]["mean"])
-                mlflow.log_metric("Action_Correctness_Mean", agg["action_correctness"]["mean"])
-                mlflow.log_metric("Reasoning_Coherence_Mean", agg["reasoning_coherence"]["mean"])
-                mlflow.log_metric("Context_Utilization_Mean", agg["context_utilization"]["mean"])
+                mlflow.log_metric("Context_Precision_Mean", agg["context_precision"]["mean"])
+                mlflow.log_metric("Answer_Relevancy_Mean", agg["answer_relevancy"]["mean"])
+                mlflow.log_metric("Faithfulness_Mean", agg["faithfulness"]["mean"])
+                mlflow.log_metric("Context_Recall_Mean", agg["context_recall"]["mean"])
+                mlflow.log_metric("Audit_Completeness_Rate_pct", agg["audit_completeness"]["mean"])
                 mlflow.log_metric("Overall_Quality_Mean", agg["overall_mean"])
             mlflow.log_artifact(OUTPUT_PATH)
         print("[+] Metrics logged to MLflow (Sentinel_Reasoning_Quality)")

@@ -46,49 +46,62 @@ CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner 
 
 ## 📊 Evaluation & Methodology
 
-SENTINEL employs a **Dual Evaluation Methodology** — combining statistical tests with cross-family LLM-as-Judge — for thesis-grade rigor.
+SENTINEL employs a **5D Evaluation Framework (v2_5D)** — combining statistical tests, operational SOC metrics, cross-family LLM-as-Judge, and deterministic audit scoring.
 
-### Dual Evaluation Framework
-| Dimension | What it Measures | Method |
-| --- | --- | --- |
-| **Classification Accuracy** | Does the system correctly detect attacks? | F1, Precision, Recall + McNemar's Test (p<0.05) |
-| **Operational Performance** | How fast is the 2-Tier vs 1-Tier? | Latency + Mann-Whitney U Test (p<0.05) |
-| **Robustness** | Can adversaries fool the guardrails? | 45 curated adversarial samples |
-| **Reasoning Quality** | Does the LLM reason intelligently? | **Cross-Family LLM-as-Judge** (Llama 3 judges Gemma 9B) |
+### 5-Dimensional Evaluation Framework
 
-### Why Dual? (Addressing Zheng et al., 2023)
-- **Statistical Tests** (F1, McNemar) measure **classification performance** — did the system make the right BLOCK/LOG decision?
-- **LLM-as-Judge** measures **reasoning quality** — did the LLM identify the correct MITRE technique, provide coherent analysis, and use RAG context effectively?
-- Using **Llama 3 (Meta)** to judge **Gemma 9B (Google)** eliminates Self-Enhancement Bias (different model family, different training data).
-- Neither method alone is sufficient; together they provide comprehensive evaluation.
+| Dimension | What it Measures | Method | Script |
+| --- | --- | --- | --- |
+| **1. Classification** | F1, Precision, Recall, FPR | McNemar's Test (p<0.05) | `run_ablation_study.py` |
+| **2. Operational** | MTTD/MTTR Proxy*, HITL Escalation Rate, RAG Cache Hit Rate | Mann-Whitney U Test (p<0.05) | `run_ablation_study.py` |
+| **3. Robustness** | Guardrail Defeat Rate per attack category | 45 curated adversarial samples | `evaluate_robustness.py` |
+| **4. Context Quality** | Context Precision, Answer Relevancy, Faithfulness, Context Recall | **RAGAS-inspired LLM-as-Judge** (Llama 3 judges Gemma 9B) | `evaluate_reasoning.py` |
+| **5. Explainability** | Audit Trail Completeness Rate (deterministic) | Programmatic field presence check | `evaluate_reasoning.py` |
+
+> **\*Disclaimer:** Processing Latency is used as a proxy for MTTD/MTTR under offline dataset constraints. Real-world ingestion and human review times are not included.
+
+### Key Methodological Decisions
+- **Cross-Family LLM-as-Judge:** Using **Llama 3 8B (Meta)** to judge **Gemma 9B (Google)** eliminates Self-Enhancement Bias (different model family, different training data — Zheng et al., NeurIPS 2023).
+- **RAGAS-inspired, not RAGAS:** Context Quality metrics are scored via LLM-as-Judge with a RAGAS-aligned rubric. Full computational RAGAS (NLI decomposition) is not feasible on RTX 4060 Ti 16GB. Explicitly tagged as `methodology="RAGAS-inspired LLM-as-Judge"` in MLflow.
+- **Deterministic Explainability:** Audit Trail Completeness is calculated programmatically (% of 5 required fields present in output), not via LLM scoring, to avoid circular self-evaluation.
+- **Schema Version:** All evaluation outputs are tagged `EVAL_SCHEMA_VERSION = "v2_5D"` for reproducibility.
 
 ### Statistical Validity
 - **McNemar's Test** for classification accuracy comparison between Config A and Config F.
 - **Mann-Whitney U Test** for skewed latency distributions.
 - **Test Coverage**: **79/79** unit and integration tests passed in 0.17s.
 
+### Ground Truth
+- 101 human-annotated samples (`experiments/ground_truth.json`): 81 attack + 20 benign.
+- Labels: `expected_action` and `expected_mitre_technique`, manually assigned by the thesis author (Domain Expert) with cross-reference to the MITRE ATT&CK Framework.
+- 45 adversarial samples across 3 categories (structural, encoding, semantic).
+
 ### Reproducibility Package
-This project is engineered for complete scientific reproducibility:
-1. `experiments/run_ablation_study.py` — Automated ablation comparing Rule-only vs Full SENTINEL.
-2. `experiments/statistical_tests.py` — Automated p-value computation (McNemar + Mann-Whitney U).
-3. `experiments/ground_truth.json` — 101 labeled samples for validation.
-4. Controlled environment orchestration is fully containerized via `docker-compose`.
+1. `experiments/run_ablation_study.py` — Automated ablation (Config A vs Config F) with 5D metrics + MLflow logging.
+2. `experiments/evaluate_reasoning.py` — RAGAS-inspired LLM-as-Judge + Audit Completeness.
+3. `experiments/statistical_tests.py` — Automated p-value computation (McNemar + Mann-Whitney U).
+4. `experiments/evaluate_robustness.py` — Adversarial Guardrail Defeat Rate evaluation.
+5. `experiments/ground_truth.json` — 101 labeled samples for validation.
 
 ## 📁 Key Project Structure
 
 ```
 sentinel/
 ├── config/
+│   ├── ablation/                     # 6 YAML configs (A-F) for ablation study
 │   └── system_settings.yaml          # Central config (LLM, Tier1, Guardrails, RAG, Redis)
 ├── docs/
 │   ├── capstone_proposal.md          # Full thesis proposal
 │   ├── architecture.md               # System architecture diagram
 │   ├── threat_model.md               # Adversary profiles & Defense limit matrix
+│   ├── research_roadmap.md           # 6-Pillar literature map with reading order
 │   └── REPRODUCIBILITY.md            # Execution framework guidelines
 ├── experiments/
 │   ├── adversarial/                  # 45 Curated attack samples (Structural, Encoding, Semantic)
 │   ├── ground_truth.json             # 101 labeled samples for Ablation Study
-│   ├── run_ablation_study.py         # Automated Config A vs Config F evaluation
+│   ├── run_ablation_study.py         # 5D metrics: F1, FPR, MTTD/MTTR Proxy, HITL, Cache
+│   ├── evaluate_reasoning.py         # RAGAS-inspired LLM-as-Judge + Audit Completeness
+│   ├── evaluate_robustness.py        # Adversarial Defeat Rate per category
 │   ├── statistical_tests.py          # McNemar + Mann-Whitney U p-value computation
 │   └── ablation_design.md            # Statistical Hypothesis matrix
 ├── src/

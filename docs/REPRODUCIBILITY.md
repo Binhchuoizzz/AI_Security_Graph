@@ -1,6 +1,6 @@
 # SENTINEL — Reproducibility Package
 
-> **Trạng thái:** HOÀN THIỆN (v3 — Cập nhật 22/04/2026)
+> **Trạng thái:** HOÀN THIỆN (v4 — 5D Framework v2_5D — Cập nhật 22/04/2026)
 > **Mục đích:** Document đầy đủ yêu cầu để tái lập toàn bộ experiments của luận văn.
 
 ---
@@ -109,17 +109,34 @@ source .venv/bin/activate && streamlit run src/ui/app.py
 source .venv/bin/activate && python src/streaming/publisher.py
 ```
 
-### 5.2 Ablation Study — Sinh số liệu cho Luận văn
+### 5.2 Ablation Study — 5D Metrics (Gemma 9B loaded)
 
 ```bash
 source .venv/bin/activate
 
-# 1. Chạy bài test Config A vs Config F (cần Oobabooga, ~15-20 phút)
+# 1. Chạy 101 mẫu: F1, FPR, MTTD_Proxy, MTTR_Proxy, HITL Rate, Cache Hit Rate
 python experiments/run_ablation_study.py
 
 # 2. Tính p-value thống kê (McNemar + Mann-Whitney U)
 python experiments/statistical_tests.py
 ```
+
+### 5.3 Adversarial Robustness (Không cần LLM)
+
+```bash
+# 3. Chạy 45 adversarial samples qua Guardrails
+python experiments/evaluate_robustness.py
+```
+
+### 5.4 RAGAS-inspired LLM-as-Judge (Llama 3 8B loaded)
+
+```bash
+# 4. Unload Gemma 9B → Load Llama 3 8B Instruct trên Oobabooga
+# 5. Chạy Cross-Family LLM-as-Judge + Audit Completeness
+python experiments/evaluate_reasoning.py
+```
+
+> **⚠️ DISCLAIMER:** Evaluation metrics được gắn tag `methodology="RAGAS-inspired proxy metrics"` trong MLflow. Đây KHÔNG phải thư viện `ragas` gốc (NLI decomposition).
 
 ### 5.3 Unit & Integration Tests
 
@@ -141,15 +158,19 @@ pytest tests/ -v --tb=short
 
 ---
 
-## 7. Phương pháp Đánh giá
+## 7. Phương pháp Đánh giá (5D Framework v2_5D)
 
-SENTINEL sử dụng **Statistical Evaluation** (Toán học) thay vì LLM-as-a-Judge để đảm bảo tính khách quan tuyệt đối:
+SENTINEL sử dụng **Dual Evaluation Methodology**: Thống kê + Cross-family LLM-as-Judge.
 
-| So sánh | Metric | Phương pháp | Ngưỡng |
+| Chiều | Metric | Phương pháp | Ngưỡng |
 |---|---|---|---|
-| Config A vs Config F | F1-Score | McNemar's Test | p < 0.05 |
-| Latency 2-Tier vs 1-Tier | Reasoning Latency | Mann-Whitney U Test | p < 0.05 |
-| Guardrails Robustness | Defeat Rate | 45 curated adversarial samples | 3 loại tấn công |
+| Classification | F1, Precision, Recall, FPR | McNemar's Test | p < 0.05 |
+| Operational | MTTD/MTTR Proxy*, HITL Rate, Cache Hit | Mann-Whitney U Test | p < 0.05 |
+| Robustness | Guardrail Defeat Rate | 45 curated adversarial samples | 3 loại tấn công |
+| Context Quality | Context Precision, Faithfulness, Relevancy, Recall | RAGAS-inspired LLM-as-Judge (Llama 3 → Gemma 9B) | Thang 1-5 |
+| Explainability | Audit Trail Completeness Rate | Deterministic field check | % |
+
+> *Processing Latency proxy — không bao gồm ingestion/human review time thực tế.
 
 ---
 

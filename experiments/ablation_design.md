@@ -94,6 +94,11 @@ rag:
 ```
 
 ### MLflow Experiment Tracking
-- Tất cả 6 runs log vào cùng 1 MLflow experiment: `sentinel_ablation_study`
-- Mỗi run tag: `config=A|B|C|D|E|F`
-- Metrics: F1, Precision, Recall, Latency, Cache Hit Rate, Bypass Rate, MITRE Accuracy
+- Tất cả runs log vào MLflow experiment: `Sentinel_Ablation_Study`
+- Mỗi run tag: `config=A|F`
+- **5D Metrics (v2_5D):**
+  - Classification: F1, Precision, Recall, FPR
+  - Operational: MTTD_Proxy_Tier1_sec, MTTR_Proxy_Tier2_sec, HITL_Escalation_Rate_pct, RAG_Cache_Hit_Rate_pct
+  - Context Quality (RAGAS-inspired): Context_Precision, Answer_Relevancy, Faithfulness, Context_Recall
+  - Explainability: Audit_Completeness_Rate_pct
+

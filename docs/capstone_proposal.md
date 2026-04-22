@@ -227,17 +227,16 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 
 ## 5. Evaluation Plan
 
-**4D Evaluation Framework:**
+**5D Evaluation Framework (v2_5D):**
 
-1. **Classification Metrics:** Precision, Recall, F1-Score trên 2 datasets. So sánh 4 cấu hình Ablation.
-2. **Operational Metrics:** Reasoning Latency (sec/incident), bao gồm cả Embedding Latency. Semantic Cache Hit Rate được đo để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier vs 1-Tier.
-3. **Robustness Metrics:** Guardrail Defeat Rate qua 45 curated adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
-4. **Statistical Validity & Eval Scoping:**
-   - **Ablation Study:** Config A (Rule-only) vs Config F (Full SENTINEL) trên 101 mẫu ground truth được gán nhãn thủ công.
-   - **Dual Evaluation Methodology:** Kết hợp đánh giá định lượng bằng thống kê và đánh giá định tính bằng LLM-as-Judge chéo dòng.
-   - **Statistical Tests (Classification):** McNemar's Test (so sánh F1 giữa Config A và F) + Mann-Whitney U (so sánh latency). P-value < 0.05 = kết quả có ý nghĩa thống kê.
-   - **Reasoning Quality (LLM-as-Judge):** Dùng Llama 3 8B (Meta) làm trọng tài độc lập chấm điểm suy luận của Gemma 9B (Google) trên 4 khía cạnh (MITRE, Action, Coherence, Context). Khác model family triệt tiêu Self-Enhancement Bias (Zheng et al., 2023).
-   - Compression Ratio của Semantic Pruning.
+1. **Classification Metrics:** Precision, Recall, F1-Score, **False Positive Rate (FPR)** trên 2 datasets. So sánh 4 cấu hình Ablation. Kiểm định: McNemar's Test (p<0.05).
+2. **Operational Metrics:** Processing Latency dùng làm proxy cho **MTTD** (Tier 1) và **MTTR** (Tier 2) trong điều kiện offline dataset. **HITL Escalation Rate** (% cases cần con người can thiệp). **RAG Semantic Cache Hit Rate**. Kiểm định: Mann-Whitney U Test (p<0.05).
+3. **Robustness Metrics:** Guardrail Defeat Rate qua 45 curated adversarial samples (3 loại: Structural, Encoding, Semantic Confusion). So sánh Full Encapsulation vs No Encapsulation (Config C).
+4. **Context Quality (RAGAS-inspired LLM-as-Judge):** Sử dụng **Llama 3 8B (Meta)** làm trọng tài độc lập chấm điểm suy luận của **Gemma 9B (Google)** — khác model family, triệt tiêu Self-Enhancement Bias (Zheng et al., NeurIPS 2023). Metrics: Context Precision, Answer Relevancy, Faithfulness, Context Recall (thang 1-5). **Lưu ý:** Đây là RAGAS-inspired via LLM-as-Judge, KHÔNG phải thư viện `ragas` gốc (NLI decomposition) do giới hạn VRAM 16GB.
+5. **Explainability (Deterministic):** **Audit Trail Completeness Rate** — tỷ lệ % các trường bắt buộc có trong output JSON của Agent (action, confidence, reasoning, target, mitre_technique). Tính toán lập trình (programmatic), không dùng LLM chấm điểm, loại bỏ circular self-evaluation.
+   - **Statistical Tests (Classification):** McNemar's Test (so sánh F1 giữa Config A và F).
+   - **Statistical Tests (Latency):** Mann-Whitney U (so sánh latency). P-value < 0.05 = kết quả có ý nghĩa thống kê.
+   - Ground Truth: 101 mẫu được gán nhãn thủ công (Human-annotated) bởi tác giả luận văn, đối chiếu chéo với MITRE ATT&CK Framework.
 
 ---
 
