@@ -133,7 +133,11 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
 
     # 5. Cập nhật State
     action = decision_json.get("action", "AWAIT_HITL")
-    confidence = decision_json.get("confidence", 0.0)
+    confidence = 0.0
+    try:
+        confidence = float(decision_json.get("confidence", 0.0))
+    except (ValueError, TypeError):
+        pass
     reasoning = decision_json.get("reasoning", "No reasoning provided.")
     new_iocs = decision_json.get("extracted_iocs", [])
 

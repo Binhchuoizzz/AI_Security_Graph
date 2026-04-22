@@ -26,13 +26,19 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     mitre_tech = "N/A"
     confidence = "N/A"
     
-    mitre_match = re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason)
+    mitre_match = re.search(r'MITRE:\s*([^\s\]]+)', raw_reason, re.IGNORECASE)
     if mitre_match:
-        mitre_tech = mitre_match.group(1)
+        mitre_tech = mitre_match.group(1).strip()
+    elif re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason):
+        mitre_tech = re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason).group(1)
         
-    conf_match = re.search(r'Confidence:\s*(0\.\d+|1\.0)', raw_reason, re.IGNORECASE)
+    conf_match = re.search(r'Confidence:\s*([01]?\.\d+|1(?:\.0)?)', raw_reason, re.IGNORECASE)
     if conf_match:
-        confidence = f"{float(conf_match.group(1)) * 100:.0f}%"
+        try:
+            val = float(conf_match.group(1))
+            confidence = f"{val * 100:.0f}%"
+        except ValueError:
+            pass
 
     # Gán class CSS dựa trên Severity
     css_class = "severity-info"

@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.10.0
+    image: ghcr.io/mlflow/mlflow:v2.19.0
     container_name: sentinel_mlflow
     ports:
       - "5001:5000"
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     container_name: sentinel_redis
     ports:
       - "127.0.0.1:6379:6379"  # Security: Bind to localhost only
