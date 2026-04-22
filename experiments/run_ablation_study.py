@@ -37,7 +37,7 @@ def run_ablation():
         "Config_F": {"y_true": [], "y_pred": [], "latencies": []},
     }
 
-    rule_engine = RuleEngine()
+
 
     # Ket noi MLflow
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
@@ -58,6 +58,9 @@ def run_ablation():
             )
             logs = sample.get("logs", [])
 
+            # Reset RuleEngine for each independent sample to prevent state bleed
+            rule_engine = RuleEngine()
+            
             # --- Config A: Rule-only ---
             start_time_a = time.time()
             pred_a = 0
