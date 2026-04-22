@@ -20,16 +20,27 @@ from src.tier1_filter.feedback_listener import FeedbackListener
 # Cấu hình trang
 st.set_page_config(
     page_title="SENTINEL AI Security",
-    page_icon="",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# Nạp CSS tuỳ chỉnh
+css_path = os.path.join(os.path.dirname(__file__), "style.css")
+if os.path.exists(css_path):
+    with open(css_path, "r") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 # 1. Bắt buộc đăng nhập
 require_auth()
 
 feedback_mgr = FeedbackListener()
 
+
+def handle_whitelist_approval(ip: str):
+    """Callback xử lý thêm IP vào Whitelist (Pentest/Internal)."""
+    feedback_mgr.add_to_whitelist(ip)
+    st.session_state[f"whitelisted_{ip}"] = True
 
 def main_dashboard():
     # Tự động refresh trang mỗi 3000ms (3 giây)
@@ -62,12 +73,21 @@ def main_dashboard():
     tab1, tab2 = st.tabs([" SIEM & Audit Trail", " HITL Rule Approval"])
 
     with tab1:
-        st.subheader("Cảnh báo & Hành động Gần đây")
+        st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
         if not alerts:
             st.success("Hệ thống an toàn. Không có sự cố nào được ghi nhận.")
         else:
             for alert in alerts:
-                render_alert_card(alert)
+                # Kiểm tra xem IP này đã được whitelist trong session này chưa
+                target_ip = alert.get("target", "N/A")
+                is_whitelisted = st.session_state.get(f"whitelisted_{target_ip}", False)
+                
+                # Gọi hàm render component, truyền thêm callback
+                render_alert_card(
+                    alert, 
+                    is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
+                    on_whitelist=handle_whitelist_approval if not is_whitelisted else None
+                )
 
     with tab2:
         st.subheader("Phê duyệt Luật Tường lửa (Dynamic Rules)")

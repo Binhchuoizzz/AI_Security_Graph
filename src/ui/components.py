@@ -5,11 +5,12 @@ Các component giao diện dùng lại cho Streamlit Dashboard.
 import streamlit as st
 import pandas as pd
 import html as html_lib
+import re
 from datetime import datetime
 
 
-def render_alert_card(alert):
-    """Hiển thị một cảnh báo bảo mật từ audit_trail (XSS-safe)."""
+def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
+    """Hiển thị một cảnh báo bảo mật từ audit_trail với UI Premium."""
     timestamp = alert.get("timestamp", "")
     try:
         dt = datetime.fromisoformat(timestamp)
@@ -17,32 +18,72 @@ def render_alert_card(alert):
     except Exception:
         formatted_time = html_lib.escape(str(timestamp))
 
-    action = html_lib.escape(str(alert.get("action", "UNKNOWN")))
+    action = str(alert.get("action", "UNKNOWN")).upper()
     target = html_lib.escape(str(alert.get("target", "N/A")))
-    reason = html_lib.escape(str(alert.get("reason", "N/A")))
+    raw_reason = str(alert.get("reason", "N/A"))
 
-    color = "grey"
-    icon = ""
+    # Bóc tách Regex từ chuỗi Reason (Do DB chỉ lưu text trơn)
+    mitre_tech = "N/A"
+    confidence = "N/A"
+    
+    mitre_match = re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason)
+    if mitre_match:
+        mitre_tech = mitre_match.group(1)
+        
+    conf_match = re.search(r'Confidence:\s*(0\.\d+|1\.0)', raw_reason, re.IGNORECASE)
+    if conf_match:
+        confidence = f"{float(conf_match.group(1)) * 100:.0f}%"
+
+    # Gán class CSS dựa trên Severity
+    css_class = "severity-info"
+    icon = "ℹ️"
     if action == "BLOCK_IP":
-        color = "red"
-        icon = ""
+        css_class = "severity-critical"
+        icon = "🛑"
     elif action == "QUARANTINE":
-        color = "orange"
-        icon = ""
+        css_class = "severity-critical"
+        icon = "☣️"
     elif action == "ALERT":
-        color = "yellow"
-        icon = ""
+        css_class = "severity-high"
+        icon = "⚠️"
+    elif action == "AWAIT_HITL":
+        css_class = "severity-medium"
+        icon = "🧑‍💻"
 
+    clean_reason = html_lib.escape(raw_reason)
+
+    # Hiển thị UI bằng Markdown + HTML nội suy
     st.markdown(
         f"""
-    <div style="border:1px solid {color}; border-left: 5px solid {color}; border-radius: 5px; padding: 10px; margin-bottom: 10px; background-color: rgba(255,255,255,0.05);">
-        <h4 style="margin-top: 0; color: {color}">{icon} {action} - {formatted_time}</h4>
-        <b>Target:</b> {target}<br/>
-        <b>Reasoning:</b> {reason}
-    </div>
-    """,
+        <div class="soc-card {css_class}">
+            <div class="soc-card-header">
+                <h4 class="soc-card-title">{icon} {action}</h4>
+                <span class="soc-timestamp">{formatted_time}</span>
+            </div>
+            <div class="soc-detail-row">
+                <span class="soc-label">Target IP:</span> 
+                <code>{target}</code>
+            </div>
+            <div class="soc-detail-row">
+                <span class="soc-label">Context:</span> 
+                <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>
+                <span class="soc-badge soc-conf-badge">AI Confidence: {confidence}</span>
+            </div>
+            <div class="soc-reasoning-box">
+                {clean_reason}
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
+    
+    # Nút Approve as Pentest (chỉ hiển thị nếu có IP hợp lệ và người dùng là L3_Manager)
+    if on_whitelist and target not in ["N/A", "UNKNOWN_TARGET"] and is_l3_manager:
+        if action in ["ALERT", "AWAIT_HITL"]:
+            if st.button(f"✅ Approve as Pentest / Internal ({target})", key=f"wl_{target}_{timestamp}"):
+                on_whitelist(target)
+                st.success(f"IP {target} đã được thêm vào Whitelist. Agent sẽ bỏ qua IP này trong tương lai.")
+                st.rerun()
 
 
 def render_ioc_table(iocs):

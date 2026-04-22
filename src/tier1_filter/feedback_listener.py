@@ -177,3 +177,24 @@ class FeedbackListener:
             logger.info("[Feedback] All dynamic rules cleared.")
         except Exception as e:
             logger.error(f"[Feedback] Failed to clear rules: {e}")
+
+    def add_to_whitelist(self, ip: str) -> bool:
+        """Thêm một IP vào whitelist trong config (Dùng cho luồng phê duyệt Pentest/Internal)."""
+        try:
+            with open(CONFIG_PATH, "r") as f:
+                config = yaml.safe_load(f)
+                
+            if "tier1" not in config:
+                config["tier1"] = {}
+            if "whitelist_ips" not in config["tier1"]:
+                config["tier1"]["whitelist_ips"] = []
+                
+            if ip not in config["tier1"]["whitelist_ips"]:
+                config["tier1"]["whitelist_ips"].append(ip)
+                with open(CONFIG_PATH, "w") as f:
+                    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+                logger.info(f"[Feedback] IP {ip} has been added to Whitelist.")
+            return True
+        except Exception as e:
+            logger.error(f"[Feedback] Failed to add {ip} to whitelist: {e}")
+            return False
