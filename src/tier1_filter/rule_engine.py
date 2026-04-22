@@ -216,6 +216,7 @@ class RuleEngine:
         self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
         self.dynamic_rules = tier1_config.get("dynamic_rules", [])
+        self.whitelist_ips = tier1_config.get("whitelist_ips", [])
 
         # Session Baselining thay thế Random Sampling
         baseline_config = tier1_config.get("session_baseline", {})
@@ -248,6 +249,15 @@ class RuleEngine:
         for alias, canonical in KEY_ALIASES.items():
             if alias in log_entry and canonical not in log_entry:
                 log_entry[canonical] = log_entry[alias]
+
+        # --- Tầng 0: Whitelist Check ---
+        source_ip = log_entry.get("Source IP", "unknown")
+        if source_ip in self.whitelist_ips:
+            log_entry["tier1_score"] = 0
+            log_entry["tier1_reasons"] = ["IP Whitelisted (Safe)"]
+            log_entry["tier1_action"] = "WHITELIST_DROP"
+            log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
+            return log_entry
 
         # --- Tầng 1: Static Rules ---
         dest_port = log_entry.get("Destination Port", -1)

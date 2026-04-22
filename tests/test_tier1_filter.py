@@ -60,6 +60,18 @@ class TestRuleEngine:
         assert result["tier1_action"] == "DROP"
         assert result["tier1_score"] < 15
 
+    def test_whitelist_ip_drop(self):
+        """Traffic từ IP trong whitelist phải bị WHITELIST_DROP dù là port nhạy cảm."""
+        self.engine.whitelist_ips = ["10.0.0.99"]
+        log = {
+            "Source IP": "10.0.0.99",
+            "Destination Port": 22,
+            "Total Fwd Packets": 5000,
+        }
+        result = self.engine.evaluate(log)
+        assert result["tier1_action"] == "WHITELIST_DROP"
+        assert result["tier1_score"] == 0
+
     def test_ftp_port_escalate(self):
         """Port 21 (FTP) phải bị escalate."""
         log = {"Source IP": "10.0.0.4", "Destination Port": 21, "Total Fwd Packets": 2}

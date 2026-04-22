@@ -102,3 +102,7 @@ tier1:
     eviction_interval: 100
     ttl_seconds: 600
     window_seconds: 300
+  whitelist_ips:
+  - 127.0.0.1
+  - 10.0.0.99
+  - 192.168.1.254
