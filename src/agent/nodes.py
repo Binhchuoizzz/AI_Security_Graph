@@ -189,11 +189,17 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
     logger.info("--- NODE: ACTION EXECUTOR ---")
     latest_decision = state.decisions[-1] if state.decisions else {}
     action = latest_decision.get("action", "UNKNOWN")
+    
+    # Format reasoning to include MITRE and Confidence so DB can save it and UI can regex it
+    mitre = latest_decision.get("mitre_technique", "N/A")
+    conf = latest_decision.get("confidence", 0.0)
+    raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
+    formatted_reasoning = f"[MITRE: {mitre}] [Confidence: {conf:.2f}] {raw_reasoning}"
 
     if action == "BLOCK_IP":
         block_ip(
             latest_decision.get("target", "UNKNOWN_IP"),
-            latest_decision.get("reasoning"),
+            formatted_reasoning,
         )
 
         # Nếu LLM phân tích ra rule chặn động, đẩy về Tier 1
@@ -203,13 +209,13 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
             "Source IP",
             rule_pattern,
             score=100,
-            reason=latest_decision.get("reasoning"),
+            reason=raw_reasoning,
         )
 
     elif action == "ALERT":
         raise_alert(
             latest_decision.get("target", "UNKNOWN_TARGET"),
-            latest_decision.get("reasoning"),
+            formatted_reasoning,
         )
 
     return {}
@@ -221,9 +227,20 @@ def node_human_in_the_loop(state: SentinelState) -> Dict[str, Any]:
     """
     logger.info("--- NODE: HUMAN IN THE LOOP (AWAIT_HITL) ---")
     latest_decision = state.decisions[-1] if state.decisions else {}
+    
+    mitre = latest_decision.get("mitre_technique", "N/A")
+    conf = latest_decision.get("confidence", 0.0)
+    raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
+    formatted_reasoning = f"[MITRE: {mitre}] [Confidence: {conf:.2f}] {raw_reasoning}"
+    
     logger.warning(
-        f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {latest_decision.get('reasoning')}"
+        f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}"
     )
+    
+    # Mặc dù AWAIT_HITL không block, nhưng vẫn cần ghi log vào DB để UI hiển thị
+    from src.response.executor import _log_to_db
+    _log_to_db("AWAIT_HITL", latest_decision.get("target", "UNKNOWN_TARGET"), formatted_reasoning)
+    
     return {}
 
 

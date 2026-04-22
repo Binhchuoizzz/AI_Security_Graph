@@ -124,6 +124,27 @@ def main_dashboard():
                     else:
                         st.warning("Bạn không có quyền L3_Manager để phê duyệt.")
 
+        st.markdown("---")
+        st.subheader("Luật Đang Hoạt Động (Active Rules)")
+        if not active_rules:
+            st.info("Không có luật nào đang hoạt động.")
+        else:
+            for rule in active_rules:
+                with st.expander(
+                    f"Luật Active: {rule.get('pattern')} (Mức độ: {rule.get('score')})",
+                    expanded=False,
+                ):
+                    st.write(f"**Trường dữ liệu:** {rule.get('field')}")
+                    st.write(f"**Lý do (LLM):** {rule.get('reason')}")
+                    st.write(f"**Tạo lúc:** {rule.get('created_at')}")
+                    
+                    if st.session_state.get("role") == "L3_Manager":
+                        if st.button(" Hoàn tác (Revoke/Reject)", key=f"rev_{rule.get('pattern')}"):
+                            feedback_mgr.reject_rule(rule.get("pattern"))
+                            st.warning(f"Đã hoàn tác và vô hiệu hóa luật {rule.get('pattern')}")
+                            time.sleep(0.5)
+                            st.rerun()
+
 
 if __name__ == "__main__":
     main_dashboard()
