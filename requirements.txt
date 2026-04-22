@@ -5,7 +5,7 @@ langgraph>=0.0.26
 langchain>=0.1.0
 langchain-openai>=0.0.5     # Dùng để gọi Oobabooga API (tương thích OpenAI)
 langchain-community>=0.0.13 # Hỗ trợ các công cụ phụ trợ cho Langchain
-pydantic>=2.0.0             # Xác thực cấu trúc JSON đầu ra của LLM
+pydantic>=2.13.3             # Xác thực cấu trúc JSON đầu ra của LLM
 
 # ==========================================
 # 2. RAG & KNOWLEDGE BASE (Tri thức AI)
