@@ -108,7 +108,7 @@ graph TD
 |---|---|---|---|
 | 1 | **OWASP Top 10 for LLM Applications** | 2025 | Tài liệu chuẩn mực #1. LLM01 (Prompt Injection) là rủi ro số 1 → justify toàn bộ Guardrails Layer. |
 | 2 | **"Not what you've signed up for: Compromising Real-World LLM-Integrated Applications with Indirect Prompt Injection"** — Greshake et al. | 2023 | Paper gốc định nghĩa Indirect Prompt Injection. Log chứa payload injection = indirect injection → đây là threat model chính của SENTINEL. arXiv: `2302.12173` |
-| 3 | **"Dual LLM Patterns for Prompt Injection Defense"** — (Simon Willison / research blogs + GitHub) | 2024 | Kiến trúc "Privileged LLM" + "Quarantined LLM" → tương tự cách bạn tách 9B (Agent) và 26B (Judge). |
+| 3 | **"Dual LLM Patterns for Prompt Injection Defense"** — (Simon Willison / research blogs + GitHub) | 2024 | Kiến trúc "Privileged LLM" + "Quarantined LLM" → tương tự cách SENTINEL tách Tier 1 (Rule-based) và Tier 2 (LLM Agent). |
 
 ### 🟡 Supporting Papers
 
@@ -158,7 +158,7 @@ graph TD
 
 | # | Paper | Năm | Tại sao quan trọng |
 |---|---|---|---|
-| 1 | **"Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"** — Zheng et al. | NeurIPS 2023 | Paper gốc bạn đã reference. BẮT BUỘC phải đọc kỹ phần **Bias**: Position Bias, Verbosity Bias, Self-Enhancement Bias → justify dùng 26B judge thay vì 9B self-evaluation. |
+| 1 | **"Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"** — Zheng et al. | NeurIPS 2023 | Paper gốc bạn đã reference. BẮT BUỘC phải đọc kỹ phần **Bias**: Position Bias, Verbosity Bias, Self-Enhancement Bias → **justify lý do SENTINEL chuyển sang Statistical Evaluation** (McNemar, Mann-Whitney U) thay vì dùng LLM-as-a-Judge. |
 | 2 | **RAGAS: Automated Evaluation of Retrieval Augmented Generation** — Shahul Es et al. | 2023 | Framework gốc cho Context Precision + Answer Relevancy. Hiểu rõ cách RAGAS tính toán để biết khi nào cần Ground Truth, khi nào không. |
 
 ### 🟡 Supporting Papers

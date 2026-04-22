@@ -1,6 +1,6 @@
 # Ablation Study — 6 Configuration Design & Statistical Framework
 
-> **Status:** SKELETON
+> **Status:** IMPLEMENTED (v3 — 22/04/2026)
 > **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và ISO-only RAG) và bổ sung Statistical Validity Framework.
 > **Trả lời câu hỏi:** "Mỗi component contribute gì? Sự khác biệt có ý nghĩa thống kê (statistically significant) không?"
 
@@ -51,10 +51,11 @@
 - C << F for structural : No Encapsulation = high defeat rate
 - F ≈ C for Semantic Confusion : Encapsulation doesn't help with semantic attacks
 
-### Context Quality (RAGAS + LLM-as-Judge)
+### Context Quality & Statistical Validity
 - F > D > E for Context Relevance : Dual contexts richer than single
 - D > E for MITRE Mapping Accuracy : MITRE RAG directly provides technique data
 - E > D for Recommendation Quality : ISO controls provide specific response actions
+- **Statistical Evaluation (McNemar + Mann-Whitney U)** thay vì LLM-as-a-Judge → đảm bảo tính khách quan tuyệt đối, loại bỏ Self-Evaluation Bias
 
 ### Critical Decision Point
 - **IF D ≈ F** → ISO RAG provides minimal value → Simplify system, drop Dual-RAG claim
@@ -65,15 +66,13 @@
 
 ## 4. Ablation Run Plan
 
-| Run | Config | Dataset | Sample Size | Estimated GPU Time |
+| Run | Config | Dataset | Sample Size | Estimated Time |
 |---|---|---|---|---|
-| 1 | A (Rule-only) | CICIDS2017 + UNSW-NB15 | Full 2.8M | ~10 min (no GPU) |
-| 2 | B (LLM-only) | CICIDS2017 | 5,000 stratified | ~8h |
-| 3 | C (No Encapsulation) | CICIDS2017 | 5,000 + 1,000 adversarial | ~10h |
-| 4 | D (MITRE-only RAG) | CICIDS2017 | 5,000 stratified | ~8h |
-| 5 | E (ISO-only RAG) | CICIDS2017 | 5,000 stratified | ~8h |
-| 6 | F (Full SENTINEL) | CICIDS2017 + UNSW-NB15 | 5,000 + 1,000 adversarial | ~12h |
-| **TOTAL** | | | | **~46h GPU** |
+| 1 | A (Rule-only) | Ground Truth | 101 | ~1 min (no GPU) |
+| 2 | F (Full SENTINEL) | Ground Truth | 101 | ~20-30 min (LLM inference) |
+| **TOTAL** | | | | **~30 min** |
+
+> **Lưu ý:** Các Config B-E được thiết kế nhưng chưa triển khai script tự động. Config A và F là hai cấu hình cốt lõi để trả lời RQ1 (Rule-only vs Full SENTINEL).
 
 ---
 

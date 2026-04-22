@@ -1,6 +1,6 @@
 # SENTINEL — Reproducibility Package
 
-> **Trạng thái:** HOÀN THIỆN
+> **Trạng thái:** HOÀN THIỆN (v3 — Cập nhật 22/04/2026)
 > **Mục đích:** Document đầy đủ yêu cầu để tái lập toàn bộ experiments của luận văn.
 
 ---
@@ -15,7 +15,7 @@
 | OS | Ubuntu 22.04+ LTS | Ubuntu 24.04 LTS |
 | Docker | Docker Engine 24.0+ | Docker Engine 27.0+ |
 
-**Lưu ý:** Gemma 2 9B Q6_K yêu cầu ~12GB VRAM. Nếu dùng Gemma 2 26B Q4_K_M làm Oracle Judge, cần tổng ~20GB VRAM.
+**Lưu ý:** Gemma 2 9B Q6_K yêu cầu ~12GB VRAM. Hệ thống chỉ cần 1 model LLM duy nhất cho Production.
 
 ---
 
@@ -59,73 +59,74 @@ cd text-generation-webui
 # API sẽ chạy tại http://localhost:5000/v1
 ```
 
+**Lưu ý về 3 Model trong hệ thống:**
+
+| Model | Vai trò | Cách chạy |
+|---|---|---|
+| Rule Engine & Session Baseline | Tier 1 — Heuristic filter | Tự động (Python thuần, không cần GPU) |
+| `all-MiniLM-L6-v2` | Embedding cho RAG (FAISS) | Tự động (chạy ngầm qua `sentence-transformers`) |
+| `Gemma 2 9B Q6_K` | LLM Reasoning (Tier 2 Agent) | **Cần bật Oobabooga** trước khi chạy `main.py` |
+
 ---
 
 ## 4. Dataset Preparation
 
-### CICIDS2017 (Kịch bản PCAP)
+### CICIDS2017 (CSV từ HuggingFace)
+
 ```bash
-# Tải Thursday-WorkingHours.pcap (~8GB) từ UNB
-# https://www.unb.ca/cic/datasets/ids-2017.html
-# Đặt vào: data/raw/Thursday-WorkingHours.pcap
+# Tải tự động qua script
+source .venv/bin/activate
+python scripts/fetch_and_build_dataset.py
+
+# Hoặc file Demo đã được trích xuất sẵn:
+# data/raw/Demo-Attack.csv (50 BENIGN + 500 DDoS — demo nhanh)
 ```
 
 ### Ground Truth Dataset
-- **Có sẵn:** `experiments/ground_truth.json` (101 mẫu)
-- **Reasoning cases:** `experiments/reasoning_ground_truth.json` (30 mẫu)
-- **Adversarial samples:** `experiments/adversarial/` (45+ mẫu pre-built)
+- **Có sẵn:** `experiments/ground_truth.json` (101 mẫu — 81 attack + 20 benign)
+- **Adversarial samples:** `experiments/adversarial/` (45 mẫu pre-built — 3 loại)
 
 ---
 
 ## 5. Chạy Experiments
 
-### 5.1 Ablation Study (6 configs)
-```bash
-source .venv/bin/activate
+### 5.1 Live Demo — Streaming Pipeline (Sát thực tế)
 
-# Chạy từng config ablation
-python experiments/evaluate_accuracy.py --config config/ablation/config_a_rule_only.yaml
-python experiments/evaluate_accuracy.py --config config/ablation/config_b_llm_only.yaml
-python experiments/evaluate_accuracy.py --config config/ablation/config_c_no_encapsulation.yaml
-python experiments/evaluate_accuracy.py --config config/ablation/config_d_mitre_only.yaml
-python experiments/evaluate_accuracy.py --config config/ablation/config_e_iso_only.yaml
-python experiments/evaluate_accuracy.py --config config/ablation/config_f_full.yaml
-```
-
-### 5.2 Adversarial Robustness Test
-```bash
-python experiments/evaluate_robustness.py
-# Output: experiments/robustness_results.json
-```
-
-### 5.3 Unit & Integration Tests
-```bash
-# Unit tests
-pytest tests/test_tier1_filter.py -v
-pytest tests/test_adversarial.py -v
-
-# Integration tests (requires Redis running)
-pytest tests/integration/test_streaming_pipeline.py -v
-
-# Full suite
-pytest tests/ -v --tb=short
-```
-
-### 5.4 Full System E2E Demo
 ```bash
 # Terminal 1: Infrastructure
 docker-compose up -d redis mlflow
 
-# Terminal 2: LLM (Oobabooga with Gemma 2 9B loaded)
+# Terminal 2: Bật Oobabooga + Load Gemma 9B
 
-# Terminal 3: SENTINEL Engine
+# Terminal 3: SENTINEL Core — xem trực tiếp các Node hoạt động
 source .venv/bin/activate && python main.py
 
-# Terminal 4: Dashboard
+# Terminal 4: Dashboard SOC
 source .venv/bin/activate && streamlit run src/ui/app.py
+# → Truy cập http://localhost:8501 (manager / sentinel_manager_2026)
 
-# Terminal 5: Traffic Simulation
-source .venv/bin/activate && python scripts/simulate_traffic.py
+# Terminal 5: Bắn dữ liệu tấn công
+source .venv/bin/activate && python src/streaming/publisher.py
+```
+
+### 5.2 Ablation Study — Sinh số liệu cho Luận văn
+
+```bash
+source .venv/bin/activate
+
+# 1. Chạy bài test Config A vs Config F (cần Oobabooga, ~15-20 phút)
+python experiments/run_ablation_study.py
+
+# 2. Tính p-value thống kê (McNemar + Mann-Whitney U)
+python experiments/statistical_tests.py
+```
+
+### 5.3 Unit & Integration Tests
+
+```bash
+# Chạy toàn bộ 79 bài test
+pytest tests/ -v --tb=short
+# Kết quả kỳ vọng: 79 passed in 0.17s
 ```
 
 ---
@@ -134,32 +135,29 @@ source .venv/bin/activate && python scripts/simulate_traffic.py
 
 | Service | URL | Nội dung |
 |---------|-----|----------|
-| Dashboard | http://localhost:8501 | SOC Analyst Interface |
+| Dashboard | http://localhost:8501 | SOC Analyst Interface (HITL) |
 | MLflow | http://localhost:5001 | Experiment Metrics & Charts |
-| LLM WebUI | http://localhost:7860 | Model Management |
+| LLM WebUI | http://localhost:7860 | Model Management (Oobabooga) |
 
 ---
 
-## 7. Cấu trúc Ablation Configs
+## 7. Phương pháp Đánh giá
 
-Mỗi file YAML trong `config/ablation/` toggle on/off từng component:
+SENTINEL sử dụng **Statistical Evaluation** (Toán học) thay vì LLM-as-a-Judge để đảm bảo tính khách quan tuyệt đối:
 
-| Config | Tier 1 | LLM | Guardrails | MITRE RAG | ISO RAG | Mục đích |
-|--------|--------|-----|------------|-----------|---------|----------|
-| A | ✅ | ❌ | ❌ | ❌ | ❌ | Rule-only baseline |
-| B | ❌ | ✅ | ✅ | ✅ | ✅ | LLM-only (no pre-filter) |
-| C | ✅ | ✅ | ❌ | ✅ | ✅ | No Guardrails delimiter |
-| D | ✅ | ✅ | ✅ | ✅ | ❌ | MITRE-only RAG |
-| E | ✅ | ✅ | ✅ | ❌ | ✅ | ISO-only RAG |
-| F | ✅ | ✅ | ✅ | ✅ | ✅ | Full system |
+| So sánh | Metric | Phương pháp | Ngưỡng |
+|---|---|---|---|
+| Config A vs Config F | F1-Score | McNemar's Test | p < 0.05 |
+| Latency 2-Tier vs 1-Tier | Reasoning Latency | Mann-Whitney U Test | p < 0.05 |
+| Guardrails Robustness | Defeat Rate | 45 curated adversarial samples | 3 loại tấn công |
 
 ---
 
 ## 8. Cách xác minh kết quả
 
-1. **MLflow Dashboard** tại `http://localhost:5001` — Xem biểu đồ Latency, Confidence Score, Action Distribution cho mỗi ablation run.
-2. **experiments/robustness_results.json** — Kết quả adversarial robustness test, Defeat Rate per category.
-3. **config/audit_trail.db** — SQLite database chứa toàn bộ lịch sử quyết định của Agent.
+1. **MLflow Dashboard** tại `http://localhost:5001` — Xem biểu đồ F1, Latency cho mỗi ablation run.
+2. **experiments/ablation_results.json** — Kết quả chi tiết y_true, y_pred, latencies.
+3. **tests/ (79/79 PASS)** — Chạy `pytest tests/` để xác minh toàn bộ logic hệ thống.
 
 ---
 
@@ -168,3 +166,4 @@ Mỗi file YAML trong `config/ablation/` toggle on/off từng component:
 - **Iptables conflict trên Ubuntu 24.04:** Nếu Docker báo lỗi `DOCKER-ISOLATION-STAGE-2`, chạy: `sudo update-alternatives --set iptables /usr/sbin/iptables-legacy && sudo systemctl restart docker`
 - **VRAM constraint:** Gemma 2 9B Q6_K cần ~12GB VRAM. Không khuyến khích chạy song song 2 models.
 - **HuggingFace warning:** Embedding model `all-MiniLM-L6-v2` sẽ hiện warning nếu chưa set `HF_TOKEN`. Bỏ qua được.
+- **LLM Latency:** Gemma 9B mất ~10-15s/lần suy luận. Đây là hành vi thiết kế — LLM đóng vai trò "Chuyên gia phân tích", không phải Firewall chặn gói tin.

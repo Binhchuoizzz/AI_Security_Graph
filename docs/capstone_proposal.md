@@ -120,11 +120,17 @@ RuleEngine.reload_dynamic_rules() (hot-reload cho Tier 1)
 
 Kiến trúc Containerized Modular Architecture (Docker).
 
-- **Primary Agent LLM:** Gemma 2 9B Q6_K (~7GB VRAM) — xử lý suy luận và phân tích log.
-- **Oracle Judge LLM:** Gemma 26B Q4_K_M (~15GB VRAM) — chấm điểm Context Quality (LLM-as-a-Judge). **Không** dùng cùng model với Agent để tránh Confirmation Bias.
-- **Ablation:** 26B cũng dùng để so sánh chất lượng suy luận (batch_size=1, short context).
+Hệ thống sử dụng **3 mô hình phối hợp** trong kiến trúc 2-Tier:
 
-VRAM Budget: RTX 4060 Ti 16GB. Chạy 9B (primary) + 26B (judge) tuần tự, không song song. Config trung tâm: `system_settings.yaml`. MLflow tracking tự động.
+| # | Model | Vai trò | Layer |
+|---|---|---|---|
+| 1 | Rule Engine & Session Baseline | Heuristic filter — DROP 99% noise | Tier 1 (Python thuần, chạy trên RAM) |
+| 2 | `all-MiniLM-L6-v2` | Embedding model — vector hóa log cho FAISS RAG | Tier 2 (chạy ngầm qua `sentence-transformers`) |
+| 3 | `Gemma 2 9B Q6_K` (~7GB VRAM) | Reasoning LLM — phân tích sâu, MITRE mapping | Tier 2 (Oobabooga WebUI, `localhost:5000`) |
+
+VRAM Budget: RTX 4060 Ti 16GB. Chỉ cần 1 LLM duy nhất cho Production. Config trung tâm: `system_settings.yaml`. MLflow tracking tự động.
+
+**Đánh giá:** Sử dụng **Statistical Evaluation** (McNemar's Test, Mann-Whitney U) thay vì LLM-as-a-Judge để đảm bảo tính khách quan tuyệt đối, loại bỏ hoàn toàn Self-Evaluation Bias.
 
 ### 2.3. Data Flow Diagram
 
@@ -200,12 +206,12 @@ Chiến lược **Lab Experiment** + **Adversarial Testing**. Datasets:
 
 **Phân tích VRAM Budget:**
 
-| Thành phần | Gemma 26B Q4 | Gemma 2 9B Q6 |
-| :--- | :--- | :--- |
-| Model Weights | ~15GB | ~7GB |
-| KV Cache còn lại | 0.5-1.5GB (❌ OOM) | 9GB (✅ Stable) |
-| System Prompt + RAG + Memory | ~2-3GB | ~2-3GB |
-| **Kết luận** | **Không đủ cho production** | **Đủ cho Streaming pipeline** |
+| Thành phần | Gemma 2 9B Q6 (Production) |
+| :--- | :--- |
+| Model Weights | ~7GB |
+| KV Cache | ~9GB (✅ Stable) |
+| System Prompt + RAG + Memory | ~2-3GB |
+| **Kết luận** | **Đủ cho Streaming pipeline** |
 
 Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử lý dependency conflicts. Lộ trình 8 tuần thực tế cho 1 người.
 
@@ -226,10 +232,10 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 1. **Classification Metrics:** Precision, Recall, F1-Score trên 2 datasets. So sánh 4 cấu hình Ablation.
 2. **Operational Metrics:** Reasoning Latency (sec/incident), bao gồm cả Embedding Latency. Semantic Cache Hit Rate được đo để chứng minh tối ưu hóa RAG lookup. So sánh 2-Tier vs 1-Tier.
 3. **Robustness Metrics:** Guardrail Defeat Rate qua 45 curated adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
-4. **Context Quality Metrics & Eval Scoping:**
-   - **Tối ưu VRAM Eval (Stratified Sampling):** Chạy code Python của Tier 1 trên toàn bộ ~2.8 triệu bản ghi CICIDS2017 để đánh giá Routing/Latencies. Tuy nhiên, tầng đánh giá LLM-as-a-Judge bằng Oracle 26B sẽ chỉ chạy trên một **mẫu phân tầng (Stratified Sample) gồm 5,000 sự kiện đại diện** (chứa tỷ lệ chuẩn mực cho cả 14 họ tấn công) thay vì toàn bộ dataset để khả thi về thời gian chạy trên tài nguyên RTX 4060 Ti 16GB.
-   - **RAGAS (200 mẫu Ground Truth tĩnh):** Tính Context Precision + Answer Relevancy.
-   - **LLM-as-a-Judge (Oracle Evaluation):** Dùng **Gemma 26B làm Oracle Model** (trọng tài độc lập) chấm điểm Context Relevance (thang 1-5) theo phương pháp Zheng et al. (2023) trên 5,000 log phân tầng. Mọi phân tích bằng 26B tách rời khỏi model Agent chính (9B) để tránh Self-Evaluation Bias.
+4. **Statistical Validity & Eval Scoping:**
+   - **Ablation Study:** Config A (Rule-only) vs Config F (Full SENTINEL) trên 101 mẫu ground truth được gán nhãn thủ công.
+   - **Statistical Tests:** McNemar's Test (so sánh F1 giữa Config A và F) + Mann-Whitney U (so sánh latency). P-value < 0.05 = kết quả có ý nghĩa thống kê.
+   - **Lý do không dùng LLM-as-a-Judge:** Tránh hoàn toàn Self-Evaluation Bias (Zheng et al., 2023). Đánh giá bằng Toán học khách quan hơn LLM chấm LLM.
    - Compression Ratio của Semantic Pruning.
 
 ---
