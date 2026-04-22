@@ -16,6 +16,8 @@ class TestRuleEngine:
 
     def setup_method(self):
         self.engine = RuleEngine()
+        self.engine.session_baseline = SessionBaseline()
+        self.engine.dynamic_rules = []  # Isolate from Feedback Loop runtime state
 
     def test_sensitive_port_ssh_escalate(self):
         """Port 22 phải bị escalate."""

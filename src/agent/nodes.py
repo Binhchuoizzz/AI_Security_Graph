@@ -144,7 +144,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
             os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
         )
         mlflow.set_experiment("Sentinel_Reasoning_Latency")
-        with mlflow.start_run(run_name=f"Triage_Cycle_{state.cycle_count}"):
+        with mlflow.start_run(run_name=f"Triage_Cycle_{state.cycle_count}", nested=True):
             mlflow.log_metric("reasoning_latency_sec", latency_sec)
             mlflow.log_metric("confidence_score", confidence)
             mlflow.log_param("action_taken", action)
