@@ -22,7 +22,7 @@ numpy==2.2.5
 # ==========================================
 # 4. USER INTERFACE (Giao diện HITL)
 # ==========================================
-streamlit==1.44.1
+streamlit==1.56.0
 streamlit-authenticator==0.4.2
 streamlit-autorefresh==1.0.1
 
