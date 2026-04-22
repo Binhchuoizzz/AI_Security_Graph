@@ -15,7 +15,11 @@
 | OS | Ubuntu 22.04+ LTS | Ubuntu 24.04 LTS |
 | Docker | Docker Engine 24.0+ | Docker Engine 27.0+ |
 
-**Lưu ý:** Gemma 2 9B Q6_K yêu cầu ~12GB VRAM. Hệ thống chỉ cần 1 model LLM duy nhất cho Production.
+**Lưu ý về Hệ sinh thái 3 Models:** Để tái lập hoàn toàn nghiên cứu này, cần 3 models độc lập:
+1. `all-MiniLM-L6-v2` (Tự động tải về khi chạy code Python).
+2. `Gemma 2 9B Q6_K` (Model Triage chính, yêu cầu ~12GB VRAM, chạy trên Oobabooga).
+3. `Llama 3 8B Instruct` (Chỉ dùng lúc Evaluate RAGAS, chạy trên Oobabooga).
+*Trong môi trường Production thực tế, hệ thống chỉ cần Model 1 và 2.*
 
 ---
 

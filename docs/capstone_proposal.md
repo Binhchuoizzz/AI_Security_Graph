@@ -120,17 +120,17 @@ RuleEngine.reload_dynamic_rules() (hot-reload cho Tier 1)
 
 Kiến trúc Containerized Modular Architecture (Docker).
 
-Hệ thống sử dụng **3 mô hình phối hợp** trong kiến trúc 2-Tier:
+Hệ thống sử dụng **3 mô hình AI độc lập** trong kiến trúc tổng thể, đảm bảo hiệu suất và chống Bias:
 
 | # | Model | Vai trò | Layer |
 |---|---|---|---|
-| 1 | Rule Engine & Session Baseline | Heuristic filter — DROP 99% noise | Tier 1 (Python thuần, chạy trên RAM) |
-| 2 | `all-MiniLM-L6-v2` | Embedding model — vector hóa log cho FAISS RAG | Tier 2 (chạy ngầm qua `sentence-transformers`) |
-| 3 | `Gemma 2 9B Q6_K` (~7GB VRAM) | Reasoning LLM — phân tích sâu, MITRE mapping | Tier 2 (Oobabooga WebUI, `localhost:5000`) |
+| 1 | `all-MiniLM-L6-v2` | Embedding model — vector hóa log cho FAISS RAG | Tier 2 (chạy ngầm qua `sentence-transformers`) |
+| 2 | `Gemma 2 9B Q6_K` | Reasoning LLM — phân tích sâu, MITRE mapping, sinh luật chặn | Tier 2 (Oobabooga WebUI, `localhost:5000`) |
+| 3 | `Llama 3 8B Instruct` | Judge Model — giám khảo đánh giá RAGAS độc lập (Cross-family) | Evaluation Layer |
 
-VRAM Budget: RTX 4060 Ti 16GB. Chỉ cần 1 LLM duy nhất cho Production. Config trung tâm: `system_settings.yaml`. MLflow tracking tự động.
+VRAM Budget: RTX 4060 Ti 16GB. Config trung tâm: `system_settings.yaml`. MLflow tracking tự động.
 
-**Đánh giá:** Sử dụng **Statistical Evaluation** (McNemar's Test, Mann-Whitney U) thay vì LLM-as-a-Judge để đảm bảo tính khách quan tuyệt đối, loại bỏ hoàn toàn Self-Evaluation Bias.
+**Đánh giá:** Kết hợp **Statistical Evaluation** (McNemar's Test, Mann-Whitney U) và **Cross-Family LLM-as-a-Judge** (dùng Llama 3 chấm Gemma 9B) để đảm bảo tính khách quan tuyệt đối, loại bỏ hoàn toàn Self-Enhancement Bias.
 
 ### 2.3. Data Flow Diagram
 

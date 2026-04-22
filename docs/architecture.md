@@ -6,6 +6,13 @@
 Kiến trúc tổng thể của hệ thống AI Security Agent, được thiết kế
 theo mô hình Containerized Modular Architecture.
 
+## The 3-Model Ecosystem (Core Brains)
+
+Kiến trúc của SENTINEL không phụ thuộc vào một AI duy nhất mà phân chia nhiệm vụ cho **3 models độc lập**, đảm bảo Separation of Concerns và chống Bias:
+1. **Embedding Model (`all-MiniLM-L6-v2`)**: Nằm ở tầng RAG, chịu trách nhiệm vector hóa log thô và tri thức (MITRE, ISO) ở tốc độ cao.
+2. **Primary Agent Model (`Gemma 2 9B Q6_K`)**: Bộ não phân tích chính (Tier 2), chạy cục bộ via Oobabooga. Chịu trách nhiệm suy luận, Triage sự cố và đưa ra quyết định hành động.
+3. **Judge Model (`Llama 3 8B Instruct`)**: Hoạt động độc lập trong pha Evaluation. Đóng vai trò giám khảo chấm điểm độ chính xác ngữ cảnh (RAGAS-inspired) của Gemma, loại bỏ hoàn toàn Self-Enhancement Bias.
+
 ## Sơ đồ luồng xử lý (Data Flow)
 
 ```

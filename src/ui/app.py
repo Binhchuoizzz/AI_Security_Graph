@@ -145,6 +145,21 @@ def main_dashboard():
                             time.sleep(0.5)
                             st.rerun()
 
+        st.markdown("---")
+        st.subheader("Quản lý IP Đặc cách (Whitelisted IPs)")
+        whitelisted_ips = feedback_mgr.get_whitelisted_ips()
+        if not whitelisted_ips:
+            st.info("Chưa có IP nào trong danh sách Whitelist.")
+        else:
+            for ip in whitelisted_ips:
+                with st.expander(f"✅ IP Nội bộ / Pentest: {ip}", expanded=False):
+                    st.write(f"Hệ thống (Tier 1) sẽ bỏ qua mọi đánh giá và Rule Engine đối với IP `{ip}`.")
+                    if st.session_state.get("role") == "L3_Manager":
+                        if st.button(" Gỡ Whitelist (Remove)", key=f"rmwl_{ip}"):
+                            feedback_mgr.remove_from_whitelist(ip)
+                            st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
+                            time.sleep(0.5)
+                            st.rerun()
 
 if __name__ == "__main__":
     main_dashboard()

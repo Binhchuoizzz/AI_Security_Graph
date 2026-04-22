@@ -198,3 +198,30 @@ class FeedbackListener:
         except Exception as e:
             logger.error(f"[Feedback] Failed to add {ip} to whitelist: {e}")
             return False
+
+    def remove_from_whitelist(self, ip: str) -> bool:
+        """Gỡ một IP khỏi whitelist."""
+        try:
+            with open(CONFIG_PATH, "r") as f:
+                config = yaml.safe_load(f)
+                
+            whitelist = config.get("tier1", {}).get("whitelist_ips", [])
+            if ip in whitelist:
+                whitelist.remove(ip)
+                with open(CONFIG_PATH, "w") as f:
+                    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+                logger.info(f"[Feedback] IP {ip} has been removed from Whitelist.")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"[Feedback] Failed to remove {ip} from whitelist: {e}")
+            return False
+
+    def get_whitelisted_ips(self) -> list:
+        """Lấy danh sách các IP đang được Whitelist."""
+        try:
+            with open(CONFIG_PATH, "r") as f:
+                config = yaml.safe_load(f)
+            return config.get("tier1", {}).get("whitelist_ips", [])
+        except Exception:
+            return []

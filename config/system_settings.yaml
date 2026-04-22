@@ -71,7 +71,7 @@ tier1:
       the IP address mitigates the immediate threat.
     score: 100
     source: langgraph_agent
-    status: ACTIVE
+    status: REJECTED
   - created_at: '2026-04-22T01:26:03.500385'
     field: Source IP
     pattern: 192.168.1.1
@@ -83,7 +83,7 @@ tier1:
       Control).
     score: 100
     source: langgraph_agent
-    status: ACTIVE
+    status: REJECTED
   max_fwd_packets: 1000
   risk_threshold: 15
   sensitive_ports:

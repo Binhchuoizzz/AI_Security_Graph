@@ -44,6 +44,14 @@ CSV/Syslog → Redis Stream → Tier 1 Rule Engine → Guardrails → LLM Agent
 - **Defense:** HITL Quarantine (all rules require L3 Manager approval)
 - **Residual risk:** L3 Manager rubber-stamping (human factor, out of scope)
 
+### 2.5 Evaluation Bias (The 3-Model Ecosystem)
+- **Attack vector:** Self-Enhancement Bias (Mô hình LLM có xu hướng tự chấm điểm cao cho kết quả của chính nó sinh ra).
+- **Defense:** Kiến trúc **3 Models độc lập**:
+  1. `all-MiniLM-L6-v2` (Vectorization RAG)
+  2. `Gemma 2 9B Q6_K` (Primary Agent sinh quyết định)
+  3. `Llama 3 8B Instruct` (Cross-family Judge Model)
+- **Residual risk:** Llama 3 và Gemma đều là mô hình instruction-tuned, có thể vẫn chia sẻ chung một số bias phòng thủ cơ bản (RLHF alignment).
+
 ---
 
 ## 3. Defense Effectiveness Matrix
