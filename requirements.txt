@@ -17,7 +17,7 @@ faiss-cpu==1.11.0
 # 3. DATA PROCESSING (Xử lý Log/Dữ liệu)
 # ==========================================
 pandas==2.2.3
-numpy==2.2.5
+numpy==2.4.4
 
 # ==========================================
 # 4. USER INTERFACE (Giao diện HITL)
