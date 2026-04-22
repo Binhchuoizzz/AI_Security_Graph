@@ -1,4 +1,4 @@
-FROM python:3.10-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
 # ---- Production Stage ----
-FROM python:3.10-slim
+FROM python:3.14-slim
 
 # Security: Metadata labels
 LABEL maintainer="Nguyen Duc Binh <binhchuoizzz@github>"
