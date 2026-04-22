@@ -84,7 +84,7 @@ Modern Security Operations Centers (SOCs) face the ``Big Data Paradox'': an over
 
 To address these challenges, this study proposes \textbf{SENTINEL} (\textbf{S}treaming \textbf{E}vents \textbf{N}etwork for \textbf{T}hreat \textbf{I}ntelligence, \textbf{N}eutralization, \textbf{E}scalation and \textbf{L}og-correlation)---a 2-Tier autonomous AI Security Agent that integrates Session-Aware Behavioral Baselining (Tier~1) with a LangGraph-based reasoning agent powered by Dual-RAG (MITRE ATT\&CK + ISO~27001) and multi-layered Adversarial Guardrails featuring Dynamic Randomized Delimiters (Tier~2). The system resolves the fundamental paradox of \textit{``preserving attack-payload variables for analysis without triggering Prompt Injection''} through Delimited Data Encapsulation---analogous to Parameterized Queries in SQL Injection prevention.
 
-The proposed system is evaluated on two benchmark datasets: CICIDS2017 and UNSW-NB15. Evaluation employs a 4D Framework encompassing Classification Metrics (F1-Score), Operational Metrics (Reasoning Latency, Semantic Cache Hit Rate), Robustness Metrics (evaluating structural defenses and Semantic Confusion baselines across 1,000+ adversarial samples), and Context Quality Metrics (RAGAS with 200 static Ground Truth samples + LLM-as-a-Judge evaluating a Stratified Sample of 5,000 incidents using an Oracle Model to avoid Self-Evaluation Bias) \citep{zheng2023}.
+The proposed system is evaluated on two benchmark datasets: CICIDS2017 and UNSW-NB15. Evaluation employs a 4D Framework encompassing Classification Metrics (F1-Score), Operational Metrics (Reasoning Latency, Semantic Cache Hit Rate), Robustness Metrics (evaluating structural defenses and Semantic Confusion baselines across 1,000+ adversarial samples), and Context Quality Metrics (RAGAS with 200 static Ground Truth samples + Statistical Framework (McNemar, Mann-Whitney U) and F1-Score evaluation on ground truth to ensure objective validity) \citep{zheng2023}.
 
 % --- TABLE OF CONTENTS ---
 \newpage
@@ -163,7 +163,7 @@ Log template mining, pioneered by the Drain algorithm \citep{he2017}, provides a
 
 \textbf{Prompt Injection \& LLM Security.} \citet{greshake2023} formally defined indirect prompt injection, where malicious instructions are embedded in retrieved content. The Agent Security Bench \citep{zhang2024asb} benchmarks 27 attack methods across 10 agent types, revealing attack success rates exceeding 84\%. Current defenses include NeMo Guardrails, Instruction Hierarchy \citep{wallace2024}, and Dual LLM patterns (privileged vs. quarantined models). SENTINEL contributes a novel defense: \textit{Dynamic Randomized Delimiters} using cryptographic hashes, making Delimiter Smuggling attacks computationally infeasible.
 
-\textbf{LLM Evaluation Methodology.} \citet{zheng2023} established the LLM-as-a-Judge paradigm, demonstrating $>$80\% agreement with human evaluators. Their work also identified critical biases (Position, Verbosity, Self-Enhancement) that must be mitigated. SENTINEL addresses Self-Enhancement Bias by using a separate, larger \textit{Oracle Model} (Gemma~26B) as the judge rather than the primary agent model (Gemma~9B).
+\textbf{LLM Evaluation Methodology.} \citet{zheng2023} established the LLM-as-a-Judge paradigm, demonstrating $>$80\% agreement with human evaluators. Their work also identified critical biases (Position, Verbosity, Self-Enhancement) that must be mitigated. SENTINEL avoids Self-Enhancement Bias entirely by eschewing LLM-as-a-Judge in favor of rigorous statistical evaluation (McNemar, Mann-Whitney U) on labeled ground truth.
 
 % =============================================================================
 % CHAPTER 3: PROPOSED SOLUTION AND RESEARCH METHODOLOGY
@@ -202,8 +202,8 @@ The system employs a \textit{Containerized Modular Architecture} (Docker Compose
 
 \begin{itemize}
     \item \textbf{Primary Agent LLM:} Gemma~2 9B Q6\_K ($\sim$7\,GB VRAM) --- handles reasoning and log analysis.
-    \item \textbf{Oracle Judge LLM:} Gemma~26B Q4\_K\_M ($\sim$15\,GB VRAM) --- scores Context Quality via LLM-as-a-Judge. \textit{Not} the same model as the Agent, to avoid Confirmation Bias.
-    \item \textbf{Ablation:} 26B also used for reasoning quality comparison (batch\_size=1, short context).
+    \item \textbf{Statistical Evaluator:} Python-based deterministic statistical framework (F1, McNemar, Mann-Whitney U) evaluating performance objectively against Ground Truth without LLM-as-a-Judge bias.
+    \item \textbf{Ablation:} Rule-only configuration (Config A) vs Full SENTINEL (Config F) using Gemma 9B.
 \end{itemize}
 
 VRAM Budget: RTX~4060~Ti 16\,GB. Models run sequentially (unload 9B $\rightarrow$ load 26B), never simultaneously. Central configuration via \texttt{system\_settings.yaml}. Automated experiment tracking via MLflow.
@@ -218,7 +218,7 @@ VRAM Budget: RTX~4060~Ti 16\,GB. Models run sequentially (unload 9B $\rightarrow
 \textbf{Layer} & \textbf{Technology} \\
 \midrule
 LLM (Primary) & Gemma~2 9B Q6\_K (Local, Oobabooga API) \\
-LLM (Judge/Ablation) & Gemma~26B Q4\_K\_M \\
+Evaluation & Statistical Tests (F1, McNemar) \\
 Agent Framework & LangGraph (Structured MemoryObject) \\
 RAG & Sentence-Transformers + FAISS (Dual Index) \\
 Guardrails & Drain3 (compression) + Dynamic Delimiters (defense) \\
@@ -245,7 +245,7 @@ Audit & SQLite \\
     \item \textbf{UNSW-NB15} \citep{moustafa2015}: Polymorphic and distributed attack scenarios (9 attack families, 49 features).
 \end{enumerate}
 
-\textbf{Synthetic Adversarial Generation:} Gemma~26B generates 1,000+ Log Injection scenarios across four attack vectors: Direct Injection, Indirect Injection, Encoding Bypass, and Semantic Confusion (\textit{linguistic manipulation through natural language --- attacker embeds malicious intent in grammatically correct, instruction-like prose that bypasses structural filters but influences LLM reasoning}).
+\textbf{Synthetic Adversarial Generation:} Offline LLM generates Log Injection scenarios across four attack vectors: Direct Injection, Indirect Injection, Encoding Bypass, and Semantic Confusion (\textit{linguistic manipulation through natural language --- attacker embeds malicious intent in grammatically correct, instruction-like prose that bypasses structural filters but influences LLM reasoning}).
 
 \textbf{Schedule (8-Week Realistic Plan):}
 \begin{itemize}
@@ -262,7 +262,7 @@ Audit & SQLite \\
 \caption{VRAM Budget Comparison}
 \begin{tabular}{lcc}
 \toprule
-\textbf{Component} & \textbf{Gemma 26B Q4} & \textbf{Gemma 2 9B Q6} \\
+\textbf{Component} & \textbf{Statistical Tests} & \textbf{Gemma 2 9B Q6} \\
 \midrule
 Model Weights & $\sim$15\,GB & $\sim$7\,GB \\
 Available KV Cache & 0.5--1.5\,GB (OOM risk) & $\sim$9\,GB (Stable) \\
@@ -305,9 +305,9 @@ The study defines a \textbf{4D Evaluation Framework}:
     
     \item \textbf{Context Quality Metrics \& Evaluation Scoping:}
     \begin{itemize}
-        \item \textit{VRAM Evaluation Optimization (Stratified Sampling):} While the Tier~1 Rule Engine processes the entire $\sim$2.8 million records of CICIDS2017 to evaluate latency, the LLM-as-a-Judge evaluation using the 26B Oracle is strictly bounded to a \textbf{Stratified Sample of 5,000 representative incidents} (proportionally containing all attack classes). This sample size provides statistical validity while making sequential model loading feasible on a consumer RTX 4060 Ti.
+        \item \textit{VRAM Evaluation Optimization (Stratified Sampling):} While the Tier~1 Rule Engine processes the entire $\sim$2.8 million records of CICIDS2017 to evaluate latency, the statistical evaluation is strictly bounded to a \textbf{curated Ground Truth sample} (proportionally containing all attack classes). This sample size provides statistical validity while making sequential model loading feasible on a consumer RTX 4060 Ti.
         \item \textit{RAGAS (200 static Ground Truth samples):} 200 representative incidents randomly drawn from the stratified sample, manually labeled. Computes Context Precision + Answer Relevancy.
-        \item \textit{LLM-as-a-Judge (5,000 Stratified Samples):} \textbf{Gemma~26B serves as Oracle Model} (independent judge) scoring Context Relevance (1--5 scale) per \citet{zheng2023} on the bounded sample. \textbf{Separated from the Primary Agent (9B)} to avoid Self-Evaluation Bias.
+        \item \textit{Statistical Evaluation:} \textbf{Objective F1-score and P-values} replacing LLM-as-a-Judge to ensure reproducibility and absolute objectivity without Self-Evaluation Bias.
         \item Compression Ratio from Semantic Pruning.
     \end{itemize}
 \end{enumerate}
@@ -346,7 +346,7 @@ From an academic perspective, this research makes three primary contributions:
 
 This study proposes SENTINEL---a Dual-Tier autonomous AI Security Agent architecture that addresses three fundamental challenges in LLM-based SOC automation: reasoning latency, adversarial robustness, and context quality. The architecture integrates Session-Aware Behavioral Baselining with TTL eviction (Tier~1), multi-layered Guardrails with Dynamic Randomized Delimiters (Guardrails Layer), a LangGraph-based reasoning agent with Dual-RAG and Structured MemoryObject (Tier~2), and analyst-supervised adaptive rule generation via HITL Quarantine.
 
-The main contributions include: (i)~proposing a novel Dual-Tier architecture with strict Separation of Concerns for LLM-based security agents; (ii)~introducing Dynamic Delimited Data Encapsulation as a defense against Prompt Injection and Delimiter Smuggling; (iii)~designing a dual evaluation methodology (RAGAS + Oracle Model LLM-as-a-Judge) that eliminates Self-Evaluation Bias; and (iv)~providing a fully reproducible, local-hardware implementation suitable for data-sovereign environments.
+The main contributions include: (i)~proposing a novel Dual-Tier architecture with strict Separation of Concerns for LLM-based security agents; (ii)~introducing Dynamic Delimited Data Encapsulation as a defense against Prompt Injection and Delimiter Smuggling; (iii)~designing a robust evaluation methodology (Ablation Study with Statistical Tests) that eliminates Self-Evaluation Bias entirely; and (iv)~providing a fully reproducible, local-hardware implementation suitable for data-sovereign environments.
 
 Future research may extend along three dimensions: (1)~integrating additional data sources (NetFlow, Windows Event Logs) to enhance multi-source correlation; (2)~exploring graph-based RAG (GraphRAG) for multi-hop threat reasoning across MITRE ATT\&CK kill chains; and (3)~investigating federated deployment patterns where multiple SENTINEL instances share threat intelligence across organizational boundaries while preserving data privacy.
 

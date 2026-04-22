@@ -152,7 +152,7 @@ graph TD
 ---
 
 ## Pillar 5️⃣: LLM Evaluation Methodology
-> **Map vào SENTINEL:** Evaluation Plan (4D Framework), RAGAS, LLM-as-a-Judge (Oracle Model)
+> **Map vào SENTINEL:** Evaluation Plan (4D Framework), RAGAS, Statistical Evaluation (McNemar)
 
 ### 🔴 Must-Read
 
@@ -237,5 +237,5 @@ graph TD
 | **2. RAG + KG** | `rag/retriever.py` | AgCyRAG, RAG-ATT&CK | Dual-RAG (MITRE+ISO) tốt hơn Single-RAG |
 | **3. Prompt Injection** | `guardrails/prompt_filter.py` | OWASP Top 10, Greshake 2023 | Dynamic Delimiters chống được Smuggling |
 | **4. Log Parsing** | `guardrails/template_miner.py` | Drain (He 2017), LILAC 2024 | Drain3 = Token Budgeting, không phải Injection Defense |
-| **5. Evaluation** | `experiments/` | Zheng 2023, RAGAS | Oracle Model 26B tránh Self-Evaluation Bias |
+| **5. Evaluation** | `experiments/` | Zheng 2023, RAGAS | Statistical Framework tránh Self-Evaluation Bias |
 | **6. IDS Datasets** | `data/raw/` | Sharafaldin 2018 | CICIDS2017 = benchmark chuẩn, so sánh trực tiếp |

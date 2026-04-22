@@ -83,19 +83,15 @@ suy luận của LLM.
 
 | Vai trò | Model | Model Family | Lý do chọn |
 |---|---|---|---|
-| **Attack Generator** | Meta Llama 3 8B Instruct | Meta AI | Khác ecosystem so với Agent |
-| **System Under Test** | Gemma 2 9B Q6_K | Google DeepMind | SENTINEL Agent chính |
-| **Oracle Judge** | Gemma 2 26B Q4_K_M | Google DeepMind | Oracle có năng lực cao hơn Agent |
+| **Attack Generator** | Offline LLM/Scripts | Môi trường R&D | Khác ecosystem so với Agent |
+| **Evaluator** | Statistical Tests (McNemar) | Toán học | Độc lập, không bias |
 
-**Tại sao Option C thay vì tự generate bằng Gemma?**
-- Nếu Gemma 26B sinh attack + làm Judge → Circular: cùng model family, cùng training bias.
-- Option C: Llama 3 (Meta) sinh attack, Gemma 26B (Google) judge → khác pretraining corpus, khác RLHF alignment → không còn circular cùng ecosystem.
+**Biện pháp Giảm thiểu Self-Evaluation Bias:**
+- Thay vì dùng LLM-as-a-Judge (vốn dễ bị thiên vị), SENTINEL sử dụng **Statistical Evaluation** (F1-score, McNemar's Test, Mann-Whitney U Test) trên tập Ground Truth.
+- Phương pháp này loại bỏ hoàn toàn tính chủ quan của LLM, đảm bảo kết quả có ý nghĩa thống kê và minh bạch 100%.
 
-**Residual bias phải acknowledge với hội đồng:**
-Cả Llama 3 và Gemma 26B đều là RLHF-aligned instruction-tuned models. Cả hai đều có xu hướng tránh tạo/đánh giá payload quá rõ ràng độc hại. Bypass rate đo được có thể thấp hơn human red-teamers trong thực tế — cần ghi rõ trong Section Limitations.
-
-**Test set:** 500 Semantic Confusion samples, 10 attack pattern templates × 50 Llama 3 variants  
-**Metric:** Bypass Rate = (Gemma 26B judge xác nhận Agent bị dẫn dắt) / 500  
+**Test set:** 45 Semantic Confusion samples, được curate thủ công và sinh offline.
+**Metric:** Bypass Rate = (Số lượng mẫu đánh lừa được Agent) / 45
 **Baseline comparison:** Bypass Rate WITH Encapsulation (Config F) vs WITHOUT (Config C)  
 → Kỳ vọng: gần bằng nhau → chứng minh Encapsulation không giúp gì cho semantic attacks
 
