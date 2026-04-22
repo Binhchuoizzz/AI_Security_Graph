@@ -46,21 +46,26 @@ CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner 
 
 ## 📊 Evaluation & Methodology
 
-SENTINEL employs a rigorous thesis-grade methodology built for reproducibility and continuous validation.
+SENTINEL employs a **Dual Evaluation Methodology** — combining statistical tests with cross-family LLM-as-Judge — for thesis-grade rigor.
 
-### Evaluation Framework
-| Dimension | Metric | Method / Dataset |
-|---|---|---|
-| **Classification** | F1, Precision, Recall | CICIDS2017 — Ablation: Config A (Rule-only) vs Config F (Full SENTINEL) |
-| **Operational** | Reasoning Latency | 2-Tier vs 1-Tier comparison (Mann-Whitney U Test) |
-| **Robustness** | Guardrail Defeat Rate | 45 Curated Adversarial samples (Structural, Encoding, Semantic) |
-| **Statistical Validity** | P-values | McNemar's Test + Mann-Whitney U — replacing LLM-as-a-Judge for objectivity |
+### Dual Evaluation Framework
+| Dimension | What it Measures | Method |
+| --- | --- | --- |
+| **Classification Accuracy** | Does the system correctly detect attacks? | F1, Precision, Recall + McNemar's Test (p<0.05) |
+| **Operational Performance** | How fast is the 2-Tier vs 1-Tier? | Latency + Mann-Whitney U Test (p<0.05) |
+| **Robustness** | Can adversaries fool the guardrails? | 45 curated adversarial samples |
+| **Reasoning Quality** | Does the LLM reason intelligently? | **Cross-Family LLM-as-Judge** (Llama 3 judges Gemma 9B) |
+
+### Why Dual? (Addressing Zheng et al., 2023)
+- **Statistical Tests** (F1, McNemar) measure **classification performance** — did the system make the right BLOCK/LOG decision?
+- **LLM-as-Judge** measures **reasoning quality** — did the LLM identify the correct MITRE technique, provide coherent analysis, and use RAG context effectively?
+- Using **Llama 3 (Meta)** to judge **Gemma 9B (Google)** eliminates Self-Enhancement Bias (different model family, different training data).
+- Neither method alone is sufficient; together they provide comprehensive evaluation.
 
 ### Statistical Validity
-All main comparisons are backed by statistical tests to ensure results are not derived from random chance:
-- **McNemar's tests** for F1-score comparison between Config A and Config F.
-- **Mann-Whitney U tests** for skewed latency distributions.
-- **Test Coverage**: **79/79** comprehensive unit and integration tests passed in 0.17s, covering RuleEngine, Guardrails, RAG, Streaming, and End-to-End scenarios.
+- **McNemar's Test** for classification accuracy comparison between Config A and Config F.
+- **Mann-Whitney U Test** for skewed latency distributions.
+- **Test Coverage**: **79/79** unit and integration tests passed in 0.17s.
 
 ### Reproducibility Package
 This project is engineered for complete scientific reproducibility:

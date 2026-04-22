@@ -48,15 +48,15 @@ class TestRuleEngine:
         ).lower() or "pkts" in str(result.get("tier1_reasons", []))
 
     def test_benign_traffic_drop(self):
-        """Traffic bình thường (port 443, ít gói) phải bị DROP."""
+        """Traffic bình thường (port không nhạy cảm, ít gói) phải bị DROP."""
         log = {
             "Source IP": "192.168.1.1",
-            "Destination Port": 443,
+            "Destination Port": 8080,
             "Total Fwd Packets": 3,
         }
         result = self.engine.evaluate(log)
         assert result["tier1_action"] == "DROP"
-        assert result["tier1_score"] < 30
+        assert result["tier1_score"] < 15
 
     def test_ftp_port_escalate(self):
         """Port 21 (FTP) phải bị escalate."""

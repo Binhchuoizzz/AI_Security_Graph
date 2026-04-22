@@ -34,7 +34,12 @@ def run_ablation():
 
     results = {
         "Config_A": {"y_true": [], "y_pred": [], "latencies": []},
-        "Config_F": {"y_true": [], "y_pred": [], "latencies": []},
+        "Config_F": {
+            "y_true": [],
+            "y_pred": [],
+            "latencies": [],
+            "reasoning_outputs": [],
+        },
     }
 
 
@@ -85,6 +90,16 @@ def run_ablation():
                     needs_llm = True
                     break
 
+            # Capture reasoning output for Judge evaluation
+            reasoning_output = {
+                "sample_id": sample["id"],
+                "expected_action": sample["expected_action"],
+                "expected_mitre": sample.get("expected_mitre_technique", ""),
+                "narrative_summary": "",
+                "decisions": [],
+                "escalated_to_llm": needs_llm,
+            }
+
             if needs_llm:
                 initial_state = SentinelState(
                     current_batch_logs=logs,
@@ -94,6 +109,10 @@ def run_ablation():
                 try:
                     final_state = agent_app.invoke(initial_state)
                     decisions = final_state.get("decisions", [])
+                    reasoning_output["narrative_summary"] = final_state.get(
+                        "narrative_summary", ""
+                    )
+                    reasoning_output["decisions"] = decisions
                     if decisions:
                         latest = decisions[-1]
                         if latest.get("action") in [
@@ -112,6 +131,7 @@ def run_ablation():
             results["Config_F"]["y_true"].append(is_attack)
             results["Config_F"]["y_pred"].append(pred_f)
             results["Config_F"]["latencies"].append(latency_f)
+            results["Config_F"]["reasoning_outputs"].append(reasoning_output)
 
             print(
                 f"[{idx+1}/{len(dataset)}] {sample['id']} | True: {is_attack} | Pred A: {pred_a} ({latency_a:.3f}s) | Pred F: {pred_f} ({latency_f:.3f}s)"

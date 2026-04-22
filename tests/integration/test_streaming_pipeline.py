@@ -97,8 +97,10 @@ class TestRuleEngineIntegration:
 
         # SSH với nhiều gói tin sẽ bị escalate
         assert results[0]["tier1_action"] == "ESCALATE"
-        # Normal HTTP should drop
-        assert results[1]["tier1_action"] == "DROP"
+        # Port 80 is now a sensitive port → should escalate
+        assert results[1]["tier1_action"] == "ESCALATE"
+        # Port 8080 with low packets → DROP
+        assert results[2]["tier1_action"] == "DROP"
 
 
 class TestRedisConnectivity:

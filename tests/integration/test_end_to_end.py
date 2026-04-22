@@ -32,7 +32,7 @@ class TestEndToEndTier1:
         """Traffic bình thường phải được đánh giá là LOG (không escalate)."""
         log = {
             "Source IP": "10.0.0.1",
-            "Destination Port": 80,
+            "Destination Port": 8080,
             "Protocol": 6,
             "Total Fwd Packets": 5,
             "Flow Duration": 1000,

@@ -75,9 +75,10 @@ python src/streaming/publisher.py
 
 ## IV. TIMELINE CHẠY CHẤM ĐIỂM (Dành cho Slide báo cáo)
 
-Khi bạn cần chép số liệu (F1, P-value) vào báo cáo Word/PowerPoint, hãy tắt hết các lệnh ở phần III, và chỉ chạy phần này:
+Đánh giá gồm 2 Pha: **Classification Accuracy** (Toán học) + **Reasoning Quality** (LLM-as-Judge).
 
-**Terminal (Môi trường ảo):**
+### Pha 1: Statistical Evaluation (Gemma 9B loaded)
+
 ```bash
 # 1. Chạy bài test 101 mẫu (đợi khoảng 15-20 phút cho Oobabooga trả lời hết)
 python experiments/run_ablation_study.py
@@ -85,4 +86,15 @@ python experiments/run_ablation_study.py
 # 2. Sinh ra điểm thống kê P-Value (Chứng minh AI không đoán mò)
 python experiments/statistical_tests.py
 ```
+
+### Pha 2: Reasoning Quality (Chuyển sang Llama 3 8B)
+
+```bash
+# 3. Trên Oobabooga: Unload Gemma 9B → Load Llama 3 8B Instruct
+# 4. Chạy LLM-as-Judge (Llama 3 chấm điểm Gemma 9B)
+python experiments/evaluate_reasoning.py
+```
+
+> 💡 **Tại sao cần 2 model?** Gemma 9B không thể tự chấm điểm chính mình (Self-Enhancement Bias — Zheng et al., 2023). Llama 3 (Meta) khác model family với Gemma (Google) → đánh giá khách quan.
+
 Sau đó vào `http://localhost:5001` (MLflow) để chụp ảnh màn hình các thông số dán vào Luận văn!

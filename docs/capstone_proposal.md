@@ -234,8 +234,9 @@ Redis Docker thay Kafka. Rule-based Filter thay ML training. Docker-compose xử
 3. **Robustness Metrics:** Guardrail Defeat Rate qua 45 curated adversarial samples. Trọng tâm là đánh giá mức độ triệt tiêu hoàn toàn **Structural Bypasses** (Smuggling/Encoding) nhờ Encapsulation, và xác định đường cơ sở phòng thủ (Baseline vulnerability) trước các đòn **Semantic Confusion** (thao túng bằng rào cản ngôn từ). So sánh Full Encapsulation vs No Encapsulation (Baseline C).
 4. **Statistical Validity & Eval Scoping:**
    - **Ablation Study:** Config A (Rule-only) vs Config F (Full SENTINEL) trên 101 mẫu ground truth được gán nhãn thủ công.
-   - **Statistical Tests:** McNemar's Test (so sánh F1 giữa Config A và F) + Mann-Whitney U (so sánh latency). P-value < 0.05 = kết quả có ý nghĩa thống kê.
-   - **Lý do không dùng LLM-as-a-Judge:** Tránh hoàn toàn Self-Evaluation Bias (Zheng et al., 2023). Đánh giá bằng Toán học khách quan hơn LLM chấm LLM.
+   - **Dual Evaluation Methodology:** Kết hợp đánh giá định lượng bằng thống kê và đánh giá định tính bằng LLM-as-Judge chéo dòng.
+   - **Statistical Tests (Classification):** McNemar's Test (so sánh F1 giữa Config A và F) + Mann-Whitney U (so sánh latency). P-value < 0.05 = kết quả có ý nghĩa thống kê.
+   - **Reasoning Quality (LLM-as-Judge):** Dùng Llama 3 8B (Meta) làm trọng tài độc lập chấm điểm suy luận của Gemma 9B (Google) trên 4 khía cạnh (MITRE, Action, Coherence, Context). Khác model family triệt tiêu Self-Enhancement Bias (Zheng et al., 2023).
    - Compression Ratio của Semantic Pruning.
 
 ---
