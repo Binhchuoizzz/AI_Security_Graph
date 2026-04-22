@@ -110,7 +110,9 @@ class EncodingNeutralizer:
             )
             if decoded.isprintable() and len(decoded) > 3:
                 return f"[BASE64_DECODED: {decoded}]"
-        except Exception:
+        except Exception:  # nosec B110
+            # Implied pass: If decoding fails, it's likely not base64. 
+            # We return the original text as per function contract.
             pass
         return text
 

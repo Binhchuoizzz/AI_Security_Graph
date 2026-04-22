@@ -51,9 +51,9 @@ class SemanticCache:
     def _make_key(self, query_text: str) -> str:
         """
         Tạo cache key từ query text.
-        Dùng MD5 hash (nhanh, không cần crypto security ở đây).
+        Dùng SHA-256 hash (chuẩn an toàn hơn MD5).
         """
-        return hashlib.md5(query_text.encode()).hexdigest()
+        return hashlib.sha256(query_text.encode()).hexdigest()
 
     def _evict_expired(self):
         """Xóa entries quá TTL."""

@@ -1,43 +1,45 @@
 # ==========================================
 # 1. CORE AI & AGENT (Lõi Suy luận LangGraph)
 # ==========================================
-langgraph==0.3.34
-langchain==0.3.25
-langchain-openai==0.3.21
-langchain-community==0.3.21
-pydantic==2.13.3
+langgraph>=0.3.34
+langchain>=0.3.25
+langchain-openai>=1.1.16
+langchain-community>=0.3.21
+pydantic>=2.10.0
+langsmith>=0.7.33
+langchain-text-splitters>=1.1.2
 
 # ==========================================
 # 2. RAG & KNOWLEDGE BASE (Tri thức AI)
 # ==========================================
-sentence-transformers==4.1.0
-faiss-cpu==1.11.0
+sentence-transformers>=3.3.0
+faiss-cpu>=1.9.0
+pyarrow>=17.0.0
 
 # ==========================================
 # 3. DATA PROCESSING (Xử lý Log/Dữ liệu)
 # ==========================================
-pandas==2.2.3
-numpy==2.2.5
+pandas>=2.2.3
+numpy>=1.26.4
 
 # ==========================================
 # 4. USER INTERFACE (Giao diện HITL)
 # ==========================================
-streamlit==1.44.1
-streamlit-authenticator==0.4.2
-streamlit-autorefresh==1.0.1
+streamlit>=1.54.0
+streamlit-authenticator>=0.4.2
+streamlit-autorefresh>=1.0.1
 
 # ==========================================
 # 5. MLOPS & TRACKING (Vận hành & Theo dõi)
 # ==========================================
-mlflow==3.11.1
-mlflow-skinny==3.11.1
-mlflow-tracing==3.11.1
-python-dotenv==1.2.2
-PyYAML==6.0.2
+mlflow>=3.11.1
+python-dotenv>=1.0.1
+PyYAML>=6.0.2
 
 # ==========================================
 # 6. TESTING & GUARDRAILS (Kiểm thử)
 # ==========================================
-pytest==8.3.5
-redis==6.2.0
+pytest>=8.3.5
+redis>=5.2.1
+# drain3 0.9.11 works with modern cachetools despite metadata constraints.
 drain3==0.9.11
