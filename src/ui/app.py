@@ -13,9 +13,10 @@ import time
 from streamlit_autorefresh import st_autorefresh
 
 from src.ui.auth import require_auth, logout
-from src.ui.components import render_alert_card, render_metrics_header
+from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables
 from src.response.executor import get_audit_trail
 from src.tier1_filter.feedback_listener import FeedbackListener
+from src.agent.threat_memory import threat_memory
 
 # Cấu hình trang
 st.set_page_config(
@@ -70,7 +71,7 @@ def main_dashboard():
 
     render_metrics_header(len(alerts), len(pending_rules), len(active_rules))
 
-    tab1, tab2 = st.tabs([" SIEM & Audit Trail", " HITL Rule Approval"])
+    tab1, tab2, tab3 = st.tabs([" SIEM & Audit Trail", " HITL Rule Approval", "🧠 Threat Intelligence"])
 
     with tab1:
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")

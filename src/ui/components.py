@@ -117,3 +117,27 @@ def render_metrics_header(total_alerts, pending_rules, active_rules):
     with col3:
         st.metric(label="Luật Đang Hoạt Động (Active)", value=active_rules)
     st.markdown("---")
+
+def render_threat_intel_tables(high_risk_ips, known_entities):
+    """Hiển thị bảng Threat Intelligence."""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🔴 High Risk IPs (APT Tracker)")
+        if not high_risk_ips:
+            st.info("Chưa ghi nhận IP nguy hiểm nào.")
+        else:
+            df_high_risk = pd.DataFrame(high_risk_ips, columns=["IP", "Reputation Score"])
+            # Define styling function
+            def color_score(val):
+                color = 'red' if val >= 70 else 'orange' if val >= 40 else 'green'
+                return f'color: {color}; font-weight: bold'
+            st.dataframe(df_high_risk.style.map(color_score, subset=['Reputation Score']), use_container_width=True)
+
+    with col2:
+        st.subheader("🟢 Known Entities (Whitelist / Internal)")
+        if not known_entities:
+            st.info("Chưa có cấu hình tổ chức nào.")
+        else:
+            df_entities = pd.DataFrame(known_entities, columns=["Entity/IP", "Role"])
+            st.dataframe(df_entities, use_container_width=True)
