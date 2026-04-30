@@ -4,18 +4,19 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
-    open-pull-requests-limit: 1
+    # Tắt auto PR — quản lý dependencies thủ công để tránh conflict
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "security"
-    # Chỉ update khi có lỗ hổng bảo mật (CVE), không update version bình thường
     versioning-strategy: "increase-if-necessary"
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "monthly"
-    open-pull-requests-limit: 1
+    # Tắt auto PR — Python version quản lý thủ công
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "docker"
