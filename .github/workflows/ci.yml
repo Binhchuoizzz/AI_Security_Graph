@@ -45,9 +45,14 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        # drain3 installed separately: its metadata pins cachetools==4.2.1
+        # but works fine with cachetools>=5.5 (required by streamlit)
+        pip install drain3==0.9.11 --no-deps
+        pip install jsonpickle>=1.5.1
         
     - name: Run unit and integration tests
       env:
         REDIS_URL: redis://localhost:6379/0
       run: |
         pytest
+

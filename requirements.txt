@@ -41,5 +41,7 @@ PyYAML>=6.0.2
 # ==========================================
 pytest>=8.3.5
 redis>=5.2.1
-# drain3 0.9.11 works with modern cachetools despite metadata constraints.
-drain3==0.9.11
+# NOTE: drain3==0.9.11 is NOT listed here because it pins cachetools==4.2.1
+# which conflicts with streamlit (needs cachetools>=5.5).
+# Install separately: pip install drain3==0.9.11 --no-deps && pip install jsonpickle>=1.5.1
+# drain3 works fine with modern cachetools despite its metadata constraint.
