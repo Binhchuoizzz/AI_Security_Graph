@@ -1,4 +1,4 @@
-# SENTINEL Framework
+# SENTINEL: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI
 
 [![CI/CD Pipeline](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/ci.yml/badge.svg)](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -7,7 +7,7 @@
 
 > **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence, **N**eutralization, **E**scalation and **L**og-correlation
 
-Autonomous AI Security Agent (IDS/SOAR) utilizing LangGraph, Dual-RAG, and Adversarial Guardrails for real-time multi-source log correlation. Built as a Master's Thesis in AI Security Engineering.
+An advanced Autonomous Security Operations Framework integrating Session-Aware Behavioral Baselining (Tier 1) with an Agentic AI driven by Retrieval-Augmented Generation (RAG) and Long-Term Threat Memory (Tier 2). Built as a Master's Thesis to solve the SOC Alert Fatigue paradox.
 
 ## Architecture Overview
 

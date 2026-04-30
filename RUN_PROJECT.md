@@ -1,4 +1,5 @@
-# Hướng Dẫn Vận Hành Hệ Thống SENTINEL v4 (Cập nhật 22/04/2026)
+# Hướng Dẫn Vận Hành SENTINEL
+## (A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI)
 
 Tài liệu này không chỉ hướng dẫn chạy code, mà còn **giải thích rõ ràng mạch tư duy bảo vệ luận văn**, trả lời trực tiếp những câu hỏi phản biện hóc búa nhất của Hội đồng.
 

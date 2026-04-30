@@ -1,6 +1,6 @@
 # CAPSTONE PROJECT PROPOSAL
 
-**Project Title:** SENTINEL — Autonomous AI Security Agent for Multi-source Log Correlation and Intrusion Response using LangGraph, Dual-RAG, and Adversarial Guardrails.
+**Project Title:** SENTINEL — A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI
 
 *(SENTINEL: Hệ thống phát hiện và phản ứng an ninh tự động dựa trên AI Agent đa nguồn kết hợp LangGraph, Dual-RAG và cơ chế phòng thủ Guardrails).*
 
