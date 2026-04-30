@@ -14,7 +14,7 @@ langchain-text-splitters>=1.1.2
 # ==========================================
 sentence-transformers>=3.3.0
 faiss-cpu>=1.9.0
-pyarrow>=17.0.0
+pyarrow>=18.0.0,<24.0.0
 
 # ==========================================
 # 3. DATA PROCESSING (Xử lý Log/Dữ liệu)
