@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4
     container_name: sentinel_redis
     ports:
       - "127.0.0.1:6379:6379"  # Security: Bind to localhost only
@@ -71,8 +71,6 @@ services:
         limits:
           memory: 512M
           cpus: '0.5'
-    security_opt:
-      - no-new-privileges:true
     restart: unless-stopped
 
 networks:
