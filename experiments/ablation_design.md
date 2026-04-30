@@ -1,4 +1,4 @@
-# Ablation Study — 6 Configuration Design & Statistical Framework
+# Ablation Study Design for the Two-Tier Architecture
 
 > **Status:** IMPLEMENTED (v3 — 22/04/2026)
 > **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và ISO-only RAG) và bổ sung Statistical Validity Framework.
@@ -15,7 +15,7 @@
 | **C** | ✅ | ✅ Drain3 | ❌ No Encapsulation | ✅ | Dual | Chứng minh Encapsulation chặn injection. |
 | **D** | ✅ | ✅ | ✅ | ✅ | **MITRE only** | **Isolate ISO 27001 RAG contribution.** |
 | **E** | ✅ | ✅ | ✅ | ✅ | **ISO only** | **Isolate MITRE ATT&CK RAG contribution.** |
-| **F** | ✅ | ✅ | ✅ | ✅ | Dual | **SENTINEL Full** — Complete system. |
+| **F** | ✅ | ✅ | ✅ | ✅ | Dual | **Full Architecture** — Complete system. |
 
 ---
 

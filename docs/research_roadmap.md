@@ -1,4 +1,4 @@
-# Bản Đồ Nghiên Cứu SENTINEL — Research Roadmap
+# Research Roadmap: Cognitive Two-Tier Architecture
 ## Hướng dẫn đọc Paper chuẩn xác theo 6 Trụ Cột Nghiên Cứu
 
 > [!IMPORTANT]

@@ -1,4 +1,4 @@
-# Adversarial Test Dataset — Encoding Bypass
+# Adversarial Test Dataset: Encoding Bypass in Two-Tier Architecture
 
 > **Status:** SKELETON
 > **Priority:** #2 — Adversarial Datasets

@@ -31,12 +31,12 @@ API_KEY = os.getenv(
 # Tuning parameters cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận deterministic, ít hallucination
-DEFAULT_MODEL = "gemma-2-9b-it"
+DEFAULT_MODEL = "gemma-2-9b-it-Q6_K.gguf"
 
 
 class LLMClient:
     def __init__(
-        self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 60
+        self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 300
     ):
         """
         Khởi tạo OpenAI Client trỏ về Local Oobabooga.

@@ -1,4 +1,4 @@
-# Adversarial Test Dataset — Structural Attacks
+# Adversarial Test Dataset: Structural Attacks in Two-Tier Architecture
 
 > **Status:** SKELETON
 > **Priority:** #2 — Adversarial Datasets

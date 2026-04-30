@@ -1,7 +1,7 @@
-# SENTINEL Threat Model
+# Threat Model for the Cognitive Two-Tier Architecture
 
 > **Status:** HOÀN THIỆN v2 — Cập nhật phòng thủ 8 Attack Vectors + Long-Term APT Memory (30/04/2026)
-> **Mục đích:** Trả lời câu hỏi "SENTINEL bảo vệ được gì, không bảo vệ được gì?"
+> **Mục đích:** Trả lời câu hỏi "Kiến trúc Hai tầng bảo vệ được gì, không bảo vệ được gì?"
 
 ---
 

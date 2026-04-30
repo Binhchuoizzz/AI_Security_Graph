@@ -1,7 +1,7 @@
 # Adversarial Rule Injection Scenarios (Feedback Loop Security)
 
 > **Status:** SKELETON
-> **Purpose:** Test cases cho RQ4 ("Does securing the Feedback Loop with a HITL Quarantine prevent Adversarial Rule Injection?")
+> **Purpose:** Test cases cho RQ4 ("Does securing the Feedback Loop with a HITL Quarantine prevent Adversarial Rule Injection in the Two-Tier Architecture?")
 
 ## Mục tiêu Evaluation
 Đo lường tính năng cô lập mã độc (Quarantine) của vòng lặp phản hồi thay vì tự động thực thi.
