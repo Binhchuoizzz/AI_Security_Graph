@@ -13,9 +13,11 @@ from typing import Dict, Any
 from src.agent.state import SentinelState
 from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
+from src.agent.threat_memory import threat_memory
 from src.rag.retriever import DualRetriever
 from src.guardrails.template_miner import LogTemplateMiner
 from src.guardrails.prompt_filter import GuardrailsPipeline, DelimitedDataEncapsulator
+from src.guardrails.output_sanitizer import output_sanitizer
 from src.response.executor import block_ip, quarantine_host, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
 
@@ -90,8 +92,31 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     """
     LLM Triage Node: Phân tích toàn bộ cụm log (Incident-Level) và đưa ra 1 quyết định duy nhất.
     Tích hợp MLflow để theo dõi Reasoning Latency và Performance Metrics (RQ1, RQ4).
+    Tích hợp Long-Term Threat Memory để inject IP reputation context.
     """
     logger.info("--- NODE: LLM TRIAGE ---")
+
+    # 0. Query Long-Term Threat Memory cho source IPs trong batch
+    threat_context_parts = []
+    seen_ips = set()
+    for log in state.current_batch_logs:
+        src_ip = log.get("Source IP") or log.get("src_ip", "")
+        if src_ip and src_ip not in seen_ips:
+            seen_ips.add(src_ip)
+            # Check if this IP is a known internal entity (legitimate traffic)
+            entity = threat_memory.is_known_entity(src_ip)
+            if entity:
+                threat_context_parts.append(
+                    f"⚠️ IP {src_ip} is a KNOWN INTERNAL ENTITY "
+                    f"({entity['entity_type']}: {entity['description']}). "
+                    f"Consider as LEGITIMATE traffic unless proven otherwise."
+                )
+            # Get IP reputation from long-term memory
+            ip_context = threat_memory.get_context_for_prompt(src_ip)
+            if ip_context:
+                threat_context_parts.append(ip_context)
+    
+    threat_memory_context = "\n".join(threat_context_parts)
 
     # 1. Đóng gói Raw Logs (kết hợp với Guardrails Encapsulation)
     raw_logs_str = state.current_batch_encapsulated
@@ -177,10 +202,37 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
 
     new_narrative = f"Last Incident: {action} based on RAG - {decision_json.get('mitre_technique', 'None')}. Reasoning: {reasoning}"
 
+    # 6. Sanitize LLM output trước khi lưu (chống Data Exfil via Markdown)
+    new_narrative = output_sanitizer.sanitize(new_narrative)
+    reasoning = output_sanitizer.sanitize(reasoning)
+
+    # 7. Record incident vào Long-Term Threat Memory
+    if target != "UNKNOWN_TARGET" and action in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
+        threat_memory.record_incident(
+            ip=target,
+            action=action,
+            mitre_technique=decision_json.get("mitre_technique", "")
+        )
+        # Check APT pattern
+        apt_check = threat_memory.check_apt_pattern(target)
+        if apt_check and apt_check["is_apt_candidate"]:
+            logger.warning(
+                f"[APT DETECTION] IP {target} flagged as APT candidate: "
+                f"{apt_check['total_incidents']} incidents over {apt_check['days_active']} days"
+            )
+            threat_memory.record_apt_indicator(
+                indicator_type="persistent_ip",
+                indicator_value=target,
+                confidence=confidence,
+                related_ips=target,
+                mitre_chain=decision_json.get("mitre_technique", "")
+            )
+
     return {
         "decisions": [decision_entry],
         "extracted_iocs": new_iocs,
         "narrative_summary": new_narrative,
+        "threat_memory_context": threat_memory_context,
         "cycle_count": state.cycle_count + 1,
     }
 
@@ -194,11 +246,12 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
     latest_decision = state.decisions[-1] if state.decisions else {}
     action = latest_decision.get("action", "UNKNOWN")
     
-    # Format reasoning to include MITRE and Confidence so DB can save it and UI can regex it
+    # Format reasoning — sanitize output trước khi ghi DB (Data Exfil defense)
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
-    formatted_reasoning = f"[MITRE: {mitre}] [Confidence: {conf:.2f}] {raw_reasoning}"
+    safe_reasoning = output_sanitizer.sanitize(raw_reasoning)
+    formatted_reasoning = f"[MITRE: {mitre}] [Confidence: {conf:.2f}] {safe_reasoning}"
 
     if action == "BLOCK_IP":
         block_ip(

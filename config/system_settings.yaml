@@ -32,7 +32,40 @@ guardrails:
   - forget everything
   - act as
   - new instructions
+  - override your instructions
+  - bypass safety
+  - pretend you are
+  - roleplay as
+  - respond without restrictions
+  jailbreak_patterns:
+  - "DAN mode"
+  - "Do Anything Now"
+  - "Developer Mode"
+  - "jailbroken"
+  - "ignore all previous"
+  - "you have no restrictions"
+  - "act without limitations"
+  - "bypass your guidelines"
+  - "entering unrestricted mode"
+  - "from now on you will"
+  - "simulate a persona"
+  - "hypothetically speaking"
+  - "for educational purposes only"
+  - "pretend there are no rules"
+  - "you are no longer bound"
   token_budget: 4000
+  output_sanitizer:
+    enabled: true
+    strip_markdown_images: true
+    strip_html_tags: true
+    strip_data_uris: true
+threat_memory:
+  db_path: config/threat_memory.db
+  apt_threshold_incidents: 5
+  apt_threshold_days: 7
+  reputation_decay_rate: 0.95
+  reputation_decay_inactive_days: 7
+  max_context_tokens: 300
 llm:
   base_url: http://host.docker.internal:5000/v1
   estimated_vram_gb: 7

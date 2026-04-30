@@ -87,6 +87,71 @@ class PromptInjectionDetector:
 
 
 # =========================================================================
+# 1b. JAILBREAK DETECTOR (Attack Vector #01)
+# =========================================================================
+class JailbreakDetector:
+    """
+    Phát hiện các kỹ thuật Jailbreak hiện đại nhắm vào LLM:
+    - DAN (Do Anything Now) mode
+    - Developer Mode / Debug Mode
+    - Role-Play manipulation ("pretend you are", "act as")
+    - Instruction Override ("from now on", "ignore all previous")
+    
+    Tách biệt với PromptInjectionDetector vì Jailbreak là tấn công vào
+    BẢN THÂN LLM (thay đổi persona), còn Injection là tấn công vào
+    DATA FLOW (chèn lệnh vào data).
+    """
+
+    def __init__(self, patterns: list = None):
+        config = load_config()
+        self.patterns = patterns or config["guardrails"].get("jailbreak_patterns", [])
+        self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]
+        
+        # Regex patterns cho role-play detection
+        self.role_play_re = re.compile(
+            r'(?:you\s+are\s+now|act\s+as\s+(?:if|a)|pretend\s+(?:to\s+be|you)|'
+            r'roleplay|simulate\s+(?:a|being)|imagine\s+you\s+are|'
+            r'from\s+now\s+on\s+you\s+(?:will|are|must))',
+            re.IGNORECASE
+        )
+
+    def scan(self, log_entry: dict) -> dict:
+        """
+        Quét log cho jailbreak patterns.
+        Trả về log gốc + jailbreak metadata.
+        """
+        jailbreak_detected = False
+        jailbreak_patterns = []
+
+        for key, value in log_entry.items():
+            if key.startswith("_"):
+                continue
+            str_value = str(value)
+            
+            # Pattern-based detection
+            for i, pattern in enumerate(self.compiled):
+                if pattern.search(str_value):
+                    jailbreak_detected = True
+                    jailbreak_patterns.append(self.patterns[i])
+
+            # Role-play regex detection
+            if self.role_play_re.search(str_value):
+                jailbreak_detected = True
+                jailbreak_patterns.append("ROLE_PLAY_ATTEMPT")
+
+        result = dict(log_entry)
+        result["_jailbreak_detected"] = jailbreak_detected
+        result["_jailbreak_patterns"] = jailbreak_patterns
+        
+        # Escalate isolation if jailbreak detected
+        if jailbreak_detected:
+            result["_isolation_level"] = "CRITICAL"
+        
+        return result
+
+
+
+# =========================================================================
 # 2. ENCODING NEUTRALIZER
 # =========================================================================
 class EncodingNeutralizer:
@@ -310,6 +375,7 @@ class GuardrailsPipeline:
 
     def __init__(self):
         self.detector = PromptInjectionDetector()
+        self.jailbreak_detector = JailbreakDetector()
         self.neutralizer = EncodingNeutralizer()
         self.encapsulator = DelimitedDataEncapsulator()
 
@@ -324,6 +390,9 @@ class GuardrailsPipeline:
         # Step 1: Detect injection patterns
         flagged = self.detector.scan(log_entry)
 
+        # Step 1b: Detect jailbreak patterns (Attack Vector #01)
+        flagged = self.jailbreak_detector.scan(flagged)
+
         # Step 2: Neutralize encoding tricks
         neutralized = self.neutralizer.neutralize(flagged)
 
@@ -336,6 +405,8 @@ class GuardrailsPipeline:
             "injection_detected": flagged.get("_injection_detected", False),
             "injection_patterns": flagged.get("_injection_patterns", []),
             "injection_fields": flagged.get("_injection_fields", []),
+            "jailbreak_detected": flagged.get("_jailbreak_detected", False),
+            "jailbreak_patterns": flagged.get("_jailbreak_patterns", []),
             "isolation_level": flagged.get("_isolation_level", "NORMAL"),
             "system_instruction": self.encapsulator.get_system_instruction(),
         }

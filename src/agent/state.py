@@ -145,6 +145,15 @@ class SentinelState:
     Sau khi feedback_listener xử lý, list này được clear.
     """
 
+    # === LONG-TERM THREAT MEMORY (persistent context) ===
+    threat_memory_context: str = ""
+    """
+    Context từ Long-Term Memory Store (SQLite persistent).
+    Chứa IP reputation, organizational context, APT indicators.
+    Inject vào prompt để Agent biết lịch sử IP trước khi phân tích.
+    """
+
+
     # === HELPER METHODS ===
 
     def add_ioc(
@@ -221,7 +230,7 @@ class SentinelState:
     def get_memory_for_prompt(self) -> str:
         """
         Tổng hợp memory cho LLM prompt.
-        Kết hợp narrative (tóm tắt) + IOCs (cứng) + recent decisions.
+        Kết hợp narrative (tóm tắt) + IOCs (cứng) + recent decisions + threat memory.
         """
         parts = []
 
@@ -244,15 +253,21 @@ class SentinelState:
                 )
             parts.append("\n".join(decision_lines))
 
+        # Phần 4: Long-Term Threat Memory (persistent context)
+        if self.threat_memory_context:
+            parts.append(f"=== Long-Term Threat Intelligence ===\n{self.threat_memory_context}")
+
         return "\n\n".join(parts)
 
     def reset_current_batch(self):
-        """Reset batch data cho cycle mới. KHÔNG reset IOCs hay narrative."""
+        """Reset batch data cho cycle mới. KHÔNG reset IOCs, narrative, hay threat memory."""
         self.current_batch_logs = []
         self.current_batch_encapsulated = ""
         self.current_batch_size = 0
         self.rag_mitre_context = ""
         self.rag_iso_context = ""
         self.pending_rules = []
+        self.threat_memory_context = ""
         self.cycle_count += 1
         self.last_updated = datetime.utcnow().isoformat()
+
