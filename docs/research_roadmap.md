@@ -42,7 +42,6 @@ graph TD
     P5 --> E2["RAGAS Framework"]
     
     P6 --> F1["CICIDS2017\n(Sharafaldin et al., 2018)"]
-    P6 --> F2["UNSW-NB15\n(Moustafa & Slay, 2015)"]
 ```
 
 ---
@@ -152,7 +151,7 @@ graph TD
 ---
 
 ## Pillar 5️⃣: LLM Evaluation Methodology
-> **Map vào SENTINEL:** Evaluation Plan (4D Framework), RAGAS, Statistical Evaluation (McNemar)
+> **Map vào SENTINEL:** Evaluation Plan (5D Evaluation Framework), RAGAS, Statistical Evaluation (McNemar, Mann-Whitney U)
 
 ### 🔴 Must-Read
 
@@ -177,15 +176,13 @@ graph TD
 ---
 
 ## Pillar 6️⃣: IDS Datasets & Benchmarking
-> **Map vào SENTINEL:** Datasets (CICIDS2017, UNSW-NB15, MAWILab), Ablation Study
+> **Map vào SENTINEL:** Dataset (CICIDS2017), Ablation Study
 
 ### 🔴 Must-Read
 
 | # | Paper | Năm | Tại sao quan trọng |
 |---|---|---|---|
 | 1 | **"Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization"** — Sharafaldin et al. | ICISSP 2018 | Paper gốc CICIDS2017. Bắt buộc cite. Đọc kỹ để nắm profiling agent methodology. |
-| 2 | **"UNSW-NB15: A Comprehensive Data Set for Network Intrusion Detection"** — Moustafa & Slay | MilCIS 2015 | Paper gốc UNSW-NB15. 49 features, 9 attack families. |
-| 3 | **"MAWILab: Combining Diverse Anomaly Detectors for Automated Anomaly Labeling and Analysis"** — Fontugne et al. | CoNEXT 2010 | Paper gốc MAWILab. Đọc để hiểu format chuyển đổi pcap → tabular cho pipeline. |
 
 ### 🟡 Supporting Papers
 
@@ -196,8 +193,6 @@ graph TD
 
 ### 🔬 Nhóm nghiên cứu nên theo dõi
 - **Canadian Institute for Cybersecurity (CIC), UNB** — Tác giả CICIDS2017/2018
-- **UNSW Canberra (Australian Defence Force Academy)** — UNSW-NB15
-- **WIDE Project / MAWILab** — Traffic measurement infrastructure
 
 ---
 
@@ -216,13 +211,12 @@ graph TD
 7. Greshake et al., Indirect Prompt Injection (2023) **(attack model)**
 8. RAGAS Documentation **(evaluation tool)**
 
-### Tuần 3-4: Applied Research (6 papers chuyên sâu)
+### Tuần 3-4: Applied Research (5 papers chuyên sâu)
 9. AgCyRAG — Agentic Cyber RAG **(benchmark cho Dual-RAG)**
 10. RAG-ATT&CK — Automated Mapping **(so sánh trực tiếp)**
 11. LILAC — LLM + Adaptive Cache **(justify Semantic Cache)**
 12. Oniagbi et al. (2024) **(GenAI in Cybersecurity)**
 13. Instruction Hierarchy — Wallace et al. **(prompt security)**
-14. Moustafa & Slay, UNSW-NB15 (2015) **(dataset 2)**
 
 ### Tuần 5-8: Bổ sung khi viết luận văn
 15-20. Các supporting papers còn lại, chọn theo chương đang viết.

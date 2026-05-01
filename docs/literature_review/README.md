@@ -28,16 +28,14 @@ phục vụ cho Chương 2 (Literature Review) của luận văn.
 
 ### E. IDS Datasets & Evaluation
 14. Sharafaldin et al. (2018) — CICIDS2017 dataset.
-15. Moustafa & Slay (2015) — UNSW-NB15 dataset.
-16. Fontugne et al. (2010) — MAWILab: Traffic anomaly detection dataset.
 
 ### F. Agentic AI Frameworks
-17. LangGraph Documentation — State management cho LLM workflows.
-18. CACAO Playbook Standard — Machine-readable IR playbook format.
+15. LangGraph Documentation — State management cho LLM workflows.
+16. CACAO Playbook Standard — Machine-readable IR playbook format.
 
 ### G. Evaluation Methodology
-19. RAGAS Framework — Automated RAG evaluation (Context Relevance, Faithfulness).
-20. TruLens — LLM evaluation and observability.
+17. RAGAS Framework — Automated RAG evaluation (Context Relevance, Faithfulness).
+18. TruLens — LLM evaluation and observability.
 
 ---
 

@@ -96,7 +96,7 @@ sentinel/
 │   ├── ablation/                     # 6 YAML configs (A-F) for ablation study
 │   └── system_settings.yaml          # Central config (LLM, Tier1, Guardrails, RAG, Redis)
 ├── docs/
-│   ├── capstone_proposal.md          # Full thesis proposal
+│   ├── proposal_latex/               # Full thesis proposals in LaTeX (EN & VI)
 │   ├── architecture.md               # System architecture diagram
 │   ├── threat_model.md               # Adversary profiles & Defense limit matrix
 │   ├── research_roadmap.md           # 6-Pillar literature map with reading order

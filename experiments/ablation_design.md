@@ -51,11 +51,14 @@
 - C << F for structural : No Encapsulation = high defeat rate
 - F ≈ C for Semantic Confusion : Encapsulation doesn't help with semantic attacks
 
-### Context Quality & Statistical Validity
+### Context Quality, Explainability & Statistical Validity
 - F > D > E for Context Relevance : Dual contexts richer than single
 - D > E for MITRE Mapping Accuracy : MITRE RAG directly provides technique data
 - E > D for Recommendation Quality : ISO controls provide specific response actions
-- **Statistical Evaluation (McNemar + Mann-Whitney U)** thay vì LLM-as-a-Judge → đảm bảo tính khách quan tuyệt đối, loại bỏ Self-Evaluation Bias
+- **5D Framework Integration**: 
+  - Classification & Operational metrics use **Statistical Evaluation (McNemar + Mann-Whitney U)** để đảm bảo tính khách quan.
+  - Context Quality dùng **Cross-Family LLM-as-a-Judge (Llama 3 đánh giá Gemma)** lấy cảm hứng từ RAGAS để chống Self-Enhancement Bias.
+  - Explainability dùng deterministic logic (Audit Completeness).
 
 ### Critical Decision Point
 - **IF D ≈ F** → ISO RAG provides minimal value → Simplify system, drop Dual-RAG claim
