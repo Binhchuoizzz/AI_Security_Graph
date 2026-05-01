@@ -29,7 +29,7 @@ def hash_password(password: str) -> str:
         ITERATIONS
     ).hex()
 
-DEFAULT_ANALYST_HASH = hash_password("sentinel_analyst_2026")
+DEFAULT_ANALYST_HASH = hash_password("Hanoi123789@")
 DEFAULT_MANAGER_HASH = hash_password("Hanoi123789@")
 
 USERS = {
