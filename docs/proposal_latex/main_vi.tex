@@ -74,8 +74,8 @@
 
 \begin{tabular}{rl}
 \textbf{Học viên:} & Nguyễn Đức Bình \\
-\textbf{MSSV:} & [Mã số sinh viên] \\[0.5cm]
-\textbf{Giảng viên hướng dẫn:} & [Tên GVHD] \\
+\textbf{MSSV:} & MSE13183 \\[0.5cm]
+\textbf{Giảng viên hướng dẫn:} & Bùi Văn Hiệu \\
 \end{tabular}
 
 \vfill
@@ -136,11 +136,11 @@ Trong giai đoạn đầu của lĩnh vực an ninh mạng, các Hệ thống Ph
 Sự chuyển dịch sang Học máy (Machine Learning) đã mở ra kỷ nguyên của IDS dựa trên sự bất thường (anomaly-based), nơi các mô hình học cách phân biệt hành vi mạng bình thường và đánh dấu những sai lệch. Tuy vậy, do bản chất của lưu lượng mạng lành tính thường xuyên thay đổi, các phương pháp này thường tạo ra tỷ lệ dương tính giả rất cao. Các hệ thống SIEM hiện đại ra đời để gom nhóm và tương quan log, song chúng vẫn đòi hỏi sức lực khổng lồ từ con người để chắp vá ngữ cảnh của một cuộc tấn công.
 
 \subsection{Các Công trình Liên quan}
-Sự bùng nổ của các Mô hình Ngôn ngữ Lớn (LLM) gần đây đã chỉ ra hướng đi mới trong việc tự động tóm tắt log và phản ứng sự cố. Thay vì dịch nguyên văn các nghiên cứu trước, có thể tổng hợp rằng: nhiều nhóm nghiên cứu \cite{oniagbi2024} đã tận dụng các API đám mây mạnh mẽ để tự động hóa một phần công việc của SOC. Tuy nhiên, rào cản lớn nhất của hướng đi này là sự vi phạm nguyên tắc bảo mật dữ liệu lõi của doanh nghiệp, cộng với độ trễ truyền tải mạng khiến việc ứng phó theo thời gian thực trở nên bất khả thi.
+Sự bùng nổ của các Mô hình Ngôn ngữ Lớn (LLM) gần đây đã chỉ ra hướng đi mới trong việc tự động tóm tắt log và phản ứng sự cố. Thay vì dịch nguyên văn các nghiên cứu trước, có thể tổng hợp rằng: nhiều bài khảo sát toàn diện \cite{habibzadeh2025} và các nghiên cứu điển hình \cite{oniagbi2024} đã tận dụng các API đám mây mạnh mẽ để tự động hóa một phần công việc của SOC. Tuy nhiên, rào cản lớn nhất của hướng đi này là sự vi phạm nguyên tắc bảo mật dữ liệu lõi của doanh nghiệp, cộng với độ trễ truyền tải mạng khiến việc ứng phó theo thời gian thực trở nên bất khả thi.
 
 Liên quan đến việc tăng cường tri thức bằng RAG (Retrieval-Augmented Generation) cho an ninh mạng, các nỗ lực tự động hóa ánh xạ chiến thuật tấn công vào biểu đồ tri thức đã mang lại kết quả khả quan \cite{ragattack2024}. Dù vậy, các nghiên cứu này phần lớn chỉ tập trung vào phân tích chiến thuật (tactical analysis) thuần túy mà bỏ qua việc liên kết với các tiêu chuẩn tuân thủ phòng thủ (như ISO 27001), dẫn đến việc hệ thống có thể phát hiện lỗi nhưng không đưa ra được hướng khắc phục thực tiễn.
 
-Về vấn đề an toàn và tính kháng lỗi của bản thân LLM, các đánh giá chuyên sâu \cite{zhang2024asb} đã cảnh báo mức độ dễ tổn thương đáng báo động của các LLM Agent trước rủi ro prompt injection. Dù các thuật toán như Drain3 \cite{he2017} rất phổ biến trong việc gom nhóm và nén log, chúng chủ yếu phục vụ mục đích lưu trữ chứ không mang thiết kế của một rào chắn an ninh chủ động. Bức tranh học thuật hiện tại cho thấy sự thiếu vắng của một kiến trúc thống nhất, có khả năng tự phòng vệ, từ đó khẳng định tính cấp thiết và định hướng nghiên cứu của luận văn này.
+Về vấn đề an toàn và tính kháng lỗi của bản thân LLM, danh sách OWASP Top 10 dành cho ứng dụng LLM \cite{owasp2025} cùng các đánh giá chuyên sâu từ Agent Security Bench (ASB) \cite{zhang2024asb} đã cảnh báo mức độ dễ tổn thương đáng báo động của các LLM Agent trước rủi ro prompt injection. Dù các thuật toán như Drain3 \cite{he2017} rất phổ biến trong việc gom nhóm và nén log, chúng chủ yếu phục vụ mục đích lưu trữ chứ không mang thiết kế của một rào chắn an ninh chủ động. Hơn nữa, các phương pháp luận đánh giá LLM gần đây nhấn mạnh sự cần thiết phải giải quyết Thiên kiến Tự đề cao (Self-Enhancement Bias) bằng cách sử dụng các mô hình đánh giá chéo họ (cross-family evaluation) hoặc các phép kiểm định thống kê thay vì chỉ dựa vào mô hình LLM-as-a-Judge đơn lẻ \cite{zheng2023, ragas2023}. Bức tranh học thuật hiện tại cho thấy sự thiếu vắng của một kiến trúc thống nhất, có khả năng tự phòng vệ với quy trình đánh giá nghiêm ngặt, từ đó khẳng định tính cấp thiết và định hướng nghiên cứu của luận văn này.
 
 % =============================================================================
 % CHƯƠNG 3: GIẢI PHÁP ĐỀ XUẤT VÀ PHƯƠNG PHÁP NGHIÊN CỨU
@@ -238,6 +238,9 @@ Ponemon Institute, ``The State of Security Operations: Alert Fatigue and Analyst
 \bibitem{greshake2023}
 K. Greshake, S. Abdelnabi, S. Mishra, A. Endres, T. Holz, and M. Fritz, ``More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models,'' \emph{arXiv preprint arXiv:2302.12173}, 2023.
 
+\bibitem{habibzadeh2025}
+M. Habibzadeh, et al., ``Large Language Models for Security Operations Centers: A Comprehensive Survey,'' \emph{arXiv preprint}, 2025.
+
 \bibitem{khraisat2019}
 A. Khraisat, I. Gondal, P. Vamplew, and J. Kamruzzaman, ``Survey of intrusion detection systems: techniques, datasets and challenges,'' \emph{Cybersecurity}, vol. 2, no. 1, p. 20, 2019.
 
@@ -252,6 +255,12 @@ Y. Zhang, et al., ``Agent Security Bench (ASB): Evaluating the Robustness of LLM
 
 \bibitem{he2017}
 P. He, J. Zhu, Z. Zheng, and M. R. Lyu, ``Drain: An Online Log Parsing Approach with Fixed Depth Tree,'' in \emph{2017 IEEE International Conference on Web Services (ICWS)}, 2017.
+
+\bibitem{owasp2025}
+OWASP Foundation, ``OWASP Top 10 for Large Language Model Applications,'' \emph{OWASP}, 2025.
+
+\bibitem{ragas2023}
+S. Shahul Es, et al., ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \emph{arXiv preprint arXiv:2309.15217}, 2023.
 
 \bibitem{zheng2023}
 L. Zheng, W.-L. Chiang, et al., ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \emph{Proceedings of the 37th International Conference on Neural Information Processing Systems (NeurIPS)}, 2023.
