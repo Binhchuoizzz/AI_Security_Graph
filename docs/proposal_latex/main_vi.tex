@@ -89,9 +89,9 @@
 \section*{Tóm tắt}
 Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đang phải đối mặt với một ``Nghịch lý Dữ liệu lớn'' nghiêm trọng: khối lượng khổng lồ các sự kiện mạng phát sinh mỗi giây dẫn đến tình trạng quá tải cảnh báo, với phần lớn trong số đó là dương tính giả. Các hệ thống Phát hiện Xâm nhập (IDS) và Quản lý Sự kiện An ninh (SIEM) truyền thống thường phân tích luồng dữ liệu một cách đơn lẻ, qua đó làm suy giảm đáng kể khả năng nhận diện các chiến dịch tấn công có chủ đích tinh vi (APT). Gần đây, việc ứng dụng trực tiếp các Mô hình Ngôn ngữ Lớn (LLM) vào việc phân tích log đã được thử nghiệm; tuy nhiên, hướng đi này lại mở ra hai lỗ hổng rủi ro lớn: độ trễ suy luận quá cao không thể đáp ứng được tốc độ của luồng dữ liệu thời gian thực, và nguy cơ hệ thống LLM bị thao túng bởi các đòn tấn công Prompt Injection ẩn giấu ngay bên trong dữ liệu log độc hại.
 
-Để giải quyết triệt để những thách thức này, nghiên cứu đề xuất một kiến trúc nhận thức (cognitive architecture) kết hợp giữa một Động cơ Quy tắc (Rule Engine) xác định và một Mô hình Ngôn ngữ Lớn. Thông qua phương pháp tiếp cận hai tầng, hệ thống được kỳ vọng sẽ sàng lọc lượng lớn nhiễu ở tốc độ cao (Tầng 1), đồng thời bảo lưu năng lực suy luận sâu --- được vận hành bởi AI Tác tử dựa trên LangGraph cùng cơ chế Dual-RAG (tích hợp MITRE ATT\&CK và ISO 27001) --- để xử lý các mối đe dọa phức tạp và khó đoán (Tầng 2). Bên cạnh đó, một cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) cũng được giới thiệu nhằm vô hiệu hóa các nỗ lực chèn mã độc vào prompt mà không làm mất đi thông tin payload quan trọng cần thiết cho việc điều tra sự cố.
+Để giải quyết triệt để những thách thức này, nghiên cứu đề xuất một kiến trúc nhận thức (cognitive architecture) kết hợp giữa một Động cơ Quy tắc (Rule Engine) xác định và một Mô hình Ngôn ngữ Lớn. Thông qua phương pháp tiếp cận hai tầng, hệ thống được kỳ vọng sẽ sàng lọc lượng lớn nhiễu ở tốc độ cao (Tầng 1), đồng thời bảo lưu năng lực suy luận sâu --- được vận hành bởi AI Tác tử dựa trên LangGraph cùng cơ chế Dual-RAG (tích hợp MITRE ATT\&CK cho nhận diện mối đe dọa và NIST SP 800-61r2 cho hướng dẫn ứng phó sự cố) --- để xử lý các mối đe dọa phức tạp và khó đoán (Tầng 2). Bên cạnh đó, một cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) cũng được giới thiệu nhằm vô hiệu hóa các nỗ lực chèn mã độc vào prompt mà không làm mất đi thông tin payload quan trọng cần thiết cho việc điều tra sự cố.
 
-Hệ thống đề xuất sẽ được triển khai và đánh giá trên bộ dữ liệu an ninh mạng chuẩn CICIDS2017. Các tiêu chí đánh giá sẽ được cấu trúc theo Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework) toàn diện, bao quát Chỉ số Phân loại, Chỉ số Vận hành, Mức độ Kháng lỗi, Chất lượng Ngữ cảnh và Tính Giải thích.
+Hệ thống đề xuất sẽ được triển khai và đánh giá trên hai bộ dữ liệu chuẩn: CSE-CIC-IDS2018 cho phát hiện xâm nhập mạng doanh nghiệp và DAPT2020 cho theo dõi tấn công APT đa giai đoạn. Các tiêu chí đánh giá sẽ được cấu trúc theo Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework) toàn diện, bao quát Chỉ số Phân loại, Chỉ số Vận hành, Mức độ Kháng lỗi, Chất lượng Ngữ cảnh và Tính Giải thích.
 
 % --- MỤC LỤC ---
 \newpage
@@ -131,16 +131,37 @@ Luận văn được tổ chức thành sáu chương chính: (1) Giới thiệu
 \section{Tổng quan Nghiên cứu}
 
 \subsection{Các Phương pháp Nền tảng}
-Trong giai đoạn đầu của lĩnh vực an ninh mạng, các Hệ thống Phát hiện Xâm nhập (IDS) chủ yếu dựa vào cơ chế đối sánh chữ ký (signature-based) để xác định các mối đe dọa đã biết. Mặc dù các hệ thống này mang lại hiệu suất cực cao về mặt thông lượng, chúng lại vấp phải những giới hạn nghiêm trọng trong việc nhận diện các đòn tấn công zero-day hoặc mã độc đa hình (polymorphic malware) \cite{khraisat2019}.
+Trong giai đoạn đầu của lĩnh vực an ninh mạng, các Hệ thống Phát hiện Xâm nhập (IDS) chủ yếu dựa vào cơ chế đối sánh chữ ký (signature-based) (ví dụ: Snort, Suricata) để xác định các mối đe dọa đã biết. Mặc dù các hệ thống này mang lại hiệu suất cực cao về mặt thông lượng, chúng lại vấp phải những giới hạn nghiêm trọng trong việc nhận diện các đòn tấn công zero-day hoặc mã độc đa hình (polymorphic malware) \cite{khraisat2019}.
 
-Sự chuyển dịch sang Học máy (Machine Learning) đã mở ra kỷ nguyên của IDS dựa trên sự bất thường (anomaly-based), nơi các mô hình học cách phân biệt hành vi mạng bình thường và đánh dấu những sai lệch. Tuy vậy, do bản chất của lưu lượng mạng lành tính thường xuyên thay đổi, các phương pháp này thường tạo ra tỷ lệ dương tính giả rất cao. Các hệ thống SIEM hiện đại ra đời để gom nhóm và tương quan log, song chúng vẫn đòi hỏi sức lực khổng lồ từ con người để chắp vá ngữ cảnh của một cuộc tấn công.
+Sự chuyển dịch sang Học máy (Machine Learning) đã mở ra kỷ nguyên của IDS dựa trên sự bất thường (anomaly-based), nơi các mô hình như Random Forest, LSTM và các transformer chuyên biệt như LogBERT \cite{logbert2021} học cách xây dựng đường cơ sở hành vi bình thường và đánh dấu các sai lệch. Mặc dù các phương pháp này cải thiện khả năng phát hiện zero-day, chúng vẫn bị giới hạn cơ bản ở mức chấm điểm bất thường dựa trên mẫu. Chúng không thể giải thích \textit{tại sao} một chuỗi log lại độc hại, không thể ánh xạ mối đe dọa vào các khung chuẩn, hay sinh ra các bước khắc phục có thể hành động --- những khả năng đòi hỏi năng lực suy luận ngữ cảnh của Mô hình Ngôn ngữ Lớn.
+
+Các hệ thống SIEM hiện đại ra đời để gom nhóm và tương quan log, song chúng vẫn đòi hỏi sức lực khổng lồ từ con người để chắp vá ngữ cảnh đầy đủ của một cuộc tấn công.
 
 \subsection{Các Công trình Liên quan}
-Sự bùng nổ của các Mô hình Ngôn ngữ Lớn (LLM) gần đây đã chỉ ra hướng đi mới trong việc tự động tóm tắt log và phản ứng sự cố. Thay vì dịch nguyên văn các nghiên cứu trước, có thể tổng hợp rằng: nhiều bài khảo sát toàn diện \cite{habibzadeh2025} và các nghiên cứu điển hình \cite{oniagbi2024} đã tận dụng các API đám mây mạnh mẽ để tự động hóa một phần công việc của SOC. Tuy nhiên, rào cản lớn nhất của hướng đi này là sự vi phạm nguyên tắc bảo mật dữ liệu lõi của doanh nghiệp, cộng với độ trễ truyền tải mạng khiến việc ứng phó theo thời gian thực trở nên bất khả thi.
+Sự bùng nổ của các Mô hình Ngôn ngữ Lớn (LLM) gần đây đã chỉ ra hướng đi mới trong việc tự động tóm tắt log và phản ứng sự cố. Các bài khảo sát toàn diện như \citet{habibzadeh2025} đã chứng minh xu hướng ngày càng tăng trong việc áp dụng các API LLM đám mây (ví dụ: GPT-4) cho tự động hóa SOC, bao gồm tóm tắt log và phân loại sự cố. Tuy nhiên, việc phụ thuộc vào API đám mây vi phạm các chính sách bảo mật dữ liệu nghiêm ngặt của tổ chức và tạo ra độ trễ mạng không thể chấp nhận cho phân loại thời gian thực.
 
-Liên quan đến việc tăng cường tri thức bằng RAG (Retrieval-Augmented Generation) cho an ninh mạng, các nỗ lực tự động hóa ánh xạ chiến thuật tấn công vào biểu đồ tri thức đã mang lại kết quả khả quan \cite{ragattack2024}. Dù vậy, các nghiên cứu này phần lớn chỉ tập trung vào phân tích chiến thuật (tactical analysis) thuần túy mà bỏ qua việc liên kết với các tiêu chuẩn tuân thủ phòng thủ (như ISO 27001), dẫn đến việc hệ thống có thể phát hiện lỗi nhưng không đưa ra được hướng khắc phục thực tiễn.
+Trong lĩnh vực phân tích mối đe dọa tăng cường tri thức, các phương pháp tiếp cận dựa trên đồ thị tri thức cho ánh xạ tình báo mối đe dọa \cite{attackg2023} đã cho thấy kết quả khả quan trong việc tự động trích xuất và cấu trúc các kỹ thuật tấn công từ báo cáo CTI thành các đồ thị tuân thủ MITRE ATT\&CK. Tuy nhiên, các nghiên cứu hiện tại phần lớn chỉ tập trung vào phân tích chiến thuật thuần túy, thiếu sự tích hợp với các tiêu chuẩn ứng phó sự cố vận hành (như NIST SP 800-61r2) cần thiết cho việc khắc phục SOC có thể hành động.
 
 Về vấn đề an toàn và tính kháng lỗi của bản thân LLM, danh sách OWASP Top 10 dành cho ứng dụng LLM \cite{owasp2025} cùng các đánh giá chuyên sâu từ Agent Security Bench (ASB) \cite{zhang2024asb} đã cảnh báo mức độ dễ tổn thương đáng báo động của các LLM Agent trước rủi ro prompt injection. Dù các thuật toán như Drain3 \cite{he2017} rất phổ biến trong việc gom nhóm và nén log, chúng chủ yếu phục vụ mục đích lưu trữ chứ không mang thiết kế của một rào chắn an ninh chủ động. Hơn nữa, các phương pháp luận đánh giá LLM gần đây nhấn mạnh sự cần thiết phải giải quyết Thiên kiến Tự đề cao (Self-Enhancement Bias) bằng cách sử dụng các mô hình đánh giá chéo họ (cross-family evaluation) hoặc các phép kiểm định thống kê thay vì chỉ dựa vào mô hình LLM-as-a-Judge đơn lẻ \cite{zheng2023, ragas2023}. Bức tranh học thuật hiện tại cho thấy sự thiếu vắng của một kiến trúc thống nhất, có khả năng tự phòng vệ với quy trình đánh giá nghiêm ngặt, từ đó khẳng định tính cấp thiết và định hướng nghiên cứu của luận văn này.
+
+\subsubsection{Phân tích So sánh các Phương pháp Hiện có}
+
+\begin{table}[H]
+\centering
+\caption{So sánh các phương pháp phân tích log SOC}
+\label{tab:comparison}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Phương pháp} & \textbf{Cục bộ} & \textbf{Thời gian thực} & \textbf{Chống Injection} & \textbf{RAG} & \textbf{HITL} \\
+\midrule
+Signature IDS (Snort)             & \checkmark & \checkmark & N/A        & --         & --         \\
+ML Anomaly IDS (RF/LSTM)          & \checkmark & \checkmark & --         & --         & --         \\
+LogBERT \cite{logbert2021}        & \checkmark & \checkmark & --         & --         & --         \\
+Cloud LLM SOC \cite{habibzadeh2025} & --      & --         & --         & Partial    & --         \\
+\textbf{SENTINEL (Ours)}          & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % =============================================================================
 % CHƯƠNG 3: GIẢI PHÁP ĐỀ XUẤT VÀ PHƯƠNG PHÁP NGHIÊN CỨU
@@ -151,33 +172,75 @@ Về vấn đề an toàn và tính kháng lỗi của bản thân LLM, danh sá
 \subsection{Giải pháp Đề xuất: Kiến trúc Nhận thức Hai tầng}
 Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tầng (Cognitive Two-Tier Architecture) được thiết kế với nguyên tắc Phân tách Mối quan tâm (Separation of Concerns) nghiêm ngặt. Cốt lõi của giải pháp là kết hợp tốc độ xử lý của các bộ quy tắc xác định (Tier 1) với năng lực suy luận sâu sắc của LLM Tác tử (Tier 2), được kết nối với nhau bởi các lớp rào chắn (guardrails) chống tấn công adversarial mạnh mẽ.
 
-Tại tầng đầu tiên (Tier 1), Động cơ Quy tắc đóng vai trò như một màng lọc heuristic tốc độ cao. Nó duy trì các đường cơ sở (baselines) hành vi nhận thức theo phiên bằng cách sử dụng cấu trúc dữ liệu trên bộ nhớ (như Redis) để theo dõi tần suất yêu cầu và các IP độc hại đã biết. Lớp này được thiết kế để loại bỏ tới 90\% lưu lượng mạng thông thường hoặc các đợt tấn công thể tích (volumetric noise) ngay tại tốc độ đường truyền (wire speed).
+Tại tầng đầu tiên (Tier 1), Động cơ Quy tắc đóng vai trò như một màng lọc heuristic tốc độ cao. Nó duy trì các đường cơ sở (baselines) hành vi nhận thức theo phiên bằng cách sử dụng cấu trúc dữ liệu trên bộ nhớ (như Redis) để theo dõi tần suất yêu cầu và các IP độc hại đã biết. Lớp này được thiết kế để sàng lọc phần lớn lưu lượng mạng lành tính hoặc nhiễu thể tích ngay tại tốc độ đường truyền (wire speed), với tỷ lệ lọc chính xác sẽ được đo lường thực nghiệm trong quá trình đánh giá. Điều này đảm bảo LLM ở tầng dưới không bị quá tải bởi lưu lượng khổng lồ.
 
 Đối với những log có biểu hiện bất thường hoặc vượt qua ngưỡng mập mờ, chúng sẽ được chuyển đến Tầng Guardrail. Tại đây, quá trình vô hiệu hóa diễn ra theo hai bước tách biệt:
 1. \textbf{Template Mining (Drain3):} Trích xuất cấu trúc tĩnh của log để nén số lượng token mà không làm thay đổi các biến payload động.
 2. \textbf{Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation):} Các trường payload động được bao bọc bên trong các dấu phân cách sinh ngẫu nhiên theo chuẩn mật mã học (ví dụ: \verb|<<RANDOM_HEX>>|). Điều này ngăn chặn triệt để đòn tấn công Delimiter Smuggling, khiến kẻ thù không thể thoát khỏi ranh giới dữ liệu để thực thi Prompt Injection.
 
-Sau khi vượt qua guardrail, dữ liệu log sạch sẽ tiến vào Tier 2, được quản lý bởi một Agent phát triển trên nền LangGraph. Agent này ứng dụng cơ chế Dual-RAG, tiến hành truy vấn cơ sở dữ liệu vector cục bộ chứa thông tin phân tích từ MITRE ATT\&CK và các biện pháp kiểm soát của ISO 27001. LLM sẽ tổng hợp lượng tri thức này để đưa ra kết luận về tính chất độc hại của sự kiện.
+Sau khi vượt qua guardrail, dữ liệu log sạch sẽ tiến vào Tier 2, được quản lý bởi một Agent phát triển trên nền LangGraph. Agent này ứng dụng cơ chế Dual-RAG với hai chỉ mục FAISS riêng biệt, được truy vấn tuần tự và hợp nhất ngữ cảnh trước khi suy luận LLM:
+\begin{itemize}
+    \item \textbf{Chỉ mục 1 --- MITRE ATT\&CK:} Ánh xạ các chỉ báo quan sát được vào các chiến thuật, kỹ thuật và thủ tục (TTP) cụ thể, trả lời câu hỏi \textit{``cuộc tấn công nào đang xảy ra?''}
+    \item \textbf{Chỉ mục 2 --- NIST SP 800-61r2 \cite{nist80061}:} Truy xuất giai đoạn ứng phó sự cố phù hợp (Chuẩn bị, Phát hiện, Ngăn chặn, Loại bỏ, Khôi phục, Bài học kinh nghiệm), trả lời câu hỏi \textit{``SOC cần làm gì tiếp theo?''}
+\end{itemize}
+Thiết kế hai chỉ mục cố định này loại bỏ nhu cầu về cơ chế định tuyến (router), giảm thiểu điểm lỗi và đảm bảo độ trễ có thể dự đoán cho quá trình đánh giá. Sự phân tách này bắc cầu giữa \textit{nhận diện chiến thuật} (MITRE: chuyện gì đã xảy ra) và \textit{phản ứng vận hành} (NIST: cần làm gì).
 
 Cuối cùng, nhằm bảo vệ hệ thống trước đòn Adversarial Rule Injection, LLM không được phép trực tiếp thay đổi tường lửa ở Tier 1. Thay vào đó, các quy tắc do nó đề xuất sẽ bị đưa vào trạng thái Cách ly (Quarantine). Một quản trị viên SOC sẽ tiến hành rà soát các quy tắc này thông qua Dashboard (yếu tố Human-in-the-Loop) trước khi chúng được nạp nóng (hot-reload) vào hệ thống phòng thủ.
 
 \subsection{Công nghệ và Công cụ}
-Hệ thống được xây dựng hoàn toàn trên các framework Python hiện đại. Quá trình xử lý luồng và theo dõi phiên ngắn hạn dựa vào Redis. Động cơ suy luận LLM sử dụng các mô hình cục bộ đã được lượng tử hóa (ví dụ: Gemma-2-9B-IT) và phục vụ thông qua API của Oobabooga text-generation-webui nhằm đảm bảo quyền riêng tư dữ liệu tuyệt đối.
+Hệ thống được xây dựng hoàn toàn trên các framework Python hiện đại. Quá trình xử lý luồng và theo dõi phiên ngắn hạn dựa vào Redis. Động cơ suy luận LLM sử dụng mô hình cục bộ đã được lượng tử hóa (Gemma-2-9B-IT) ở định dạng GGUF Q4\_K\_M, được phục vụ thông qua llama.cpp, đảm bảo quyền riêng tư dữ liệu tuyệt đối và khả năng vận hành hoàn toàn ngoại tuyến.
 
-Luồng công việc của Agent được điều phối bởi LangGraph. Đối với phần truy xuất tri thức, thư viện \verb|sentence-transformers| kết hợp với FAISS được sử dụng để tìm kiếm vector ngữ nghĩa tốc độ cao. Giao diện người dùng và bảng điều khiển HITL được phát triển bằng Streamlit, trong khi bộ nhớ rủi ro dài hạn và nhật ký kiểm toán (audit trails) được lưu trữ bền vững qua SQLite.
+Luồng công việc của Agent được điều phối bởi LangGraph, cho phép ra quyết định tuần hoàn và sử dụng công cụ. Đối với phần truy xuất tri thức, thư viện \verb|sentence-transformers| kết hợp với FAISS được sử dụng để tìm kiếm vector ngữ nghĩa tốc độ cao. Giao diện người dùng và bảng điều khiển HITL được phát triển bằng Streamlit, trong khi bộ nhớ rủi ro dài hạn và nhật ký kiểm toán (audit trails) được lưu trữ bền vững qua SQLite.
 
-% =============================================================================
-% CHƯƠNG 4: KẾ HOẠCH TRIỂN KHAI VÀ ĐÁNH GIÁ
-% =============================================================================
-\newpage
-\section{Kế hoạch Triển khai và Đánh giá}
+\subsubsection{Cấu hình Phần cứng}
+Để đảm bảo tính tái lập hoàn toàn của các phép đo hiệu năng, toàn bộ thí nghiệm được thực hiện trên cấu hình phần cứng sau:
 
-\subsection{Các Giai đoạn Phát triển Chính}
-Giai đoạn đầu tiên của quá trình triển khai sẽ tập trung vào Pipeline Tiếp nhận Dữ liệu và Động cơ Quy tắc Tier 1. Bộ dữ liệu an ninh mạng tiêu chuẩn CICIDS2017 sẽ được tiền xử lý và mô phỏng thành luồng streaming thực tế. Cơ chế theo dõi phiên sẽ được xây dựng dựa trên chức năng TTL của Redis để thiết lập các đường cơ sở hành vi.
+\begin{table}[H]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Thành phần} & \textbf{Thông số} \\
+\midrule
+CPU  & Intel Core i7-14700KF (28 luồng) @ 5.700 GHz \\
+GPU  & NVIDIA GeForce RTX 4060 Ti (16 GB VRAM) \\
+RAM  & 32 GB DDR5 \\
+HĐH  & Ubuntu 24.04.4 LTS (x86\_64, Kernel 6.17) \\
+LLM Backend & llama.cpp với lượng tử hóa GGUF Q4\_K\_M \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Tiếp theo đó, Tầng Guardrail sẽ được tích hợp. Thuật toán Drain3 sẽ được áp dụng cho mục đích template mining, đi kèm với việc phát triển module Đóng gói Dữ liệu mật mã học nhằm vô hiệu hóa các payload chứa mã độc adversarial.
+% ===========================\\subsection{Kết quả Kỳ vọng}
+Nghiên cứu này được kỳ vọng sẽ phát triển thành công một hệ thống tự trị hoàn chỉnh, có khả năng vận hành trơn tru toàn bộ chu trình xử lý của SOC — từ việc tiếp nhận log, lọc rác bằng thuật toán heuristic, thanh lọc mã độc adversarial, suy luận chuyên sâu, cho đến sinh quy tắc phòng thủ tự động. Các chỉ tiêu định lượng cho Khung Đánh giá 5D được trình bày như sau:
 
-Giai đoạn then chốt thứ ba là việc kiến tạo Agent ở Tier 2 sử dụng LangGraph và kho tri thức Dual-RAG. Hệ thống FAISS index sẽ được nạp dữ liệu từ các tiêu chuẩn MITRE và ISO. Quá trình thiết kế prompt cho Agent sẽ được căn chỉnh tinh tế để tách biệt hoàn toàn các chỉ thị hệ thống (system instructions) khỏi phần dữ liệu payload đã được đóng gói.
+\\begin{table}[H]
+\\centering
+\\caption{Các chỉ tiêu hiệu năng định lượng}
+\\label{tab:targets}
+\\begin{tabular}{lll}
+\\toprule
+\\textbf{Chiều đánh giá} & \\textbf{Mục tiêu} & \\textbf{Cơ sở} \\\\
+\\midrule
+F1-Score (Phân loại)              & $\\geq 0.90$  & Chuẩn benchmark IDS \\cite{khraisat2019} \\\\
+Giảm Độ trễ so với LLM-only      & $\\geq 60\\%$  & Tier 1 lọc phần lớn lưu lượng \\\\
+Tỷ lệ Đánh bại Guardrail         & $< 10\\%$     & 45 mẫu adversarial đặc chế \\\\
+Độ Phù hợp Ngữ cảnh (RAGAS)      & $\\geq 0.85$  & Dual-RAG MITRE + NIST \\\\
+Hoàn thiện Nhật ký Kiểm toán     & $100\\%$      & Kiểm tra trường dữ liệu xác định \\\\
+\\bottomrule
+\\end{tabular}
+\\end{table}
+
+Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách được kỳ vọng sẽ đạt Tỷ lệ Đánh bại Guardrail dưới 10\\% trước các đòn tấn công prompt injection dạng cấu trúc, chứng minh khả năng tự phòng vệ vững chắc mà không tước đi phần dữ liệu payload quan trọng cần thiết cho việc điều tra của LLM.
+
+Bên cạnh đó, quá trình tích hợp Dual-RAG hứa hẹn sẽ mang lại điểm Độ Phù hợp Ngữ cảnh từ 0.85 trở lên, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn NIST SP 800-61r2 thay vì sinh ra những kết quả ảo giác (hallucination).
+
+\\subsection{Đóng góp Khoa học}
+Xét về mặt học thuật, đóng góp tiên quyết của nghiên cứu là việc đề xuất một Kiến trúc Nhận thức Hai tầng độc đáo, nối liền một cách an toàn giữa sức mạnh của Động cơ Quy tắc xác định với trí tuệ của LLM Agent. Hướng tiếp cận này vẫn còn rất mới mẻ trong các văn bản nghiên cứu an ninh mạng, đặc biệt là khi kết hợp việc triển khai các LLM bảo mật cục bộ cùng với rào chắn adversarial linh hoạt.
+
+Đóng góp thứ hai nằm ở việc xây dựng phương pháp luận đánh giá các hệ thống SOC Agent dựa trên LLM. Thông qua Khung Đánh giá 5 Chiều (5D) — kết hợp giữa phân loại thống kê, chỉ số vận hành, kháng lỗi adversarial, chấm điểm LLM-as-a-Judge chéo họ và tính giải thích — nghiên cứu cung cấp một chuẩn mực (baseline) toàn diện để các nghiên cứu tương lai về an ninh mạng AI có thể tham chiếu.
+
+Cuối cùng, ở góc độ thực tiễn, nghiên cứu đóng góp một pipeline mã nguồn mở chuẩn hóa (SENTINEL), tích hợp toàn vẹn từ khâu phân loại cảnh báo đến sự phản hồi có giám sát của con người. Đây là một bộ khung có tính mở rộng cao, sẵn sàng để các tổ chức ứng dụng vào môi trường thực tế nhằm giảm thiểu vấn nạn quá tải cảnh báo một cách an toàn và bền vững.
+ liệu payload đã được đóng gói.
 
 Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamlit và Bộ nhớ Dài hạn bằng SQLite. Bước này hoàn thiện chu trình khép kín của hệ thống bằng cách kích hoạt tính năng Human-in-the-Loop, cho phép quản trị viên phê duyệt các bộ quy tắc tự động do LLM sinh ra và đẩy ngược chúng trở lại Tier 1.
 
@@ -190,7 +253,7 @@ Các tiêu chí đánh giá bao gồm:
     \item \textbf{1. Phân loại (Classification):} Điểm F1-Score, Precision, Recall và Tỷ lệ Dương tính giả (FPR), được phân tích ý nghĩa thống kê bằng kiểm định McNemar ($p<0.05$).
     \item \textbf{2. Vận hành (Operational):} Độ trễ Xử lý (đại diện cho Thời gian Phát hiện/Phản hồi Trung bình), Tỷ lệ Leo thang HITL (Escalation Rate), và Tỷ lệ Cache Hit Ngữ nghĩa RAG, được kiểm định thông qua phép thử Mann-Whitney U ($p<0.05$).
     \item \textbf{3. Kháng lỗi (Robustness):} Tỷ lệ Đánh bại Guardrail sẽ được kiểm thử bằng 45 mẫu adversarial đặc chế, bao trùm tấn công cấu trúc (Delimiter Smuggling) và nhầm lẫn ngữ nghĩa (Semantic Confusion).
-    \item \textbf{4. Chất lượng Ngữ cảnh (Context Quality):} Sử dụng phương pháp tiếp cận LLM-as-a-Judge (lấy cảm hứng từ RAGAS) để chấm điểm Độ chính xác Ngữ cảnh, Sự liên quan của Câu trả lời, Tính trung thực (Faithfulness) và Độ bao phủ Ngữ cảnh (Context Recall).
+    \item \textbf{4. Chất lượng Ngữ cảnh (Context Quality):} Để đánh giá suy luận của LLM và giảm thiểu Thiên kiến Tự đề cao, phương pháp LLM-as-a-Judge chéo họ được áp dụng: trong khi Gemma-2-9B-IT đóng vai trò mô hình suy luận chính, \textbf{Llama-3.1-8B-Instruct} (thuộc họ mô hình khác) sẽ làm giám khảo, chấm điểm Độ chính xác Ngữ cảnh, Sự liên quan của Câu trả lời, Tính trung thực và Độ bao phủ Ngữ cảnh theo khung RAGAS \cite{ragas2023}. Điểm giám khảo sẽ được kiểm chứng chéo với các chỉ số RAGAS tự động để đảm bảo tính nhất quán thống kê.
     \item \textbf{5. Tính Giải thích (Explainability):} Tỷ lệ Hoàn thiện Nhật ký Kiểm toán (Audit Trail Completeness Rate) được đo lường một cách xác định (deterministic) thông qua kiểm tra tự động sự tồn tại của các trường dữ liệu.
 \end{itemize}
 
@@ -203,14 +266,33 @@ Các tiêu chí đánh giá bao gồm:
 \subsection{Kết quả Kỳ vọng}
 Nghiên cứu này được kỳ vọng sẽ phát triển thành công một hệ thống tự trị hoàn chỉnh, có khả năng vận hành trơn tru toàn bộ chu trình xử lý của SOC — từ việc tiếp nhận log, lọc rác bằng thuật toán heuristic, thanh lọc mã độc adversarial, suy luận chuyên sâu, cho đến sinh quy tắc phòng thủ tự động.
 
-Dưới góc độ kỹ thuật, kiến trúc Hai tầng được dự đoán sẽ giảm thiểu đáng kể độ trễ xử lý tổng thể so với các hệ thống chỉ dựa vào LLM, bởi lẽ Động cơ Tier 1 đã loại trừ hầu hết lưu lượng mạng lành tính. Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách được kỳ vọng sẽ đạt tỷ lệ đánh chặn tuyệt đối trước các đòn tấn công prompt injection dạng cấu trúc, chứng minh khả năng tự phòng vệ vững chắc mà không tước đi phần dữ liệu payload quan trọng cần thiết cho việc điều tra của LLM.
+Các chỉ tiêu định lượng cho Khung Đánh giá 5D được trình bày như sau:
 
-Bên cạnh đó, quá trình tích hợp Dual-RAG hứa hẹn sẽ mang lại điểm số cao về Sự liên quan của Câu trả lời và Tính trung thực, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn tuân thủ thực tế thay vì sinh ra những kết quả ảo giác (hallucination).
+\begin{table}[H]
+\centering
+\caption{Các chỉ tiêu hiệu năng định lượng}
+\label{tab:targets}
+\begin{tabular}{lll}
+\toprule
+\textbf{Chiều đánh giá} & \textbf{Mục tiêu} & \textbf{Cơ sở} \\
+\midrule
+F1-Score (Phân loại)              & $\geq 0.90$  & Chuẩn benchmark IDS \cite{khraisat2019} \\
+Giảm Độ trễ so với LLM-only      & $\geq 60\%$  & Tier 1 lọc phần lớn lưu lượng \\
+Tỷ lệ Đánh bại Guardrail         & $< 10\%$     & 45 mẫu adversarial đặc chế \\
+Độ Phù hợp Ngữ cảnh (RAGAS)      & $\geq 0.85$  & Dual-RAG MITRE + NIST \\
+Hoàn thiện Nhật ký Kiểm toán     & $100\%$      & Kiểm tra trường dữ liệu xác định \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách được kỳ vọng sẽ đạt Tỷ lệ Đánh bại Guardrail dưới 10\% trước các đòn tấn công prompt injection dạng cấu trúc, chứng minh khả năng tự phòng vệ vững chắc mà không tước đi phần dữ liệu payload quan trọng cần thiết cho việc điều tra của LLM.
+
+Bên cạnh đó, quá trình tích hợp Dual-RAG hứa hẹn sẽ mang lại điểm Độ Phù hợp Ngữ cảnh từ 0.85 trở lên, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn NIST SP 800-61r2 thay vì sinh ra những kết quả ảo giác (hallucination).
 
 \subsection{Đóng góp Khoa học}
 Xét về mặt học thuật, đóng góp tiên quyết của nghiên cứu là việc đề xuất một Kiến trúc Nhận thức Hai tầng độc đáo, nối liền một cách an toàn giữa sức mạnh của Động cơ Quy tắc xác định với trí tuệ của LLM Agent. Hướng tiếp cận này vẫn còn rất mới mẻ trong các văn bản nghiên cứu an ninh mạng, đặc biệt là khi kết hợp việc triển khai các LLM bảo mật cục bộ cùng với rào chắn adversarial linh hoạt.
 
-Đóng góp thứ hai nằm ở việc xây dựng phương pháp luận đánh giá các hệ thống SOC Agent dựa trên LLM. Thông qua Khung Đánh giá 5 Chiều (5D) — kết hợp giữa phân loại thống kê, chỉ số vận hành, kháng lỗi adversarial, chấm điểm LLM-as-a-Judge và tính giải thích — nghiên cứu cung cấp một chuẩn mực (baseline) toàn diện để các nghiên cứu tương lai về an ninh mạng AI có thể tham chiếu.
+Đóng góp thứ hai nằm ở việc xây dựng phương pháp luận đánh giá các hệ thống SOC Agent dựa trên LLM. Thông qua Khung Đánh giá 5 Chiều (5D) — kết hợp giữa phân loại thống kê, chỉ số vận hành, kháng lỗi adversarial, chấm điểm LLM-as-a-Judge chéo họ và tính giải thích — nghiên cứu cung cấp một chuẩn mực (baseline) toàn diện để các nghiên cứu tương lai về an ninh mạng AI có thể tham chiếu.
 
 Cuối cùng, ở góc độ thực tiễn, nghiên cứu đóng góp một pipeline mã nguồn mở chuẩn hóa (SENTINEL), tích hợp toàn vẹn từ khâu phân loại cảnh báo đến sự phản hồi có giám sát của con người. Đây là một bộ khung có tính mở rộng cao, sẵn sàng để các tổ chức ứng dụng vào môi trường thực tế nhằm giảm thiểu vấn nạn quá tải cảnh báo một cách an toàn và bền vững.
 
@@ -221,16 +303,16 @@ Cuối cùng, ở góc độ thực tiễn, nghiên cứu đóng góp một pipe
 \section{Kết luận}
 Trong nghiên cứu này, chúng tôi đề xuất một Kiến trúc Nhận thức Hai tầng kết hợp một Động cơ Quy tắc xác định tốc độ cao với một Mô hình Ngôn ngữ Lớn Tác tử có khả năng suy luận sâu. Kiến trúc này được thiết kế để giải quyết "Nghịch lý Dữ liệu lớn" và hiện tượng quá tải cảnh báo đang bào mòn năng lực của các Trung tâm Điều hành An ninh hiện đại, đồng thời giảm thiểu các lỗ hổng rủi ro đặc thù khi ứng dụng trực tiếp LLM vào luồng dữ liệu adversarial log.
 
-Hệ thống tận dụng tốc độ của Tier 1 để sàng lọc khối lượng lớn nhiễu, và tin cậy vào các rào chắn Guardrail vững chắc — cụ thể là cơ chế Đóng gói Dữ liệu có Phân cách — để trung hòa các đòn prompt injection trước khi chúng chạm đến Agent ở Tier 2. Được trang bị bộ nhớ tri thức Dual-RAG từ MITRE ATT\&CK và ISO 27001, Agent có khả năng đưa ra các phân tích rủi ro giàu tính ngữ cảnh và có độ chính xác cao. Hơn thế nữa, thiết kế chu trình khép kín đảm bảo sự an toàn thông qua hệ thống cách ly Human-in-the-Loop.
+Hệ thống tận dụng tốc độ của Tier 1 để sàng lọc khối lượng lớn nhiễu, và tin cậy vào các rào chắn Guardrail vững chắc — cụ thể là cơ chế Đóng gói Dữ liệu có Phân cách — để trung hòa các đòn prompt injection trước khi chúng chạm đến Agent ở Tier 2. Được trang bị bộ nhớ tri thức Dual-RAG gồm MITRE ATT\&CK cho nhận diện chiến thuật và NIST SP 800-61r2 cho hướng dẫn ứng phó sự cố, Agent có khả năng đưa ra các phân tích rủi ro giàu tính ngữ cảnh và có độ chính xác cao, kèm theo các bước khắc phục có thể hành động. Hơn thế nữa, thiết kế chu trình khép kín đảm bảo sự an toàn thông qua hệ thống cách ly Human-in-the-Loop.
 
-Những đóng góp kỳ vọng của nghiên cứu bao gồm việc đề xuất kiến trúc hybrid mới lạ, cung cấp các phương pháp đánh giá thực nghiệm cho AI Security Agent, và phát triển một pipeline thực tiễn, mở rộng được cho quy trình phản ứng sự cố tự động theo thời gian thực. Các hướng nghiên cứu trong tương lai có thể hướng tới việc điều phối hệ thống đa tác tử (multi-agent orchestration) trên các tô-pô mạng phân tán hoặc tích hợp năng lực phân tích log đa phương thức (multi-modal).
+Những đóng góp kỳ vọng của nghiên cứu bao gồm việc đề xuất kiến trúc hybrid mới lạ, cung cấp các phương pháp đánh giá thực nghiệm cho AI Security Agent, và phát triển một pipeline thực tiễn, mở rộng được cho quy trình phản ứng sự cố tự động theo thời gian thực. Các hướng nghiên cứu trong tương lai có thể mở rộng pipeline Dual-RAG với Sigma Rules cho việc tổng hợp quy tắc tự động và MITRE D3FEND cho việc sinh phản ứng nhận biết biện pháp đối phó.
 
 % =============================================================================
 % TÀI LIỆU THAM KHẢO
 % =============================================================================
 \newpage
 \addcontentsline{toc}{section}{Tài liệu tham khảo}
-\begin{thebibliography}{10}
+\begin{thebibliography}{99}
 
 \bibitem{ponemon2023}
 Ponemon Institute, ``The State of Security Operations: Alert Fatigue and Analyst Burnout,'' \emph{Annual Cybersecurity Report}, 2023.
@@ -244,14 +326,23 @@ M. Habibzadeh, et al., ``Large Language Models for Security Operations Centers: 
 \bibitem{khraisat2019}
 A. Khraisat, I. Gondal, P. Vamplew, and J. Kamruzzaman, ``Survey of intrusion detection systems: techniques, datasets and challenges,'' \emph{Cybersecurity}, vol. 2, no. 1, p. 20, 2019.
 
-\bibitem{oniagbi2024}
-E. Oniagbi, et al., ``LLMs in the SOC: Automated Log Analysis and Incident Response,'' \emph{Journal of Cybersecurity and AI}, 2024.
+\bibitem{attackg2023}
+Z. Li, J. Ning, and B. Wang, ``AttacKG: Constructing Technique Knowledge Graph from Cyber Threat Intelligence Reports,'' \emph{Findings of EACL 2023}, arXiv:2111.07093.
 
-\bibitem{ragattack2024}
-Research Group, ``RAG-ATT\&CK: Utilizing Knowledge Graphs for Threat Intelligence,'' \emph{Proceedings of the International Conference on Cyber Security}, 2024.
+\bibitem{logbert2021}
+H. Guo, S. Yuan, and X. Wu, ``LogBERT: Log Anomaly Detection via BERT,'' in \emph{2021 International Joint Conference on Neural Networks (IJCNN)}, IEEE, 2021.
+
+\bibitem{nist80061}
+P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' \emph{NIST Special Publication 800-61 Revision 2}, 2012.
+
+\bibitem{sharafaldin2018}
+I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \emph{4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018.
+
+\bibitem{dapt2020}
+S. Myneni, A. Chowdhary, A. Sabur, D. Dasgupta, et al., ``DAPT 2020 --- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \emph{Workshop on Deployable Machine Learning for Security Defense (MLHat), KDD 2020}, 2020.
 
 \bibitem{zhang2024asb}
-Y. Zhang, et al., ``Agent Security Bench (ASB): Evaluating the Robustness of LLM Agents,'' \emph{arXiv preprint arXiv:2403.00000}, 2024.
+Y. Zhang, et al., ``Agent Security Bench (ASB): Evaluating the Robustness of LLM Agents,'' \emph{arXiv preprint arXiv:2410.02644}, 2024.
 
 \bibitem{he2017}
 P. He, J. Zhu, Z. Zheng, and M. R. Lyu, ``Drain: An Online Log Parsing Approach with Fixed Depth Tree,'' in \emph{2017 IEEE International Conference on Web Services (ICWS)}, 2017.
