@@ -13,8 +13,8 @@
 | **A** | ✅ | ❌ | ❌ | ❌ | ❌ | Baseline: Rule-only IDS. Chứng minh LLM thêm giá trị. |
 | **B** | ❌ | ❌ | ❌ | ✅ | Dual | LLM-only (không lọc trước). Chứng minh 2-Tier tối ưu latency. |
 | **C** | ✅ | ✅ Drain3 | ❌ No Encapsulation | ✅ | Dual | Chứng minh Encapsulation chặn injection. |
-| **D** | ✅ | ✅ | ✅ | ✅ | **MITRE only** | **Isolate ISO 27001 RAG contribution.** |
-| **E** | ✅ | ✅ | ✅ | ✅ | **ISO only** | **Isolate MITRE ATT&CK RAG contribution.** |
+| **D** | ✅ | ✅ | ✅ | ✅ | **MITRE only** | **Isolate NIST SP 800-61r2 RAG contribution.** |
+| **E** | ✅ | ✅ | ✅ | ✅ | **NIST only** | **Isolate MITRE ATT&CK RAG contribution.** |
 | **F** | ✅ | ✅ | ✅ | ✅ | Dual | **Full Architecture** — Complete system. |
 
 ---
@@ -54,16 +54,16 @@
 ### Context Quality, Explainability & Statistical Validity
 - F > D > E for Context Relevance : Dual contexts richer than single
 - D > E for MITRE Mapping Accuracy : MITRE RAG directly provides technique data
-- E > D for Recommendation Quality : ISO controls provide specific response actions
+- E > D for Recommendation Quality : NIST phases provide specific response actions
 - **5D Framework Integration**: 
   - Classification & Operational metrics use **Statistical Evaluation (McNemar + Mann-Whitney U)** để đảm bảo tính khách quan.
   - Context Quality dùng **Cross-Family LLM-as-a-Judge (Llama 3 đánh giá Gemma)** lấy cảm hứng từ RAGAS để chống Self-Enhancement Bias.
   - Explainability dùng deterministic logic (Audit Completeness).
 
 ### Critical Decision Point
-- **IF D ≈ F** → ISO RAG provides minimal value → Simplify system, drop Dual-RAG claim
+- **IF D ≈ F** → NIST RAG provides minimal value → Simplify system, drop Dual-RAG claim
 - **IF E ≈ F** → MITRE RAG provides minimal value → Unlikely but would reshape contribution
-- **IF D >> E** → ISO RAG contribution proven, Dual-RAG justified
+- **IF D >> E** → NIST RAG contribution proven, Dual-RAG justified
 
 ---
 
@@ -87,13 +87,13 @@
 rag:
   enabled_sources: ["mitre"]  # Only MITRE ATT&CK index
 
-# config/ablation_configs/config_e_iso_only.yaml
+# config/ablation_configs/config_e_nist_only.yaml
 rag:
-  enabled_sources: ["iso"]    # Only ISO 27001 index
+  enabled_sources: ["nist"]    # Only NIST SP 800-61r2 index
 
 # config/ablation_configs/config_f_full.yaml
 rag:
-  enabled_sources: ["mitre", "iso"]  # Dual-RAG (default)
+  enabled_sources: ["mitre", "nist"]  # Dual-RAG (default)
 ```
 
 ### MLflow Experiment Tracking

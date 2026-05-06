@@ -12,7 +12,7 @@ agent:
   enabled: true
 
 rag:
-  enabled_sources: ["mitre", "iso"]   # Dual-RAG
+  enabled_sources: ["mitre", "nist"]   # Dual-RAG
 
 evaluation:
   tag: "ablation_F_sentinel_full"

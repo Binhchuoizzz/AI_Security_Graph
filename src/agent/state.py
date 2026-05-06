@@ -57,7 +57,7 @@ class AgentDecision:
     confidence: float  # 0.0 - 1.0
     reasoning: str  # Giải thích ngắn gọn
     mitre_technique: str = ""  # VD: "T1110.003 - Brute Force: Password Spraying"
-    iso_control: str = ""  # Ví dụ: "A.9.4.2 - Secure log-on procedures"
+    nist_control: str = ""  # Ví dụ: "Containment - Network isolation"
     hitl_status: str = "N/A"  # Các trạng thái: "PENDING", "APPROVED", "REJECTED", "N/A"
 
     def to_dict(self) -> dict:
@@ -68,7 +68,7 @@ class AgentDecision:
             "confidence": self.confidence,
             "reasoning": self.reasoning,
             "mitre_technique": self.mitre_technique,
-            "iso_control": self.iso_control,
+            "nist_control": self.nist_control,
             "hitl_status": self.hitl_status,
         }
 
@@ -128,8 +128,8 @@ class SentinelState:
     rag_mitre_context: str = ""
     """Context từ MITRE ATT&CK FAISS search."""
 
-    rag_iso_context: str = ""
-    """Context từ ISO 27001 FAISS search."""
+    rag_nist_context: str = ""
+    """Context từ NIST SP 800-61r2 FAISS search."""
 
     # === METADATA ===
     cycle_count: int = 0
@@ -189,7 +189,7 @@ class SentinelState:
         confidence: float,
         reasoning: str,
         mitre_technique: str = "",
-        iso_control: str = "",
+        nist_control: str = "",
         hitl_status: str = "N/A",
     ):
         """Ghi nhận quyết định mới vào audit trail."""
@@ -200,7 +200,7 @@ class SentinelState:
             confidence=confidence,
             reasoning=reasoning,
             mitre_technique=mitre_technique,
-            iso_control=iso_control,
+            nist_control=nist_control,
             hitl_status=hitl_status,
         )
         self.decisions.append(decision.to_dict())
@@ -265,7 +265,7 @@ class SentinelState:
         self.current_batch_encapsulated = ""
         self.current_batch_size = 0
         self.rag_mitre_context = ""
-        self.rag_iso_context = ""
+        self.rag_nist_context = ""
         self.pending_rules = []
         self.threat_memory_context = ""
         self.cycle_count += 1

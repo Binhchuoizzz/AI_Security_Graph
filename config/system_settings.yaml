@@ -76,7 +76,7 @@ mlflow:
 rag:
   embedding_model: all-MiniLM-L6-v2
   faiss_index_path: knowledge_base/faiss_index
-  iso_27001_path: knowledge_base/iso_27001_controls.json
+  nist_800_61r2_path: knowledge_base/nist_800_61r2.json
   mitre_attack_path: knowledge_base/mitre_attack.json
   semantic_cache:
     max_size: 500
@@ -112,7 +112,7 @@ tier1:
       traffic patterns.  The events exhibit characteristics of port scanning and potential
       reconnaissance activities, as indicated by the high number of unique ports accessed
       and the volume of traffic. This behavior aligns with MITRE ATT&CK technique
-      T1589 (Gather Victim Identity Information) and ISO 27001 control A.12.1.1 (Access
+      T1589 (Gather Victim Identity Information) and NIST SP 800-61r2 Detection phase (Access
       Control).
     score: 100
     source: langgraph_agent

@@ -44,7 +44,7 @@ class SessionBaseline:
     CHỐNG REDIS/RAM OOM:
       Cơ chế Sliding Window TTL: IP sessions inactive quá ttl_seconds
       sẽ tự động bị evict. Đảm bảo RAM không cạn kiệt khi chạy
-      CICIDS2017 (~2.8M records) hoặc dataset lớn hơn.
+      CSE-CIC-IDS2018 (~2.8M records) hoặc dataset lớn hơn.
 
     Baseline variables per IP:
     - request_count: Tổng số request trong window

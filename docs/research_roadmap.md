@@ -41,7 +41,7 @@ graph TD
     P5 --> E1["MT-Bench\n(Zheng et al., NeurIPS 2023)"]
     P5 --> E2["RAGAS Framework"]
     
-    P6 --> F1["CICIDS2017\n(Sharafaldin et al., 2018)"]
+    P6 --> F1["CSE-CIC-IDS2018\n(Sharafaldin et al., 2018)"]
 ```
 
 ---
@@ -73,14 +73,14 @@ graph TD
 ---
 
 ## Pillar 2️⃣: RAG + Knowledge Graph cho Cybersecurity
-> **Map vào SENTINEL:** Dual-RAG Engine (FAISS + MITRE ATT&CK + ISO 27001), Semantic Cache
+> **Map vào SENTINEL:** Dual-RAG Engine (FAISS + MITRE ATT&CK + NIST SP 800-61r2), Semantic Cache
 
 ### 🔴 Must-Read
 
 | # | Paper | Năm | Tại sao quan trọng |
 |---|---|---|---|
 | 1 | **"AgCyRAG: Agentic Cybersecurity RAG"** — CEUR-WS | 2024 | Framework gần nhất với Dual-RAG của bạn. Kết hợp KG reasoning + vector retrieval. So sánh trực tiếp trong Related Work. |
-| 2 | **"RAG-ATT&CK: Automated MITRE Mapping with Retrieval-Augmented Generation"** — Univ. of Twente | 2024 | Paper gốc về RAG cho MITRE. Bạn *mở rộng* bằng cách thêm ISO 27001 (Dual-RAG) — đây là điểm mới. |
+| 2 | **"RAG-ATT&CK: Automated MITRE Mapping with Retrieval-Augmented Generation"** — Univ. of Twente | 2024 | Paper gốc về RAG cho MITRE. Bạn *mở rộng* bằng cách thêm NIST SP 800-61r2 (Dual-RAG) — đây là điểm mới. |
 | 3 | **"CyKG-RAG: Integrating Cybersecurity Knowledge Graphs with RAG"** — CEUR-WS | 2024 | Cách xây dựng Knowledge Graph cho Security. Hữu ích khi bạn code `embedder.py` + `retriever.py`. |
 
 ### 🟡 Supporting Papers
@@ -176,23 +176,23 @@ graph TD
 ---
 
 ## Pillar 6️⃣: IDS Datasets & Benchmarking
-> **Map vào SENTINEL:** Dataset (CICIDS2017), Ablation Study
+> **Map vào SENTINEL:** Dataset (CSE-CIC-IDS2018), Ablation Study
 
 ### 🔴 Must-Read
 
 | # | Paper | Năm | Tại sao quan trọng |
 |---|---|---|---|
-| 1 | **"Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization"** — Sharafaldin et al. | ICISSP 2018 | Paper gốc CICIDS2017. Bắt buộc cite. Đọc kỹ để nắm profiling agent methodology. |
+| 1 | **"Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization"** — Sharafaldin et al. | ICISSP 2018 | Paper gốc CSE-CIC-IDS2018. Bắt buộc cite. Đọc kỹ để nắm profiling agent methodology. |
 
 ### 🟡 Supporting Papers
 
 | # | Paper | Map vào |
 |---|---|---|
-| 4 | **Recent Survey: "Deep Learning for IDS: A Comprehensive Review" (2023–2024)** — Tìm trên IEEE/arXiv | So sánh CNN, LSTM, Hybrid trên CICIDS2017. Dùng số liệu F1-Score làm baseline so sánh. |
-| 5 | **"CSE-CIC-IDS2018"** — Sharafaldin et al. (2018 dataset update) | Chuẩn bị phản biện: "Tại sao không dùng dataset mới hơn?" → Trả lời: CICIDS2017 cho phép so sánh trực tiếp với 500+ papers đã publish. |
+| 4 | **Recent Survey: "Deep Learning for IDS: A Comprehensive Review" (2023–2024)** — Tìm trên IEEE/arXiv | So sánh CNN, LSTM, Hybrid trên CSE-CIC-IDS2018. Dùng số liệu F1-Score làm baseline so sánh. |
+| 5 | **"CSE-CIC-IDS2018"** — Sharafaldin et al. (2018 dataset update) | Chuẩn bị phản biện: "Tại sao không dùng dataset mới hơn?" → Trả lời: CSE-CIC-IDS2018 cho phép so sánh trực tiếp với 500+ papers đã publish. |
 
 ### 🔬 Nhóm nghiên cứu nên theo dõi
-- **Canadian Institute for Cybersecurity (CIC), UNB** — Tác giả CICIDS2017/2018
+- **Canadian Institute for Cybersecurity (CIC), UNB** — Tác giả CSE-CIC-IDS2018/2018
 
 ---
 
@@ -207,7 +207,7 @@ graph TD
 3. ⭐ Zhang et al., ASB (ICLR 2025) **(justify Guardrails)**
 4. ⭐ Zheng et al., MT-Bench (NeurIPS 2023) **(evaluation method)**
 5. He et al., Drain (2017) **(thuật toán parsing)**
-6. Sharafaldin et al., CICIDS2017 (2018) **(dataset)**
+6. Sharafaldin et al., CSE-CIC-IDS2018 (2018) **(dataset)**
 7. Greshake et al., Indirect Prompt Injection (2023) **(attack model)**
 8. RAGAS Documentation **(evaluation tool)**
 
@@ -228,8 +228,8 @@ graph TD
 | Trụ cột | Module trong Code | Paper cốt lõi nhất | Điều bạn cần chứng minh |
 |---|---|---|---|
 | **1. LLM Agent SOC** | `agent/workflow.py` | ASB (ICLR 2025) | Agent dễ bị tấn công → cần Guardrails |
-| **2. RAG + KG** | `rag/retriever.py` | AgCyRAG, RAG-ATT&CK | Dual-RAG (MITRE+ISO) tốt hơn Single-RAG |
+| **2. RAG + KG** | `rag/retriever.py` | AgCyRAG, RAG-ATT&CK | Dual-RAG (MITRE+NIST) tốt hơn Single-RAG |
 | **3. Prompt Injection** | `guardrails/prompt_filter.py` | OWASP Top 10, Greshake 2023 | Dynamic Delimiters chống được Smuggling |
 | **4. Log Parsing** | `guardrails/template_miner.py` | Drain (He 2017), LILAC 2024 | Drain3 = Token Budgeting, không phải Injection Defense |
 | **5. Evaluation** | `experiments/` | Zheng 2023, RAGAS | Statistical Framework tránh Self-Evaluation Bias |
-| **6. IDS Datasets** | `data/raw/` | Sharafaldin 2018 | CICIDS2017 = benchmark chuẩn, so sánh trực tiếp |
+| **6. IDS Datasets** | `data/raw/` | Sharafaldin 2018 | CSE-CIC-IDS2018 = benchmark chuẩn, so sánh trực tiếp |

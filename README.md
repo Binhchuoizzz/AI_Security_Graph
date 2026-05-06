@@ -27,7 +27,7 @@ CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner 
 |---|---|---|---|---|
 | **1** | Rule Engine & Session Baseline | Heuristic filter — DROP 99% noise at wire speed | Tier 1 | Python (RAM) |
 | **2** | `all-MiniLM-L6-v2` | Embedding model — vectorize logs for FAISS semantic search | Tier 2 (RAG) | `sentence-transformers` (GPU) |
-| **3** | `Gemma 2 9B Q6_K` | Reasoning LLM — deep analysis, MITRE mapping, action decisions | Tier 2 (Agent) | Oobabooga WebUI (`localhost:5000`) |
+| **3** | `Gemma 2 9B Q6_K` | Reasoning LLM — deep analysis, MITRE mapping, action decisions | Tier 2 (Agent) | Local LLM Server — Oobabooga/llama.cpp (`localhost:5000`) |
 
 **Tier 1 (Speed Layer):** Session-Aware Behavioral Baselining + TTL eviction.
 
@@ -35,7 +35,7 @@ CSV → Data Publisher → Redis → Tier 1 (Baselining+TTL) → Template Miner 
 - `template_miner.py` — Volume Compression ONLY (Drain3). Variables preserved.
 - `prompt_filter.py` — Injection Defense ONLY (Dynamic Randomized Delimiters + Encoding Neutralization).
 
-**Tier 2 (Intelligence Layer):** LangGraph Agent (Gemma 2 9B Q6_K) + Semantic Cache + Dual-RAG (MITRE ATT&CK + ISO 27001).
+**Tier 2 (Intelligence Layer):** LangGraph Agent (Gemma 2 9B Q6_K) + Semantic Cache + Dual-RAG (MITRE ATT&CK + NIST SP 800-61r2).
 
 ## 🛡️ Core Novelty & Defenses
 
@@ -133,7 +133,7 @@ source .venv/bin/activate && pip install -r requirements.txt
 # 2. Start infrastructure
 docker-compose up -d redis mlflow
 
-# 3. Ensure Oobabooga is running at http://localhost:5000 with Gemma 9B loaded
+# 3. Ensure LLM server (Oobabooga/llama.cpp) is running at http://localhost:5000 with Gemma 9B loaded
 
 # 4. Start SENTINEL Core (Terminal 1)
 python main.py

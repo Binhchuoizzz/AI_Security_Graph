@@ -2,8 +2,8 @@
 LangGraph Agent: LLM Client Wrapper
 
 CHỨC NĂNG:
-- Giao tiếp với Local LLM (Gemma 9B) thông qua Oobabooga Text-Generation-WebUI.
-- Sử dụng OpenAI API format (do Oobabooga cung cấp OpenAI-compatible endpoint ở port 5000).
+- Giao tiếp với Local LLM (Gemma 9B) thông qua OpenAI-compatible endpoint (Oobabooga/llama.cpp).
+- Sử dụng OpenAI API format (OpenAI-compatible endpoint tại port 5000).
 - Implement Retry logic, Exponential Backoff, và Timeout handling để đảm bảo
   Agent không bị crash khi model đang bận tính toán.
 """
@@ -22,7 +22,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Oobabooga OpenAI-compatible endpoint
+# OpenAI-compatible endpoint (Oobabooga / llama.cpp)
 API_BASE_URL = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
 API_KEY = os.getenv(
     "LLM_API_KEY", "sk-placeholder-local-only"
@@ -39,7 +39,7 @@ class LLMClient:
         self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 300
     ):
         """
-        Khởi tạo OpenAI Client trỏ về Local Oobabooga.
+        Khởi tạo OpenAI Client trỏ về Local LLM server.
         """
         self.client = openai.OpenAI(base_url=base_url, api_key=API_KEY, timeout=timeout)
         self.max_retries = max_retries
@@ -87,7 +87,7 @@ class LLMClient:
 
             except openai.APIConnectionError as e:
                 logger.error(
-                    f"LLM Connection Error: {e}. Is Oobabooga running on port 5000?"
+                    f"LLM Connection Error: {e}. Is LLM server running on port 5000?"
                 )
                 if retries == self.max_retries:
                     raise

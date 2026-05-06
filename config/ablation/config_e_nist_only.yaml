@@ -1,4 +1,4 @@
-# Ablation Config E: ISO-Only RAG
+# Ablation Config E: NIST-Only RAG
 # Purpose: Isolate MITRE ATT&CK RAG contribution.
 #          Expect: D > E for technique mapping, E > D for response recommendations
 
@@ -13,7 +13,7 @@ agent:
   enabled: true
 
 rag:
-  enabled_sources: ["iso"]      # <-- KEY: ISO only, no MITRE
+  enabled_sources: ["nist"]      # <-- KEY: NIST only, no MITRE
 
 evaluation:
-  tag: "ablation_E_iso_only_rag"
+  tag: "ablation_E_nist_only_rag"

@@ -29,7 +29,7 @@ def stream_logs_to_redis(csv_path: str):
 
     if not os.path.exists(csv_path):
         print(f"[!] CSV path not found: {csv_path}.")
-        print("    Vui lòng copy file sample từ CICIDS2017 vào đường dẫn này.")
+        print("    Vui lòng copy file sample từ CSE-CIC-IDS2018 vào đường dẫn này.")
         return
 
     print(
@@ -59,5 +59,5 @@ def stream_logs_to_redis(csv_path: str):
 
 if __name__ == "__main__":
     MOCK_CSV = "data/raw/Demo-Attack.csv"
-    # Bạn sẽ tạo một sample_logs.csv giả lập hoặc trích từ CICIDS2017
+    # Bạn sẽ tạo một sample_logs.csv giả lập hoặc trích từ CSE-CIC-IDS2018
     stream_logs_to_redis(MOCK_CSV)

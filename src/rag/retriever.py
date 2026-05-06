@@ -54,7 +54,7 @@ class DualRetriever:
             logger.error(f"Missing dependency: {e}")
             raise
 
-        self.enabled_sources = enabled_sources or ["mitre", "iso"]
+        self.enabled_sources = enabled_sources or ["mitre", "nist"]
         self.top_k = top_k
         self.faiss = faiss
 
@@ -70,8 +70,8 @@ class DualRetriever:
         if "mitre" in self.enabled_sources:
             self._load_indexes("mitre", "mitre_attack")
 
-        if "iso" in self.enabled_sources:
-            self._load_indexes("iso", "iso_27001")
+        if "nist" in self.enabled_sources:
+            self._load_indexes("nist", "nist_800_61r2")
 
         # Khởi tạo Bộ nhớ đệm ngữ nghĩa (Semantic Cache)
         self.cache = None
@@ -215,20 +215,20 @@ class DualRetriever:
 
         # Thực hiện Hybrid Search trên cả 2 tập dữ liệu
         mitre_results = self._hybrid_search(query_text, "mitre")
-        iso_results = self._hybrid_search(query_text, "iso")
+        nist_results = self._hybrid_search(query_text, "nist")
 
         # Định dạng kết quả thành chuỗi văn bản ngữ cảnh
         mitre_context = self._format_context(mitre_results, "MITRE ATT&CK")
-        iso_context = self._format_context(iso_results, "ISO 27001")
+        nist_context = self._format_context(nist_results, "NIST SP 800-61r2")
 
         # Tạo đoạn prompt tổng hợp
-        combined_prompt = self._build_combined_prompt(mitre_context, iso_context)
+        combined_prompt = self._build_combined_prompt(mitre_context, nist_context)
 
         result = {
             "mitre_results": mitre_results,
-            "iso_results": iso_results,
+            "nist_results": nist_results,
             "mitre_context": mitre_context,
-            "iso_context": iso_context,
+            "nist_context": nist_context,
             "combined_prompt": combined_prompt,
             "cache_hit": False,
         }
@@ -251,14 +251,14 @@ class DualRetriever:
 
         return "\n".join(lines)
 
-    def _build_combined_prompt(self, mitre_context: str, iso_context: str) -> str:
+    def _build_combined_prompt(self, mitre_context: str, nist_context: str) -> str:
         parts = ["=== KNOWLEDGE BASE CONTEXT (RAG) ==="]
         if mitre_context:
             parts.append("")
             parts.append(mitre_context)
-        if iso_context:
+        if nist_context:
             parts.append("")
-            parts.append(iso_context)
+            parts.append(nist_context)
         parts.append("")
         parts.append("=== END KNOWLEDGE BASE CONTEXT ===")
         return "\n".join(parts)
@@ -288,7 +288,7 @@ if __name__ == "__main__":
         for r in result["mitre_results"]:
             print(f"  [{r['rrf_score']:.4f}] {r['id']} - {r['name']}")
 
-        print(f"\n--- ISO Results ({len(result['iso_results'])}) ---")
+        print(f"\n--- NIST Results ({len(result['nist_results'])}) ---")
         for r in result["iso_results"]:
             print(f"  [{r['rrf_score']:.4f}] {r['id']} - {r['name']}")
 

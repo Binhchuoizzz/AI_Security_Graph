@@ -113,7 +113,7 @@ def _infer_service(port: int) -> str:
 def fetch_and_build(
     n_per_label: int = 10, output_path: str = "experiments/ground_truth.json"
 ):
-    print("[*] Bắt đầu tải và lọc dataset CICIDS2017 trực tiếp từ Hugging Face...")
+    print("[*] Bắt đầu tải và lọc dataset CSE-CIC-IDS2018 trực tiếp từ Hugging Face...")
 
     all_data = []
 
@@ -165,7 +165,7 @@ def fetch_and_build(
         for _, row in chosen.iterrows():
             sample = {
                 "id": f"GT-{gt_counter:03d}",
-                "description": f"{label} attack sample from CICIDS2017",
+                "description": f"{label} attack sample from CSE-CIC-IDS2018",
                 "logs": [
                     {
                         "timestamp": "2026-04-18T10:00:00Z",  # Mock timestamp cho schema cũ

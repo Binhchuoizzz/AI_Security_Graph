@@ -48,7 +48,7 @@ CSV/Syslog → Redis Stream → Tier 1 Rule Engine → Guardrails → LLM Agent
 - **Residual risk:** Semantic Confusion (see Section 4)
 
 ### 3.2 RAG Knowledge Base
-- **Attack vector:** Knowledge Base Poisoning (modify MITRE/ISO JSON files)
+- **Attack vector:** Knowledge Base Poisoning (modify MITRE/NIST JSON files)
 - **Defense:** SHA-256 integrity verification (`checksums.sha256`), provenance tagging, read-only Docker mount
 - **Residual risk:** Insider with filesystem access could update both KB and checksums simultaneously
 

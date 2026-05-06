@@ -100,7 +100,7 @@ class AuditLogger:
                 agent_decision TEXT,
                 agent_reasoning TEXT,
                 mitre_technique TEXT,
-                iso_control TEXT,
+                nist_control TEXT,
                 hitl_approved BOOLEAN,
                 latency_ms REAL,
                 metadata TEXT
@@ -117,7 +117,7 @@ class AuditLogger:
             INSERT INTO audit_log (
                 timestamp, event_type, source_ip, tier1_score, tier1_action,
                 guardrail_injected, agent_decision, agent_reasoning,
-                mitre_technique, iso_control, hitl_approved, latency_ms, metadata
+                mitre_technique, nist_control, hitl_approved, latency_ms, metadata
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
@@ -130,7 +130,7 @@ class AuditLogger:
                 event.get("agent_decision"),
                 event.get("agent_reasoning"),
                 event.get("mitre_technique"),
-                event.get("iso_control"),
+                event.get("nist_control"),
                 event.get("hitl_approved"),
                 event.get("latency_ms"),
                 json.dumps(event.get("metadata", {})),

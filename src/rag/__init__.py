@@ -1,5 +1,5 @@
 """
-Module RAG: Dual Retrieval-Augmented Generation (MITRE ATT&CK + ISO 27001).
+Module RAG: Dual Retrieval-Augmented Generation (MITRE ATT&CK + NIST SP 800-61r2).
 
 Bao gom cac thanh phan:
 - Embedder: Tao FAISS index tu knowledge base.

@@ -105,7 +105,7 @@ def build_ground_truth(
         for _, row in chosen.iterrows():
             sample = {
                 "gt_id": f"GT-{gt_counter:03d}",
-                "description": f"{label} attack sample from CICIDS2017",
+                "description": f"{label} attack sample from CSE-CIC-IDS2018",
                 "input": {
                     "network_layer": {
                         "src_ip": str(row.get("Source IP", "0.0.0.0")),
@@ -132,7 +132,7 @@ def build_ground_truth(
                     "action": mapping["action"],
                     "severity": mapping["severity"],
                 },
-                "labeling_notes": f"Auto-mapped from CICIDS2017 label '{label}'. VERIFY before use.",
+                "labeling_notes": f"Auto-mapped from CSE-CIC-IDS2018 label '{label}'. VERIFY before use.",
             }
             samples.append(sample)
             gt_counter += 1

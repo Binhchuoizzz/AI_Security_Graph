@@ -80,7 +80,7 @@ def node_rag_context(state: SentinelState) -> Dict[str, Any]:
     # Trả về các trường cần update vào State
     return {
         "rag_mitre_context": results.get("mitre_context", ""),
-        "rag_iso_context": results.get("iso_context", ""),
+        "rag_nist_context": results.get("nist_context", ""),
     }
 
 
@@ -129,7 +129,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         raw_logs_str = emergency_enc.encapsulate(raw_content)
 
     # 2. Xây dựng Prompt (inject Guardrails system_instruction vào LLM)
-    rag_combined = f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nISO 27001:\n{state.rag_iso_context}"
+    rag_combined = f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nNIST SP 800-61r2:\n{state.rag_nist_context}"
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_combined)
 
     # CRITICAL: Inject Guardrails system instruction vào system prompt
@@ -196,7 +196,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         "reasoning": reasoning,
         "target": target,
         "mitre_technique": decision_json.get("mitre_technique", ""),
-        "iso_control": decision_json.get("iso_control", ""),
+        "nist_control": decision_json.get("nist_control", ""),
         "cycle_count": state.cycle_count + 1,
     }
 

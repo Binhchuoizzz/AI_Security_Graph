@@ -6,7 +6,7 @@ suy luận của Gemma 9B (Google) — tránh Self-Enhancement Bias.
 
 WORKFLOW:
   1. Chạy run_ablation_study.py với Gemma 9B → lưu reasoning_outputs
-  2. Unload Gemma 9B → Load Llama 3 8B trên Oobabooga
+  2. Unload Gemma 9B → Load Llama 3 8B trên LLM server
   3. Chạy script này → Llama 3 chấm điểm reasoning quality
   4. Kết quả: reasoning_eval_results.json + MLflow metrics
 
@@ -14,7 +14,7 @@ EVALUATION RUBRIC (4 chiều RAGAS-aligned, thang 1-5):
   - Context Precision: Xác định đúng kỹ thuật tấn công (MITRE)?
   - Answer Relevancy: Hành động đề xuất có giải quyết đúng mối đe dọa?
   - Faithfulness: Phân tích dựa trên sự thật, không bịa đặt (hallucinate)?
-  - Context Recall: Trích xuất và sử dụng đúng context ISO/MITRE?
+  - Context Recall: Trích xuất và sử dụng đúng context NIST/MITRE?
 
 EVAL_SCHEMA_VERSION = "v2_5D"
 """
@@ -27,7 +27,7 @@ import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Oobabooga OpenAI-compatible API
+# OpenAI-compatible API (Oobabooga / llama.cpp)
 LLM_API_BASE = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
 
 ABLATION_RESULTS_PATH = os.path.join(
@@ -79,7 +79,7 @@ Rate each dimension (1-5):
 - 1: Significant hallucination or completely illogical
 
 **4. Context Recall (1-5)**
-- 5: Extracted and effectively used MITRE/ISO context in analysis
+- 5: Extracted and effectively used MITRE/NIST context in analysis
 - 3: Mentioned context but didn't integrate well
 - 1: Ignored available context entirely
 
@@ -88,7 +88,7 @@ Respond ONLY in this JSON format:
 
 
 def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
-    """Call Oobabooga API (Llama 3 loaded) to judge reasoning quality."""
+    """Call LLM Judge API (Llama 3 loaded) to judge reasoning quality."""
     import requests
 
     try:
@@ -147,7 +147,7 @@ def format_decisions(decisions: list) -> str:
             f"    Target: {d.get('target', 'N/A')}\n"
             f"    Confidence: {d.get('confidence', 'N/A')}\n"
             f"    MITRE: {d.get('mitre_technique', 'N/A')}\n"
-            f"    ISO: {d.get('iso_control', 'N/A')}\n"
+            f"    NIST: {d.get('nist_control', 'N/A')}\n"
             f"    Reasoning: {d.get('reasoning', 'N/A')}"
         )
     return "\n".join(parts)
@@ -179,7 +179,7 @@ def run_judge_evaluation():
     print(f"    Escalated to LLM (will judge): {len(escalated)}")
     print(f"    Not escalated (Tier 1 only): {len(not_escalated)}")
     print(f"\n[*] Starting LLM-as-Judge evaluation...")
-    print(f"    Judge Model: Llama 3 (loaded on Oobabooga at {LLM_API_BASE})")
+    print(f"    Judge Model: Llama 3 (loaded on LLM server at {LLM_API_BASE})")
     print(f"    Agent Model: Gemma 9B (outputs from ablation study)")
     print()
 

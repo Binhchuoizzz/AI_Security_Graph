@@ -17,8 +17,8 @@
 
 **Lưu ý về Hệ sinh thái 3 Models:** Để tái lập hoàn toàn nghiên cứu này, cần 3 models độc lập:
 1. `all-MiniLM-L6-v2` (Tự động tải về khi chạy code Python).
-2. `Gemma 2 9B Q6_K` hoặc tương đương (Model Triage chính - Reasoning LLM, yêu cầu ~12GB VRAM, chạy trên Oobabooga).
-3. `Llama 3 8B Instruct` (Chỉ dùng lúc Evaluate RAGAS, chạy trên Oobabooga).
+2. `Gemma 2 9B Q6_K` hoặc tương đương (Model Triage chính - Reasoning LLM, yêu cầu ~12GB VRAM, chạy trên LLM server (Oobabooga/llama.cpp)).
+3. `Llama 3 8B Instruct` (Chỉ dùng lúc Evaluate RAGAS, chạy trên LLM server (Oobabooga/llama.cpp)).
 *Trong môi trường Production thực tế, hệ thống chỉ cần Model 1 và 2.*
 
 ---
@@ -47,10 +47,10 @@ docker-compose up -d redis mlflow
 
 ---
 
-## 3. LLM Setup (Oobabooga Text Generation WebUI)
+## 3. LLM Setup (LLM Server (Oobabooga/llama.cpp))
 
 ```bash
-# Cài đặt Oobabooga
+# Option A: Oobabooga
 git clone https://github.com/oobabooga/text-generation-webui.git
 cd text-generation-webui
 ./start_linux.sh
@@ -69,13 +69,13 @@ cd text-generation-webui
 |---|---|---|
 | Rule Engine & Session Baseline | Tier 1 — Heuristic filter | Tự động (Python thuần, không cần GPU) |
 | `all-MiniLM-L6-v2` | Embedding cho RAG (FAISS) | Tự động (chạy ngầm qua `sentence-transformers`) |
-| `Gemma 2 9B Q6_K` | LLM Reasoning (Tier 2 Agent) | **Cần bật Oobabooga** trước khi chạy `main.py` |
+| `Gemma 2 9B Q6_K` | LLM Reasoning (Tier 2 Agent) | **Cần bật LLM server** trước khi chạy `main.py` |
 
 ---
 
 ## 4. Dataset Preparation
 
-### CICIDS2017 (CSV từ HuggingFace)
+### CSE-CIC-IDS2018 (CSV từ HuggingFace)
 
 ```bash
 # Tải tự động qua script
@@ -100,7 +100,7 @@ python scripts/fetch_and_build_dataset.py
 # Terminal 1: Infrastructure
 docker-compose up -d redis mlflow
 
-# Terminal 2: Bật Oobabooga + Load Gemma 9B
+# Terminal 2: Bật Oobabooga + Load Gemma 9B (Oobabooga/llama.cpp)
 
 # Terminal 3: SENTINEL Core — xem trực tiếp các Node hoạt động
 source .venv/bin/activate && python main.py
@@ -135,7 +135,7 @@ python experiments/evaluate_robustness.py
 ### 5.4 RAGAS-inspired LLM-as-Judge (Llama 3 8B loaded)
 
 ```bash
-# 4. Unload Gemma 9B → Load Llama 3 8B Instruct trên Oobabooga
+# 4. Unload Gemma 9B → Load Llama 3 8B Instruct trên LLM server
 # 5. Chạy Cross-Family LLM-as-Judge + Audit Completeness
 python experiments/evaluate_reasoning.py
 ```

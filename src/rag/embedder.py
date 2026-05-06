@@ -2,15 +2,15 @@
 RAG: Knowledge Base Embedder (FAISS Index Builder)
 
 CHỨC NĂNG:
-  Đọc knowledge base JSON (MITRE ATT&CK + ISO 27001) → tạo text chunks
+  Đọc knowledge base JSON (MITRE ATT&CK + NIST SP 800-61r2) → tạo text chunks
   → embed bằng Sentence-Transformers → build FAISS index riêng cho mỗi nguồn.
 
   Tạo ra 2 FAISS index:
     knowledge_base/faiss_index/mitre_attack.index
-    knowledge_base/faiss_index/iso_27001.index
+    knowledge_base/faiss_index/nist_800_61r2.index
   + 2 metadata files:
     knowledge_base/faiss_index/mitre_attack_metadata.json
-    knowledge_base/faiss_index/iso_27001_metadata.json
+    knowledge_base/faiss_index/nist_800_61r2_metadata.json
 
   Metadata map: vector index position → original chunk text + source ID
 
@@ -44,7 +44,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 KB_DIR = os.path.join(BASE_DIR, "knowledge_base")
 INDEX_DIR = os.path.join(KB_DIR, "faiss_index")
 MITRE_JSON = os.path.join(KB_DIR, "mitre_attack.json")
-ISO_JSON = os.path.join(KB_DIR, "iso_27001_controls.json")
+NIST_JSON = os.path.join(KB_DIR, "nist_800_61r2.json")
 
 # Khởi tạo mô hình
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -96,12 +96,12 @@ def load_mitre_chunks() -> list[dict]:
     return chunks
 
 
-def load_iso_chunks() -> list[dict]:
+def load_nist_chunks() -> list[dict]:
     """
-    Chuyển mỗi ISO 27001 control thành 1 text chunk để embed.
+    Chuyển mỗi NIST SP 800-61r2 phase/control thành 1 text chunk để embed.
     Format chunk: "A.8.20 - Networks security (Technological Controls): ..."
     """
-    with open(ISO_JSON, "r", encoding="utf-8") as f:
+    with open(NIST_JSON, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     chunks = []
@@ -121,7 +121,7 @@ def load_iso_chunks() -> list[dict]:
             {
                 "text": chunk_text,
                 "metadata": {
-                    "source": "iso_27001",
+                    "source": "nist_800_61r2",
                     "id": ctrl["control"],
                     "name": ctrl["name"],
                     "domain": ctrl.get("domain", "Unknown"),
@@ -129,7 +129,7 @@ def load_iso_chunks() -> list[dict]:
             }
         )
 
-    logger.info(f"Loaded {len(chunks)} ISO 27001 control chunks")
+    logger.info(f"Loaded {len(chunks)} NIST SP 800-61r2 control chunks")
     return chunks
 
 
@@ -210,7 +210,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
 
 def build_all_indexes():
-    """Build cả 2 FAISS indexes: MITRE ATT&CK + ISO 27001."""
+    """Build cả 2 FAISS indexes: MITRE ATT&CK + NIST SP 800-61r2."""
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError as e:
@@ -229,13 +229,13 @@ def build_all_indexes():
     mitre_chunks = load_mitre_chunks()
     build_indexes(mitre_chunks, "mitre_attack", model=shared_model)
 
-    # ISO 27001 (Khung tiêu chuẩn kiểm soát bảo mật)
-    iso_chunks = load_iso_chunks()
-    build_indexes(iso_chunks, "iso_27001", model=shared_model)
+    # NIST SP 800-61r2 (Khung ứng phó sự cố bảo mật)
+    nist_chunks = load_nist_chunks()
+    build_indexes(nist_chunks, "nist_800_61r2", model=shared_model)
 
     logger.info("=" * 60)
     logger.info(f"All indexes built successfully in: {INDEX_DIR}")
-    logger.info(f"Total vectors: {len(mitre_chunks) + len(iso_chunks)}")
+    logger.info(f"Total vectors: {len(mitre_chunks) + len(nist_chunks)}")
     logger.info("=" * 60)
 
 

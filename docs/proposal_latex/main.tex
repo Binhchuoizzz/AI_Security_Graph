@@ -177,12 +177,14 @@ Following the guardrails, the sanitized log enters Tier 2, governed by a LangGra
 \end{itemize}
 This fixed dual-index design eliminates the need for a routing mechanism, reducing failure points and ensuring predictable latency for evaluation. The separation bridges the gap between \textit{tactical identification} (MITRE: what happened) and \textit{operational response} (NIST: what to do about it).
 
+Each index employs a \textbf{Hybrid Search} strategy combining dense semantic search (FAISS with \verb|all-MiniLM-L6-v2|) with sparse keyword matching (BM25Okapi), fused via \textbf{Reciprocal Rank Fusion (RRF, k=60)} \cite{rrf2009}. This dual-signal approach maximizes both semantic understanding and exact-match recall for security-specific identifiers such as CVE IDs, IP addresses, and port numbers. Retrieved chunks undergo \textbf{Structural Sanitization}---Unicode normalization, control character removal, and length truncation---to defend against RAG Poisoning before injection into the LLM prompt.
+
 Finally, to ensure system safety against Adversarial Rule Injection, the LLM cannot directly modify the Tier 1 firewall. Instead, its recommended rules are placed into a Quarantine state (Human-in-the-Loop Feedback Loop). A SOC manager reviews these rules via a Dashboard before they are hot-reloaded into the Tier 1 engine.
 
 \subsection{Technologies and Tools}
 The system is built on modern Python frameworks. The data streaming and short-term session tracking rely on Redis. The LLM reasoning engine utilizes a local quantized model (Gemma-2-9B-IT) in GGUF Q4\_K\_M format, served via llama.cpp, ensuring absolute data privacy and full offline operation.
 
-The agentic workflow is orchestrated by LangGraph, enabling cyclical decision-making and tool-use. For knowledge retrieval, \verb|sentence-transformers| is used alongside FAISS for efficient semantic vector search. The user interface and Human-in-the-Loop dashboard are developed using Streamlit, while long-term threat memory and audit trails are persisted using SQLite.
+The agentic workflow is orchestrated by LangGraph, enabling cyclical decision-making and tool-use. For knowledge retrieval, \verb|sentence-transformers| is used alongside FAISS for dense semantic vector search and BM25Okapi (\verb|rank\_bm25|) for sparse keyword matching. The user interface and Human-in-the-Loop dashboard are developed using Streamlit, while long-term threat memory and audit trails are persisted using SQLite.
 
 \subsubsection{Hardware Specification}
 To ensure full reproducibility of latency benchmarks, all experiments are conducted on the following hardware:
@@ -333,6 +335,9 @@ The expected contributions of this research include proposing a novel hybrid arc
 
     \bibitem{zheng2023}
     L. Zheng \emph{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \emph{Proceedings of NeurIPS 2023}, 2023.
+
+    \bibitem{rrf2009}
+    G. V. Cormack, C. L. A. Clarke, and S. Buettcher, ``Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods,'' in \emph{Proceedings of the 32nd International ACM SIGIR Conference on Research and Development in Information Retrieval}, 2009, pp. 758--759.
 
 \end{thebibliography}
 

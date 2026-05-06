@@ -31,7 +31,7 @@ class SemanticCache:
     """
     LRU Cache cho RAG query results.
     Key: hash của query template (từ LogTemplateMiner output)
-    Value: FAISS search results (MITRE + ISO contexts)
+    Value: FAISS search results (MITRE + NIST contexts)
 
     Dùng OrderedDict để implement LRU eviction khi cache đầy.
     TTL đảm bảo cache không bị stale.

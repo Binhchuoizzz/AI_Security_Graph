@@ -12,7 +12,7 @@ agent:
   enabled: true
 
 rag:
-  enabled_sources: ["mitre", "iso"]
+  enabled_sources: ["mitre", "nist"]
 
 evaluation:
   tag: "ablation_B_llm_only"
