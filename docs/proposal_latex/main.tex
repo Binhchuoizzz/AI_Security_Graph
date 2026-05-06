@@ -19,7 +19,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{url}
-\usepackage{natbib}
+\usepackage{cite} % IEEE numbered citation style
 \usepackage{array}
 \usepackage{longtable}
 \usepackage{float}
@@ -96,9 +96,9 @@ The proposed system will be implemented and evaluated on two benchmark datasets:
 \section{Introduction and Background}
 
 \subsection{Research Problem}
-Modern Security Operations Centers (SOCs) are overwhelmed by the sheer volume of security events. According to recent industry reports, the average SOC analyst processes thousands of alerts daily, with nearly half identified as false positives \citep{ponemon2023}. This phenomenon, known as \textit{alert fatigue}, leads to critical threats being overlooked. Traditional IDS/SIEM systems exacerbate this problem by analyzing data sources (Web logs, Firewall logs, Authentication logs) in isolation, severely reducing the ability to detect sophisticated multi-stage attack chains such as Advanced Persistent Threats (APTs).
+Modern Security Operations Centers (SOCs) are overwhelmed by the sheer volume of security events. According to recent industry reports, the average SOC analyst processes thousands of alerts daily, with nearly half identified as false positives \cite{ponemon2023}. This phenomenon, known as \textit{alert fatigue}, leads to critical threats being overlooked. Traditional IDS/SIEM systems exacerbate this problem by analyzing data sources (Web logs, Firewall logs, Authentication logs) in isolation, severely reducing the ability to detect sophisticated multi-stage attack chains such as Advanced Persistent Threats (APTs).
 
-The application of Large Language Models (LLMs), particularly Agentic AI and Retrieval-Augmented Generation (RAG) architectures, to automated log analysis introduces critical operational and security vulnerabilities. First, the \textit{reasoning latency} is prohibitively high for real-time streaming environments. Second, Agentic AI architectures drastically expand the attack surface beyond traditional LLMs. These autonomous systems are highly susceptible to a spectrum of adversarial vectors: \textit{Indirect Prompt Injection} and \textit{Jailbreaks} hidden within log data \citep{greshake2023}, where adversaries embed malicious instructions in dynamic fields (e.g., User-Agent) to hijack the agent's logic. Furthermore, granting agents access to execution environments creates the risk of \textit{Sandbox Escape} and \textit{Remote Code Execution (RCE)}, while rendering LLM outputs on analyst dashboards introduces \textit{Data Exfiltration} vulnerabilities via malicious Markdown rendering. Additionally, relying on external knowledge bases exposes the system to \textit{RAG Poisoning}, where threat actors manipulate reference documents to subvert the agent's contextual understanding. This creates a fundamental paradox: analysts must grant the agent dynamic context and execution capabilities to analyze attacks, yet doing so exposes the SOC infrastructure to hijacking.
+The application of Large Language Models (LLMs), particularly Agentic AI and Retrieval-Augmented Generation (RAG) architectures, to automated log analysis introduces critical operational and security vulnerabilities. First, the \textit{reasoning latency} is prohibitively high for real-time streaming environments. Second, Agentic AI architectures drastically expand the attack surface beyond traditional LLMs. These autonomous systems are highly susceptible to a spectrum of adversarial vectors: \textit{Indirect Prompt Injection} and \textit{Jailbreaks} hidden within log data \cite{greshake2023}, where adversaries embed malicious instructions in dynamic fields (e.g., User-Agent) to hijack the agent's logic. Furthermore, granting agents access to execution environments creates the risk of \textit{Sandbox Escape} and \textit{Remote Code Execution (RCE)}, while rendering LLM outputs on analyst dashboards introduces \textit{Data Exfiltration} vulnerabilities via malicious Markdown rendering. Additionally, relying on external knowledge bases exposes the system to \textit{RAG Poisoning}, where threat actors manipulate reference documents to subvert the agent's contextual understanding. This creates a fundamental paradox: analysts must grant the agent dynamic context and execution capabilities to analyze attacks, yet doing so exposes the SOC infrastructure to hijacking.
 
 \subsection{Research Objectives}
 Motivated by these limitations, this study aims to develop an autonomous AI Security Agent utilizing a cognitive two-tier architecture. Instead of relying purely on a single LLM to process all logs, the thesis proposes a hybrid approach: a high-speed deterministic rule engine combined with a deep-reasoning LLM Agent. This approach is expected to drastically reduce reasoning latency by filtering noise, mitigate prompt injection via bounded encapsulation, and enhance context awareness using Long-Term Threat Memory and a Dual-RAG setup (incorporating MITRE ATT\&CK for tactical threat identification and NIST SP 800-61r2 for incident response guidance). A Human-in-the-Loop (HITL) Web Dashboard will also be developed to demonstrate practical SOC automation.
@@ -123,36 +123,36 @@ The thesis will be organized into six main chapters: (1) Introduction and Backgr
 \section{Literature Review}
 
 \subsection{Foundational Approaches}
-In the early stages of network security, Intrusion Detection Systems (IDS) primarily relied on signature-based matching (e.g., Snort, Suricata) to detect known threats. While highly efficient in terms of throughput, these systems exhibit significant limitations in identifying zero-day attacks and polymorphic malware \citep{khraisat2019}.
+In the early stages of network security, Intrusion Detection Systems (IDS) primarily relied on signature-based matching (e.g., Snort, Suricata) to detect known threats. While highly efficient in terms of throughput, these systems exhibit significant limitations in identifying zero-day attacks and polymorphic malware \cite{khraisat2019}.
 
-The advent of Machine Learning (ML) led to anomaly-based IDS, where models such as Random Forests, LSTMs, and domain-specific transformers like LogBERT \citep{logbert2021} learn a baseline of normal behavior and flag deviations. While these approaches improved zero-day detection, they remain fundamentally limited to pattern-based anomaly scoring. They cannot explain \textit{why} a log sequence is malicious, map threats to standardized frameworks, or generate actionable remediation steps—capabilities that require the contextual reasoning of a Large Language Model.
+The advent of Machine Learning (ML) led to anomaly-based IDS, where models such as Random Forests, LSTMs, and domain-specific transformers like LogBERT \cite{logbert2021} learn a baseline of normal behavior and flag deviations. While these approaches improved zero-day detection, they remain fundamentally limited to pattern-based anomaly scoring. They cannot explain \textit{why} a log sequence is malicious, map threats to standardized frameworks, or generate actionable remediation steps—capabilities that require the contextual reasoning of a Large Language Model.
 
 Modern Security Information and Event Management (SIEM) systems aggregate logs, yet they still require extensive manual triage by human analysts to construct the full context of an attack.
 
 \subsection{Related Work}
-The recent emergence of Large Language Models (LLMs) has opened new directions for automated log summarization and incident response. Comprehensive surveys such as \citet{habibzadeh2025} demonstrate the growing adoption of cloud-based LLM APIs (e.g., GPT-4) for SOC automation, including log summarization and incident triage. However, relying on cloud APIs violates strict organizational data privacy policies and introduces unacceptable network latency for real-time triage.
+The recent emergence of Large Language Models (LLMs) has opened new directions for automated log summarization and incident response. Comprehensive surveys such as \cite{habibzadeh2025} demonstrate the growing adoption of cloud-based LLM APIs (e.g., GPT-4) for SOC automation, including log summarization and incident triage. However, relying on cloud APIs violates strict organizational data privacy policies and introduces unacceptable network latency for real-time triage.
 
-In the realm of knowledge-augmented threat analysis, knowledge graph-based approaches to threat intelligence mapping \citep{attackg2023} have shown promising results in automatically extracting and structuring attack techniques from CTI reports into MITRE ATT\&CK-aligned graphs. Yet, existing studies generally focus solely on tactical analysis, lacking the integration of operational incident response standards (such as NIST SP 800-61r2) required for actionable SOC remediation.
+In the realm of knowledge-augmented threat analysis, knowledge graph-based approaches to threat intelligence mapping \cite{attackg2023} have shown promising results in automatically extracting and structuring attack techniques from CTI reports into MITRE ATT\&CK-aligned graphs. Yet, existing studies generally focus solely on tactical analysis, lacking the integration of operational incident response standards (such as NIST SP 800-61r2) required for actionable SOC remediation.
 
-Regarding adversarial robustness, the OWASP Top 10 for LLM Applications \citep{owasp2025} and the Agent Security Bench (ASB) \citep{zhang2024asb} highlight that LLM agents suffer from high attack success rates via prompt injection. While the Drain3 algorithm \citep{he2017} is widely used for log template mining, it is typically employed for storage compression rather than active injection defense. Furthermore, recent methodologies for LLM evaluation emphasize the need to address Self-Enhancement Bias by employing cross-family evaluation or statistical validation instead of isolated LLM-as-a-Judge paradigms \citep{zheng2023, ragas2023}. These studies reveal a critical research gap that this thesis seeks to address: the absence of a unified, self-defending architecture with rigorous, multi-dimensional evaluation.
+Regarding adversarial robustness, the OWASP Top 10 for LLM Applications \cite{owasp2025} and the Agent Security Bench (ASB) \cite{zhang2024asb} highlight that LLM agents suffer from high attack success rates via prompt injection. While the Drain3 algorithm \cite{he2017} is widely used for log template mining, it is typically employed for storage compression rather than active injection defense. Furthermore, recent methodologies for LLM evaluation emphasize the need to address Self-Enhancement Bias by employing cross-family evaluation or statistical validation instead of isolated LLM-as-a-Judge paradigms \cite{zheng2023, ragas2023}. These studies reveal a critical research gap that this thesis seeks to address: the absence of a unified, self-defending architecture with rigorous, multi-dimensional evaluation.
 
 \subsubsection{Comparative Analysis of Existing Approaches}
 
 \begin{table}[H]
-\centering
-\caption{Comparison of approaches for SOC log analysis}
-\label{tab:comparison}
-\begin{tabular}{lccccc}
-\toprule
-\textbf{Approach} & \textbf{Local} & \textbf{Real-time} & \textbf{Anti-Injection} & \textbf{RAG} & \textbf{HITL} \\
-\midrule
-Signature IDS (Snort)             & \checkmark & \checkmark & N/A        & --         & --         \\
-ML Anomaly IDS (RF/LSTM)          & \checkmark & \checkmark & --         & --         & --         \\
-LogBERT \citep{logbert2021}       & \checkmark & \checkmark & --         & --         & --         \\
-Cloud LLM SOC \citep{habibzadeh2025} & --      & --         & --         & Partial    & --         \\
-\textbf{SENTINEL (Ours)}          & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
-\bottomrule
-\end{tabular}
+    \centering
+    \caption{Comparison of approaches for SOC log analysis}
+    \label{tab:comparison}
+    \begin{tabular}{lccccc}
+        \toprule
+        \textbf{Approach}                   & \textbf{Local} & \textbf{Real-time} & \textbf{Anti-Injection} & \textbf{RAG} & \textbf{HITL} \\
+        \midrule
+        Signature IDS (Snort)               & \checkmark     & \checkmark         & N/A                     & --           & --            \\
+        ML Anomaly IDS (RF/LSTM)            & \checkmark     & \checkmark         & --                      & --           & --            \\
+        LogBERT \cite{logbert2021}          & \checkmark     & \checkmark         & --                      & --           & --            \\
+        Cloud LLM SOC \cite{habibzadeh2025} & --             & --                 & --                      & Partial      & --            \\
+        \textbf{SENTINEL (Ours)}            & \checkmark     & \checkmark         & \checkmark              & \checkmark   & \checkmark    \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 % =============================================================================
@@ -173,7 +173,7 @@ Logs that exhibit anomalous behavior or trigger ambiguous thresholds are passed 
 Following the guardrails, the sanitized log enters Tier 2, governed by a LangGraph-based Agent. The Agent utilizes a Dual-RAG mechanism with two dedicated FAISS indexes, queried sequentially and merged before LLM inference:
 \begin{itemize}
     \item \textbf{Index 1 — MITRE ATT\&CK:} Maps observed indicators to specific tactics, techniques, and procedures (TTPs), answering \textit{``what attack is happening?''}
-    \item \textbf{Index 2 — NIST SP 800-61r2 \citep{nist80061}:} Retrieves the appropriate incident response phase (Preparation, Detection, Containment, Eradication, Recovery, Lessons Learned), answering \textit{``what should the SOC do next?''}
+    \item \textbf{Index 2 — NIST SP 800-61r2 \cite{nist80061}:} Retrieves the appropriate incident response phase (Preparation, Detection, Containment, Eradication, Recovery, Lessons Learned), answering \textit{``what should the SOC do next?''}
 \end{itemize}
 This fixed dual-index design eliminates the need for a routing mechanism, reducing failure points and ensuring predictable latency for evaluation. The separation bridges the gap between \textit{tactical identification} (MITRE: what happened) and \textit{operational response} (NIST: what to do about it).
 
@@ -188,18 +188,18 @@ The agentic workflow is orchestrated by LangGraph, enabling cyclical decision-ma
 To ensure full reproducibility of latency benchmarks, all experiments are conducted on the following hardware:
 
 \begin{table}[H]
-\centering
-\begin{tabular}{ll}
-\toprule
-\textbf{Component} & \textbf{Specification} \\
-\midrule
-CPU  & Intel Core i7-14700KF (28 threads) @ 5.700 GHz \\
-GPU  & NVIDIA GeForce RTX 4060 Ti (16 GB VRAM) \\
-RAM  & 32 GB DDR5 \\
-OS   & Ubuntu 24.04.4 LTS (x86\_64, Kernel 6.17) \\
-LLM Backend & llama.cpp with GGUF Q4\_K\_M quantization \\
-\bottomrule
-\end{tabular}
+    \centering
+    \begin{tabular}{ll}
+        \toprule
+        \textbf{Component} & \textbf{Specification}                         \\
+        \midrule
+        CPU                & Intel Core i7-14700KF (28 threads) @ 5.700 GHz \\
+        GPU                & NVIDIA GeForce RTX 4060 Ti (16 GB VRAM)        \\
+        RAM                & 32 GB DDR5                                     \\
+        OS                 & Ubuntu 24.04.4 LTS (x86\_64, Kernel 6.17)      \\
+        LLM Backend        & llama.cpp with GGUF Q4\_K\_M quantization      \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 % =============================================================================
@@ -212,8 +212,8 @@ LLM Backend & llama.cpp with GGUF Q4\_K\_M quantization \\
 The implementation process will first focus on the Data Ingestion and Tier 1 Rule Engine. Two benchmark datasets are selected for evaluation:
 
 \begin{itemize}
-    \item \textbf{CSE-CIC-IDS2018 \citep{sharafaldin2018}:} The de facto standard for enterprise network intrusion detection research. As of 2025, no publicly available general-purpose enterprise NIDS dataset post-2018 exists. CIC's 2023--2026 releases (CICIoT2023, CIC-YNU-IoTMal 2026) target IoT environments and are not representative of enterprise SOC traffic. CSE-CIC-IDS2018 provides both raw PCAP and pre-extracted flow features, and its extensive adoption enables direct comparison with prior work.
-    \item \textbf{DAPT2020 \citep{dapt2020}:} A purpose-built dataset for multi-stage Advanced Persistent Threat detection. This complements CSE-CIC-IDS2018 by providing attack chains that exercise SENTINEL's Tier 2 agent and Long-Term Threat Memory capabilities.
+    \item \textbf{CSE-CIC-IDS2018 \cite{sharafaldin2018}:} The de facto standard for enterprise network intrusion detection research. As of 2025, no publicly available general-purpose enterprise NIDS dataset post-2018 exists. CIC's 2023--2026 releases (CICIoT2023, CIC-YNU-IoTMal 2026) target IoT environments and are not representative of enterprise SOC traffic. CSE-CIC-IDS2018 provides both raw PCAP and pre-extracted flow features, and its extensive adoption enables direct comparison with prior work.
+    \item \textbf{DAPT2020 \cite{dapt2020}:} A purpose-built dataset for multi-stage Advanced Persistent Threat detection. This complements CSE-CIC-IDS2018 by providing attack chains that exercise SENTINEL's Tier 2 agent and Long-Term Threat Memory capabilities.
 \end{itemize}
 
 The session-tracking mechanism will be built using Redis TTLs to establish behavioral baselines.
@@ -233,7 +233,7 @@ The evaluation metrics will include:
     \item \textbf{1. Classification:} F1-Score, Precision, Recall, and False Positive Rate (FPR), evaluated using McNemar's Test ($p<0.05$) for statistical significance.
     \item \textbf{2. Operational:} Processing Latency (serving as a proxy for Mean Time To Detect/Respond), HITL Escalation Rate, and RAG Semantic Cache Hit Rate, evaluated using the Mann-Whitney U Test ($p<0.05$).
     \item \textbf{3. Robustness:} The Guardrail Defeat Rate will be tested against 45 curated adversarial samples covering Structural Attacks (Delimiter Smuggling) and Semantic Confusion.
-    \item \textbf{4. Context Quality:} To evaluate the LLM's reasoning and mitigate Self-Enhancement Bias, a cross-family LLM-as-a-Judge methodology will be employed: while Gemma-2-9B-IT serves as the primary reasoning model, \textbf{Llama-3.1-8B-Instruct} (a different model family) will serve as the judge, assessing Context Precision, Answer Relevancy, Faithfulness, and Context Recall using the RAGAS framework \citep{ragas2023}. Judge scores will be cross-validated with automated RAGAS metrics for statistical consistency.
+    \item \textbf{4. Context Quality:} To evaluate the LLM's reasoning and mitigate Self-Enhancement Bias, a cross-family LLM-as-a-Judge methodology will be employed: while Gemma-2-9B-IT serves as the primary reasoning model, \textbf{Llama-3.1-8B-Instruct} (a different model family) will serve as the judge, assessing Context Precision, Answer Relevancy, Faithfulness, and Context Recall using the RAGAS framework \cite{ragas2023}. Judge scores will be cross-validated with automated RAGAS metrics for statistical consistency.
     \item \textbf{5. Explainability:} Audit Trail Completeness Rate will be measured deterministically via programmatic field presence checks.
 \end{itemize}
 
@@ -247,20 +247,20 @@ The evaluation metrics will include:
 This study is expected to develop a complete, autonomous pipeline capable of performing the full sequence of SOC tasks—log ingestion, heuristic filtering, adversarial sanitization, deep reasoning, and rule generation. The quantitative targets for the 5D Evaluation Framework are as follows:
 
 \begin{table}[H]
-\centering
-\caption{Quantitative performance targets}
-\label{tab:targets}
-\begin{tabular}{lll}
-\toprule
-\textbf{Dimension} & \textbf{Target} & \textbf{Basis} \\
-\midrule
-F1-Score (Classification)         & $\geq 0.90$  & IDS benchmark standards \citep{khraisat2019} \\
-Latency Reduction vs LLM-only    & $\geq 60\%$  & Tier 1 filters majority of traffic \\
-Guardrail Defeat Rate             & $< 10\%$     & 45 curated adversarial samples \\
-Context Relevance (RAGAS)         & $\geq 0.85$  & Dual-RAG with MITRE + NIST \\
-Audit Trail Completeness          & $100\%$      & Deterministic field-presence check \\
-\bottomrule
-\end{tabular}
+    \centering
+    \caption{Quantitative performance targets}
+    \label{tab:targets}
+    \begin{tabular}{lll}
+        \toprule
+        \textbf{Dimension}            & \textbf{Target} & \textbf{Basis}                              \\
+        \midrule
+        F1-Score (Classification)     & $\geq 0.90$     & IDS benchmark standards \cite{khraisat2019} \\
+        Latency Reduction vs LLM-only & $\geq 60\%$     & Tier 1 filters majority of traffic          \\
+        Guardrail Defeat Rate         & $< 10\%$        & 45 curated adversarial samples              \\
+        Context Relevance (RAGAS)     & $\geq 0.85$     & Dual-RAG with MITRE + NIST                  \\
+        Audit Trail Completeness      & $100\%$         & Deterministic field-presence check          \\
+        \bottomrule
+    \end{tabular}
 \end{table}
 
 The integration of Delimited Data Encapsulation is expected to achieve a Guardrail Defeat Rate below 10\% against structural prompt injection attacks, demonstrating a robust defense mechanism without stripping away the necessary payload forensics required by the LLM.
@@ -292,75 +292,47 @@ The expected contributions of this research include proposing a novel hybrid arc
 \addcontentsline{toc}{section}{References}
 \begin{thebibliography}{99}
 
-    \bibitem[Cichonski et al.(2012)]{nist80061}
-    Cichonski, P., Millar, T., Grance, T., \& Scarfone, K. (2012).
-    \textit{Computer Security Incident Handling Guide}.
-    NIST Special Publication 800-61 Revision 2.
+    \bibitem{nist80061}
+    P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' \emph{NIST Special Publication 800-61 Revision 2}, 2012.
 
-    \bibitem[Greshake et al.(2023)]{greshake2023}
-    Greshake, K., Abdelnabi, S., Mishra, S., Endres, A., Holz, T., \& Fritz, M. (2023).
-    \textit{More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models}.
-    arXiv preprint arXiv:2302.12173.
+    \bibitem{greshake2023}
+    K. Greshake, S. Abdelnabi, S. Mishra, A. Endres, T. Holz, and M. Fritz, ``More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models,'' \emph{arXiv preprint arXiv:2302.12173}, 2023.
 
-    \bibitem[Guo et al.(2021)]{logbert2021}
-    Guo, H., Yuan, S., \& Wu, X. (2021).
-    \textit{LogBERT: Log Anomaly Detection via BERT}.
-    2021 International Joint Conference on Neural Networks (IJCNN), IEEE.
+    \bibitem{logbert2021}
+    H. Guo, S. Yuan, and X. Wu, ``LogBERT: Log Anomaly Detection via BERT,'' in \emph{2021 International Joint Conference on Neural Networks (IJCNN)}, IEEE, 2021.
 
-    \bibitem[Habibzadeh et al.(2025)]{habibzadeh2025}
-    Habibzadeh, M., et al. (2025).
-    \textit{Large Language Models for Security Operations Centers: A Comprehensive Survey}.
-    arXiv preprint.
+    \bibitem{habibzadeh2025}
+    M. Habibzadeh \emph{et al.}, ``Large Language Models for Security Operations Centers: A Comprehensive Survey,'' \emph{arXiv preprint}, 2025.
 
-    \bibitem[He et al.(2017)]{he2017}
-    He, P., Zhu, J., Zheng, Z., \& Lyu, M. R. (2017).
-    \textit{Drain: An Online Log Parsing Approach with Fixed Depth Tree}.
-    2017 IEEE International Conference on Web Services (ICWS).
+    \bibitem{he2017}
+    P. He, J. Zhu, Z. Zheng, and M. R. Lyu, ``Drain: An Online Log Parsing Approach with Fixed Depth Tree,'' in \emph{2017 IEEE International Conference on Web Services (ICWS)}, 2017.
 
-    \bibitem[Khraisat et al.(2019)]{khraisat2019}
-    Khraisat, A., Gondal, I., Vamplew, P., \& Kamruzzaman, J. (2019).
-    \textit{Survey of intrusion detection systems: techniques, datasets and challenges}.
-    Cybersecurity, 2(1), 20.
+    \bibitem{khraisat2019}
+    A. Khraisat, I. Gondal, P. Vamplew, and J. Kamruzzaman, ``Survey of intrusion detection systems: techniques, datasets and challenges,'' \emph{Cybersecurity}, vol. 2, no. 1, p. 20, 2019.
 
-    \bibitem[Li et al.(2023)]{attackg2023}
-    Li, Z., Ning, J., \& Wang, B. (2023).
-    \textit{AttacKG: Constructing Technique Knowledge Graph from Cyber Threat Intelligence Reports}.
-    Findings of EACL 2023. arXiv:2111.07093.
+    \bibitem{attackg2023}
+    Z. Li, J. Ning, and B. Wang, ``AttacKG: Constructing Technique Knowledge Graph from Cyber Threat Intelligence Reports,'' in \emph{Findings of EACL 2023}, arXiv:2111.07093.
 
-    \bibitem[Myneni et al.(2020)]{dapt2020}
-    Myneni, S., Chowdhary, A., Sabur, A., Dasgupta, D., et al. (2020).
-    \textit{DAPT 2020 --- Constructing a Benchmark Dataset for Advanced Persistent Threats}.
-    Workshop on Deployable Machine Learning for Security Defense (MLHat), KDD 2020.
+    \bibitem{dapt2020}
+    S. Myneni, A. Chowdhary, A. Sabur, D. Dasgupta \emph{et al.}, ``DAPT 2020 --- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \emph{Workshop on Deployable Machine Learning for Security Defense (MLHat), KDD 2020}, 2020.
 
-    \bibitem[OWASP(2025)]{owasp2025}
-    OWASP Foundation (2025).
-    \textit{OWASP Top 10 for Large Language Model Applications}.
-    OWASP.
+    \bibitem{owasp2025}
+    OWASP Foundation, ``OWASP Top 10 for Large Language Model Applications,'' OWASP, 2025.
 
-    \bibitem[Ponemon Institute(2023)]{ponemon2023}
-    Ponemon Institute (2023).
-    \textit{The State of Security Operations: Alert Fatigue and Analyst Burnout}.
-    Annual Cybersecurity Report.
+    \bibitem{ponemon2023}
+    Ponemon Institute, ``The State of Security Operations: Alert Fatigue and Analyst Burnout,'' \emph{Annual Cybersecurity Report}, 2023.
 
-    \bibitem[Shahul Es et al.(2023)]{ragas2023}
-    Shahul Es, S., et al. (2023).
-    \textit{RAGAS: Automated Evaluation of Retrieval Augmented Generation}.
-    arXiv preprint arXiv:2309.15217.
+    \bibitem{ragas2023}
+    S. Shahul Es \emph{et al.}, ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \emph{arXiv preprint arXiv:2309.15217}, 2023.
 
-    \bibitem[Sharafaldin et al.(2018)]{sharafaldin2018}
-    Sharafaldin, I., Lashkari, A. H., \& Ghorbani, A. A. (2018).
-    \textit{Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization}.
-    4th International Conference on Information Systems Security and Privacy (ICISSP).
+    \bibitem{sharafaldin2018}
+    I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \emph{4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018.
 
-    \bibitem[Zhang et al.(2024)]{zhang2024asb}
-    Zhang, Y., et al. (2024).
-    \textit{Agent Security Bench (ASB): Evaluating the Robustness of LLM Agents}.
-    arXiv preprint arXiv:2410.02644.
+    \bibitem{zhang2024asb}
+    Y. Zhang \emph{et al.}, ``Agent Security Bench (ASB): Evaluating the Robustness of LLM Agents,'' \emph{arXiv preprint arXiv:2410.02644}, 2024.
 
-    \bibitem[Zheng et al.(2023)]{zheng2023}
-    Zheng, L., et al. (2023).
-    \textit{Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena}.
-    NeurIPS 2023.
+    \bibitem{zheng2023}
+    L. Zheng \emph{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \emph{Proceedings of NeurIPS 2023}, 2023.
 
 \end{thebibliography}
 
