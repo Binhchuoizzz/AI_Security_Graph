@@ -22,7 +22,7 @@ def calculate_budget():
     rag_context = result["combined_prompt"]
 
     rag_context_tokens = len(enc.encode(rag_context))
-    print(f"RAG Context Size (Top 5 MITRE + Top 5 ISO): {rag_context_tokens} tokens")
+    print(f"RAG Context Size (Top 5 MITRE + Top 5 NIST): {rag_context_tokens} tokens")
 
     # Dữ liệu log giả lập
     log_data = "192.168.1.1 GET /api?id=1 HTTP/1.1 200\n" * 10

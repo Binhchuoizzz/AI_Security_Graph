@@ -13,6 +13,9 @@
 \usepackage{geometry}
 \geometry{left=3cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+\usepackage{pgfgantt}
 \usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{enumitem}
@@ -170,20 +173,59 @@ The proposed solution is based on a cognitive Two-Tier Architecture designed wit
 
 \begin{figure}[H]
     \centering
-    \begin{verbatim}
-[ Network Traffic / Logs ]
-            |
-            v
-+------------------------+  Filtered  +------------------------+
-| TIER 1: RULE ENGINE    |----------->| TIER 2: LLM AGENT      |
-| - Redis State Tracking |            | - Drain3 Template      |
-| - Heuristic Baselines  |            | - Encapsulation        |
-| - Volumetric Filter    |            | - Dual-RAG (MITRE/NIST)|
-+------------------------+            +----------+-------------+
-                                                 | Quarantine
-                                                 v
-                              [ HITL Dashboard (Streamlit) ]
-    \end{verbatim}
+    \resizebox{\textwidth}{!}{
+    \begin{tikzpicture}[
+        >=stealth,
+        node distance=1cm and 0.5cm,
+        font=\small,
+        box/.style={draw, rectangle, minimum height=1cm, align=center, fill=white},
+    ]
+
+    % Nodes
+    \node[box, text width=7cm] (dataset) {DATASET INPUT \\ CSE-CIC-IDS2018 (Tier 1) \textbullet\ DAPT2020 (Tier 2)};
+    \node[box, text width=7cm, below=1cm of dataset] (tier1) {TIER 1 -- RULE ENGINE \\ Behavioral baseline \textbullet\ IP blacklist};
+    \node[box, right=1.5cm of tier1] (drop) {[ DROP ]};
+
+    \node[box, text width=7cm, below=1cm of tier1] (guardrail) {GUARDRAIL LAYER \\ 1. Drain3 template mining -- token compression \\ 2. Delimited Data Encapsulation -- anti-inject};
+
+    \node[box, text width=5cm, below=2cm of guardrail] (tier2) {TIER 2 -- LANGGRAPH AGENT \\ Gemma-2-9B-IT via llama.cpp \\ Dual-RAG \textbullet\ long-term threat memory};
+    \node[box, text width=3.5cm, left=0.5cm of tier2] (mitre) {MITRE ATT\&CK \\ FAISS Index 1 \\ TTP mapping};
+    \node[box, text width=3.5cm, right=0.5cm of tier2] (nist) {NIST 800-61r2 \\ FAISS Index 2 \\ IR playbook};
+
+    \node[box, below=1.5cm of tier2] (quarantine) {[ QUARANTINE ]};
+    \node[box, left=1.5cm of quarantine] (block) {[ BLOCK ]};
+    \node[box, right=1.5cm of quarantine] (alert) {[ ALERT ]};
+
+    \node[box, text width=5.5cm, below=1cm of quarantine] (hitl) {HITL DASHBOARD \\ Streamlit \textbullet\ SQLite memory \\ Llama-3.1-8B judge \\ Rule approval queue};
+
+    % Edges
+    \draw[->] (dataset) -- node[right] {Redis stream} (tier1);
+    \draw[->] (tier1) -- node[above] {benign} (drop);
+    \draw[->] (tier1) -- node[right] {anomalous} (guardrail);
+
+    % Routing from guardrail to MITRE/NIST and Tier 2
+    \coordinate (split1) at ([yshift=-1cm]guardrail.south);
+    \draw[-] (guardrail.south) -- (split1);
+    \draw[->] (split1) -| (mitre.north);
+    \draw[->] (split1) -| (nist.north);
+    \draw[->] (split1) -- (tier2.north);
+
+    \draw[->] (mitre.east) -- (tier2.west);
+    \draw[->] (nist.west) -- (tier2.east);
+
+    % Routing from tier2 to block/quar/alert
+    \coordinate (split2) at ([yshift=-0.75cm]tier2.south);
+    \draw[-] (tier2.south) -- (split2);
+    \draw[->] (split2) -| (block.north);
+    \draw[->] (split2) -| (alert.north);
+    \draw[->] (split2) -- (quarantine.north);
+
+    \draw[->] (quarantine) -- (hitl);
+
+    \draw[->, dashed] (hitl.south) -- ++(0,-0.5) -| node[pos=0.25, above] {rules hot-reload (dashed)} ++(5.5,0) |- (tier1.east);
+
+    \end{tikzpicture}
+    }
     \caption{Cognitive Two-Tier Architecture}
     \label{fig:architecture}
 \end{figure}
@@ -266,25 +308,37 @@ The evaluation metrics will include:
 \subsection{Project Timeline}
 The project spans a standard 14-week Capstone period, structured as follows:
 
-\begin{table}[H]
+\begin{figure}[H]
     \centering
-    \caption{14-Week Project Timeline}
-    \label{tab:timeline}
-    \begin{tabular}{lp{10cm}}
-        \toprule
-        \textbf{Week} & \textbf{Milestone} \\
-        \midrule
-        Week 1--2 & Literature review, dataset acquisition (CSE-CIC-IDS2018), and environment setup. \\
-        Week 3--4 & Development of Tier 1 Rule Engine and Redis session tracking. \\
-        Week 5--6 & Implementation of Guardrail Layer (Drain3 and Delimited Encapsulation). \\
-        Week 7--8 & Integration of Local LLM Backend (llama.cpp) and LangGraph workflow. \\
-        Week 9--10 & Construction of Dual-RAG FAISS indexes (MITRE ATT\&CK and NIST SP 800-61r2). \\
-        Week 11--12 & Development of Streamlit HITL Dashboard and SQLite Audit DB. \\
-        Week 13 & Full system integration, Ablation Study execution, and metrics collection. \\
-        Week 14 & Final report writing, defense preparation, and project submission. \\
-        \bottomrule
-    \end{tabular}
-\end{table}
+    \resizebox{\textwidth}{!}{
+    \begin{ganttchart}[
+        vgrid,
+        hgrid,
+        x unit=0.8cm,
+        y unit title=0.6cm,
+        y unit chart=0.6cm,
+        title label font=\bfseries\footnotesize,
+        bar label font=\footnotesize,
+        bar/.style={fill=blue!30, draw=blue},
+        bar height=0.6,
+        milestone label font=\bfseries\footnotesize,
+        milestone/.style={fill=red, draw=red, shape=circle, inner sep=1.5pt}
+    ]{1}{14}
+    \gantttitle{14-Week Capstone Project Timeline}{14} \\
+    \gantttitlelist{1,...,14}{1} \\
+    \ganttbar{Literature Review \& Dataset}{1}{2} \\
+    \ganttbar{Tier 1: Rule Engine \& Redis}{3}{4} \\
+    \ganttbar{Guardrails (Drain3 \& Encapsulation)}{5}{6} \\
+    \ganttbar{Local LLM backend \& LangGraph}{7}{8} \\
+    \ganttbar{Dual-RAG (MITRE \& NIST)}{9}{10} \\
+    \ganttbar{HITL Dashboard \& Audit DB}{11}{12} \\
+    \ganttbar{Ablation Study \& Evaluation}{13}{13} \\
+    \ganttbar{Final Report \& Defense}{14}{14}
+    \end{ganttchart}
+    }
+    \caption{Project Timeline (Gantt Chart)}
+    \label{fig:timeline}
+\end{figure}
 
 % =============================================================================
 % CHAPTER 5: EXPECTED RESULTS AND CONTRIBUTIONS

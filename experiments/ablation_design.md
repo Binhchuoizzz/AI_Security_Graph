@@ -1,7 +1,7 @@
 # Ablation Study Design for the Two-Tier Architecture
 
 > **Status:** IMPLEMENTED (v3 — 22/04/2026)
-> **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và ISO-only RAG) và bổ sung Statistical Validity Framework.
+> **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và NIST-only RAG) và bổ sung Statistical Validity Framework.
 > **Trả lời câu hỏi:** "Mỗi component contribute gì? Sự khác biệt có ý nghĩa thống kê (statistically significant) không?"
 
 ---

@@ -289,7 +289,7 @@ if __name__ == "__main__":
             print(f"  [{r['rrf_score']:.4f}] {r['id']} - {r['name']}")
 
         print(f"\n--- NIST Results ({len(result['nist_results'])}) ---")
-        for r in result["iso_results"]:
+        for r in result["nist_results"]:
             print(f"  [{r['rrf_score']:.4f}] {r['id']} - {r['name']}")
 
     print(f"\nCache Stats: {retriever.get_cache_stats()}")
