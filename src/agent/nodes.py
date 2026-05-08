@@ -15,10 +15,9 @@ from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
 from src.agent.threat_memory import threat_memory
 from src.rag.retriever import DualRetriever
-from src.guardrails.template_miner import LogTemplateMiner
 from src.guardrails.prompt_filter import GuardrailsPipeline, DelimitedDataEncapsulator
 from src.guardrails.output_sanitizer import output_sanitizer
-from src.response.executor import block_ip, quarantine_host, raise_alert
+from src.response.executor import block_ip, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
 
 logger = logging.getLogger(__name__)
