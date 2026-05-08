@@ -110,6 +110,10 @@ Based on the objectives, this thesis focuses on four core research questions:
 3. How does a Dual-RAG pipeline (combining tactical threat frameworks with incident response standards) improve the Context Relevance of the LLM's threat analysis?
 4. Can an adaptive Feedback Loop with HITL Quarantine prevent Adversarial Rule Injection and safely automate defensive responses?
 
+\subsection{Research Object and Methodology}
+The primary objects of this research are the Two-Tier Security Architecture, Agentic AI (LLMs applied to SOC automation), Adversarial Prompt Injections, and network intrusion log data.
+The study employs a Quantitative Experimental methodology, utilizing an Ablation Study to compare the Two-Tier system against a baseline LLM-only setup. Evaluation is conducted using a 5-Dimensional (5D) Framework covering Classification metrics, Operational latency, Adversarial Robustness, RAGAS-based Context Quality (via cross-family LLM-as-a-Judge), and Explainability.
+
 \subsection{Scope of the Study}
 The research is limited to Network Intrusion Detection and SOC log triage. The in-scope components include: Data Streaming Pipeline (Redis), Tier-1 Rule Engine, LangGraph Agent with Dual-RAG, Guardrails (Volume Compression and Injection Defense), and a Streamlit HITL Dashboard with SQLite-based Threat Memory. The study does not cover fine-tuning Foundation Models, physical hardware deployment (e.g., physical Kafka clusters), or Layer 3/4 volumetric DDoS mitigation.
 
@@ -125,7 +129,7 @@ The thesis will be organized into six main chapters: (1) Introduction and Backgr
 \subsection{Foundational Approaches}
 In the early stages of network security, Intrusion Detection Systems (IDS) primarily relied on signature-based matching (e.g., Snort, Suricata) to detect known threats. While highly efficient in terms of throughput, these systems exhibit significant limitations in identifying zero-day attacks and polymorphic malware \cite{khraisat2019}.
 
-The advent of Machine Learning (ML) led to anomaly-based IDS, where models such as Random Forests, LSTMs, and domain-specific transformers like LogBERT \cite{logbert2021} learn a baseline of normal behavior and flag deviations. While these approaches improved zero-day detection, they remain fundamentally limited to pattern-based anomaly scoring. They cannot explain \textit{why} a log sequence is malicious, map threats to standardized frameworks, or generate actionable remediation steps—capabilities that require the contextual reasoning of a Large Language Model.
+The advent of Machine Learning (ML) led to anomaly-based IDS, where models such as Random Forests, LSTMs, and domain-specific transformers like LogBERT \cite{logbert2021} learn a baseline of normal behavior and flag deviations. While these approaches improved zero-day detection, they remain fundamentally limited to pattern-based anomaly scoring. They cannot explain \textit{why} a log sequence is malicious, map threats to standardized frameworks, or generate actionable remediation steps—capabilities that require the contextual reasoning of a Large Language Model. These pattern-based models, by design, cannot query external knowledge bases at inference time---a fundamental architectural constraint that precludes contextual threat mapping and actionable remediation.
 
 Modern Security Information and Event Management (SIEM) systems aggregate logs, yet they still require extensive manual triage by human analysts to construct the full context of an attack.
 
@@ -163,6 +167,26 @@ Regarding adversarial robustness, the OWASP Top 10 for LLM Applications \cite{ow
 
 \subsection{Proposed Solution: Cognitive Two-Tier Architecture}
 The proposed solution is based on a cognitive Two-Tier Architecture designed with a strict Separation of Concerns. The core idea is to leverage the speed of deterministic rules (Tier 1) alongside the deep reasoning capabilities of an Agentic LLM (Tier 2), interconnected by robust adversarial guardrails.
+
+\begin{figure}[H]
+    \centering
+    \begin{verbatim}
+[ Network Traffic / Logs ]
+            |
+            v
++------------------------+  Filtered  +------------------------+
+| TIER 1: RULE ENGINE    |----------->| TIER 2: LLM AGENT      |
+| - Redis State Tracking |            | - Drain3 Template      |
+| - Heuristic Baselines  |            | - Encapsulation        |
+| - Volumetric Filter    |            | - Dual-RAG (MITRE/NIST)|
++------------------------+            +----------+-------------+
+                                                 | Quarantine
+                                                 v
+                              [ HITL Dashboard (Streamlit) ]
+    \end{verbatim}
+    \caption{Cognitive Two-Tier Architecture}
+    \label{fig:architecture}
+\end{figure}
 
 At the first stage, the Tier 1 Rule Engine acts as a heuristic filter. It maintains Session-Aware Behavioral Baselines using in-memory data structures (Redis) to track request rates and known malicious IPs. This layer is designed to filter the majority of benign or purely volumetric noise at wire speed, with the exact filtration ratio to be empirically measured during evaluation. This ensures the downstream LLM is not overwhelmed by high-volume traffic.
 
@@ -238,6 +262,29 @@ The evaluation metrics will include:
     \item \textbf{4. Context Quality:} To evaluate the LLM's reasoning and mitigate Self-Enhancement Bias, a cross-family LLM-as-a-Judge methodology will be employed: while Gemma-2-9B-IT serves as the primary reasoning model, \textbf{Llama-3.1-8B-Instruct} (a different model family) will serve as the judge, assessing Context Precision, Answer Relevancy, Faithfulness, and Context Recall using the RAGAS framework \cite{ragas2023}. Judge scores will be cross-validated with automated RAGAS metrics for statistical consistency.
     \item \textbf{5. Explainability:} Audit Trail Completeness Rate will be measured deterministically via programmatic field presence checks.
 \end{itemize}
+
+\subsection{Project Timeline}
+The project spans a standard 14-week Capstone period, structured as follows:
+
+\begin{table}[H]
+    \centering
+    \caption{14-Week Project Timeline}
+    \label{tab:timeline}
+    \begin{tabular}{lp{10cm}}
+        \toprule
+        \textbf{Week} & \textbf{Milestone} \\
+        \midrule
+        Week 1--2 & Literature review, dataset acquisition (CSE-CIC-IDS2018), and environment setup. \\
+        Week 3--4 & Development of Tier 1 Rule Engine and Redis session tracking. \\
+        Week 5--6 & Implementation of Guardrail Layer (Drain3 and Delimited Encapsulation). \\
+        Week 7--8 & Integration of Local LLM Backend (llama.cpp) and LangGraph workflow. \\
+        Week 9--10 & Construction of Dual-RAG FAISS indexes (MITRE ATT\&CK and NIST SP 800-61r2). \\
+        Week 11--12 & Development of Streamlit HITL Dashboard and SQLite Audit DB. \\
+        Week 13 & Full system integration, Ablation Study execution, and metrics collection. \\
+        Week 14 & Final report writing, defense preparation, and project submission. \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
 % =============================================================================
 % CHAPTER 5: EXPECTED RESULTS AND CONTRIBUTIONS
