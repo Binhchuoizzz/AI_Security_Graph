@@ -12,6 +12,7 @@ import threading
 import subprocess
 import time
 import logging
+import argparse
 
 from dotenv import load_dotenv
 
@@ -20,27 +21,36 @@ load_dotenv()  # Load environment variables (Security Hardening)
 from src.streaming.subscriber import start_listening
 from src.agent.workflow import agent_app
 from src.agent.state import SentinelState
+from src.tier1_filter.scanner import VulnerabilityScanner
+from src.rag.graph_builder import KnowledgeGraphBuilder
 
-# Cấu hình logging cơ bản
+# Cấu hình logging mặc định
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 
-def run_publisher():
-    """Chạy DataPublisher ở một process độc lập để bắn log vào Redis"""
-    logger.info("[MAIN] Starting DataPublisher...")
-    publisher_path = os.path.join(
-        os.path.dirname(__file__), "src", "streaming", "publisher.py"
-    )
+def setup_logger(log_level: str):
+    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
+    logger.setLevel(numeric_level)
 
-    # Chạy publisher script (nó sẽ đọc CSV và đẩy vào Redis liên tục)
-    # Giả định publisher_path có thể chạy trực tiếp
-    try:
-        subprocess.run([sys.executable, publisher_path], check=True)
-    except Exception as e:
-        logger.error(f"[MAIN] Publisher process exited: {e}")
+
+def run_vulnerability_scan():
+    """Quét lỗ hổng dùng Trivy và nạp vào Neo4j (V2 Architecture)"""
+    logger.info("[PIPELINE] Running Vulnerability Scan (Trivy)...")
+    scanner = VulnerabilityScanner(target_dir="/app", output_file="data/trivy-results.json")
+    results_path = scanner.run_scan()
+    logger.info(f"[PIPELINE] Vulnerability Scan complete. Findings saved to {results_path}")
+
+
+def build_knowledge_graph():
+    """Xây dựng Knowledge Graph từ OSV/Trivy results (V2 Architecture)"""
+    logger.info("[PIPELINE] Building Knowledge Graph (Neo4j)...")
+    builder = KnowledgeGraphBuilder()
+    builder.build_from_trivy(trivy_json_path="data/trivy-results.json")
+    builder.close()
+    logger.info("[PIPELINE] Knowledge Graph build complete.")
 
 
 def handle_escalated_batch(batch):
@@ -60,8 +70,6 @@ def handle_escalated_batch(batch):
         final_state = agent_app.invoke(initial_state)
         logger.info("[MAIN] LangGraph execution completed.")
 
-        # Có thể kiểm tra actions của final_state ở đây,
-        # nhưng logic action đã được xử lý trong Action Executor Node
         decisions = final_state.get("decisions", [])
         if decisions:
             logger.info(
@@ -73,19 +81,28 @@ def handle_escalated_batch(batch):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="SENTINEL System Entrypoint")
+    parser.add_argument("--mode", type=str, choices=["server", "scan", "full"], default="server", help="Chế độ chạy: server (lắng nghe traffic), scan (quét lỗ hổng), full (cả hai)")
+    parser.add_argument("--config", type=str, default="config/default.yaml", help="Đường dẫn file cấu hình")
+    parser.add_argument("--log-level", type=str, choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="Mức độ log")
+    args = parser.parse_args()
+
+    setup_logger(args.log_level)
+
     logger.info("=" * 60)
-    logger.info(" SENTINEL SYSTEM INITIALIZING ")
+    logger.info(f" SENTINEL SYSTEM INITIALIZING | MODE: {args.mode.upper()}")
     logger.info("=" * 60)
 
-    # 1. Khởi chạy Publisher trên một thread riêng (Đã chuyển sang chạy thủ công ở Terminal riêng)
-    # publisher_thread = threading.Thread(target=run_publisher, daemon=True)
-    # publisher_thread.start()
+    # Nếu ở chế độ Full hoặc Scan, chạy Vulnerability Pipeline trước
+    if args.mode in ["scan", "full"]:
+        run_vulnerability_scan()
+        build_knowledge_graph()
+        if args.mode == "scan":
+            logger.info("[MAIN] Scan complete. Exiting...")
+            return
 
-    # Đợi 2 giây cho Redis khởi động ổn định
-    time.sleep(2)
-
-    # 2. Chạy Subscriber (Vòng lặp chính, block thread này)
-    logger.info("[MAIN] Starting Tier 1 Subscriber Loop...")
+    # Chế độ Server / Full: Khởi chạy APT Detection Engine
+    logger.info("[MAIN] Starting Tier 1 Subscriber Loop (APT Detection Engine)...")
     try:
         start_listening(
             on_batch_ready=handle_escalated_batch, batch_size=10, timeout_sec=5

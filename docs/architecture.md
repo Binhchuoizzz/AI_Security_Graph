@@ -1,42 +1,61 @@
-# Architecture: Cognitive Two-Tier Agentic AI Framework
+# Kiến Trúc Hệ Thống (System Architecture)
 
-> **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence,
-> **N**eutralization, **E**scalation and **L**og-correlation
+Hệ thống SENTINEL được thiết kế theo kiến trúc **2-Tier (2 Tầng)** kết hợp luồng dữ liệu thời gian thực (Streaming) và Tác tử suy luận AI (LLM Agent).
 
-Kiến trúc tổng thể của hệ thống Nhận thức Hai tầng (Cognitive Two-Tier Architecture) cho Tự động Phát hiện và Phản hồi Mối đe dọa.
+## 1. Biểu Đồ Kiến Trúc Luồng Dữ Liệu
 
-## The 3-Model Ecosystem (Core Brains)
+```mermaid
+graph TD
+    subgraph Data Ingestion
+        A[Nguồn Log Mạng / Cảm biến] -->|Streaming| B(Redis Pub/Sub)
+    end
 
-Kiến trúc của hệ thống không phụ thuộc vào một AI duy nhất mà phân chia nhiệm vụ cho **3 models độc lập**, đảm bảo Separation of Concerns và chống Bias:
-1. **Embedding Model (`all-MiniLM-L6-v2`)**: Nằm ở tầng RAG, chịu trách nhiệm vector hóa log thô và tri thức (MITRE, NIST) ở tốc độ cao.
-2. **Primary Agent Model (Reasoning LLM)**: Bộ não phân tích chính (Tier 2), chạy cục bộ. Chịu trách nhiệm suy luận sâu, Triage sự cố và sinh luật.
-3. **Oracle Judge Model (Evaluation LLM)**: Hoạt động độc lập trong pha Evaluation. Đóng vai trò giám khảo (LLM-as-a-Judge) chấm điểm độ chính xác ngữ cảnh của Agent chính, loại bỏ hoàn toàn Self-Enhancement Bias.
+    subgraph Tier 1: Lọc Sơ Cấp (Rule Engine)
+        B --> C[Subscriber]
+        C --> D{Rule Engine Filter}
+        D -->|Log Hợp Lệ| E[(Elasticsearch / Cold Storage)]
+        D -->|Bất Thường (Escalate)| F[Guardrails Encapsulator]
+    end
 
-## Sơ đồ luồng xử lý (Data Flow)
+    subgraph Khối Tri Thức & Trạng Thái (Storage Layer)
+        G[(MITRE FAISS Index)]
+        H[(NIST FAISS Index)]
+        I[(Neo4j: Vuln Graph)]
+        J[(Redis: Session Memory)]
+        K[(MLflow DB & Artifacts)]
+    end
 
+    subgraph Tier 2: LLM Agent (LangGraph)
+        F --> L[Triage Node]
+        L --> M[RAG Retrieval Node]
+        L --> N[Vuln Assessment Node]
+        M --> O[Reasoning Node (Local LLM)]
+        N --> O
+        O --> P[Action Node]
+    end
+
+    M -.-> G
+    M -.-> H
+    N -.-> I
+    L -.-> J
+    O -.-> K
+
+    P -->|Phản hồi| Q[Firewall / HITL Dashboard]
 ```
-│                                              │                  │
-│                                              ▼                  │
-│                                      ┌───────────────┐          │
-│                                      │ Response       │          │
-│                                      │ Executor       │          │
-│                                      │ (Block IP /    │          │
-│                                      │  Alert / Log)  │          │
-│                                      └───────────────┘          │
-│                                                                 │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │ MLOps Layer: MLflow Tracking + Docker + SQLite Audit     │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────┘
-```
 
-## Mapping giữa Module và Research Question
+## 2. Các Thành Phần Chính (Components)
 
-| Module | Giải quyết RQ | File chính |
-|---|---|---|
-| Tier 1 + Redis Multi-Queue Streaming | RQ1 (Latency) | `src/tier1_filter/`, `src/streaming/` |
-| Guardrails Layer (3-layer + Dynamic Delimiters) | RQ2 (Defeat Rate) | `src/guardrails/` |
-| Dual-RAG (MITRE + NIST, Hybrid FAISS+BM25+RRF) | RQ3 (Context Relevance) | `src/rag/` |
-| Feedback Loop + Session Baselining | RQ4 (Zero-day Adaptation) | `src/tier1_filter/rule_engine.py` |
-| LangGraph Agent (Structured MemoryObject) | RQ1 + RQ3 | `src/agent/` |
-| HITL Dashboard (RBAC, Auto-refresh) | RQ3 | `src/ui/` |
+1. **Streaming Layer (`src/streaming/`)**: Xử lý dữ liệu đầu vào tốc độ cao. Gồm Publisher đẩy log lên Redis và Subscriber lấy log xuống.
+2. **Tier 1 Filter (`src/tier1_filter/`)**: Một Rule Engine kiểm tra các điều kiện cơ bản (DDoS, quét port diện rộng). Giúp giảm tải cho Tier 2.
+3. **Guardrails (`src/guardrails/`)**: Màng bọc an ninh. Đóng gói dữ liệu đầu vào để chống Prompt Injection trước khi đưa cho LLM.
+4. **LangGraph Agent (`src/agent/`)**: Trái tim của hệ thống. Nhận log bất thường, lên kế hoạch suy luận, gọi tool (RAG, Graph) và ra quyết định.
+5. **RAG Module (`src/rag/`)**: Chịu trách nhiệm nhúng (Embedder) và tìm kiếm (Retriever) các kịch bản ứng phó từ MITRE và NIST.
+
+## 3. Lớp Lưu Trữ (Storage Layer)
+
+- **`logs/`**: Chứa raw logs (văn bản) sinh ra trong quá trình hệ thống chạy. Phục vụ debug và kiểm toán (Auditing).
+- **`mlruns/`**: Chứa Artifacts và SQLite DB của MLflow. Lưu trữ metrics (F1, Latency), tham số thí nghiệm, và model metadata để đảm bảo tính tái tạo (Reproducibility).
+- **`knowledge_base/`**: 
+  - Lưu trữ các tệp tri thức gốc dạng JSON (`mitre_attack.json`, `nist_800_61r2.json`).
+  - Lưu trữ thư mục `faiss_index/` chứa các tệp nhúng `.index` (Vector DB tĩnh).
+- **`data/`**: Chứa dữ liệu đầu vào (e.g., CSE-CIC-IDS2018 CSV/PCAP) hoặc file kết quả quét lỗ hổng (như `trivy-results.json`).

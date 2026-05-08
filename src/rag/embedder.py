@@ -61,7 +61,8 @@ def load_mitre_chunks() -> list[dict]:
         data = json.load(f)
 
     chunks = []
-    for tech in data.get("techniques", []):
+    techniques = data if isinstance(data, list) else data.get("techniques", [])
+    for tech in techniques:
         # Xây dựng đoạn văn bản (chunk) giàu ngữ nghĩa để nhúng (embedding)
         text_parts = [
             f"{tech['id']} - {tech['name']} ({tech.get('tactic', 'Unknown')})",

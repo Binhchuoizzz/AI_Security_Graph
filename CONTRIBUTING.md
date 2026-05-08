@@ -1,22 +1,33 @@
-# Contributing to AI Security Graph
+# Hướng Dẫn Đóng Góp (Contributing)
 
-First off, thank you for considering contributing to this AI Security project! It's people like you that make the open-source community such a great place to learn, inspire, and create.
+Cám ơn bạn đã quan tâm đến việc đóng góp mã nguồn cho dự án **SENTINEL**. Dưới đây là các tiêu chuẩn và quy trình bạn cần tuân thủ.
 
-## How to Contribute
+## 1. Branching Strategy (Chiến Lược Rẽ Nhánh)
+Dự án áp dụng mô hình Feature Branch Workflow:
+- `main`: Nhánh production-ready, chỉ nhận merge từ các PR đã được test đầy đủ.
+- `develop`: Nhánh chứa các tính năng đang phát triển.
+- `feature/<tên-tính-năng>`: Nhánh cá nhân để bạn làm việc (VD: `feature/trivy-scanner`).
+- `bugfix/<tên-lỗi>`: Nhánh để sửa lỗi khẩn cấp (VD: `bugfix/redis-timeout`).
 
-### 1. Understand the Scope
-This project focuses on **Multi-source Log Correlation** and **Adversarial Guardrails** using LangGraph. We welcome contributions regarding:
-- Custom Tier 1 filter rules.
-- Better RAG logic and Faiss indexing optimizations.
-- Proof-of-Concepts (PoCs) showing Prompt Injection vulnerability and defenses.
+## 2. Commit Convention (Quy Ước Commit)
+Tuân thủ Conventional Commits để tự động hóa việc sinh Changelog:
+- `feat:` Thêm tính năng mới (VD: `feat: add Neo4j graph builder module`)
+- `fix:` Sửa lỗi (VD: `fix: handle Redis connection timeout gracefully`)
+- `docs:` Cập nhật tài liệu (VD: `docs: update architecture diagram`)
+- `refactor:` Tái cấu trúc mã nhưng không đổi logic (VD: `refactor: move llm_client to core folder`)
+- `test:` Thêm hoặc sửa Unit Test.
 
-### 2. Setting up the Development Environment
-1. Fork the repo and create your branch from `main`.
-2. Follow the `README.md` to start `docker-compose up`.
-3. If you've added code that should be tested, ensure `pytest` passes locally.
+## 3. Cách Thêm Một Detection Module Mới (Module Mở Rộng)
+Nếu bạn muốn đóng góp một Rule mới cho Tier 1 hoặc một Tool mới cho Agent Tier 2:
+1. **Với Tier 1 (Rules):** Tạo một file Python class kế thừa từ `BaseRule` trong thư mục `src/tier1_filter/rules/`. Hàm `evaluate(log)` phải trả về một trong các nhãn: `DROP`, `LOG`, `ESCALATE`.
+2. **Với Tier 2 (Agent Tools):** Định nghĩa một Tool sử dụng `@tool` decorator của LangChain và đăng ký nó vào mảng Tools trong file `src/agent/workflow.py`. Đảm bảo mô tả của Tool (Docstring) phải cực kỳ rõ ràng để LLM biết khi nào nên gọi nó.
 
-### 3. Submission Guidelines
-- **Pull Requests (PR):** Please use the PR template provided. Ensure your commit messages are descriptive.
-- **Issues:** If you find a bug (especially with the LLM routing), please file an issue using the Bug Report template. DO NOT publicly report strict security vulnerabilities impacting the Guardrails without coordinating first.
+## 4. Pull Request Checklist (Kiểm Tra Trước Khi Nộp PR)
+Trước khi nhấn nút Create Pull Request, hãy tự rà soát:
+- [ ] Code mới đã được viết Unit Test (Coverage > 80%).
+- [ ] Lệnh `pytest tests/ --tb=short` chạy thành công (Xanh toàn bộ).
+- [ ] Code tuân thủ chuẩn PEP 8 (khuyến khích dùng `black` và `flake8`).
+- [ ] Tài liệu Markdown liên quan đã được cập nhật (nếu kiến trúc bị thay đổi).
+- [ ] Không rò rỉ bất kỳ thông tin nhạy cảm nào (Token, Mật khẩu) trong file diff.
 
-Thank you!
+Mọi PR sẽ được Reviewer đọc và đánh giá trong vòng 3-5 ngày làm việc. Cám ơn sự hỗ trợ của bạn!

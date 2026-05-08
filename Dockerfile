@@ -19,6 +19,13 @@ LABEL maintainer="Nguyen Duc Binh <binhchuoizzz@github>"
 LABEL description="SENTINEL SOC - Autonomous AI Security Agent"
 LABEL version="1.0.0"
 
+# Install Trivy for Vulnerability Scanning
+RUN apt-get update && apt-get install -y wget apt-transport-https gnupg \
+    && wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - \
+    && echo deb https://aquasecurity.github.io/trivy-repo/deb bullseye main | tee -a /etc/apt/sources.list.d/trivy.list \
+    && apt-get update && apt-get install -y trivy \
+    && rm -rf /var/lib/apt/lists/*
+
 # Security: Create non-root user
 RUN groupadd -r sentinel && useradd --no-log-init -r -g sentinel sentinel
 

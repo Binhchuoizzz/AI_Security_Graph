@@ -76,8 +76,8 @@ mlflow:
 rag:
   embedding_model: all-MiniLM-L6-v2
   faiss_index_path: knowledge_base/faiss_index
-  nist_800_61r2_path: knowledge_base/nist_800_61r2.json
   mitre_attack_path: knowledge_base/mitre_attack.json
+  nist_800_61r2_path: knowledge_base/nist_800_61r2.json
   semantic_cache:
     max_size: 500
     ttl_seconds: 1800
@@ -112,11 +112,19 @@ tier1:
       traffic patterns.  The events exhibit characteristics of port scanning and potential
       reconnaissance activities, as indicated by the high number of unique ports accessed
       and the volume of traffic. This behavior aligns with MITRE ATT&CK technique
-      T1589 (Gather Victim Identity Information) and NIST SP 800-61r2 Detection phase (Access
-      Control).
+      T1589 (Gather Victim Identity Information) and NIST SP 800-61r2 Detection phase
+      (Access Control).
     score: 100
     source: langgraph_agent
     status: REJECTED
+  - created_at: '2026-05-08T02:40:38.264417'
+    field: Source IP
+    pattern: 192.168.1.100
+    reason: Mock reasoning from MOCK_LLM=1. Detected anomaly matching MITRE TTPs and
+      NIST containment phases.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
   max_fwd_packets: 1000
   risk_threshold: 15
   sensitive_ports:

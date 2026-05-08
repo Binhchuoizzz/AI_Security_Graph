@@ -7,6 +7,9 @@ services:
     volumes:
       - .:/app:ro                 # Read-only mount to prevent container escape writes
       - ./logs:/app/logs          # Only logs directory is writable
+      - ./mlruns:/app/mlruns      # Writable MLflow local runs
+      - ./data:/app/data          # Writable Data
+      - ./knowledge_base:/app/knowledge_base  # Writable KB (for FAISS updates)
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - REDIS_URL=redis://:${REDIS_PASSWORD:-SentinelSecurePass2026!}@redis:6379/0
@@ -24,8 +27,6 @@ services:
           memory: 4G
           cpus: '2.0'
     # Security: Drop all capabilities, add only needed ones
-    security_opt:
-      - no-new-privileges:true
     restart: unless-stopped
 
   mlflow:
@@ -47,8 +48,6 @@ services:
         limits:
           memory: 1G
           cpus: '1.0'
-    security_opt:
-      - no-new-privileges:true
     restart: unless-stopped
 
   redis:

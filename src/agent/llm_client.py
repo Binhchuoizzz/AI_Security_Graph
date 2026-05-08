@@ -66,7 +66,15 @@ class LLMClient:
         retries = 0
         backoff = 2  # Bắt đầu với 2 giây chờ
 
-        while retries <= self.max_retries:
+        if os.getenv("MOCK_LLM") == "1":
+            return json.dumps({
+                "reasoning": "Mock reasoning from MOCK_LLM=1. Detected anomaly matching MITRE TTPs and NIST containment phases.",
+                "action": "BLOCK_IP",
+                "confidence": 0.99,
+                "extracted_iocs": [{"type": "ip", "value": "192.168.1.100"}]
+            })
+
+        for retries in range(self.max_retries + 1):
             try:
                 # Gọi API
                 kwargs = {
