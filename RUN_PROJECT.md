@@ -1,98 +1,100 @@
-# Hướng Dẫn Khởi Chạy Dự Án (RUN_PROJECT)
+# Hướng Dẫn Khởi Chạy Dự Án SENTINEL (V2 Architecture)
 
-Tài liệu này cung cấp các bước chi tiết để khởi chạy hệ thống SENTINEL trên môi trường cục bộ (Local) hoặc thông qua Docker.
+Tài liệu này cung cấp các bước chi tiết để khởi chạy toàn bộ hệ thống SENTINEL (bao gồm cả AI Agent, Knowledge Graph, Vulnerability Scanner và Dashboard).
 
-## 1. Khởi chạy Local (Virtual Environment)
+---
 
-Phương pháp này dành cho quá trình phát triển (Development) và debug trực tiếp mã nguồn.
+## 1. Môi trường Yêu cầu (Prerequisites)
 
-### Bước 1: Khởi tạo và kích hoạt Virtual Environment
+- **Hệ điều hành:** Linux (Ubuntu 22.04+) hoặc WSL2 trên Windows.
+- **Phần cứng:** NVIDIA GPU (RTX 4060 Ti 16GB VRAM) để chạy cục bộ LLM Llama-3-8B. Cần 32GB RAM cho xử lý Graph và Caching.
+- **Phần mềm:** Docker, Docker Compose, Python 3.10+, Trivy (cài đặt qua docker-compose hoặc script).
+
+---
+
+## 2. Khởi chạy Tự động bằng Script (Khuyên dùng cho Demo)
+
+Dự án đã được đóng gói kèm một kịch bản demo chạy toàn bộ Pipeline End-to-End từ việc quét lỗ hổng cơ sở hạ tầng, xây dựng Knowledge Graph, đến việc AI Agent phân tích lưu lượng APT.
+
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate  # Trên Linux/macOS
-# .venv\Scripts\activate   # Trên Windows
+# 1. Cấp quyền thực thi cho file script
+chmod +x demo_script.sh
+
+# 2. Chạy Demo
+./demo_script.sh
 ```
 
-### Bước 2: Cài đặt Dependencies
+**Quá trình này sẽ thực hiện 4 bước tự động:**
+1. Khởi chạy Vulnerability Scanner (Trivy) & Knowledge Graph Build (Neo4j).
+2. Chạy luồng Ingestion Data và phân tích APT (Tích hợp Dual-RAG: MITRE + NIST).
+3. Đẩy log và các metric F1-Score lên hệ thống MLflow (Tracking Server).
+4. Đóng gói kết quả (Vulnerability Reports, APT Alerts) vào thư mục `demo_outputs/`.
+
+---
+
+## 3. Khởi chạy Thủ công (Từng Thành phần)
+
+Nếu bạn muốn debug hoặc kiểm soát từng quá trình (SIEM UI, Agent, Scanner), hãy làm theo các bước sau:
+
+### Bước 1: Khởi tạo Dịch vụ Phụ trợ (Docker)
+Cần có Redis (để Caching/Pub-Sub), Neo4j (cho Vulnerability Graph), và MLflow.
 ```bash
+cp .env.example .env
+docker-compose up -d --build
+```
+*Lưu ý: Mở `.env` và thiết lập `LLM_API_BASE`, `SENTINEL_MANAGER_HASH` và thông tin cấu hình Neo4j.*
+
+### Bước 2: Thiết lập Virtual Environment (Python)
+```bash
+python3.10 -m venv .venv
+source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### Bước 3: Cấu hình Môi trường
-Sao chép template và cấu hình file `.env`:
-```bash
-cp .env.example .env
-```
-*(Tham khảo bảng cấu hình biến môi trường ở phần dưới).*
+### Bước 3: Chạy SENTINEL Core Backend
+File `main.py` hỗ trợ các chế độ (`--mode`) chuyên biệt:
 
-### Bước 4: Chạy các dịch vụ phụ trợ
-Bạn cần có Redis và MLflow đang chạy. Cách nhanh nhất là dùng Docker cho chúng:
-```bash
-docker-compose up -d redis mlflow
-```
+- **Quét Hệ thống & Xây dựng Knowledge Graph (Tier 1 & Graph Build):**
+  ```bash
+  python main.py --mode scan --log-level INFO
+  ```
 
-### Bước 5: Chạy Pipeline Core
-Sử dụng cờ `--mode` để chọn chế độ hoạt động:
+- **Chạy AI Agent lắng nghe Traffic (Tier 2):**
+  ```bash
+  python main.py --mode server --log-level INFO
+  ```
+
+- **Chạy ĐỒNG THỜI cả Scan và Server:**
+  ```bash
+  python main.py --mode full --log-level INFO
+  ```
+
+### Bước 4: Khởi chạy Dashboard (SOC SIEM)
+Giao diện Giám sát và Điều hành An ninh (Human-in-the-loop):
 ```bash
-python main.py --mode server --log-level INFO
+streamlit run src/ui/app.py
 ```
 
 ---
 
-## 2. Khởi chạy bằng Docker (Production / Evaluation)
+## 4. Bảng Dịch Vụ và Cổng (Ports Map)
 
-Sử dụng Docker Compose để khởi chạy toàn bộ hệ thống (UI, Backend, Redis, MLflow) chỉ bằng một lệnh duy nhất.
+Sau khi hệ thống khởi động thành công, bạn có thể truy cập các thành phần sau:
 
-### Bước 1: Build và Up
-```bash
-cp .env.example .env
-docker-compose up --build -d
-```
-
-### Bước 2: Kiểm tra trạng thái
-```bash
-docker-compose ps
-docker-compose logs -f agent_ui
-```
-
-### Bước 3: Truy cập Dịch vụ
-- **Sentinel Dashboard (Streamlit):** `http://localhost:8501`
-- **MLflow Tracking Server:** `http://localhost:5001`
+| Tên Dịch Vụ | Công Cụ | Truy Cập (URL) |
+| --- | --- | --- |
+| **SENTINEL Dashboard** | Streamlit UI | `http://localhost:8501` |
+| **Threat Graph DB** | Neo4j Browser | `http://localhost:7474` (Bolt: 7687) |
+| **Model Tracking** | MLflow Server | `http://localhost:5001` |
+| **Cache & Pub/Sub** | Redis | `localhost:6379` |
+| **AI Inference** | Llama.cpp / Oobabooga | `http://localhost:5000` |
 
 ---
 
-## 3. Danh sách Biến Môi trường (Environment Variables)
-
-| Biến (Variable) | Mô tả (Description) | Giá trị mặc định |
-| :--- | :--- | :--- |
-| `REDIS_URL` | Chuỗi kết nối tới Redis (dùng cho Pub/Sub và Short-term Memory). | `redis://:SentinelSecurePass2026!@localhost:6379/0` |
-| `MLFLOW_TRACKING_URI` | URL của MLflow Tracking Server. | `http://localhost:5001` |
-| `LLM_API_BASE` | Endpoint API tương thích OpenAI (Oobabooga/llama.cpp). | `http://127.0.0.1:5000/v1` |
-| `LLM_API_KEY` | Khóa API (thường chỉ là placeholder cho Local LLM). | `sk-placeholder-local-only` |
-| `MOCK_LLM` | Đặt là `1` để giả lập phản hồi của LLM khi không có GPU. | `0` |
-| `NEO4J_URI` | Chuỗi kết nối tới Neo4j Graph Database (Kiến trúc V2). | `bolt://localhost:7687` |
-
----
-
-## 4. Xử lý Sự cố (Troubleshooting Top 5 Lỗi)
-
-1. **Lỗi `Connection refused` khi chạy LLM Agent**
-   - *Nguyên nhân:* Oobabooga/llama.cpp server chưa được bật hoặc sai cổng.
-   - *Khắc phục:* Đảm bảo `LLM_API_BASE` trỏ đúng port. Nếu bạn không có GPU, hãy set `MOCK_LLM=1` trong `.env`.
-
-2. **Lỗi `ModuleNotFoundError: No module named 'langgraph'`**
-   - *Nguyên nhân:* Quên kích hoạt môi trường ảo.
-   - *Khắc phục:* Chạy `source .venv/bin/activate` trước khi chạy lệnh.
-
-3. **Lỗi `Redis ConnectionError`**
-   - *Nguyên nhân:* Redis chưa chạy hoặc sai mật khẩu.
-   - *Khắc phục:* Chạy `docker-compose up -d redis`. Kiểm tra lại `REDIS_URL`.
-
-4. **Lỗi phân quyền khi ghi log/mlruns trong Docker**
-   - *Nguyên nhân:* Người dùng Docker không có quyền ghi vào thư mục được mount.
-   - *Khắc phục:* Chạy `chmod -R 777 mlruns/ logs/ data/ knowledge_base/` hoặc `chown` lại thư mục.
-
-5. **Lỗi `IndexError: list index out of range` khi query FAISS**
-   - *Nguyên nhân:* FAISS index chưa được tạo.
-   - *Khắc phục:* Chạy `python src/rag/embedder.py` để nhúng lại toàn bộ tri thức.
+## 5. Cấu trúc Thư mục Kết quả (Output)
+Khi chạy chế độ phân tích hoặc demo, kết quả sẽ nằm trong `demo_outputs/`:
+- `vulnerability_report.md`: Báo cáo từ Trivy đã được Agent dịch/phân tích.
+- `knowledge_graph.json`: Cấu trúc Node/Edge của Graph hệ thống.
+- `pipeline_summary.md`: Tóm tắt luồng đánh giá RAG và các luật (Rules) được tự động sinh.
+- `apt_alerts.json`: Các thông báo và phân tích hành vi của APT Agent.
