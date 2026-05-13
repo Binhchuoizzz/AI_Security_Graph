@@ -2,7 +2,7 @@
 LangGraph Agent: LLM Client Wrapper
 
 CHỨC NĂNG:
-- Giao tiếp với Local LLM (Gemma 9B) thông qua OpenAI-compatible endpoint (Oobabooga/llama.cpp).
+- Giao tiếp với Local LLM (Gemma 9B) thông qua OpenAI-compatible endpoint (llama.cpp server).
 - Sử dụng OpenAI API format (OpenAI-compatible endpoint tại port 5000).
 - Implement Retry logic, Exponential Backoff, và Timeout handling để đảm bảo
   Agent không bị crash khi model đang bận tính toán.
@@ -22,7 +22,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# OpenAI-compatible endpoint (Oobabooga / llama.cpp)
+# OpenAI-compatible endpoint (llama.cpp server)
 API_BASE_URL = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
 API_KEY = os.getenv(
     "LLM_API_KEY", "sk-placeholder-local-only"
@@ -31,7 +31,7 @@ API_KEY = os.getenv(
 # Tuning parameters cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận deterministic, ít hallucination
-DEFAULT_MODEL = "gemma-2-9b-it-Q6_K.gguf"
+DEFAULT_MODEL = "gemma-2-9b-it-Q4_K_M.gguf"
 
 
 class LLMClient:
@@ -84,7 +84,7 @@ class LLMClient:
                     "max_tokens": max_tokens,
                 }
 
-                # Oobabooga API hỗ trợ JSON mode cho một số model
+                # llama.cpp API hỗ trợ JSON mode cho một số model
                 if response_format:
                     kwargs["response_format"] = response_format
 

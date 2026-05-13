@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 data/raw/
+data/processed/
 knowledge_base/faiss_index/
 logs/
 .env
