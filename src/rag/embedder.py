@@ -97,10 +97,11 @@ def load_mitre_chunks() -> list[dict]:
     return chunks
 
 
-def load_nist_chunks() -> list[dict]:
+def load_nist_chunks_json() -> list[dict]:
     """
-    Chuyển mỗi NIST SP 800-61r2 phase/control thành 1 text chunk để embed.
-    Format chunk: "A.8.20 - Networks security (Technological Controls): ..."
+    [LEGACY] Chuyển mỗi NIST SP 800-61r2 phase/control thành 1 text chunk để embed.
+    Chỉ tạo ra 6 chunks từ curated JSON — không đủ granularity cho RAG.
+    Giữ lại cho backward compatibility.
     """
     with open(NIST_JSON, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -130,7 +131,157 @@ def load_nist_chunks() -> list[dict]:
             }
         )
 
-    logger.info(f"Loaded {len(chunks)} NIST SP 800-61r2 control chunks")
+    logger.info(f"[LEGACY] Loaded {len(chunks)} NIST SP 800-61r2 control chunks")
+    return chunks
+
+
+# Path to NIST PDF-extracted text file
+NIST_TXT_PATH = os.path.join(BASE_DIR, "data", "knowledge", "nist_800_61r2.txt")
+
+
+def load_nist_chunks() -> list[dict]:
+    """
+    Chunk NIST SP 800-61r2 full document (79 pages) into fine-grained
+    paragraph-level chunks for semantic RAG retrieval.
+    Target: 80-120 chunks.
+
+    Strategy:
+      - Source: PDF-extracted text (data/knowledge/nist_800_61r2.txt)
+      - Primary split: sentence-aware sliding window via RecursiveCharacterTextSplitter
+      - chunk_size: 1500 chars (~256 tokens for all-MiniLM-L6-v2)
+      - overlap: 190 chars (~32 tokens)
+      - Preserve section headings as metadata (IR phase tagging)
+
+    Falls back to legacy JSON chunking if text file not found.
+    """
+    if not os.path.exists(NIST_TXT_PATH):
+        logger.warning(
+            f"NIST text file not found at {NIST_TXT_PATH}. "
+            f"Falling back to legacy JSON chunking (6 controls only)."
+        )
+        return load_nist_chunks_json()
+
+    import re
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    text = open(NIST_TXT_PATH, "r", encoding="utf-8", errors="ignore").read()
+    original_len = len(text)
+
+    # Clean PDF artifacts
+    text = re.sub(r"\n{3,}", "\n\n", text)           # collapse excessive blank lines
+    text = re.sub(r"NIST SP 800-61.*?\n", "", text)   # remove repeated headers
+    text = re.sub(r"Page \d+\n", "", text)             # remove page numbers
+    text = re.sub(r"\f", "", text)                     # remove form feeds
+    text = re.sub(r"^\d+\s*\n", "", text, flags=re.MULTILINE)  # remove standalone page numbers
+
+    logger.info(
+        f"NIST text loaded: {original_len} chars → {len(text)} chars after cleanup"
+    )
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1500,        # ~256 tokens for all-MiniLM-L6-v2
+        chunk_overlap=190,      # ~32 tokens overlap
+        separators=[
+            "\n\n",             # paragraph break (highest priority)
+            "\n",               # line break
+            ". ",               # sentence break
+            " ",                # word break (fallback)
+        ],
+        length_function=len,
+    )
+
+    raw_chunks = splitter.split_text(text)
+
+    # Tag each chunk with IR phase using multi-keyword matching
+    # Each phase has synonyms/related terms from the actual NIST document
+    ir_phase_keywords = {
+        "Preparation": [
+            "preparation", "preparing", "prepared", "readiness",
+            "incident response plan", "irp", "policy", "training",
+            "exercise", "toolkit", "jump bag", "contact list",
+            "war room", "communication plan", "resource",
+        ],
+        "Detection": [
+            "detection", "detect", "detecting", "identified",
+            "indicator", "precursor", "sign", "symptom",
+            "monitoring", "alerting", "ids", "intrusion detection",
+            "anomaly", "signature", "log analysis", "correlation",
+            "siem", "sensor", "network monitoring",
+        ],
+        "Analysis": [
+            "analysis", "analyze", "analyzing", "triage",
+            "investigate", "investigation", "priorit", "severity",
+            "categoriz", "classify", "validation", "verify",
+            "false positive", "incident category", "functional impact",
+            "information impact", "recoverability",
+        ],
+        "Containment": [
+            "containment", "contain", "containing", "isolat",
+            "quarantin", "sandbox", "segmentation", "block",
+            "disconnect", "short-term containment", "long-term containment",
+            "network isolation", "disable account",
+        ],
+        "Eradication": [
+            "eradication", "eradicat", "eliminat", "remov",
+            "clean", "disinfect", "patch", "remediat",
+            "vulnerability", "root cause", "malware removal",
+            "reimag", "rebuild",
+        ],
+        "Recovery": [
+            "recovery", "recover", "restoring", "restored",
+            "rebuild", "reconstitut", "backup", "business continuity",
+            "return to normal", "service restoration",
+            "validation testing", "monitoring after",
+        ],
+        "Post-Incident": [
+            "post-incident", "lessons learned", "after action",
+            "retrospective", "improvement", "metrics",
+            "incident cost", "follow-up", "report",
+            "what happened", "what could be improved",
+            "retention", "evidence retention",
+        ],
+    }
+
+    chunks = []
+    for i, chunk_text in enumerate(raw_chunks):
+        # Score each phase by keyword hit count
+        text_lower = chunk_text.lower()
+        phase_scores = {}
+        for phase, keywords in ir_phase_keywords.items():
+            score = sum(1 for kw in keywords if kw in text_lower)
+            if score > 0:
+                phase_scores[phase] = score
+
+        if phase_scores:
+            phase = max(phase_scores, key=phase_scores.get)
+        else:
+            phase = "General"
+
+        chunks.append(
+            {
+                "text": chunk_text,
+                "metadata": {
+                    "source": "nist_800_61r2",
+                    "id": f"nist_{i:03d}",
+                    "name": f"NIST SP 800-61r2 Chunk {i}",
+                    "domain": "Incident Response",
+                    "ir_phase": phase,
+                },
+            }
+        )
+
+    logger.info(
+        f"Generated {len(chunks)} NIST paragraph-level chunks "
+        f"(target: 80-120, from {original_len} chars)"
+    )
+
+    if len(chunks) < 30:
+        logger.warning(
+            f"Only {len(chunks)} chunks generated — source file may be truncated. "
+            f"Supplementing with legacy JSON controls."
+        )
+        chunks.extend(load_nist_chunks_json())
+
     return chunks
 
 

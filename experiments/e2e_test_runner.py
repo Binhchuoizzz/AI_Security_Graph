@@ -1,13 +1,14 @@
 """
-SENTINEL E2E Validation Suite — 15 Component Tests
+SENTINEL E2E Validation Suite — 20 Component Tests
 
-Phase 3: Kiểm chứng tất cả module hoạt động đúng spec.
+Phase 3+4: Kiểm chứng tất cả module hoạt động đúng spec.
 Tests 1-12 chạy OFFLINE (không cần LLM/Redis).
 Tests 13-15 yêu cầu Redis + LLM server.
+Tests 16-20: Validation cho 5 Critical Fixes (NIST, GT, DAPT, Latency, BM25).
 
 Usage:
   python experiments/e2e_test_runner.py
-  python experiments/e2e_test_runner.py --offline  # Chỉ chạy T1-T12
+  python experiments/e2e_test_runner.py --offline  # Chỉ chạy T1-T18, T20
 
 Output:
   reports/test_report_YYYYMMDD.md
@@ -330,6 +331,170 @@ def test_15_guardrails_pipeline(r: TestResult):
 
 
 # ============================================================================
+# TEST 16: NIST Index Size (≥60 vectors)
+# ============================================================================
+def test_16_nist_index_size(r: TestResult):
+    import faiss
+    nist_faiss = faiss.read_index("knowledge_base/faiss_index/nist_800_61r2.index")
+    with open("knowledge_base/faiss_index/nist_800_61r2_metadata.json") as f:
+        meta = json.load(f)
+
+    assert nist_faiss.ntotal >= 60, f"NIST FAISS only has {nist_faiss.ntotal} vectors (need ≥60)"
+    assert len(meta) >= 60, f"NIST metadata only has {len(meta)} entries (need ≥60)"
+    assert nist_faiss.ntotal == len(meta), f"Vector/metadata mismatch: {nist_faiss.ntotal} vs {len(meta)}"
+
+    # Test IR-phase-specific retrieval
+    from sentence_transformers import SentenceTransformer
+    import numpy as np
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+
+    ir_queries = [
+        ("containment strategy after detecting intrusion", "Containment"),
+        ("preparing incident response team", "Preparation"),
+        ("recovering systems after security breach", "Recovery"),
+    ]
+
+    phase_hits = 0
+    for query, expected_phase in ir_queries:
+        q_vec = model.encode([query], normalize_embeddings=True).astype(np.float32)
+        D, I = nist_faiss.search(q_vec, k=3)
+        top_phases = [meta[i].get("ir_phase", "") for i in I[0] if i >= 0]
+        if any(expected_phase in p for p in top_phases):
+            phase_hits += 1
+
+    r.passed(f"NIST index: {nist_faiss.ntotal} vectors, {phase_hits}/3 IR-phase queries matched")
+
+
+# ============================================================================
+# TEST 17: Ground Truth Scale (≥700 samples)
+# ============================================================================
+def test_17_ground_truth_scale(r: TestResult):
+    with open("experiments/ground_truth.json") as f:
+        gt = json.load(f)
+
+    from collections import Counter
+    labels = Counter(
+        s.get("input", {}).get("cicids_label", "Adversarial") for s in gt
+    )
+
+    total = len(gt)
+    assert total >= 700, f"Only {total} samples (need ≥700)"
+
+    # Check minimum per class
+    min_threshold = 20
+    for label, count in labels.items():
+        if label != "Adversarial":
+            assert count >= min_threshold, \
+                f"Class '{label}' has only {count} samples (need ≥{min_threshold})"
+
+    # Check adversarial test set
+    adv_path = "experiments/adversarial_samples.json"
+    assert os.path.exists(adv_path), f"Missing: {adv_path}"
+    with open(adv_path) as f:
+        adv = json.load(f)
+    assert adv["total"] == 45, f"Expected 45 adversarial samples, got {adv['total']}"
+    assert len(adv["samples"]) == 45, f"Expected 45 samples in list, got {len(adv['samples'])}"
+
+    r.passed(f"Ground truth: {total} samples, {len(labels)} classes, all ≥{min_threshold}; adversarial: 45")
+
+
+# ============================================================================
+# TEST 18: DAPT2020 APT Chain Tracking
+# ============================================================================
+def test_18_dapt_chain(r: TestResult):
+    import tempfile
+
+    chains_path = "data/processed/dapt2020_chains.jsonl"
+    assert os.path.exists(chains_path), f"Missing: {chains_path}"
+
+    chains = [json.loads(l) for l in open(chains_path)]
+    multi_day = [c for c in chains if len(c["days_spanned"]) >= 2]
+    assert len(multi_day) >= 5, f"Need ≥5 multi-day chains, got {len(multi_day)}"
+
+    # Test check_apt_chain
+    from src.agent.threat_memory import ThreatMemoryStore
+    db_path = os.path.join(tempfile.gettempdir(), "test_apt_t18.db")
+    try:
+        store = ThreatMemoryStore(db_path=db_path)
+        test_ip = chains[0]["attacker_ip"]
+        store.record_apt_event(test_ip, apt_phase="Reconnaissance", apt_day=1)
+        store.record_apt_event(test_ip, apt_phase="Initial_Compromise", apt_day=2)
+
+        result = store.check_apt_chain(test_ip)
+        assert result["is_apt"] is True, f"Expected is_apt=True, got {result}"
+        assert result["chain_length"] >= 2, f"chain_length={result['chain_length']}"
+    finally:
+        if os.path.exists(db_path):
+            os.remove(db_path)
+
+    r.passed(f"DAPT2020: {len(multi_day)} multi-day chains, check_apt_chain verified")
+
+
+# ============================================================================
+# TEST 19: Latency Benchmark (≥60% reduction)
+# ============================================================================
+def test_19_latency_benchmark(r: TestResult):
+    # Check if LLM server is available on port 5000 or 8080
+    import urllib.request
+    llm_available = False
+    for port in [5000, 8080]:
+        try:
+            req = urllib.request.Request(f"http://localhost:{port}/v1/models")
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                if resp.status == 200:
+                    llm_available = True
+                    break
+        except Exception:
+            continue
+
+    if not llm_available:
+        r.skipped("llama.cpp server not running on port 5000/8080 — run measure_latency_baseline.py manually")
+        return
+
+    # If LLM is available, check for existing results first
+    benchmark_path = "reports/latency_benchmark.json"
+    if os.path.exists(benchmark_path):
+        with open(benchmark_path) as f:
+            data = json.load(f)
+        if data.get("status") == "SKIPPED":
+            r.skipped("Latency benchmark was skipped (LLM unavailable at time of run)")
+            return
+        pct = data.get("latency_reduction_pct", 0)
+        assert pct >= 60, f"Latency reduction {pct}% < 60% target"
+        r.passed(f"Latency reduction: {pct}% (target ≥60%)")
+    else:
+        r.skipped("No benchmark results yet — run: python experiments/measure_latency_baseline.py")
+
+
+# ============================================================================
+# TEST 20: rank_bm25 Import & Usage
+# ============================================================================
+def test_20_rank_bm25(r: TestResult):
+    from rank_bm25 import BM25Okapi
+    # Verify basic functionality — need enough docs for IDF to be non-zero
+    corpus = [
+        ["hello", "world", "test"],
+        ["brute", "force", "ssh", "attack"],
+        ["normal", "http", "traffic", "web"],
+        ["dns", "query", "lookup", "server"],
+        ["login", "attempt", "failed", "password"],
+    ]
+    bm25 = BM25Okapi(corpus)
+    scores = bm25.get_scores(["brute", "force", "ssh"])
+    # Doc 1 (brute force ssh) should score highest
+    assert scores[1] > scores[0], f"BM25 scoring incorrect: {scores}"
+    assert scores[1] > scores[2], f"BM25 scoring incorrect: {scores}"
+
+    # Verify retriever.py uses BM25
+    import inspect
+    from src.rag.retriever import DualRetriever
+    source = inspect.getsource(DualRetriever)
+    assert "BM25Okapi" in source, "DualRetriever does not reference BM25Okapi"
+
+    r.passed("rank_bm25 imports OK, BM25Okapi scoring verified, used in DualRetriever")
+
+
+# ============================================================================
 # REPORT GENERATOR
 # ============================================================================
 def generate_report():
@@ -380,8 +545,8 @@ if __name__ == "__main__":
     offline_only = "--offline" in sys.argv
 
     print("=" * 60)
-    print("  SENTINEL E2E Validation Suite")
-    print(f"  Mode: {'OFFLINE (T1-T15 component tests)' if offline_only else 'FULL'}")
+    print("  SENTINEL E2E Validation Suite (20 Tests)")
+    print(f"  Mode: {'OFFLINE (T1-T18, T20)' if offline_only else 'FULL'}")
     print("=" * 60)
 
     run_test("T01", "Ground Truth File Valid", test_01_ground_truth)
@@ -399,14 +564,20 @@ if __name__ == "__main__":
     run_test("T13", "Agent State MemoryObject", test_13_agent_state)
     run_test("T14", "Template Miner Compression", test_14_template_miner)
     run_test("T15", "GuardrailsPipeline Integration", test_15_guardrails_pipeline)
+    run_test("T16", "NIST Index Size (≥60 vectors)", test_16_nist_index_size)
+    run_test("T17", "Ground Truth Scale (≥700)", test_17_ground_truth_scale)
+    run_test("T18", "DAPT2020 APT Chain", test_18_dapt_chain)
+    run_test("T19", "Latency Benchmark", test_19_latency_benchmark)
+    run_test("T20", "rank_bm25 Import & Usage", test_20_rank_bm25)
 
     report_path = generate_report()
 
     # Summary
     passed = sum(1 for r in results if r.status == "PASS")
     failed = sum(1 for r in results if r.status == "FAIL")
+    skipped = sum(1 for r in results if r.status == "SKIP")
     print(f"\n{'='*60}")
-    print(f"  FINAL: {passed}/{len(results)} PASSED | {failed} FAILED")
+    print(f"  FINAL: {passed}/{len(results)} PASSED | {failed} FAILED | {skipped} SKIPPED")
     if failed == 0:
         print(f"  ✅ ALL TESTS PASSED — THESIS READY")
     else:

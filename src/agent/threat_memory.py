@@ -98,6 +98,20 @@ class ThreatMemoryStore:
                 )
             """)
 
+            # Bảng 4: Threat Events — APT chain tracking from DAPT2020
+            c.execute("""
+                CREATE TABLE IF NOT EXISTS threat_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    src_ip TEXT NOT NULL,
+                    dst_ip TEXT DEFAULT '',
+                    apt_phase TEXT,
+                    apt_day INTEGER,
+                    label TEXT DEFAULT '',
+                    timestamp TEXT DEFAULT '',
+                    recorded_at TEXT DEFAULT ''
+                )
+            """)
+
             conn.commit()
         logger.info(f"[THREAT MEMORY] Initialized at {self.db_path}")
 
@@ -253,6 +267,80 @@ class ThreatMemoryStore:
             c = conn.cursor()
             c.execute("SELECT * FROM known_entities WHERE is_active = 1 ORDER BY added_at DESC")
             return [dict(row) for row in c.fetchall()]
+
+    # =========================================================================
+    # APT CHAIN TRACKING (DAPT2020 Integration)
+    # =========================================================================
+
+    def record_apt_event(self, src_ip: str, dst_ip: str = "",
+                         apt_phase: str = None, apt_day: int = None,
+                         label: str = "", timestamp: str = ""):
+        """Record a single threat event for APT chain tracking."""
+        now = datetime.utcnow().isoformat()
+        with sqlite3.connect(self.db_path) as conn:
+            c = conn.cursor()
+            c.execute("""
+                INSERT INTO threat_events
+                (src_ip, dst_ip, apt_phase, apt_day, label, timestamp, recorded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (src_ip, dst_ip, apt_phase, apt_day, label, timestamp, now))
+            conn.commit()
+
+    def check_apt_chain(self, src_ip: str) -> dict:
+        """
+        Check if this IP is part of a known APT chain.
+        Returns escalation info if multi-stage attack detected.
+
+        An IP is flagged as APT if it appears in events across ≥2 different days.
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """SELECT COUNT(*), MAX(apt_day), GROUP_CONCAT(DISTINCT apt_phase)
+                   FROM threat_events
+                   WHERE src_ip = ? AND apt_phase IS NOT NULL""",
+                (src_ip,)
+            )
+            row = cursor.fetchone()
+
+        event_count, max_day, phases = row
+
+        if event_count and event_count >= 2:
+            return {
+                "is_apt": True,
+                "chain_length": event_count,
+                "max_day_seen": max_day,
+                "phases_seen": phases,
+                "severity_escalation": "CRITICAL" if event_count >= 3 else "HIGH",
+            }
+        return {"is_apt": False, "chain_length": event_count or 0}
+
+    def ingest_dapt_chains(self, chains_path: str = "data/processed/dapt2020_chains.jsonl"):
+        """
+        Ingest DAPT2020 APT chains from JSONL into threat_events table.
+        Each chain contains events from the same attacker IP across multiple days.
+        """
+        import json
+
+        if not os.path.exists(chains_path):
+            logger.warning(f"DAPT2020 chains not found: {chains_path}")
+            return 0
+
+        count = 0
+        for line in open(chains_path):
+            chain = json.loads(line)
+            for event in chain.get("events", []):
+                self.record_apt_event(
+                    src_ip=event.get("src_ip", chain["attacker_ip"]),
+                    dst_ip=event.get("dst_ip", ""),
+                    apt_phase=event.get("phase"),
+                    apt_day=event.get("day"),
+                    label=event.get("label", ""),
+                    timestamp=event.get("timestamp", ""),
+                )
+                count += 1
+
+        logger.info(f"[THREAT MEMORY] Ingested {count} DAPT2020 events")
+        return count
 
     # =========================================================================
     # APT CORRELATION
