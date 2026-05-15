@@ -102,7 +102,7 @@ def measure_two_tier(events: list) -> list:
 
         # LLM
         try:
-            _ = llm.analyze(safe_log[:1000], context.get("combined_prompt", ""))
+            _ = llm.invoke([{"role": "user", "content": str(context.get("combined_prompt", "")) + "\n" + safe_log[:1000]}])
         except Exception:
             # LLM call may fail, still count latency
             pass
@@ -126,7 +126,7 @@ def measure_llm_only_baseline(events: list) -> list:
         # Direct LLM inference — no filtering, no RAG
         raw_log = json.dumps(event, default=str)[:1500]
         try:
-            _ = llm.analyze(raw_log, context="")
+            _ = llm.invoke([{"role": "user", "content": raw_log}])
         except Exception:
             pass
 
@@ -197,7 +197,7 @@ Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
         "two_tier_mean_ms": round(two_tier_mean, 2),
         "latency_reduction_pct": round(reduction_pct, 2),
         "target_pct": 60,
-        "pass": reduction_pct >= 60,
+        "pass": bool(reduction_pct >= 60),
         "per_event_two_tier_ms": [round(x, 2) for x in two_tier_latencies],
         "per_event_baseline_ms": [round(x, 2) for x in baseline_latencies],
     }
