@@ -49,7 +49,7 @@ class LLMClient:
         messages: List[Dict[str, str]],
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-        response_format: Optional[Dict[str, str]] = None,
+        response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Gọi LLM với Retry Logic.
@@ -77,7 +77,7 @@ class LLMClient:
         for retries in range(self.max_retries + 1):
             try:
                 # Gọi API
-                kwargs = {
+                kwargs: Any = {
                     "model": DEFAULT_MODEL,
                     "messages": messages,
                     "temperature": temperature,
@@ -88,20 +88,20 @@ class LLMClient:
                 if response_format:
                     kwargs["response_format"] = response_format
 
-                response = self.client.chat.completions.create(**kwargs)
+                response: Any = self.client.chat.completions.create(**kwargs)  # type: ignore
 
                 # Trả về text
                 return response.choices[0].message.content
 
-            except openai.APIConnectionError as e:
-                logger.error(
-                    f"LLM Connection Error: {e}. Is LLM server running on port 5000?"
-                )
-                if retries == self.max_retries:
-                    raise
             except openai.APITimeoutError as e:
                 logger.warning(
                     f"LLM Timeout (attempt {retries+1}/{self.max_retries}): {e}"
+                )
+                if retries == self.max_retries:
+                    raise
+            except openai.APIConnectionError as e:
+                logger.error(
+                    f"LLM Connection Error: {e}. Is LLM server running on port 5000?"
                 )
                 if retries == self.max_retries:
                     raise
