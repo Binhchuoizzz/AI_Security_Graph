@@ -19,10 +19,10 @@ LABEL maintainer="Nguyen Duc Binh <binhchuoizzz@github>"
 LABEL description="SENTINEL SOC - Autonomous AI Security Agent"
 LABEL version="1.0.0"
 
-# Install Trivy for Vulnerability Scanning
+# Install Trivy for Vulnerability Scanning (modern GPG key method)
 RUN apt-get update && apt-get install -y wget apt-transport-https gnupg \
-    && wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - \
-    && echo deb https://aquasecurity.github.io/trivy-repo/deb bullseye main | tee -a /etc/apt/sources.list.d/trivy.list \
+    && wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | tee /etc/apt/sources.list.d/trivy.list \
     && apt-get update && apt-get install -y trivy \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,8 +31,8 @@ RUN groupadd -r sentinel && useradd --no-log-init -r -g sentinel sentinel
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /root/.local /home/sentinel/.local
+# Copy installed packages from builder — CRITICAL: chown to sentinel to fix exec permission
+COPY --from=builder --chown=sentinel:sentinel /root/.local /home/sentinel/.local
 ENV PATH=/home/sentinel/.local/bin:$PATH
 
 # Copy application code
@@ -40,6 +40,9 @@ COPY --chown=sentinel:sentinel . .
 
 # Security: Make knowledge_base read-only to prevent RAG poisoning
 RUN chmod -R 555 /app/knowledge_base/ 2>/dev/null || true
+
+# Ensure sentinel's pip binaries are executable
+RUN chmod -R u+x /home/sentinel/.local/bin/ 2>/dev/null || true
 
 # Expose Streamlit port
 EXPOSE 8501

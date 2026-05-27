@@ -72,6 +72,26 @@ services:
           cpus: '0.5'
     restart: unless-stopped
 
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: sentinel_neo4j
+    ports:
+      - "7474:7474"   # HTTP Browser
+      - "7687:7687"   # Bolt protocol
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-SentinelGraphPass2026!}
+      - NEO4J_PLUGINS=["apoc"]
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - sentinel_net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    restart: unless-stopped
+
 networks:
   sentinel_net:
     driver: bridge
@@ -80,4 +100,6 @@ networks:
 
 volumes:
   mlflow_data:
+    driver: local
+  neo4j_data:
     driver: local
