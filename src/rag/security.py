@@ -111,7 +111,10 @@ def verify_document_integrity() -> dict:
         # Compute actual hash
         sha256 = hashlib.sha256()
         with open(filepath, "rb") as f:
-            for chunk in iter(lambda: f.read(8192), b""):
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
                 sha256.update(chunk)
         actual_hash = sha256.hexdigest()
 

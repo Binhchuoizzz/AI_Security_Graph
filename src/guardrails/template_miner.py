@@ -25,6 +25,7 @@ QUAN TRỌNG - RANH GIỚI TRÁCH NHIỆM:
 import re
 import math
 from collections import Counter
+from typing import Optional
 
 
 class LogTemplateMiner:
@@ -71,7 +72,7 @@ class LogTemplateMiner:
                 generalized.append(token)
         return " ".join(generalized)
 
-    def add_log(self, log_str: str, timestamp: float = None):
+    def add_log(self, log_str: str, timestamp: Optional[float] = None):
         """Thêm log vào bộ template. GIỮ NGUYÊN nội dung gốc trong samples."""
         self.total_logs_processed += 1
         tokens = self._tokenize(log_str)
@@ -211,7 +212,7 @@ class TokenBudgetManager:
     def estimate_tokens(text: str) -> int:
         return len(text) // 4
 
-    def fit_to_budget(self, template_text: str, high_entropy_logs: list = None) -> str:
+    def fit_to_budget(self, template_text: str, high_entropy_logs: Optional[list] = None) -> str:
         """
         Cắt tỉa cho vừa ngân sách.
         Output sẽ được chuyển tiếp qua DelimitedDataEncapsulator.

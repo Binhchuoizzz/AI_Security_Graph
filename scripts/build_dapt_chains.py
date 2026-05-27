@@ -71,8 +71,15 @@ def build_chains():
         ip = str(row.get("src_ip", "unknown"))
         if ip not in chains:
             chains[ip] = []
+        
+        def safe_int(val):
+            try:
+                return int(val) if pd.notna(val) else 0 # type: ignore
+            except (ValueError, TypeError):
+                return 0
+
         chains[ip].append({
-            "day": int(row.get("apt_day", 0)),
+            "day": safe_int(row.get("apt_day", 0)),
             "phase": row.get("apt_phase", "Unknown"),
             "label": str(row.get("label", "Unknown")),
             "src_ip": ip,

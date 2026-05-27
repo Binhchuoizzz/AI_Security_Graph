@@ -38,9 +38,9 @@ def mcnemar_test(y_true, y_pred1, y_pred2):
 def calculate_metrics(y_true, y_pred):
     return {
         "accuracy": accuracy_score(y_true, y_pred),
-        "precision": precision_score(y_true, y_pred, zero_division=0),
-        "recall": recall_score(y_true, y_pred, zero_division=0),
-        "f1": f1_score(y_true, y_pred, zero_division=0),
+        "precision": precision_score(y_true, y_pred, zero_division=0),  # type: ignore
+        "recall": recall_score(y_true, y_pred, zero_division=0),  # type: ignore
+        "f1": f1_score(y_true, y_pred, zero_division=0),  # type: ignore
     }
 
 

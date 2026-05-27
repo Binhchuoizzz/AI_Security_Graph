@@ -59,7 +59,18 @@ def evaluate_guardrails_defense(samples: list) -> dict:
     detector = PromptInjectionDetector()
     neutralizer = EncodingNeutralizer()
 
-    results_by_category = defaultdict(
+    from typing import TypedDict, Any
+
+    class CategoryStats(TypedDict):
+        total: int
+        detected_by_pattern: int
+        neutralized_encoding: int
+        delimiter_stripped: int
+        fully_blocked: int
+        bypassed: int
+        details: list[dict[str, Any]]
+
+    results_by_category: dict[str, CategoryStats] = defaultdict(
         lambda: {
             "total": 0,
             "detected_by_pattern": 0,

@@ -154,33 +154,33 @@ def run_ablation():
         f1_a = f1_score(
             results["Config_A"]["y_true"],
             results["Config_A"]["y_pred"],
-            zero_division=0,
+            zero_division=0,  # type: ignore
         )
         prec_a = precision_score(
             results["Config_A"]["y_true"],
             results["Config_A"]["y_pred"],
-            zero_division=0,
+            zero_division=0,  # type: ignore
         )
         rec_a = recall_score(
             results["Config_A"]["y_true"],
             results["Config_A"]["y_pred"],
-            zero_division=0,
+            zero_division=0,  # type: ignore
         )
 
         f1_f = f1_score(
             results["Config_F"]["y_true"],
             results["Config_F"]["y_pred"],
-            zero_division=0,
+            zero_division=0,  # type: ignore
         )
         prec_f = precision_score(
             results["Config_F"]["y_true"],
             results["Config_F"]["y_pred"],
-            zero_division=0,
+            zero_division=0,  # type: ignore
         )
         rec_f = recall_score(
             results["Config_F"]["y_true"],
             results["Config_F"]["y_pred"],
-            zero_division=0,
+            zero_division=0,  # type: ignore
         )
 
         # Tính toán False Positive Rate (FPR)

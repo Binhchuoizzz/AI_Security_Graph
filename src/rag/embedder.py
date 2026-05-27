@@ -253,7 +253,7 @@ def load_nist_chunks() -> list[dict]:
                 phase_scores[phase] = score
 
         if phase_scores:
-            phase = max(phase_scores, key=phase_scores.get)
+            phase = max(phase_scores, key=lambda k: phase_scores[k])
         else:
             phase = "General"
 
@@ -329,7 +329,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
     # Xây dựng FAISS index (Inner Product = cosine similarity khi được chuẩn hóa)
     index = faiss.IndexFlatIP(EMBEDDING_DIM)
-    index.add(embeddings)
+    index.add(embeddings)  # type: ignore
 
     os.makedirs(INDEX_DIR, exist_ok=True)
     index_path = os.path.join(INDEX_DIR, f"{index_name}.index")

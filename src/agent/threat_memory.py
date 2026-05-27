@@ -27,7 +27,7 @@ MỤC ĐÍCH:
 import sqlite3
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ class ThreatMemoryStore:
         Ghi nhận một sự cố liên quan đến IP.
         Tự động tăng reputation score dựa trên severity.
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         score_delta = {
             "BLOCK_IP": 30.0,
             "QUARANTINE": 25.0,
@@ -194,7 +194,7 @@ class ThreatMemoryStore:
         Giảm reputation score cho IPs inactive > N ngày.
         Chạy định kỳ (ví dụ: mỗi ngày) để tránh stale data.
         """
-        cutoff = (datetime.utcnow() - timedelta(days=inactive_days)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
             c.execute("""
@@ -219,7 +219,7 @@ class ThreatMemoryStore:
         entity_type: 'scanner', 'pentest_ip', 'admin_tool', 'scheduled_scan'
         entity_value: IP, hostname, hoặc tool name
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         try:
             with sqlite3.connect(self.db_path) as conn:
                 c = conn.cursor()
@@ -273,10 +273,10 @@ class ThreatMemoryStore:
     # =========================================================================
 
     def record_apt_event(self, src_ip: str, dst_ip: str = "",
-                         apt_phase: str = None, apt_day: int = None,
+                         apt_phase: Optional[str] = None, apt_day: Optional[int] = None,
                          label: str = "", timestamp: str = ""):
         """Record a single threat event for APT chain tracking."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
             c.execute("""
@@ -352,7 +352,7 @@ class ThreatMemoryStore:
         Kiểm tra xem IP có pattern APT không.
         APT = IP bị escalate >= threshold_incidents lần trong threshold_days ngày.
         """
-        cutoff = (datetime.utcnow() - timedelta(days=threshold_days)).isoformat()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=threshold_days)).isoformat()
         reputation = self.get_ip_reputation(ip)
 
         if not reputation:
@@ -364,7 +364,7 @@ class ThreatMemoryStore:
                 "ip": ip,
                 "is_apt_candidate": True,
                 "total_incidents": reputation["total_incidents"],
-                "days_active": (datetime.utcnow() - datetime.fromisoformat(
+                "days_active": (datetime.now(timezone.utc) - datetime.fromisoformat(
                     reputation["first_seen"])).days,
                 "reputation_score": reputation["reputation_score"],
                 "last_mitre": reputation.get("last_mitre_technique", ""),
@@ -375,7 +375,7 @@ class ThreatMemoryStore:
                              confidence: float, related_ips: str = "",
                              mitre_chain: str = ""):
         """Ghi nhận APT indicator cho correlation dài hạn."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
             # Check existing

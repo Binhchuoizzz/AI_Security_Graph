@@ -220,11 +220,11 @@ def fetch_and_build(
             df_filtered = df[available_cols].copy()
 
             # Normalize label strings
-            df_filtered["Label"] = df_filtered["Label"].str.strip()
+            df_filtered["Label"] = pd.Series(df_filtered["Label"]).str.strip()
 
             # Only keep labels in our LABEL_MAP
             valid_labels = list(LABEL_MAP.keys())
-            df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]
+            df_filtered = df_filtered[pd.Series(df_filtered["Label"]).isin(valid_labels)]
             all_data.append(df_filtered)
             print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm.")
         except Exception as e:
@@ -254,13 +254,19 @@ def fetch_and_build(
 
         chosen = subset.sample(n_take, random_state=42)
 
+        def safe_int(val):
+            try:
+                return int(val) if pd.notna(val) else 0 # type: ignore
+            except (ValueError, TypeError):
+                return 0
+
         for idx, (_, row) in enumerate(chosen.iterrows()):
             # CIC-IDS2018 processed CSVs don't have Src IP/Dst IP
             # Generate deterministic mock IPs for Tier 1 compatibility
             src_ip = str(row.get("Src IP", f"10.{(gt_counter // 256) % 256}.{gt_counter % 256}.{(idx+1) % 256}"))
             dst_ip = str(row.get("Dst IP", f"192.168.1.{(gt_counter + idx) % 256}"))
-            src_port = int(row.get("Src Port", 0)) if pd.notna(row.get("Src Port")) else 0
-            dst_port = int(row.get("Dst Port", 0)) if pd.notna(row.get("Dst Port")) else 0
+            src_port = safe_int(row.get("Src Port", 0))
+            dst_port = safe_int(row.get("Dst Port", 0))
 
             sample = {
                 "id": f"GT-{gt_counter:03d}",
@@ -272,12 +278,12 @@ def fetch_and_build(
                         "dst_ip": dst_ip,
                         "src_port": src_port,
                         "dst_port": dst_port,
-                        "protocol": int(row.get("Protocol", 6)) if pd.notna(row.get("Protocol")) else 6,
-                        "flow_duration_ms": int(row.get("Flow Duration", 0)) if pd.notna(row.get("Flow Duration")) else 0,
-                        "fwd_packets": int(row.get("Tot Fwd Pkts", 0)) if pd.notna(row.get("Tot Fwd Pkts")) else 0,
-                        "bwd_packets": int(row.get("Tot Bwd Pkts", 0)) if pd.notna(row.get("Tot Bwd Pkts")) else 0,
-                        "fwd_bytes": int(row.get("TotLen Fwd Pkts", 0)) if pd.notna(row.get("TotLen Fwd Pkts")) else 0,
-                        "bwd_bytes": int(row.get("TotLen Bwd Pkts", 0)) if pd.notna(row.get("TotLen Bwd Pkts")) else 0,
+                        "protocol": safe_int(row.get("Protocol", 6)),
+                        "flow_duration_ms": safe_int(row.get("Flow Duration", 0)),
+                        "fwd_packets": safe_int(row.get("Tot Fwd Pkts", 0)),
+                        "bwd_packets": safe_int(row.get("Tot Bwd Pkts", 0)),
+                        "fwd_bytes": safe_int(row.get("TotLen Fwd Pkts", 0)),
+                        "bwd_bytes": safe_int(row.get("TotLen Bwd Pkts", 0)),
                         "service": _infer_service(dst_port),
                     }
                 ],

@@ -29,8 +29,8 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     mitre_match = re.search(r'MITRE:\s*([^\s\]]+)', raw_reason, re.IGNORECASE)
     if mitre_match:
         mitre_tech = mitre_match.group(1).strip()
-    elif re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason):
-        mitre_tech = re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason).group(1)
+    elif t_match := re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason):
+        mitre_tech = t_match.group(1)
         
     conf_match = re.search(r'Confidence:\s*([01]?\.\d+|1(?:\.0)?)', raw_reason, re.IGNORECASE)
     if conf_match:
@@ -127,7 +127,7 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
         if not high_risk_ips:
             st.info("Chưa ghi nhận IP nguy hiểm nào.")
         else:
-            df_high_risk = pd.DataFrame(high_risk_ips, columns=["IP", "Reputation Score"])
+            df_high_risk = pd.DataFrame(high_risk_ips, columns=["IP", "Reputation Score"]) # type: ignore
             # Define styling function
             def color_score(val):
                 color = 'red' if val >= 70 else 'orange' if val >= 40 else 'green'
@@ -139,5 +139,5 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
         if not known_entities:
             st.info("Chưa có cấu hình tổ chức nào.")
         else:
-            df_entities = pd.DataFrame(known_entities, columns=["Entity/IP", "Role"])
+            df_entities = pd.DataFrame(known_entities, columns=["Entity/IP", "Role"]) # type: ignore
             st.dataframe(df_entities, use_container_width=True)

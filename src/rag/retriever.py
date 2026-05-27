@@ -20,6 +20,7 @@ import logging
 import numpy as np
 import pickle
 import sys
+from typing import Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
@@ -42,7 +43,7 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 class DualRetriever:
     def __init__(
         self,
-        enabled_sources: list[str] = None,
+        enabled_sources: Optional[list[str]] = None,
         top_k: int = DEFAULT_TOP_K,
         use_cache: bool = True,
     ):

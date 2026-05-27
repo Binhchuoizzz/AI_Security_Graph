@@ -88,7 +88,7 @@ def build_ground_truth(
     n_per_label: int = 10,
     output_path: str = "experiments/ground_truth.json",
 ):
-    df = pd.read_csv(csv_path, usecols=FEATURE_COLS, low_memory=False)
+    df = pd.read_csv(csv_path, usecols=FEATURE_COLS, low_memory=False)  # type: ignore
     df.columns = df.columns.str.strip()
 
     samples = []

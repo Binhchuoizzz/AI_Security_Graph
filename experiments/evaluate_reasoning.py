@@ -90,6 +90,7 @@ Respond ONLY in this JSON format:
 def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
     """Call LLM Judge API (Llama 3 loaded) to judge reasoning quality."""
     import requests
+    content = ""
 
     try:
         response = requests.post(

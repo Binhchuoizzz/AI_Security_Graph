@@ -243,6 +243,7 @@ def test_11_session_baseline(r: TestResult):
     from src.tier1_filter.rule_engine import RuleEngine
     engine = RuleEngine()
     scanner_ip = "10.99.99.99"
+    result = {}
     # Simulate port scanning: same IP, 15 different ports
     for port in range(1, 16):
         log = {"Source IP": scanner_ip, "Destination Port": port, "Total Fwd Packets": 1}

@@ -9,6 +9,7 @@ import os
 
 try:
     from langgraph.graph import StateGraph, END
+    from langgraph.graph.state import CompiledStateGraph
 except ImportError:
     raise ImportError("Missing dependency: pip install langgraph")
 
@@ -23,7 +24,7 @@ from src.agent.nodes import (
 )
 
 
-def create_agent_workflow() -> StateGraph:
+def create_agent_workflow() -> CompiledStateGraph:
     """
     Khởi tạo và biên dịch LangGraph cho quá trình phân tích bảo mật.
     """

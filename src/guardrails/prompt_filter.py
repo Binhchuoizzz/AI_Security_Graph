@@ -30,6 +30,7 @@ import base64
 import secrets
 import urllib.parse
 from collections import Counter
+from typing import Optional
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
@@ -53,7 +54,7 @@ class PromptInjectionDetector:
     - Tăng mức isolation khi đưa vào LLM prompt
     """
 
-    def __init__(self, patterns: list = None):
+    def __init__(self, patterns: Optional[list] = None):
         config = load_config()
         self.patterns = patterns or config["guardrails"]["injection_patterns"]
         self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]
@@ -102,7 +103,7 @@ class JailbreakDetector:
     DATA FLOW (chèn lệnh vào data).
     """
 
-    def __init__(self, patterns: list = None):
+    def __init__(self, patterns: Optional[list] = None):
         config = load_config()
         self.patterns = patterns or config["guardrails"].get("jailbreak_patterns", [])
         self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]

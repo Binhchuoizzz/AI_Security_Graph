@@ -24,7 +24,16 @@ import json
 import yaml
 import os
 import time
+import time
 from collections import defaultdict
+from typing import TypedDict, Optional, Set, Dict, List, Any
+
+class IPProfile(TypedDict):
+    request_count: int
+    unique_ports: Set[int]
+    total_fwd_packets: float
+    first_seen: Optional[float]
+    last_seen: Optional[float]
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
@@ -59,11 +68,11 @@ class SessionBaseline:
         window_seconds: int = 300,
         ttl_seconds: int = 600,
     ):
-        self.profiles = defaultdict(
+        self.profiles: Dict[str, IPProfile] = defaultdict(
             lambda: {
                 "request_count": 0,
                 "unique_ports": set(),
-                "total_fwd_packets": 0,
+                "total_fwd_packets": 0.0,
                 "first_seen": None,
                 "last_seen": None,
             }

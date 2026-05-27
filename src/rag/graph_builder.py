@@ -84,7 +84,8 @@ class KnowledgeGraphBuilder:
                     
             # Count nodes
             result = session.run("MATCH (n) RETURN count(n) as count")
-            count = result.single()["count"]
+            single_result = result.single()
+            count = single_result["count"] if single_result else 0
             logger.info(f"Knowledge Graph updated. Total nodes: {count}")
             
     def _mock_build(self):

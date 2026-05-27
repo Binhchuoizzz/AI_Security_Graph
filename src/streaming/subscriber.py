@@ -53,7 +53,8 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         try:
             # BLPOP lắng nghe trên nhiều queue cùng lúc.
             # item sẽ là một tuple: ('tên_queue', 'giá_trị_chuyển_vào')
-            item = r.blpop(QUEUES, timeout=1)
+            from typing import Any, cast
+            item = cast(Any, r.blpop(QUEUES, timeout=1))
             if item:
                 source_queue = item[0]
                 raw_log = json.loads(item[1])

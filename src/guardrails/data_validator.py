@@ -7,11 +7,13 @@ Kiểm tra tính toàn vẹn dữ liệu trước khi đưa vào pipeline LangGr
   - Null/NaN Handling: Làm sạch giá trị rỗng.
 """
 
+from typing import Optional
+
 REQUIRED_FIELDS = ["Source IP", "Destination Port", "Protocol"]
 
 
 class DataValidator:
-    def __init__(self, required_fields: list = None):
+    def __init__(self, required_fields: Optional[list] = None):
         self.required_fields = required_fields or REQUIRED_FIELDS
 
     def validate(self, log_entry: dict) -> dict:
