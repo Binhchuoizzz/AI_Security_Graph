@@ -239,39 +239,27 @@ Luồng công việc của Agent được điều phối bởi LangGraph, cho ph
     \end{tabular}
 \end{table}
 
-% ===========================\subsection{Kết quả Kỳ vọng}
-Nghiên cứu này được kỳ vọng sẽ phát triển thành công một hệ thống tự trị hoàn chỉnh, có khả năng vận hành trơn tru toàn bộ chu trình xử lý của SOC — từ việc tiếp nhận log, lọc rác bằng thuật toán heuristic, thanh lọc mã độc adversarial, suy luận chuyên sâu, cho đến sinh quy tắc phòng thủ tự động. Các chỉ tiêu định lượng cho Khung Đánh giá 5D được trình bày như sau:
+% =============================================================================
+% CHƯƠNG 4: KẾ HOẠCH TRIỂN KHAI VÀ ĐÁNH GIÁ
+% =============================================================================
+\newpage
+\section{Kế hoạch Triển khai và Đánh giá}
 
-\begin{table}[H]
-    \centering
-    \caption{Các chỉ tiêu hiệu năng định lượng}
-    \label{tab:targets}
-    \begin{tabular}{lll}
-        \toprule
-        \textbf{Chiều đánh giá} & \textbf{Mục tiêu} & \textbf{Cơ sở} \\
-        \midrule
-        F1-Score (Phân loại)         & $\geq 0.90$  & Chuẩn benchmark IDS \cite{khraisat2019} \\
-        Giảm Độ trễ so với LLM-only  & $\geq 60\%$  & Tier 1 lọc phần lớn lưu lượng \\
-        Tỷ lệ Đánh bại Guardrail     & $< 10\%$     & 45 mẫu adversarial đặc chế \\
-        Độ Phù hợp Ngữ cảnh (RAGAS)  & $\geq 0.85$  & Dual-RAG MITRE + NIST \\
-        Hoàn thiện Nhật ký Kiểm toán & $100\%$      & Kiểm tra trường dữ liệu xác định \\
-        \bottomrule
-        \end{tabular}
-    \end{table}
+\subsection{Các Giai đoạn Phát triển Chính}
+Quá trình triển khai hệ thống tập trung trước tiên vào việc Thu nhận Dữ liệu (Data Ingestion) và Động cơ Quy tắc Tier 1 (Tier 1 Rule Engine). Hai bộ dữ liệu chuẩn được lựa chọn để đánh giá là:
 
-Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách được kỳ vọng sẽ đạt Tỷ lệ Đánh bại Guardrail dưới 10\% trước các đòn tấn công prompt injection dạng cấu trúc, chứng minh khả năng tự phòng vệ vững chắc mà không tước đi phần dữ liệu payload quan trọng cần thiết cho việc điều tra của LLM.
+\begin{itemize}
+    \item \textbf{CSE-CIC-IDS2018 \cite{sharafaldin2018}:} Tiêu chuẩn thực tế cho nghiên cứu phát hiện xâm nhập mạng doanh nghiệp. Bộ dữ liệu cung cấp cả tệp PCAP thô và các đặc trưng luồng được trích xuất sẵn, giúp so sánh trực tiếp với các nghiên cứu trước đó.
+    \item \textbf{DAPT2020 \cite{dapt2020}:} Bộ dữ liệu được thiết kế riêng cho việc phát hiện tấn công APT đa giai đoạn. Bộ dữ liệu này bổ sung cho CSE-CIC-IDS2018 bằng cách cung cấp các chuỗi tấn công dài hạn nhằm thử nghiệm tính năng Tác tử Tier 2 và Bộ nhớ Rủi ro Dài hạn của SENTINEL.
+\end{itemize}
 
-Bên cạnh đó, quá trình tích hợp Dual-RAG hứa hẹn sẽ mang lại điểm Độ Phù hợp Ngữ cảnh từ 0.85 trở lên, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn NIST SP 800-61r2 thay vì sinh ra những kết quả ảo giác (hallucination).
+Cơ chế theo dõi phiên (session-tracking) được xây dựng bằng cách sử dụng Redis TTL để thiết lập đường cơ sở hành vi bình thường.
 
-\subsection{Đóng góp Khoa học}
-Xét về mặt học thuật, đóng góp tiên quyết của nghiên cứu là việc đề xuất một Kiến trúc Nhận thức Hai tầng độc đáo, nối liền một cách an toàn giữa sức mạnh của Động cơ Quy tắc xác định với trí tuệ của LLM Agent. Hướng tiếp cận này vẫn còn rất mới mẻ trong các văn bản nghiên cứu an ninh mạng, đặc biệt là khi kết hợp việc triển khai các LLM bảo mật cục bộ cùng với rào chắn adversarial linh hoạt.
+Tiếp theo, lớp Guardrail được triển khai, tích hợp thuật toán Drain3 cho gom nhóm log và phát triển mô-đun Đóng gói Dữ liệu có Phân cách bằng mật mã để trung hòa các payload độc hại.
 
-Đóng góp thứ hai nằm ở việc xây dựng phương pháp luận đánh giá các hệ thống SOC Agent dựa trên LLM. Thông qua Khung Đánh giá 5 Chiều (5D) — kết hợp giữa phân loại thống kê, chỉ số vận hành, kháng lỗi adversarial, chấm điểm LLM-as-a-Judge chéo họ và tính giải thích — nghiên cứu cung cấp một chuẩn mực (baseline) toàn diện để các nghiên cứu tương lai về an ninh mạng AI có thể tham chiếu.
+Bước quan trọng kế tiếp là xây dựng Tác tử Tier 2 bằng LangGraph và cơ sở tri thức Dual-RAG. Hai chỉ mục FAISS riêng biệt được tạo lập: một chứa các kỹ thuật MITRE ATT\&CK và một chứa quy trình ứng phó sự cố NIST SP 800-61r2.
 
-Cuối cùng, ở góc độ thực tiễn, nghiên cứu đóng góp một pipeline mã nguồn mở chuẩn hóa (SENTINEL), tích hợp toàn vẹn từ khâu phân loại cảnh báo đến sự phản hồi có giám sát của con người. Đây là một bộ khung có tính mở rộng cao, sẵn sàng để các tổ chức ứng dụng vào môi trường thực tế nhằm giảm thiểu vấn nạn quá tải cảnh báo một cách an toàn và bền vững.
-liệu payload đã được đóng gói.
-
-Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamlit và Bộ nhớ Dài hạn bằng SQLite. Bước này hoàn thiện chu trình khép kín của hệ thống bằng cách kích hoạt tính năng Human-in-the-Loop, cho phép quản trị viên phê duyệt các bộ quy tắc tự động do LLM sinh ra và đẩy ngược chúng trở lại Tier 1.
+Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamlit và Bộ nhớ Dài hạn bằng SQLite. Bước này hoàn thiện chu trình khép kín của hệ thống bằng cách kích hoạt tính năng Human-in-the-Loop, cho phép quản trị viên phê duyệt các bộ quy tắc tự động do LLM sinh ra và đẩy ngược chúng trở lại Tier 1. Ngoài ra, giao diện tích hợp mô-đun Điều tra Đối tượng Tương tác (Interactive Threat Investigation) cho phép nhấp chọn trực tiếp địa chỉ IP trên các bảng giám sát để hiển thị hồ sơ rủi ro chi tiết (reputation score, incidents, blocks, alerts) và lịch sử cảnh báo theo thời gian thực từ SQLite.
 
 \subsection{Kế hoạch Đánh giá}
 Nhằm kiểm chứng tính hiệu quả của hệ thống, nghiên cứu áp dụng chiến lược đánh giá toàn diện dựa trên Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework).
