@@ -96,59 +96,12 @@ threat_memory:
   reputation_decay_rate: 0.95
 tier1:
   dynamic_rules:
-  - created_at: '2026-04-18T02:49:47.345963'
-    field: Source IP
-    pattern: UNKNOWN_IP
-    reason: Nhiều lần đăng nhập thất bại từ cùng một địa chỉ IP nhắm vào các tên người
-      dùng phổ biến (root, admin, user) trên cổng 22 cho thấy có tấn công Brute Force.
-      Chặn IP này giúp ngăn chặn mối đe dọa ngay lập tức.
-    score: 100
-    source: langgraph_agent
-    status: REJECTED
-  - created_at: '2026-04-22T01:26:03.500385'
-    field: Source IP
-    pattern: 192.168.1.1
-    reason: Nhiều sự kiện từ cùng một địa chỉ IP nhắm vào cổng 80 với các mẫu lưu
-      lượng đáng ngờ. Các sự kiện này thể hiện đặc điểm của hoạt động quét cổng và
-      trinh sát, được chỉ ra bởi số lượng lớn các cổng duy nhất được truy cập và khối
-      lượng lưu lượng lớn. Hành vi này khớp với kỹ thuật MITRE ATT&CK T1589 (Thu thập
-      thông tin định danh nạn nhân) và giai đoạn Phát hiện của NIST SP 800-61r2 (Kiểm
-      soát truy cập).
-    score: 100
-    source: langgraph_agent
-    status: REJECTED
-  - created_at: '2026-05-08T02:40:38.264417'
-    field: Source IP
-    pattern: 192.168.1.100
-    reason: Suy luận mô phỏng từ MOCK_LLM=1. Phát hiện bất thường khớp với các kỹ
-      thuật MITRE và các giai đoạn ngăn chặn của NIST.
-    score: 100
-    source: langgraph_agent
-    status: ACTIVE
-  - created_at: '2026-05-28T05:50:17.345341'
-    field: Source IP
-    pattern: UNKNOWN_TARGET
-    reason: Nhiều nhật ký từ queue_waf cho thấy tần suất yêu cầu cao nhắm vào cổng
-      80, vượt quá ngưỡng bình thường. Điều này gợi ý khả năng xảy ra tấn công DDoS
-      hoặc khuếch đại lưu lượng độc hại.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-05-28T05:50:50.266077'
-    field: Source IP
-    pattern: N/A
-    reason: Nhiều nhật ký từ queue_waf cho thấy hoạt động quét cổng trên diện rộng
-      nhắm vào cả cổng thông thường và cổng không tiêu chuẩn. Việc truy cập cổng 80
-      kết hợp với lưu lượng lớn gợi ý khả năng xảy ra tấn công DDoS.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-05-28T06:08:42.230922'
+  - created_at: '2026-05-28T12:41:29.954352'
     field: Source IP
     pattern: 192.168.2.150
-    reason: Nhiều cảnh báo từ cảm biến queue_waf cho thấy các nỗ lực liên tục truy
-      cập cổng 80 từ cùng một IP nguồn. Hành vi này khớp với đặc trưng của tấn công
-      DDoS, có khả năng tận dụng kỹ thuật quảng cáo độc hại (malvertising).
+    reason: 'IP nguồn 192.168.2.150 liên tục gửi nhiều yêu cầu đến cổng 80 với tần
+      suất cao, vượt ngưỡng bình thường. Hành vi này có thể là một cuộc tấn công DDoS
+      hoặc một hoạt động malvertising. '
     score: 100
     source: langgraph_agent
     status: PENDING_APPROVAL

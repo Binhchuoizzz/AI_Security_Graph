@@ -82,21 +82,36 @@ def main_dashboard():
             from src.response.executor import DB_PATH as AUDIT_DB
             from src.agent.threat_memory import MEMORY_DB_PATH as THREAT_DB
             import sqlite3
+            import yaml
             try:
                 # 1. Xóa audit_trail
                 with sqlite3.connect(AUDIT_DB) as conn:
                     conn.execute("DELETE FROM audit_trail")
                     conn.commit()
                 
-                # 2. Xóa threat memory
+                # 2. Xóa threat memory (bao gồm cả known_entities để seed lại)
                 with sqlite3.connect(THREAT_DB) as conn:
                     conn.execute("DELETE FROM ip_reputation")
                     conn.execute("DELETE FROM threat_events")
                     conn.execute("DELETE FROM apt_indicators")
+                    conn.execute("DELETE FROM known_entities")
                     conn.commit()
                 
                 # 3. Seed lại default known entities
                 threat_memory._init_db()
+                
+                # 4. Clear dynamic rules trong system_settings.yaml
+                feedback_mgr.clear_all_dynamic_rules()
+                
+                # 5. Reset whitelist_ips trong system_settings.yaml về mặc định
+                config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "config", "system_settings.yaml")
+                if os.path.exists(config_path):
+                    with open(config_path, "r") as f:
+                        config_data = yaml.safe_load(f)
+                    if "tier1" in config_data:
+                        config_data["tier1"]["whitelist_ips"] = ["127.0.0.1", "10.0.0.99", "192.168.1.254", "0.0.0.0"]
+                        with open(config_path, "w") as f:
+                            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
                 
                 st.success("Đã reset toàn bộ dữ liệu hệ thống về trạng thái ban đầu!")
                 time.sleep(0.7)

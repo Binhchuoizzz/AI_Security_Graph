@@ -8,7 +8,7 @@ html, body, [class*="css"] {
 /* Glassmorphism Card Base */
 .soc-card {
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px 16px;
     margin-bottom: 16px;
     background: rgba(30, 30, 30, 0.6);
     backdrop-filter: blur(10px);
@@ -31,7 +31,7 @@ html, body, [class*="css"] {
 /* Typography inside cards */
 .soc-card-header {
     margin-top: 0;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -85,7 +85,7 @@ html, body, [class*="css"] {
 }
 
 .soc-reasoning-box {
-    margin-top: 10px;
+    margin-top: 8px;
     padding: 10px;
     background: rgba(0,0,0,0.2);
     border-radius: 4px;

@@ -50,6 +50,7 @@ services:
       - ./logs:/app/logs          # Only logs directory is writable
       - ./mlruns:/app/mlruns      # Writable MLflow local runs
       - ./data:/app/data          # Writable Data
+      - ./config:/app/config      # Writable Config (database, dynamic rules)
       - ./knowledge_base:/app/knowledge_base  # Writable KB (for FAISS updates)
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
