@@ -5,6 +5,7 @@ services:
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     container_name: sentinel_llm
+    runtime: nvidia
     ports:
       - "127.0.0.1:5000:8080"     # Map host:5000 → container:8080
     volumes:
@@ -19,13 +20,10 @@ services:
       LLAMA_ARG_PORT: "8080"
       LLAMA_ARG_N_PARALLEL: "2"       # 2 concurrent requests
       LLAMA_ARG_FLASH_ATTN: "1"       # Enable Flash Attention
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "all"
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
         limits:
           memory: 20G
     networks:
