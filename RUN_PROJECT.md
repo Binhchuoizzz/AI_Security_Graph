@@ -96,8 +96,7 @@ docker-compose down
 > **Mục đích:** Chứng minh toàn bộ 20 module hoạt động đúng spec. **KHÔNG cần LLM server** cho chế độ offline.
 
 ```bash
-source .venv/bin/activate
-python experiments/e2e_test_runner.py --offline
+.venv/bin/python experiments/e2e_test_runner.py --offline
 ```
 
 **Kết quả mong đợi:**
@@ -110,7 +109,7 @@ FINAL: 19/20 PASSED | 0 FAILED | 1 SKIPPED
 > T19 (Latency Benchmark) SKIP vì cần LLM server. Chạy full 20/20 khi Docker đã `up`:
 
 ```bash
-python experiments/e2e_test_runner.py
+.venv/bin/python experiments/e2e_test_runner.py
 ```
 
 **Report tự động sinh tại:** `reports/test_report_YYYYMMDD.md`
@@ -124,8 +123,7 @@ python experiments/e2e_test_runner.py
 Mở Python REPL:
 
 ```bash
-source .venv/bin/activate
-python
+.venv/bin/python
 ```
 
 ```python
@@ -165,8 +163,7 @@ print(result)
 > **Mục đích:** Demo 4 lớp phòng thủ chống tấn công vào chính AI.
 
 ```bash
-source .venv/bin/activate
-python
+.venv/bin/python
 ```
 
 ```python
@@ -229,8 +226,7 @@ print(f"Encapsulated output (first 200 chars): {result['batch_encapsulated'][:20
 > **Mục đích:** Demo Hybrid Search kết hợp FAISS (semantic) + BM25 (lexical) với Reciprocal Rank Fusion.
 
 ```bash
-source .venv/bin/activate
-python
+.venv/bin/python
 ```
 
 ```python
@@ -258,7 +254,7 @@ print(result3["mitre_context"][:300])
 > **Xây dựng lại RAG Index (nếu cần):**
 
 ```bash
-python src/rag/embedder.py
+.venv/bin/python src/rag/embedder.py
 ```
 
 ---
@@ -271,15 +267,13 @@ python src/rag/embedder.py
 **Terminal 1 — Khởi động Agent (Subscriber):**
 
 ```bash
-source .venv/bin/activate
-python main.py --mode server --log-level INFO
+.venv/bin/python main.py --mode server --log-level INFO
 ```
 
 **Terminal 2 — Đẩy dữ liệu tấn công vào Redis (Publisher):**
 
 ```bash
-source .venv/bin/activate
-python src/streaming/publisher.py
+.venv/bin/python src/streaming/publisher.py
 ```
 
 → Publisher đẩy 550 dòng từ `data/raw/Demo-Attack.csv` vào Redis queue.
@@ -289,7 +283,7 @@ python src/streaming/publisher.py
 **Dùng dataset CICIDS2018 thay vì Demo:**
 
 ```bash
-python -c "from src.streaming.publisher import stream_logs_to_redis; stream_logs_to_redis('data/raw/cicids2018/Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv')"
+.venv/bin/python -c "from src.streaming.publisher import stream_logs_to_redis; stream_logs_to_redis('data/raw/cicids2018/Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv')"
 ```
 
 ---
@@ -326,7 +320,7 @@ streamlit run src/ui/app.py
 
 ```bash
 source .venv/bin/activate
-python experiments/evaluate_robustness.py
+.venv/bin/python experiments/evaluate_robustness.py
 ```
 
 **Kết quả mong đợi:**
@@ -350,7 +344,7 @@ python experiments/evaluate_robustness.py
 
 ```bash
 source .venv/bin/activate
-python experiments/run_ablation_study.py
+.venv/bin/python experiments/run_ablation_study.py
 ```
 
 **6 cấu hình (ablation configs):**
@@ -369,7 +363,7 @@ python experiments/run_ablation_study.py
 **Chạy kiểm định thống kê (McNemar + Mann-Whitney U):**
 
 ```bash
-python experiments/statistical_tests.py
+.venv/bin/python experiments/statistical_tests.py
 ```
 
 ---
@@ -379,8 +373,7 @@ python experiments/statistical_tests.py
 > **Mục đích:** Demo khả năng phát hiện chuỗi tấn công APT kéo dài nhiều ngày.
 
 ```bash
-source .venv/bin/activate
-python
+.venv/bin/python
 ```
 
 ```python
@@ -432,20 +425,20 @@ docker-compose up -d
 curl http://localhost:5000/v1/models
 
 # Chạy E2E tests (offline)
-source .venv/bin/activate && python experiments/e2e_test_runner.py --offline
+.venv/bin/python experiments/e2e_test_runner.py --offline
 
 # Chạy Full Pipeline
-# Terminal 1: python main.py --mode server
-# Terminal 2: python src/streaming/publisher.py
+# Terminal 1: .venv/bin/python main.py --mode server
+# Terminal 2: .venv/bin/python src/streaming/publisher.py
 
 # Mở Dashboard
 streamlit run src/ui/app.py
 
 # Chạy Adversarial test
-python experiments/evaluate_robustness.py
+.venv/bin/python experiments/evaluate_robustness.py
 
 # Chạy Ablation study
-python experiments/run_ablation_study.py
+.venv/bin/python experiments/run_ablation_study.py
 
 # Tắt toàn bộ
 docker-compose down
