@@ -5,6 +5,8 @@ Khởi chạy bằng lệnh: streamlit run src/ui/app.py
 
 import sys
 import os
+import math
+import pandas as pd
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
@@ -56,6 +58,40 @@ def main_dashboard():
             logout()
 
         st.markdown("---")
+        st.markdown("### 🔍 Bộ lọc Sự cố")
+        
+        # Lọc theo hành động
+        action_filter = st.selectbox(
+            "Phân loại Hành động",
+            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL", "QUARANTINE"],
+            index=0,
+            key="action_filter_sb"
+        )
+        
+        # Tìm kiếm theo IP Mục tiêu
+        search_ip = st.text_input("Tìm kiếm IP mục tiêu", placeholder="Nhập IP để lọc...").strip()
+        
+        # Số dòng trên một trang
+        page_size = st.slider("Số lượng hiển thị / trang", min_value=5, max_value=50, value=5, step=5)
+        
+        st.markdown("---")
+        st.markdown("### ⚙️ Quản lý Lịch sử")
+        
+        # Nút xóa lịch sử quét
+        if st.button("🗑️ Xóa Lịch sử Cảnh báo", help="Xóa sạch toàn bộ lịch sử trong audit_trail"):
+            from src.response.executor import DB_PATH as AUDIT_DB
+            import sqlite3
+            try:
+                with sqlite3.connect(AUDIT_DB) as conn:
+                    conn.execute("DELETE FROM audit_trail")
+                    conn.commit()
+                st.success("Đã xóa sạch lịch sử cảnh báo!")
+                time.sleep(0.5)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Lỗi khi xóa: {e}")
+
+        st.markdown("---")
         st.markdown("## Về SENTINEL")
         st.info(
             "Hệ thống phát hiện xâm nhập thông minh sử dụng **Advanced Hybrid RAG** và **LangGraph Agent**."
@@ -64,31 +100,83 @@ def main_dashboard():
 
     st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
 
-    # Lấy dữ liệu
-    alerts = get_audit_trail(limit=20)
+    # Lấy toàn bộ dữ liệu để lọc và phân trang (tối đa 2000 dòng lịch sử)
+    all_alerts = get_audit_trail(limit=2000)
     active_rules = feedback_mgr.get_active_dynamic_rules()
     pending_rules = feedback_mgr.get_pending_rules()
 
-    render_metrics_header(len(alerts), len(pending_rules), len(active_rules))
+    # Tính toán bộ lọc sự cố
+    filtered_alerts = all_alerts
+    if action_filter != "Tất cả":
+        filtered_alerts = [a for a in filtered_alerts if a.get("action") == action_filter]
+    if search_ip:
+        filtered_alerts = [a for a in filtered_alerts if search_ip in a.get("target", "")]
+
+    total_filtered = len(filtered_alerts)
+    
+    # Hiển thị số lượng sự cố (Metrics)
+    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules))
 
     tab1, tab2, tab3 = st.tabs(["📊 Nhật ký SIEM & Audit Trail", "🧑‍💻 Phê duyệt Luật (HITL)", "🎯 Giám sát APT & Threat Intel"])
 
     with tab1:
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
-        if not alerts:
-            st.success("Hệ thống an toàn. Không có sự cố nào được ghi nhận.")
+        
+        # Xuất dữ liệu CSV để lưu trữ lịch sử
+        if filtered_alerts:
+            df_download = pd.DataFrame(filtered_alerts)
+            df_download = df_download.rename(columns={
+                "timestamp": "Thời gian",
+                "action": "Hành động",
+                "target": "Đối tượng (Target)",
+                "reason": "Lý do & Lập luận"
+            })
+            csv_data = df_download.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Tải xuống lịch sử lọc (CSV)",
+                data=csv_data,
+                file_name="sentinel_scan_history.csv",
+                mime="text/csv"
+            )
+            
+        if not filtered_alerts:
+            st.success("Không có sự cố nào khớp với bộ lọc hoặc cơ sở dữ liệu trống.")
         else:
-            for alert in alerts:
-                # Kiểm tra xem IP này đã được whitelist trong session này chưa
+            # Phân trang
+            total_pages = max(1, math.ceil(total_filtered / page_size))
+            if "current_page" not in st.session_state:
+                st.session_state["current_page"] = 1
+            if st.session_state["current_page"] > total_pages:
+                st.session_state["current_page"] = total_pages
+                
+            start_idx = (st.session_state["current_page"] - 1) * page_size
+            end_idx = start_idx + page_size
+            page_alerts = filtered_alerts[start_idx:end_idx]
+            
+            # Hiển thị các Alert Cards cho trang hiện tại
+            for alert in page_alerts:
                 target_ip = alert.get("target", "N/A")
                 is_whitelisted = st.session_state.get(f"whitelisted_{target_ip}", False)
                 
-                # Gọi hàm render component, truyền thêm callback
                 render_alert_card(
                     alert, 
                     is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
                     on_whitelist=handle_whitelist_approval if not is_whitelisted else None
                 )
+                
+            # Điều hướng trang
+            st.write("")
+            col_prev, col_page, col_next = st.columns([1, 2, 1])
+            with col_prev:
+                if st.button("⬅️ Trang trước", disabled=(st.session_state["current_page"] == 1), key="btn_prev_page"):
+                    st.session_state["current_page"] -= 1
+                    st.rerun()
+            with col_page:
+                st.markdown(f"<div style='text-align: center; padding-top: 5px; font-weight: bold;'>Trang {st.session_state['current_page']} / {total_pages} (Tổng cộng {total_filtered} sự cố)</div>", unsafe_allow_html=True)
+            with col_next:
+                if st.button("Trang sau ➡️", disabled=(st.session_state["current_page"] == total_pages), key="btn_next_page"):
+                    st.session_state["current_page"] += 1
+                    st.rerun()
 
     with tab2:
         st.subheader("Phê duyệt Luật Tường lửa (Dynamic Rules)")
