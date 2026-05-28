@@ -50,9 +50,9 @@ def main_dashboard():
 
     # Sidebar
     with st.sidebar:
-        st.markdown(f"###  User: `{st.session_state.get('username')}`")
-        st.markdown(f"###  Role: `{st.session_state.get('role')}`")
-        if st.button(" Đăng xuất"):
+        st.markdown(f"### 👤 Tài khoản: `{st.session_state.get('username')}`")
+        st.markdown(f"### 🔑 Vai trò: `{st.session_state.get('role')}`")
+        if st.button("🚪 Đăng xuất"):
             logout()
 
         st.markdown("---")
@@ -60,9 +60,9 @@ def main_dashboard():
         st.info(
             "Hệ thống phát hiện xâm nhập thông minh sử dụng **Advanced Hybrid RAG** và **LangGraph Agent**."
         )
-        st.caption(f"Refreshes: {count}")
+        st.caption(f"Lượt tải lại: {count}")
 
-    st.title(" SENTINEL AI Security Operations Center")
+    st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
 
     # Lấy dữ liệu
     alerts = get_audit_trail(limit=20)
@@ -71,7 +71,7 @@ def main_dashboard():
 
     render_metrics_header(len(alerts), len(pending_rules), len(active_rules))
 
-    tab1, tab2 = st.tabs([" SIEM & Audit Trail", " HITL Rule Approval"])
+    tab1, tab2 = st.tabs(["📊 Nhật ký SIEM & Audit Trail", "🧑‍💻 Phê duyệt Luật (HITL)"])
 
     with tab1:
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
@@ -108,7 +108,7 @@ def main_dashboard():
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             if st.button(
-                                " Phê duyệt (Approve)", key=f"app_{rule.get('pattern')}"
+                                " Phê duyệt", key=f"app_{rule.get('pattern')}"
                             ):
                                 feedback_mgr.approve_rule(rule.get("pattern"))
                                 st.success(f"Đã duyệt luật {rule.get('pattern')}")
@@ -116,7 +116,7 @@ def main_dashboard():
                                 st.rerun()
                         with col2:
                             if st.button(
-                                " Từ chối (Reject)", key=f"rej_{rule.get('pattern')}"
+                                " Từ chối", key=f"rej_{rule.get('pattern')}"
                             ):
                                 feedback_mgr.reject_rule(rule.get("pattern"))
                                 st.warning(f"Đã từ chối luật {rule.get('pattern')}")
@@ -132,7 +132,7 @@ def main_dashboard():
         else:
             for rule in active_rules:
                 with st.expander(
-                    f"Luật Active: {rule.get('pattern')} (Mức độ: {rule.get('score')})",
+                    f"Luật đang hoạt động: {rule.get('pattern')} (Mức độ: {rule.get('score')})",
                     expanded=False,
                 ):
                     st.write(f"**Trường dữ liệu:** {rule.get('field')}")
@@ -140,7 +140,7 @@ def main_dashboard():
                     st.write(f"**Tạo lúc:** {rule.get('created_at')}")
                     
                     if st.session_state.get("role") == "L3_Manager":
-                        if st.button(" Hoàn tác (Revoke/Reject)", key=f"rev_{rule.get('pattern')}"):
+                        if st.button(" Vô hiệu hóa / Hoàn tác", key=f"rev_{rule.get('pattern')}"):
                             feedback_mgr.reject_rule(rule.get("pattern"))
                             st.warning(f"Đã hoàn tác và vô hiệu hóa luật {rule.get('pattern')}")
                             time.sleep(0.5)
@@ -156,7 +156,7 @@ def main_dashboard():
                 with st.expander(f"✅ IP Nội bộ / Pentest: {ip}", expanded=False):
                     st.write(f"Hệ thống (Tier 1) sẽ bỏ qua mọi đánh giá và Rule Engine đối với IP `{ip}`.")
                     if st.session_state.get("role") == "L3_Manager":
-                        if st.button(" Gỡ Whitelist (Remove)", key=f"rmwl_{ip}"):
+                        if st.button(" Gỡ khỏi Whitelist", key=f"rmwl_{ip}"):
                             feedback_mgr.remove_from_whitelist(ip)
                             st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
                             time.sleep(0.5)

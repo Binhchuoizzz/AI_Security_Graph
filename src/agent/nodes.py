@@ -250,7 +250,7 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
     safe_reasoning = output_sanitizer.sanitize(raw_reasoning)
-    formatted_reasoning = f"[MITRE: {mitre}] [Confidence: {conf:.2f}] {safe_reasoning}"
+    formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {safe_reasoning}"
 
     if action == "BLOCK_IP":
         block_ip(
@@ -287,7 +287,7 @@ def node_human_in_the_loop(state: SentinelState) -> Dict[str, Any]:
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
-    formatted_reasoning = f"[MITRE: {mitre}] [Confidence: {conf:.2f}] {raw_reasoning}"
+    formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {raw_reasoning}"
     
     logger.warning(
         f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}"

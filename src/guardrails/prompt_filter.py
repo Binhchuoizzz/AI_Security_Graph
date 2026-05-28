@@ -310,9 +310,24 @@ class DelimitedDataEncapsulator:
 
     def encapsulate_fields(self, log_entry: dict) -> str:
         """Đóng gói từng field riêng biệt."""
+        # Nhóm các trường quan trọng cho phân tích an ninh mạng (để giảm thiểu context size)
+        # Loại bỏ các cột thông số chi tiết của luồng mạng không hữu ích cho LLM Triage
+        ALLOWED_FIELDS = {
+            "source ip", "src_ip", "source_ip",
+            "destination ip", "dst_ip", "destination_ip", 
+            "destination port", "dst_port", "destination_port",
+            "protocol", "total fwd packets", "total backward packets", "flow duration",
+            "label", "log_source", "timestamp",
+            "payload", "message", "uri", "user_agent", "method", "headers", "command", "process",
+            "tier1_action", "tier1_score", "tier1_reasons"
+        }
+
         lines = []
         for key, value in log_entry.items():
             if key.startswith("_"):
+                continue
+            # Chỉ giữ các trường có ý nghĩa bảo mật/phân loại
+            if key.lower() not in ALLOWED_FIELDS:
                 continue
             # Sanitize từng field value
             safe_value = self._sanitize_delimiter_smuggling(str(value))

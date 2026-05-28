@@ -46,8 +46,18 @@ def stream_logs_to_redis(csv_path: str):
                     k: ("" if pd.isna(v) else v) for k, v in log_entry.items()
                 }
 
+                # Tự động sinh Source IP và Destination IP giả lập nếu thiếu (đặc thù CSE-CIC-IDS2018 CSV ẩn IP)
+                # Giúp giao diện SOC Dashboard hiển thị IP thực tế chân thực và trực quan hơn.
+                if "Source IP" not in clean_entry and "src_ip" not in clean_entry:
+                    if clean_entry.get("Label", "BENIGN") != "BENIGN":
+                        clean_entry["Source IP"] = "192.168.2.150"  # Attacker IP
+                        clean_entry["Destination IP"] = "10.0.0.5"
+                    else:
+                        clean_entry["Source IP"] = f"10.0.0.{100 + (index % 50)}"  # Normal user IPs
+                        clean_entry["Destination IP"] = "10.0.0.5"
+
                 r.rpush(QUEUE_NAME, json.dumps(clean_entry))
-                print(f"[>] Published row {index} -> Redis Queue: {QUEUE_NAME}")
+                print(f"[>] Published row {index} -> Redis Queue: {QUEUE_NAME} | Source: {clean_entry.get('Source IP')}")
 
                 time.sleep(BATCH_DELAY_SECONDS)
 

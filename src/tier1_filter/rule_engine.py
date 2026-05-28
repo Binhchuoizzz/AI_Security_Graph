@@ -135,7 +135,7 @@ class SessionBaseline:
         if unique_port_count > 5:
             deviation_score += unique_port_count * 3
             deviation_reasons.append(
-                f"Port scanning: {unique_port_count} unique ports accessed"
+                f"Quét cổng (Port scan): đã truy cập {unique_port_count} cổng khác nhau"
             )
 
         # Indicator 2: High-frequency requests (so với global average)
@@ -144,8 +144,8 @@ class SessionBaseline:
         if request_rate > self.global_avg_request_rate * self.deviation_threshold:
             deviation_score += 20
             deviation_reasons.append(
-                f"High request rate: {request_rate:.2f} req/s "
-                f"(baseline: {self.global_avg_request_rate:.2f})"
+                f"Tần suất gửi yêu cầu cao: {request_rate:.2f} req/s "
+                f"(ngưỡng bình thường: {self.global_avg_request_rate:.2f})"
             )
 
         # Indicator 3: Abnormal packet volume
@@ -154,7 +154,7 @@ class SessionBaseline:
             if avg_packets > 500:
                 deviation_score += 15
                 deviation_reasons.append(
-                    f"High avg packet volume: {avg_packets:.0f} pkts/request"
+                    f"Số lượng gói tin trung bình cao: {avg_packets:.0f} gói/yêu cầu"
                 )
 
         return {
@@ -262,7 +262,7 @@ class RuleEngine:
         source_ip = log_entry.get("Source IP", "unknown")
         if source_ip in self.whitelist_ips:
             log_entry["tier1_score"] = 0
-            log_entry["tier1_reasons"] = ["IP Whitelisted (Safe)"]
+            log_entry["tier1_reasons"] = ["IP nằm trong Whitelist (An toàn)"]
             log_entry["tier1_action"] = "WHITELIST_DROP"
             log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
             return log_entry
@@ -274,14 +274,14 @@ class RuleEngine:
         try:
             if int(dest_port) in self.sensitive_ports:
                 score += 40
-                reasons.append(f"Sensitive port access (Port {dest_port})")
+                reasons.append(f"Truy cập cổng nhạy cảm (Cổng {dest_port})")
         except (ValueError, TypeError):
             pass
 
         try:
             if float(fwd_packets) > self.max_fwd_packets:
                 score += 30
-                reasons.append(f"Volumetric anomaly ({fwd_packets} fwd pkts)")
+                reasons.append(f"Bất thường về dung lượng ({fwd_packets} gói tin chiều đi)")
         except (ValueError, TypeError):
             pass
 
@@ -295,7 +295,7 @@ class RuleEngine:
                 if rule_pattern in field_value:
                     score += rule_score
                     reasons.append(
-                        f"Dynamic Rule [from Agent]: {rule_field}='{rule_pattern}'"
+                        f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'"
                     )
 
         # --- Tầng 3: Session Baseline (thay thế Random Sampling) ---

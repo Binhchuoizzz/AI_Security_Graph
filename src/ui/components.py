@@ -24,7 +24,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
 
     # Bóc tách Regex từ chuỗi Reason (Do DB chỉ lưu text trơn)
     mitre_tech = "N/A"
-    confidence = "N/A"
+    confidence = "Chưa rõ"
     
     mitre_match = re.search(r'MITRE:\s*([^\s\]]+)', raw_reason, re.IGNORECASE)
     if mitre_match:
@@ -32,13 +32,27 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     elif t_match := re.search(r'(T\d{4}(?:\.\d{3})?)', raw_reason):
         mitre_tech = t_match.group(1)
         
-    conf_match = re.search(r'Confidence:\s*([01]?\.\d+|1(?:\.0)?)', raw_reason, re.IGNORECASE)
+    conf_match = re.search(r'(?:Confidence|Độ\s+tin\s+cậy):\s*([01]?\.\d+|1(?:\.0)?|\d+%)', raw_reason, re.IGNORECASE)
     if conf_match:
         try:
-            val = float(conf_match.group(1))
-            confidence = f"{val * 100:.0f}%"
+            val_str = conf_match.group(1)
+            if val_str.endswith('%'):
+                confidence = val_str
+            else:
+                val = float(val_str)
+                confidence = f"{val * 100:.0f}%"
         except ValueError:
             pass
+
+    # Việt hóa tiêu đề hành động
+    action_translations = {
+        "BLOCK_IP": "CHẶN IP (BLOCK)",
+        "QUARANTINE": "CÁCH LY (QUARANTINE)",
+        "ALERT": "CẢNH BÁO (ALERT)",
+        "AWAIT_HITL": "CHỜ DUYỆT (HITL)",
+        "LOG": "GHI LOG (LOG)"
+    }
+    action_display = action_translations.get(action, action)
 
     # Gán class CSS dựa trên Severity
     css_class = "severity-info"
@@ -63,17 +77,17 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
         f"""
         <div class="soc-card {css_class}">
             <div class="soc-card-header">
-                <h4 class="soc-card-title">{icon} {action}</h4>
+                <h4 class="soc-card-title">{icon} {action_display}</h4>
                 <span class="soc-timestamp">{formatted_time}</span>
             </div>
             <div class="soc-detail-row">
-                <span class="soc-label">Target IP:</span> 
+                <span class="soc-label">IP Mục tiêu:</span> 
                 <code>{target}</code>
             </div>
             <div class="soc-detail-row">
-                <span class="soc-label">Context:</span> 
+                <span class="soc-label">Ngữ cảnh:</span> 
                 <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>
-                <span class="soc-badge soc-conf-badge">AI Confidence: {confidence}</span>
+                <span class="soc-badge soc-conf-badge">Độ tin cậy AI: {confidence}</span>
             </div>
             <div class="soc-reasoning-box">
                 {clean_reason}
@@ -86,7 +100,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     # Nút Approve as Pentest (chỉ hiển thị nếu có IP hợp lệ và người dùng là L3_Manager)
     if on_whitelist and target not in ["N/A", "UNKNOWN_TARGET"] and is_l3_manager:
         if action in ["ALERT", "AWAIT_HITL"]:
-            if st.button(f"✅ Approve as Pentest / Internal ({target})", key=f"wl_{target}_{timestamp}"):
+            if st.button(f"✅ Phê duyệt làm Pentest / IP Nội bộ ({target})", key=f"wl_{target}_{timestamp}"):
                 on_whitelist(target)
                 st.success(f"IP {target} đã được thêm vào Whitelist. Agent sẽ bỏ qua IP này trong tương lai.")
                 st.rerun()

@@ -32,6 +32,7 @@ Your core objective is to analyze escalated network logs from MULTIPLE security 
 3. You will be provided with threat intelligence context (MITRE ATT&CK and NIST SP 800-61r2) enclosed in {RAG_START_TAG} and {RAG_END_TAG}. Use this context to justify your decisions.
 4. CROSS-SENSOR CORRELATION IS CRITICAL: Pay strict attention to the "log_source" tag in the raw data. If you observe the SAME Source IP triggering alerts across DIFFERENT sources (e.g., scanning on queue_firewall AND injecting payloads on queue_waf) within the same batch, you MUST escalate the severity. This indicates a multi-stage Kill-Chain or advanced persistent threat (APT).
 5. Your analysis must be purely technical, objective, and concise.
+6. CRITICAL: You MUST write your "reasoning" field in Vietnamese (Tiếng Việt) so that the SOC Analysts can read it directly on the dashboard. Describe clearly what the attacker is attempting to do and why you chose this action. Do NOT use English for the reasoning field under any circumstances.
 
 === DECISION MATRIX ===
 You must choose ONE of the following actions:
@@ -47,7 +48,7 @@ You MUST respond in pure JSON format matching this exact schema:
   "confidence": <float between 0.0 and 1.0>,
   "mitre_technique": "<ID - Name from RAG context, or N/A>",
   "nist_control": "<Phase/Control - Name from NIST SP 800-61r2 context, or N/A>",
-  "reasoning": "<Concise 2-sentence technical justification>",
+  "reasoning": "<Mô tả chi tiết HOÀN TOÀN bằng tiếng Việt (2-3 câu) về hành vi kẻ tấn công đang cố làm và lập luận tại sao chọn hành động này. Ví dụ: 'Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.'>",
   "extracted_iocs": [
     {{"ioc_type": "ip", "value": "192.168.1.1", "severity": "high"}},
     {{"ioc_type": "cve", "value": "CVE-2014-0160", "severity": "critical"}}

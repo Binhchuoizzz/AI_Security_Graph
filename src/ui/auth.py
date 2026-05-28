@@ -50,8 +50,8 @@ LOCKOUT_SECONDS = 60
 
 def login_screen():
     """Hien thi man hinh dang nhap chuyen nghiep (khong lo credentials)."""
-    st.title("SENTINEL -- Security Operations Center")
-    st.caption("Authorized personnel only. All access is logged and monitored.")
+    st.title("🛡️ SENTINEL - Trung tâm Giám sát An ninh SOC")
+    st.caption("Chỉ dành cho nhân viên SOC được ủy quyền. Mọi hoạt động truy cập đều được ghi nhật ký và giám sát.")
 
     # Kiem tra lockout
     if "login_attempts" not in st.session_state:
@@ -61,27 +61,29 @@ def login_screen():
     if time.time() < st.session_state.get("lockout_until", 0):
         remaining = int(st.session_state["lockout_until"] - time.time())
         st.error(
-            f"Account locked due to too many failed attempts. Try again in {remaining}s."
+            f"Tài khoản bị khóa tạm thời do nhập sai quá nhiều lần. Vui lòng thử lại sau {remaining} giây."
         )
         return
 
     with st.form("login_form"):
-        username = st.text_input("Username", placeholder="Enter your SOC username")
+        username = st.text_input("Tên đăng nhập", placeholder="Nhập tài khoản SOC của bạn")
         password = st.text_input(
-            "Password", type="password", placeholder="Enter your password"
+            "Mật khẩu", type="password", placeholder="Nhập mật khẩu của bạn"
         )
-        submit = st.form_submit_button("Sign In")
+        submit = st.form_submit_button("Đăng nhập")
 
         if submit:
-            input_hash = hash_password(password)
-            user = USERS.get(username)
+            clean_username = username.strip()
+            clean_password = password.strip()
+            input_hash = hash_password(clean_password)
+            user = USERS.get(clean_username)
 
             if user and _constant_time_compare(input_hash, user["password_hash"]):
                 st.session_state["authenticated"] = True
                 st.session_state["role"] = user["role"]
-                st.session_state["username"] = username
+                st.session_state["username"] = clean_username
                 st.session_state["login_attempts"] = 0
-                st.query_params["auth_user"] = username
+                st.query_params["auth_user"] = clean_username
                 st.rerun()
             else:
                 st.session_state["login_attempts"] += 1
@@ -92,11 +94,11 @@ def login_screen():
                 if remaining_attempts <= 0:
                     st.session_state["lockout_until"] = time.time() + LOCKOUT_SECONDS
                     st.error(
-                        f"Too many failed attempts. Account locked for {LOCKOUT_SECONDS}s."
+                        f"Nhập sai quá nhiều lần. Tài khoản bị khóa trong {LOCKOUT_SECONDS} giây."
                     )
                 else:
                     st.error(
-                        f"Invalid credentials. {remaining_attempts} attempts remaining."
+                        f"Thông tin đăng nhập không chính xác. Còn lại {remaining_attempts} lần thử."
                     )
 
 

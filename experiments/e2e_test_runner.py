@@ -250,7 +250,7 @@ def test_11_session_baseline(r: TestResult):
         result = engine.evaluate(log)
     # After 15 ports, should be ESCALATE due to port scanning deviation
     assert result["tier1_action"] == "ESCALATE", f"Port scan not detected after 15 ports"
-    assert "Port scanning" in str(result.get("tier1_reasons", "")), "Missing port scanning reason"
+    assert "Quét cổng (Port scan)" in str(result.get("tier1_reasons", "")), "Missing port scanning reason"
     r.passed(f"Port scanning detected after 15 unique ports (score={result['tier1_score']})")
 
 
