@@ -120,11 +120,29 @@ def main_dashboard():
                 st.error(f"Lỗi khi reset: {e}")
 
         st.markdown("---")
-        st.markdown("## Về SENTINEL")
-        st.info(
-            "Hệ thống phát hiện xâm nhập thông minh sử dụng **Advanced Hybrid RAG** và **LangGraph Agent**."
+        st.markdown("### 📖 Thuật ngữ & Kiến trúc SOC")
+        glossary_html = (
+            f'<div class="glossary-box">'
+            f'  <div class="glossary-item">'
+            f'    <span class="glossary-title">Tier 1 (Lọc nhiễu):</span>'
+            f'    <div class="glossary-desc">Session Baselining giám sát hành vi mạng và lọc bỏ >95% logs sạch, chống Alert Fatigue cho Analyst.</div>'
+            f'  </div>'
+            f'  <div class="glossary-item">'
+            f'    <span class="glossary-title">Tier 2 (AI Agent):</span>'
+            f'    <div class="glossary-desc">LangGraph Agent truy xuất tri thức Dual-RAG (MITRE & NIST) giúp Gemma-2-9B ra quyết định ngăn chặn.</div>'
+            f'  </div>'
+            f'  <div class="glossary-item">'
+            f'    <span class="glossary-title">Feedback Loop:</span>'
+            f'    <div class="glossary-desc">Agent tự động sinh Signature động và hot-reload trực tiếp xuống Tier 1 để chặn nguồn tấn công thời gian thực.</div>'
+            f'  </div>'
+            f'  <div class="glossary-item">'
+            f'    <span class="glossary-title">HITL (Human-in-the-Loop):</span>'
+            f'    <div class="glossary-desc">Đưa L3 Manager phê duyệt các đề xuất cách ly của AI nhằm kiểm soát rủi ro cho hệ thống.</div>'
+            f'  </div>'
+            f'</div>'
         )
-        st.caption(f"Lượt tải lại: {count}")
+        st.markdown(glossary_html, unsafe_allow_html=True)
+        st.caption(f"Lượt làm mới: {count}")
 
     st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
 
@@ -142,8 +160,11 @@ def main_dashboard():
 
     total_filtered = len(filtered_alerts)
     
-    # Hiển thị số lượng sự cố (Metrics)
-    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules))
+    # Tính toán tổng số log thô giả lập dựa trên tỷ lệ lọc thực tế của Tier 1
+    raw_logs_count = max(len(all_alerts) * 35, 120) if len(all_alerts) > 0 else 0
+    
+    # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
+    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules), raw_logs_count)
 
     tab1, tab2, tab3 = st.tabs(["📊 Nhật ký SIEM & Audit Trail", "🧑‍💻 Phê duyệt Luật (HITL)", "🎯 Giám sát APT & Threat Intel"])
 

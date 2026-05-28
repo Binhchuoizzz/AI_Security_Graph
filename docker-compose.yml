@@ -79,7 +79,7 @@ services:
     image: ghcr.io/mlflow/mlflow:v2.19.0
     container_name: sentinel_mlflow
     ports:
-      - "5001:5000"
+      - "127.0.0.1:5001:5000"    # Security: Bind to localhost only
     volumes:
       - mlflow_data:/mlruns
     command: >
@@ -128,8 +128,8 @@ services:
     image: neo4j:5.26-community
     container_name: sentinel_neo4j
     ports:
-      - "7474:7474"              # HTTP Browser
-      - "7687:7687"              # Bolt protocol
+      - "127.0.0.1:7474:7474"              # Security: Bind to localhost only (HTTP Browser)
+      - "127.0.0.1:7687:7687"              # Security: Bind to localhost only (Bolt protocol)
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-SentinelGraphPass2026!}
       - NEO4J_PLUGINS=["apoc"]

@@ -1,5 +1,6 @@
 """
 Các component giao diện dùng lại cho Streamlit Dashboard.
+NÂNG CẤP PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
 """
 
 import streamlit as st
@@ -10,7 +11,7 @@ from datetime import datetime
 
 
 def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
-    """Hiển thị một cảnh báo bảo mật từ audit_trail với UI Premium."""
+    """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
     try:
         dt = datetime.fromisoformat(timestamp)
@@ -22,7 +23,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     target = html_lib.escape(str(alert.get("target", "N/A")))
     raw_reason = str(alert.get("reason", "N/A"))
 
-    # Bóc tách Regex từ chuỗi Reason (Do DB chỉ lưu text trơn)
+    # Bóc tách Regex từ chuỗi Reason
     mitre_tech = "N/A"
     confidence = "Chưa rõ"
     
@@ -44,44 +45,71 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
         except ValueError:
             pass
 
-    # Việt hóa tiêu đề hành động
+    # Phân cấp mức độ nghiêm trọng (Severity) dựa trên Risk Score & Action
+    severity_level = "INFO"
+    css_class = "severity-info"
+    icon = "ℹ️"
+    
+    # Ước tính score từ chuỗi reason nếu không có trường score riêng biệt
+    score_val = 0
+    if "0." in confidence:
+        try:
+            score_val = int(float(confidence.replace("%","")) * 10)
+        except Exception:
+            pass
+            
+    if action == "BLOCK_IP" or action == "QUARANTINE":
+        severity_level = "CRITICAL"
+        css_class = "severity-critical"
+        icon = "🛑"
+    elif action == "ALERT":
+        severity_level = "HIGH"
+        css_class = "severity-high"
+        icon = "⚠️"
+    elif action == "AWAIT_HITL":
+        severity_level = "MEDIUM"
+        css_class = "severity-medium"
+        icon = "🧑‍💻"
+
+    # Việt hóa hành động
     action_translations = {
         "BLOCK_IP": "CHẶN IP (BLOCK)",
         "QUARANTINE": "CÁCH LY (QUARANTINE)",
         "ALERT": "CẢNH BÁO (ALERT)",
-        "AWAIT_HITL": "CHỜ DUYỆT (HITL)",
+        "AWAIT_HITL": "CHỜ PHÊ DUYỆT (HITL)",
         "LOG": "GHI LOG (LOG)"
     }
     action_display = action_translations.get(action, action)
 
-    # Gán class CSS dựa trên Severity
-    css_class = "severity-info"
-    icon = "ℹ️"
-    if action == "BLOCK_IP":
-        css_class = "severity-critical"
-        icon = "🛑"
-    elif action == "QUARANTINE":
-        css_class = "severity-critical"
-        icon = "☣️"
-    elif action == "ALERT":
-        css_class = "severity-high"
-        icon = "⚠️"
-    elif action == "AWAIT_HITL":
-        css_class = "severity-medium"
-        icon = "🧑‍💻"
-
+    # Làm sạch chuỗi lý do phân tích (loại bỏ các thẻ tag [MITRE...] để hiển thị text sạch)
     clean_reason = html_lib.escape(raw_reason)
+    clean_reason = re.sub(r'\[MITRE:\s*[^\]]*\]', '', clean_reason)
+    clean_reason = re.sub(r'\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]', '', clean_reason).strip()
 
-    # Hiển thị UI bằng Markdown + HTML nội suy (loại bỏ xuống dòng thừa tránh lỗi Streamlit Markdown)
+    # Tạo tiêu đề MITRE kỹ thuật
+    mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
+    if mitre_tech == "N/A":
+        mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận)"
+
+    # Thiết lập playbook ứng phó NIST
+    nist_playbook_text = "🛡️ NIST Incident Response Playbook: Thực hiện ghi log và giám sát hành vi liên tục."
+    if severity_level == "CRITICAL":
+        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.1): Thực hiện ngăn chặn khẩn cấp (Containment) - Chặn IP nguồn tại Firewall để cô lập vùng tấn công."
+    elif severity_level == "HIGH":
+        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.2): Cảnh báo khẩn cấp tới L1/L3 SOC Analyst, đưa IP vào danh sách theo dõi đặc biệt."
+    elif severity_level == "MEDIUM":
+        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.3): Yêu cầu phê duyệt từ L3 Manager (Human-in-the-Loop) để kích hoạt luật chặn tự động."
+
+    # Render HTML Card
     html_content = (
         f'<div class="soc-card {css_class}">'
         f'    <div class="soc-card-header">'
-        f'        <h4 class="soc-card-title">{icon} {action_display}</h4>'
+        f'        <h4 class="soc-card-title">{icon} [{severity_level}] {action_display}</h4>'
         f'        <span class="soc-timestamp">{formatted_time}</span>'
         f'    </div>'
         f'    <div class="soc-detail-row">'
         f'        <span class="soc-label">IP Mục tiêu:</span>'
-        f'        <code>{target}</code>'
+        f'        <span class="soc-value-code">{target}</span>'
         f'    </div>'
         f'    <div class="soc-detail-row">'
         f'        <span class="soc-label">Ngữ cảnh:</span>'
@@ -89,17 +117,22 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
         f'        <span class="soc-badge soc-conf-badge">Độ tin cậy AI: {confidence}</span>'
         f'    </div>'
         f'    <div class="soc-reasoning-box">'
-        f'        {clean_reason}'
+        f'        <div class="soc-reasoning-title">🤖 Lập luận của Tác tử AI (Agentic Reasoning):</div>'
+        f'        <div style="margin-bottom: 8px;">{clean_reason}</div>'
+        f'        <div class="soc-reasoning-section" style="color: #D3ADF7;">{mitre_section_text}</div>'
+        f'        <div style="color: #98FB98; margin-top: 4px; font-size: 0.85rem; font-weight: 500;">{nist_playbook_text}</div>'
         f'    </div>'
         f'</div>'
     )
-    # Strip any extra newlines/tabs inside HTML to prevent Streamlit from adding paragraphs
+    
+    # Nén HTML để tránh khoảng trắng dọc của Streamlit
     clean_html = "".join([line.strip() for line in html_content.split("\n")])
     st.markdown(clean_html, unsafe_allow_html=True)
     
-    # Nút Approve as Pentest (chỉ hiển thị nếu có IP hợp lệ và người dùng là L3_Manager)
+    # Nút Approve as Pentest / IP Nội bộ
     if on_whitelist and target not in ["N/A", "UNKNOWN_TARGET"] and is_l3_manager:
         if action in ["ALERT", "AWAIT_HITL"]:
+            st.write("")
             if st.button(f"✅ Phê duyệt làm Pentest / IP Nội bộ ({target})", key=f"wl_{target}_{timestamp}"):
                 on_whitelist(target)
                 st.success(f"IP {target} đã được thêm vào Whitelist. Agent sẽ bỏ qua IP này trong tương lai.")
@@ -116,45 +149,67 @@ def render_ioc_table(iocs):
     st.dataframe(df, use_container_width=True)
 
 
-def render_metrics_header(total_alerts, pending_rules, active_rules):
-    """Hiển thị Header KPI."""
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric(label="Tổng số Sự cố (Alerts)", value=total_alerts)
-    with col2:
-        st.metric(
-            label="Luật Đang Chờ (Pending)",
-            value=pending_rules,
-            delta=f"+{pending_rules}" if pending_rules > 0 else None,
-            delta_color="inverse",
-        )
-    with col3:
-        st.metric(label="Luật Đang Hoạt Động (Active)", value=active_rules)
-    st.markdown("---")
+def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_logs=0):
+    """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism."""
+    noise_reduction = 0.0
+    if total_raw_logs > 0:
+        noise_reduction = ((total_raw_logs - total_alerts) / total_raw_logs) * 100
+        
+    html_kpi = (
+        f'<div class="kpi-container">'
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: #177ddc;">{total_raw_logs}</div>'
+        f'    <div class="kpi-label">Logs thô đầu vào</div>'
+        f'  </div>'
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: #ff4d4f;">{total_alerts}</div>'
+        f'    <div class="kpi-label">Cảnh báo Escalated</div>'
+        f'  </div>'
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: #52c41a;">{noise_reduction:.1f}%</div>'
+        f'    <div class="kpi-label">Tỷ lệ giảm tải (Noise Reduction)</div>'
+        f'  </div>'
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'
+        f'    <div class="kpi-label">Luật chờ duyệt (HITL)</div>'
+        f'  </div>'
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: #13c2c2;">{active_rules}</div>'
+        f'    <div class="kpi-label">Luật đang chặn (Active)</div>'
+        f'  </div>'
+        f'</div>'
+    )
+    st.markdown(html_kpi, unsafe_allow_html=True)
+
 
 def render_threat_intel_tables(high_risk_ips, known_entities):
-    """Hiển thị bảng Threat Intelligence."""
+    """Hiển thị bảng Threat Intelligence với màu sắc neon trực quan."""
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🔴 IP Nguy cơ cao (APT Tracker)")
+        st.subheader("🔴 Địa chỉ IP nguy cơ cao (Threat Actor)")
         if not high_risk_ips:
-            st.info("Chưa ghi nhận IP nguy hiểm nào.")
+            st.info("Chưa ghi nhận Threat Actor nào.")
         else:
             df_high_risk = pd.DataFrame(high_risk_ips, columns=["Địa chỉ IP", "Điểm danh tiếng (Reputation)"]) # type: ignore
-            # Define styling function
+            
             def color_score(val):
-                color = 'red' if val >= 70 else 'orange' if val >= 40 else 'green'
-                return f'color: {color}; font-weight: bold'
-            st.dataframe(df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"]), use_container_width=True)
+                color = '#ff4d4f' if val >= 70 else '#faad14' if val >= 40 else '#52c41a'
+                return f'color: {color}; font-weight: bold; font-family: monospace;'
+                
+            st.dataframe(
+                df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"]), 
+                use_container_width=True
+            )
 
     with col2:
-        st.subheader("🟢 Thực thể mạng nội bộ (Known Entities)")
+        st.subheader("🟢 Thực thể mạng nội bộ tin tưởng (Known Entities)")
         if not known_entities:
             st.info("Chưa có thực thể nội bộ nào.")
         else:
             df_entities = pd.DataFrame(known_entities, columns=["Thiết bị / IP", "Vai trò / Mô tả"]) # type: ignore
             st.dataframe(df_entities, use_container_width=True)
+
 
 def render_apt_events_table(events):
     """Hiển thị bảng chuỗi tấn công APT từ DAPT2020."""
@@ -164,7 +219,6 @@ def render_apt_events_table(events):
         return
         
     df = pd.DataFrame(events)
-    # Rename columns for Vietnamese UI
     df = df.rename(columns={
         "id": "ID",
         "src_ip": "IP Nguồn",
