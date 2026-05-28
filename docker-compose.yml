@@ -1,4 +1,46 @@
 services:
+  # ================================================================
+  # LOCAL LLM SERVER — Gemma-2-9B-IT via llama.cpp (GPU Accelerated)
+  # ================================================================
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: sentinel_llm
+    ports:
+      - "127.0.0.1:5000:8080"     # Map host:5000 → container:8080
+    volumes:
+      # Mount thư mục chứa model GGUF (read-only)
+      - /home/binhchuoiz/text-generation-webui/user_data/models:/models:ro
+    environment:
+      # Buộc sử dụng toàn bộ GPU layers (offload hết lên VRAM)
+      LLAMA_ARG_N_GPU_LAYERS: "99"
+      LLAMA_ARG_MODEL: "/models/gemma-2-9b-it-Q6_K.gguf"
+      LLAMA_ARG_CTX_SIZE: "4096"
+      LLAMA_ARG_HOST: "0.0.0.0"
+      LLAMA_ARG_PORT: "8080"
+      LLAMA_ARG_N_PARALLEL: "2"       # 2 concurrent requests
+      LLAMA_ARG_FLASH_ATTN: "1"       # Enable Flash Attention
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 20G
+    networks:
+      - sentinel_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s           # Model load takes ~30-60s
+
+  # ================================================================
+  # SENTINEL DASHBOARD — Streamlit UI (SOC SIEM Interface)
+  # ================================================================
   agent_ui:
     build: .
     container_name: sentinel_dashboard
@@ -13,22 +55,26 @@ services:
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - REDIS_URL=redis://:${REDIS_PASSWORD:-SentinelSecurePass2026!}@redis:6379/0
+      - LLM_API_BASE=http://llm:8080/v1
     depends_on:
       mlflow:
         condition: service_started
       redis:
         condition: service_started
+      llm:
+        condition: service_healthy
     networks:
       - sentinel_net
-    # Security: Resource limits to prevent DoS
     deploy:
       resources:
         limits:
           memory: 4G
           cpus: '2.0'
-    # Security: Drop all capabilities, add only needed ones
     restart: unless-stopped
 
+  # ================================================================
+  # MLFLOW — Experiment Tracking Server
+  # ================================================================
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.19.0
     container_name: sentinel_mlflow
@@ -50,11 +96,14 @@ services:
           cpus: '1.0'
     restart: unless-stopped
 
+  # ================================================================
+  # REDIS — Streaming Queue + Session Cache
+  # ================================================================
   redis:
     image: redis:7.4
     container_name: sentinel_redis
     ports:
-      - "127.0.0.1:6379:6379"  # Security: Bind to localhost only
+      - "127.0.0.1:6379:6379"    # Security: Bind to localhost only
     command: >
       redis-server
       --requirepass "${REDIS_PASSWORD:-SentinelSecurePass2026!}"
@@ -72,12 +121,15 @@ services:
           cpus: '0.5'
     restart: unless-stopped
 
+  # ================================================================
+  # NEO4J — Vulnerability Knowledge Graph (Optional)
+  # ================================================================
   neo4j:
     image: neo4j:5.26-community
     container_name: sentinel_neo4j
     ports:
-      - "7474:7474"   # HTTP Browser
-      - "7687:7687"   # Bolt protocol
+      - "7474:7474"              # HTTP Browser
+      - "7687:7687"              # Bolt protocol
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-SentinelGraphPass2026!}
       - NEO4J_PLUGINS=["apoc"]
@@ -95,7 +147,6 @@ services:
 networks:
   sentinel_net:
     driver: bridge
-    # Security: Internal network isolation
     internal: false
 
 volumes:
