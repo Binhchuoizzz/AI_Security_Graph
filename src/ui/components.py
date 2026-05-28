@@ -183,8 +183,9 @@ def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_l
 
 
 def render_threat_intel_tables(high_risk_ips, known_entities):
-    """Hiển thị bảng Threat Intelligence với màu sắc neon trực quan."""
+    """Hiển thị bảng Threat Intelligence với màu sắc neon trực quan. Hỗ trợ chọn hàng để điều tra."""
     col1, col2 = st.columns(2)
+    selected_ip = None
     
     with col1:
         st.subheader("🔴 Địa chỉ IP nguy cơ cao (Threat Actor)")
@@ -197,10 +198,17 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
                 color = '#ff4d4f' if val >= 70 else '#faad14' if val >= 40 else '#52c41a'
                 return f'color: {color}; font-weight: bold; font-family: monospace;'
                 
-            st.dataframe(
-                df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"]), 
-                use_container_width=True
+            from typing import Any, cast
+            selection = st.dataframe(
+                cast(Any, df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"])), 
+                on_select="rerun",
+                selection_mode="single-row",
+                key="threat_actor_table_select"
             )
+            
+            if selection and "selection" in selection and selection["selection"]["rows"]:
+                row_idx = selection["selection"]["rows"][0]
+                selected_ip = df_high_risk.iloc[row_idx]["Địa chỉ IP"]
 
     with col2:
         st.subheader("🟢 Thực thể mạng nội bộ tin tưởng (Known Entities)")
@@ -209,14 +217,16 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
         else:
             df_entities = pd.DataFrame(known_entities, columns=["Thiết bị / IP", "Vai trò / Mô tả"]) # type: ignore
             st.dataframe(df_entities, use_container_width=True)
+            
+    return selected_ip
 
 
 def render_apt_events_table(events):
-    """Hiển thị bảng chuỗi tấn công APT từ DAPT2020."""
+    """Hiển thị bảng chuỗi tấn công APT từ DAPT2020. Hỗ trợ chọn hàng để điều tra."""
     st.subheader("🎯 Nhật ký chuỗi tấn công APT (DAPT2020 Tracker)")
     if not events:
         st.info("Chưa ghi nhận sự kiện chuỗi APT nào.")
-        return
+        return None
         
     df = pd.DataFrame(events)
     df = df.rename(columns={
@@ -228,4 +238,17 @@ def render_apt_events_table(events):
         "label": "Nhãn",
         "timestamp": "Thời gian xảy ra"
     })
-    st.dataframe(df, use_container_width=True)
+    
+    from typing import Any, cast
+    selection = st.dataframe(
+        cast(Any, df), 
+        on_select="rerun",
+        selection_mode="single-row",
+        key="apt_events_table_select"
+    )
+    
+    selected_ip = None
+    if selection and "selection" in selection and selection["selection"]["rows"]:
+        row_idx = selection["selection"]["rows"][0]
+        selected_ip = df.iloc[row_idx]["IP Nguồn"]
+    return selected_ip

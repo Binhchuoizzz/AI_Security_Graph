@@ -490,6 +490,17 @@ class ThreatMemoryStore:
             c.execute("SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events ORDER BY id DESC LIMIT ?", (limit,))
             return [dict(row) for row in c.fetchall()]
 
+    def get_threat_events_for_ip(self, ip: str, limit: int = 50) -> List[Dict]:
+        """Lấy threat events liên quan đến IP cụ thể (IP nguồn hoặc IP đích)."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute(
+                "SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events WHERE src_ip = ? OR dst_ip = ? ORDER BY id DESC LIMIT ?",
+                (ip, ip, limit),
+            )
+            return [dict(row) for row in c.fetchall()]
+
 
 # Singleton
 threat_memory = ThreatMemoryStore()

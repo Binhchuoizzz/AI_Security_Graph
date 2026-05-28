@@ -79,6 +79,10 @@ class TestOrganizationalContext:
         assert memory_store.is_known_entity("192.168.50.10") is None
 
     def test_get_all_entities(self, memory_store):
+        import sqlite3
+        with sqlite3.connect(memory_store.db_path) as conn:
+            conn.execute("DELETE FROM known_entities")
+            conn.commit()
         memory_store.add_known_entity("scanner", "10.0.0.1", "Scanner A")
         memory_store.add_known_entity("admin_tool", "10.0.0.2", "Admin Panel")
         entities = memory_store.get_all_known_entities()
@@ -144,6 +148,10 @@ class TestStats:
     """Test dashboard statistics."""
 
     def test_initial_stats(self, memory_store):
+        import sqlite3
+        with sqlite3.connect(memory_store.db_path) as conn:
+            conn.execute("DELETE FROM known_entities")
+            conn.commit()
         stats = memory_store.get_stats()
         assert stats["total_tracked_ips"] == 0
         assert stats["high_risk_ips"] == 0
@@ -151,6 +159,10 @@ class TestStats:
         assert stats["apt_indicators"] == 0
 
     def test_stats_after_operations(self, memory_store):
+        import sqlite3
+        with sqlite3.connect(memory_store.db_path) as conn:
+            conn.execute("DELETE FROM known_entities")
+            conn.commit()
         memory_store.record_incident("1.1.1.1", "ALERT")
         memory_store.add_known_entity("scanner", "2.2.2.2", "Test")
         stats = memory_store.get_stats()

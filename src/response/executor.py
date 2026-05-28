@@ -157,3 +157,20 @@ def get_audit_trail(limit=50):
     except Exception:
         return []
 
+
+def get_audit_trail_for_ip(ip: str, limit=100):
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute(
+                "SELECT timestamp, action, target, reason FROM audit_trail WHERE target = ? ORDER BY id DESC LIMIT ?",
+                (ip, limit),
+            )
+            rows = c.fetchall()
+        return [
+            {"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]}
+            for r in rows
+        ]
+    except Exception:
+        return []
+

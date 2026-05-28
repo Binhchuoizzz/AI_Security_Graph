@@ -16,7 +16,7 @@ from streamlit_autorefresh import st_autorefresh
 
 from src.ui.auth import require_auth, logout
 from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables, render_apt_events_table
-from src.response.executor import get_audit_trail
+from src.response.executor import get_audit_trail, get_audit_trail_for_ip
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.agent.threat_memory import threat_memory
 
@@ -310,14 +310,171 @@ def main_dashboard():
         known_entities = threat_memory.get_all_known_entities()
         known_entities_data = [[e["entity_value"], f"{e['entity_type']} - {e['description']}"] for e in known_entities]
         
-        # Hiển thị bảng danh tiếng và whitelist
-        render_threat_intel_tables(high_risk_data, known_entities_data)
+        # Hiển thị bảng danh tiếng và whitelist, đồng thời nhận IP được click chọn (nếu có)
+        selected_actor_ip = render_threat_intel_tables(high_risk_data, known_entities_data)
         
         st.markdown("---")
         
-        # Lấy và hiển thị chuỗi sự kiện APT (DAPT2020)
+        # Lấy và hiển thị chuỗi sự kiện APT (DAPT2020), đồng thời nhận IP được click chọn (nếu có)
         apt_events = threat_memory.get_all_threat_events()
-        render_apt_events_table(apt_events)
+        selected_apt_ip = render_apt_events_table(apt_events)
+        
+        # Quản lý đồng bộ IP được chọn qua click bảng và hộp điều tra selectbox
+        if "threat_investigation_ip" not in st.session_state:
+            st.session_state["threat_investigation_ip"] = None
+            
+        if selected_actor_ip and selected_actor_ip != st.session_state.get("last_selected_actor_ip"):
+            st.session_state["threat_investigation_ip"] = selected_actor_ip
+            st.session_state["last_selected_actor_ip"] = selected_actor_ip
+        if selected_apt_ip and selected_apt_ip != st.session_state.get("last_selected_apt_ip"):
+            st.session_state["threat_investigation_ip"] = selected_apt_ip
+            st.session_state["last_selected_apt_ip"] = selected_apt_ip
+            
+        # Phần điều tra sự cố IP (Drill-down Investigation)
+        st.markdown("---")
+        st.subheader("🔍 Trung tâm Điều tra Đối tượng (Threat Investigation)")
+        
+        # Gom danh sách IP từ cả hai bảng để người dùng có thể điều tra bất cứ IP nào
+        all_ips = set(r["ip"] for r in high_risk_ips)
+        if apt_events:
+            for e in apt_events:
+                if e.get("src_ip"):
+                    all_ips.add(e["src_ip"])
+                if e.get("dst_ip"):
+                    all_ips.add(e["dst_ip"])
+        actor_ips = sorted(list(all_ips))
+        
+        if actor_ips:
+            # Chọn index mặc định dựa trên IP trong session state
+            default_ip = st.session_state.get("threat_investigation_ip")
+            default_idx = 0
+            if default_ip in actor_ips:
+                default_idx = actor_ips.index(default_ip)
+            else:
+                st.session_state["threat_investigation_ip"] = actor_ips[0]
+                default_idx = 0
+                
+            selected_ip = st.selectbox(
+                "Chọn hoặc nhập địa chỉ IP để điều tra lịch sử tấn công (hoặc click chọn trực tiếp hàng trên 2 bảng ở trên):",
+                options=actor_ips,
+                index=default_idx,
+                key="threat_investigation_ip_widget"
+            )
+            
+            # Cập nhật ngược lại cho session state dùng chung
+            st.session_state["threat_investigation_ip"] = selected_ip
+            
+            if selected_ip:
+                # 1. Truy vấn thông tin danh tiếng từ threat_memory
+                ip_rep = threat_memory.get_ip_reputation(selected_ip)
+                # 2. Truy vấn lịch sử cảnh báo của IP này từ audit_trail
+                ip_history = get_audit_trail_for_ip(selected_ip, limit=50)
+                # 3. Truy vấn threat events của IP này từ threat_memory
+                ip_events = threat_memory.get_threat_events_for_ip(selected_ip)
+                
+                # Lấy reputation score của IP
+                rep_score = 0.0
+                if ip_rep:
+                    rep_score = ip_rep.get("reputation_score", 0.0)
+                
+                # Hiển thị kết quả điều tra
+                st.markdown(f"#### 🔍 Kết quả điều tra đối tượng cho IP: `{selected_ip}`")
+                
+                # Render hồ sơ danh tiếng & lý do bị cảnh báo bằng giao diện premium
+                import re
+                latest_reason = "Không có lý do chi tiết từ AI Agent."
+                if ip_history:
+                    # Lấy lý do từ cảnh báo mới nhất
+                    latest_reason = str(ip_history[0].get("reason", "N/A"))
+                    # Làm sạch reason (loại bỏ tag [MITRE...] cho giao diện đẹp)
+                    latest_reason = re.sub(r'\[MITRE:\s*[^\]]*\]', '', latest_reason)
+                    latest_reason = re.sub(r'\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]', '', latest_reason).strip()
+                
+                if ip_rep:
+                    # Phân cấp mức độ nguy hại
+                    severity_level = "CRITICAL" if rep_score >= 50 else "HIGH" if rep_score >= 20 else "MEDIUM"
+                    severity_class = "severity-critical" if severity_level == "CRITICAL" else "severity-high" if severity_level == "HIGH" else "severity-medium"
+                    severity_icon = "🛑" if severity_level == "CRITICAL" else "⚠️" if severity_level == "HIGH" else "🧑‍💻"
+                    
+                    profile_html = (
+                        f'<div class="soc-card {severity_class}">'
+                        f'  <div class="soc-card-header">'
+                        f'    <h4 class="soc-card-title">{severity_icon} [{severity_level}] Hồ sơ đối tượng: {selected_ip}</h4>'
+                        f'    <span class="soc-timestamp">Phát hiện lần đầu: {ip_rep.get("first_seen", "N/A")}</span>'
+                        f'  </div>'
+                        f'  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">'
+                        f'    <div><b>Điểm nguy hại (Reputation):</b> <span class="soc-value-code" style="color: #ff4d4f; font-weight: bold;">{rep_score:.1f}/100</span></div>'
+                        f'    <div><b>Tổng sự cố (Incidents):</b> <span class="soc-value-code">{ip_rep.get("total_incidents", 0)}</span></div>'
+                        f'    <div><b>Số lần bị chặn (Blocks):</b> <span class="soc-value-code" style="color: #ff7875;">{ip_rep.get("total_blocks", 0)}</span></div>'
+                        f'    <div><b>Số lần cảnh báo (Alerts):</b> <span class="soc-value-code" style="color: #ffd666;">{ip_rep.get("total_alerts", 0)}</span></div>'
+                        f'  </div>'
+                        f'  <div style="margin-bottom: 8px;"><b>Hoạt động gần nhất:</b> {ip_rep.get("last_seen", "N/A")}</div>'
+                        f'  <div style="margin-bottom: 12px;"><b>Kỹ thuật MITRE cuối cùng:</b> <code style="background: rgba(138,43,226,0.15); padding: 2px 6px; border-radius: 4px; color: #D3ADF7;">{ip_rep.get("last_mitre_technique") or "T1190"}</code></div>'
+                        f'  <div class="soc-reasoning-box">'
+                        f'    <div class="soc-reasoning-title">❓ Tại sao IP này bị đưa vào danh sách đen:</div>'
+                        f'    <div>{latest_reason}</div>'
+                        f'  </div>'
+                        f'</div>'
+                    )
+                    st.markdown(profile_html, unsafe_allow_html=True)
+                else:
+                    profile_html = (
+                        f'<div class="soc-card severity-medium">'
+                        f'  <div class="soc-card-header">'
+                        f'    <h4 class="soc-card-title">🧑‍💻 [MEDIUM] Hồ sơ đối tượng: {selected_ip}</h4>'
+                        f'    <span class="soc-timestamp">Phát hiện lần đầu: N/A</span>'
+                        f'  </div>'
+                        f'  <div style="margin-bottom: 8px;">IP này được phát hiện tham gia chuỗi tấn công APT từ tập dữ liệu DAPT2020 nhưng chưa phát sinh cảnh báo chặn trên luồng trực tuyến.</div>'
+                        f'  <div class="soc-reasoning-box">'
+                        f'    <div class="soc-reasoning-title">❓ Tại sao IP này bị đưa vào danh sách đen:</div>'
+                        f'    <div>Ghi nhận sự kiện tấn công tương quan trong chuỗi APT dài hạn.</div>'
+                        f'  </div>'
+                        f'</div>'
+                    )
+                    st.markdown(profile_html, unsafe_allow_html=True)
+                
+                # Hiển thị Timeline/Chi tiết lịch sử cảnh báo
+                st.markdown("##### 🕒 Lịch sử hành vi và quyết định của AI Agent")
+                if not ip_history:
+                    st.info("Chưa có cảnh báo nào được ghi nhận trong audit_trail cho IP này.")
+                else:
+                    for i, record in enumerate(ip_history):
+                        act = str(record.get("action") or "UNKNOWN")
+                        time_str = record.get("timestamp")
+                        reason = record.get("reason")
+                        
+                        # Việt hóa action
+                        act_translations = {
+                            "BLOCK_IP": "🛑 CHẶN IP (BLOCK)",
+                            "QUARANTINE": "☣️ CÁCH LY (QUARANTINE)",
+                            "ALERT": "⚠️ CẢNH BÁO (ALERT)",
+                            "AWAIT_HITL": "🧑‍💻 CHỜ PHÊ DUYỆT (HITL)",
+                            "LOG": "ℹ GHI LOG (LOG)"
+                        }
+                        act_disp = act_translations.get(act, act)
+                        
+                        # Tạo expander cho mỗi alert
+                        with st.expander(f"{time_str} - {act_disp}", expanded=(i == 0)):
+                            st.write(f"**Hành động của SOC:** `{act}`")
+                            st.write(f"**Lập luận phân tích của Agent:**")
+                            st.info(reason)
+                
+                # Hiển thị APT Chain của IP này nếu có
+                if ip_events:
+                    st.markdown("##### 🎯 Tiến trình chuỗi tấn công APT (DAPT2020)")
+                    df_ip_events = pd.DataFrame(ip_events)
+                    df_ip_events = df_ip_events.rename(columns={
+                        "id": "ID",
+                        "src_ip": "IP Nguồn",
+                        "dst_ip": "IP Đích",
+                        "apt_phase": "Giai đoạn APT",
+                        "apt_day": "Ngày tấn công",
+                        "label": "Nhãn",
+                        "timestamp": "Thời gian xảy ra"
+                    })
+                    st.dataframe(df_ip_events, use_container_width=True)
+        else:
+            st.info("Chưa ghi nhận IP nguy cơ cao nào trong hệ thống để thực hiện điều tra.")
 
 if __name__ == "__main__":
     main_dashboard()

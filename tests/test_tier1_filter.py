@@ -45,9 +45,10 @@ class TestRuleEngine:
         }
         result = self.engine.evaluate(log)
         assert result["tier1_action"] == "ESCALATE"
-        assert "anomaly" in str(
-            result.get("tier1_reasons", [])
-        ).lower() or "pkts" in str(result.get("tier1_reasons", []))
+        assert any(
+            x in str(result.get("tier1_reasons", [])).lower()
+            for x in ["anomaly", "pkts", "bất thường", "gói"]
+        )
 
     def test_benign_traffic_drop(self):
         """Traffic bình thường (port không nhạy cảm, ít gói) phải bị DROP."""
