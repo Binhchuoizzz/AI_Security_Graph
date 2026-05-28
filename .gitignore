@@ -21,3 +21,9 @@ knowledge_base/faiss_index/*_metadata.json
 *.log
 .gemini/
 *.pid
+
+# Ignore all markdown files except README.md
+**/*.md
+*.md
+!README.md
+!**/README.md
