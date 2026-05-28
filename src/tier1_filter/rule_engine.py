@@ -226,6 +226,9 @@ class RuleEngine:
         self.dynamic_rules = tier1_config.get("dynamic_rules", [])
         self.whitelist_ips = tier1_config.get("whitelist_ips", [])
 
+        # Theo dõi file modification time để hot-reload
+        self.last_config_mtime = os.path.getmtime(CONFIG_PATH) if os.path.exists(CONFIG_PATH) else 0
+
         # Session Baselining thay thế Random Sampling
         baseline_config = tier1_config.get("session_baseline", {})
         self.session_baseline = SessionBaseline(
@@ -238,6 +241,19 @@ class RuleEngine:
         Đánh giá log entry qua 3 tầng: Static Rules → Dynamic Rules → Session Baseline.
         Quyết định: ESCALATE hoặc DROP. KHÔNG có SAMPLE ngẫu nhiên.
         """
+        # Tự động reload dynamic rules/whitelists nếu file system_settings.yaml bị sửa đổi
+        try:
+            if os.path.exists(CONFIG_PATH):
+                current_mtime = os.path.getmtime(CONFIG_PATH)
+                if current_mtime > self.last_config_mtime:
+                    self.reload_dynamic_rules()
+                    self.last_config_mtime = current_mtime
+                    # Đồng thời cập nhật whitelist_ips trong cache của engine
+                    config = load_config()
+                    self.whitelist_ips = config.get("tier1", {}).get("whitelist_ips", [])
+        except Exception:
+            pass
+
         score = 0
         reasons = []
 

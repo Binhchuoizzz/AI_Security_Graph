@@ -95,16 +95,7 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
-  dynamic_rules:
-  - created_at: '2026-05-28T12:41:29.954352'
-    field: Source IP
-    pattern: 192.168.2.150
-    reason: 'IP nguồn 192.168.2.150 liên tục gửi nhiều yêu cầu đến cổng 80 với tần
-      suất cao, vượt ngưỡng bình thường. Hành vi này có thể là một cuộc tấn công DDoS
-      hoặc một hoạt động malvertising. '
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
+  dynamic_rules: []
   max_fwd_packets: 1000
   risk_threshold: 15
   sensitive_ports:
