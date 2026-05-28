@@ -146,7 +146,7 @@ def render_ioc_table(iocs):
         return
 
     df = pd.DataFrame(iocs)
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df, width="stretch")
 
 
 def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_logs=0):
@@ -216,7 +216,7 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
             st.info("Chưa có thực thể nội bộ nào.")
         else:
             df_entities = pd.DataFrame(known_entities, columns=["Thiết bị / IP", "Vai trò / Mô tả"]) # type: ignore
-            st.dataframe(df_entities, use_container_width=True)
+            st.dataframe(df_entities, width="stretch")
             
     return selected_ip
 

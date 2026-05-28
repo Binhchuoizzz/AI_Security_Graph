@@ -472,7 +472,7 @@ def main_dashboard():
                         "label": "Nhãn",
                         "timestamp": "Thời gian xảy ra"
                     })
-                    st.dataframe(df_ip_events, use_container_width=True)
+                    st.dataframe(df_ip_events, width="stretch")
         else:
             st.info("Chưa ghi nhận IP nguy cơ cao nào trong hệ thống để thực hiện điều tra.")
 
