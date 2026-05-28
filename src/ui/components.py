@@ -137,21 +137,41 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🔴 High Risk IPs (APT Tracker)")
+        st.subheader("🔴 IP Nguy cơ cao (APT Tracker)")
         if not high_risk_ips:
             st.info("Chưa ghi nhận IP nguy hiểm nào.")
         else:
-            df_high_risk = pd.DataFrame(high_risk_ips, columns=["IP", "Reputation Score"]) # type: ignore
+            df_high_risk = pd.DataFrame(high_risk_ips, columns=["Địa chỉ IP", "Điểm danh tiếng (Reputation)"]) # type: ignore
             # Define styling function
             def color_score(val):
                 color = 'red' if val >= 70 else 'orange' if val >= 40 else 'green'
                 return f'color: {color}; font-weight: bold'
-            st.dataframe(df_high_risk.style.map(color_score, subset=['Reputation Score']), use_container_width=True)
+            st.dataframe(df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"]), use_container_width=True)
 
     with col2:
-        st.subheader("🟢 Known Entities (Whitelist / Internal)")
+        st.subheader("🟢 Thực thể mạng nội bộ (Known Entities)")
         if not known_entities:
-            st.info("Chưa có cấu hình tổ chức nào.")
+            st.info("Chưa có thực thể nội bộ nào.")
         else:
-            df_entities = pd.DataFrame(known_entities, columns=["Entity/IP", "Role"]) # type: ignore
+            df_entities = pd.DataFrame(known_entities, columns=["Thiết bị / IP", "Vai trò / Mô tả"]) # type: ignore
             st.dataframe(df_entities, use_container_width=True)
+
+def render_apt_events_table(events):
+    """Hiển thị bảng chuỗi tấn công APT từ DAPT2020."""
+    st.subheader("🎯 Nhật ký chuỗi tấn công APT (DAPT2020 Tracker)")
+    if not events:
+        st.info("Chưa ghi nhận sự kiện chuỗi APT nào.")
+        return
+        
+    df = pd.DataFrame(events)
+    # Rename columns for Vietnamese UI
+    df = df.rename(columns={
+        "id": "ID",
+        "src_ip": "IP Nguồn",
+        "dst_ip": "IP Đích",
+        "apt_phase": "Giai đoạn APT",
+        "apt_day": "Ngày tấn công",
+        "label": "Nhãn",
+        "timestamp": "Thời gian xảy ra"
+    })
+    st.dataframe(df, use_container_width=True)

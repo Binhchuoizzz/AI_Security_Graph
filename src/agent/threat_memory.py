@@ -112,6 +112,18 @@ class ThreatMemoryStore:
                 )
             """)
 
+            # Seed default known entities if empty
+            c.execute("SELECT COUNT(*) FROM known_entities")
+            if c.fetchone()[0] == 0:
+                now_str = datetime.now().isoformat()
+                c.execute("""
+                    INSERT INTO known_entities (entity_type, entity_value, description, added_by, added_at, is_active)
+                    VALUES 
+                    ('Jump_Host', '192.168.1.254', 'Máy chủ nhảy quản trị nội bộ', 'system', ?, 1),
+                    ('Security_Scanner', '10.0.0.99', 'Máy quét bảo mật Nessus định kỳ', 'system', ?, 1),
+                    ('Active_Directory', '192.168.1.10', 'Máy chủ AD Domain Controller', 'system', ?, 1)
+                """, (now_str, now_str, now_str))
+
             conn.commit()
         logger.info(f"[THREAT MEMORY] Initialized at {self.db_path}")
 
@@ -469,6 +481,14 @@ class ThreatMemoryStore:
             "known_entities": known,
             "apt_indicators": apt,
         }
+
+    def get_all_threat_events(self, limit: int = 50) -> List[Dict]:
+        """Lấy toàn bộ threat events cho UI."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            c = conn.cursor()
+            c.execute("SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events ORDER BY id DESC LIMIT ?", (limit,))
+            return [dict(row) for row in c.fetchall()]
 
 
 # Singleton

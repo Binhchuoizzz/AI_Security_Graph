@@ -13,7 +13,7 @@ import time
 from streamlit_autorefresh import st_autorefresh
 
 from src.ui.auth import require_auth, logout
-from src.ui.components import render_alert_card, render_metrics_header
+from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables, render_apt_events_table
 from src.response.executor import get_audit_trail
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.agent.threat_memory import threat_memory
@@ -71,7 +71,7 @@ def main_dashboard():
 
     render_metrics_header(len(alerts), len(pending_rules), len(active_rules))
 
-    tab1, tab2 = st.tabs(["📊 Nhật ký SIEM & Audit Trail", "🧑‍💻 Phê duyệt Luật (HITL)"])
+    tab1, tab2, tab3 = st.tabs(["📊 Nhật ký SIEM & Audit Trail", "🧑‍💻 Phê duyệt Luật (HITL)", "🎯 Giám sát APT & Threat Intel"])
 
     with tab1:
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
@@ -161,6 +161,26 @@ def main_dashboard():
                             st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
                             time.sleep(0.5)
                             st.rerun()
+
+    with tab3:
+        st.subheader("Giám sát Chuỗi APT & Danh tiếng IP")
+        
+        # Lấy danh sách IP nguy hiểm từ Long-term Memory
+        high_risk_ips = threat_memory.get_high_risk_ips(min_score=1.0)
+        high_risk_data = [[r["ip"], r["reputation_score"]] for r in high_risk_ips]
+        
+        # Lấy danh sách Known Entities nội bộ
+        known_entities = threat_memory.get_all_known_entities()
+        known_entities_data = [[e["entity_value"], f"{e['entity_type']} - {e['description']}"] for e in known_entities]
+        
+        # Hiển thị bảng danh tiếng và whitelist
+        render_threat_intel_tables(high_risk_data, known_entities_data)
+        
+        st.markdown("---")
+        
+        # Lấy và hiển thị chuỗi sự kiện APT (DAPT2020)
+        apt_events = threat_memory.get_all_threat_events()
+        render_apt_events_table(apt_events)
 
 if __name__ == "__main__":
     main_dashboard()
