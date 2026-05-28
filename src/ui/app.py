@@ -78,18 +78,31 @@ def main_dashboard():
         st.markdown("### ⚙️ Quản lý Lịch sử")
         
         # Nút xóa lịch sử quét
-        if st.button("🗑️ Xóa Lịch sử Cảnh báo", help="Xóa sạch toàn bộ lịch sử trong audit_trail"):
+        if st.button("🗑️ Reset Hệ thống & Demo từ đầu", help="Xóa sạch toàn bộ lịch sử cảnh báo và danh tiếng IP để chạy lại demo từ đầu"):
             from src.response.executor import DB_PATH as AUDIT_DB
+            from src.agent.threat_memory import MEMORY_DB_PATH as THREAT_DB
             import sqlite3
             try:
+                # 1. Xóa audit_trail
                 with sqlite3.connect(AUDIT_DB) as conn:
                     conn.execute("DELETE FROM audit_trail")
                     conn.commit()
-                st.success("Đã xóa sạch lịch sử cảnh báo!")
-                time.sleep(0.5)
+                
+                # 2. Xóa threat memory
+                with sqlite3.connect(THREAT_DB) as conn:
+                    conn.execute("DELETE FROM ip_reputation")
+                    conn.execute("DELETE FROM threat_events")
+                    conn.execute("DELETE FROM apt_indicators")
+                    conn.commit()
+                
+                # 3. Seed lại default known entities
+                threat_memory._init_db()
+                
+                st.success("Đã reset toàn bộ dữ liệu hệ thống về trạng thái ban đầu!")
+                time.sleep(0.7)
                 st.rerun()
             except Exception as e:
-                st.error(f"Lỗi khi xóa: {e}")
+                st.error(f"Lỗi khi reset: {e}")
 
         st.markdown("---")
         st.markdown("## Về SENTINEL")

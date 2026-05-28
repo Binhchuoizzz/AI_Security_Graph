@@ -72,30 +72,30 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
 
     clean_reason = html_lib.escape(raw_reason)
 
-    # Hiển thị UI bằng Markdown + HTML nội suy
-    st.markdown(
-        f"""
-        <div class="soc-card {css_class}">
-            <div class="soc-card-header">
-                <h4 class="soc-card-title">{icon} {action_display}</h4>
-                <span class="soc-timestamp">{formatted_time}</span>
-            </div>
-            <div class="soc-detail-row">
-                <span class="soc-label">IP Mục tiêu:</span> 
-                <code>{target}</code>
-            </div>
-            <div class="soc-detail-row">
-                <span class="soc-label">Ngữ cảnh:</span> 
-                <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>
-                <span class="soc-badge soc-conf-badge">Độ tin cậy AI: {confidence}</span>
-            </div>
-            <div class="soc-reasoning-box">
-                {clean_reason}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    # Hiển thị UI bằng Markdown + HTML nội suy (loại bỏ xuống dòng thừa tránh lỗi Streamlit Markdown)
+    html_content = (
+        f'<div class="soc-card {css_class}">'
+        f'    <div class="soc-card-header">'
+        f'        <h4 class="soc-card-title">{icon} {action_display}</h4>'
+        f'        <span class="soc-timestamp">{formatted_time}</span>'
+        f'    </div>'
+        f'    <div class="soc-detail-row">'
+        f'        <span class="soc-label">IP Mục tiêu:</span>'
+        f'        <code>{target}</code>'
+        f'    </div>'
+        f'    <div class="soc-detail-row">'
+        f'        <span class="soc-label">Ngữ cảnh:</span>'
+        f'        <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>'
+        f'        <span class="soc-badge soc-conf-badge">Độ tin cậy AI: {confidence}</span>'
+        f'    </div>'
+        f'    <div class="soc-reasoning-box">'
+        f'        {clean_reason}'
+        f'    </div>'
+        f'</div>'
     )
+    # Strip any extra newlines/tabs inside HTML to prevent Streamlit from adding paragraphs
+    clean_html = "".join([line.strip() for line in html_content.split("\n")])
+    st.markdown(clean_html, unsafe_allow_html=True)
     
     # Nút Approve as Pentest (chỉ hiển thị nếu có IP hợp lệ và người dùng là L3_Manager)
     if on_whitelist and target not in ["N/A", "UNKNOWN_TARGET"] and is_l3_manager:
