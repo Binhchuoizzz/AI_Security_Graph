@@ -15,7 +15,7 @@ import time
 from streamlit_autorefresh import st_autorefresh
 
 from src.ui.auth import require_auth, logout
-from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables, render_apt_events_table
+from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables, render_apt_events_table, is_valid_ip
 from src.response.executor import get_audit_trail, get_audit_trail_for_ip
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.agent.threat_memory import threat_memory
@@ -150,6 +150,7 @@ def main_dashboard():
     all_alerts = get_audit_trail(limit=2000)
     active_rules = feedback_mgr.get_active_dynamic_rules()
     pending_rules = feedback_mgr.get_pending_rules()
+    whitelisted_ips = feedback_mgr.get_whitelisted_ips()
 
     # Tính toán bộ lọc sự cố
     filtered_alerts = all_alerts
@@ -166,7 +167,12 @@ def main_dashboard():
     # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
     render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules), raw_logs_count)
 
-    tab1, tab2, tab3 = st.tabs(["📊 Nhật ký SIEM & Audit Trail", "🧑‍💻 Phê duyệt Luật (HITL)", "🎯 Giám sát APT & Threat Intel"])
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📊 Nhật ký SIEM & Audit Trail", 
+        "🧑‍💻 Phê duyệt Luật (HITL)", 
+        "🎯 Giám sát APT & Threat Intel",
+        "🔒 Quản lý Blocklist & Whitelist"
+    ])
 
     with tab1:
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
@@ -205,7 +211,7 @@ def main_dashboard():
             # Hiển thị các Alert Cards cho trang hiện tại
             for alert in page_alerts:
                 target_ip = alert.get("target", "N/A")
-                is_whitelisted = st.session_state.get(f"whitelisted_{target_ip}", False)
+                is_whitelisted = target_ip in whitelisted_ips
                 
                 render_alert_card(
                     alert, 
@@ -280,22 +286,6 @@ def main_dashboard():
                         if st.button(" Vô hiệu hóa / Hoàn tác", key=f"rev_{rule.get('pattern')}"):
                             feedback_mgr.reject_rule(rule.get("pattern"))
                             st.warning(f"Đã hoàn tác và vô hiệu hóa luật {rule.get('pattern')}")
-                            time.sleep(0.5)
-                            st.rerun()
-
-        st.markdown("---")
-        st.subheader("Quản lý IP Đặc cách (Whitelisted IPs)")
-        whitelisted_ips = feedback_mgr.get_whitelisted_ips()
-        if not whitelisted_ips:
-            st.info("Chưa có IP nào trong danh sách Whitelist.")
-        else:
-            for ip in whitelisted_ips:
-                with st.expander(f"✅ IP Nội bộ / Pentest: {ip}", expanded=False):
-                    st.write(f"Hệ thống (Tier 1) sẽ bỏ qua mọi đánh giá và Rule Engine đối với IP `{ip}`.")
-                    if st.session_state.get("role") == "L3_Manager":
-                        if st.button(" Gỡ khỏi Whitelist", key=f"rmwl_{ip}"):
-                            feedback_mgr.remove_from_whitelist(ip)
-                            st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
                             time.sleep(0.5)
                             st.rerun()
 
@@ -475,6 +465,218 @@ def main_dashboard():
                     st.dataframe(df_ip_events, width="stretch")
         else:
             st.info("Chưa ghi nhận IP nguy cơ cao nào trong hệ thống để thực hiện điều tra.")
+
+    with tab4:
+        st.subheader("🔒 Quản lý Blocklist & Whitelist (IP Control Center)")
+
+        # -------------------------------------------------------------
+        # Phân quyền check
+        # -------------------------------------------------------------
+        is_l3 = (st.session_state.get("role") == "L3_Manager")
+
+        # -------------------------------------------------------------
+        # 1. KPI Stats
+        # -------------------------------------------------------------
+        all_rules = feedback_mgr.get_all_dynamic_rules()
+        ip_blocks = [r for r in all_rules if r.get("field") == "Source IP"]
+        
+        active_blocks_count = len([r for r in ip_blocks if r.get("status") == "ACTIVE"])
+        pending_blocks_count = len([r for r in ip_blocks if r.get("status") == "PENDING_APPROVAL"])
+        whitelisted_count = len(whitelisted_ips)
+
+        st.markdown(f"""
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+            <div style="background: rgba(255, 77, 79, 0.1); border: 1px solid rgba(255, 77, 79, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{active_blocks_count}</div>
+                <div style="font-size: 0.85rem; color: #ff7875; font-weight: 600; text-transform: uppercase;">IP Đang Chặn (Active)</div>
+            </div>
+            <div style="background: rgba(250, 173, 20, 0.1); border: 1px solid rgba(250, 173, 20, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #faad14;">{pending_blocks_count}</div>
+                <div style="font-size: 0.85rem; color: #ffc069; font-weight: 600; text-transform: uppercase;">Luật Chờ Duyệt (Pending)</div>
+            </div>
+            <div style="background: rgba(82, 196, 26, 0.1); border: 1px solid rgba(82, 196, 26, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #52c41a;">{whitelisted_count}</div>
+                <div style="font-size: 0.85rem; color: #95de64; font-weight: 600; text-transform: uppercase;">IP Đặc Cách (Whitelist)</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_left, col_right = st.columns([3, 2])
+
+        with col_left:
+            st.markdown("### 🛑 Danh sách Blocklist & Lịch sử chặn")
+            
+            if not ip_blocks:
+                st.info("Chưa ghi nhận địa chỉ IP nào bị chặn trong cấu hình.")
+            else:
+                # Chuẩn bị dữ liệu bảng
+                block_rows = []
+                for rule in ip_blocks:
+                    status_val = rule.get("status", "ACTIVE")
+                    # Tạo nhãn status có icon
+                    status_icon = "🛑 ACTIVE" if status_val == "ACTIVE" else "🧑‍💻 PENDING" if status_val == "PENDING_APPROVAL" else "🔓 UNBLOCKED"
+                    block_rows.append({
+                        "Địa chỉ IP": rule.get("pattern"),
+                        "Trạng thái": status_icon,
+                        "Điểm Risk": rule.get("score", 50),
+                        "Ngày tạo": rule.get("created_at", "N/A")[:19].replace("T", " "),
+                        "Lý do": rule.get("reason", "N/A")
+                    })
+                df_blocks = pd.DataFrame(block_rows)
+                
+                # Interactive Table
+                st.markdown("<p style='font-size: 0.85rem; color: #8E9AA8;'>💡 Click chọn hàng bất kỳ để xem chi tiết lịch sử và thực hiện Hoàn tác / Gỡ chặn:</p>", unsafe_allow_html=True)
+                
+                # Hàm tô màu trạng thái
+                def color_status(val):
+                    color = '#ff4d4f' if 'ACTIVE' in val else '#faad14' if 'PENDING' in val else '#8c8c8c'
+                    return f'color: {color}; font-weight: bold; font-family: monospace;'
+
+                from typing import Any, cast
+                block_selection = st.dataframe(
+                    cast(Any, df_blocks.style.map(color_status, subset=["Trạng thái"])),
+                    on_select="rerun",
+                    selection_mode="single-row",
+                    key="blocklist_table_select"
+                )
+
+                selected_block_ip = None
+                if block_selection and "selection" in block_selection and block_selection["selection"]["rows"]:
+                    selected_row_idx = block_selection["selection"]["rows"][0]
+                    selected_block_ip = df_blocks.iloc[selected_row_idx]["Địa chỉ IP"]
+                
+                # Nếu người dùng đã chọn một IP
+                if selected_block_ip:
+                    st.markdown("---")
+                    st.markdown(f"#### 🔍 Chi tiết và Hành động cho IP: `{selected_block_ip}`")
+                    
+                    # Lấy luật tương ứng
+                    target_rule = next((r for r in ip_blocks if r.get("pattern") == selected_block_ip), None)
+                    if target_rule:
+                        status_val = target_rule.get("status")
+                        st.write(f"**Trạng thái hiện tại:** `{status_val}`")
+                        st.write(f"**Lý do block:** {target_rule.get('reason')}")
+                        st.write(f"**Nguồn tạo:** `{target_rule.get('source')}`")
+                        st.write(f"**Thời gian:** `{target_rule.get('created_at')}`")
+                        
+                        # Điều tra lịch sử IP từ audit_trail
+                        ip_audit = get_audit_trail_for_ip(selected_block_ip, limit=10)
+                        if ip_audit:
+                            st.write("**Lịch sử hành vi trong hệ thống (SIEM Logs):**")
+                            for idx, record in enumerate(ip_audit):
+                                st.caption(f"⏱️ {record.get('timestamp')} | **Action:** `{record.get('action')}` | **Lý do:** {record.get('reason')}")
+                        else:
+                            st.caption("Chưa ghi nhận log thô nào trong cơ sở dữ liệu cho IP này.")
+
+                        # Nút hoàn tác
+                        if is_l3:
+                            col_b1, col_b2 = st.columns(2)
+                            with col_b1:
+                                if status_val in ["ACTIVE", "PENDING_APPROVAL"]:
+                                    if st.button("🔓 Hoàn tác / Gỡ chặn IP này", key=f"unblock_{selected_block_ip}"):
+                                        # Set status thành REJECTED
+                                        feedback_mgr.reject_rule(selected_block_ip)
+                                        # Log hành động unblock vào audit_trail
+                                        from src.response.executor import _log_to_db
+                                        _log_to_db("LOG", selected_block_ip, f"Manual unblock by Administrator ({st.session_state.get('username')})")
+                                        st.success(f"Đã hoàn tác và gỡ chặn cho IP {selected_block_ip}")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                                elif status_val == "REJECTED":
+                                    if st.button("🛑 Tái kích hoạt chặn IP này", key=f"reblock_{selected_block_ip}"):
+                                        # Set status thành ACTIVE
+                                        feedback_mgr.approve_rule(selected_block_ip)
+                                        from src.response.executor import _log_to_db
+                                        _log_to_db("BLOCK_IP", selected_block_ip, f"Manual re-block by Administrator ({st.session_state.get('username')})")
+                                        st.success(f"Đã tái kích hoạt luật chặn cho IP {selected_block_ip}")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                            with col_b2:
+                                # Whitelist IP trực tiếp
+                                if selected_block_ip not in whitelisted_ips:
+                                    if st.button("🛡️ Đưa thẳng vào Whitelist", key=f"towhitelist_{selected_block_ip}"):
+                                        # Remove block rule or reject it
+                                        feedback_mgr.reject_rule(selected_block_ip)
+                                        # Add to whitelist
+                                        feedback_mgr.add_to_whitelist(selected_block_ip)
+                                        from src.response.executor import _log_to_db
+                                        _log_to_db("LOG", selected_block_ip, f"IP whitelisted and block rule removed by Administrator ({st.session_state.get('username')})")
+                                        st.success(f"Đã đưa IP {selected_block_ip} vào Whitelist!")
+                                        time.sleep(0.5)
+                                        st.rerun()
+                        else:
+                            st.warning("💡 Yêu cầu vai trò L3 Manager để thay đổi trạng thái chặn.")
+
+        with col_right:
+            st.markdown("### ⚙️ Thao tác & Quản lý Whitelist")
+            
+            # Form chặn IP thủ công (Manual Block)
+            with st.expander("🛑 Chặn IP thủ công", expanded=True):
+                st.write("Thêm thủ công một IP vào danh sách chặn của Tier 1.")
+                manual_block_ip = st.text_input("Địa chỉ IP cần chặn", placeholder="Ví dụ: 192.168.1.50", key="manual_block_ip_input").strip()
+                manual_block_score = st.slider("Điểm Risk Score", min_value=10, max_value=100, value=100, step=10, key="manual_block_score_input")
+                manual_block_reason = st.text_area("Lý do chặn", placeholder="Nhập lý do nghi ngờ / tấn công...", key="manual_block_reason_input")
+                
+                if st.button("🛑 Kích hoạt luật chặn", key="btn_trigger_manual_block"):
+                    if not is_l3:
+                        st.error("💡 Yêu cầu vai trò L3 Manager để thực hiện chặn IP.")
+                    elif not manual_block_ip:
+                        st.error("Vui lòng nhập địa chỉ IP.")
+                    elif not is_valid_ip(manual_block_ip):
+                        st.error("Địa chỉ IP không đúng định dạng.")
+                    elif not manual_block_reason:
+                        st.error("Vui lòng nhập lý do chặn.")
+                    else:
+                        # Ghi luật chặn mới
+                        feedback_mgr.receive_new_rule("Source IP", manual_block_ip, score=manual_block_score, source=f"manual_{st.session_state.get('username')}", reason=manual_block_reason)
+                        # Duyệt luôn
+                        feedback_mgr.approve_rule(manual_block_ip)
+                        
+                        # Ghi audit log
+                        from src.response.executor import block_ip
+                        block_ip(manual_block_ip, f"Chặn thủ công: {manual_block_reason}")
+                        
+                        st.success(f"Đã kích hoạt chặn IP {manual_block_ip} thành công!")
+                        time.sleep(0.5)
+                        st.rerun()
+
+            # Form Whitelist thủ công
+            with st.expander("🛡️ Thêm IP vào Whitelist", expanded=True):
+                st.write("Thêm thủ công một IP an toàn (Pentest, Máy chủ nội bộ) để Rule Engine bỏ qua.")
+                manual_wl_ip = st.text_input("Địa chỉ IP an toàn", placeholder="Ví dụ: 192.168.10.10", key="manual_wl_ip_input").strip()
+                
+                if st.button("✅ Thêm vào Whitelist", key="btn_trigger_manual_wl"):
+                    if not is_l3:
+                        st.error("💡 Yêu cầu vai trò L3 Manager để whitelist IP.")
+                    elif not manual_wl_ip:
+                        st.error("Vui lòng nhập địa chỉ IP.")
+                    elif not is_valid_ip(manual_wl_ip):
+                        st.error("Địa chỉ IP không đúng định dạng.")
+                    else:
+                        feedback_mgr.add_to_whitelist(manual_wl_ip)
+                        from src.response.executor import _log_to_db
+                        _log_to_db("LOG", manual_wl_ip, f"IP added to Whitelist manually by {st.session_state.get('username')}")
+                        st.success(f"Đã thêm IP {manual_wl_ip} vào Whitelist thành công!")
+                        time.sleep(0.5)
+                        st.rerun()
+
+            # Danh sách Whitelisted IPs hiện tại
+            st.markdown("---")
+            st.markdown("#### ✅ Danh sách Whitelist hiện tại")
+            if not whitelisted_ips:
+                st.info("Chưa có IP nào trong danh sách Whitelist.")
+            else:
+                for ip in whitelisted_ips:
+                    with st.expander(f"✅ Whitelisted: {ip}", expanded=False):
+                        st.write(f"Mọi traffic từ `{ip}` sẽ được bỏ qua bởi Rule Engine.")
+                        if is_l3:
+                            if st.button("❌ Gỡ khỏi Whitelist", key=f"rmwl_t4_{ip}"):
+                                feedback_mgr.remove_from_whitelist(ip)
+                                from src.response.executor import _log_to_db
+                                _log_to_db("LOG", ip, f"IP removed from Whitelist by {st.session_state.get('username')}")
+                                st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
+                                time.sleep(0.5)
+                                st.rerun()
 
 if __name__ == "__main__":
     main_dashboard()

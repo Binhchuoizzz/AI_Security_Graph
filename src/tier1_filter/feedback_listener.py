@@ -24,7 +24,7 @@ import yaml
 import os
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
@@ -67,7 +67,7 @@ class FeedbackListener:
             "field": field,
             "pattern": pattern,
             "score": score,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "source": source,
             "reason": reason,
             "status": "PENDING_APPROVAL",  # Trạng thái chờ kiểm duyệt
@@ -225,3 +225,13 @@ class FeedbackListener:
             return config.get("tier1", {}).get("whitelist_ips", [])
         except Exception:
             return []
+
+    def get_all_dynamic_rules(self) -> list:
+        """Đọc toàn bộ danh sách dynamic rules từ config (gồm cả ACTIVE, PENDING_APPROVAL, REJECTED)."""
+        try:
+            with open(CONFIG_PATH, "r") as f:
+                config = yaml.safe_load(f)
+            return config.get("tier1", {}).get("dynamic_rules", [])
+        except Exception:
+            return []
+

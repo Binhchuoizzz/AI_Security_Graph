@@ -10,6 +10,17 @@ import re
 from datetime import datetime
 
 
+def is_valid_ip(ip_str: str) -> bool:
+    """Kiểm tra chuỗi IP hợp lệ (IPv4 hoặc IPv6)."""
+    ip_str = ip_str.strip()
+    ipv4_pattern = r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
+    ipv6_pattern = r"^([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])$"
+    if re.match(ipv4_pattern, ip_str):
+        parts = ip_str.split('.')
+        return all(0 <= int(p) <= 255 for p in parts)
+    return bool(re.match(ipv6_pattern, ip_str))
+
+
 def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
@@ -129,14 +140,23 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
     clean_html = "".join([line.strip() for line in html_content.split("\n")])
     st.markdown(clean_html, unsafe_allow_html=True)
     
-    # Nút Approve as Pentest / IP Nội bộ
-    if on_whitelist and target not in ["N/A", "UNKNOWN_TARGET"] and is_l3_manager:
-        if action in ["ALERT", "AWAIT_HITL"]:
-            st.write("")
-            if st.button(f"✅ Phê duyệt làm Pentest / IP Nội bộ ({target})", key=f"wl_{target}_{timestamp}"):
-                on_whitelist(target)
-                st.success(f"IP {target} đã được thêm vào Whitelist. Agent sẽ bỏ qua IP này trong tương lai.")
-                st.rerun()
+    # Nút Whitelist IP dành cho mọi alert có target là IP hợp lệ
+    cleaned_target = target.strip()
+    if is_valid_ip(cleaned_target):
+        st.write("")
+        if on_whitelist:
+            # IP chưa được Whitelist
+            if is_l3_manager:
+                if st.button(f"🛡️ Whitelist IP: {cleaned_target}", key=f"wl_btn_{cleaned_target}_{timestamp}"):
+                    on_whitelist(cleaned_target)
+                    st.success(f"IP {cleaned_target} đã được thêm vào Whitelist thành công!")
+                    st.rerun()
+            else:
+                st.button(f"🛡️ Whitelist IP: {cleaned_target}", key=f"wl_btn_dis_{cleaned_target}_{timestamp}", disabled=True, help="💡 Yêu cầu vai trò L3 Manager để whitelist IP này.")
+        else:
+            # IP đã được Whitelist rồi
+            st.button(f"✅ Đã Whitelist IP: {cleaned_target}", key=f"wl_btn_done_{cleaned_target}_{timestamp}", disabled=True, help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).")
+
 
 
 def render_ioc_table(iocs):
