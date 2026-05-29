@@ -27,8 +27,11 @@ def load_ground_truth():
         return json.load(f)
 
 
-def run_ablation():
+def run_ablation(limit=None):
     dataset = load_ground_truth()
+    if limit:
+        dataset = dataset[:limit]
+
 
     # Positive Class (Attack): expected_action != "LOG"
     # Negative Class (Benign): expected_action == "LOG"
@@ -228,4 +231,9 @@ def run_ablation():
 
 
 if __name__ == "__main__":
-    run_ablation()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Gioi han so luong mau de chay nhanh")
+    args = parser.parse_args()
+    run_ablation(limit=args.limit)
+
