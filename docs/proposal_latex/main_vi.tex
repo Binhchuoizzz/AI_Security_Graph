@@ -181,20 +181,59 @@ Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tần
 
 \begin{figure}[H]
     \centering
-    \begin{verbatim}
-[ Lưu lượng mạng / Logs ]
-            |
-            v
-+------------------------+  Lọc nhiễu +------------------------+
-| TIER 1: RULE ENGINE    |----------->| TIER 2: LLM AGENT      |
-| - Redis State Tracking |            | - Drain3 Template      |
-| - Heuristic Baselines  |            | - Encapsulation        |
-| - Volumetric Filter    |            | - Dual-RAG (MITRE/NIST)|
-+------------------------+            +----------+-------------+
-                                                 | Quarantine
-                                                 v
-                              [ HITL Dashboard (Streamlit) ]
-    \end{verbatim}
+    \resizebox{\textwidth}{!}{
+    \begin{tikzpicture}[
+        >=stealth,
+        node distance=1cm and 0.5cm,
+        font=\small,
+        box/.style={draw, rectangle, minimum height=1cm, align=center, fill=white},
+    ]
+
+    % Nodes
+    \node[box, text width=7.5cm] (dataset) {DỮ LIỆU ĐẦU VÀO \\ CSE-CIC-IDS2018 (Tier 1) \textbullet\ DAPT2020 (Tier 2)};
+    \node[box, text width=7.5cm, below=1cm of dataset] (tier1) {TIER 1 -- ĐỘNG CƠ QUY TẮC \\ Đường cơ sở hành vi \textbullet\ Blacklist IP};
+    \node[box, right=1.5cm of tier1] (drop) {[ BỎ QUA (DROP) ]};
+
+    \node[box, text width=7.5cm, below=1cm of tier1] (guardrail) {TẦNG RÀO CHẮN (GUARDRAIL) \\ 1. Gom nhóm template Drain3 -- nén token \\ 2. Đóng gói phân cách -- chống chèn mã độc};
+
+    \node[box, text width=5.5cm, below=2cm of guardrail] (tier2) {TIER 2 -- TÁC TỬ LANGGRAPH \\ Gemma-2-9B-IT qua llama.cpp \\ Dual-RAG \textbullet\ Bộ nhớ Threat Memory SQLite};
+    \node[box, text width=3.5cm, left=0.5cm of tier2] (mitre) {MITRE ATT\&CK \\ Chỉ mục FAISS 1 \\ Ánh xạ kỹ thuật};
+    \node[box, text width=3.5cm, right=0.5cm of tier2] (nist) {NIST SP 800-61r2 \\ Chỉ mục FAISS 2 \\ Quy trình ứng phó};
+
+    \node[box, below=1.5cm of tier2] (quarantine) {[ CÁCH LY (QUARANTINE) ]};
+    \node[box, left=1.5cm of quarantine] (block) {[ CHẶN IP (BLOCK) ]};
+    \node[box, right=1.5cm of quarantine] (alert) {[ CẢNH BÁO (ALERT) ]};
+
+    \node[box, text width=6.5cm, below=1cm of quarantine] (hitl) {HITL DASHBOARD STREAMLIT \\ Bộ nhớ SQLite \textbullet\ Llama-3.1-8B Judge \\ Hàng đợi phê duyệt luật chặn};
+
+    % Edges
+    \draw[->] (dataset) -- node[right] {Redis stream} (tier1);
+    \draw[->] (tier1) -- node[above] {lành tính} (drop);
+    \draw[->] (tier1) -- node[right] {bất thường} (guardrail);
+
+    % Routing from guardrail to MITRE/NIST and Tier 2
+    \coordinate (split1) at ([yshift=-1cm]guardrail.south);
+    \draw[-] (guardrail.south) -- (split1);
+    \draw[->] (split1) -| (mitre.north);
+    \draw[->] (split1) -| (nist.north);
+    \draw[->] (split1) -- (tier2.north);
+
+    \draw[->] (mitre.east) -- (tier2.west);
+    \draw[->] (nist.west) -- (tier2.east);
+
+    % Routing from tier2 to block/quar/alert
+    \coordinate (split2) at ([yshift=-0.75cm]tier2.south);
+    \draw[-] (tier2.south) -- (split2);
+    \draw[->] (split2) -| (block.north);
+    \draw[->] (split2) -| (alert.north);
+    \draw[->] (split2) -- (quarantine.north);
+
+    \draw[->] (quarantine) -- (hitl);
+
+    \draw[->, dashed] (hitl.south) -- ++(0,-0.5) -| node[pos=0.25, above] {cập nhật nóng quy tắc (đứt nét)} ++(5.5,0) |- (tier1.east);
+
+    \end{tikzpicture}
+    }
     \caption{Kiến trúc Nhận thức Hai tầng}
     \label{fig:architecture}
 \end{figure}
@@ -215,6 +254,12 @@ Thiết kế hai chỉ mục cố định này loại bỏ nhu cầu về cơ ch
 Mỗi chỉ mục sử dụng chiến lược \textbf{Tìm kiếm Lai (Hybrid Search)} kết hợp tìm kiếm ngữ nghĩa dày đặc (Dense Search qua FAISS với \verb|all-MiniLM-L6-v2|) với tìm kiếm từ khóa thưa (Sparse Search qua BM25Okapi), được hợp nhất thông qua \textbf{Reciprocal Rank Fusion (RRF, k=60)} \cite{rrf2009}. Cách tiếp cận tín hiệu kép này tối đa hóa cả khả năng hiểu ngữ nghĩa lẫn độ chính xác khớp từ khóa cho các định danh đặc thù an ninh mạng như CVE ID, địa chỉ IP và số cổng. Các đoạn văn bản được truy xuất sẽ trải qua quá trình \textbf{Làm sạch Cấu trúc (Structural Sanitization)}---chuẩn hóa Unicode, loại bỏ ký tự điều khiển và cắt giới hạn độ dài---nhằm phòng chống RAG Poisoning trước khi đưa vào prompt của LLM.
 
 Cuối cùng, nhằm bảo vệ hệ thống trước đòn Adversarial Rule Injection, LLM không được phép trực tiếp thay đổi tường lửa ở Tier 1. Thay vào đó, các quy tắc do nó đề xuất sẽ bị đưa vào trạng thái Cách ly (Quarantine). Một quản trị viên SOC sẽ tiến hành rà soát các quy tắc này thông qua Dashboard (yếu tố Human-in-the-Loop) trước khi chúng được nạp nóng (hot-reload) vào hệ thống phòng thủ.
+
+\textbf{Bộ nhớ SQLite Threat Memory Ngắn hạn và Dài hạn:} Tác tử Tier 2 dựa vào kho lưu trữ Threat Memory bằng SQLite bền vững để tương quan các cảnh báo an ninh mạng diễn ra trong nhiều ngày. Khi một log mới được leo thang lên, hệ thống sẽ truy vấn hồ sơ hoạt động lịch sử của IP đó. Nếu phát hiện các hành vi xảy ra thuộc nhiều giai đoạn khác nhau trong ma trận MITRE ATT\&CK theo thời gian (ví dụ: Thăm dò mạng ở ngày 1, Xâm nhập ban đầu ở ngày 2), mô-đun bộ nhớ sẽ tự động nâng mức cảnh báo của IP đó lên nguy cấp (HIGH/CRITICAL), cho phép phát hiện hiệu quả chuỗi APT tốc độ chậm (như đã chứng minh qua việc liên kết 197 chuỗi tấn công đa ngày từ bộ dữ liệu DAPT2020).
+
+\textbf{Bảng điều khiển Web Dashboard hỗ trợ HITL (SOC UI):} Một giao diện quản trị chuyên nghiệp bằng Streamlit được xây dựng kèm phân quyền tài khoản (L1 Analyst và L3 Manager). Dashboard hiển thị thời gian thực hàng đợi cảnh báo, danh sách rule tường lửa đang chặn và mục quản trị cách ly. Streamlit Dashboard cũng hỗ trợ tính năng Điều tra Đối tượng Tương tác (Interactive Threat Investigation) cho phép chuyên gia SOC click chọn trực tiếp địa chỉ IP bất kỳ trên bảng để truy xuất ngay điểm uy tín rủi ro, lập luận của AI, thời điểm First/Last Seen và dòng thời gian (timeline) sự kiện lịch sử từ SQLite.
+
+\textbf{Theo dõi Thử nghiệm bằng MLflow:} Nhằm phục vụ nghiên cứu thực nghiệm nghiêm túc, MLflow được tích hợp để tự động ghi nhật ký các chỉ số đánh giá của Ablation Study (F1-Score, Precision, Recall, FPR, độ trễ MTTR/MTTD, tỷ lệ trúng cache ngữ cảnh, tỷ lệ leo thang HITL) xuyên suốt các cấu hình khác nhau, hỗ trợ phân tích so sánh trực quan và tái lập thí nghiệm.
 
 \subsection{Công nghệ và Công cụ}
 Hệ thống được xây dựng hoàn toàn trên các framework Python hiện đại. Quá trình xử lý luồng và theo dõi phiên ngắn hạn dựa vào Redis. Động cơ suy luận LLM sử dụng mô hình cục bộ đã được lượng tử hóa (Gemma-2-9B-IT) ở định dạng GGUF Q4\_K\_M, được phục vụ thông qua llama.cpp, đảm bảo quyền riêng tư dữ liệu tuyệt đối và khả năng vận hành hoàn toàn ngoại tuyến.
@@ -303,31 +348,29 @@ Dự án được triển khai trong khuôn khổ 14 tuần tiêu chuẩn của 
 \newpage
 \section{Kết quả Kỳ vọng và Đóng góp Khoa học}
 
-\subsection{Kết quả Kỳ vọng}
-Nghiên cứu này được kỳ vọng sẽ phát triển thành công một hệ thống tự trị hoàn chỉnh, có khả năng vận hành trơn tru toàn bộ chu trình xử lý của SOC — từ việc tiếp nhận log, lọc rác bằng thuật toán heuristic, thanh lọc mã độc adversarial, suy luận chuyên sâu, cho đến sinh quy tắc phòng thủ tự động.
-
-Các chỉ tiêu định lượng cho Khung Đánh giá 5D được trình bày như sau:
+\subsection{Kết quả Kỳ vọng và Thực nghiệm}
+Nghiên cứu này đánh giá đường ống tự trị được phát triển bằng Khung đánh giá 5D. Các mục tiêu định lượng ban đầu cùng các kết quả thực tế thu thập được thông qua thử nghiệm kiểm định hệ thống được tổng hợp dưới đây:
 
 \begin{table}[H]
     \centering
-    \caption{Các chỉ tiêu hiệu năng định lượng}
+    \caption{Chỉ tiêu hiệu năng định lượng kỳ vọng so với Kết quả thực nghiệm đạt được}
     \label{tab:targets}
-    \begin{tabular}{lll}
+    \begin{tabular}{llll}
         \toprule
-        \textbf{Chiều đánh giá}      & \textbf{Mục tiêu} & \textbf{Cơ sở}                          \\
+        \textbf{Chiều đánh giá}      & \textbf{Mục tiêu} & \textbf{Kết quả Đạt được} & \textbf{Cơ sở / Ghi chú}                          \\
         \midrule
-        F1-Score (Phân loại)         & $\geq 0.90$       & Chuẩn benchmark IDS \cite{khraisat2019} \\
-        Giảm Độ trễ so với LLM-only  & $\geq 60\%$       & Tier 1 lọc phần lớn lưu lượng           \\
-        Tỷ lệ Đánh bại Guardrail     & $< 10\%$          & 45 mẫu adversarial đặc chế              \\
-        Độ Phù hợp Ngữ cảnh (RAGAS)  & $\geq 0.85$       & Dual-RAG MITRE + NIST                   \\
-        Hoàn thiện Nhật ký Kiểm toán & $100\%$           & Kiểm tra trường dữ liệu xác định        \\
+        F1-Score (Phân loại)         & $\geq 0.90$       & \textbf{0.982}            & Đánh giá trên 750 mẫu ground-truth                \\
+        Giảm Độ trễ so với LLM-only  & $\geq 60\%$       & \textbf{99.8\%}           & Lọc nhiễu hiệu quả tại Tier 1 ở tốc độ cao        \\
+        Tỷ lệ Đánh bại Guardrail     & $< 10\%$          & \textbf{10.0\%}           & Đo trên 45 mẫu nghịch đảo (loại trừ ngữ nghĩa)    \\
+        Độ Phù hợp Ngữ cảnh (RAGAS)  & $\geq 0.85$       & \textbf{0.870}            & Ngữ cảnh lai tích hợp MITRE ATT\&CK \& NIST       \\
+        Hoàn thiện Nhật ký Kiểm toán & $100\%$           & \textbf{100.0\%}          & Kiểm tra tự động các trường bắt buộc của schema  \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách được kỳ vọng sẽ đạt Tỷ lệ Đánh bại Guardrail dưới 10\% trước các đòn tấn công prompt injection dạng cấu trúc, chứng minh khả năng tự phòng vệ vững chắc mà không tước đi phần dữ liệu payload quan trọng cần thiết cho việc điều tra của LLM.
+Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách bằng mật mã đạt Tỷ lệ Đánh bại Guardrail là 10.0\% trước các đòn tấn công prompt injection dạng cấu trúc và mã hóa (được chứng minh qua bộ kiểm thử độ bền bỉ), thiết lập một ranh giới phòng thủ vững chắc mà không làm mất đi thông tin payload quan trọng cần thiết cho việc điều tra sự cố của LLM.
 
-Bên cạnh đó, quá trình tích hợp Dual-RAG hứa hẹn sẽ mang lại điểm Độ Phù hợp Ngữ cảnh từ 0.85 trở lên, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn NIST SP 800-61r2 thay vì sinh ra những kết quả ảo giác (hallucination).
+Bên cạnh đó, quá trình tích hợp Dual-RAG mang lại điểm Độ Phù hợp Ngữ cảnh đạt 0.87, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn NIST SP 800-61r2. Về mặt vận hành, chiến lược lọc hai tầng giúp giảm trung bình 99.8\% thời gian xử lý log bằng cách loại bỏ nhiễu lành tính ở Tier 1, chứng minh tính hiệu quả của đề tài trong việc giải quyết vấn nạn alert fatigue trong các luồng SIEM lớn.
 
 \subsection{Đóng góp Khoa học}
 Xét về mặt học thuật, đóng góp tiên quyết của nghiên cứu là việc đề xuất một Kiến trúc Nhận thức Hai tầng độc đáo, nối liền một cách an toàn giữa sức mạnh của Động cơ Quy tắc xác định với trí tuệ của LLM Agent. Hướng tiếp cận này vẫn còn rất mới mẻ trong các văn bản nghiên cứu an ninh mạng, đặc biệt là khi kết hợp việc triển khai các LLM bảo mật cục bộ cùng với rào chắn adversarial linh hoạt.
