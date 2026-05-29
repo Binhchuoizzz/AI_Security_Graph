@@ -27,3 +27,15 @@ knowledge_base/faiss_index/*_metadata.json
 *.md
 !README.md
 !**/README.md
+
+# Large binary data files
+data/raw/*.pcap
+
+# Demo output logs
+demo_outputs/pipeline_summary.md
+demo_outputs/TEST_REPORT.md
+demo_outputs/vulnerability_report.md
+
+# LaTeX compile logs
+docs/proposal_latex/compile_*.log
+
