@@ -56,6 +56,10 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
         except ValueError:
             pass
 
+    # Xử lý chống Stored XSS cho các biến trích xuất động
+    mitre_tech = html_lib.escape(mitre_tech)
+    confidence = html_lib.escape(confidence)
+
     # Phân cấp mức độ nghiêm trọng (Severity) dựa trên Risk Score & Action
     severity_level = "INFO"
     css_class = "severity-info"
@@ -156,6 +160,10 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
         else:
             # IP đã được Whitelist rồi
             st.button(f"✅ Đã Whitelist IP: {cleaned_target}", key=f"wl_btn_done_{cleaned_target}_{timestamp}", disabled=True, help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).")
+
+    # Hiển thị log gốc JSON phục vụ việc kiểm tra sâu của SOC Analysts
+    with st.expander("🔍 Xem Log gốc (Raw JSON)", expanded=False):
+        st.json(alert)
 
 
 

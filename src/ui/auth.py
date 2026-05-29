@@ -14,10 +14,11 @@ import streamlit as st
 import hashlib
 import os
 import time
+from src.response.executor import get_login_attempts, increment_login_attempts, reset_login_attempts, lock_user
 
 # Password Hashing Strategy: PBKDF2-HMAC-SHA256 (NIST Approved)
-# Salt co dinh cho demo, trong Production nen dung unique salt moi user.
-SALT = b"sentinel_security_2026_salt"
+# Dung muoi tu bien moi truong, neu khong co thi dung muoi mac dinh an toan
+SALT = os.getenv("SENTINEL_AUTH_SALT", "sentinel_security_2026_default_salt").encode()
 ITERATIONS = 100000
 
 def hash_password(password: str) -> str:
@@ -53,18 +54,6 @@ def login_screen():
     st.title("🛡️ SENTINEL - Trung tâm Giám sát An ninh SOC")
     st.caption("Chỉ dành cho nhân viên SOC được ủy quyền. Mọi hoạt động truy cập đều được ghi nhật ký và giám sát.")
 
-    # Kiem tra lockout
-    if "login_attempts" not in st.session_state:
-        st.session_state["login_attempts"] = 0
-        st.session_state["lockout_until"] = 0
-
-    if time.time() < st.session_state.get("lockout_until", 0):
-        remaining = int(st.session_state["lockout_until"] - time.time())
-        st.error(
-            f"Tài khoản bị khóa tạm thời do nhập sai quá nhiều lần. Vui lòng thử lại sau {remaining} giây."
-        )
-        return
-
     with st.form("login_form"):
         username = st.text_input("Tên đăng nhập", placeholder="Nhập tài khoản SOC của bạn")
         password = st.text_input(
@@ -75,6 +64,16 @@ def login_screen():
         if submit:
             clean_username = username.strip()
             clean_password = password.strip()
+            
+            # 1. Kiem tra persistent lockout truoc tu database
+            attempts, lockout_until = get_login_attempts(clean_username)
+            if time.time() < lockout_until:
+                remaining = int(lockout_until - time.time())
+                st.error(
+                    f"Tài khoản `{clean_username}` bị khóa tạm thời do nhập sai quá nhiều lần. Vui lòng thử lại sau {remaining} giây."
+                )
+                return
+
             input_hash = hash_password(clean_password)
             user = USERS.get(clean_username)
 
@@ -82,23 +81,24 @@ def login_screen():
                 st.session_state["authenticated"] = True
                 st.session_state["role"] = user["role"]
                 st.session_state["username"] = clean_username
-                st.session_state["login_attempts"] = 0
+                # Reset attempts khi thanh cong
+                reset_login_attempts(clean_username)
                 st.rerun()
             else:
-                st.session_state["login_attempts"] += 1
-                remaining_attempts = (
-                    MAX_LOGIN_ATTEMPTS - st.session_state["login_attempts"]
-                )
+                # Tang attempt và lock neu vuot nguong
+                cur_attempts = increment_login_attempts(clean_username)
+                remaining_attempts = MAX_LOGIN_ATTEMPTS - cur_attempts
 
                 if remaining_attempts <= 0:
-                    st.session_state["lockout_until"] = time.time() + LOCKOUT_SECONDS
+                    lock_user(clean_username, LOCKOUT_SECONDS)
                     st.error(
-                        f"Nhập sai quá nhiều lần. Tài khoản bị khóa trong {LOCKOUT_SECONDS} giây."
+                        f"Nhập sai quá nhiều lần. Tài khoản `{clean_username}` bị khóa trong {LOCKOUT_SECONDS} giây."
                     )
                 else:
                     st.error(
                         f"Thông tin đăng nhập không chính xác. Còn lại {remaining_attempts} lần thử."
                     )
+
 
 
 def _constant_time_compare(a: str, b: str) -> bool:

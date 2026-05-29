@@ -16,9 +16,11 @@ from streamlit_autorefresh import st_autorefresh
 
 from src.ui.auth import require_auth, logout
 from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables, render_apt_events_table, is_valid_ip
-from src.response.executor import get_audit_trail, get_audit_trail_for_ip
+from src.response.executor import get_audit_trail, get_audit_trail_for_ip, verify_audit_trail_integrity
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.agent.threat_memory import threat_memory
+import html
+
 
 # Cấu hình trang
 st.set_page_config(
@@ -120,6 +122,36 @@ def main_dashboard():
                 st.error(f"Lỗi khi reset: {e}")
 
         st.markdown("---")
+        st.markdown("### 🛡️ Nhật ký An toàn & Toàn vẹn")
+        if st.button("🛡️ Kiểm tra tính toàn vẹn Logs (HMAC Audit)", help="Xác minh chuỗi băm HMAC Ledger để phát hiện giả mạo dữ liệu"):
+            is_valid, msg = verify_audit_trail_integrity()
+            if is_valid:
+                st.success(msg)
+            else:
+                st.error(msg)
+
+        st.markdown("---")
+        st.markdown("### 📟 Live System Console Logs")
+        
+        # Lấy 10 log mới nhất để hiển thị kiểu terminal nhấp nháy
+        console_logs = get_audit_trail(limit=10)
+        if not console_logs:
+            console_html = '<div class="console-box"><div class="console-line blink">> Waiting for system events...</div></div>'
+        else:
+            console_lines = []
+            for log in reversed(console_logs):
+                t_str = log.get("timestamp", "").split(" ")[-1]  # Lấy phần HH:MM:SS
+                act = log.get("action", "LOG")
+                tgt = log.get("target", "N/A")
+                tgt_safe = html.escape(str(tgt))
+                console_lines.append(f'<div class="console-line">> [{t_str}] {act} -> {tgt_safe}</div>')
+            # Thêm dòng blink ở cuối cùng
+            console_lines.append('<div class="console-line blink">> _</div>')
+            console_html = f'<div class="console-box">{"".join(console_lines)}</div>'
+        
+        st.markdown(console_html, unsafe_allow_html=True)
+
+        st.markdown("---")
         st.markdown("### 📖 Thuật ngữ & Kiến trúc SOC")
         glossary_html = (
             f'<div class="glossary-box">'
@@ -175,6 +207,28 @@ def main_dashboard():
     ])
 
     with tab1:
+        # Biểu đồ Live SOC Analytics dạng collapsible
+        with st.expander("📊 Phân tích số liệu & Biểu đồ SIEM (Live Analytics)", expanded=True):
+            if not all_alerts:
+                st.info("Chưa có đủ dữ liệu sự cố để vẽ biểu đồ phân tích.")
+            else:
+                try:
+                    df_alerts = pd.DataFrame(all_alerts)
+                    df_alerts['hour'] = df_alerts['timestamp'].apply(lambda x: str(x)[5:16])
+                    
+                    col_chart1, col_chart2 = st.columns(2)
+                    with col_chart1:
+                        st.markdown("##### 📈 Xu hướng Sự cố theo Thời gian (Timeline)")
+                        trend_df = df_alerts.groupby('hour').size().reset_index(name='Số lượng')
+                        trend_df = trend_df.sort_values('hour')
+                        st.area_chart(trend_df.set_index('hour'), y='Số lượng', height=200, width='stretch')
+                    with col_chart2:
+                        st.markdown("##### 📊 Phân bổ Cảnh báo theo Hành động (Distribution)")
+                        action_df = df_alerts.groupby('action').size().reset_index(name='Số lượng')
+                        st.bar_chart(action_df.set_index('action'), y='Số lượng', height=200, width='stretch')
+                except Exception as e:
+                    st.write("Không thể vẽ biểu đồ phân tích SIEM:", e)
+
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
         
         # Xuất dữ liệu CSV để lưu trữ lịch sử
@@ -380,6 +434,13 @@ def main_dashboard():
                     latest_reason = re.sub(r'\[MITRE:\s*[^\]]*\]', '', latest_reason)
                     latest_reason = re.sub(r'\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]', '', latest_reason).strip()
                 
+                # Xử lý chống Stored XSS cho giao diện HTML tùy chỉnh
+                safe_ip = html.escape(str(selected_ip))
+                safe_latest_reason = html.escape(str(latest_reason))
+                safe_first_seen = html.escape(str(ip_rep.get("first_seen", "N/A"))) if ip_rep else "N/A"
+                safe_last_seen = html.escape(str(ip_rep.get("last_seen", "N/A"))) if ip_rep else "N/A"
+                safe_last_mitre = html.escape(str(ip_rep.get("last_mitre_technique") or "T1190")) if ip_rep else "T1190"
+
                 if ip_rep:
                     # Phân cấp mức độ nguy hại
                     severity_level = "CRITICAL" if rep_score >= 50 else "HIGH" if rep_score >= 20 else "MEDIUM"
@@ -389,8 +450,8 @@ def main_dashboard():
                     profile_html = (
                         f'<div class="soc-card {severity_class}">'
                         f'  <div class="soc-card-header">'
-                        f'    <h4 class="soc-card-title">{severity_icon} [{severity_level}] Hồ sơ đối tượng: {selected_ip}</h4>'
-                        f'    <span class="soc-timestamp">Phát hiện lần đầu: {ip_rep.get("first_seen", "N/A")}</span>'
+                        f'    <h4 class="soc-card-title">{severity_icon} [{severity_level}] Hồ sơ đối tượng: {safe_ip}</h4>'
+                        f'    <span class="soc-timestamp">Phát hiện lần đầu: {safe_first_seen}</span>'
                         f'  </div>'
                         f'  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px;">'
                         f'    <div><b>Điểm nguy hại (Reputation):</b> <span class="soc-value-code" style="color: #ff4d4f; font-weight: bold;">{rep_score:.1f}/100</span></div>'
@@ -398,11 +459,11 @@ def main_dashboard():
                         f'    <div><b>Số lần bị chặn (Blocks):</b> <span class="soc-value-code" style="color: #ff7875;">{ip_rep.get("total_blocks", 0)}</span></div>'
                         f'    <div><b>Số lần cảnh báo (Alerts):</b> <span class="soc-value-code" style="color: #ffd666;">{ip_rep.get("total_alerts", 0)}</span></div>'
                         f'  </div>'
-                        f'  <div style="margin-bottom: 8px;"><b>Hoạt động gần nhất:</b> {ip_rep.get("last_seen", "N/A")}</div>'
-                        f'  <div style="margin-bottom: 12px;"><b>Kỹ thuật MITRE cuối cùng:</b> <code style="background: rgba(138,43,226,0.15); padding: 2px 6px; border-radius: 4px; color: #D3ADF7;">{ip_rep.get("last_mitre_technique") or "T1190"}</code></div>'
+                        f'  <div style="margin-bottom: 8px;"><b>Hoạt động gần nhất:</b> {safe_last_seen}</div>'
+                        f'  <div style="margin-bottom: 12px;"><b>Kỹ thuật MITRE cuối cùng:</b> <code style="background: rgba(138,43,226,0.15); padding: 2px 6px; border-radius: 4px; color: #D3ADF7;">{safe_last_mitre}</code></div>'
                         f'  <div class="soc-reasoning-box">'
                         f'    <div class="soc-reasoning-title">❓ Tại sao IP này bị đưa vào danh sách đen:</div>'
-                        f'    <div>{latest_reason}</div>'
+                        f'    <div>{safe_latest_reason}</div>'
                         f'  </div>'
                         f'</div>'
                     )
@@ -411,7 +472,7 @@ def main_dashboard():
                     profile_html = (
                         f'<div class="soc-card severity-medium">'
                         f'  <div class="soc-card-header">'
-                        f'    <h4 class="soc-card-title">🧑‍💻 [MEDIUM] Hồ sơ đối tượng: {selected_ip}</h4>'
+                        f'    <h4 class="soc-card-title">🧑‍💻 [MEDIUM] Hồ sơ đối tượng: {safe_ip}</h4>'
                         f'    <span class="soc-timestamp">Phát hiện lần đầu: N/A</span>'
                         f'  </div>'
                         f'  <div style="margin-bottom: 8px;">IP này được phát hiện tham gia chuỗi tấn công APT từ tập dữ liệu DAPT2020 nhưng chưa phát sinh cảnh báo chặn trên luồng trực tuyến.</div>'
