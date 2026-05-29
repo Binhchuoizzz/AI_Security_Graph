@@ -242,14 +242,21 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
 
 
 def get_login_attempts(username: str) -> tuple[int, float]:
-    """Tra ve (attempts, lockout_until) cho mot username."""
+    """Tra ve (attempts, lockout_until) cho mot username. Tu dong reset neu thoi gian lockout da het."""
     try:
+        import time
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute("SELECT attempts, lockout_until FROM login_attempts WHERE username = ?", (username,))
             row = c.fetchone()
             if row:
-                return row[0], row[1]
+                attempts, lockout_until = row[0], row[1]
+                if lockout_until > 0.0 and time.time() >= lockout_until:
+                    # Lockout da het han, tu dong reset so lan thu
+                    c.execute("UPDATE login_attempts SET attempts = 0, lockout_until = 0.0 WHERE username = ?", (username,))
+                    conn.commit()
+                    return 0, 0.0
+                return attempts, lockout_until
             return 0, 0.0
     except Exception:
         return 0, 0.0

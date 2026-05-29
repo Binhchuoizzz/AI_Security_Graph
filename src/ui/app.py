@@ -20,6 +20,7 @@ from src.response.executor import get_audit_trail, get_audit_trail_for_ip, verif
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.agent.threat_memory import threat_memory
 import html
+import json
 
 
 # Cấu hình trang
@@ -199,11 +200,12 @@ def main_dashboard():
     # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
     render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules), raw_logs_count)
 
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Nhật ký SIEM & Audit Trail", 
         "🧑‍💻 Phê duyệt Luật (HITL)", 
         "🎯 Giám sát APT & Threat Intel",
-        "🔒 Quản lý Blocklist & Whitelist"
+        "🔒 Quản lý Blocklist & Whitelist",
+        "🔍 Lỗ hổng & Tri thức Graph"
     ])
 
     with tab1:
@@ -738,6 +740,166 @@ def main_dashboard():
                                 st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
                                 time.sleep(0.5)
                                 st.rerun()
+
+    with tab5:
+        st.subheader("🔍 Quản lý Lỗ hổng & Tri thức Graph (Vulnerabilities & Graph)")
+        
+        # 1. Nút bấm Quét Lỗ Hổng Hệ thống
+        col_scan_btn, col_integrity_btn = st.columns([1, 1])
+        with col_scan_btn:
+            if st.button("⚡ Chạy Quét Lỗ Hổng (Run Trivy Scan)", help="Kích hoạt quét Trivy và tự động xây dựng Knowledge Graph trong Neo4j"):
+                with st.spinner("Đang chạy quét lỗ hổng Trivy (có thể mất vài giây)..."):
+                    try:
+                        from main import run_vulnerability_scan, build_knowledge_graph
+                        run_vulnerability_scan()
+                        build_knowledge_graph()
+                        st.success("✅ Quét lỗ hổng và cập nhật Knowledge Graph Neo4j thành công!")
+                        time.sleep(0.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Lỗi khi chạy quét lỗ hổng: {e}")
+        
+        with col_integrity_btn:
+            # 2. Gọi verify_document_integrity() kiểm định tài liệu RAG
+            if st.button("🛡️ Kiểm tra tính toàn vẹn tài liệu (RAG Integrity Check)", help="Xác minh SHA-256 của các tệp Knowledge Base chống RAG Poisoning"):
+                with st.spinner("Đang kiểm định tệp RAG..."):
+                    from src.rag.security import verify_document_integrity
+                    res = verify_document_integrity()
+                    if res.get("verified", False):
+                        st.success("✅ Toàn bộ tài liệu RAG an toàn & khớp mã băm SHA-256!")
+                    else:
+                        st.error("⚠️ PHÁT HIỆN LỖI TOÀN VẸN TÀI LIỆU RAG! Có thể tệp KB bị sửa đổi trái phép.")
+                    with st.expander("Chi tiết kiểm định tài liệu", expanded=True):
+                        for detail in res.get("details", []):
+                            st.write(f"- {detail}")
+
+        # 3. Đọc dữ liệu từ data/trivy-results.json để thống kê và hiển thị
+        trivy_path = "data/trivy-results.json"
+        has_vulns = False
+        vuln_list = []
+        if os.path.exists(trivy_path):
+            try:
+                with open(trivy_path, "r") as f:
+                    trivy_data = json.load(f)
+                results = trivy_data.get("Results", [])
+                for res in results:
+                    target = res.get("Target", "Unknown")
+                    vulnerabilities = res.get("Vulnerabilities", [])
+                    for v in vulnerabilities:
+                        vuln_list.append({
+                            "Target": target,
+                            "CVE ID": v.get("VulnerabilityID", "N/A"),
+                            "Package": v.get("PkgName", "N/A"),
+                            "Installed": v.get("InstalledVersion", "N/A"),
+                            "Severity": v.get("Severity", "UNKNOWN").upper(),
+                            "Description": v.get("Description", "No description provided.")
+                        })
+                has_vulns = len(vuln_list) > 0
+            except Exception as e:
+                st.warning(f"Không thể đọc kết quả Trivy: {e}")
+
+        # 4. Thống kê KPI Lỗ hổng
+        if has_vulns:
+            sev_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
+            for v in vuln_list:
+                sev = v["Severity"]
+                if sev in sev_counts:
+                    sev_counts[sev] += 1
+                else:
+                    sev_counts["UNKNOWN"] += 1
+            
+            st.markdown(f"""
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 16px; margin-bottom: 24px;">
+                <div style="background: rgba(255, 77, 79, 0.1); border: 1px solid rgba(255, 77, 79, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{sev_counts['CRITICAL']}</div>
+                    <div style="font-size: 0.8rem; color: #ff7875; font-weight: 600;">CRITICAL</div>
+                </div>
+                <div style="background: rgba(250, 140, 22, 0.1); border: 1px solid rgba(250, 140, 22, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #fa8c16;">{sev_counts['HIGH']}</div>
+                    <div style="font-size: 0.8rem; color: #ffa940; font-weight: 600;">HIGH</div>
+                </div>
+                <div style="background: rgba(250, 219, 20, 0.1); border: 1px solid rgba(250, 219, 20, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #fadb14;">{sev_counts['MEDIUM']}</div>
+                    <div style="font-size: 0.8rem; color: #ffe58f; font-weight: 600;">MEDIUM</div>
+                </div>
+                <div style="background: rgba(24, 144, 255, 0.1); border: 1px solid rgba(24, 144, 255, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #1890ff;">{sev_counts['LOW']}</div>
+                    <div style="font-size: 0.8rem; color: #69c0ff; font-weight: 600;">LOW</div>
+                </div>
+                <div style="background: rgba(140, 140, 140, 0.1); border: 1px solid rgba(140, 140, 140, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: #8c8c8c;">{len(vuln_list)}</div>
+                    <div style="font-size: 0.8rem; color: #bfbfbf; font-weight: 600;">TOTAL VULNS</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Bảng lỗ hổng
+            df_vulns = pd.DataFrame(vuln_list)
+            st.markdown("##### 📦 Chi tiết các lỗ hổng phát hiện được (Trivy Scan)")
+            
+            def color_sev(val):
+                color = '#ff4d4f' if val == 'CRITICAL' else '#fa8c16' if val == 'HIGH' else '#fadb14' if val == 'MEDIUM' else '#1890ff'
+                return f'color: {color}; font-weight: bold; font-family: monospace;'
+
+            from typing import Any, cast
+            vuln_selection = st.dataframe(
+                cast(Any, df_vulns.style.map(color_sev, subset=["Severity"])),
+                on_select="rerun",
+                selection_mode="single-row",
+                key="trivy_vulns_table_select",
+                width="stretch"
+            )
+            
+            # Khi chọn dòng lỗ hổng, hiện thông tin chi tiết
+            selected_vuln_idx = None
+            if vuln_selection and "selection" in vuln_selection and vuln_selection["selection"]["rows"]:
+                selected_vuln_idx = vuln_selection["selection"]["rows"][0]
+                
+            if selected_vuln_idx is not None:
+                v = vuln_list[selected_vuln_idx]
+                st.markdown("---")
+                st.markdown(f"#### 🔍 Chi tiết lỗ hổng: `{v['CVE ID']}`")
+                st.markdown(f"**Tập tin bị ảnh hưởng:** `{v['Target']}`")
+                st.markdown(f"**Gói thư viện:** `{v['Package']}` (Đang dùng: `{v['Installed']}`)")
+                st.markdown(f"**Mức độ nguy hại:** `{v['Severity']}`")
+                st.info(f"**Mô tả:** {v['Description']}")
+                
+            # 5. Vẽ biểu đồ Knowledge Graph (Neo4j Visual Tree)
+            st.markdown("---")
+            st.markdown("##### 🧬 Biểu đồ Tri thức Lỗ hổng (Vulnerability Knowledge Graph)")
+            
+            # Xây dựng DOT code động dựa trên lỗ hổng thực tế để vẽ sơ đồ đẹp mắt
+            dot_lines = [
+                'digraph G {',
+                '    background="transparent";',
+                '    rankdir=LR;',
+                '    node [color="#ffffff", fontcolor="#ffffff", style=filled, fillcolor="#112240", fontname="sans-serif", shape=box, rx=5];',
+                '    edge [color="#888888", fontcolor="#888888", fontname="sans-serif", fontsize=10];',
+                '    ',
+                '    // Nodes',
+                '    SOC [label="SENTINEL_SOC\\n(Main Application)", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"];'
+            ]
+            
+            # Thêm tối đa 8 SubComponents và Vulnerabilities để sơ đồ không bị rối mắt
+            subcomponents = set()
+            for v in vuln_list[:8]:
+                target_clean = v["Target"].replace(".", "_").replace("/", "_").replace("-", "_")
+                if v["Target"] not in subcomponents:
+                    subcomponents.add(v["Target"])
+                    dot_lines.append(f'    {target_clean} [label="{v["Target"]}", fillcolor="#14c2c2", color="#14c2c2"];')
+                    dot_lines.append(f'    SOC -> {target_clean} [label="CONTAINS"];')
+                
+                cve_clean = v["CVE ID"].replace("-", "_")
+                color = "#ff4d4f" if v["Severity"] == "CRITICAL" else "#fa8c16" if v["Severity"] == "HIGH" else "#fadb14" if v["Severity"] == "MEDIUM" else "#1890ff"
+                dot_lines.append(f'    {cve_clean} [label="{v["CVE ID"]}\\n({v["Severity"]})", fillcolor="#1d39c4", color="{color}"];')
+                dot_lines.append(f'    {target_clean} -> {cve_clean} [label="HAS_VULN"];')
+                
+            dot_lines.append('}')
+            dot_code = "\n".join(dot_lines)
+            st.graphviz_chart(dot_code, width="stretch")
+            
+        else:
+            st.info("Chưa có kết quả quét lỗ hổng. Vui lòng bấm '⚡ Chạy Quét Lỗ Hổng' ở trên để phân tích hệ thống.")
 
 if __name__ == "__main__":
     main_dashboard()
