@@ -83,7 +83,6 @@ def login_screen():
                 st.session_state["role"] = user["role"]
                 st.session_state["username"] = clean_username
                 st.session_state["login_attempts"] = 0
-                st.query_params["auth_user"] = clean_username
                 st.rerun()
             else:
                 st.session_state["login_attempts"] += 1
@@ -113,25 +112,13 @@ def _constant_time_compare(a: str, b: str) -> bool:
 
 
 def require_auth():
-    """Ham bao boc de bat buoc dang nhap truoc khi xem app."""
-    # Khoi phuc session neu co query param sau khi an F5
-    if "auth_user" in st.query_params:
-        username = st.query_params["auth_user"]
-        user = USERS.get(username)
-        if user:
-            st.session_state["authenticated"] = True
-            st.session_state["role"] = user["role"]
-            st.session_state["username"] = username
-
+    """Hàm bao bọc để bắt buộc đăng nhập trước khi xem app."""
     if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
         login_screen()
         st.stop()
 
 
 def logout():
-    """Huy session hien tai."""
-    if "auth_user" in st.query_params:
-        del st.query_params["auth_user"]
-    for key in ["authenticated", "role", "username"]:
-        st.session_state[key] = None
+    """Hủy session hiện tại và xóa sạch state."""
+    st.session_state.clear()
     st.rerun()
