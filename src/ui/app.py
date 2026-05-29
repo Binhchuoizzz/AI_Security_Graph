@@ -221,12 +221,12 @@ def main_dashboard():
                     col_chart1, col_chart2 = st.columns(2)
                     with col_chart1:
                         st.markdown("##### 📈 Xu hướng Sự cố theo Thời gian (Timeline)")
-                        trend_df = df_alerts.groupby('hour').size().reset_index(name='Số lượng')
+                        trend_df = df_alerts.groupby('hour').size().to_frame(name='Số lượng').reset_index()
                         trend_df = trend_df.sort_values('hour')
                         st.area_chart(trend_df.set_index('hour'), y='Số lượng', height=200, width='stretch')
                     with col_chart2:
                         st.markdown("##### 📊 Phân bổ Cảnh báo theo Hành động (Distribution)")
-                        action_df = df_alerts.groupby('action').size().reset_index(name='Số lượng')
+                        action_df = df_alerts.groupby('action').size().to_frame(name='Số lượng').reset_index()
                         st.bar_chart(action_df.set_index('action'), y='Số lượng', height=200, width='stretch')
                 except Exception as e:
                     st.write("Không thể vẽ biểu đồ phân tích SIEM:", e)
@@ -604,8 +604,10 @@ def main_dashboard():
                 )
 
                 selected_block_ip = None
-                if block_selection and "selection" in block_selection and block_selection["selection"]["rows"]:
-                    selected_row_idx = block_selection["selection"]["rows"][0]
+                block_select_data = block_selection.get("selection", {}) if block_selection else {}
+                block_rows = block_select_data.get("rows", [])
+                if block_rows:
+                    selected_row_idx = block_rows[0]
                     selected_block_ip = df_blocks.iloc[selected_row_idx]["Địa chỉ IP"]
                 
                 # Nếu người dùng đã chọn một IP
@@ -852,8 +854,10 @@ def main_dashboard():
             
             # Khi chọn dòng lỗ hổng, hiện thông tin chi tiết
             selected_vuln_idx = None
-            if vuln_selection and "selection" in vuln_selection and vuln_selection["selection"]["rows"]:
-                selected_vuln_idx = vuln_selection["selection"]["rows"][0]
+            vuln_select_data = vuln_selection.get("selection", {}) if vuln_selection else {}
+            vuln_rows = vuln_select_data.get("rows", [])
+            if vuln_rows:
+                selected_vuln_idx = vuln_rows[0]
                 
             if selected_vuln_idx is not None:
                 v = vuln_list[selected_vuln_idx]

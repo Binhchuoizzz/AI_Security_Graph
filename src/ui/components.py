@@ -234,8 +234,10 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
                 key="threat_actor_table_select"
             )
             
-            if selection and "selection" in selection and selection["selection"]["rows"]:
-                row_idx = selection["selection"]["rows"][0]
+            select_data = selection.get("selection", {}) if selection else {}
+            rows = select_data.get("rows", [])
+            if rows:
+                row_idx = rows[0]
                 selected_ip = df_high_risk.iloc[row_idx]["Địa chỉ IP"]
 
     with col2:
@@ -276,7 +278,9 @@ def render_apt_events_table(events):
     )
     
     selected_ip = None
-    if selection and "selection" in selection and selection["selection"]["rows"]:
-        row_idx = selection["selection"]["rows"][0]
+    select_data = selection.get("selection", {}) if selection else {}
+    rows = select_data.get("rows", [])
+    if rows:
+        row_idx = rows[0]
         selected_ip = df.iloc[row_idx]["IP Nguồn"]
     return selected_ip
