@@ -58,10 +58,73 @@ Ensure the JSON is perfectly valid and contains no markdown formatting (like ```
 """
 
 
+def load_few_shot_feedback_context() -> str:
+    """
+    Đọc các dynamic_rules từ system_settings.yaml để sinh context few-shot.
+    ACTIVE rules -> Mẫu tấn công được con người phê duyệt chặn.
+    REJECTED rules -> Mẫu cảnh báo sai (False Positive) bị con người từ chối.
+    """
+    import os
+    import yaml
+    
+    config_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+    )
+    if not os.path.exists(config_path):
+        return ""
+        
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+            
+        rules = config.get("tier1", {}).get("dynamic_rules", [])
+        if not rules:
+            return ""
+            
+        approved_examples = []
+        rejected_examples = []
+        
+        for rule in rules:
+            status = rule.get("status", "ACTIVE")
+            field = rule.get("field")
+            pattern = rule.get("pattern")
+            reason = rule.get("reason", "Không có lý do chi tiết")
+            
+            if status == "ACTIVE":
+                approved_examples.append(
+                    f"- Nếu log chứa {field} = '{pattern}': Đây là MỐI ĐE DỌA đã được phê duyệt chặn. "
+                    f"Hành động đề xuất: BLOCK_IP. Lý do: {reason}."
+                )
+            elif status == "REJECTED":
+                rejected_examples.append(
+                    f"- Nếu log chứa {field} = '{pattern}': Đây là CẢNH BÁO SAI (False Positive) đã bị bác bỏ bởi Analyst. "
+                    f"Hành động đề xuất: LOG hoặc whitelist. KHÔNG chặn IP. Lý do: {reason}."
+                )
+                
+        context_parts = []
+        if approved_examples:
+            context_parts.append("Các mẫu TẤN CÔNG XÁC THỰC đã được con người phê duyệt:")
+            context_parts.extend(approved_examples[:5]) # Giới hạn tối đa 5 ví dụ
+        if rejected_examples:
+            context_parts.append("\nCác mẫu CẢNH BÁO SAI (False Positive) đã bị con người bác bỏ:")
+            context_parts.extend(rejected_examples[:5]) # Giới hạn tối đa 5 ví dụ
+            
+        if context_parts:
+            return "\n=== ACTIVE LEARNING: HUMAN FEEDBACK & HISTORICAL DECISIONS ===\n" + "\n".join(context_parts)
+    except Exception:
+        pass
+    return ""
+
+
 def build_triage_prompt(log_data: str, rag_context: str) -> list[dict]:
     """
     Build messages array for OpenAI client.
     """
+    feedback_context = load_few_shot_feedback_context()
+    system_prompt = TRIAGE_SYSTEM_PROMPT
+    if feedback_context:
+        system_prompt += "\n" + feedback_context
+
     user_message = f"""
 Please analyze the following network event:
 
@@ -74,7 +137,7 @@ Please analyze the following network event:
 {LOG_END_TAG}
 """
     return [
-        {"role": "system", "content": TRIAGE_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_message},
     ]
 

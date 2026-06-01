@@ -177,12 +177,19 @@ def render_ioc_table(iocs):
     st.dataframe(df, width="stretch")
 
 
-def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_logs=0):
+def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_logs=0, live_fpr=0.0):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism."""
     noise_reduction = 0.0
     if total_raw_logs > 0:
         noise_reduction = ((total_raw_logs - total_alerts) / total_raw_logs) * 100
         
+    # Xác định màu sắc cho live_fpr (dưới 10% xanh lá, dưới 25% vàng, ngược lại đỏ)
+    fpr_color = "#52c41a"  # green
+    if live_fpr > 25.0:
+        fpr_color = "#ff4d4f"  # red
+    elif live_fpr > 10.0:
+        fpr_color = "#faad14"  # orange/yellow
+
     html_kpi = (
         f'<div class="kpi-container">'
         f'  <div class="kpi-card">'
@@ -204,6 +211,10 @@ def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_l
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #13c2c2;">{active_rules}</div>'
         f'    <div class="kpi-label">Luật đang chặn (Active)</div>'
+        f'  </div>'
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: {fpr_color};">{live_fpr:.1f}%</div>'
+        f'    <div class="kpi-label">Tỷ lệ cảnh báo sai (Live FPR)</div>'
         f'  </div>'
         f'</div>'
     )

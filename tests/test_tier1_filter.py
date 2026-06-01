@@ -113,6 +113,25 @@ class TestRuleEngine:
         assert "tier1_reasons" in result
         assert result["tier1_action"] in ["ESCALATE", "DROP"]
 
+    def test_unsupervised_anomaly_detection(self):
+        """Kiểm thử phát hiện dị biệt thống kê (Unsupervised Anomaly Detection)."""
+        engine = RuleEngine()
+        engine.warmup_count = 10  # Giảm warmup_count xuống 10 để chạy nhanh trong test
+        
+        # 1. Bơm 10 mẫu bình thường có biến động nhỏ để tạo độ lệch chuẩn > 0.01
+        packet_counts = [5, 6, 5, 4, 5, 6, 5, 4, 5, 5]
+        for pct in packet_counts:
+            log = {"Source IP": "192.168.1.5", "Destination Port": 80, "Total Fwd Packets": pct}
+            engine.evaluate(log)
+            
+        # 2. Bơm mẫu thứ 11 có đột biến cực lớn (Total Fwd Packets = 500000)
+        abnormal_log = {"Source IP": "192.168.1.5", "Destination Port": 80, "Total Fwd Packets": 500000}
+        result = engine.evaluate(abnormal_log)
+        
+        # 3. Phải bị escalate và có lý do "Z-Score" hoặc "dị biệt thống kê"
+        assert result["tier1_action"] == "ESCALATE"
+        assert any("Z-Score" in r or "thống kê" in r for r in result["tier1_reasons"])
+
 
 class TestSessionBaseline:
     """Kiểm thử Session Behavioral Baselining."""

@@ -194,11 +194,18 @@ def main_dashboard():
 
     total_filtered = len(filtered_alerts)
     
+    # Tính toán Live FPR dựa trên các rule được Duyệt (ACTIVE) vs Bác bỏ (REJECTED) bởi con người
+    all_rules = feedback_mgr.get_all_dynamic_rules()
+    approved_rules_count = sum(1 for r in all_rules if r.get("status") == "ACTIVE")
+    rejected_rules_count = sum(1 for r in all_rules if r.get("status") == "REJECTED")
+    total_reviewed = approved_rules_count + rejected_rules_count
+    live_fpr = (rejected_rules_count / total_reviewed) * 100 if total_reviewed > 0 else 0.0
+    
     # Tính toán tổng số log thô giả lập dựa trên tỷ lệ lọc thực tế của Tier 1
     raw_logs_count = max(len(all_alerts) * 35, 120) if len(all_alerts) > 0 else 0
     
     # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
-    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules), raw_logs_count)
+    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules), raw_logs_count, live_fpr)
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Nhật ký SIEM & Audit Trail", 
@@ -438,7 +445,7 @@ def main_dashboard():
                 
                 # Xử lý chống Stored XSS cho giao diện HTML tùy chỉnh
                 safe_ip = html.escape(str(selected_ip))
-                safe_latest_reason = html.escape(str(latest_reason))
+                safe_latest_reason = html.escape(latest_reason)
                 safe_first_seen = html.escape(str(ip_rep.get("first_seen", "N/A"))) if ip_rep else "N/A"
                 safe_last_seen = html.escape(str(ip_rep.get("last_seen", "N/A"))) if ip_rep else "N/A"
                 safe_last_mitre = html.escape(str(ip_rep.get("last_mitre_technique") or "T1190")) if ip_rep else "T1190"

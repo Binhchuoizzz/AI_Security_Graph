@@ -34,6 +34,40 @@ class IPProfile(TypedDict):
     first_seen: Optional[float]
     last_seen: Optional[float]
 
+class RunningStats:
+    """
+    Duy trì Trung bình và Phương sai chạy trực tuyến dùng thuật toán Welford.
+    Độ phức tạp: O(1) thời gian, O(1) không gian. Tránh memory leak/OOM trên data lớn.
+    """
+    def __init__(self):
+        self.n = 0
+        self.old_m = 0.0
+        self.new_m = 0.0
+        self.old_s = 0.0
+        self.new_s = 0.0
+
+    def push(self, x: float):
+        self.n += 1
+        if self.n == 1:
+            self.old_m = self.new_m = x
+            self.old_s = 0.0
+        else:
+            self.new_m = self.old_m + (x - self.old_m) / self.n
+            self.new_s = self.old_s + (x - self.old_m) * (x - self.new_m)
+            self.old_m = self.new_m
+            self.old_s = self.new_s
+
+    def mean(self) -> float:
+        return self.new_m if self.n > 0 else 0.0
+
+    def variance(self) -> float:
+        return self.new_s / (self.n - 1) if self.n > 1 else 0.0
+
+    def std_dev(self) -> float:
+        import math
+        return math.sqrt(self.variance()) if self.n > 1 else 0.0
+
+
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
@@ -223,7 +257,10 @@ class RuleEngine:
         self.risk_threshold = tier1_config.get("risk_threshold", 30)
         self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
-        self.dynamic_rules = tier1_config.get("dynamic_rules", [])
+        
+        # Sửa lỗi: Chỉ tải các luật đã phê duyệt (ACTIVE)
+        all_rules = tier1_config.get("dynamic_rules", [])
+        self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
         self.whitelist_ips = tier1_config.get("whitelist_ips", [])
 
         # Theo dõi file modification time để hot-reload
@@ -235,6 +272,18 @@ class RuleEngine:
             deviation_threshold=baseline_config.get("deviation_threshold", 2.0),
             window_seconds=baseline_config.get("window_seconds", 300),
         )
+
+        # Unsupervised Anomaly Detection (Zero-Day statistical profiling)
+        self.global_stats: Dict[str, RunningStats] = {
+            "Flow Duration": RunningStats(),
+            "Total Fwd Packets": RunningStats(),
+            "Total Length of Fwd Packets": RunningStats(),
+            "Total Backward Packets": RunningStats(),
+            "Total Length of Bwd Packets": RunningStats()
+        }
+        # Cần 100 mẫu để khởi tạo baseline tin cậy trước khi tính Z-score
+        self.warmup_count = 100
+        self.total_processed_logs = 0
 
     def evaluate(self, log_entry: dict) -> dict:
         """
@@ -282,6 +331,58 @@ class RuleEngine:
             log_entry["tier1_action"] = "WHITELIST_DROP"
             log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
             return log_entry
+
+        # --- Tầng 0.5: Cập nhật & Kiểm tra Unsupervised Statistical Anomaly ---
+        self.total_processed_logs += 1
+        
+        # Ánh xạ các trường mạng thô sang các nhóm tính năng
+        raw_to_canonical = {
+            "Flow Duration": ["Flow Duration", "flow_duration_ms"],
+            "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets"],
+            "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes"],
+            "Total Backward Packets": ["Total Backward Packets", "bwd_packets"],
+            "Total Length of Bwd Packets": ["Total Length of Bwd Packets", "bwd_bytes"]
+        }
+        
+        current_values = {}
+        for key, aliases in raw_to_canonical.items():
+            val = None
+            for alias in aliases:
+                if alias in log_entry:
+                    try:
+                        val = float(log_entry[alias])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+            if val is not None:
+                current_values[key] = val
+                
+        # Chỉ kích hoạt cảnh báo sau giai đoạn warmup (100 log đầu vào)
+        if self.total_processed_logs > self.warmup_count:
+            z_anomaly_reasons = []
+            z_anomaly_score = 0
+            for key, val in current_values.items():
+                stats = self.global_stats[key]
+                mean_val = stats.mean()
+                std_val = stats.std_dev()
+                
+                # Bỏ qua nếu dữ liệu không biến động (std quá bé)
+                if std_val > 0.01:
+                    z_score = abs(val - mean_val) / std_val
+                    if z_score > 3.5:
+                        # Điểm phạt tăng dần theo độ lệch, cap ở 40
+                        penalty = min(int(z_score * 5), 40)
+                        z_anomaly_score += penalty
+                        z_anomaly_reasons.append(
+                            f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} lệch {z_score:.2f} lần độ lệch chuẩn (Z-Score > 3.5)"
+                        )
+            if z_anomaly_reasons:
+                score += z_anomaly_score
+                reasons.extend(z_anomaly_reasons)
+
+        # Cập nhật giá trị vào bộ theo dõi thống kê chạy (sau khi đã tính Z-score để tránh tự làm nhiễu)
+        for key, val in current_values.items():
+            self.global_stats[key].push(val)
 
         # --- Tầng 1: Static Rules ---
         dest_port = log_entry.get("Destination Port", -1)
@@ -340,7 +441,8 @@ class RuleEngine:
     def reload_dynamic_rules(self):
         """
         Hot-reload dynamic rules từ YAML config.
-        Được gọi bởi feedback_listener khi có rule mới.
+        Chỉ tải các luật đã phê duyệt (status == 'ACTIVE').
         """
         config = load_config()
-        self.dynamic_rules = config.get("tier1", {}).get("dynamic_rules", [])
+        all_rules = config.get("tier1", {}).get("dynamic_rules", [])
+        self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
