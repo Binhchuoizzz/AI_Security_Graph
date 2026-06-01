@@ -21,10 +21,11 @@ SENTINEL operates on a strict **Separation of Concerns** model to minimize proce
                                [ Redis Stream ]
                                      │
     ┌────────────────────────────────┴────────────────────────────────┐
-    │ TIER 1 - Heuristic Rule Engine & Session-Aware Behavioral Baselining │
+    │ TIER 1 - Stateful/Stateless Rule Engine & Unsupervised Anomaly  │
+    │          Detection (Welford's Algorithm - Outliers Z-Score > 3.5)│
     └────────────────────────────────┬────────────────────────────────┘
                                      ├─ Benign (F1=1.0) ──> [ DROP ] (Noise Reduction)
-                                     └─ Anomalous
+                                     └─ Anomalous / Escalated
                                              │
     ┌────────────────────────────────────────┴────────────────────────────────┐
     │ GUARDRAILS & PRE-PROCESSING LAYER                                       │
@@ -35,7 +36,7 @@ SENTINEL operates on a strict **Separation of Concerns** model to minimize proce
     └────────────────────────────────────────┬────────────────────────────────┘
                                              │
     ┌────────────────────────────────────────┴────────────────────────────────┐
-    │ TIER 2 - LangGraph Agentic Reasoning (Gemma-2-9B-IT Q4_K_M via llama.cpp)│
+    │ TIER 2 - LangGraph Agentic Reasoning (Gemma-2-9B-IT via llama.cpp)      │
     └────────────────────┬────────────────────────────────┬───────────────────┘
                          │                                │
         ┌────────────────┴────────────────┐      ┌────────┴────────┐
@@ -47,6 +48,7 @@ SENTINEL operates on a strict **Separation of Concerns** model to minimize proce
                          └────────────────┬───────────────┘
                                           │
                                 [ LangGraph Workflow ]
+                                 (Few-shot Active Learning)
                                           │
                         ┌─────────────────┼─────────────────┐
                   (Decision: ALERT) (Decision: QUARANTINE) (Decision: BLOCK_IP)
@@ -57,7 +59,7 @@ SENTINEL operates on a strict **Separation of Concerns** model to minimize proce
                                           │
                                    [ Feedback Loop ]
                                           │
-                            (Dynamic Rule Hot-Reload)
+                       (Dynamic Rules & Human-in-the-Loop FPR)
                                           │
                                      [ Tier 1 ]
 ```
@@ -66,14 +68,14 @@ SENTINEL operates on a strict **Separation of Concerns** model to minimize proce
 
 | ID | Component | Layer | Technology Stack | Core Role |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | **Rule Engine & Session Baseline** | Tier 1 | Python + Redis | Real-time stateless/stateful log filtering. Drops benign events at wire-speed. |
-| **2** | **Guardrails Defenses** | Pre-processing | Regex + Delimiter Deliters | Delimited Data Encapsulation, Encoding Neutralization, Jailbreak defense. |
+| **1** | **Rule Engine & Unsupervised Detector** | Tier 1 | Python + Redis | Stateless/stateful filtering + online Welford statistics checking for statistical zero-day anomalies. |
+| **2** | **Guardrails Defenses** | Pre-processing | Regex + Delimiter Encapsulation | Delimited Data Encapsulation, Encoding Neutralization, Jailbreak defense. |
 | **3** | **Drain3 Template Miner** | Pre-processing | Python Drain3 | Compresses high-volume syslog and network stream tokens before LLM input. |
 | **4** | **Dual-RAG Hybrid Search** | Tier 2 (RAG) | FAISS + BM25 + RRF | Fetches context from MITRE ATT&CK and NIST SP 800-61r2 using hybrid indexes. |
-| **5** | **LangGraph Agent** | Tier 2 (Reasoning) | LangGraph + Gemma-2-9B-IT | Orchestrates cognitive threat analysis, TTP mapping, and mitigation actions. |
+| **5** | **LangGraph Agent** | Tier 2 (Reasoning) | LangGraph + Gemma-2-9B-IT | Orchestrates cognitive threat analysis, TTP mapping, and mitigation actions with few-shot learning. |
 | **6** | **Threat Memory** | Tier 2 (Memory) | SQLite + Correlation Engine | Tracks long-term host behaviors, correlating multi-day APT attack chains (DAPT2020). |
 | **7** | **HMAC Log Chaining** | Integrity | SQLite + HMAC SHA-256 | Cryptographically chains audit logs. Automatically flags DB tampering. |
-| **8** | **Persistent Lockout** | Auth Security | SQLite + SHA-256 + Timeouts | Persistent brute-force protection (max 5 attempts, 60s lockout) with usability auto-reset. |
+| **8** | Persist Lockout & Live FPR | Auth / Admin | SQLite + Streamlit UI | Real-time false positive metrics + brute-force protection (max 5 attempts, lockout). |
 | **9** | **Trivy & Neo4j KB Graph** | Vulnerability | Neo4j + Trivy + Graphviz | Scans system files and links vulnerabilities into an interactive threat knowledge graph. |
 | **10**| **HITL Streamlit Dashboard** | UI/UX | Streamlit + Glassmorphism | SOC Operator control panel, live monitoring, log auditor, and whitelist controls. |
 
@@ -109,7 +111,7 @@ SENTINEL is systematically benchmarked across five analytical axes:
 | **1. Classification** | F1-Score $\ge 0.90$ (Triage accuracy) | McNemar's Test ($p < 0.05$) | `experiments/run_ablation_study.py` |
 | **2. Operational** | Latency Reduction $\ge 60\%$ (Tier 1 filter rate)| Mann-Whitney U Test ($p < 0.05$) | `experiments/measure_latency_baseline.py` |
 | **3. Robustness** | Guardrail Bypass Rate $< 10\%$ | 45-sample Adversarial Suite | `experiments/evaluate_robustness.py` |
-| **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3.1) | `experiments/evaluate_reasoning.py` |
+| **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3 8B) | `experiments/evaluate_reasoning.py` |
 | **5. Explainability**| Completeness Index $= 100\%$ (Audit Trail) | Deterministic schema checks | `experiments/evaluate_reasoning.py` |
 
 ---
@@ -142,13 +144,19 @@ AI_Security_Graph/
 │   ├── adversarial_samples.json      # 45 adversarial test vectors
 │   ├── run_ablation_study.py         # Runs ablation tests across A-F configs
 │   ├── evaluate_robustness.py        # Benchmarks LLM Guardrails
-│   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation
+│   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation (Llama 3)
+│   ├── evaluate_zeroday.py           # Simulates and evaluates Zero-Day outlier threats
 │   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
 │   └── e2e_test_runner.py            # Automated E2E integration test suite
 ├── knowledge_base/
 │   ├── mitre_attack.json             # Structured MITRE TTPs
 │   ├── nist_800_61r2.json            # Structured NIST incident response playbooks
 │   └── faiss_index/                  # Embedded FAISS and BM25 vector indexes
+├── reports/
+│   ├── test_report_FINAL.md          # E2E 20/20 PASS verification report
+│   └── zeroday_evaluation_report.md  # Zero-Day threat detection evaluation report
+├── scripts/
+│   └── switch_model.sh               # Utility script to hot-swap LLM models in Docker
 ├── src/
 │   ├── streaming/                    # Publisher/Subscriber message broker (Redis Streams)
 │   ├── tier1_filter/                 # Rule engine, session monitor & feedback logic

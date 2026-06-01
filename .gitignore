@@ -27,6 +27,7 @@ knowledge_base/faiss_index/*_metadata.json
 *.md
 !README.md
 !**/README.md
+!RUN_PROJECT.md
 !reports/*.md
 
 # Large binary data files
