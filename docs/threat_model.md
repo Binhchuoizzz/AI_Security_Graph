@@ -3,11 +3,13 @@
 Tài liệu này xác định các ranh giới tin cậy (Trust Boundaries), tài sản cần bảo vệ, và các vector tấn công đối với chính hệ thống SENTINEL cũng như môi trường mà nó giám sát.
 
 ## 1. Trust Boundaries (Ranh Giới Tin Cậy)
+
 - **Vùng Ngoại vi (Untrusted):** Traffic mạng Internet (dữ liệu từ CICIDS2018/DAPT2020), payload độc hại do user nhập.
 - **Vùng Đệm (DMZ / Tier 1):** Subscriber Queue (Redis), Tier 1 Rule Engine. Dữ liệu chưa tin cậy, được xử lý tốc độ cao.
 - **Vùng Lõi (Trusted / Tier 2):** Agent LLM (Gemma-2-9B-IT), FAISS Indexes, Threat Memory (SQLite), MLflow. Dữ liệu ở đây phải qua Guardrails xử lý.
 
 ## 2. Tài Sản Cần Bảo Vệ (Assets)
+
 1. **Mô hình Trí tuệ Nhân tạo (LLM Weights):** Tránh bị đánh cắp hoặc đầu độc qua prompt injection.
 2. **Cơ sở Tri thức (Knowledge Base):** MITRE ATT&CK và NIST SP 800-61r2 (Playbooks).
 3. **Log & Audit Trail:** Bằng chứng pháp lý (Forensic logs) trong `audit_trail.db` và `threat_memory.db`. Không được phép giả mạo.
