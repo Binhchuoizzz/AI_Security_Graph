@@ -358,6 +358,7 @@ class RuleEngine:
                 current_values[key] = val
                 
         # Chỉ kích hoạt cảnh báo sau giai đoạn warmup (100 log đầu vào)
+        max_z_score = 0.0
         if self.total_processed_logs > self.warmup_count:
             z_anomaly_reasons = []
             z_anomaly_score = 0
@@ -369,6 +370,7 @@ class RuleEngine:
                 # Bỏ qua nếu dữ liệu không biến động (std quá bé)
                 if std_val > 0.01:
                     z_score = abs(val - mean_val) / std_val
+                    max_z_score = max(max_z_score, z_score)
                     if z_score > 3.5:
                         # Điểm phạt tăng dần theo độ lệch, cap ở 40
                         penalty = min(int(z_score * 5), 40)
@@ -426,6 +428,7 @@ class RuleEngine:
         # --- Quyết định ---
         log_entry["tier1_score"] = score
         log_entry["tier1_reasons"] = reasons
+        log_entry["tier1_z_score"] = max_z_score
         log_entry["tier1_baseline"] = {
             "ip_request_count": baseline_result["request_count"],
             "ip_unique_ports": baseline_result["unique_ports"],

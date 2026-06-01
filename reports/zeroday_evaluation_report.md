@@ -13,22 +13,22 @@
 
 | ID | Tên Kịch Bản Tấn Công | Rule Engine Tĩnh (Config A) | Tier-1 Outlier (Z-Score) | Quyết Định Của AI (Tier-2) | Kết Quả |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| ZD-001 | Zero-Day Data Exfiltration (Outlier Packets) | DROP (Bỏ sót) | ESCALATE (Z=0.0) | BLOCK_IP (Conf: 0.95) | ✅ THÀNH CÔNG |
-| ZD-002 | Zero-Day Session Flooding (Outlier Volume) | DROP (Bỏ sót) | ESCALATE (Z=0.0) | BLOCK_IP (Conf: 0.95) | ✅ THÀNH CÔNG |
+| ZD-001 | Zero-Day Data Exfiltration (Outlier Packets) | DROP (Bỏ sót) | ESCALATE (Z=59792.25) | BLOCK_IP (Conf: 0.95) | ✅ THÀNH CÔNG |
+| ZD-002 | Zero-Day Session Flooding (Outlier Volume) | DROP (Bỏ sót) | ESCALATE (Z=14.09) | BLOCK_IP (Conf: 0.95) | ✅ THÀNH CÔNG |
 
 ## 🔍 Chi Tiết Suy Luận Và Lập Luận Của AI Tác Tử
 
 ### ZD-001: Zero-Day Data Exfiltration (Outlier Packets)
-* **Z-Score ở Tier-1:** 0.0 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
+* **Z-Score ở Tier-1:** 59792.25 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
 * **Hành động phản ứng tự động:** `BLOCK_IP` (Độ tin cậy: 0.95)
 * **Lập luận bảo mật (Reasoning):**
-  > "Dữ liệu cho thấy IP 10.0.0.22 gửi một lượng gói tin bất thường (85000 gói) đến cổng 80 với User-Agent là 'exfil-tool/v1.0'.  Hành vi này khớp với kỹ thuật Malvertising (T1583.008) và có thể là một nỗ lực exfiltration dữ liệu. Hệ thống nên chặn IP này để ngăn chặn hoạt động độc hại."
+  > "Dữ liệu cho thấy IP 10.0.0.22 gửi một lượng gói tin bất thường (85000 gói) đến cổng 80, kèm theo User-Agent là exfil-tool/v1.0.  Hành vi này khớp với kỹ thuật Malvertising (T1583.008) và có thể là một nỗ lực lây nhiễm malware. Hệ thống thực hiện chặn IP để ngăn chặn hoạt động này."
 
 ### ZD-002: Zero-Day Session Flooding (Outlier Volume)
-* **Z-Score ở Tier-1:** 0.0 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
+* **Z-Score ở Tier-1:** 14.09 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
 * **Hành động phản ứng tự động:** `BLOCK_IP` (Độ tin cậy: 0.95)
 * **Lập luận bảo mật (Reasoning):**
-  > "Dữ liệu cho thấy IP 10.0.0.33 gửi một lượng gói tin rất lớn (120000 gói) đến cổng 80, kèm theo user-agent là Wget/1.21.1 flood-bot, thường được sử dụng trong các cuộc tấn công DDoS.  Hành vi này khớp với kỹ thuật Malvertising (T1583.008) và có khả năng cao là một cuộc tấn công DDoS nhằm hạ gục dịch vụ."
+  > "IP nguồn 10.0.0.33 thực hiện truy cập cổng 80 với số lượng gói tin bất thường (120000 gói tin), vượt quá ngưỡng Z-Score cho phép. User-agent là Wget/1.21.1 flood-bot, thường được sử dụng trong các cuộc tấn công DDoS. Hệ thống chặn IP để ngăn chặn hoạt động đáng ngờ."
 
 ---
 ## 💡 Kết Luận Khoa Học Cho Luận Văn Thạc Sĩ

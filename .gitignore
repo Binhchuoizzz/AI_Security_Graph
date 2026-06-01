@@ -22,13 +22,21 @@ knowledge_base/faiss_index/*_metadata.json
 .gemini/
 *.pid
 
-# Ignore all markdown files except README.md and reports
+# Ignore all markdown files except README.md and specific reports
 **/*.md
 *.md
 !README.md
 !**/README.md
 !RUN_PROJECT.md
-!reports/*.md
+!reports/test_report_FINAL.md
+!reports/zeroday_evaluation_report.md
+reports/test_report_*.md
+
+# Track markdown docs in docs/ and experiments/
+!docs/**/*.md
+!docs/*.md
+!experiments/**/*.md
+!experiments/*.md
 
 # Large binary data files
 data/raw/*.pcap

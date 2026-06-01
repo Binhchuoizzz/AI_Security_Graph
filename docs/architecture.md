@@ -1,0 +1,64 @@
+# Kiến Trúc Hệ Thống (System Architecture)
+
+Hệ thống SENTINEL được thiết kế theo kiến trúc **2-Tier (2 Tầng)** kết hợp luồng dữ liệu thời gian thực (Streaming) và Tác tử suy luận AI (LLM Agent) có hỗ trợ học tích cực Few-shot và phát hiện Outlier không giám sát.
+
+## 1. Biểu Đồ Kiến Trúc Luồng Dữ Liệu
+
+```mermaid
+graph TD
+    subgraph Data Ingestion
+        A[Nguồn Log Mạng / DAPT2020 / CICIDS2018] -->|Streaming| B(Redis Pub/Sub)
+    end
+
+    subgraph Tier 1: Lọc Sơ Cấp (Rule Engine & Unsupervised)
+        B --> C[Subscriber]
+        C --> D{Rule Engine: Static, Stateful & Outlier Detector Welford}
+        D -->|Benign| E[(Drop/Bỏ qua)]
+        D -->|Bất Thường Escalate / Z-Score > 3.5| F[Guardrails: Template Miner + Encapsulator]
+    end
+
+    subgraph Khối Tri Thức & Trạng Thái (Storage Layer)
+        G[(MITRE FAISS Index)]
+        H[(NIST FAISS Index)]
+        I[(Threat Memory SQLite)]
+        J[(MLflow DB & Artifacts)]
+        K[(Audit Trail DB)]
+    end
+
+    subgraph Tier 2: LLM Agent & Active Learning (LangGraph)
+        F --> L[Triage Node]
+        L --> M[RAG Retrieval Node]
+        M --> O[Reasoning Node Gemma-2-9B-IT + Few-shot Active Learning]
+        O --> P[Action/Routing Node]
+    end
+
+    M -.-> G
+    M -.-> H
+    L -.-> I
+    O -.-> J
+    P -.-> K
+
+    P -->|Phản hồi/Quyết định| Q[Firewall / Streamlit Dashboard + Live FPR]
+    Q -.->|Phê duyệt Rule / Active Learning| R[Feedback Loop (Cập nhật Tier 1)]
+    R -.-> D
+```
+
+## 2. Các Thành Phần Chính (Components)
+
+1. **Streaming Layer (`src/streaming/`)**: Xử lý dữ liệu đầu vào tốc độ cao. Gồm Publisher đẩy log lên Redis và Subscriber lấy log xuống.
+2. **Tier 1 Filter (`src/tier1_filter/`)**: Rule Engine kiểm tra các điều kiện cơ bản (Session Baseline) và chặn nhanh (IP Blacklist, Port rules). Đồng thời tích hợp thuật toán **Welford** online để phát hiện **Unsupervised Anomaly (Zero-day outliers Z-score > 3.5)** dựa trên các metrics lưu lượng mạng thực tế.
+3. **Guardrails (`src/guardrails/`)**: Màng bọc an ninh. Đóng gói dữ liệu đầu vào (Delimited Data Encapsulation) chống Prompt Injection, phát hiện Jailbreak/DAN mode, và Nén luồng (Drain3 Template Miner) trước khi đưa cho LLM.
+4. **LangGraph Agent (`src/agent/`)**: Trái tim của hệ thống. Nhận log bất thường, truy xuất lịch sử APT (Threat Memory), gọi RAG và ra quyết định. LLM sử dụng là `Gemma-2-9B-IT` kết hợp **Few-shot Active Learning** tự động tải các luật được phê duyệt/từ chối từ Human làm ví dụ prompt cải thiện độ chính xác.
+5. **RAG Module (`src/rag/`)**: Chịu trách nhiệm nhúng (Embedder) và tìm kiếm lai (Dual-RAG Hybrid: FAISS + BM25) các kịch bản ứng phó từ MITRE ATT&CK và NIST SP 800-61r2.
+6. **UI Dashboard (`src/ui/`)**: Giao diện quản trị Streamlit hỗ trợ cơ chế phê duyệt an ninh Human-in-the-Loop, live monitoring và hiển thị biểu đồ **Live Production FPR Card** cập nhật theo hành động thực tế của SOC Analyst.
+
+## 3. Lớp Lưu Trữ (Storage Layer)
+
+- **`config/`**: Chứa SQLite DB của Hệ thống: `threat_memory.db` (lưu vết APT), `audit_trail.db` (lưu quyết định) và file `system_settings.yaml` lưu trữ whitelist, static rules, dynamic active rules.
+- **`mlruns/`**: Chứa Artifacts và SQLite DB của MLflow. Lưu trữ metrics (F1, Latency, Defeat Rate, Reasoning Quality Scores) để đảm bảo tính tái tạo.
+- **`knowledge_base/`**:
+  - Lưu trữ các tệp tri thức gốc dạng JSON (`mitre_attack.json`, `nist_800_61r2.json`).
+  - Thư mục `faiss_index/` chứa các tệp nhúng và chỉ mục BM25.
+- **`data/`**: Chứa tập dữ liệu đầu vào chuẩn hóa cho luận văn: CSE-CIC-IDS2018 (CSV) và DAPT2020.
+- **`reports/`**: Lưu trữ các báo cáo thực nghiệm an ninh (E2E Integration Validation, Zero-Day Outlier Threat Detection).
+- **`scripts/`**: Chứa các script tiện ích quản trị như `switch_model.sh` để hot-swap các model LLM.
