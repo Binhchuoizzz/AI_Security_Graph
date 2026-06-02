@@ -1,0 +1,24 @@
+\chapter{Kiến trúc hệ thống đề xuất SENTINEL}
+\label{ch:proposed_solution}
+
+Chương này trình bày kiến trúc đề xuất SENTINEL (Cognitive Two-Tier Architecture) giúp tự động hóa phân loại và ứng cứu sự cố trong SOC. Chương này bao gồm: Mô tả tổng quan luồng dữ liệu 2 tầng; Công thức toán học của Thuật toán Welford trực tuyến tại Tier 1; Thiết kế Tầng Guardrail bảo vệ; Mô hình tác tử LangGraph điều khiển suy luận RAG tại Tier 2; Cơ chế bộ nhớ SQLite Threat Memory; và hệ thống bảo đảm logs toàn vẹn HMAC Log Chaining.
+
+\section{Tổng quan kiến trúc hai tầng}
+Trình bày sơ đồ khối kiến trúc và giải thích cơ chế phối hợp giảm tải logs từ Tier 1 (Rule-based) lên Tier 2 (LLM Agent).
+
+\section{Thuật toán Outlier Detection thống kê trực tuyến Welford}
+Đặc tả chi tiết công thức toán học cập nhật trung bình và phương sai liên tục của Welford. Giải thích cơ chế tính toán Z-Score trực tuyến với độ phức tạp không gian và thời gian tối ưu $O(1)$ để phát hiện Zero-day.
+
+\section{Thiết kế Tầng Guardrail bảo vệ Prompt}
+Mô tả chi tiết 3 lớp phòng ngự: Template Mining (Drain3) để nén logs, Đóng gói dấu phân cách ngẫu nhiên cryptographically secure delimiter để chống Prompt Injection, và bộ lọc Smuggling Detection và Output Sanitizer.
+
+\section{Mô hình Tác tử nhận thức LangGraph và Dual-RAG}
+Đặc tả cấu trúc `SentinelState`, đồ thị trạng thái LangGraph (Nodes và Conditional Edges) và quy trình truy xuất Hybrid Search hợp nhất bằng RRF từ chỉ mục MITRE ATT\&CK và NIST.
+
+\section{SQLite Threat Memory và liên kết chuỗi APT}
+Giải thích cơ chế chấm điểm danh tiếng IP dài hạn và logic xâu chuỗi tương quan các kỹ thuật tấn công xảy ra rải rác qua nhiều ngày để phát hiện chiến dịch tấn công APT low-and-slow.
+
+\section{Bảo vệ toàn vẹn chứng cứ logs bằng HMAC Log Chaining}
+Trình bày cấu trúc chuỗi liên kết băm băm mật mã học (mỗi dòng log chứa HMAC được tính từ nội dung log hiện tại và hash của dòng trước đó) giúp phát hiện giả mạo logs.
+
+Tóm lại, Chương 3 đã mô tả toàn diện thiết kế kiến trúc hệ thống SENTINEL. Chương tiếp theo sẽ đi sâu vào mô tả chi tiết quá trình triển khai mã nguồn thực tế.

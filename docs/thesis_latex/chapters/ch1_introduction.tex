@@ -1,0 +1,66 @@
+\chapter{Mở đầu}
+\label{ch:introduction}
+
+% Chương cần bắt đầu bằng một đoạn văn ngắn giới thiệu nội dung chương
+Chương này giới thiệu bối cảnh nghiên cứu về an ninh mạng trong các Trung tâm Điều hành An ninh (SOC), nêu bật những thách thức của các tiếp cận hiện tại và lý do nghiên cứu đề xuất giải pháp kiến trúc nhận thức hai tầng SENTINEL. Tiếp theo, chương trình bày mục tiêu nghiên cứu, câu hỏi nghiên cứu, đối tượng, phương pháp và phạm vi của đề tài.
+
+\section{Bối cảnh nghiên cứu và Lý do chọn đề tài}
+Trong kỷ nguyên số, các tổ chức và doanh nghiệp đang đối mặt với tần suất và độ phức tạp ngày càng tăng của các cuộc tấn công mạng. Để bảo vệ tài sản số thông tin, các Trung tâm Điều hành An ninh (SOC) đóng vai trò nòng cốt trong việc giám sát, phát hiện và ứng cứu sự cố. Tuy nhiên, các SOC hiện đại đang gặp phải "Nghịch lý Dữ liệu lớn":
+\begin{itemize}
+    \item \textbf{Vấn nạn Alert Fatigue (Mệt mỏi vì cảnh báo):} Lượng log khổng lồ phát sinh từ thiết bị tường lửa, IDS/IPS và SIEM tạo ra hàng triệu cảnh báo mỗi ngày, trong đó tỷ lệ báo động giả (False Positive) rất lớn, dẫn đến việc chuyên gia phân tích SOC bỏ sót các cuộc tấn công thực tế.
+    \item \textbf{Giới hạn của các hệ thống dựa trên Luật (Rule-based):} Các hệ thống truyền thống chỉ phát hiện các mẫu tấn công đã biết (signatures), không có khả năng phát hiện các cuộc tấn công chưa có mẫu (Zero-day).
+    \item \textbf{Hạn chế của phương pháp Random Sampling:} Một số tiếp cận lọc giảm tải log bằng cách lấy mẫu ngẫu nhiên (chỉ giữ lại 1-3% log sạch). Phương pháp này vô tình xóa bỏ bằng chứng của các chiến dịch tấn công APT "Low-and-Slow" vốn thực hiện các bước thăm dò cực kỳ kín kẽ và kéo dài nhiều ngày.
+\end{itemize}
+
+Sự xuất hiện của các Mô hình Ngôn ngữ Lớn (LLM) mở ra tiềm năng ứng dụng trí tuệ nhân tạo để đọc hiểu logs và tự động hóa ứng cứu. Tuy nhiên, việc áp dụng trực tiếp LLM trong SOC vấp phải hai rào cản lớn:
+\begin{enumerate}
+    \item \textbf{Độ trễ xử lý (Latency):} Việc gửi toàn bộ luồng logs qua LLM để suy luận sẽ gây nghẽn cổ chai nghiêm trọng về hiệu năng xử lý luồng mạng thời gian thực.
+    \item \textbf{Nguy cơ chèn câu lệnh độc hại (Prompt Injection):} Kẻ tấn công có thể chèn các chuỗi câu lệnh phá hoại prompt vào trong logs (ví dụ: HTTP User-Agent chứa lệnh yêu cầu LLM phân loại là lành tính), từ đó thao túng quyết định của AI.
+\end{enumerate}
+
+Do đó, việc nghiên cứu một kiến trúc phối hợp hai tầng, sàng lọc thô tốc độ cao ở tầng dưới và suy luận nhận thức chuyên sâu, an toàn bằng AI Tác tử ở tầng trên là cực kỳ cần thiết. Đó là lý do đề tài "Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI tác tử" được lựa chọn.
+
+\section{Mục tiêu nghiên cứu}
+Đề tài hướng tới các mục tiêu cụ thể sau:
+\begin{itemize}
+    \item Thiết kế và triển khai kiến trúc lai hai tầng SENTINEL hoạt động cục bộ (offline) an toàn.
+    \item Phát triển thuật toán thống kê trực tuyến Welford tại Tier 1 để lọc nhiễu lưu lượng lành tính ở tốc độ đường truyền mà không cần giám sát.
+    \item Xây dựng tác tử Tier 2 sử dụng LangGraph kết hợp cơ chế Dual-RAG (MITRE ATT\&CK và NIST) đưa ra phán quyết ứng phó sự cố chính xác và có tính giải thích cao.
+    \item Đề xuất cơ chế bảo vệ Guardrail chống lại Prompt Injection bằng kỹ thuật mã hóa dấu phân cách ngẫu nhiên.
+    \item Đảm bảo tính toàn vẹn chứng cứ nhật ký hệ thống bằng chuỗi băm HMAC.
+\end{itemize}
+
+\section{Câu hỏi nghiên cứu}
+Đề tài tập trung trả lời ba câu hỏi nghiên cứu chính:
+\begin{enumerate}
+    \item Làm thế nào để lọc bỏ nhiễu logs lưu lượng mạng lớn mà không làm đứt gãy hay mất dấu vết của các chuỗi tấn công dài ngày (APT)?
+    \item Làm thế nào để tích hợp LLM vào quy trình phân tích logs mà vẫn đảm bảo độ trễ thời gian thực và ngăn chặn hoàn toàn nguy cơ tấn công Prompt Injection thông qua logs độc hại?
+    \item Cơ chế tự học chủ động (Active Learning) không cần fine-tune giúp cải thiện độ chính xác và giảm tỷ lệ cảnh báo sai (FPR) của mô hình trong vận hành thực tế như thế nào?
+\end{enumerate}
+
+\section{Đối tượng và Phương pháp nghiên cứu}
+\begin{itemize}
+    \item \textbf{Đối tượng nghiên cứu:} Luồng lưu lượng mạng doanh nghiệp (mô phỏng trên tập dữ liệu CSE-CIC-IDS2018 và chuỗi tấn công APT DAPT2020), các kỹ thuật tác tử AI (Agentic AI), RAG và an toàn prompt.
+    \item \textbf{Phương pháp nghiên cứu:} Phương pháp nghiên cứu thực nghiệm. Xây dựng hệ thống hoàn chỉnh chạy thử nghiệm trên các kịch bản tấn công thực tế, tiến hành đo lường định lượng và phân tích thống kê để kiểm chứng giả thuyết.
+\end{itemize}
+
+\section{Phạm vi nghiên cứu}
+Nghiên cứu tập trung vào:
+\begin{itemize}
+    \item Phân tích luồng logs ở cấp độ flow-level (các thông số thống kê lưu lượng) và một số trường thông tin text trong payload logs.
+    \item Mô hình ngôn ngữ lớn hoạt động offline (khảo sát trên Gemma-2-9B-IT) chạy trên cấu hình phần cứng GPU đơn lập để mô phỏng môi trường bảo mật độc lập của doanh nghiệp.
+    \item Không bao gồm các phản ứng mạng tác động vật lý phá hủy hoặc can thiệp trực tiếp vào thiết bị của nhà cung cấp bên thứ ba ngoài mô phỏng firewall rules.
+\end{itemize}
+
+\section{Cấu trúc của luận văn}
+Báo cáo luận văn được cấu trúc thành các chương sau:
+\begin{itemize}
+    \item \textbf{Chương 1: Mở đầu} - Giới thiệu bối cảnh, lý do chọn đề tài, mục tiêu, câu hỏi, đối tượng, phương pháp, phạm vi và cấu trúc luận văn.
+    \item \textbf{Chương 2: Cơ sở lý thuyết và các nghiên cứu liên quan} - Trình bày các kiến thức nền tảng về Agentic AI, RAG, thuật toán thống kê, an toàn prompt và tổng quan các công trình nghiên cứu liên quan.
+    \item \textbf{Chương 3: Kiến trúc hệ thống đề xuất SENTINEL} - Mô tả chi tiết mô hình kiến trúc hai tầng, các thuật toán Welford trực tuyến, cơ chế đóng gói dấu phân cách an toàn, workflow LangGraph và cấu trúc HMAC Chaining.
+    \item \textbf{Chương 4: Triển khai kỹ thuật} - Đặc tả chi tiết mã nguồn, môi trường Docker và thiết kế giao diện dashboard Streamlit hỗ trợ Human-in-the-Loop.
+    \item \textbf{Chương 5: Thực nghiệm và Đánh giá kết quả} - Trình bày kết quả đo lường định lượng 5 chiều (5D), phân tích ablation study và các kiểm định thống kê McNemar, Mann-Whitney U.
+    \item \textbf{Chương 6: Kết luận và Hướng phát triển} - Tổng kết các đóng góp chính, chỉ ra các hạn chế và định hướng các nghiên cứu tiếp theo.
+\end{itemize}
+
+Tóm lại, Chương 1 đã phác thảo bức tranh tổng quan về đề tài nghiên cứu. Chương tiếp theo sẽ đi sâu vào các cơ sở lý thuyết khoa học làm nền tảng cho việc thiết kế kiến trúc hệ thống đề xuất.

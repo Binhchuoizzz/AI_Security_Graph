@@ -1,0 +1,27 @@
+\chapter{Thực nghiệm và Đánh giá kết quả}
+\label{ch:experiments_evaluation}
+
+Chương này trình bày chi tiết về thiết kế thực nghiệm và phân tích kết quả định lượng của hệ thống SENTINEL dựa trên Khung đánh giá 5 chiều (5D). Nội dung chương bao gồm: Đặc tả tập dữ liệu thử nghiệm và cấu hình mô phỏng; Thiết lập 6 cấu hình ablation study; Phân tích kết quả chất lượng phân loại và kiểm định ý nghĩa thống kê McNemar; Đánh giá hiệu năng vận hành và kiểm định trễ Mann-Whitney U; Kiểm thử tính kháng tấn công Prompt Injection; Đo lường tính giải thích được của AI; và đánh giá chất lượng tri thức Dual-RAG bằng mô hình trọng tài.
+
+\section{Tập dữ liệu thử nghiệm và Môi trường mô phỏng}
+Mô tả chi tiết quá trình phát sinh logs stream mô phỏng từ tập dữ liệu chuẩn CSE-CIC-IDS2018 (phát hiện xâm nhập) và DAPT2020 (theo dõi APT chuỗi đa giai đoạn).
+
+\section{Thiết lập cấu hình thử nghiệm Ablation Study}
+Đặc tả chi tiết 6 cấu hình thử nghiệm (từ Config A đến Config F) được bật/tắt các module để đo lường đóng góp của từng cấu phần.
+
+\section{Đánh giá chất lượng phân loại và Kiểm định thống kê McNemar}
+Trình bày bảng số liệu so sánh chỉ số Precision, Recall, F1, và FPR giữa các cấu hình. Giải thích kết quả chạy kiểm định phi tham số McNemar's Test trên ma trận nhầm lẫn để chứng minh sự cải tiến của Sentinel là có ý nghĩa thực tế ($p < 0.05$).
+
+\section{Đánh giá hiệu năng vận hành và Kiểm định trễ Mann-Whitney U}
+Phân tích độ trễ xử lý logs (Inference Latency), tỷ lệ leo thang (Escalation Rate) và RAG cache hit rate. Sử dụng kiểm định phi tham số Mann-Whitney U Test để chứng minh việc giảm trễ ở kiến trúc hai tầng so với gửi trực tiếp qua LLM có ý nghĩa thống kê vượt trội.
+
+\section{Đánh giá tính kháng tấn công nghịch đảo (Robustness)}
+Trình bày kết quả kiểm thử hệ thống trước bộ dữ liệu 45 payload tấn công nghịch đảo tinh vi (Prompt Injection, Delimiter Smuggling, RAG Poisoning) để đo lường tỷ lệ chặn thành công của Tầng Guardrail.
+
+\section{Đánh giá tính giải thích được (Explainability)}
+Đo lường chỉ số Audit Trail Completeness Rate - tỷ lệ phần trăm các phán quyết của LLM đáp ứng đầy đủ cấu trúc định dạng JSON bắt buộc của hệ thống.
+
+\section{Đánh giá chất lượng RAG bằng mô hình trọng tài (LLM-as-a-Judge)}
+Trình bày kết quả đánh giá tự động dựa trên mô hình Llama-3.1 làm trọng tài chấm điểm độc lập cho các chỉ số: Context Precision, Faithfulness, Relevancy và Context Recall.
+
+Tóm lại, Chương 5 đã chứng minh bằng số liệu thực nghiệm khoa học hiệu năng của Sentinel. Chương tiếp theo sẽ tổng kết nghiên cứu và chỉ ra hướng phát triển trong tương lai.

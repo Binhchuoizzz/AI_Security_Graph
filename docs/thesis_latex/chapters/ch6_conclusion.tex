@@ -1,0 +1,28 @@
+\chapter{Kết luận và Hướng phát triển}
+\label{ch:conclusion}
+
+Chương này tổng kết lại toàn bộ nghiên cứu về hệ thống SENTINEL. Nội dung chương bao gồm: Tổng hợp các kết quả đạt được; Các hạn chế hiện tại của hệ thống; và hướng phát triển nghiên cứu trong tương lai.
+
+\section{Các kết quả đạt được}
+Tóm tắt các đóng góp khoa học và thực tiễn của đề tài:
+\begin{itemize}
+    \item Đã thiết kế và cài đặt thành công kiến trúc nhận thức hai tầng hoạt động offline ổn định, tin cậy.
+    \item Phát triển thuật toán thống kê Welford trực tuyến giúp phát hiện dị thường hiệu quả với độ trễ tối thiểu và không bị tràn bộ nhớ.
+    \item Xây dựng tác tử LangGraph kết hợp Hybrid Dual-RAG cung cấp phán quyết an toàn, có tính giải thích cao.
+    \item Đưa ra giải pháp Guardrail mã hóa delimiter bảo vệ prompt và cơ chế HMAC Log Chaining chống giả mạo logs.
+    \item Chứng minh tính hiệu quả qua các kiểm định thống kê McNemar và Mann-Whitney U.
+\end{itemize}
+
+\section{Hạn chế của hệ thống}
+Chỉ ra một số hạn chế cần khắc phục:
+\begin{itemize}
+    \item Hệ thống mới chỉ thử nghiệm trên logs mạng flow-level và một số trường thông tin text tĩnh, cần kiểm thử trên các định dạng log đa dạng khác (như OS logs, auditd, syslog).
+    \item Tốc độ suy luận của LLM offline vẫn phụ thuộc nhiều vào năng lực phần cứng GPU, cần tối ưu thêm các kỹ thuật suy luận song song.
+\end{itemize}
+
+\section{Hướng phát triển tương lai}
+Định hướng các nghiên cứu tiếp theo:
+\begin{itemize}
+    \item Nghiên cứu mở rộng hệ thống bằng cơ chế học liên kết (Federated Learning) để chia sẻ tri thức về mối đe dọa giữa các tổ chức mà không làm lộ dữ liệu thô nhạy cảm.
+    \item Tích hợp thêm các tác tử con (sub-agents) chuyên biệt cho từng loại thiết bị bảo mật để tăng cường khả năng tự động hóa phản hồi.
+\end{itemize}

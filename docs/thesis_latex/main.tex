@@ -1,0 +1,203 @@
+% =============================================================================
+% FPT UNIVERSITY - MASTER OF SOFTWARE ENGINEERING (MSE) THESIS TEMPLATE
+% Formatted strictly according to FPT MSE Thesis Guidelines (V5)
+% =============================================================================
+\documentclass[12pt,a4paper]{report}
+
+% --- Packages ---
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc} % Supports Vietnamese language output
+\usepackage[vietnamese,english]{babel}
+\usepackage{times} % Times New Roman font
+\usepackage{geometry}
+\geometry{top=2.54cm, bottom=2.54cm, left=3.0cm, right=2.8cm} % Margin rules
+\usepackage{graphicx}
+\usepackage{setspace} % Double spacing package
+\usepackage{fancyhdr} % Page numbering custom configuration
+\usepackage{titlesec}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% --- Paragraph Formatting (Block Style: No indent, 12pt space above) ---
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{12pt}
+
+% --- Headings Formatting (Maximum 3 levels) ---
+\setcounter{secnumdepth}{3}
+\titleformat{\chapter}[display]{\large\bfseries}{\chaptername\ \thechapter}{0.5em}{\Large}
+\titleformat{\section}{\large\bfseries}{\thesection}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
+
+% --- Code Block Styling ---
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5},
+    keywordstyle=\color{blue},
+    commentstyle=\color{green!60!black},
+    stringstyle=\color{orange},
+    showstringspaces=false,
+    inputencoding=utf8,
+    extendedchars=true
+}
+
+% --- Header/Footer Customization (Page number on Top-Right) ---
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage} % Position page number on top right
+\renewcommand{\headrulewidth}{0pt} % Remove header line
+
+% Override standard plain style (which is automatically used on Chapter start pages)
+\fancypagestyle{plain}{
+    \fancyhf{}
+    \fancyhead[R]{\thepage}
+    \renewcommand{\headrulewidth}{0pt}
+}
+
+% --- Vietnamese Captions Map ---
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\listtablename}{Danh sách bảng}
+\renewcommand{\listfigurename}{Danh sách hình vẽ}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\chaptername}{Chương}
+\renewcommand{\appendixname}{Phụ lục}
+\renewcommand{\bibname}{Tài liệu tham khảo}
+
+% =============================================================================
+\begin{document}
+\selectlanguage{vietnamese}
+
+% -----------------------------------------------------------------------------
+% FRONT MATTER (No page numbering on cover pages)
+% -----------------------------------------------------------------------------
+\pagestyle{empty}
+
+% Cover Page 1
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    {\large\textbf{MINISTRY OF EDUCATION AND TRAINING}}\\[0.3cm]
+    {\large\textbf{FPT UNIVERSITY}}\\[2.5cm]
+    
+    {\Large\textbf{KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ}}\\[2.5cm]
+    
+    {\large\textit{LUẬN VĂN THẠC SĨ}}\\[4cm]
+    
+    \begin{tabular}{rl}
+        \textbf{Học viên:} & Nguyễn Đức Bình \\
+        \textbf{MSSV:}     & MSE13183 \\
+    \end{tabular}
+    
+    \vfill
+    {\normalsize Hà Nội, 2026}
+\end{titlepage}
+
+% Cover Page 2 (with Supervisors)
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    {\large\textbf{MINISTRY OF EDUCATION AND TRAINING}}\\[0.3cm]
+    {\large\textbf{FPT UNIVERSITY}}\\[2.5cm]
+    
+    {\Large\textbf{KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ}}\\[2.5cm]
+    
+    {\large\textit{LUẬN VĂN THẠC SĨ}}\\[3cm]
+    
+    \begin{tabular}{rl}
+        \textbf{Học viên:} & Nguyễn Đức Bình \\
+        \textbf{MSSV:}     & MSE13183 \\[0.5cm]
+        \textbf{Giảng viên hướng dẫn:} & 1. Bùi Văn Hiệu \\
+                                      & 2. [Tên GVHD phụ nếu có] \\
+    \end{tabular}
+    
+    \vfill
+    {\normalsize Hà Nội, 2026}
+\end{titlepage}
+
+% -----------------------------------------------------------------------------
+% FRONT MATTER WITH ROMAN NUMERALS (i, ii, iii...)
+% -----------------------------------------------------------------------------
+\pagenumbering{roman}
+\pagestyle{fancy}
+\setcounter{page}{3} % Starts from page iii after cover pages
+
+% Abstract Page
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\begin{singlespace} % Abstract text is typically single spaced in templates
+This thesis proposes a novel two-tier cognitive architecture, named SENTINEL, to automate network security threat triage and response. The first tier utilizes Welford's online statistical anomaly detection to filter out benign traffic at wire speed. The second tier acts as an AI Agent built on LangGraph, utilizing offline large language model (LLM) reasoning and hybrid Dual-RAG (MITRE ATT\&CK and NIST SP 800-61r2) for threat classification and mitigation instruction. Prompt safety is enforced via Delimited Data Encapsulation, and database log integrity is secured using HMAC log chaining. Evaluated on CSE-CIC-IDS2018 and DAPT2020 datasets, the system demonstrates high precision, low latency, and robustness against adversarial prompt injection.
+\end{singlespace}
+
+% Acknowledgements Page
+\chapter*{Lời cảm ơn}
+\addcontentsline{toc}{chapter}{Lời cảm ơn}
+Lời cảm ơn ghi nhận tại đây...
+
+% Table of Contents and Lists
+\tableofcontents
+\listoftables
+\listoffigures
+
+% -----------------------------------------------------------------------------
+% MAIN BODY (Arabic numerals 1, 2, 3...)
+% -----------------------------------------------------------------------------
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1} % Reset page numbering to 1 for the main body
+\doublespacing % Apply Double Spacing rules to main body text
+
+% Include modular chapter files
+\include{chapters/ch1_introduction}
+\include{chapters/ch2_literature_review}
+\include{chapters/ch3_proposed_solution}
+\include{chapters/ch4_implementation}
+\include{chapters/ch5_experiments_evaluation}
+\include{chapters/ch6_conclusion}
+
+% -----------------------------------------------------------------------------
+% REFERENCES & BIBLIOGRAPHY (Restart page numbering at 1)
+% -----------------------------------------------------------------------------
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\singlespacing % References are typically single-spaced
+
+\begin{thebibliography}{99}
+\addcontentsline{toc}{chapter}{Tài liệu tham khảo}
+
+\bibitem{ids2018}
+I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Dataset for Cyber Security in Ad hoc Networks,'' in \textit{Proceedings of the International Conference on Information Systems Security and Privacy (ICISSP)}, 2018.
+
+\bibitem{nist80061}
+P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' NIST Special Publication 800-61 Revision 2, 2012.
+
+\bibitem{rrf2009}
+G. V. Cormack, C. L. A. Clarke, and S. Buettcher, ``Reciprocal Rank Fusion Outperforms Condorcet and Individual Bootstrap Product Algorithms,'' in \textit{Proceedings of the 32nd International ACM SIGIR Conference on Research and Development in Information Retrieval}, 2009.
+
+\end{thebibliography}
+
+% -----------------------------------------------------------------------------
+% APPENDICES (Restart page numbering at 1)
+% -----------------------------------------------------------------------------
+\newpage
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\doublespacing
+
+\appendix
+\chapter{Các payload tấn công nghịch đảo thử nghiệm}
+Nội dung phụ lục...
+
+\end{document}

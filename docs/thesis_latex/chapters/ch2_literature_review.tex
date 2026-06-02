@@ -1,0 +1,21 @@
+\chapter{Cơ sở lý thuyết và các nghiên cứu liên quan}
+\label{ch:literature_review}
+
+Chương này trình bày các lý thuyết nền tảng khoa học máy tính và an ninh mạng làm cơ sở thiết kế cho hệ thống SENTINEL. Nội dung chương bao gồm: Tổng quan mô hình ngôn ngữ lớn hoạt động offline và kỹ thuật lượng tử hóa; Kiến trúc tác tử AI và cỗ máy trạng thái; Công nghệ RAG và thuật toán xếp hạng lai; Các nguy cơ an toàn đối với hệ thống LLM; và tổng quan các nghiên cứu liên quan gần đây.
+
+\section{Mô hình ngôn ngữ lớn offline và Lượng tử hóa mô hình}
+Trình bày về các kiến trúc transformer, kỹ thuật phục vụ cục bộ bằng llama.cpp và lượng tử hóa mô hình (GGUF, Q4\_K\_M) để chạy mượt mà trên phần cứng giới hạn (GPU RTX 4060 Ti 16GB).
+
+\section{Kiến trúc AI Agent và Đồ thị trạng thái}
+Trình bày về LangGraph, StateGraph và vai trò của tác tử trong việc thực thi vòng lặp phản hồi nhận thức có điều kiện thay vì suy luận tuyến tính thông thường.
+
+\section{Retrieval-Augmented Generation (RAG) và Tìm kiếm lai}
+Trình bày cơ chế Dense Search (sử dụng FAISS và mô hình all-MiniLM-L6-v2), Sparse Search (sử dụng BM25Okapi), và thuật toán kết hợp thứ hạng Reciprocal Rank Fusion (RRF, k=60) nhằm tối ưu hóa độ chính xác tri thức đầu vào cho LLM.
+
+\section{Các vector tấn công nghịch đảo vào LLM và Tầng Guardrail}
+Trình bày về Prompt Injection, Delimiter Smuggling, RAG Poisoning và cơ chế phòng vệ chống rò rỉ dữ liệu (XSS/Markdown Exfiltration).
+
+\section{Tổng quan các nghiên cứu liên quan}
+Phân tích, đánh giá ưu nhược điểm của các tiếp cận hiện tại về tự động hóa phân tích log trong SOC bằng AI và chỉ ra các điểm Sentinel cải tiến.
+
+Tóm lại, Chương 2 đã làm sáng tỏ các lý thuyết cốt lõi sử dụng trong đề tài. Chương tiếp theo sẽ giới thiệu chi tiết kiến trúc đề xuất SENTINEL.

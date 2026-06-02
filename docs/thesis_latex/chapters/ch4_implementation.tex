@@ -1,0 +1,24 @@
+\chapter{Triển khai kỹ thuật}
+\label{ch:implementation}
+
+Chương này trình bày chi tiết về mặt triển khai mã nguồn thực tế của hệ thống SENTINEL. Nội dung chương bao gồm: Bản đồ cấu trúc thư mục dự án và vai trò của từng file; Chi tiết triển khai mã nguồn các lớp cốt lõi; Cấu hình môi trường Container Docker và cơ chế hot-swap model; Thiết kế và giao diện Web Dashboard giám sát hỗ trợ Human-in-the-Loop.
+
+\section{Bản đồ cấu trúc thư mục dự án}
+Trình bày cấu trúc thư mục phân lớp rõ ràng của dự án và giải thích vai trò của các module trong `src/` và `scripts/`.
+
+\section{Đặc tả chi tiết mã nguồn các cấu phần cốt lõi}
+Trích dẫn và lý giải cấu trúc mã nguồn các class chính:
+\begin{itemize}
+    \item Lớp bộ lọc: `RuleEngine`, `SessionBaseline` và `RunningStats`.
+    \item Lớp Guardrail: `LogTemplateMiner`, `TokenBudgetManager` và `DelimitedDataEncapsulator`.
+    \item Lớp RAG \& Retrieval: `DualRetriever` và `OpenAILLMClient`.
+    \item Lớp bộ nhớ và phản hồi: `ThreatMemoryManager` và `RuleExecutor`.
+\end{itemize}
+
+\section{Đóng gói Container Docker và Bộ chuyển đổi mô hình (Model Switcher)}
+Đặc tả chi tiết `Dockerfile` và tệp cấu hình `docker-compose.yml`. Giải thích cơ chế script điều khiển nạp nóng mô hình ngôn ngữ lớn offline.
+
+\section{Giao diện quản trị SOC Web Dashboard (Streamlit UI)}
+Trình bày các tính năng của dashboard: Hàng đợi cảnh báo thời gian thực, quản lý luật tường lửa, phân quyền RBAC, theo dõi Live FPR và module điều tra tương tác IP lịch sử.
+
+Tóm lại, Chương 4 đã đặc tả chi tiết về mặt cơ cấu mã nguồn và giao diện vận hành của Sentinel. Chương tiếp theo sẽ trình bày thiết lập thực nghiệm và phân tích kết quả đo lường cụ thể.

@@ -1,0 +1,43 @@
+\babel@toc {english}{}\relax 
+\babel@toc {vietnamese}{}\relax 
+\contentsline {chapter}{Abstract}{iii}{}%
+\contentsline {chapter}{Lời cảm ơn}{iv}{}%
+\contentsline {chapter}{\numberline {1}Mở đầu}{1}{}%
+\contentsline {section}{\numberline {1.1}Bối cảnh nghiên cứu và Lý do chọn đề tài}{1}{}%
+\contentsline {section}{\numberline {1.2}Mục tiêu nghiên cứu}{2}{}%
+\contentsline {section}{\numberline {1.3}Câu hỏi nghiên cứu}{3}{}%
+\contentsline {section}{\numberline {1.4}Đối tượng và Phương pháp nghiên cứu}{3}{}%
+\contentsline {section}{\numberline {1.5}Phạm vi nghiên cứu}{4}{}%
+\contentsline {section}{\numberline {1.6}Cấu trúc của luận văn}{4}{}%
+\contentsline {chapter}{\numberline {2}Cơ sở lý thuyết và các nghiên cứu liên quan}{6}{}%
+\contentsline {section}{\numberline {2.1}Mô hình ngôn ngữ lớn offline và Lượng tử hóa mô hình}{6}{}%
+\contentsline {section}{\numberline {2.2}Kiến trúc AI Agent và Đồ thị trạng thái}{6}{}%
+\contentsline {section}{\numberline {2.3}Retrieval-Augmented Generation (RAG) và Tìm kiếm lai}{7}{}%
+\contentsline {section}{\numberline {2.4}Các vector tấn công nghịch đảo vào LLM và Tầng Guardrail}{7}{}%
+\contentsline {section}{\numberline {2.5}Tổng quan các nghiên cứu liên quan}{7}{}%
+\contentsline {chapter}{\numberline {3}Kiến trúc hệ thống đề xuất SENTINEL}{8}{}%
+\contentsline {section}{\numberline {3.1}Tổng quan kiến trúc hai tầng}{8}{}%
+\contentsline {section}{\numberline {3.2}Thuật toán Outlier Detection thống kê trực tuyến Welford}{8}{}%
+\contentsline {section}{\numberline {3.3}Thiết kế Tầng Guardrail bảo vệ Prompt}{9}{}%
+\contentsline {section}{\numberline {3.4}Mô hình Tác tử nhận thức LangGraph và Dual-RAG}{9}{}%
+\contentsline {section}{\numberline {3.5}SQLite Threat Memory và liên kết chuỗi APT}{9}{}%
+\contentsline {section}{\numberline {3.6}Bảo vệ toàn vẹn chứng cứ logs bằng HMAC Log Chaining}{9}{}%
+\contentsline {chapter}{\numberline {4}Triển khai kỹ thuật}{10}{}%
+\contentsline {section}{\numberline {4.1}Bản đồ cấu trúc thư mục dự án}{10}{}%
+\contentsline {section}{\numberline {4.2}Đặc tả chi tiết mã nguồn các cấu phần cốt lõi}{10}{}%
+\contentsline {section}{\numberline {4.3}Đóng gói Container Docker và Bộ chuyển đổi mô hình (Model Switcher)}{11}{}%
+\contentsline {section}{\numberline {4.4}Giao diện quản trị SOC Web Dashboard (Streamlit UI)}{11}{}%
+\contentsline {chapter}{\numberline {5}Thực nghiệm và Đánh giá kết quả}{12}{}%
+\contentsline {section}{\numberline {5.1}Tập dữ liệu thử nghiệm và Môi trường mô phỏng}{12}{}%
+\contentsline {section}{\numberline {5.2}Thiết lập cấu hình thử nghiệm Ablation Study}{12}{}%
+\contentsline {section}{\numberline {5.3}Đánh giá chất lượng phân loại và Kiểm định thống kê McNemar}{13}{}%
+\contentsline {section}{\numberline {5.4}Đánh giá hiệu năng vận hành và Kiểm định trễ Mann-Whitney U}{13}{}%
+\contentsline {section}{\numberline {5.5}Đánh giá tính kháng tấn công nghịch đảo (Robustness)}{13}{}%
+\contentsline {section}{\numberline {5.6}Đánh giá tính giải thích được (Explainability)}{13}{}%
+\contentsline {section}{\numberline {5.7}Đánh giá chất lượng RAG bằng mô hình trọng tài (LLM-as-a-Judge)}{13}{}%
+\contentsline {chapter}{\numberline {6}Kết luận và Hướng phát triển}{15}{}%
+\contentsline {section}{\numberline {6.1}Các kết quả đạt được}{15}{}%
+\contentsline {section}{\numberline {6.2}Hạn chế của hệ thống}{16}{}%
+\contentsline {section}{\numberline {6.3}Hướng phát triển tương lai}{16}{}%
+\contentsline {chapter}{Tài liệu tham khảo}{1}{}%
+\contentsline {chapter}{\numberline {A}Các payload tấn công nghịch đảo thử nghiệm}{1}{}%
