@@ -49,3 +49,7 @@ demo_outputs/vulnerability_report.md
 # LaTeX compile logs
 docs/proposal_latex/compile_*.log
 
+# Dynamically generated scan results
+data/trivy-results.json
+
+
