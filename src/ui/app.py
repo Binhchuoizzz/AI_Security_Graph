@@ -272,14 +272,15 @@ def main_dashboard():
             page_alerts = filtered_alerts[start_idx:end_idx]
             
             # Hiển thị các Alert Cards cho trang hiện tại
-            for alert in page_alerts:
+            for idx, alert in enumerate(page_alerts):
                 target_ip = alert.get("target", "N/A")
                 is_whitelisted = target_ip in whitelisted_ips
                 
                 render_alert_card(
                     alert, 
                     is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
-                    on_whitelist=handle_whitelist_approval if not is_whitelisted else None
+                    on_whitelist=handle_whitelist_approval if not is_whitelisted else None,
+                    card_id=f"{start_idx + idx}"
                 )
                 
             # Điều hướng trang

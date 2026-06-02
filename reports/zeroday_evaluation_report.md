@@ -22,13 +22,13 @@
 * **Z-Score ở Tier-1:** 59792.25 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
 * **Hành động phản ứng tự động:** `BLOCK_IP` (Độ tin cậy: 0.95)
 * **Lập luận bảo mật (Reasoning):**
-  > "Dữ liệu cho thấy IP 10.0.0.22 gửi một lượng gói tin bất thường (85000 gói) đến cổng 80, kèm theo User-Agent là exfil-tool/v1.0.  Hành vi này khớp với kỹ thuật Malvertising (T1583.008) và có thể là một nỗ lực lây nhiễm malware. Hệ thống thực hiện chặn IP để ngăn chặn hoạt động này."
+  > "Dữ liệu cho thấy IP 10.0.0.22 gửi một lượng gói tin bất thường (85000 gói) đến cổng 80 với User-Agent là 'exfil-tool/v1.0', có khả năng là một công cụ exfiltration. Hành vi này khớp với kỹ thuật Malvertising (T1583.008) và cần được chặn để bảo vệ hệ thống."
 
 ### ZD-002: Zero-Day Session Flooding (Outlier Volume)
 * **Z-Score ở Tier-1:** 14.09 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
 * **Hành động phản ứng tự động:** `BLOCK_IP` (Độ tin cậy: 0.95)
 * **Lập luận bảo mật (Reasoning):**
-  > "IP nguồn 10.0.0.33 thực hiện truy cập cổng 80 với số lượng gói tin bất thường (120000 gói tin), vượt quá ngưỡng Z-Score cho phép. User-agent là Wget/1.21.1 flood-bot, thường được sử dụng trong các cuộc tấn công DDoS. Hệ thống chặn IP để ngăn chặn hoạt động đáng ngờ."
+  > "Phát hiện IP nguồn 10.0.0.33 gửi một lượng gói tin rất lớn (120000 gói) đến cổng 80 với User-Agent là Wget/1.21.1 flood-bot, nghi ngờ là botnet thực hiện tấn công DDoS. Hệ thống thực hiện chặn IP để ngăn chặn tấn công."
 
 ---
 ## 💡 Kết Luận Khoa Học Cho Luận Văn Thạc Sĩ

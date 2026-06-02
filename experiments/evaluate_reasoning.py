@@ -336,7 +336,10 @@ def run_judge_evaluation():
                 mlflow.log_metric("Context_Recall_Mean", agg["context_recall"]["mean"])
                 mlflow.log_metric("Audit_Completeness_Rate_pct", agg["audit_completeness"]["mean"])
                 mlflow.log_metric("Overall_Quality_Mean", agg["overall_mean"])
-            mlflow.log_artifact(OUTPUT_PATH)
+            try:
+                mlflow.log_artifact(OUTPUT_PATH)
+            except Exception as art_err:
+                print(f"[!] Warning: Failed to log artifact to MLflow: {art_err}")
         print("[+] Metrics logged to MLflow (Sentinel_Reasoning_Quality)")
     except Exception as e:
         print(f"[!] MLflow logging failed (non-critical): {e}")

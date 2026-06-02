@@ -21,7 +21,7 @@ def is_valid_ip(ip_str: str) -> bool:
     return bool(re.match(ipv6_pattern, ip_str))
 
 
-def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
+def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id=""):
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
     try:
@@ -151,15 +151,15 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None):
         if on_whitelist:
             # IP chưa được Whitelist
             if is_l3_manager:
-                if st.button(f"🛡️ Whitelist IP: {cleaned_target}", key=f"wl_btn_{cleaned_target}_{timestamp}"):
+                if st.button(f"🛡️ Whitelist IP: {cleaned_target}", key=f"wl_btn_{cleaned_target}_{timestamp}_{card_id}"):
                     on_whitelist(cleaned_target)
                     st.success(f"IP {cleaned_target} đã được thêm vào Whitelist thành công!")
                     st.rerun()
             else:
-                st.button(f"🛡️ Whitelist IP: {cleaned_target}", key=f"wl_btn_dis_{cleaned_target}_{timestamp}", disabled=True, help="💡 Yêu cầu vai trò L3 Manager để whitelist IP này.")
+                st.button(f"🛡️ Whitelist IP: {cleaned_target}", key=f"wl_btn_dis_{cleaned_target}_{timestamp}_{card_id}", disabled=True, help="💡 Yêu cầu vai trò L3 Manager để whitelist IP này.")
         else:
             # IP đã được Whitelist rồi
-            st.button(f"✅ Đã Whitelist IP: {cleaned_target}", key=f"wl_btn_done_{cleaned_target}_{timestamp}", disabled=True, help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).")
+            st.button(f"✅ Đã Whitelist IP: {cleaned_target}", key=f"wl_btn_done_{cleaned_target}_{timestamp}_{card_id}", disabled=True, help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).")
 
     # Hiển thị log gốc JSON phục vụ việc kiểm tra sâu của SOC Analysts
     with st.expander("🔍 Xem Log gốc (Raw JSON)", expanded=False):

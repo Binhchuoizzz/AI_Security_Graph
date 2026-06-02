@@ -37,7 +37,7 @@ echo "[+] Stage 3 Completed in ${duration}s"
 # Stage 4
 echo -e "\n[4/4] Verifying Demo Package..."
 start=$SECONDS
-if [ -f "demo_outputs/vulnerability_report.md" ] && [ -f "demo_outputs/apt_alerts.json" ]; then
+if [ -f "demo_outputs/knowledge_graph.json" ] && [ -f "demo_outputs/apt_alerts.json" ]; then
     echo "[+] All artifacts generated successfully!"
 else
     echo "[-] Missing some artifacts."
