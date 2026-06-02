@@ -58,7 +58,7 @@ LABEL_MAP = {
         "severity": "HIGH",
     },
     "PortScan": {"mitre": "T1046", "sub": None, "action": "LOG", "severity": "LOW"},
-    "Bot": {"mitre": "T1071", "sub": None, "action": "ALERT", "severity": "HIGH"},
+    "Bot": {"mitre": "T1071", "sub": "T1071.001", "action": "BLOCK_IP", "severity": "HIGH"},
     "Infiltration": {
         "mitre": "T1078",
         "sub": None,

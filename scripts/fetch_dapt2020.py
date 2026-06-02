@@ -34,32 +34,108 @@ DAPT_RAW_DIR = "data/raw/dapt2020/"
 
 
 def download_from_kaggle():
-    """Attempt to download DAPT2020 from Kaggle."""
+    """Attempt to download DAPT2020 from Kaggle using kagglehub."""
     try:
-        subprocess.run(["pip", "install", "kaggle", "--quiet"],
-                      capture_output=True, check=True)
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return False
+        import kagglehub
+        import shutil
+        import pandas as pd
+    except ImportError:
+        try:
+            print("[*] Installing kagglehub...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "kagglehub", "pandas", "--quiet"],
+                          capture_output=True, check=True)
+            import kagglehub
+            import shutil
+            import pandas as pd
+        except Exception as e:
+            print(f"[!] Failed to install dependencies: {e}")
+            return False
 
     kaggle_json = os.path.expanduser("~/.kaggle/kaggle.json")
-    if not os.path.exists(kaggle_json):
-        print("[!] Kaggle API key not found at ~/.kaggle/kaggle.json")
+    kaggle_token = os.path.expanduser("~/.kaggle/access_token")
+    if not os.path.exists(kaggle_json) and not os.path.exists(kaggle_token) and "KAGGLE_API_TOKEN" not in os.environ:
+        print("[!] Kaggle API key not found at ~/.kaggle/kaggle.json or ~/.kaggle/access_token")
         print("    ACTION REQUIRED:")
-        print("    1. Go to: https://www.kaggle.com/datasets/anjum48/dapt2020")
-        print("    2. Click Download")
-        print("    3. Extract to: data/raw/dapt2020/")
-        print("    4. Expected files: day1.csv, day2.csv, day3.csv, day4.csv, day5.csv")
+        print("    1. Go to: https://www.kaggle.com/datasets/sowmyamyneni/dapt2020")
+        print("    2. Make sure you have Kaggle API token configured.")
         return False
 
     try:
         os.makedirs(DAPT_RAW_DIR, exist_ok=True)
-        subprocess.run([
-            "kaggle", "datasets", "download", "-d", "anjum48/dapt2020",
-            "--path", DAPT_RAW_DIR, "--unzip"
-        ], check=True)
-        print("[+] DAPT2020 downloaded from Kaggle successfully!")
+        raw_dir = Path(DAPT_RAW_DIR)
+
+        # Map public & private files to target days
+        day_mapping = {
+            "day1": {
+                "public": "csv/enp0s3-monday.pcap_Flow.csv",
+                "pvt": "csv/enp0s3-monday-pvt.pcap_Flow.csv"
+            },
+            "day2": {
+                "public": "csv/enp0s3-public-tuesday.pcap_Flow.csv",
+                "pvt": "csv/enp0s3-pvt-tuesday.pcap_Flow.csv"
+            },
+            "day3": {
+                "public": "csv/enp0s3-public-wednesday.pcap_Flow.csv",
+                "pvt": "csv/enp0s3-pvt-wednesday.pcap_Flow.csv"
+            },
+            "day4": {
+                "public": "csv/enp0s3-public-thursday.pcap_Flow.csv",
+                "pvt": "csv/enp0s3-pvt-thursday.pcap_Flow.csv"
+            },
+            "day5": {
+                "public": "csv/enp0s3-tcpdump-friday.pcap_Flow.csv",
+                "pvt": "csv/enp0s3-tcpdump-pvt-friday.pcap_Flow.csv"
+            }
+        }
+
+        # Step 1: Download one file to get standard headers
+        print("[*] Downloading header reference file from Kaggle...")
+        ref_path = kagglehub.dataset_download("sowmyamyneni/dapt2020", path=day_mapping["day1"]["public"])
+        df_ref = pd.read_csv(ref_path, nrows=1)
+        headers = df_ref.columns.tolist()
+
+        # Step 2: Download, map, and preprocess each day
+        for day_name, files in day_mapping.items():
+            dfs = []
+            for net_type, remote_path in files.items():
+                print(f"[*] Downloading {day_name} {net_type} file...")
+                local_path = kagglehub.dataset_download("sowmyamyneni/dapt2020", path=remote_path)
+                
+                # Check for header
+                with open(local_path, "r", encoding="utf-8") as f:
+                    first_line = f.readline()
+                
+                has_header = "Flow ID" in first_line or "Src IP" in first_line
+                if has_header:
+                    df = pd.read_csv(local_path, low_memory=False)
+                else:
+                    print(f"    [INFO] Applying standard headers to {remote_path}")
+                    df = pd.read_csv(local_path, header=None, low_memory=False)
+                    df.columns = headers
+
+                df.columns = df.columns.str.strip()
+
+                # Normalize the label column name to 'label'
+                label_col = None
+                for col in ["Activity", "Stage", "Label"]:
+                    if col in df.columns:
+                        label_col = col
+                        break
+                
+                if label_col:
+                    df = df.rename(columns={label_col: "label"})
+                
+                dfs.append(df)
+
+            if dfs:
+                combined_df = pd.concat(dfs, ignore_index=True)
+                output_path = raw_dir / f"{day_name}.csv"
+                combined_df.to_csv(output_path, index=False)
+                print(f"[+] Saved merged {day_name}.csv ({len(combined_df)} rows)")
+
+        print("[+] DAPT2020 downloaded and preprocessed successfully!")
         return True
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         print(f"[!] Kaggle download failed: {e}")
         return False
 

@@ -100,8 +100,8 @@ LABEL_MAP = {
     },
     "Bot": {
         "mitre": "T1071",
-        "sub": None,
-        "action": "ALERT",
+        "sub": "T1071.001",
+        "action": "BLOCK_IP",
         "severity": "HIGH",
     },
     "Benign": {
@@ -112,11 +112,37 @@ LABEL_MAP = {
     },
 }
 
+# ============================================================================
+# ATTACK NETWORK PROFILE: Static Representative Network Profiles per Attack Type
+# ============================================================================
+ATTACK_NETWORK_PROFILE = {
+    "SSH-Bruteforce":    {"src_ip": "10.0.0.1",   "dst_ip": "192.168.1.10", "src_port": 54321},
+    "FTP-BruteForce":   {"src_ip": "10.0.0.2",   "dst_ip": "192.168.1.10", "src_port": 54322},
+    "Bot":              {"src_ip": "10.0.0.50",  "dst_ip": "192.168.1.20", "src_port": 49152},
+    "Infilteration":    {"src_ip": "10.0.0.99",  "dst_ip": "192.168.1.30", "src_port": 60000},
+    "DoS attacks-GoldenEye":  {"src_ip": "10.0.1.1", "dst_ip": "192.168.1.100", "src_port": 0},
+    "DoS attacks-Slowloris":  {"src_ip": "10.0.1.2", "dst_ip": "192.168.1.100", "src_port": 0},
+    "DoS attacks-Hulk":       {"src_ip": "10.0.1.3", "dst_ip": "192.168.1.100", "src_port": 0},
+    "DoS attacks-SlowHTTPTest": {"src_ip": "10.0.1.4", "dst_ip": "192.168.1.100", "src_port": 0},
+    "DDOS attack-HOIC":       {"src_ip": "10.0.1.10","dst_ip": "192.168.1.100", "src_port": 0},
+    "DDOS attack-LOIC-UDP":   {"src_ip": "10.0.1.11","dst_ip": "192.168.1.100", "src_port": 0},
+    "Brute Force -Web":  {"src_ip": "10.0.2.1",  "dst_ip": "192.168.1.50", "src_port": 54400},
+    "Brute Force -XSS":  {"src_ip": "10.0.2.2",  "dst_ip": "192.168.1.50", "src_port": 54401},
+    "SQL Injection":     {"src_ip": "10.0.2.3",  "dst_ip": "192.168.1.50", "src_port": 54402},
+    "Benign":            {"src_ip": "192.168.1.200","dst_ip": "8.8.8.8",   "src_port": 12345},
+}
+
 # CIC-IDS2018 columns of interest
 FEATURE_COLS = [
-    "Src IP", "Dst IP", "Src Port", "Dst Port", "Protocol",
-    "Flow Duration", "Tot Fwd Pkts", "Tot Bwd Pkts",
-    "TotLen Fwd Pkts", "TotLen Bwd Pkts", "Label",
+    "Timestamp",
+    "Dst Port",
+    "Protocol",
+    "Flow Duration",
+    "Tot Fwd Pkts",
+    "Tot Bwd Pkts",
+    "TotLen Fwd Pkts",
+    "TotLen Bwd Pkts",
+    "Label",
 ]
 
 # AWS S3 Bucket (CIC-IDS2018 official source)
@@ -131,7 +157,7 @@ CSV_FILES_2018 = [
     "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",
     "Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv",
     "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
-    "Tuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",
+    # "Tuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # DDoS-LOIC-HTTP: not in LABEL_MAP
     "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
     "Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv",
     "Wednesday-28-02-2018_TrafficForML_CICFlowMeter.csv",
@@ -142,6 +168,13 @@ def _infer_service(port: int) -> str:
     return {22: "SSH", 21: "FTP", 80: "HTTP", 443: "HTTPS", 3306: "MySQL"}.get(
         port, f"PORT_{port}"
     )
+
+
+def safe_int(val: object) -> int:
+    try:
+        return int(val) if pd.notna(val) else 0  # type: ignore
+    except (ValueError, TypeError):
+        return 0
 
 
 def download_from_aws():
@@ -198,6 +231,14 @@ def fetch_and_build(
             return
         csv_files = glob.glob(os.path.join(LOCAL_RAW_DIR, "*.csv"))
 
+    # Filter only files specified in CSV_FILES_2018 to avoid processing discarded files (like Tuesday-20-02)
+    allowed_basenames = {name.lower() for name in CSV_FILES_2018}
+    csv_files = [
+        f for f in csv_files
+        if os.path.basename(f).lower() in allowed_basenames or
+           os.path.basename(f).lower().replace("thuesday", "tuesday") in allowed_basenames
+    ]
+
     all_data = []
 
     for filepath in csv_files:
@@ -217,14 +258,15 @@ def fetch_and_build(
             if "Label" not in df.columns:
                 print(f"     [WARN] No 'Label' column in {filename}, skipping.")
                 continue
+            df = df[df["Label"] != "Label"]   # drop stray header rows
             df_filtered = df[available_cols].copy()
 
             # Normalize label strings
-            df_filtered["Label"] = pd.Series(df_filtered["Label"]).str.strip()
+            df_filtered["Label"] = df_filtered["Label"].str.strip()
 
             # Only keep labels in our LABEL_MAP
             valid_labels = list(LABEL_MAP.keys())
-            df_filtered = df_filtered[pd.Series(df_filtered["Label"]).isin(valid_labels)]
+            df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]
             all_data.append(df_filtered)
             print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm.")
         except Exception as e:
@@ -254,26 +296,35 @@ def fetch_and_build(
 
         chosen = subset.sample(n_take, random_state=42)
 
-        def safe_int(val):
-            try:
-                return int(val) if pd.notna(val) else 0 # type: ignore
-            except (ValueError, TypeError):
-                return 0
-
         for idx, (_, row) in enumerate(chosen.iterrows()):
-            # CIC-IDS2018 processed CSVs don't have Src IP/Dst IP
-            # Generate deterministic mock IPs for Tier 1 compatibility
-            src_ip = str(row.get("Src IP", f"10.{(gt_counter // 256) % 256}.{gt_counter % 256}.{(idx+1) % 256}"))
-            dst_ip = str(row.get("Dst IP", f"192.168.1.{(gt_counter + idx) % 256}"))
-            src_port = safe_int(row.get("Src Port", 0))
+            # Use static profile IPs and ports per attack type
+            profile = ATTACK_NETWORK_PROFILE.get(
+                label,
+                {"src_ip": "10.255.0.1", "dst_ip": "192.168.1.1", "src_port": 0}
+            )
+            src_ip = profile["src_ip"]
+            dst_ip = profile["dst_ip"]
+            src_port = profile["src_port"]
             dst_port = safe_int(row.get("Dst Port", 0))
+
+            # Parse timestamp from data
+            raw_ts = row.get("Timestamp", None)
+            if raw_ts and str(raw_ts) not in ("nan", "Timestamp"):
+                try:
+                    from datetime import datetime
+                    dt = datetime.strptime(str(raw_ts), "%d/%m/%Y %H:%M:%S")
+                    timestamp = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                except ValueError:
+                    timestamp = "2018-02-14T10:00:00Z"  # fallback only
+            else:
+                timestamp = "2018-02-14T10:00:00Z"
 
             sample = {
                 "id": f"GT-{gt_counter:03d}",
                 "description": f"{label} attack sample from CSE-CIC-IDS2018",
                 "logs": [
                     {
-                        "timestamp": "2018-02-14T10:00:00Z",
+                        "timestamp": timestamp,
                         "src_ip": src_ip,
                         "dst_ip": dst_ip,
                         "src_port": src_port,
