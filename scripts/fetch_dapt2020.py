@@ -39,7 +39,6 @@ def download_from_kaggle():
     """Attempt to download DAPT2020 from Kaggle using kagglehub."""
     try:
         import kagglehub
-        import shutil
         import pandas as pd
     except ImportError:
         try:
@@ -47,7 +46,6 @@ def download_from_kaggle():
             subprocess.run([sys.executable, "-m", "pip", "install", "kagglehub", "pandas", "--quiet"],
                           capture_output=True, check=True)
             import kagglehub
-            import shutil
             import pandas as pd
         except Exception as e:
             print(f"[!] Failed to install dependencies: {e}")
@@ -255,9 +253,10 @@ def verify_dapt2020():
         if not os.path.exists(path):
             print(f"  [FAIL] Missing: {path}")
             return False
-        df = pd.read_csv(path, nrows=5)
-        total = len(pd.read_csv(path))
-        print(f"  {f}: {total} rows, cols: {list(df.columns)[:5]}")
+        df = pd.read_csv(path, low_memory=False)
+        total = len(df)
+        df_sample = df.head(5)
+        print(f"  {f}: {total} rows, cols: {list(df_sample.columns)[:5]}")
     return True
 
 

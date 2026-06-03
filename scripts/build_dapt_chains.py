@@ -19,12 +19,14 @@ import pandas as pd
 try:
     from scripts.dapt2020_config import (
         APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
-        BENIGN_LABELS, normalize_stage, normalize_label
+        BENIGN_LABELS, normalize_stage, normalize_label,
+        DAPT_LABEL_TO_MITRE
     )
 except ImportError:
     from dapt2020_config import (  # type: ignore  # noqa: E402
         APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
-        BENIGN_LABELS, normalize_stage, normalize_label
+        BENIGN_LABELS, normalize_stage, normalize_label,
+        DAPT_LABEL_TO_MITRE
     )
 
 
@@ -106,10 +108,12 @@ def build_chains():
         if ip not in chains:
             chains[ip] = []
         
+        lbl_val = str(row.get("label", "Normal"))
         chains[ip].append({
             "day": safe_int(row.get("apt_day", 0)),
             "phase": str(row.get("apt_phase", "Unknown")),
-            "label": str(row.get("label", "Normal")),
+            "label": lbl_val,
+            "mitre_ttp": DAPT_LABEL_TO_MITRE.get(lbl_val, None),
             "src_ip": ip,
             "dst_ip": str(row.get("dst_ip", "10.0.0.1")),
             "timestamp": str(row.get("timestamp", "")),
@@ -132,6 +136,8 @@ def build_chains():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
         for ip, events in apt_chains.items():
+            if len(events) > 20:
+                print(f"  [INFO] {ip}: {len(events)} events -> truncated to 20")
             f.write(json.dumps({
                 "attacker_ip": ip,
                 "chain_length": len(events),

@@ -30,10 +30,26 @@ def normalize_stage(stage_val):
 def normalize_label(label_val):
     if pd.isna(label_val) or label_val is None:
         return "Unknown"
-    l = str(label_val).strip()
-    if l.upper() in ("BENIGN", "NORMAL"):
+    lbl = str(label_val).strip()
+    if lbl.upper() in ("BENIGN", "NORMAL"):
         return "Normal"
-    return l
+    return lbl
+
+# Mapping of DAPT2020 attack labels to MITRE ATT&CK TTPs
+DAPT_LABEL_TO_MITRE = {
+    "Network Scan":           "T1046",
+    "Web Vulnerability Scan": "T1595.002",
+    "Directory Bruteforce":   "T1083",
+    "Account Bruteforce":     "T1110.001",
+    "Account Discovery":      "T1087",
+    "SQL Injection":          "T1190",
+    "CSRF":                   "T1185",
+    "Malware Download":       "T1105",
+    "Backdoor":               "T1543",
+    "Privilege Escalation":   "T1068",
+    "Command Injection":      "T1059",
+    "Data Exfiltration":      "T1041",
+}
 
 # Full list of 85 columns in DAPT2020 raw dataset
 DAPT2020_HEADERS = [
