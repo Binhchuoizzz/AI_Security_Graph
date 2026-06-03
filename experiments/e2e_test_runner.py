@@ -76,10 +76,13 @@ def test_01_ground_truth(r: TestResult):
         data = json.load(f)
     assert len(data) >= 100, f"Too few samples: {len(data)}"
     # Check structure
-    sample = data[0]
-    for key in ["id", "logs", "expected_mitre_technique", "expected_action"]:
-        assert key in sample, f"Missing key '{key}' in sample"
-    r.passed(f"{len(data)} samples loaded, structure valid")
+    valid_severities = {"INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"}
+    for idx, sample in enumerate(data):
+        for key in ["id", "logs", "expected_mitre_technique", "expected_action", "expected_severity"]:
+            assert key in sample, f"Missing key '{key}' in sample index {idx} (ID: {sample.get('id', 'unknown')})"
+        severity = sample["expected_severity"]
+        assert severity in valid_severities, f"Invalid severity '{severity}' in sample index {idx} (ID: {sample.get('id', 'unknown')})"
+    r.passed(f"{len(data)} samples loaded, structure and expected_severity valid")
 
 
 # ============================================================================

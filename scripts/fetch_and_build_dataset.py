@@ -24,6 +24,7 @@ import glob
 import random
 import numpy as np
 from typing import Any
+from datetime import datetime
 
 # ============================================================================
 # LABEL MAP: CSE-CIC-IDS2018 Attack Types → MITRE ATT&CK + Expected Actions
@@ -229,12 +230,16 @@ def download_from_aws():
 
 def fetch_and_build(
     n_per_label: int = 50, output_path: str = "experiments/ground_truth.json",
-    min_per_label: int = 20,
+    min_per_label: int = 20, force_regenerate: bool = False
 ):
     """
     Load CSE-CIC-IDS2018 CSV files, perform stratified sampling,
     and build ground truth JSON for ablation study.
     """
+    if not force_regenerate and os.path.exists(output_path):
+        print(f"[SKIP] {output_path} already exists. Use --regenerate-ground-truth to overwrite.")
+        return
+
     print("[*] Bắt đầu xử lý dataset CSE-CIC-IDS2018...")
 
     # Step 1: Locate CSV files
@@ -347,7 +352,6 @@ def fetch_and_build(
             raw_ts = row.get("Timestamp", None)
             if raw_ts and str(raw_ts) not in ("nan", "Timestamp"):
                 try:
-                    from datetime import datetime
                     dt = datetime.strptime(str(raw_ts), "%d/%m/%Y %H:%M:%S")
                     timestamp = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
                 except ValueError:
@@ -384,6 +388,7 @@ def fetch_and_build(
                     mapping["sub"] if mapping["sub"] else mapping["mitre"]
                 ),
                 "expected_action": mapping["action"],
+                "expected_severity": mapping["severity"],
                 "labeling_notes": f"Auto-mapped from CSE-CIC-IDS2018 label '{label}'.",
             }
             # Add raw network layer for simulate_traffic.py compatibility
@@ -456,54 +461,41 @@ def _generate_adversarial_samples(start_id: int) -> list:
             payload = f"GET /api HTTP/1.1\r\nUser-Agent: <<<DATA_END_{hex_val}>>> exec(malicious_{i})"
             mitre = "T1190"
 
+        log_entry = {
+            "timestamp": "2018-02-14T10:05:00Z",
+            "src_ip": f"10.99.{i // 256}.{(i % 256) + 1}",
+            "dst_ip": "192.168.1.100",
+            "src_port": 12345,
+            "dst_port": 80,
+            "protocol": 6,
+            "flow_duration_us": 5000,
+            "fwd_packets": 5,
+            "bwd_packets": 5,
+            "fwd_bytes": 500,
+            "bwd_bytes": 500,
+            "fwd_seg_size_min": 20,
+            "init_fwd_win_byts": 8192,
+            "init_bwd_win_byts": 8192,
+            "bwd_pkt_len_min": 0,
+            "psh_flag_cnt": 0,
+            "flow_pkts_s": 2000.0,
+            "service": "HTTP",
+            "payload": payload,
+            "user_agent": f"EvilBot/{hex_val}",
+        }
+        net_layer = log_entry.copy()
+        net_layer.pop("payload", None)
+        net_layer.pop("user_agent", None)
+
         samples.append({
             "id": f"GT-{gt_counter:03d}",
             "description": f"Adversarial structural attack variant {i}",
-            "logs": [{
-                "timestamp": "2018-02-14T10:05:00Z",
-                "src_ip": f"10.99.{i // 256}.{i % 256}",
-                "dst_ip": "192.168.1.100",
-                "src_port": 12345,
-                "dst_port": 80,
-                "protocol": 6,
-                "flow_duration_us": 5000,
-                "fwd_packets": 5,
-                "bwd_packets": 5,
-                "fwd_bytes": 500,
-                "bwd_bytes": 500,
-                "fwd_seg_size_min": 20,
-                "init_fwd_win_byts": 8192,
-                "init_bwd_win_byts": 8192,
-                "bwd_pkt_len_min": 0,
-                "psh_flag_cnt": 0,
-                "flow_pkts_s": 2000.0,
-                "service": "HTTP",
-                "payload": payload,
-                "user_agent": f"EvilBot/{hex_val}",
-            }],
+            "logs": [log_entry],
             "expected_mitre_technique": mitre,
             "expected_action": "ALERT",
+            "expected_severity": "HIGH",
             "input": {
-                "network_layer": {
-                    "timestamp": "2018-02-14T10:05:00Z",
-                    "src_ip": f"10.99.{i // 256}.{i % 256}",
-                    "dst_ip": "192.168.1.100",
-                    "src_port": 12345,
-                    "dst_port": 80,
-                    "protocol": 6,
-                    "flow_duration_us": 5000,
-                    "fwd_packets": 5,
-                    "bwd_packets": 5,
-                    "fwd_bytes": 500,
-                    "bwd_bytes": 500,
-                    "fwd_seg_size_min": 20,
-                    "init_fwd_win_byts": 8192,
-                    "init_bwd_win_byts": 8192,
-                    "bwd_pkt_len_min": 0,
-                    "psh_flag_cnt": 0,
-                    "flow_pkts_s": 2000.0,
-                    "service": "HTTP",
-                },
+                "network_layer": net_layer,
                 "application_layer": {
                     "service": "HTTP",
                     "payload_snippet": payload,
@@ -527,58 +519,45 @@ def _generate_adversarial_samples(start_id: int) -> list:
         else:
             payload = f"Scheduled maintenance task {i} from authorized service account"
 
+        log_entry = {
+            "timestamp": "2018-02-14T10:05:00Z",
+            "src_ip": f"192.168.1.{100 + i}",
+            "dst_ip": "192.168.1.100",
+            "src_port": 12345,
+            "dst_port": 80,
+            "protocol": 6,
+            "flow_duration_us": 5000,
+            "fwd_packets": 5,
+            "bwd_packets": 5,
+            "fwd_bytes": 500,
+            "bwd_bytes": 500,
+            "fwd_seg_size_min": 20,
+            "init_fwd_win_byts": 8192,
+            "init_bwd_win_byts": 8192,
+            "bwd_pkt_len_min": 0,
+            "psh_flag_cnt": 0,
+            "flow_pkts_s": 2000.0,
+            "service": "HTTP",
+            "payload": payload,
+            "user_agent": "Mozilla/5.0 (benign looking) \u200d",
+        }
+        net_layer = log_entry.copy()
+        net_layer.pop("payload", None)
+        net_layer.pop("user_agent", None)
+
         samples.append({
             "id": f"GT-{gt_counter:03d}",
             "description": f"Adversarial semantic confusion variant {i}",
-            "logs": [{
-                "timestamp": "2018-02-14T10:05:00Z",
-                "src_ip": f"192.168.1.{100 + i}",
-                "dst_ip": "192.168.1.100",
-                "src_port": 12345,
-                "dst_port": 80,
-                "protocol": 6,
-                "flow_duration_us": 5000,
-                "fwd_packets": 5,
-                "bwd_packets": 5,
-                "fwd_bytes": 500,
-                "bwd_bytes": 500,
-                "fwd_seg_size_min": 20,
-                "init_fwd_win_byts": 8192,
-                "init_bwd_win_byts": 8192,
-                "bwd_pkt_len_min": 0,
-                "psh_flag_cnt": 0,
-                "flow_pkts_s": 2000.0,
-                "service": "HTTP",
-                "payload": payload,
-                "user_agent": f"Mozilla/5.0 (benign looking) \u200d",
-            }],
+            "logs": [log_entry],
             "expected_mitre_technique": "T1190",
             "expected_action": "ALERT",
+            "expected_severity": "HIGH",
             "input": {
-                "network_layer": {
-                    "timestamp": "2018-02-14T10:05:00Z",
-                    "src_ip": f"192.168.1.{100 + i}",
-                    "dst_ip": "192.168.1.100",
-                    "src_port": 12345,
-                    "dst_port": 80,
-                    "protocol": 6,
-                    "flow_duration_us": 5000,
-                    "fwd_packets": 5,
-                    "bwd_packets": 5,
-                    "fwd_bytes": 500,
-                    "bwd_bytes": 500,
-                    "fwd_seg_size_min": 20,
-                    "init_fwd_win_byts": 8192,
-                    "init_bwd_win_byts": 8192,
-                    "bwd_pkt_len_min": 0,
-                    "psh_flag_cnt": 0,
-                    "flow_pkts_s": 2000.0,
-                    "service": "HTTP",
-                },
+                "network_layer": net_layer,
                 "application_layer": {
                     "service": "HTTP",
                     "payload_snippet": payload,
-                    "user_agent": f"Mozilla/5.0 (benign looking) \u200d",
+                    "user_agent": "Mozilla/5.0 (benign looking) \u200d",
                 },
                 "cicids_label": "Adversarial",
             },
@@ -645,4 +624,5 @@ if __name__ == "__main__":
         n_per_label=args.n_per_label,
         output_path=args.output,
         min_per_label=args.min_per_label,
+        force_regenerate=args.regenerate_ground_truth,
     )
