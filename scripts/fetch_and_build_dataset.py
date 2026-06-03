@@ -301,20 +301,54 @@ def fetch_and_build(
     print(f"[*] Đã gộp thành công. Tổng số mẫu sau lọc: {len(combined_df)}")
 
     # Preprocessing Pipeline
-    print("[*] Đang thực hiện tiền xử lý dữ liệu (dedup, replace inf, TCP Window Size sentinel)...")
-    combined_df.drop_duplicates(inplace=True)
-    
-    # Thay thế inf và -inf thành NaN
+    print("[*] Đang thực hiện tiền xử lý dữ liệu...")
+    n_before = len(combined_df)
+    stats = {}
+
+    # 1. Force numeric coercion on feature columns (CSV may leave them as object/string dtype)
+    numeric_cols = [c for c in FEATURE_COLS if c not in ("Timestamp", "Label") and c in combined_df.columns]
+    for col in numeric_cols:
+        combined_df[col] = pd.to_numeric(combined_df[col], errors="coerce")
+    stats["coerced_to_numeric"] = len(numeric_cols)
+
+    # 2. Replace inf and -inf with NaN (before any numeric operations)
+    inf_mask = combined_df[numeric_cols].isin([np.inf, -np.inf])
+    stats["inf_replaced"] = int(inf_mask.sum().sum())
     combined_df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    
-    # Xử lý Init Win Byts sentinel value -1 thành 0
-    for col in ["Init Fwd Win Byts", "Init Bwd Win Byts"]:
+
+    # 3. Drop exact duplicates
+    combined_df.drop_duplicates(inplace=True)
+    n_after_dedup = len(combined_df)
+    stats["duplicates_removed"] = n_before - n_after_dedup
+
+    # 4. Clip negative Flow Duration to 0 (physically impossible — CICFlowMeter bug)
+    if "Flow Duration" in combined_df.columns:
+        neg_dur_mask = combined_df["Flow Duration"] < 0
+        stats["negative_duration_clipped"] = int(neg_dur_mask.sum())
+        combined_df.loc[neg_dur_mask, "Flow Duration"] = 0
+
+    # 5. Validate Dst Port range (must be 0-65535)
+    if "Dst Port" in combined_df.columns:
+        invalid_port_mask = (combined_df["Dst Port"] < 0) | (combined_df["Dst Port"] > 65535)
+        stats["invalid_port_clipped"] = int(invalid_port_mask.sum())
+        combined_df["Dst Port"] = combined_df["Dst Port"].clip(lower=0, upper=65535)
+
+    # 6. TCP Window Size sentinel value -1 → 0
+    win_cols = ["Init Fwd Win Byts", "Init Bwd Win Byts"]
+    for col in win_cols:
         if col in combined_df.columns:
+            sentinel_mask = combined_df[col] == -1
+            stats[f"{col}_sentinel_fixed"] = int(sentinel_mask.sum())
             combined_df[col] = combined_df[col].replace(-1, 0)
-            
-    # Điền NaN bằng 0 để an toàn cho chuyển đổi số
+
+    # 7. Fill remaining NaN with 0 (safe default for numeric features)
+    stats["nan_filled"] = int(combined_df[numeric_cols].isna().sum().sum())
     combined_df.fillna(0, inplace=True)
-    print(f"[*] Tiền xử lý hoàn tất. Tổng số mẫu sau dedup: {len(combined_df)}")
+
+    print(f"[*] Tiền xử lý hoàn tất. Tổng số mẫu sau dedup: {n_after_dedup}")
+    print(f"    Preprocessing stats:")
+    for key, val in stats.items():
+        print(f"      {key}: {val}")
 
     # Step 2: Stratified Sampling (random_state=42 for REPRODUCIBILITY)
     samples = []
