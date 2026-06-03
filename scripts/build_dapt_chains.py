@@ -9,18 +9,23 @@ represent real APT behavior (persistent attackers).
 """
 
 import os
-import sys
 import glob
 import json
 from pathlib import Path
 import pandas as pd
 
-# Add current directory to path to allow importing dapt2020_config
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from dapt2020_config import (
-    APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
-    BENIGN_LABELS, normalize_stage, normalize_label
-)
+# Static analysis tools (VS Code/Pyright) will resolve scripts.dapt2020_config
+# Fallback handles direct execution within scripts/ directory
+try:
+    from scripts.dapt2020_config import (
+        APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
+        BENIGN_LABELS, normalize_stage, normalize_label
+    )
+except ImportError:
+    from dapt2020_config import (  # type: ignore  # noqa: E402
+        APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
+        BENIGN_LABELS, normalize_stage, normalize_label
+    )
 
 
 def safe_int(val):
@@ -141,7 +146,7 @@ def build_chains():
           f"max={max(chain_lengths)}, "
           f"avg={sum(chain_lengths) / len(chain_lengths):.1f}")
 
-    print(f"\nPASS: DAPT2020 APT chains built successfully")
+    print("\nPASS: DAPT2020 APT chains built successfully")
     print(f"Output: {DAPT_PROCESSED_FILE}")
 
     return len(apt_chains)

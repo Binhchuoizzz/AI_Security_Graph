@@ -14,18 +14,25 @@ SYNTHETIC MODE:
 
 import os
 import sys
-import json
 import random
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# Add current directory to path to allow importing dapt2020_config
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from dapt2020_config import (
-    APT_PHASES, DAPT_RAW_DIR, DAPT2020_HEADERS,
-    normalize_label, normalize_stage
-)
+from typing import Any, Dict
+
+# Static analysis tools (VS Code/Pyright) will resolve scripts.dapt2020_config
+# Fallback handles direct execution within scripts/ directory
+try:
+    from scripts.dapt2020_config import (
+        APT_PHASES, DAPT_RAW_DIR, DAPT2020_HEADERS,
+        normalize_label, normalize_stage
+    )
+except ImportError:
+    from dapt2020_config import (  # type: ignore  # noqa: E402
+        APT_PHASES, DAPT_RAW_DIR, DAPT2020_HEADERS,
+        normalize_label, normalize_stage
+    )
 
 
 def download_from_kaggle():
@@ -188,7 +195,7 @@ def generate_synthetic_dapt2020():
                 # If label is Normal, Stage is Benign. Otherwise, use standard day phase.
                 stage = "Benign" if label == "Normal" else phase
 
-                row_dict = {col: 0 for col in DAPT2020_HEADERS}
+                row_dict: Dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
                 row_dict["Flow ID"] = f"{atk_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([22, 80, 443, 445, 3389, 53, 8080])}-{random.choice([6, 17])}"
                 row_dict["Src IP"] = atk_ip
                 row_dict["Src Port"] = random.randint(1024, 65535)
@@ -210,7 +217,7 @@ def generate_synthetic_dapt2020():
             benign_ip = f"172.16.{random.randint(0,5)}.{random.randint(1,254)}"
             target = random.choice(target_ips)
             
-            row_dict = {col: 0 for col in DAPT2020_HEADERS}
+            row_dict: Dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
             row_dict["Flow ID"] = f"{benign_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([80, 443, 8080])}-6"
             row_dict["Src IP"] = benign_ip
             row_dict["Src Port"] = random.randint(1024, 65535)
