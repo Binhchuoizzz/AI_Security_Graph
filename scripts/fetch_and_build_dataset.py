@@ -25,6 +25,7 @@ import random
 import numpy as np
 from typing import Any
 from datetime import datetime
+from collections import Counter
 
 # ============================================================================
 # LABEL MAP: CSE-CIC-IDS2018 Attack Types → MITRE ATT&CK + Expected Actions
@@ -416,7 +417,6 @@ def fetch_and_build(
 
     print(f"\n[OK] Đã generate {len(samples)} samples ra file {output_path}")
 
-    from collections import Counter
     dist = Counter(
         s.get("input", {}).get("cicids_label", "Adversarial") for s in samples
     )
