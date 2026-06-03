@@ -16,21 +16,16 @@ import os
 import sys
 import json
 import random
-import hashlib
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
 
-# DAPT2020 APT phases per day
-APT_PHASES = {
-    "day1": "Reconnaissance",
-    "day2": "Initial_Compromise",
-    "day3": "Lateral_Movement",
-    "day4": "Data_Exfiltration",
-    "day5": "C2_Communication",
-}
-
-DAPT_RAW_DIR = "data/raw/dapt2020/"
+# Add current directory to path to allow importing dapt2020_config
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from dapt2020_config import (
+    APT_PHASES, DAPT_RAW_DIR, DAPT2020_HEADERS,
+    normalize_label, normalize_stage
+)
 
 
 def download_from_kaggle():
@@ -115,15 +110,24 @@ def download_from_kaggle():
 
                 df.columns = df.columns.str.strip()
 
-                # Normalize the label column name to 'label'
-                label_col = None
-                for col in ["Activity", "Stage", "Label"]:
-                    if col in df.columns:
-                        label_col = col
-                        break
-                
-                if label_col:
-                    df = df.rename(columns={label_col: "label"})
+                # Normalize column headers safely avoiding duplicate columns
+                rename_dict = {}
+                seen_targets = set()
+                for col in df.columns:
+                    col_lower = col.lower()
+                    if col_lower == "stage" and "Stage" not in seen_targets:
+                        rename_dict[col] = "Stage"
+                        seen_targets.add("Stage")
+                    elif col_lower in ("activity", "label") and "label" not in seen_targets:
+                        rename_dict[col] = "label"
+                        seen_targets.add("label")
+                df = df.rename(columns=rename_dict)
+
+                # Standardize casing & normalize
+                if "label" in df.columns:
+                    df["label"] = df["label"].apply(normalize_label)
+                if "Stage" in df.columns:
+                    df["Stage"] = df["Stage"].apply(normalize_stage)
                 
                 dfs.append(df)
 
@@ -144,11 +148,7 @@ def generate_synthetic_dapt2020():
     """
     Generate synthetic DAPT2020-style CSV files.
     Creates 5 day files with realistic APT attack chain data.
-
-    Each file contains:
-      - src_ip, dst_ip, src_port, dst_port, protocol
-      - timestamp, flow_duration, fwd_packets, bwd_packets
-      - label (attack type per day)
+    All generated data follows the standard 85-feature schema of DAPT2020.
     """
     import pandas as pd
 
@@ -162,12 +162,13 @@ def generate_synthetic_dapt2020():
     # Define 30 target IPs
     target_ips = [f"10.0.{i//256}.{i%256+1}" for i in range(30)]
 
+    # Real DAPT2020 attack labels
     attack_labels_per_day = {
-        "day1": ["Port_Scan", "DNS_Enum", "Service_Discovery"],
-        "day2": ["Phishing", "Exploit_Web", "Brute_Force_SSH"],
-        "day3": ["Pass_The_Hash", "RDP_Lateral", "SMB_Relay"],
-        "day4": ["Large_Upload", "DNS_Tunnel", "HTTP_Exfil"],
-        "day5": ["C2_Beacon", "C2_DNS", "Reverse_Shell"],
+        "day1": ["Normal"],  # Day 1 is 100% normal/benign
+        "day2": ["Network Scan", "Account Discovery", "Directory Bruteforce", "Web Vulnerability Scan", "Account Bruteforce"],
+        "day3": ["SQL Injection", "Directory Bruteforce", "Account Bruteforce", "Account Discovery", "CSRF", "Malware Download", "Network Scan"],
+        "day4": ["Network Scan", "Backdoor", "Account Discovery", "SQL Injection", "Privilege Escalation"],
+        "day5": ["Network Scan", "Command Injection", "Data Exfiltration"],
     }
 
     for day_name, phase in APT_PHASES.items():
@@ -183,37 +184,52 @@ def generate_synthetic_dapt2020():
                 target = random.choice(target_ips)
                 label = random.choice(labels)
                 ts = base_time + timedelta(seconds=random.randint(0, 36000))
+                
+                # If label is Normal, Stage is Benign. Otherwise, use standard day phase.
+                stage = "Benign" if label == "Normal" else phase
 
-                rows.append({
-                    "src_ip": atk_ip,
-                    "dst_ip": target,
-                    "src_port": random.randint(1024, 65535),
-                    "dst_port": random.choice([22, 80, 443, 445, 3389, 53, 8080]),
-                    "protocol": random.choice([6, 17]),  # TCP or UDP
-                    "timestamp": ts.isoformat(),
-                    "flow_duration": random.randint(100, 500000),
-                    "fwd_packets": random.randint(1, 200),
-                    "bwd_packets": random.randint(0, 150),
-                    "label": label,
-                })
+                row_dict = {col: 0 for col in DAPT2020_HEADERS}
+                row_dict["Flow ID"] = f"{atk_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([22, 80, 443, 445, 3389, 53, 8080])}-{random.choice([6, 17])}"
+                row_dict["Src IP"] = atk_ip
+                row_dict["Src Port"] = random.randint(1024, 65535)
+                row_dict["Dst IP"] = target
+                row_dict["Dst Port"] = random.choice([22, 80, 443, 445, 3389, 53, 8080])
+                row_dict["Protocol"] = random.choice([6, 17])
+                row_dict["Timestamp"] = ts.strftime("%d/%m/%Y %I:%M:%S %p")
+                row_dict["Flow Duration"] = random.randint(100, 500000)
+                row_dict["Total Fwd Packet"] = random.randint(1, 200)
+                row_dict["Total Bwd packets"] = random.randint(0, 150)
+                row_dict["label"] = normalize_label(label)
+                row_dict["Stage"] = normalize_stage(stage)
+                
+                rows.append(row_dict)
 
         # Add 200 benign events
         for j in range(200):
             ts = base_time + timedelta(seconds=random.randint(0, 36000))
-            rows.append({
-                "src_ip": f"172.16.{random.randint(0,5)}.{random.randint(1,254)}",
-                "dst_ip": random.choice(target_ips),
-                "src_port": random.randint(1024, 65535),
-                "dst_port": random.choice([80, 443, 8080]),
-                "protocol": 6,
-                "timestamp": ts.isoformat(),
-                "flow_duration": random.randint(100, 10000),
-                "fwd_packets": random.randint(1, 20),
-                "bwd_packets": random.randint(1, 20),
-                "label": "Benign",
-            })
+            benign_ip = f"172.16.{random.randint(0,5)}.{random.randint(1,254)}"
+            target = random.choice(target_ips)
+            
+            row_dict = {col: 0 for col in DAPT2020_HEADERS}
+            row_dict["Flow ID"] = f"{benign_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([80, 443, 8080])}-6"
+            row_dict["Src IP"] = benign_ip
+            row_dict["Src Port"] = random.randint(1024, 65535)
+            row_dict["Dst IP"] = target
+            row_dict["Dst Port"] = random.choice([80, 443, 8080])
+            row_dict["Protocol"] = 6
+            row_dict["Timestamp"] = ts.strftime("%d/%m/%Y %I:%M:%S %p")
+            row_dict["Flow Duration"] = random.randint(100, 10000)
+            row_dict["Total Fwd Packet"] = random.randint(1, 20)
+            row_dict["Total Bwd packets"] = random.randint(1, 20)
+            row_dict["label"] = "Normal"
+            row_dict["Stage"] = "Benign"
+            
+            rows.append(row_dict)
 
         df = pd.DataFrame(rows)
+        # Ensure exact column ordering
+        df = df[DAPT2020_HEADERS]
+        
         path = os.path.join(DAPT_RAW_DIR, f"{day_name}.csv")
         df.to_csv(path, index=False)
         print(f"  {day_name}.csv: {len(df)} events ({phase})")

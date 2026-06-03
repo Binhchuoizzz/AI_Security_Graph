@@ -4,103 +4,128 @@ Build APT session chains from DAPT2020.
 Each chain = sequence of events from same attacker IP across days.
 Output: data/processed/dapt2020_chains.jsonl
 
-Chains that span ≥2 days represent real APT behavior (persistent attackers).
+Chains that span ≥2 days and contain at least one attack event
+represent real APT behavior (persistent attackers).
 """
-import pandas as pd
-import json
-import glob
-from pathlib import Path
 
-APT_PHASES = {
-    "day1": "Reconnaissance",
-    "day2": "Initial_Compromise",
-    "day3": "Lateral_Movement",
-    "day4": "Data_Exfiltration",
-    "day5": "C2_Communication",
-}
+import os
+import sys
+import glob
+import json
+from pathlib import Path
+import pandas as pd
+
+# Add current directory to path to allow importing dapt2020_config
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from dapt2020_config import (
+    APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
+    BENIGN_LABELS, normalize_stage, normalize_label
+)
+
+
+def safe_int(val):
+    """Safely coerce value to integer."""
+    try:
+        return int(val) if pd.notna(val) else 0
+    except (ValueError, TypeError):
+        return 0
 
 
 def build_chains():
     all_events = []
 
     for day_file, phase in APT_PHASES.items():
-        path = f"data/raw/dapt2020/{day_file}.csv"
+        path = os.path.join(DAPT_RAW_DIR, f"{day_file}.csv")
         if not Path(path).exists():
             # Try to find by pattern
-            matches = glob.glob(f"data/raw/dapt2020/*{day_file[-1]}*")
+            matches = glob.glob(os.path.join(DAPT_RAW_DIR, f"*{day_file[-1]}*"))
             if not matches:
                 print(f"WARNING: {path} not found, skipping")
                 continue
             path = matches[0]
 
         df = pd.read_csv(path, low_memory=False)
-        df["apt_phase"] = phase
         df["apt_day"] = int(day_file[-1])
 
         # Normalize column names (DAPT2020 uses various formats)
         col_map = {}
         for col in df.columns:
-            if "src" in col.lower() and "ip" in col.lower():
+            col_lower = col.lower()
+            if "src" in col_lower and "ip" in col_lower:
                 col_map[col] = "src_ip"
-            elif "dst" in col.lower() and "ip" in col.lower():
+            elif "dst" in col_lower and "ip" in col_lower:
                 col_map[col] = "dst_ip"
-            elif col.lower() == "label":
+            elif col_lower == "label":
                 col_map[col] = "label"
-            elif "timestamp" in col.lower() or "time" in col.lower():
+            elif col_lower == "stage":
+                col_map[col] = "Stage"
+            elif "timestamp" in col_lower or "time" in col_lower:
                 col_map[col] = "timestamp"
         df = df.rename(columns=col_map)
 
+        # Normalize label and Stage/phase if they exist
+        if "label" in df.columns:
+            df["label"] = df["label"].apply(normalize_label)
+        else:
+            df["label"] = "Normal"
+
+        if "Stage" in df.columns:
+            df["apt_phase"] = df["Stage"].apply(normalize_stage)
+        else:
+            df["apt_phase"] = phase
+
+        # Only select columns we need to save memory
+        cols_to_keep = [c for c in ["src_ip", "dst_ip", "label", "apt_phase", "apt_day", "timestamp"] if c in df.columns]
+        df = df[cols_to_keep]
+
         all_events.append(df)
-        print(f"  Loaded {len(df)} events from {day_file} ({phase})")
+        print(f"  Loaded {len(df)} events from {day_file} (canonical phase: {phase})")
 
     if not all_events:
-        raise RuntimeError("No DAPT2020 files loaded. Check data/raw/dapt2020/")
+        raise RuntimeError(f"No DAPT2020 files loaded. Check {DAPT_RAW_DIR}")
 
     combined = pd.concat(all_events, ignore_index=True)
-    print(f"\nTotal events: {len(combined)}")
+    print(f"\nTotal combined events: {len(combined)}")
 
-    # Build chains by attacker IP
+    # Ensure src_ip exists
     if "src_ip" not in combined.columns:
         print("WARNING: src_ip not found. Using mock IP from index.")
         combined["src_ip"] = (combined.index % 50).apply(
             lambda x: f"192.168.{x // 256}.{x % 256}"
         )
 
+    # Build chains by attacker IP
     chains = {}
     for _, row in combined.iterrows():
         ip = str(row.get("src_ip", "unknown"))
         if ip not in chains:
             chains[ip] = []
         
-        def safe_int(val):
-            try:
-                return int(val) if pd.notna(val) else 0 # type: ignore
-            except (ValueError, TypeError):
-                return 0
-
         chains[ip].append({
             "day": safe_int(row.get("apt_day", 0)),
-            "phase": row.get("apt_phase", "Unknown"),
-            "label": str(row.get("label", "Unknown")),
+            "phase": str(row.get("apt_phase", "Unknown")),
+            "label": str(row.get("label", "Normal")),
             "src_ip": ip,
             "dst_ip": str(row.get("dst_ip", "10.0.0.1")),
             "timestamp": str(row.get("timestamp", "")),
         })
 
-    # Keep only multi-day chains (real APT behavior)
+    # Keep only multi-day chains representing real APT behavior (requires >= 2 days AND at least one attack)
     apt_chains = {
         ip: sorted(events, key=lambda x: x["day"])
         for ip, events in chains.items()
-        if len(set(e["day"] for e in events)) >= 2  # spans multiple days
+        if len(set(e["day"] for e in events)) >= 2
+        and any(e["label"] not in BENIGN_LABELS for e in events)
     }
 
-    print(f"Multi-day APT chains found: {len(apt_chains)} attacker IPs")
+    print(f"Multi-day APT chains found (with attack events): {len(apt_chains)} attacker IPs")
     assert len(apt_chains) >= 5, \
         f"Need >= 5 multi-day chains, got {len(apt_chains)}"
 
     # Write to JSONL
-    Path("data/processed").mkdir(parents=True, exist_ok=True)
-    with open("data/processed/dapt2020_chains.jsonl", "w") as f:
+    output_path = Path(DAPT_PROCESSED_FILE)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, "w") as f:
         for ip, events in apt_chains.items():
             f.write(json.dumps({
                 "attacker_ip": ip,
@@ -117,7 +142,7 @@ def build_chains():
           f"avg={sum(chain_lengths) / len(chain_lengths):.1f}")
 
     print(f"\nPASS: DAPT2020 APT chains built successfully")
-    print(f"Output: data/processed/dapt2020_chains.jsonl")
+    print(f"Output: {DAPT_PROCESSED_FILE}")
 
     return len(apt_chains)
 
