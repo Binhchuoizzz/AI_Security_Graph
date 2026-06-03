@@ -316,6 +316,7 @@ class RuleEngine:
             "bwd_packets": "Total Backward Packets",
             "fwd_bytes": "Total Length of Fwd Packets",
             "bwd_bytes": "Total Length of Bwd Packets",
+            "flow_duration_us": "Flow Duration",
             "flow_duration_ms": "Flow Duration",
             "protocol": "Protocol",
         }
@@ -337,7 +338,7 @@ class RuleEngine:
         
         # Ánh xạ các trường mạng thô sang các nhóm tính năng
         raw_to_canonical = {
-            "Flow Duration": ["Flow Duration", "flow_duration_ms"],
+            "Flow Duration": ["Flow Duration", "flow_duration_us", "flow_duration_ms"],
             "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets"],
             "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes"],
             "Total Backward Packets": ["Total Backward Packets", "bwd_packets"],

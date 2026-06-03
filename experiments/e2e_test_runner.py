@@ -393,10 +393,10 @@ def test_17_ground_truth_scale(r: TestResult):
     assert os.path.exists(adv_path), f"Missing: {adv_path}"
     with open(adv_path) as f:
         adv = json.load(f)
-    assert adv["total"] == 45, f"Expected 45 adversarial samples, got {adv['total']}"
-    assert len(adv["samples"]) == 45, f"Expected 45 samples in list, got {len(adv['samples'])}"
+    assert adv["total"] == 50, f"Expected 50 adversarial samples, got {adv['total']}"
+    assert len(adv["samples"]) == 50, f"Expected 50 samples in list, got {len(adv['samples'])}"
 
-    r.passed(f"Ground truth: {total} samples, {len(labels)} classes, all ≥{min_threshold}; adversarial: 45")
+    r.passed(f"Ground truth: {total} samples, {len(labels)} classes, all ≥{min_threshold}; adversarial: 50")
 
 
 # ============================================================================

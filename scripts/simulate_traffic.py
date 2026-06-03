@@ -24,7 +24,7 @@ def map_keys_to_cicids(network_layer, application_layer):
         "Destination Port": network_layer.get("dst_port", 0),
         "Total Fwd Packets": network_layer.get("fwd_packets", 0),
         "timestamp": network_layer.get("timestamp", ""),
-        "Flow Duration": network_layer.get("flow_duration_ms", 0),
+        "Flow Duration": network_layer.get("flow_duration_us") if "flow_duration_us" in network_layer else network_layer.get("flow_duration_ms", 0),
         "Label": "Simulated",  # Mark as simulated
     }
 
