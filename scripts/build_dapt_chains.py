@@ -12,6 +12,7 @@ import os
 import glob
 import json
 from pathlib import Path
+from datetime import datetime
 import pandas as pd
 
 # Static analysis tools (VS Code/Pyright) will resolve scripts.dapt2020_config
@@ -119,9 +120,22 @@ def build_chains():
             "timestamp": str(row.get("timestamp", "")),
         })
 
+    def parse_dapt_timestamp(ts_str):
+        try:
+            return datetime.strptime(ts_str, "%d/%m/%Y %I:%M:%S %p")
+        except Exception:
+            try:
+                return datetime.fromisoformat(ts_str)
+            except Exception:
+                return datetime.min
+
+    # Sort each chain chronologically
+    for ip in chains:
+        chains[ip].sort(key=lambda x: (x["day"], parse_dapt_timestamp(x.get("timestamp", ""))))
+
     # Keep only multi-day chains representing real APT behavior (requires >= 2 days AND at least one attack)
     apt_chains = {
-        ip: sorted(events, key=lambda x: x["day"])
+        ip: events
         for ip, events in chains.items()
         if len(set(e["day"] for e in events)) >= 2
         and any(e["label"] not in BENIGN_LABELS for e in events)
@@ -137,13 +151,22 @@ def build_chains():
     with open(output_path, "w") as f:
         for ip, events in apt_chains.items():
             if len(events) > 20:
-                print(f"  [INFO] {ip}: {len(events)} events -> truncated to 20")
+                print(f"  [INFO] {ip}: {len(events)} events -> sampling 10 attack + 10 benign events")
+            
+            # Select up to 10 attack and 10 benign events to preserve signal
+            attack_evts = [e for e in events if e["label"] not in BENIGN_LABELS]
+            benign_evts = [e for e in events if e["label"] in BENIGN_LABELS]
+            
+            sampled = attack_evts[:10] + benign_evts[:10]
+            # Re-sort to maintain chronological order
+            sampled.sort(key=lambda x: (x["day"], parse_dapt_timestamp(x.get("timestamp", ""))))
+
             f.write(json.dumps({
                 "attacker_ip": ip,
                 "chain_length": len(events),
                 "days_spanned": sorted(set(e["day"] for e in events)),
                 "phases": list(dict.fromkeys(e["phase"] for e in events)),
-                "events": events[:20],  # cap at 20 events per chain for readability
+                "events": sampled,
             }) + "\n")
 
     # Summary stats
