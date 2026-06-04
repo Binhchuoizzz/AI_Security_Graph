@@ -95,63 +95,7 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
-  dynamic_rules:
-  - created_at: '2026-05-28T12:54:04.531527'
-    field: Source IP
-    pattern: 192.168.2.150
-    reason: Có nhiều hoạt động truy cập cổng 80 từ cùng một địa chỉ IP (192.168.2.150)
-      với thời gian lưu thông dài và số lượng gói tin lớn. Điều này có thể là dấu
-      hiệu của một cuộc tấn công DDoS. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-06-01T08:26:49.097643+00:00'
-    field: Source IP
-    pattern: 192.168.2.101
-    reason: IP 192.168.2.101 thực hiện quét cổng liên tục trên nhiều cổng nhạy cảm
-      (22, 3, 4, 5, 6, 7, 8, 9, 10, 11) với tần suất cao, khớp với kỹ thuật quét cổng
-      (Port Scanning) T1583.008. Hành vi này có thể là dấu hiệu của một cuộc tấn công
-      để tìm kiếm lỗ hổng bảo mật hoặc cài đặt backdoor.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-06-01T08:28:37.858194+00:00'
-    field: Source IP
-    pattern: 192.168.2.99
-    reason: IP nguồn 192.168.2.99 liên tục truy cập cổng 80 với số lượng gói tin bất
-      thường, vượt quá mức cho phép. Hành vi này có thể là dấu hiệu của tấn công Malvertising.
-      Hệ thống thực hiện chặn IP để ngăn chặn khả năng xâm nhập và phân tán malware.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-06-01T08:38:35.964963+00:00'
-    field: Source IP
-    pattern: 10.0.0.22
-    reason: Dữ liệu cho thấy IP 10.0.0.22 gửi một lượng gói tin bất thường (85000
-      gói) đến cổng 80 với User-Agent là 'exfil-tool/v1.0'.  Hành vi này khớp với
-      kỹ thuật Malvertising (T1583.008) và có thể là một nỗ lực exfiltration dữ liệu.
-      Hệ thống nên chặn IP này để ngăn chặn hoạt động độc hại.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-06-01T08:38:44.014284+00:00'
-    field: Source IP
-    pattern: 10.0.0.33
-    reason: Dữ liệu cho thấy IP 10.0.0.33 gửi một lượng gói tin rất lớn (120000 gói)
-      đến cổng 80, kèm theo user-agent là Wget/1.21.1 flood-bot, thường được sử dụng
-      trong các cuộc tấn công DDoS.  Hành vi này khớp với kỹ thuật Malvertising (T1583.008)
-      và có khả năng cao là một cuộc tấn công DDoS nhằm hạ gục dịch vụ.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
-  - created_at: '2026-06-02T14:05:58.834511+00:00'
-    field: Source IP
-    pattern: 192.168.1.100
-    reason: Mock reasoning from MOCK_LLM=1. Detected anomaly matching MITRE TTPs and
-      NIST containment phases.
-    score: 100
-    source: langgraph_agent
-    status: PENDING_APPROVAL
+  dynamic_rules: []
   max_fwd_packets: 1000
   risk_threshold: 15
   sensitive_ports:

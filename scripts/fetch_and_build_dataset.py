@@ -14,7 +14,6 @@ CHIẾN LƯỢC:
 """
 
 import os
-import sys
 import argparse
 import hashlib
 import pandas as pd

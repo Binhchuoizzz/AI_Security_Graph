@@ -152,12 +152,13 @@ def build_chains():
         for ip, events in apt_chains.items():
             if len(events) > 20:
                 print(f"  [INFO] {ip}: {len(events)} events -> sampling 10 attack + 10 benign events")
+                # Select up to 10 attack and 10 benign events to preserve signal
+                attack_evts = [e for e in events if e["label"] not in BENIGN_LABELS]
+                benign_evts = [e for e in events if e["label"] in BENIGN_LABELS]
+                sampled = attack_evts[:10] + benign_evts[:10]
+            else:
+                sampled = events
             
-            # Select up to 10 attack and 10 benign events to preserve signal
-            attack_evts = [e for e in events if e["label"] not in BENIGN_LABELS]
-            benign_evts = [e for e in events if e["label"] in BENIGN_LABELS]
-            
-            sampled = attack_evts[:10] + benign_evts[:10]
             # Re-sort to maintain chronological order
             sampled.sort(key=lambda x: (x["day"], parse_dapt_timestamp(x.get("timestamp", ""))))
 
