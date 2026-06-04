@@ -66,6 +66,36 @@ CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
 
+# Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
+_KEY_ALIASES = {
+    "dst_port": "Destination Port",
+    "src_port": "Source Port",
+    "src_ip": "Source IP",
+    "dst_ip": "Destination IP",
+    "fwd_packets": "Total Fwd Packets",
+    "bwd_packets": "Total Backward Packets",
+    "fwd_bytes": "Total Length of Fwd Packets",
+    "bwd_bytes": "Total Length of Bwd Packets",
+    "flow_duration_us": "Flow Duration",
+    "flow_duration_ms": "Flow Duration",
+    "protocol": "Protocol",
+}
+
+# Ánh xạ các trường mạng thô sang các nhóm tính năng phục vụ Z-score tracking
+_RAW_TO_CANONICAL = {
+    "Flow Duration": ["Flow Duration", "flow_duration_us", "flow_duration_ms"],
+    "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets"],
+    "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes", "Total Fwd Bytes"],
+    "Total Backward Packets": ["Total Backward Packets", "bwd_packets", "Total Bwd Packets"],
+    "Total Length of Bwd Packets": ["Total Length of Bwd Packets", "bwd_bytes", "Total Bwd Bytes"],
+    "Fwd Seg Size Min": ["Fwd Seg Size Min", "fwd_seg_size_min"],
+    "Init Fwd Win Byts": ["Init Fwd Win Byts", "init_fwd_win_byts"],
+    "Init Bwd Win Byts": ["Init Bwd Win Byts", "init_bwd_win_byts"],
+    "Bwd Pkt Len Min": ["Bwd Pkt Len Min", "bwd_pkt_len_min"],
+    "PSH Flag Cnt": ["PSH Flag Cnt", "psh_flag_cnt"],
+    "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"]
+}
+
 
 def load_config():
     with open(CONFIG_PATH, "r") as f:
@@ -281,20 +311,7 @@ class RuleEngine:
         reasons = []
 
         # Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
-        KEY_ALIASES = {
-            "dst_port": "Destination Port",
-            "src_port": "Source Port",
-            "src_ip": "Source IP",
-            "dst_ip": "Destination IP",
-            "fwd_packets": "Total Fwd Packets",
-            "bwd_packets": "Total Backward Packets",
-            "fwd_bytes": "Total Length of Fwd Packets",
-            "bwd_bytes": "Total Length of Bwd Packets",
-            "flow_duration_us": "Flow Duration",
-            "flow_duration_ms": "Flow Duration",
-            "protocol": "Protocol",
-        }
-        for alias, canonical in KEY_ALIASES.items():
+        for alias, canonical in _KEY_ALIASES.items():
             if alias in log_entry and canonical not in log_entry:
                 log_entry[canonical] = log_entry[alias]
 
@@ -311,22 +328,8 @@ class RuleEngine:
         self.total_processed_logs += 1
         
         # Ánh xạ các trường mạng thô sang các nhóm tính năng
-        raw_to_canonical = {
-            "Flow Duration": ["Flow Duration", "flow_duration_us", "flow_duration_ms"],
-            "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets"],
-            "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes", "Total Fwd Bytes"],
-            "Total Backward Packets": ["Total Backward Packets", "bwd_packets", "Total Bwd Packets"],
-            "Total Length of Bwd Packets": ["Total Length of Bwd Packets", "bwd_bytes", "Total Bwd Bytes"],
-            "Fwd Seg Size Min": ["Fwd Seg Size Min", "fwd_seg_size_min"],
-            "Init Fwd Win Byts": ["Init Fwd Win Byts", "init_fwd_win_byts"],
-            "Init Bwd Win Byts": ["Init Bwd Win Byts", "init_bwd_win_byts"],
-            "Bwd Pkt Len Min": ["Bwd Pkt Len Min", "bwd_pkt_len_min"],
-            "PSH Flag Cnt": ["PSH Flag Cnt", "psh_flag_cnt"],
-            "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"]
-        }
-        
         current_values = {}
-        for key, aliases in raw_to_canonical.items():
+        for key, aliases in _RAW_TO_CANONICAL.items():
             val = None
             for alias in aliases:
                 if alias in log_entry:
