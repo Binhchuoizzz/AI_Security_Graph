@@ -1,19 +1,12 @@
 """
 Tier 1 Filter: Rule-based Engine with Session Baselining & Dynamic Rules
 
-TRIẾT LÝ THIẾT KẾ (ĐÃ SỬA LỖI KIẾN TRÚC):
-  Phiên bản cũ dùng Random Sampling (1-3% clean traffic) → BẺ GÃY kill-chain.
-  Lý do: APT là tấn công low-and-slow. Ném bỏ 97-99% dữ liệu = tự tay
-  xóa bằng chứng. Không tool Log Correlation nào hoạt động trên dữ liệu
-  đã bị băm nát ngẫu nhiên.
-
-  GIẢI PHÁP MỚI: Session-Aware Behavioral Baselining
+TRIẾT LÝ THIẾT KẾ:
+  Session-Aware Behavioral Baselining
   - Tier 1 duy trì baseline hành vi cho mỗi IP (frequency, ports, packet/flow ratio)
   - Mọi traffic đều được GHI NHẬN vào baseline (không vứt bỏ ngẫu nhiên)
   - Escalate lên Tier 2 khi phát hiện STATISTICAL DEVIATION so với baseline
   - Đảm bảo 100% dữ liệu bất thường (kể cả APT low-and-slow) được chuyển lên
-
-  Tier 1 hoạt động như một BỘ LỌC THÔNG MINH, không phải máy xay ngẫu nhiên.
 
   FEEDBACK LOOP (Data Flow rõ ràng):
   LangGraph Agent → feedback_listener.py → system_settings.yaml → RuleEngine.__init__()
@@ -24,6 +17,7 @@ import json
 import yaml
 import os
 import time
+import math
 from collections import defaultdict
 from typing import TypedDict, Optional, Set, Dict, List, Any
 
@@ -33,6 +27,7 @@ class IPProfile(TypedDict):
     total_fwd_packets: float
     first_seen: Optional[float]
     last_seen: Optional[float]
+
 
 class RunningStats:
     """
@@ -64,7 +59,6 @@ class RunningStats:
         return self.new_s / (self.n - 1) if self.n > 1 else 0.0
 
     def std_dev(self) -> float:
-        import math
         return math.sqrt(self.variance()) if self.n > 1 else 0.0
 
 
@@ -85,14 +79,7 @@ class SessionBaseline:
 
     CHỐNG REDIS/RAM OOM:
       Cơ chế Sliding Window TTL: IP sessions inactive quá ttl_seconds
-      sẽ tự động bị evict. Đảm bảo RAM không cạn kiệt khi chạy
-      CSE-CIC-IDS2018 (~2.8M records) hoặc dataset lớn hơn.
-
-    Baseline variables per IP:
-    - request_count: Tổng số request trong window
-    - unique_ports: Tập hợp các port đã truy cập
-    - total_fwd_packets: Tổng packet forwarded
-    - first_seen / last_seen: Timestamps
+      sẽ tự động bị evict. Đảm bảo RAM không cạn kiệt khi chạy.
     """
 
     def __init__(
@@ -130,6 +117,8 @@ class SessionBaseline:
         ]
         for ip in stale_ips:
             del self.profiles[ip]
+        # Recalibrate global baseline request rate sau mỗi chu kỳ dọn dẹp
+        self.update_global_baseline()
 
     def update(self, source_ip: str, log_entry: dict) -> dict:
         """
@@ -164,12 +153,13 @@ class SessionBaseline:
         deviation_reasons = []
         deviation_score = 0
 
-        # Indicator 1: Port Scanning (IP truy cập quá nhiều ports khác nhau)
-        unique_port_count = len(profile["unique_ports"])
-        if unique_port_count > 5:
-            deviation_score += unique_port_count * 3
+        # Indicator 1: Port Scanning (Loại trừ HTTP/HTTPS traffic thông thường của client)
+        non_http_ports = profile["unique_ports"] - {80, 443, 8080, 8443}
+        non_http_port_count = len(non_http_ports)
+        if non_http_port_count > 10:
+            deviation_score += non_http_port_count * 3
             deviation_reasons.append(
-                f"Quét cổng (Port scan): đã truy cập {unique_port_count} cổng khác nhau"
+                f"Quét cổng (Port scan): đã truy cập {non_http_port_count} cổng non-HTTP khác nhau"
             )
 
         # Indicator 2: High-frequency requests (so với global average)
@@ -196,7 +186,7 @@ class SessionBaseline:
             "deviation_score": deviation_score,
             "deviation_reasons": deviation_reasons,
             "request_count": profile["request_count"],
-            "unique_ports": unique_port_count,
+            "unique_ports": len(profile["unique_ports"]),
             "is_anomalous": deviation_score > 0,
             "active_profiles": len(self.profiles),  # Metric cho monitoring
         }
@@ -228,26 +218,7 @@ class RuleEngine:
       1. Static Rules: Kiểm tra port nhạy cảm, volumetric attack
       2. Dynamic Rules: Áp dụng rule từ Feedback Loop (LangGraph Agent)
       3. Session Baselining: Kiểm tra behavioral deviation cho Source IP
-      4. Quyết định: ESCALATE (lên Tier 2) hoặc DROP (log sạch)
-
-    KHÔNG có Random Sampling. Mọi quyết định đều dựa trên LOGIC.
-
-    FEEDBACK LOOP DATA FLOW:
-    ┌─────────────────────────────────────────────────────────┐
-    │ LangGraph Agent (Tier 2) phát hiện mẫu tấn công mới   │
-    │         │                                               │
-    │         ▼                                               │
-    │ feedback_listener.py nhận rule mới                      │
-    │         │                                               │
-    │         ▼                                               │
-    │ Persist vào config/system_settings.yaml                 │
-    │         │                                               │
-    │         ▼                                               │
-    │ RuleEngine.reload_dynamic_rules() load rule mới        │
-    │         │                                               │
-    │         ▼                                               │
-    │ Rule mới được áp dụng ngay trong evaluate() tiếp theo  │
-    └─────────────────────────────────────────────────────────┘
+      4. Quyết định hành động chi tiết (Action Differentiation): ESCALATE / BLOCK_IP / ALERT / AWAIT_HITL / LOG / DROP
     """
 
     def __init__(self):
@@ -258,7 +229,6 @@ class RuleEngine:
         self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
         
-        # Sửa lỗi: Chỉ tải các luật đã phê duyệt (ACTIVE)
         all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
         self.whitelist_ips = tier1_config.get("whitelist_ips", [])
@@ -273,13 +243,19 @@ class RuleEngine:
             window_seconds=baseline_config.get("window_seconds", 300),
         )
 
-        # Unsupervised Anomaly Detection (Zero-Day statistical profiling)
+        # Unsupervised Anomaly Detection (Zero-Day statistical profiling trên các core features có corr cao)
         self.global_stats: Dict[str, RunningStats] = {
             "Flow Duration": RunningStats(),
             "Total Fwd Packets": RunningStats(),
             "Total Length of Fwd Packets": RunningStats(),
             "Total Backward Packets": RunningStats(),
-            "Total Length of Bwd Packets": RunningStats()
+            "Total Length of Bwd Packets": RunningStats(),
+            "Fwd Seg Size Min": RunningStats(),
+            "Init Fwd Win Byts": RunningStats(),
+            "Init Bwd Win Byts": RunningStats(),
+            "Bwd Pkt Len Min": RunningStats(),
+            "PSH Flag Cnt": RunningStats(),
+            "Flow Pkts/s": RunningStats()
         }
         # Cần 100 mẫu để khởi tạo baseline tin cậy trước khi tính Z-score
         self.warmup_count = 100
@@ -287,21 +263,19 @@ class RuleEngine:
 
     def evaluate(self, log_entry: dict) -> dict:
         """
-        Đánh giá log entry qua 3 tầng: Static Rules → Dynamic Rules → Session Baseline.
-        Quyết định: ESCALATE hoặc DROP. KHÔNG có SAMPLE ngẫu nhiên.
+        Đánh giá log entry qua các tầng: Whitelist -> Static/Dynamic Rules -> Session Baseline -> Action.
         """
-        # Tự động reload dynamic rules/whitelists nếu file system_settings.yaml bị sửa đổi
+        # Tự động reload configurations nếu file system_settings.yaml bị sửa đổi (đã gộp & bảo vệ I/O)
         try:
             if os.path.exists(CONFIG_PATH):
                 current_mtime = os.path.getmtime(CONFIG_PATH)
                 if current_mtime > self.last_config_mtime:
                     self.reload_dynamic_rules()
                     self.last_config_mtime = current_mtime
-                    # Đồng thời cập nhật whitelist_ips trong cache của engine
-                    config = load_config()
-                    self.whitelist_ips = config.get("tier1", {}).get("whitelist_ips", [])
-        except Exception:
-            pass
+        except (yaml.YAMLError, FileNotFoundError) as e:
+            print(f"[!] Config reload failed: {e}. Using cached configurations.")
+        except Exception as e:
+            print(f"[!] Unexpected error during config reload: {e}")
 
         score = 0
         reasons = []
@@ -329,7 +303,7 @@ class RuleEngine:
         if source_ip in self.whitelist_ips:
             log_entry["tier1_score"] = 0
             log_entry["tier1_reasons"] = ["IP nằm trong Whitelist (An toàn)"]
-            log_entry["tier1_action"] = "WHITELIST_DROP"
+            log_entry["tier1_action"] = "DROP"
             log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
             return log_entry
 
@@ -340,9 +314,15 @@ class RuleEngine:
         raw_to_canonical = {
             "Flow Duration": ["Flow Duration", "flow_duration_us", "flow_duration_ms"],
             "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets"],
-            "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes"],
-            "Total Backward Packets": ["Total Backward Packets", "bwd_packets"],
-            "Total Length of Bwd Packets": ["Total Length of Bwd Packets", "bwd_bytes"]
+            "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes", "Total Fwd Bytes"],
+            "Total Backward Packets": ["Total Backward Packets", "bwd_packets", "Total Bwd Packets"],
+            "Total Length of Bwd Packets": ["Total Length of Bwd Packets", "bwd_bytes", "Total Bwd Bytes"],
+            "Fwd Seg Size Min": ["Fwd Seg Size Min", "fwd_seg_size_min"],
+            "Init Fwd Win Byts": ["Init Fwd Win Byts", "init_fwd_win_byts"],
+            "Init Bwd Win Byts": ["Init Bwd Win Byts", "init_bwd_win_byts"],
+            "Bwd Pkt Len Min": ["Bwd Pkt Len Min", "bwd_pkt_len_min"],
+            "PSH Flag Cnt": ["PSH Flag Cnt", "psh_flag_cnt"],
+            "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"]
         }
         
         current_values = {}
@@ -385,7 +365,8 @@ class RuleEngine:
 
         # Cập nhật giá trị vào bộ theo dõi thống kê chạy (sau khi đã tính Z-score để tránh tự làm nhiễu)
         for key, val in current_values.items():
-            self.global_stats[key].push(val)
+            if key in self.global_stats:
+                self.global_stats[key].push(val)
 
         # --- Tầng 1: Static Rules ---
         dest_port = log_entry.get("Destination Port", -1)
@@ -418,7 +399,7 @@ class RuleEngine:
                         f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'"
                     )
 
-        # --- Tầng 3: Session Baseline (thay thế Random Sampling) ---
+        # --- Tầng 3: Session Baseline ---
         source_ip = log_entry.get("Source IP", "unknown")
         baseline_result = self.session_baseline.update(source_ip, log_entry)
 
@@ -426,7 +407,7 @@ class RuleEngine:
             score += baseline_result["deviation_score"]
             reasons.extend(baseline_result["deviation_reasons"])
 
-        # --- Quyết định ---
+        # --- Đánh giá & Phân luồng Action (Tier 1 Action Differentiation) ---
         log_entry["tier1_score"] = score
         log_entry["tier1_reasons"] = reasons
         log_entry["tier1_z_score"] = max_z_score
@@ -436,17 +417,46 @@ class RuleEngine:
         }
 
         if score >= self.risk_threshold:
-            log_entry["tier1_action"] = "ESCALATE"
+            dest_port_val = 0
+            try:
+                dest_port_val = int(dest_port)
+            except (ValueError, TypeError):
+                pass
+            
+            fwd_pkts_val = 0.0
+            try:
+                fwd_pkts_val = float(fwd_packets)
+            except (ValueError, TypeError):
+                pass
+
+            if dest_port_val in self.sensitive_ports and fwd_pkts_val < 200:
+                # BruteForce: port nhạy cảm, packet count trung bình → block IP
+                log_entry["tier1_action"] = "BLOCK_IP"
+            elif fwd_pkts_val > self.max_fwd_packets:
+                # DoS/DDoS: volumetric → alert không block (có thể distributed)
+                log_entry["tier1_action"] = "ALERT"
+            elif dest_port_val not in self.sensitive_ports and dest_port_val not in [80, 443, 8080]:
+                # Lateral movement / Infiltration: unusual port, moderate score → HITL
+                log_entry["tier1_action"] = "AWAIT_HITL"
+            else:
+                log_entry["tier1_action"] = "ESCALATE"
         else:
-            log_entry["tier1_action"] = "DROP"
+            log_entry["tier1_action"] = "DROP" if not reasons else "LOG"
 
         return log_entry
 
     def reload_dynamic_rules(self):
         """
-        Hot-reload dynamic rules từ YAML config.
+        Hot-reload dynamic rules, whitelists, thresholds, and configurations từ YAML config.
         Chỉ tải các luật đã phê duyệt (status == 'ACTIVE').
         """
         config = load_config()
-        all_rules = config.get("tier1", {}).get("dynamic_rules", [])
+        tier1_config = config.get("tier1", {})
+        
+        self.risk_threshold = tier1_config.get("risk_threshold", self.risk_threshold)
+        self.sensitive_ports = tier1_config.get("sensitive_ports", self.sensitive_ports)
+        self.max_fwd_packets = tier1_config.get("max_fwd_packets", self.max_fwd_packets)
+        self.whitelist_ips = tier1_config.get("whitelist_ips", self.whitelist_ips)
+        
+        all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]

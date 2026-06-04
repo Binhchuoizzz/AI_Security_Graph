@@ -230,7 +230,7 @@ def test_10_tier1_static(r: TestResult):
     # SSH port 22 should trigger sensitive port rule
     ssh_log = {"Source IP": "192.168.1.100", "Destination Port": 22, "Total Fwd Packets": 5}
     result = engine.evaluate(ssh_log)
-    assert result["tier1_action"] == "ESCALATE", f"Expected ESCALATE, got {result['tier1_action']}"
+    assert result["tier1_action"] == "BLOCK_IP", f"Expected BLOCK_IP, got {result['tier1_action']}"
     assert result["tier1_score"] >= 30, f"Score too low: {result['tier1_score']}"
     # Benign log on safe port
     safe_log = {"Source IP": "10.0.0.50", "Destination Port": 8080, "Total Fwd Packets": 1}
@@ -251,8 +251,8 @@ def test_11_session_baseline(r: TestResult):
     for port in range(1, 16):
         log = {"Source IP": scanner_ip, "Destination Port": port, "Total Fwd Packets": 1}
         result = engine.evaluate(log)
-    # After 15 ports, should be ESCALATE due to port scanning deviation
-    assert result["tier1_action"] == "ESCALATE", f"Port scan not detected after 15 ports"
+    # After 15 ports, should be AWAIT_HITL due to port scanning deviation on non-sensitive ports
+    assert result["tier1_action"] == "AWAIT_HITL", f"Port scan not detected after 15 ports: {result['tier1_action']}"
     assert "Quét cổng (Port scan)" in str(result.get("tier1_reasons", "")), "Missing port scanning reason"
     r.passed(f"Port scanning detected after 15 unique ports (score={result['tier1_score']})")
 
@@ -266,7 +266,7 @@ def test_12_whitelist(r: TestResult):
     # 127.0.0.1 is whitelisted in system_settings.yaml
     log = {"Source IP": "127.0.0.1", "Destination Port": 22, "Total Fwd Packets": 9999}
     result = engine.evaluate(log)
-    assert result["tier1_action"] == "WHITELIST_DROP", f"Whitelist not working: {result['tier1_action']}"
+    assert result["tier1_action"] == "DROP", f"Whitelist not working: {result['tier1_action']}"
     r.passed("Whitelisted IP correctly bypassed all rules")
 
 
