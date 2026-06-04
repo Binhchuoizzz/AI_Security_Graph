@@ -3,16 +3,16 @@ Log Subscriber & Tier 1 Trigger
 
 Kết nối trực tiếp vào hàng chờ cấu trúc Redis List, sử dụng vòng chờ chặn `blpop`
 để hứng phân tích theo dạng Real-time Streaming. Ngay khi có dữ liệu, trigger
-`RuleEngine` ngay tại RAM và in kết quả.
+`RuleEngine` ngay tại RAM và chuyển tiếp theo đúng vai trò quyết định của Tier 1.
 """
 
-import redis
-import json
 import os
 import sys
+import json
+import time
+from typing import Any, cast
+import redis
 from dotenv import load_dotenv
-
-load_dotenv()
 
 # Khắc phục lỗi ModuleNotFound khi chạy trực tiếp file trong python
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -23,8 +23,6 @@ from src.tier1_filter.rule_engine import RuleEngine
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # Hỗ trợ cấu trúc Multi-source cho Log Correlation (MAWILab)
 QUEUES = ["queue_firewall", "queue_waf", "queue_sysmon"]
-
-import time
 
 
 def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
@@ -53,7 +51,6 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         try:
             # BLPOP lắng nghe trên nhiều queue cùng lúc.
             # item sẽ là một tuple: ('tên_queue', 'giá_trị_chuyển_vào')
-            from typing import Any, cast
             item = cast(Any, r.blpop(QUEUES, timeout=1))
             if item:
                 source_queue = item[0]
@@ -64,13 +61,31 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
 
                 # Gọi ngay Tier 1 Rule Engine để cân nhắc
                 evaluated_log = engine.evaluate(raw_log)
+                action = evaluated_log.get("tier1_action", "DROP")
 
-                if evaluated_log["tier1_action"] == "ESCALATE":
-                    alert_msg = f"[!] ESCALATE TO AI | Source: {source_queue} | Risk: {evaluated_log['tier1_score']} | Vi phạm: {evaluated_log['tier1_reasons']}"
+                # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
+                if action == "ESCALATE":
+                    alert_msg = f"[!] ESCALATE TO AI | Source: {source_queue} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
                     print(alert_msg)
                     batch_buffer.append(evaluated_log)
-                else:
-                    pass
+
+                elif action == "AWAIT_HITL":
+                    # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
+                    print(f"[*] routing AWAIT_HITL (Infiltration) -> queue_hitl")
+                    r.rpush("queue_hitl", json.dumps(evaluated_log))
+
+                elif action == "BLOCK_IP":
+                    # Đẩy IP vào blacklist của Redis với TTL 1 giờ
+                    src_ip = evaluated_log.get("Source IP") or evaluated_log.get("src_ip", "")
+                    if src_ip:
+                        print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
+                        r.setex(f"blacklist:{src_ip}", 3600, "1")
+                    # Ghi nhận vào log quyết định để phục vụ ablation study
+                    r.rpush("queue_decisions", json.dumps(evaluated_log))
+
+                elif action in ("ALERT", "LOG"):
+                    # Chỉ ghi nhận vào ablation log phục vụ thống kê nghiên cứu
+                    r.rpush("queue_decisions", json.dumps(evaluated_log))
 
             # Kiểm tra xem có cần trigger batch không
             current_time = time.time()
@@ -83,16 +98,26 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                         f"[*] Triggering Agent Workflow for batch of {len(batch_buffer)} logs..."
                     )
                     on_batch_ready(batch_buffer)
+                else:
+                    # standalone mode — log to console
+                    for log in batch_buffer:
+                        print(f"[ESCALATE] gt_id={log.get('gt_id')} "
+                              f"ip={log.get('Source IP')} score={log.get('tier1_score')}")
                 batch_buffer = []
-                last_batch_time = time.time()
+                last_batch_time = current_time
+            elif not batch_buffer:
+                last_batch_time = current_time  # reset timer khi idle (tránh timing bug)
 
         except KeyboardInterrupt:
             print("\n[*] Subscriber offline (Shutdown).")
             break
+        except redis.ConnectionError as e:
+            print(f"[!] Redis connection lost: {e}. Retrying in 5s...")
+            time.sleep(5)
         except json.JSONDecodeError:
             print("[!] Malformed JSON Log received via Redis. Skipping.")
         except Exception as e:
-            print(f"[!] Critical Error in stream processing: {e}")
+            print(f"[!] Unexpected error in stream processing: {e}")
 
 
 if __name__ == "__main__":
