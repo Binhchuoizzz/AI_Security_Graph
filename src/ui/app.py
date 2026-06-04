@@ -317,7 +317,7 @@ def main_dashboard():
                             if st.button(
                                 " Phê duyệt", key=f"app_{rule.get('pattern')}"
                             ):
-                                feedback_mgr.approve_rule(rule.get("pattern"))
+                                feedback_mgr.approve_rule(rule.get("pattern"), rule.get("field"))
                                 st.success(f"Đã duyệt luật {rule.get('pattern')}")
                                 time.sleep(0.5)
                                 st.rerun()
@@ -325,7 +325,7 @@ def main_dashboard():
                             if st.button(
                                 " Từ chối", key=f"rej_{rule.get('pattern')}"
                             ):
-                                feedback_mgr.reject_rule(rule.get("pattern"))
+                                feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
                                 st.warning(f"Đã từ chối luật {rule.get('pattern')}")
                                 time.sleep(0.5)
                                 st.rerun()
@@ -348,7 +348,7 @@ def main_dashboard():
                     
                     if st.session_state.get("role") == "L3_Manager":
                         if st.button(" Vô hiệu hóa / Hoàn tác", key=f"rev_{rule.get('pattern')}"):
-                            feedback_mgr.reject_rule(rule.get("pattern"))
+                            feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
                             st.warning(f"Đã hoàn tác và vô hiệu hóa luật {rule.get('pattern')}")
                             time.sleep(0.5)
                             st.rerun()
@@ -648,7 +648,7 @@ def main_dashboard():
                                 if status_val in ["ACTIVE", "PENDING_APPROVAL"]:
                                     if st.button("🔓 Hoàn tác / Gỡ chặn IP này", key=f"unblock_{selected_block_ip}"):
                                         # Set status thành REJECTED
-                                        feedback_mgr.reject_rule(selected_block_ip)
+                                        feedback_mgr.reject_rule(selected_block_ip, "Source IP")
                                         # Log hành động unblock vào audit_trail
                                         from src.response.executor import _log_to_db
                                         _log_to_db("LOG", selected_block_ip, f"Manual unblock by Administrator ({st.session_state.get('username')})")
@@ -658,7 +658,7 @@ def main_dashboard():
                                 elif status_val == "REJECTED":
                                     if st.button("🛑 Tái kích hoạt chặn IP này", key=f"reblock_{selected_block_ip}"):
                                         # Set status thành ACTIVE
-                                        feedback_mgr.approve_rule(selected_block_ip)
+                                        feedback_mgr.approve_rule(selected_block_ip, "Source IP")
                                         from src.response.executor import _log_to_db
                                         _log_to_db("BLOCK_IP", selected_block_ip, f"Manual re-block by Administrator ({st.session_state.get('username')})")
                                         st.success(f"Đã tái kích hoạt luật chặn cho IP {selected_block_ip}")
@@ -669,7 +669,7 @@ def main_dashboard():
                                 if selected_block_ip not in whitelisted_ips:
                                     if st.button("🛡️ Đưa thẳng vào Whitelist", key=f"towhitelist_{selected_block_ip}"):
                                         # Remove block rule or reject it
-                                        feedback_mgr.reject_rule(selected_block_ip)
+                                        feedback_mgr.reject_rule(selected_block_ip, "Source IP")
                                         # Add to whitelist
                                         feedback_mgr.add_to_whitelist(selected_block_ip)
                                         from src.response.executor import _log_to_db
@@ -703,7 +703,7 @@ def main_dashboard():
                         # Ghi luật chặn mới
                         feedback_mgr.receive_new_rule("Source IP", manual_block_ip, score=manual_block_score, source=f"manual_{st.session_state.get('username')}", reason=manual_block_reason)
                         # Duyệt luôn
-                        feedback_mgr.approve_rule(manual_block_ip)
+                        feedback_mgr.approve_rule(manual_block_ip, "Source IP")
                         
                         # Ghi audit log
                         from src.response.executor import block_ip

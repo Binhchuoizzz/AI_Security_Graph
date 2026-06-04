@@ -55,9 +55,9 @@ Tài liệu này tổng hợp toàn bộ **45 tệp tin mã nguồn** trong hệ
 *   **Mối quan hệ:** Được gọi bởi Web UI ở `src/ui/app.py` để đồng bộ xuống `src/tier1_filter/rule_engine.py`.
 
 ### 10. `src/tier1_filter/scanner.py`
-*   **Mục đích:** Thực hiện quét/thăm dò mạng nội bộ mô phỏng (nếu cần).
-*   **Tác dụng:** Tạo các tín hiệu giả lập quét cổng để kiểm thử phản ứng nhanh của Rule Engine.
-*   **Mối quan hệ:** Hoạt động độc lập hoặc bổ trợ cho luồng sinh log.
+*   **Mục đích:** Phân hệ quét lỗ hổng bảo mật tĩnh phụ thuộc (SCA - Software Composition Analysis).
+*   **Tác dụng:** Tích hợp công cụ Trivy để quét mã nguồn và dependencies của chính hệ thống nhằm phát hiện CVE tĩnh, phục vụ kiểm thử tính tự an toàn (Self-Securing) của hệ thống.
+*   **Mối quan hệ:** Chạy độc lập dưới dạng tác vụ DevSecOps của hệ thống; kết quả quét được lưu xuống ổ đĩa dạng JSON và đồng bộ hóa làm tri thức RAG/Knowledge Graph.
 
 ### 11. `demo_tier1.py`
 *   **Mục đích:** Demo chạy riêng phân hệ Tier 1.

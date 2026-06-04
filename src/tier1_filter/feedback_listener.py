@@ -24,13 +24,35 @@ import yaml
 import os
 import json
 import logging
+import tempfile
 from datetime import datetime, timezone
+from typing import Optional
+from filelock import FileLock
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
+LOCK_PATH = CONFIG_PATH + ".lock"
+_lock = FileLock(LOCK_PATH)
 
 logger = logging.getLogger(__name__)
+
+
+def _save_config_atomically(config: dict):
+    """Ghi đè file cấu hình một cách nguyên tử (Atomic Write) chống lỗi đọc dở file."""
+    dir_name = os.path.dirname(CONFIG_PATH)
+    fd, temp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
+    try:
+        with open(fd, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+        os.replace(temp_path, CONFIG_PATH)
+    except Exception as e:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+        raise e
 
 
 class FeedbackListener:
@@ -63,6 +85,9 @@ class FeedbackListener:
         Returns:
             dict chứa thông tin rule + status
         """
+        # Validate score: clamp [1, 100]
+        score = max(1, min(score, 100))
+
         new_rule = {
             "field": field,
             "pattern": pattern,
@@ -75,30 +100,29 @@ class FeedbackListener:
 
         # Persist vào YAML
         try:
-            with open(CONFIG_PATH, "r") as f:
-                config = yaml.safe_load(f)
+            with _lock:
+                with open(CONFIG_PATH, "r") as f:
+                    config = yaml.safe_load(f)
 
-            if "tier1" not in config:
-                config["tier1"] = {}
-            if "dynamic_rules" not in config["tier1"]:
-                config["tier1"]["dynamic_rules"] = []
+                if "tier1" not in config:
+                    config["tier1"] = {}
+                if "dynamic_rules" not in config["tier1"]:
+                    config["tier1"]["dynamic_rules"] = []
 
-            # Kiểm tra trùng lặp trước khi thêm
-            existing_patterns = [
-                r.get("pattern") for r in config["tier1"]["dynamic_rules"]
-            ]
-            if pattern in existing_patterns:
-                logger.warning(f"[Feedback] Duplicate rule skipped: {pattern}")
-                return {
-                    "status": "SKIPPED",
-                    "reason": "Duplicate pattern",
-                    "rule": new_rule,
+                # Kiểm tra trùng lặp trước khi thêm (check cả field và pattern)
+                existing_rules = {
+                    (r.get("field"), r.get("pattern")) for r in config["tier1"]["dynamic_rules"]
                 }
+                if (field, pattern) in existing_rules:
+                    logger.warning(f"[Feedback] Duplicate rule skipped: {field} contains '{pattern}'")
+                    return {
+                        "status": "SKIPPED",
+                        "reason": "Duplicate pattern for field",
+                        "rule": new_rule,
+                    }
 
-            config["tier1"]["dynamic_rules"].append(new_rule)
-
-            with open(CONFIG_PATH, "w") as f:
-                yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+                config["tier1"]["dynamic_rules"].append(new_rule)
+                _save_config_atomically(config)
 
             logger.info(
                 f"[Feedback] New dynamic rule persisted: {field} contains '{pattern}'"
@@ -137,42 +161,45 @@ class FeedbackListener:
         except Exception:
             return []
 
-    def update_rule_status(self, pattern: str, new_status: str) -> bool:
+    def update_rule_status(self, pattern: str, new_status: str, field: Optional[str] = None) -> bool:
         """Cập nhật trạng thái của rule (ACTIVE hoặc REJECTED)."""
         try:
-            with open(CONFIG_PATH, "r") as f:
-                config = yaml.safe_load(f)
+            with _lock:
+                with open(CONFIG_PATH, "r") as f:
+                    config = yaml.safe_load(f)
 
-            rules = config.get("tier1", {}).get("dynamic_rules", [])
-            updated = False
-            for rule in rules:
-                if rule.get("pattern") == pattern:
-                    rule["status"] = new_status
-                    updated = True
+                rules = config.get("tier1", {}).get("dynamic_rules", [])
+                updated = False
+                for rule in rules:
+                    match = rule.get("pattern") == pattern
+                    if field is not None:
+                        match = match and rule.get("field") == field
+                    if match:
+                        rule["status"] = new_status
+                        updated = True
 
-            if updated:
-                with open(CONFIG_PATH, "w") as f:
-                    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-                logger.info(f"[Feedback] Rule '{pattern}' updated to {new_status}")
+                if updated:
+                    _save_config_atomically(config)
+                    logger.info(f"[Feedback] Rule '{pattern}' (field={field}) updated to {new_status}")
             return updated
         except Exception as e:
             logger.error(f"[Feedback] Failed to update rule status: {e}")
             return False
 
-    def approve_rule(self, pattern: str) -> bool:
-        return self.update_rule_status(pattern, "ACTIVE")
+    def approve_rule(self, pattern: str, field: Optional[str] = None) -> bool:
+        return self.update_rule_status(pattern, "ACTIVE", field)
 
-    def reject_rule(self, pattern: str) -> bool:
-        return self.update_rule_status(pattern, "REJECTED")
+    def reject_rule(self, pattern: str, field: Optional[str] = None) -> bool:
+        return self.update_rule_status(pattern, "REJECTED", field)
 
     def clear_all_dynamic_rules(self):
         """Reset toàn bộ dynamic rules (dùng khi chạy experiment mới)."""
         try:
-            with open(CONFIG_PATH, "r") as f:
-                config = yaml.safe_load(f)
-            config["tier1"]["dynamic_rules"] = []
-            with open(CONFIG_PATH, "w") as f:
-                yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+            with _lock:
+                with open(CONFIG_PATH, "r") as f:
+                    config = yaml.safe_load(f)
+                config["tier1"]["dynamic_rules"] = []
+                _save_config_atomically(config)
             self.feedback_log = []
             logger.info("[Feedback] All dynamic rules cleared.")
         except Exception as e:
@@ -181,19 +208,19 @@ class FeedbackListener:
     def add_to_whitelist(self, ip: str) -> bool:
         """Thêm một IP vào whitelist trong config (Dùng cho luồng phê duyệt Pentest/Internal)."""
         try:
-            with open(CONFIG_PATH, "r") as f:
-                config = yaml.safe_load(f)
-                
-            if "tier1" not in config:
-                config["tier1"] = {}
-            if "whitelist_ips" not in config["tier1"]:
-                config["tier1"]["whitelist_ips"] = []
-                
-            if ip not in config["tier1"]["whitelist_ips"]:
-                config["tier1"]["whitelist_ips"].append(ip)
-                with open(CONFIG_PATH, "w") as f:
-                    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-                logger.info(f"[Feedback] IP {ip} has been added to Whitelist.")
+            with _lock:
+                with open(CONFIG_PATH, "r") as f:
+                    config = yaml.safe_load(f)
+                    
+                if "tier1" not in config:
+                    config["tier1"] = {}
+                if "whitelist_ips" not in config["tier1"]:
+                    config["tier1"]["whitelist_ips"] = []
+                    
+                if ip not in config["tier1"]["whitelist_ips"]:
+                    config["tier1"]["whitelist_ips"].append(ip)
+                    _save_config_atomically(config)
+                    logger.info(f"[Feedback] IP {ip} has been added to Whitelist.")
             return True
         except Exception as e:
             logger.error(f"[Feedback] Failed to add {ip} to whitelist: {e}")
@@ -202,16 +229,16 @@ class FeedbackListener:
     def remove_from_whitelist(self, ip: str) -> bool:
         """Gỡ một IP khỏi whitelist."""
         try:
-            with open(CONFIG_PATH, "r") as f:
-                config = yaml.safe_load(f)
-                
-            whitelist = config.get("tier1", {}).get("whitelist_ips", [])
-            if ip in whitelist:
-                whitelist.remove(ip)
-                with open(CONFIG_PATH, "w") as f:
-                    yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-                logger.info(f"[Feedback] IP {ip} has been removed from Whitelist.")
-                return True
+            with _lock:
+                with open(CONFIG_PATH, "r") as f:
+                    config = yaml.safe_load(f)
+                    
+                whitelist = config.get("tier1", {}).get("whitelist_ips", [])
+                if ip in whitelist:
+                    whitelist.remove(ip)
+                    _save_config_atomically(config)
+                    logger.info(f"[Feedback] IP {ip} has been removed from Whitelist.")
+                    return True
             return False
         except Exception as e:
             logger.error(f"[Feedback] Failed to remove {ip} from whitelist: {e}")
