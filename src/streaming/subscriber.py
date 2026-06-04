@@ -14,6 +14,8 @@ from typing import Any, cast
 import redis
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # Khắc phục lỗi ModuleNotFound khi chạy trực tiếp file trong python
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
