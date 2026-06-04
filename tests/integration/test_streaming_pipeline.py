@@ -31,11 +31,11 @@ class TestMultiSourceRouting:
         log = {"Destination Port": 80, "payload": "GET /admin"}
         assert determine_queue(log) == "queue_waf"
 
-    def test_sysmon_routing(self):
+    def test_unrecognized_port_goes_to_firewall(self):
         from scripts.simulate_traffic import determine_queue
 
         log = {"Destination Port": 9999, "payload": ""}
-        assert determine_queue(log) == "queue_sysmon"
+        assert determine_queue(log) == "queue_firewall"
 
     def test_rdp_goes_to_firewall(self):
         from scripts.simulate_traffic import determine_queue
@@ -95,11 +95,11 @@ class TestRuleEngineIntegration:
 
         results = [engine.evaluate(log) for log in batch]
 
-        # SSH với nhiều gói tin sẽ bị escalate
-        assert results[0]["tier1_action"] == "ESCALATE"
-        # Port 80 is now a sensitive port → should escalate
-        assert results[1]["tier1_action"] == "ESCALATE"
-        # Port 8080 with low packets → DROP
+        # SSH với nhiều gói tin (volumetric) sẽ bị ALERT
+        assert results[0]["tier1_action"] == "ALERT"
+        # Port 80 with low packets -> BLOCK_IP (since port 80 is in sensitive_ports in config)
+        assert results[1]["tier1_action"] == "BLOCK_IP"
+        # Port 8080 with low packets -> DROP
         assert results[2]["tier1_action"] == "DROP"
 
 

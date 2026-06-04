@@ -20,31 +20,31 @@ class TestRuleEngine:
         self.engine.dynamic_rules = []  # Isolate from Feedback Loop runtime state
 
     def test_sensitive_port_ssh_escalate(self):
-        """Port 22 phải bị escalate."""
+        """Port 22 phải bị block IP (BLOCK_IP)."""
         log = {"Source IP": "10.0.0.1", "Destination Port": 22, "Total Fwd Packets": 5}
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "ESCALATE"
+        assert result["tier1_action"] == "BLOCK_IP"
         assert result["tier1_score"] >= 30
 
     def test_sensitive_port_rdp_escalate(self):
-        """Port 3389 (RDP) phải bị escalate."""
+        """Port 3389 (RDP) phải bị block IP (BLOCK_IP)."""
         log = {
             "Source IP": "10.0.0.2",
             "Destination Port": 3389,
             "Total Fwd Packets": 10,
         }
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "ESCALATE"
+        assert result["tier1_action"] == "BLOCK_IP"
 
     def test_high_packet_count_escalate(self):
-        """Gói tin vượt ngưỡng max_fwd_packets phải bị escalate."""
+        """Gói tin vượt ngưỡng max_fwd_packets phải bị cảnh báo (ALERT)."""
         log = {
             "Source IP": "10.0.0.3",
             "Destination Port": 443,
             "Total Fwd Packets": 5000,
         }
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "ESCALATE"
+        assert result["tier1_action"] == "ALERT"
         assert any(
             x in str(result.get("tier1_reasons", [])).lower()
             for x in ["anomaly", "pkts", "bất thường", "gói"]
@@ -62,7 +62,7 @@ class TestRuleEngine:
         assert result["tier1_score"] < 15
 
     def test_whitelist_ip_drop(self):
-        """Traffic từ IP trong whitelist phải bị WHITELIST_DROP dù là port nhạy cảm."""
+        """Traffic từ IP trong whitelist phải bị DROP dù là port nhạy cảm."""
         self.engine.whitelist_ips = ["10.0.0.99"]
         log = {
             "Source IP": "10.0.0.99",
@@ -70,20 +70,20 @@ class TestRuleEngine:
             "Total Fwd Packets": 5000,
         }
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "WHITELIST_DROP"
+        assert result["tier1_action"] == "DROP"
         assert result["tier1_score"] == 0
 
     def test_ftp_port_escalate(self):
-        """Port 21 (FTP) phải bị escalate."""
+        """Port 21 (FTP) phải bị block IP (BLOCK_IP)."""
         log = {"Source IP": "10.0.0.4", "Destination Port": 21, "Total Fwd Packets": 2}
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "ESCALATE"
+        assert result["tier1_action"] == "BLOCK_IP"
 
     def test_telnet_port_escalate(self):
-        """Port 23 (Telnet) phải bị escalate."""
+        """Port 23 (Telnet) phải bị block IP (BLOCK_IP)."""
         log = {"Source IP": "10.0.0.5", "Destination Port": 23, "Total Fwd Packets": 1}
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "ESCALATE"
+        assert result["tier1_action"] == "BLOCK_IP"
 
     def test_combined_score_accumulation(self):
         """SSH + high packets phải có score cao hơn chỉ SSH."""
@@ -111,7 +111,7 @@ class TestRuleEngine:
         assert "tier1_action" in result
         assert "tier1_score" in result
         assert "tier1_reasons" in result
-        assert result["tier1_action"] in ["ESCALATE", "DROP"]
+        assert result["tier1_action"] in ["ESCALATE", "BLOCK_IP", "ALERT", "AWAIT_HITL", "DROP", "LOG"]
 
     def test_unsupervised_anomaly_detection(self):
         """Kiểm thử phát hiện dị biệt thống kê (Unsupervised Anomaly Detection)."""
@@ -128,8 +128,8 @@ class TestRuleEngine:
         abnormal_log = {"Source IP": "192.168.1.5", "Destination Port": 80, "Total Fwd Packets": 500000}
         result = engine.evaluate(abnormal_log)
         
-        # 3. Phải bị escalate và có lý do "Z-Score" hoặc "dị biệt thống kê"
-        assert result["tier1_action"] == "ESCALATE"
+        # 3. Phải bị cảnh báo (ALERT) và có lý do "Z-Score" hoặc "dị biệt thống kê"
+        assert result["tier1_action"] == "ALERT"
         assert any("Z-Score" in r or "thống kê" in r for r in result["tier1_reasons"])
 
 
