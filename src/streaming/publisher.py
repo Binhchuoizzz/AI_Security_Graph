@@ -50,11 +50,13 @@ COLUMN_MAPPING = {
 
 
 def _clean_val(v):
-    """Clean NaN and Inf values to safe representations for JSON parsing."""
+    """Clean NaN, Inf, and -1 sentinel values to safe representations for JSON parsing."""
     if pd.isna(v):
         return 0
     if isinstance(v, float) and np.isinf(v):
         return 0.0
+    if v == -1:
+        return 0
     return v
 
 
@@ -102,10 +104,20 @@ def stream_logs_to_redis(csv_path: str):
     try:
         # chunksize=500 is optimal for balancing performance and memory overhead
         for chunk_idx, chunk in enumerate(pd.read_csv(csv_path, chunksize=500)):
+            # Backpressure: Check queue size before processing the chunk to avoid per-row Redis calls
+            wait_count = 0
+            while r.llen(QUEUE_NAME) > MAX_QUEUE_SIZE:  # type: ignore
+                time.sleep(0.1)
+                wait_count += 1
+                if wait_count % 100 == 0:  # Every 10 seconds (100 * 0.1s)
+                    print(
+                        f"[!] Backpressure: queue={r.llen(QUEUE_NAME)} exceeds threshold {MAX_QUEUE_SIZE}. Consumer offline or slow?"
+                    )
+
             for index, row in chunk.iterrows():
                 log_entry = row.to_dict()
 
-                # Clean invalid values (NaN -> 0, Inf -> 0.0)
+                # Clean invalid values (NaN -> 0, Inf -> 0.0, -1 -> 0)
                 clean_entry = {
                     k: _clean_val(v) for k, v in log_entry.items()
                 }
@@ -120,8 +132,8 @@ def stream_logs_to_redis(csv_path: str):
                 # Auto-generate simulated IPs deterministically if missing
                 _inject_ips(normalized_entry, index)
 
-                while r.llen(QUEUE_NAME) > MAX_QUEUE_SIZE:  # type: ignore
-                    time.sleep(0.1)
+                # Add dataset source filename to allow Tier-1/Tier-2 to differentiate context
+                normalized_entry["dataset_source"] = os.path.basename(csv_path)
 
                 # Push to Redis List
                 r.rpush(QUEUE_NAME, json.dumps(normalized_entry))
