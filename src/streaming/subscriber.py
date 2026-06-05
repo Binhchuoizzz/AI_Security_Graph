@@ -14,6 +14,8 @@ from typing import Any, cast
 import redis
 from dotenv import load_dotenv
 
+import yaml
+
 load_dotenv()
 
 # Khắc phục lỗi ModuleNotFound khi chạy trực tiếp file trong python
@@ -21,10 +23,20 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.tier1_filter.rule_engine import RuleEngine
 
-# Nhận config theo chuẩn OS Env
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+)
+try:
+    with open(CONFIG_PATH, "r") as f:
+        _config = yaml.safe_load(f)
+except Exception:
+    _config = {}
+
+# Nhận config theo chuẩn OS Env hoặc YAML fallback
+REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
 # Hỗ trợ cấu trúc Multi-source cho Log Correlation (MAWILab)
-QUEUES = ["queue_firewall", "queue_waf", "queue_sysmon"]
+QUEUES = _config.get("redis", {}).get("queues", ["queue_firewall", "queue_waf", "queue_sysmon"])
+ESCALATED_QUEUE = _config.get("redis", {}).get("escalated_queue", "queue_hitl")
 
 
 def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
@@ -40,7 +52,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         print(f"[!] Subscriber failed to connect to Redis: {e}")
         return
 
-    # Ngưỡng (Threshold) = 30 là mức nhạy khá, dễ dính chùm port 22
+    # Ngưỡng (Threshold) được load từ system_settings.yaml (hiện tại: 15)
     engine = RuleEngine()
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
     print(f"[*] Subscribed and listening on multiple queues: {QUEUES}...")
@@ -73,8 +85,8 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
 
                 elif action == "AWAIT_HITL":
                     # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
-                    print(f"[*] routing AWAIT_HITL (Infiltration) -> queue_hitl")
-                    r.rpush("queue_hitl", json.dumps(evaluated_log))
+                    print(f"[*] routing AWAIT_HITL (Infiltration) -> {ESCALATED_QUEUE}")
+                    r.rpush(ESCALATED_QUEUE, json.dumps(evaluated_log))
 
                 elif action == "BLOCK_IP":
                     # Đẩy IP vào blacklist của Redis với TTL 1 giờ

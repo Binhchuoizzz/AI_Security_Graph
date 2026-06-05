@@ -20,10 +20,23 @@ try:
 except ImportError:
     raise ImportError("Thiếu thư viện yêu cầu: hãy chạy pip install openai")
 
+import yaml
+
 logger = logging.getLogger(__name__)
 
+CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+)
+try:
+    with open(CONFIG_PATH, "r") as f:
+        _config = yaml.safe_load(f)
+except Exception:
+    _config = {}
+
+YAML_BASE_URL = _config.get("llm", {}).get("base_url", "http://127.0.0.1:5000/v1")
+
 # OpenAI-compatible endpoint (llama.cpp server)
-API_BASE_URL = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
+API_BASE_URL = os.getenv("LLM_API_BASE", YAML_BASE_URL)
 API_KEY = os.getenv(
     "LLM_API_KEY", "sk-placeholder-local-only"
 )  # Placeholder cho Local LLM

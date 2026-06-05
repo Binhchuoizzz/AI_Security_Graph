@@ -37,6 +37,8 @@ guardrails:
   - pretend you are
   - roleplay as
   - respond without restrictions
+  - "<<<DATA_END_"
+  - ">>>>"
   jailbreak_patterns:
   - DAN mode
   - Do Anything Now
@@ -60,7 +62,7 @@ guardrails:
     strip_markdown_images: true
   token_budget: 4000
 llm:
-  base_url: http://host.docker.internal:5000/v1
+  base_url: http://localhost:5000/v1
   estimated_vram_gb: 7
   max_context_tokens: 8192
   model_name: gemma-2-9b-it-Q4_K_M
@@ -83,10 +85,14 @@ rag:
     ttl_seconds: 1800
   top_k_results: 3
 redis:
-  escalated_queue: escalated_logs
-  publisher_delay_seconds: 0.5
-  queue_name: security_logs_stream
   url: redis://localhost:6379/0
+  queues:
+    - queue_firewall
+    - queue_waf
+    - queue_sysmon
+  queue_name: queue_waf
+  escalated_queue: queue_hitl
+  publisher_delay_seconds: 0.5
 threat_memory:
   apt_threshold_days: 7
   apt_threshold_incidents: 5
@@ -102,8 +108,6 @@ tier1:
   - 21
   - 22
   - 23
-  - 80
-  - 443
   - 3389
   - 445
   - 1433
@@ -118,4 +122,3 @@ tier1:
   - 127.0.0.1
   - 10.0.0.99
   - 192.168.1.254
-  - 0.0.0.0

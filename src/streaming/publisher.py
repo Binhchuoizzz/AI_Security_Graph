@@ -8,11 +8,22 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 
+import yaml
+
 load_dotenv()
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-QUEUE_NAME = "queue_waf"  # Default to WAF queue for CSV-based ingestion
-BATCH_DELAY_SECONDS = 0.5  # Throttle delay between batches
+CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+)
+try:
+    with open(CONFIG_PATH, "r") as f:
+        _config = yaml.safe_load(f)
+except Exception:
+    _config = {}
+
+REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
+QUEUE_NAME = _config.get("redis", {}).get("queue_name", "queue_waf")
+BATCH_DELAY_SECONDS = float(_config.get("redis", {}).get("publisher_delay_seconds", 0.5))
 MAX_QUEUE_SIZE = 10000  # Backpressure queue limit to prevent Redis OOM
 
 # Standard column mapping to align different datasets (CSE-CIC-IDS2018 & DAPT2020)
