@@ -28,30 +28,31 @@ Tài liệu này tổng hợp toàn bộ **45 tệp tin mã nguồn** trong hệ
 
 ### 5. `src/streaming/publisher.py`
 *   **Mục đích:** Mô phỏng dòng lưu lượng mạng doanh nghiệp thời gian thực.
-*   **Tác dụng:** Đọc tập dữ liệu đã chuẩn hóa, chuyển đổi từng dòng log (flow) thành JSON và đẩy liên tục lên Redis Pub/Sub channel ở tốc độ tùy chỉnh (mô phỏng wire-speed).
+*   **Tác dụng:** Đọc cấu hình kết nối Redis trực tiếp từ file cấu hình trung tâm `config/system_settings.yaml` (loại bỏ các khóa cấu hình tĩnh dư thừa); đọc tập dữ liệu đã chuẩn hóa, chuyển đổi từng dòng log (flow) thành JSON và đẩy liên tục lên Redis Pub/Sub channel ở tốc độ tùy chỉnh (mô phỏng wire-speed).
 *   **Mối quan hệ:** Đẩy dữ liệu lên Redis. Được import và gọi bởi `scripts/simulate_traffic.py`.
 
 ### 6. `scripts/simulate_traffic.py`
 *   **Mục đích:** Script thực thi dòng lưu lượng mạng mô phỏng.
-*   **Tác dụng:** Điểm khởi chạy (entrypoint) để bắt đầu tiến trình stream dữ liệu logs mạng.
+*   **Tác dụng:** Điểm khởi chạy (entrypoint) để bắt đầu tiến trình stream dữ liệu logs mạng. Hỗ trợ ánh xạ 17 trường mạng từ tập dữ liệu thô sang các trường chuẩn hóa của Rule Engine thông qua alias khóa (`_KEY_ALIASES` và `_RAW_TO_CANONICAL`).
 *   **Mối quan hệ:** Khởi tạo instance và gọi hàm từ `src/streaming/publisher.py`.
 
 ### 7. `src/streaming/subscriber.py`
 *   **Mục đích:** Lắng nghe và gom batch dữ liệu logs từ Redis.
-*   **Tác dụng:** Đăng ký lắng nghe kênh Redis, nhận JSON log mạng, tích lũy logs theo từng cửa sổ trượt thời gian (time window) và đẩy sang Rule Engine của Tier 1 để đánh giá.
+*   **Tác dụng:** Đăng ký lắng nghe kênh Redis (cấu hình đọc động từ `system_settings.yaml`), nhận JSON log mạng, tích lũy logs theo từng cửa sổ trượt thời gian (time window) và đẩy sang Rule Engine của Tier 1 để đánh giá.
 *   **Mối quan hệ:** Nhận logs từ Redis Pub/Sub, chuyển tiếp dữ liệu đến `src/tier1_filter/rule_engine.py` và gọi tác tử LangGraph ở `src/agent/workflow.py` nếu có escalate.
 
 ### 8. `src/tier1_filter/rule_engine.py` *(Cực kỳ quan trọng)*
 *   **Mục đích:** Màng lọc thô heuristics và phát hiện dị biệt thống kê phi giám sát trực tuyến.
 *   **Tác dụng:** 
     *   Class `RunningStats`: Cài đặt thuật toán Welford trực tuyến cập nhật Mean/StdDev với độ phức tạp $O(1)$ RAM/CPU.
-    *   Class `SessionBaseline`: Quản lý IP profiles và cơ chế tự dọn dẹp (eviction) IP rác quá TTL để chống OOM.
-    *   Đo lường Z-Score và so sánh với blacklist/rate-limit để tính tổng điểm rủi ro. Quyết định DROP hoặc ESCALATE.
+    *   Class `SessionBaseline`: Quản lý IP profiles, theo dõi hành vi quét cổng (Port scan) và cơ chế tự dọn dẹp (eviction) IP rác quá TTL để chống OOM.
+    *   Đo lường Z-Score và so sánh với blacklist/rate-limit để tính tổng điểm rủi ro. Quyết định DROP, LOG, ALERT, hoặc ESCALATE.
+    *   Đồng bộ hóa 100% với cấu hình cổng nhạy cảm `sensitive_ports` (loại bỏ các cổng Web chuẩn như 80/443 để tránh chặn nhầm các cuộc tấn công tầng ứng dụng SQLi/XSS cần LLM phân tích) và loại bỏ hoàn toàn IP `0.0.0.0` khỏi whitelist để tránh bypass.
 *   **Mối quan hệ:** Nhận logs đầu vào từ `subscriber.py`, đọc cấu hình từ `system_settings.yaml` (thông qua `feedback_listener.py`), trả quyết định chặn về cho hệ thống.
 
 ### 9. `src/tier1_filter/feedback_listener.py`
 *   **Mục đích:** Cầu nối phản hồi thời gian thực giúp đồng bộ cấu hình hệ thống.
-*   **Tác dụng:** Lắng nghe các thay đổi trong cấu hình rules từ UI và cập nhật nạp nóng (hot-reload) vào class `RuleEngine` mà không cần restart.
+*   **Tác dụng:** Lắng nghe các thay đổi trong cấu hình rules từ UI và cập nhật nạp nóng (hot-reload) vào class `RuleEngine` mà không cần restart. Sử dụng cơ chế ghi đè an toàn (atomic write) kết hợp `FileLock` trên file YAML cấu hình rules động, đồng thời đảm bảo điểm số rủi ro (risk score) luôn được giới hạn (clamp) trong khoảng `[0, 100]`.
 *   **Mối quan hệ:** Được gọi bởi Web UI ở `src/ui/app.py` để đồng bộ xuống `src/tier1_filter/rule_engine.py`.
 
 ### 10. `src/tier1_filter/scanner.py`
@@ -61,7 +62,7 @@ Tài liệu này tổng hợp toàn bộ **45 tệp tin mã nguồn** trong hệ
 
 ### 11. `demo_tier1.py`
 *   **Mục đích:** Demo chạy riêng phân hệ Tier 1.
-*   **Tác dụng:** Cung cấp script tương tác dòng lệnh để kiểm tra thuật toán Welford và Z-Score mà không cần khởi động toàn bộ UI/Agent.
+*   **Tác dụng:** Cung cấp script tương tác dòng lệnh để kiểm tra thuật toán Welford và Z-Score. Khắc phục lỗi Case 4 bằng cách tích hợp xử lý đúng trạng thái phê duyệt của rule động (`ACTIVE` và `PENDING_APPROVAL`), đảm bảo kịch bản leo thang (ESCALATE) chạy chuẩn xác.
 *   **Mối quan hệ:** Gọi trực tiếp `src/tier1_filter/rule_engine.py`.
 
 ---
