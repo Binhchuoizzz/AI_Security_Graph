@@ -1,27 +1,27 @@
 """
-Long-Term Threat Intelligence Memory Store
+Kho lưu trữ bộ nhớ tình báo mối đe dọa dài hạn (Long-Term Threat Intelligence Memory Store)
 
 MỤC ĐÍCH:
   SENTINEL hiện tại chỉ có Session Memory (trong RAM, mất khi restart).
   Module này bổ sung PERSISTENT MEMORY (SQLite) cho 3 chức năng:
 
-  1. IP REPUTATION TRACKING:
+  1. THEO DÕI DANH TIẾNG IP (IP REPUTATION TRACKING):
      Ghi nhận lịch sử hành vi IP qua nhiều ngày/tuần.
      → Phát hiện APT low-and-slow (tấn công chậm, ít lưu lượng mỗi ngày).
 
-  2. ORGANIZATIONAL CONTEXT:
+  2. BỐI CẢNH TỔ CHỨC (ORGANIZATIONAL CONTEXT):
      Lưu danh sách tools/services hợp pháp nội bộ (Nessus scanner, pentest IPs).
      → Agent tự động nhận ra traffic từ internal security tools, tránh false positive.
 
-  3. APT CORRELATION:
+  3. TƯƠNG QUAN APT (APT CORRELATION):
      Tự động flag IP bị escalate > N lần trong M ngày.
      → Tương quan sự kiện dài hạn mà Session Memory không làm được.
 
   THIẾT KẾ:
   - Persistent Store: SQLite (nhẹ, không cần server, tích hợp Python stdlib)
   - Tables: ip_reputation, known_entities, apt_indicators
-  - Decay Mechanism: Reputation score giảm dần theo thời gian nếu IP im lặng
-  - Integration: Inject vào LLM prompt qua node_llm_triage
+  - Cơ chế suy hao (Decay Mechanism): Điểm reputation score giảm dần theo thời gian nếu IP im lặng
+  - Tích hợp: Inject vào LLM prompt qua node_llm_triage
 """
 
 import sqlite3
@@ -39,8 +39,8 @@ MEMORY_DB_PATH = os.path.join(
 
 class ThreatMemoryStore:
     """
-    Persistent Long-Term Memory cho SENTINEL Agent.
-    Lưu trữ IP reputation, organizational context, và APT indicators.
+    Bộ nhớ dài hạn bền vững (Persistent Long-Term Memory) cho SENTINEL Agent.
+    Lưu trữ danh tiếng IP (IP reputation), bối cảnh tổ chức (organizational context), và các dấu hiệu APT.
     """
 
     def __init__(self, db_path: str = MEMORY_DB_PATH):
@@ -48,7 +48,7 @@ class ThreatMemoryStore:
         self._init_db()
 
     def _init_db(self):
-        """Khởi tạo schema nếu chưa tồn tại."""
+        """Khởi tạo cấu trúc bảng (schema) nếu chưa tồn tại."""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
@@ -112,7 +112,7 @@ class ThreatMemoryStore:
                 )
             """)
 
-            # Seed default known entities if empty
+            # Nạp các thực thể đã biết mặc định nếu bảng trống
             c.execute("SELECT COUNT(*) FROM known_entities")
             if c.fetchone()[0] == 0:
                 now_str = datetime.now().isoformat()
@@ -128,13 +128,13 @@ class ThreatMemoryStore:
         logger.info(f"[THREAT MEMORY] Initialized at {self.db_path}")
 
     # =========================================================================
-    # IP REPUTATION
+    # DANH TIẾNG IP
     # =========================================================================
 
     def record_incident(self, ip: str, action: str, mitre_technique: str = ""):
         """
         Ghi nhận một sự cố liên quan đến IP.
-        Tự động tăng reputation score dựa trên severity.
+        Tự động tăng reputation score dựa trên mức độ nghiêm trọng (severity).
         """
         now = datetime.now(timezone.utc).isoformat()
         score_delta = {
@@ -148,13 +148,13 @@ class ThreatMemoryStore:
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
 
-            # Upsert IP reputation
+            # Thêm mới hoặc cập nhật danh tiếng IP (Upsert)
             c.execute("SELECT ip, total_incidents, reputation_score FROM ip_reputation WHERE ip = ?", (ip,))
             row = c.fetchone()
 
             if row:
                 new_incidents = row[1] + 1
-                new_score = min(row[2] + score_delta, 100.0)  # Cap at 100
+                new_score = min(row[2] + score_delta, 100.0)  # Giới hạn tối đa là 100
                 block_delta = 1 if action == "BLOCK_IP" else 0
                 alert_delta = 1 if action == "ALERT" else 0
                 c.execute("""
@@ -203,8 +203,8 @@ class ThreatMemoryStore:
 
     def decay_reputation(self, decay_rate: float = 0.95, inactive_days: int = 7):
         """
-        Giảm reputation score cho IPs inactive > N ngày.
-        Chạy định kỳ (ví dụ: mỗi ngày) để tránh stale data.
+        Giảm điểm danh tiếng cho các IP không hoạt động (inactive) quá N ngày.
+        Chạy định kỳ (ví dụ: mỗi ngày) để tránh dữ liệu cũ (stale data).
         """
         cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
         with sqlite3.connect(self.db_path) as conn:
@@ -226,10 +226,10 @@ class ThreatMemoryStore:
     def add_known_entity(self, entity_type: str, entity_value: str,
                          description: str = "", added_by: str = "system"):
         """
-        Thêm entity hợp pháp (internal tool, pentest IP, scanner).
+        Thêm thực thể hợp pháp (internal tool, pentest IP, scanner).
         
         entity_type: 'scanner', 'pentest_ip', 'admin_tool', 'scheduled_scan'
-        entity_value: IP, hostname, hoặc tool name
+        entity_value: IP, tên máy chủ (hostname), hoặc tên công cụ (tool name)
         """
         now = datetime.now(timezone.utc).isoformat()
         try:
@@ -281,13 +281,13 @@ class ThreatMemoryStore:
             return [dict(row) for row in c.fetchall()]
 
     # =========================================================================
-    # APT CHAIN TRACKING (DAPT2020 Integration)
+    # THEO DÕI CHUỖI APT (Tích hợp DAPT2020)
     # =========================================================================
 
     def record_apt_event(self, src_ip: str, dst_ip: str = "",
                          apt_phase: Optional[str] = None, apt_day: Optional[int] = None,
                          label: str = "", timestamp: str = ""):
-        """Record a single threat event for APT chain tracking."""
+        """Ghi nhận một sự kiện đe dọa đơn lẻ để theo dõi chuỗi APT."""
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
@@ -300,10 +300,10 @@ class ThreatMemoryStore:
 
     def check_apt_chain(self, src_ip: str) -> dict:
         """
-        Check if this IP is part of a known APT chain.
-        Returns escalation info if multi-stage attack detected.
+        Kiểm tra xem IP này có thuộc một chuỗi APT đã biết hay không.
+        Trả về thông tin leo thang nếu phát hiện tấn công nhiều giai đoạn (multi-stage).
 
-        An IP is flagged as APT if it appears in events across ≥2 different days.
+        Một IP được đánh dấu là APT nếu xuất hiện trong các sự kiện thuộc ít nhất 2 ngày khác nhau.
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
@@ -328,8 +328,8 @@ class ThreatMemoryStore:
 
     def ingest_dapt_chains(self, chains_path: str = "data/processed/dapt2020_chains.jsonl"):
         """
-        Ingest DAPT2020 APT chains from JSONL into threat_events table.
-        Each chain contains events from the same attacker IP across multiple days.
+        Nạp các chuỗi APT DAPT2020 từ JSONL vào bảng threat_events.
+        Mỗi chuỗi chứa các sự kiện từ cùng một IP tấn công qua nhiều ngày.
         """
         import json
 
@@ -390,7 +390,7 @@ class ThreatMemoryStore:
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
-            # Check existing
+            # Kiểm tra xem đã tồn tại chưa
             c.execute("""
                 SELECT id, occurrence_count FROM apt_indicators 
                 WHERE indicator_type = ? AND indicator_value = ?
@@ -420,12 +420,12 @@ class ThreatMemoryStore:
 
     def get_context_for_prompt(self, source_ip: str, max_tokens: int = 300) -> str:
         """
-        Sinh context từ Long-Term Memory để inject vào LLM prompt.
-        Giúp Agent biết lịch sử IP trước khi phân tích batch mới.
+        Sinh ngữ cảnh từ Bộ nhớ dài hạn để đưa vào LLM prompt.
+        Giúp Agent nắm bắt lịch sử hoạt động của IP trước khi phân tích batch mới.
         """
         parts = []
 
-        # 1. IP Reputation
+        # 1. Danh tiếng IP (IP Reputation)
         rep = self.get_ip_reputation(source_ip)
         if rep and rep["total_incidents"] > 0:
             parts.append(
@@ -438,7 +438,7 @@ class ThreatMemoryStore:
                 f"  Last MITRE: {rep.get('last_mitre_technique', 'N/A')}"
             )
 
-        # 2. Known Entity check
+        # 2. Kiểm tra thực thể nội bộ đã biết (Known Entity check)
         entity = self.is_known_entity(source_ip)
         if entity:
             parts.append(
@@ -446,7 +446,7 @@ class ThreatMemoryStore:
                 f"{entity['description']}. Consider FALSE POSITIVE."
             )
 
-        # 3. APT check
+        # 3. Kiểm tra mẫu APT (APT check)
         apt = self.check_apt_pattern(source_ip)
         if apt and apt["is_apt_candidate"]:
             parts.append(
@@ -458,7 +458,7 @@ class ThreatMemoryStore:
             return ""
 
         context = "\n".join(parts)
-        # Token budget control
+        # Tỉ lệ ký tự/token ước lượng
         if len(context) > max_tokens * 4:  # rough char-to-token ratio
             context = context[:max_tokens * 4] + "\n  ... [TRUNCATED]"
         return context
@@ -502,5 +502,5 @@ class ThreatMemoryStore:
             return [dict(row) for row in c.fetchall()]
 
 
-# Singleton
+# Thực thể duy nhất (Singleton)
 threat_memory = ThreatMemoryStore()

@@ -1,5 +1,5 @@
 """
-Log Subscriber & Tier 1 Trigger
+Log Subscriber & Kích hoạt Tier 1
 
 Kết nối trực tiếp vào hàng chờ cấu trúc Redis List, sử dụng vòng chờ chặn `blpop`
 để hứng phân tích theo dạng Real-time Streaming. Ngay khi có dữ liệu, trigger
@@ -57,7 +57,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
     print(f"[*] Subscribed and listening on multiple queues: {QUEUES}...")
 
-    # Incident-Level Aggregation Buffers
+    # Bộ đệm gom sự cố (Incident-Level Aggregation Buffers)
     batch_buffer = []
     last_batch_time = time.time()
 
@@ -113,14 +113,14 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                     )
                     on_batch_ready(batch_buffer)
                 else:
-                    # standalone mode — log to console
+                    # Chế độ độc lập (standalone mode) — ghi log ra màn hình (console)
                     for log in batch_buffer:
                         print(f"[ESCALATE] gt_id={log.get('gt_id')} "
                               f"ip={log.get('Source IP')} score={log.get('tier1_score')}")
                 batch_buffer = []
                 last_batch_time = current_time
             elif not batch_buffer:
-                last_batch_time = current_time  # reset timer khi idle (tránh timing bug)
+                last_batch_time = current_time  # Đặt lại timer khi nhàn rỗi (tránh timing bug)
 
         except KeyboardInterrupt:
             print("\n[*] Subscriber offline (Shutdown).")

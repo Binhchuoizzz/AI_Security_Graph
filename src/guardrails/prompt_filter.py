@@ -1,5 +1,5 @@
 """
-Guardrails: Prompt Injection Defense (Delimited Data Encapsulation)
+Guardrails: Phòng thủ Prompt Injection (Đóng gói dữ liệu phân vùng - Delimited Data Encapsulation)
 
 QUAN TRỌNG - TRIẾT LÝ THIẾT KẾ:
   Module này KHÔNG dùng Drain3 để chống Prompt Injection.
@@ -71,7 +71,7 @@ class PromptInjectionDetector:
         injection_fields = []  # Ghi rõ field nào chứa injection
 
         for key, value in log_entry.items():
-            if key.startswith("_"):  # Skip internal metadata fields
+            if key.startswith("_"):  # Bỏ qua các trường siêu dữ liệu nội bộ (internal metadata)
                 continue
             str_value = str(value)
             for i, pattern in enumerate(self.compiled):
@@ -80,7 +80,7 @@ class PromptInjectionDetector:
                     detected_patterns.append(self.patterns[i])
                     injection_fields.append(key)
 
-        # KHÔNG sửa đổi log gốc — chỉ thêm metadata
+        # KHÔNG sửa đổi log gốc — chỉ thêm siêu dữ liệu (metadata)
         result = dict(log_entry)
         result["_injection_detected"] = is_injected
         result["_injection_patterns"] = detected_patterns
@@ -131,13 +131,13 @@ class JailbreakDetector:
                 continue
             str_value = str(value)
             
-            # Pattern-based detection
+            # Phát hiện dựa trên mẫu (pattern-based)
             for i, pattern in enumerate(self.compiled):
                 if pattern.search(str_value):
                     jailbreak_detected = True
                     jailbreak_patterns.append(self.patterns[i])
 
-            # Role-play regex detection
+            # Phát hiện đóng vai bằng biểu thức chính quy (role-play regex)
             if self.role_play_re.search(str_value):
                 jailbreak_detected = True
                 jailbreak_patterns.append("ROLE_PLAY_ATTEMPT")
@@ -146,7 +146,7 @@ class JailbreakDetector:
         result["_jailbreak_detected"] = jailbreak_detected
         result["_jailbreak_patterns"] = jailbreak_patterns
         
-        # Escalate isolation if jailbreak detected
+        # Leo thang mức độ cô lập nếu phát hiện jailbreak
         if jailbreak_detected:
             result["_isolation_level"] = "CRITICAL"
         
@@ -171,7 +171,7 @@ class EncodingNeutralizer:
 
     @staticmethod
     def decode_if_base64(text: str) -> str:
-        """Thử decode Base64. Nếu thành công → expose hidden content."""
+        """Thử decode Base64. Nếu thành công → expose nội dung thật."""
         try:
             decoded = base64.b64decode(text, validate=True).decode(
                 "utf-8", errors="ignore"
@@ -179,8 +179,8 @@ class EncodingNeutralizer:
             if decoded.isprintable() and len(decoded) > 3:
                 return f"[BASE64_DECODED: {decoded}]"
         except Exception:  # nosec B110
-            # Implied pass: If decoding fails, it's likely not base64. 
-            # We return the original text as per function contract.
+            # Bỏ qua ngầm định: Nếu giải mã thất bại, có khả năng không phải Base64.
+            # Trả về văn bản gốc theo đúng thiết kế của hàm.
             pass
         return text
 
@@ -202,10 +202,10 @@ class EncodingNeutralizer:
     @staticmethod
     def decode_url_and_hex(text: str) -> str:
         """Decode URL encoding và Hex escape (\\xNN)."""
-        # 1. URL Decode (%20 -> space)
+        # 1. Giải mã URL Decode (%20 -> khoảng trắng)
         decoded = urllib.parse.unquote(text)
 
-        # 2. Hex escape decode (\\x41 -> A)
+        # 2. Giải mã Hex escape (\\x41 -> A)
         # Thay thế \\xNN thành ký tự ASCII tương ứng nếu hợp lệ
         def hex_repl(match):
             try:
@@ -220,7 +220,7 @@ class EncodingNeutralizer:
         """Chạy toàn bộ pipeline neutralization trên log entry."""
         neutralized = {}
         for key, value in log_entry.items():
-            if key.startswith("_"):  # Preserve internal metadata
+            if key.startswith("_"):  # Bảo toàn siêu dữ liệu nội bộ (internal metadata)
                 neutralized[key] = value
                 continue
             str_value = str(value)
@@ -252,7 +252,7 @@ class DelimitedDataEncapsulator:
 
     GIẢI PHÁP: Dynamic Randomized Delimiters
     - Mỗi request sinh delimiter MỚI bằng cryptographic hash
-    - VD: <<<DATA_BEGIN_a7f3c9e2>>> ... <<<DATA_END_a7f3c9e2>>>
+    - Ví dụ: <<<DATA_BEGIN_a7f3c9e2>>> ... <<<DATA_END_a7f3c9e2>>>
     - Kẻ tấn công không thể đoán trước hash → không thể smuggle
     - Bước sanitize bổ sung: quét raw log và strip bất kỳ chuỗi nào
       có dạng giống delimiter pattern (<<<...>>>) trước khi encapsulate
@@ -298,7 +298,7 @@ class DelimitedDataEncapsulator:
         Đóng gói dữ liệu log bên trong delimiter ĐỘNG.
         Bước sanitize chống Delimiter Smuggling chạy TRƯỚC encapsulation.
         """
-        # QUAN TRỌNG: Strip mọi delimiter-like pattern trong raw data
+        # QUAN TRỌNG: Loại bỏ mọi mẫu có cấu trúc giống delimiter trong dữ liệu thô
         safe_text = self._sanitize_delimiter_smuggling(log_data_text)
 
         if isolation_level == "HIGH":
@@ -405,16 +405,16 @@ class GuardrailsPipeline:
           - encapsulated_text: text đã đóng gói sẵn sàng cho LLM
           - metadata: thông tin detection
         """
-        # Step 1: Detect injection patterns
+        # Bước 1: Phát hiện các mẫu injection
         flagged = self.detector.scan(log_entry)
 
-        # Step 1b: Detect jailbreak patterns (Attack Vector #01)
+        # Bước 1b: Phát hiện các mẫu jailbreak (Vector tấn công #01)
         flagged = self.jailbreak_detector.scan(flagged)
 
-        # Step 2: Neutralize encoding tricks
+        # Bước 2: Vô hiệu hóa các thủ thuật mã hóa (encoding tricks)
         neutralized = self.neutralizer.neutralize(flagged)
 
-        # Step 3: Encapsulate trong delimiter
+        # Bước 3: Đóng gói trong delimiter
         encapsulated = self.encapsulator.encapsulate_fields(neutralized)
 
         return {

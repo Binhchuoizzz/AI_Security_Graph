@@ -23,7 +23,7 @@ class DataValidator:
         """
         errors = []
 
-        # Schema check
+        # Kiểm tra cấu trúc (schema)
         for field in self.required_fields:
             if field not in log_entry:
                 errors.append(f"Missing required field: {field}")
@@ -40,11 +40,11 @@ class DataValidator:
                         f"Invalid numeric value for '{field}', defaulted to 0"
                     )
 
-        # Null/NaN handling
+        # Xử lý giá trị Null/NaN
         for key, value in log_entry.items():
             if value is None or (
                 isinstance(value, float) and value != value
-            ):  # NaN check
+            ):  # Kiểm tra giá trị NaN
                 log_entry[key] = ""
 
         log_entry["_validation_errors"] = errors

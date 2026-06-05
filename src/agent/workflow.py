@@ -70,5 +70,5 @@ def create_agent_workflow() -> CompiledStateGraph:
     return app
 
 
-# Singleton App để export
+# Thực thể duy nhất agent_app để xuất ra ngoài (Singleton)
 agent_app = create_agent_workflow()

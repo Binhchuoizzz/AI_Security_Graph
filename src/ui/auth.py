@@ -1,13 +1,13 @@
 """
-Xac thuc cho giao dien HITL Dashboard.
-Su dung st.session_state de demo 2 Role: L1_Analyst va L3_Manager.
-Mat khau duoc hash SHA-256 mot chieu (CWE-256 Compliant).
+Xác thực cho giao diện HITL Dashboard.
+Sử dụng st.session_state để mô phỏng 2 vai trò: L1_Analyst và L3_Manager.
+Mật khẩu được băm SHA-256 một chiều (Tương thích CWE-256).
 
-THIET KE BAO MAT:
-  - Mat khau KHONG duoc hardcode trong source code.
-  - Doc tu bien moi truong (OS Environment Variables).
-  - Neu khong co bien moi truong, su dung gia tri mac dinh DA HASH SAN.
-  - Toan bo quy trinh xac thuc chi lam viec voi hash, KHONG BAO GIO luu plaintext.
+THIẾT KẾ BẢO MẬT:
+  - Mật khẩu KHÔNG được ghi cứng (hardcode) trong mã nguồn.
+  - Đọc từ biến môi trường (OS Environment Variables).
+  - Nếu không có biến môi trường, sử dụng giá trị mặc định ĐÃ BĂM SẴN.
+  - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ (plaintext).
 """
 
 import streamlit as st
@@ -16,13 +16,13 @@ import os
 import time
 from src.response.executor import get_login_attempts, increment_login_attempts, reset_login_attempts, lock_user
 
-# Password Hashing Strategy: PBKDF2-HMAC-SHA256 (NIST Approved)
-# Dung muoi tu bien moi truong, neu khong co thi dung muoi mac dinh an toan
+# Chiến lược băm mật khẩu: PBKDF2-HMAC-SHA256 (Chuẩn NIST)
+# Sử dụng salt từ biến môi trường, nếu không có thì dùng salt mặc định an toàn
 SALT = os.getenv("SENTINEL_AUTH_SALT", "sentinel_security_2026_default_salt").encode()
 ITERATIONS = 100000
 
 def hash_password(password: str) -> str:
-    """Hash password dung PBKDF2 de chong brute-force/GPU cracking."""
+    """Băm mật khẩu dùng PBKDF2 để chống tấn công Brute-force/Bẻ khóa bằng GPU."""
     return hashlib.pbkdf2_hmac(
         'sha256', 
         password.encode(), 
@@ -44,13 +44,13 @@ USERS = {
     },
 }
 
-# Bao ve chong brute-force
+# Bảo vệ chống brute-force
 MAX_LOGIN_ATTEMPTS = 5
 LOCKOUT_SECONDS = 60
 
 
 def login_screen():
-    """Hien thi man hinh dang nhap chuyen nghiep (khong lo credentials)."""
+    """Hiển thị màn hình đăng nhập chuyên nghiệp (không lộ thông tin đăng nhập)."""
     st.title("🛡️ SENTINEL - Trung tâm Giám sát An ninh SOC")
     st.caption("Chỉ dành cho nhân viên SOC được ủy quyền. Mọi hoạt động truy cập đều được ghi nhật ký và giám sát.")
 
@@ -65,7 +65,7 @@ def login_screen():
             clean_username = username.strip()
             clean_password = password.strip()
             
-            # 1. Kiem tra persistent lockout truoc tu database
+            # 1. Kiểm tra trạng thái khóa (lockout) từ cơ sở dữ liệu
             attempts, lockout_until = get_login_attempts(clean_username)
             if time.time() < lockout_until:
                 remaining = int(lockout_until - time.time())
@@ -81,11 +81,11 @@ def login_screen():
                 st.session_state["authenticated"] = True
                 st.session_state["role"] = user["role"]
                 st.session_state["username"] = clean_username
-                # Reset attempts khi thanh cong
+                # Reset số lần thử khi đăng nhập thành công
                 reset_login_attempts(clean_username)
                 st.rerun()
             else:
-                # Tang attempt và lock neu vuot nguong
+                # Tăng số lần thử và khóa nếu vượt ngưỡng
                 cur_attempts = increment_login_attempts(clean_username)
                 remaining_attempts = MAX_LOGIN_ATTEMPTS - cur_attempts
 
@@ -103,8 +103,8 @@ def login_screen():
 
 def _constant_time_compare(a: str, b: str) -> bool:
     """
-    So sanh chuoi an toan chong Timing Attack (CWE-208).
-    Dung hmac.compare_digest thay vi '==' de tranh lo thong tin do do thoi gian so sanh.
+    So sánh chuỗi thời gian không đổi (Constant-time comparison) chống Timing Attack (CWE-208).
+    Dùng hmac.compare_digest thay vì '==' để tránh rò rỉ thông tin qua thời gian xử lý.
     """
     import hmac
 

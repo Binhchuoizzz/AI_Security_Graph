@@ -1,18 +1,18 @@
 """
-Latency Benchmark: Two-Tier System vs LLM-only Baseline
+Đánh giá Hiệu năng Độ trễ: Hệ thống 2 Lớp (Two-Tier) so với LLM-only
 
 CHỨC NĂNG:
-  Đo latency của 2 chế độ:
+  Đo độ trễ của 2 chế độ:
     - Two-Tier:  Tier1 → Guardrail → RAG → LLM
-    - Baseline:  Every event → LLM directly (no filtering, no RAG)
+    - Baseline:  Mỗi sự kiện → LLM trực tiếp (không lọc, không RAG)
 
-  Sử dụng 100 events từ ground truth (50 benign, 50 malicious).
-  Target: ≥ 60% latency reduction so với LLM-only baseline.
+  Sử dụng 100 sự kiện từ ground truth (50 benign, 50 malicious).
+  Mục tiêu: Giảm thiểu độ trễ ≥ 60% so với baseline chỉ dùng LLM.
 
   LƯU Ý: Yêu cầu llama.cpp server chạy tại port 5000.
-  Nếu server không khả dụng, test sẽ SKIP gracefully.
+  Nếu server không hoạt động, kiểm thử sẽ được bỏ qua (SKIP) an toàn.
 
-OUTPUT:
+KẾT QUẢ ĐẦU RA:
   reports/latency_benchmark.json
 """
 
@@ -27,14 +27,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
 def check_llm_server():
-    """Check if llama.cpp server is running. Tries port 5000 and 8080."""
+    """Kiểm tra máy chủ llama.cpp có đang chạy hay không. Thử kết nối với các port 5000 và 8080."""
     import urllib.request
     for port in [5000, 8080]:
         try:
             req = urllib.request.Request(f"http://localhost:{port}/v1/models")
             with urllib.request.urlopen(req, timeout=3) as resp:
                 if resp.status == 200:
-                    # Set env var so LLMClient uses correct port
+                    # Thiết lập biến môi trường để LLMClient sử dụng port chính xác
                     os.environ["LLM_API_BASE"] = f"http://127.0.0.1:{port}/v1"
                     print(f"  LLM server detected on port {port}")
                     return True
@@ -44,7 +44,7 @@ def check_llm_server():
 
 
 def load_test_events(n=100):
-    """Load test events from ground truth."""
+    """Tải các sự kiện kiểm thử từ tập ground truth."""
     gt_path = "experiments/ground_truth.json"
     with open(gt_path) as f:
         samples = json.load(f)
@@ -53,7 +53,7 @@ def load_test_events(n=100):
     malicious = [s for s in samples if s.get("input", {}).get("cicids_label") != "Benign"
                  and s.get("input", {}).get("cicids_label") != "Adversarial"]
 
-    # Take up to n/2 from each
+    # Lấy tối đa n/2 mẫu từ mỗi nhóm
     import random
     random.seed(42)
     benign_sample = random.sample(benign, min(n // 2, len(benign)))
@@ -67,7 +67,7 @@ def load_test_events(n=100):
 
 
 def measure_two_tier(events: list) -> list:
-    """Run Two-Tier pipeline, return latency per event in ms."""
+    """Chạy pipeline 2 Lớp và trả về độ trễ của từng sự kiện (tính bằng ms)."""
     from src.tier1_filter.rule_engine import RuleEngine
     from src.guardrails.template_miner import LogTemplateMiner
     from src.guardrails.prompt_filter import GuardrailsPipeline
@@ -93,18 +93,18 @@ def measure_two_tier(events: list) -> list:
             latencies.append((time.perf_counter() - t_start) * 1000)
             continue
 
-        # Guardrails
+        # Lớp bảo vệ
         guard_result = guardrails.process_batch([event])
         safe_log = guard_result.get("batch_encapsulated", str(event))
 
         # RAG
-        context = retriever.retrieve(safe_log[:500])  # cap query length
+        context = retriever.retrieve(safe_log[:500])        # Giới hạn độ dài truy vấn
 
         # LLM
         try:
             _ = llm.invoke([{"role": "user", "content": str(context.get("combined_prompt", "")) + "\n" + safe_log[:1000]}])
         except Exception:
-            # LLM call may fail, still count latency
+            # Cuộc gọi LLM thất bại, vẫn tính thời gian xử lý
             pass
 
         latencies.append((time.perf_counter() - t_start) * 1000)
@@ -114,7 +114,7 @@ def measure_two_tier(events: list) -> list:
 
 
 def measure_llm_only_baseline(events: list) -> list:
-    """Run LLM-only (no Tier 1, no RAG), return latency per event in ms."""
+    """Chạy chế độ chỉ dùng LLM (không có Tier 1, không có RAG) và trả về độ trễ (ms)."""
     from src.agent.llm_client import LLMClient
 
     llm = LLMClient()
@@ -123,7 +123,7 @@ def measure_llm_only_baseline(events: list) -> list:
     for event in events:
         t_start = time.perf_counter()
 
-        # Direct LLM inference — no filtering, no RAG
+        # Suy luận trực tiếp bằng LLM — không lọc, không RAG
         raw_log = json.dumps(event, default=str)[:1500]
         try:
             _ = llm.invoke([{"role": "user", "content": raw_log}])
@@ -136,7 +136,7 @@ def measure_llm_only_baseline(events: list) -> list:
 
 
 def run(n_events: int = 100):
-    # Check LLM server
+    # Kiểm tra máy chủ LLM
     if not check_llm_server():
         print("[SKIP] llama.cpp server not running on port 5000 or 8080.")
         print("       Start with one of:")
@@ -144,7 +144,7 @@ def run(n_events: int = 100):
         print("         or set LLM_API_BASE=http://127.0.0.1:8080/v1")
         print("       Then re-run this script.")
 
-        # Save skip result
+        # Lưu kết quả bỏ qua (skip)
         Path("reports").mkdir(exist_ok=True)
         json.dump(
             {"status": "SKIPPED", "reason": "LLM server not available"},
@@ -164,7 +164,7 @@ def run(n_events: int = 100):
     print(f"\n[2/2] Measuring LLM-only baseline ({actual_n} events)...")
     baseline_latencies = measure_llm_only_baseline(events)
 
-    # Statistics
+    # Thống kê
     two_tier_mean = np.mean(two_tier_latencies)
     baseline_mean = np.mean(baseline_latencies)
     reduction_pct = (baseline_mean - two_tier_mean) / baseline_mean * 100
@@ -189,7 +189,7 @@ Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
 ═══════════════════════════════════════
     """)
 
-    # Save detailed results
+    # Lưu kết quả chi tiết
     results = {
         "hardware": "i7-14700KF / RTX 4060 Ti 16GB / 32GB DDR5",
         "n_events": actual_n,
@@ -206,7 +206,7 @@ Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
     json.dump(results, open("reports/latency_benchmark.json", "w"), indent=2)
     print("Saved: reports/latency_benchmark.json")
 
-    # Mann-Whitney U test
+    # Kiểm định thống kê Mann-Whitney U
     try:
         from scipy.stats import mannwhitneyu
         stat, p_value = mannwhitneyu(two_tier_latencies, baseline_latencies,

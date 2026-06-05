@@ -27,7 +27,7 @@ import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# OpenAI-compatible API (Oobabooga / llama.cpp)
+# API tương thích với OpenAI (Oobabooga / llama.cpp)
 LLM_API_BASE = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
 
 ABLATION_RESULTS_PATH = os.path.join(
@@ -88,7 +88,7 @@ Respond ONLY in this JSON format:
 
 
 def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
-    """Call LLM Judge API (Llama 3 loaded) to judge reasoning quality."""
+    """Gọi API LLM Judge (đã nạp Llama 3) để đánh giá chất lượng suy luận."""
     import requests
     content = ""
 
@@ -109,8 +109,8 @@ def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
 
-        # Parse JSON from response
-        # Handle cases where LLM wraps in markdown code blocks
+        # Phân tích cú pháp JSON từ phản hồi của LLM
+        # Xử lý trường hợp LLM bọc kết quả trong markdown block
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0]
         elif "```" in content:
@@ -138,7 +138,7 @@ def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
 
 
 def format_decisions(decisions: list) -> str:
-    """Format agent decisions for judge prompt."""
+    """Định dạng các quyết định của tác tử để đưa vào prompt đánh giá."""
     if not decisions:
         return "(No decisions made — sample was not escalated to LLM)"
     parts = []
@@ -155,9 +155,9 @@ def format_decisions(decisions: list) -> str:
 
 
 def run_judge_evaluation():
-    """Main evaluation loop: send each reasoning output to Llama 3 Judge."""
+    """Vòng lặp đánh giá chính: gửi từng kết quả suy luận đến Llama 3 Judge."""
 
-    # Check if ablation results exist
+    # Kiểm tra xem file kết quả thử nghiệm loại trừ (ablation results) có tồn tại không
     if not os.path.exists(ABLATION_RESULTS_PATH):
         print("[!] ERROR: ablation_results.json not found!")
         print("    Run 'python experiments/run_ablation_study.py' with Gemma 9B first.")
@@ -172,7 +172,7 @@ def run_judge_evaluation():
         print("    Re-run ablation study with the updated script to capture outputs.")
         sys.exit(1)
 
-    # Filter: only evaluate samples that were escalated to LLM
+    # Lọc: chỉ đánh giá các mẫu được chuyển tiếp lên lớp LLM (Tier 2)
     escalated = [r for r in reasoning_outputs if r.get("escalated_to_llm", False)]
     not_escalated = [r for r in reasoning_outputs if not r.get("escalated_to_llm", False)]
 
@@ -221,7 +221,7 @@ def run_judge_evaluation():
         scores = call_llm_judge(JUDGE_SYSTEM_PROMPT, user_prompt)
         elapsed = time.time() - start
 
-        # Calculate Deterministic Audit Trail Completeness Rate
+        # Tính toán tỷ lệ hoàn thành vết kiểm toán (Audit Trail Completeness Rate)
         latest_decision = sample.get("decisions", [{}])[-1] if sample.get("decisions") else {}
         required_fields = ["action", "confidence", "reasoning", "target", "mitre_technique"]
         present_fields = sum(1 for f in required_fields if latest_decision.get(f) not in [None, "", "UNKNOWN_TARGET", "N/A"])
@@ -251,7 +251,7 @@ def run_judge_evaluation():
             f"({elapsed:.1f}s)"
         )
 
-    # Aggregate statistics
+    # Thống kê tổng hợp
     if all_precision:
         eval_results["aggregate"] = {
             "context_precision": {
@@ -295,7 +295,7 @@ def run_judge_evaluation():
             ),
         }
 
-    # Save results
+    # Lưu kết quả
     with open(OUTPUT_PATH, "w") as f:
         json.dump(eval_results, f, indent=2, ensure_ascii=False)
 
@@ -314,7 +314,7 @@ def run_judge_evaluation():
     print(f"{'='*60}")
     print(f"[+] Results saved to: {OUTPUT_PATH}")
 
-    # Log to MLflow
+    # Ghi nhận dữ liệu lên MLflow
     try:
         import mlflow
 

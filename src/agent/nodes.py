@@ -102,7 +102,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         src_ip = log.get("Source IP") or log.get("src_ip", "")
         if src_ip and src_ip not in seen_ips:
             seen_ips.add(src_ip)
-            # Check if this IP is a known internal entity (legitimate traffic)
+            # Kiểm tra xem IP này có phải là thực thể nội bộ đã biết không (traffic hợp lệ)
             entity = threat_memory.is_known_entity(src_ip)
             if entity:
                 threat_context_parts.append(
@@ -110,7 +110,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
                     f"({entity['entity_type']}: {entity['description']}). "
                     f"Consider as LEGITIMATE traffic unless proven otherwise."
                 )
-            # Get IP reputation from long-term memory
+            # Lấy danh tiếng IP (IP reputation) từ bộ nhớ dài hạn
             ip_context = threat_memory.get_context_for_prompt(src_ip)
             if ip_context:
                 threat_context_parts.append(ip_context)
@@ -120,7 +120,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     # 1. Đóng gói Raw Logs (kết hợp với Guardrails Encapsulation)
     raw_logs_str = state.current_batch_encapsulated
     if not raw_logs_str:
-        # SAFETY: Nếu encapsulated rỗng, wrap thủ công thay vì bypass guardrails
+        # AN TOÀN: Nếu encapsulated rỗng, bọc thủ công thay vì bỏ qua guardrails
         from src.guardrails.prompt_filter import DelimitedDataEncapsulator
 
         emergency_enc = DelimitedDataEncapsulator()
@@ -185,7 +185,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         target = new_iocs[0].get("value", "UNKNOWN_TARGET")
 
     if target == "UNKNOWN_TARGET" and state.current_batch_logs:
-        # Fallback to Source IP or src_ip if no IOC was explicitly extracted
+        # Dự phòng: Sử dụng Source IP hoặc src_ip nếu không trích xuất được IOC trực tiếp
         log_entry = state.current_batch_logs[0]
         target = log_entry.get("Source IP") or log_entry.get("src_ip", "UNKNOWN_TARGET")
 
@@ -212,7 +212,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
             action=action,
             mitre_technique=decision_json.get("mitre_technique", "")
         )
-        # Check APT pattern
+        # Kiểm tra mẫu tấn công APT
         apt_check = threat_memory.check_apt_pattern(target)
         if apt_check and apt_check["is_apt_candidate"]:
             logger.warning(

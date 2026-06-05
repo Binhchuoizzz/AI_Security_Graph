@@ -1,10 +1,10 @@
 """
-LangGraph Agent: LLM Client Wrapper
+LangGraph Agent: Bộ điều hợp Client LLM
 
 CHỨC NĂNG:
 - Giao tiếp với Local LLM (Gemma 9B) thông qua OpenAI-compatible endpoint (llama.cpp server).
 - Sử dụng OpenAI API format (OpenAI-compatible endpoint tại port 5000).
-- Implement Retry logic, Exponential Backoff, và Timeout handling để đảm bảo
+- Triển khai cơ chế Retry, Exponential Backoff, và xử lý Timeout để đảm bảo
   Agent không bị crash khi model đang bận tính toán.
 """
 
@@ -35,15 +35,15 @@ except Exception:
 
 YAML_BASE_URL = _config.get("llm", {}).get("base_url", "http://127.0.0.1:5000/v1")
 
-# OpenAI-compatible endpoint (llama.cpp server)
+# Endpoint tương thích với OpenAI (llama.cpp server)
 API_BASE_URL = os.getenv("LLM_API_BASE", YAML_BASE_URL)
 API_KEY = os.getenv(
     "LLM_API_KEY", "sk-placeholder-local-only"
-)  # Placeholder cho Local LLM
+)  # Giá trị giữ chỗ cho Local LLM
 
-# Tuning parameters cho Security Agent
+# Tham số cấu hình cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
-DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận deterministic, ít hallucination
+DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận nhất quán (deterministic), ít ảo tưởng
 DEFAULT_MODEL = "gemma-2-9b-it-Q4_K_M.gguf"
 
 
@@ -65,16 +65,16 @@ class LLMClient:
         response_format: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Gọi LLM với Retry Logic.
+        Gọi LLM với cơ chế thử lại (Retry).
 
         Args:
-            messages: List of dict [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
-            temperature: Độ sáng tạo của model. 0.1 cho Security Analysis.
-            max_tokens: Số token output tối đa.
-            response_format: Định dạng output (vd: {"type": "json_object"} nếu model hỗ trợ)
+            messages: Danh sách dict [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
+            temperature: Độ sáng tạo của mô hình. 0.1 cho Phân tích Bảo mật.
+            max_tokens: Số lượng token đầu ra tối đa.
+            response_format: Định dạng đầu ra (vd: {"type": "json_object"} nếu mô hình hỗ trợ)
 
-        Returns:
-            Text output từ LLM.
+        Trả về:
+            Văn bản đầu ra từ LLM.
         """
         retries = 0
         backoff = 2  # Bắt đầu với 2 giây chờ
@@ -103,7 +103,7 @@ class LLMClient:
 
                 response: Any = self.client.chat.completions.create(**kwargs)  # type: ignore
 
-                # Trả về text
+                # Trả về văn bản
                 return response.choices[0].message.content
 
             except openai.APITimeoutError as e:
@@ -134,7 +134,7 @@ class LLMClient:
                 logger.error(f"LLM Unexpected Error: {e}")
                 raise  # Các lỗi khác (vd: code logic error) thì fail fast luôn
 
-            # Retry logic
+            # Cơ chế thử lại (Retry)
             retries += 1
             if retries <= self.max_retries:
                 logger.info(f"Retrying in {backoff} seconds...")
@@ -145,11 +145,11 @@ class LLMClient:
 
     def parse_llm_response(self, raw: str) -> dict:
         """
-        Parse JSON an toàn từ LLM output với Fallback Logic.
-        Ngăn chặn crash hệ thống khi Gemma 9B hallucinate (ví dụ: markdown fences,
+        Parse JSON an toàn từ LLM output với cơ chế dự phòng (Fallback).
+        Ngăn chặn crash hệ thống khi Gemma 9B ảo tưởng (ví dụ: markdown fences,
         trailing commas, hoặc chữ text kẹp chung với JSON).
         """
-        # Strip markdown fences nếu có
+        # Loại bỏ các khung markdown (fences) nếu có
         clean = re.sub(r"```json|```", "", raw).strip()
         try:
             return json.loads(clean)
@@ -157,7 +157,7 @@ class LLMClient:
             logger.warning(
                 f"JSON Decode failed, attempting regex fallback. Raw: {raw[:100]}..."
             )
-            # Fallback: extract JSON block bằng regex
+            # Dự phòng: trích xuất khối JSON bằng biểu thức chính quy (regex)
             match = re.search(r"\{.*\}", clean, re.DOTALL)
             if match:
                 try:
@@ -165,7 +165,7 @@ class LLMClient:
                 except json.JSONDecodeError:
                     pass
 
-            # Hard fallback: trả về safe default thay vì crash
+            # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash
             logger.error("All JSON parse attempts failed. Using safe default.")
             return {
                 "action": "AWAIT_HITL",
@@ -184,5 +184,5 @@ class LLMClient:
             return False
 
 
-# Singleton instance
+# Thực thể duy nhất (Singleton)
 llm_client = LLMClient()

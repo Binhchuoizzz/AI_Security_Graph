@@ -1,5 +1,5 @@
 """
-LangGraph Agent: State Schema (Structured MemoryObject)
+LangGraph Agent: Lược đồ trạng thái State Schema (Đối tượng bộ nhớ cấu trúc)
 
 CHỐNG SEMANTIC DRIFT:
   Summary Memory thuần túy (tóm tắt → tóm tắt → tóm tắt) sẽ dẫn đến
@@ -33,7 +33,7 @@ class IOCEntry:
     value: str  # Giá trị cụ thể: "192.168.1.100", "445", "abc123..."
     severity: str  # "low", "medium", "high", "critical"
     source_template: str = ""  # Template ID nơi phát hiện IOC này
-    first_seen: str = ""  # Timestamp ISO format
+    first_seen: str = ""  # Định dạng thời gian ISO
     context: str = ""  # Ghi chú ngắn: "Port scanning 12 ports"
 
     def to_dict(self) -> dict:

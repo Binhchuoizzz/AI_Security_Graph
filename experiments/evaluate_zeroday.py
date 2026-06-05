@@ -43,7 +43,7 @@ def run_zeroday_evaluation():
     print("\n[*] Bước 1: Đang nạp baseline traffic thông thường để thiết lập phân phối chuẩn...")
     # Cổng 80: trung bình 15 packets, std ~ 5
     for i in range(100):
-        val = 15 + (i % 5) - 2 # 13, 14, 15, 16, 17 packets
+        val = 15 + (i % 5) - 2 # 13, 14, 15, 16, 17 gói tin
         engine.evaluate({
             "Source IP": f"192.168.1.{10+i}",
             "Destination Port": 80,
@@ -63,7 +63,7 @@ def run_zeroday_evaluation():
             "log": {
                 "Source IP": "10.0.0.22",
                 "Destination Port": 80,
-                "Total Fwd Packets": 85000, # Bất thường cực lớn so với baseline mean=15
+                "Total Fwd Packets": 85000, # Bất thường cực lớn so với trung bình baseline=15
                 "Flow Bytes/s": 85000 * 120,
                 "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) exfil-tool/v1.0"
             },
@@ -76,7 +76,7 @@ def run_zeroday_evaluation():
             "log": {
                 "Source IP": "10.0.0.33",
                 "Destination Port": 80,
-                "Total Fwd Packets": 120000, # Flood tấn công
+                "Total Fwd Packets": 120000, # Tấn công dồn dập (flooding)
                 "Flow Bytes/s": 120000 * 150,
                 "user_agent": "Mozilla/5.0 Wget/1.21.1 flood-bot"
             },
@@ -118,7 +118,7 @@ def run_zeroday_evaluation():
         if t1_result["tier1_action"] == "ESCALATE":
             echo_green("  [✓] Tier-1 phát hiện anomaly thành công! Đang escalate lên Tier-2 Agent để phân tích...")
             
-            # Gọi Agent Triage thực tế
+            # Gọi Agent phân loại rủi ro (triage) thực tế
             initial_state = SentinelState(
                 current_batch_logs=[log_entry],
                 current_batch_size=1,

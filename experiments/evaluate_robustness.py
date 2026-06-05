@@ -1,10 +1,10 @@
 """
-Adversarial Evaluation Pipeline — FULL IMPLEMENTATION
+Hệ thống Đánh giá Tấn công Adversarial — BẢN ĐẦY ĐỦ
 
-Chạy toàn bộ adversarial test suite qua Guardrails pipeline.
-Đo lường Defeat Rate theo từng attack category.
+Chạy toàn bộ tập kiểm thử adversarial qua pipeline Guardrails.
+Đo lường Tỷ lệ Chặn (Defeat Rate) theo từng nhóm tấn công.
 
-Usage:
+Cách dùng:
     python experiments/evaluate_robustness.py
 """
 
@@ -24,13 +24,13 @@ from src.guardrails.prompt_filter import (
 )
 
 # =============================================================================
-# ADVERSARIAL SAMPLE LOADER
+# BỘ TẢI MẪU TẤN CÔNG ADVERSARIAL
 # =============================================================================
 ADVERSARIAL_DIR = os.path.join(os.path.dirname(__file__), "adversarial")
 
 
 def load_adversarial_samples():
-    """Load tất cả adversarial samples từ 3 categories."""
+    """Tải toàn bộ mẫu adversarial từ 3 nhóm tấn công."""
     all_samples = []
     categories = ["encoding_bypass", "structural_attacks", "semantic_confusion"]
 
@@ -48,12 +48,12 @@ def load_adversarial_samples():
 
 
 # =============================================================================
-# GUARDRAILS EVALUATION ENGINE
+# BỘ ĐÁNH GIÁ PHÒNG THỦ GUARDRAILS
 # =============================================================================
 def evaluate_guardrails_defense(samples: list) -> dict:
     """
-    Chạy mỗi adversarial sample qua Guardrails pipeline.
-    Đo: (1) Pattern Detection, (2) Encoding Neutralization, (3) Delimiter Sanitization.
+    Chạy từng mẫu adversarial qua pipeline Guardrails.
+    Đo lường: (1) Phát hiện mẫu định sẵn, (2) Hóa giải mã hóa, (3) Lọc ký tự phân tách.
     """
     pipeline = GuardrailsPipeline()
     detector = PromptInjectionDetector()
@@ -88,7 +88,7 @@ def evaluate_guardrails_defense(samples: list) -> dict:
         payload = sample["payload"]
         expected_blocked = sample.get("expected_blocked", True)
 
-        # Tạo log entry giả với payload
+        # Tạo log entry giả lập kèm payload
         log_entry = {
             "Source IP": "10.0.0.1",
             "Destination Port": 80,
@@ -100,13 +100,13 @@ def evaluate_guardrails_defense(samples: list) -> dict:
         stats = results_by_category[category]
         stats["total"] += 1
 
-        # === Test Layer 1: Pattern Detection ===
+        # === Lớp 1: Phát hiện mẫu định sẵn ===
         flagged = detector.scan(log_entry)
         pattern_detected = flagged.get("_injection_detected", False)
         if pattern_detected:
             stats["detected_by_pattern"] += 1
 
-        # === Test Layer 2: Encoding Neutralization ===
+        # === Lớp 2: Hóa giải mã hóa ===
         neutralized = neutralizer.neutralize(log_entry)
         encoding_changed = str(neutralized.get(payload_field)) != str(
             log_entry.get(payload_field)
@@ -114,14 +114,14 @@ def evaluate_guardrails_defense(samples: list) -> dict:
         if encoding_changed:
             stats["neutralized_encoding"] += 1
 
-        # === Test Layer 3: Delimiter Sanitization ===
+        # === Lớp 3: Lọc ký tự phân tách ===
         encapsulator = DelimitedDataEncapsulator()
         encapsulated = encapsulator.encapsulate_fields(log_entry)
         delimiter_stripped = "[DELIMITER_STRIPPED]" in encapsulated
         if delimiter_stripped:
             stats["delimiter_stripped"] += 1
 
-        # === Overall Assessment ===
+        # === Đánh giá tổng thể ===
         is_blocked = pattern_detected or encoding_changed or delimiter_stripped
         if is_blocked:
             stats["fully_blocked"] += 1
@@ -144,10 +144,10 @@ def evaluate_guardrails_defense(samples: list) -> dict:
 
 
 # =============================================================================
-# REPORT GENERATOR
+# BỘ XUẤT BÁO CÁO
 # =============================================================================
 def print_report(results: dict):
-    """In báo cáo chi tiết theo từng category."""
+    """In báo cáo chi tiết theo từng nhóm tấn công."""
     print("\n" + "=" * 70)
     print("  SENTINEL ADVERSARIAL ROBUSTNESS EVALUATION REPORT")
     print(f"  Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -180,14 +180,14 @@ def print_report(results: dict):
         print(f"  ├─ Encoding Neutral.:   {stats['neutralized_encoding']}")
         print(f"  └─ Delimiter Strip:     {stats['delimiter_stripped']}")
 
-        # Chi tiết bypassed samples
+        # Chi tiết các mẫu lọt bộ lọc (bypassed)
         bypassed_details = [d for d in stats["details"] if not d["overall_blocked"]]
         if bypassed_details:
             print(f"\n   Bypassed samples:")
             for d in bypassed_details:
                 print(f"    - {d['id']} ({d['attack_type']})")
 
-    # Summary
+    # Tóm tắt
     overall_defeat = (blocked_all / total_all * 100) if total_all > 0 else 0
     overall_accuracy = (correct_all / total_all * 100) if total_all > 0 else 0
 
@@ -222,7 +222,7 @@ def print_report(results: dict):
 
 
 # =============================================================================
-# MAIN
+# HÀM CHẠY CHÍNH
 # =============================================================================
 if __name__ == "__main__":
     print("[*] SENTINEL Adversarial Robustness Evaluation")
@@ -238,7 +238,7 @@ if __name__ == "__main__":
 
     summary = print_report(results)
 
-    # Lưu kết quả vào JSON
+    # Lưu kết quả ra file JSON
     output_path = os.path.join(os.path.dirname(__file__), "robustness_results.json")
     with open(output_path, "w") as f:
         json.dump(

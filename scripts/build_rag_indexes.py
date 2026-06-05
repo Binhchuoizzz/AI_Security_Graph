@@ -21,7 +21,7 @@ OUTPUT:
 import sys
 import os
 
-# Ensure project root is in PYTHONPATH
+# Đảm bảo thư mục gốc dự án nằm trong PYTHONPATH
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.rag.embedder import build_all_indexes

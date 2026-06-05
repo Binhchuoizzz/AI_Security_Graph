@@ -21,9 +21,9 @@ def plot_robustness():
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # 1. Defeat Rate Chart
+    # 1. Biểu đồ Tỷ lệ Chặn (Defeat Rate)
     labels = ["Structural Injection", "Encoding Bypass", "Semantic Confusion"]
-    # Actually let's just parse the counts from category_breakdown
+    # Phân tích dữ liệu từ category_breakdown
     breakdown = data.get("category_breakdown", {})
     categories = []
     defeat_pcts = []
@@ -45,7 +45,7 @@ def plot_robustness():
     plt.ylabel("Defeat Rate (%)", fontsize=12)
     plt.title("Sentinel Guardrails Defeat Rate by Attack Category", fontsize=14)
 
-    # Add labels on top of bars
+    # Thêm nhãn giá trị trên đầu cột
     for bar in bars:
         yval = bar.get_height()
         plt.text(
@@ -62,7 +62,7 @@ def plot_robustness():
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
     print(f"[+] Saved Defeat Rate Plot -> {out_file}")
 
-    # 2. Overall Accuracy Pie Chart
+    # 2. Biểu đồ tròn Tỷ lệ Chính xác Tổng thể
     plt.figure(figsize=(8, 8))
     metrics = data.get("metrics", {})
     acc = metrics.get("overall_prediction_accuracy", 0.0) * 100

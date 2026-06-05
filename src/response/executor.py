@@ -2,10 +2,10 @@
 Mock Executor Module cho Hệ thống Phản hồi tự động.
 Mô phỏng các hành động khóa IP, cách ly Host và gửi Cảnh báo.
 
-HARDENED (Attack Vector #07 — Sandbox Escape / RCE Defense):
-  - ActionValidator: Allowlist-only actions, reject unknown commands
-  - Input Sanitization: Chặn command injection trong target/reason fields
-  - Output Sanitizer: Strip markdown/HTML trước khi ghi DB
+TĂNG CƯỜNG BẢO MẬT (Attack Vector #07 — Sandbox Escape / Phòng thủ RCE):
+  - ActionValidator: Chỉ cho phép các hành động trong allowlist, từ chối lệnh lạ
+  - Làm sạch đầu vào (Input Sanitization): Chặn command injection trong các trường target/reason
+  - Làm sạch đầu ra (Output Sanitizer): Loại bỏ markdown/HTML trước khi ghi DB
 """
 
 import sqlite3
@@ -28,46 +28,46 @@ DB_PATH = os.path.join(
 # =========================================================================
 class ActionValidator:
     """
-    Allowlist-based action validator.
-    CHỈ cho phép các action đã định nghĩa trước.
-    Reject mọi thứ khác → ngăn LLM bị thao túng để thực thi lệnh tùy ý.
+    Trình xác thực hành động dựa trên danh sách cho phép (allowlist).
+    CHỈ cho phép các hành động đã được định nghĩa trước.
+    Từ chối các hành động khác -> ngăn LLM bị thao túng để thực thi lệnh tùy ý.
     """
 
     ALLOWED_ACTIONS = frozenset({
         "BLOCK_IP", "QUARANTINE", "ALERT", "LOG", "AWAIT_HITL"
     })
 
-    # Patterns nguy hiểm trong target/reason fields (command injection)
+    # Các mẫu nguy hiểm trong trường target/reason (command injection)
     DANGEROUS_PATTERNS = re.compile(
-        r'[;|&`$]|'           # Shell metacharacters
+        r'[;|&`$]|'           # Ký tự đặc biệt của shell (metacharacters)
         r'\b(?:rm|sudo|chmod|chown|wget|curl|nc|bash|sh|python|exec)\b|'
-        r'\.\./',             # Path traversal
+        r'\.\./',             # Tấn công duyệt thư mục (path traversal)
         re.IGNORECASE
     )
 
     @classmethod
     def validate_action(cls, action: str) -> bool:
-        """Kiểm tra action có nằm trong allowlist không."""
+        """Kiểm tra hành động có nằm trong danh sách cho phép hay không."""
         return action.upper() in cls.ALLOWED_ACTIONS
 
     @classmethod
     def sanitize_target(cls, target: str) -> str:
         """
-        Sanitize target field — chặn command injection.
-        Target chỉ nên là IP, hostname, hoặc identifier.
+        Làm sạch trường target — chặn command injection.
+        Target chỉ nên là IP, hostname, hoặc định danh (identifier).
         """
         if cls.DANGEROUS_PATTERNS.search(target):
             logger.warning(
                 f"[ACTION VALIDATOR] Dangerous pattern in target: {target[:50]}. "
                 f"Possible command injection attempt!"
             )
-            # Strip dangerous characters, keep only safe ones
+            # Loại bỏ các ký tự nguy hiểm, giữ lại các ký tự an toàn
             return re.sub(r'[^a-zA-Z0-9._:\-/@ ]', '', target)
         return target
 
     @classmethod
     def sanitize_reason(cls, reason: str) -> str:
-        """Sanitize reason field trước khi ghi DB."""
+        """Làm sạch trường reason trước khi ghi cơ sở dữ liệu."""
         if cls.DANGEROUS_PATTERNS.search(reason):
             logger.warning(
                 f"[ACTION VALIDATOR] Dangerous pattern in reason field. Sanitizing."
@@ -76,16 +76,16 @@ class ActionValidator:
         return reason
 
 
-# Singleton validator
+# Thực thể duy nhất (Singleton)
 _validator = ActionValidator()
 
 
 def _init_db():
-    """Khoi tao SQLite Database cho audit trail va login locks neu chua co."""
+    """Khởi tạo cơ sở dữ liệu SQLite cho audit trail và login locks nếu chưa tồn tại."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
-        # Tao bang audit_trail
+        # Tạo bảng audit_trail
         c.execute("""
             CREATE TABLE IF NOT EXISTS audit_trail (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,7 +96,7 @@ def _init_db():
             )
         """)
         
-        # Tao bang login_attempts
+        # Tạo bảng login_attempts
         c.execute("""
             CREATE TABLE IF NOT EXISTS login_attempts (
                 username TEXT PRIMARY KEY,
@@ -105,7 +105,7 @@ def _init_db():
             )
         """)
 
-        # Tu dong check va nang cap them cot integrity_hash neu chua co
+        # Tự động kiểm tra và nâng cấp thêm cột integrity_hash nếu chưa có
         c.execute("PRAGMA table_info(audit_trail)")
         columns = [col[1] for col in c.fetchall()]
         if "integrity_hash" not in columns:
@@ -118,16 +118,16 @@ _init_db()
 
 
 def _log_to_db(action: str, target: str, reason: str):
-    """Ghi audit trail voi validation, sanitization va HMAC log chaining."""
-    # Validate action
+    """Ghi nhật ký kiểm toán (audit trail) kèm xác thực, làm sạch đầu vào và liên kết mã HMAC."""
+    # Xác thực hành động
     if not _validator.validate_action(action):
         logger.error(
             f"[ACTION VALIDATOR] REJECTED unknown action: {action}. "
             f"Possible sandbox escape attempt!"
         )
-        action = "AWAIT_HITL"  # Fallback to safe action
+        action = "AWAIT_HITL"  # Chuyển về hành động an toàn mặc định
 
-    # Sanitize inputs
+    # Làm sạch đầu vào (sanitize)
     safe_target = _validator.sanitize_target(target)
     safe_reason = _validator.sanitize_reason(reason)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -136,24 +136,24 @@ def _log_to_db(action: str, target: str, reason: str):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             
-            # 1. Lay integrity_hash cua log cuoi cung de xau chuoi
+            # 1. Lấy integrity_hash của dòng log cuối cùng để liên kết (chaining)
             c.execute("SELECT integrity_hash FROM audit_trail ORDER BY id DESC LIMIT 1")
             last_row = c.fetchone()
             prev_hash = last_row[0] if last_row and last_row[0] else "genesis_block_hash_sentinel_soc"
 
-            # 2. Tinh toan HMAC hash
+            # 2. Tính toán mã băm HMAC
             secret_key = os.getenv("SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026").encode()
             message = f"{prev_hash}|{timestamp}|{action}|{safe_target}|{safe_reason}".encode()
             current_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
 
-            # 3. Ghi vao database
+            # 3. Ghi vào database
             c.execute(
                 "INSERT INTO audit_trail (timestamp, action, target, reason, integrity_hash) VALUES (?, ?, ?, ?, ?)",
                 (timestamp, action, safe_target, safe_reason, current_hash),
             )
             conn.commit()
     except Exception as e:
-        logger.error(f"Loi ghi audit trail: {e}")
+        logger.error(f"Lỗi ghi audit trail: {e}")
 
 
 def block_ip(ip: str, reason: str):
@@ -209,8 +209,8 @@ def get_audit_trail_for_ip(ip: str, limit=100):
 
 def verify_audit_trail_integrity() -> tuple[bool, str]:
     """
-    Quet toan bo chuoi audit_trail va xac minh tinh toan ven (HMAC Log Chaining).
-    Tra ve (True, "He thong toan ven") hoac (False, "Mo ta loi").
+    Quét toàn bộ chuỗi audit_trail và xác minh tính toàn vẹn (HMAC Log Chaining).
+    Trả về (True, "Hệ thống toàn vẹn") hoặc (False, "Mô tả lỗi").
     """
     try:
         with sqlite3.connect(DB_PATH) as conn:
@@ -227,7 +227,7 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
         for row in rows:
             row_id, timestamp, action, target, reason, integrity_hash = row
             
-            # Tinh toan lai hash mong doi
+            # Tính toán lại hash mong đợi
             message = f"{prev_hash}|{timestamp}|{action}|{target}|{reason}".encode()
             expected_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
             
@@ -242,7 +242,7 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
 
 
 def get_login_attempts(username: str) -> tuple[int, float]:
-    """Tra ve (attempts, lockout_until) cho mot username. Tu dong reset neu thoi gian lockout da het."""
+    """Trả về (attempts, lockout_until) cho một username. Tự động đặt lại (reset) nếu thời gian khóa đã hết."""
     try:
         import time
         with sqlite3.connect(DB_PATH) as conn:
@@ -252,7 +252,7 @@ def get_login_attempts(username: str) -> tuple[int, float]:
             if row:
                 attempts, lockout_until = row[0], row[1]
                 if lockout_until > 0.0 and time.time() >= lockout_until:
-                    # Lockout da het han, tu dong reset so lan thu
+                    # Thời gian khóa đã hết hạn, tự động đặt lại số lần thử
                     c.execute("UPDATE login_attempts SET attempts = 0, lockout_until = 0.0 WHERE username = ?", (username,))
                     conn.commit()
                     return 0, 0.0
@@ -263,7 +263,7 @@ def get_login_attempts(username: str) -> tuple[int, float]:
 
 
 def increment_login_attempts(username: str) -> int:
-    """Tang so lan dang nhap that bai va tra ve so lan hien tai."""
+    """Tăng số lần đăng nhập thất bại và trả về số lần hiện tại."""
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -276,12 +276,12 @@ def increment_login_attempts(username: str) -> int:
         attempts, _ = get_login_attempts(username)
         return attempts
     except Exception as e:
-        logger.error(f"Loi tang login attempts: {e}")
+        logger.error(f"Lỗi tăng login attempts: {e}")
         return 0
 
 
 def reset_login_attempts(username: str):
-    """Reset so lan dang nhap sai va mo khoa."""
+    """Đặt lại số lần đăng nhập sai và mở khóa."""
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
@@ -292,11 +292,11 @@ def reset_login_attempts(username: str):
             """, (username,))
             conn.commit()
     except Exception as e:
-        logger.error(f"Loi reset login attempts: {e}")
+        logger.error(f"Lỗi reset login attempts: {e}")
 
 
 def lock_user(username: str, duration_seconds: int):
-    """Khoa tai khoan trong mot khoang thoi gian."""
+    """Khóa tài khoản trong một khoảng thời gian."""
     try:
         import time
         lockout_time = time.time() + duration_seconds
@@ -309,5 +309,5 @@ def lock_user(username: str, duration_seconds: int):
             """, (username, lockout_time, lockout_time, lockout_time))
             conn.commit()
     except Exception as e:
-        logger.error(f"Loi khoa user: {e}")
+        logger.error(f"Lỗi khóa người dùng: {e}")
 

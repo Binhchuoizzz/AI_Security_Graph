@@ -7,7 +7,7 @@ from neo4j.exceptions import ServiceUnavailable
 logger = logging.getLogger(__name__)
 
 class KnowledgeGraphBuilder:
-    """Builds a Knowledge Graph in Neo4j from vulnerability data"""
+    """Xây dựng đồ thị tri thức (Knowledge Graph) trong Neo4j từ dữ liệu lỗ hổng bảo mật."""
 
     def __init__(self):
         self.uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -29,7 +29,7 @@ class KnowledgeGraphBuilder:
             self.driver.close()
 
     def build_from_trivy(self, trivy_json_path="data/trivy-results.json"):
-        """Reads Trivy results and builds graph nodes/edges"""
+        """Đọc kết quả từ Trivy và xây dựng các nút/cạnh trong đồ thị."""
         if not self.driver:
             logger.warning("No Neo4j connection. Running mock graph build.")
             self._mock_build()
@@ -44,10 +44,10 @@ class KnowledgeGraphBuilder:
 
         logger.info("Building Knowledge Graph from Trivy results...")
         with self.driver.session() as session:
-            # 1. Clear existing vulnerability nodes to avoid duplicates on rescan
+            # 1. Xóa các nút lỗ hổng cũ để tránh trùng lặp khi quét lại
             session.run("MATCH (v:Vulnerability) DETACH DELETE v")
             
-            # 2. Add System Component Node
+            # 2. Thêm nút Thành phần Hệ thống (System Component Node)
             session.run(
                 "MERGE (c:Component {name: $name}) "
                 "SET c.type = 'Application'",
@@ -59,7 +59,7 @@ class KnowledgeGraphBuilder:
                 target = result.get("Target", "Unknown")
                 vulnerabilities = result.get("Vulnerabilities", [])
                 
-                # Create sub-component for the target (e.g. requirements.txt, Dockerfile)
+                # Tạo thành phần con (sub-component) cho target (ví dụ: requirements.txt, Dockerfile)
                 session.run(
                     "MERGE (t:SubComponent {name: $name}) "
                     "MERGE (c:Component {name: 'SENTINEL_SOC'}) "
@@ -71,7 +71,7 @@ class KnowledgeGraphBuilder:
                     vuln_id = vuln.get("VulnerabilityID")
                     severity = vuln.get("Severity")
                     pkg_name = vuln.get("PkgName")
-                    description = vuln.get("Description", "")[:200] # Truncate
+                    description = vuln.get("Description", "")[:200] # Cắt ngắn bớt
 
                     session.run(
                         "MERGE (v:Vulnerability {id: $vuln_id}) "
@@ -82,14 +82,14 @@ class KnowledgeGraphBuilder:
                         description=description, target=target
                     )
                     
-            # Count nodes
+            # Đếm số lượng nút
             result = session.run("MATCH (n) RETURN count(n) as count")
             single_result = result.single()
             count = single_result["count"] if single_result else 0
             logger.info(f"Knowledge Graph updated. Total nodes: {count}")
             
     def _mock_build(self):
-        """Mock behavior for offline or missing Neo4j demo"""
+        """Cơ chế giả lập (mock) khi Neo4j ngoại tuyến hoặc thiếu demo."""
         logger.info("Generating mock Knowledge Graph output (Neo4j unreachable)")
         os.makedirs("demo_outputs", exist_ok=True)
         with open("demo_outputs/knowledge_graph.json", "w") as f:

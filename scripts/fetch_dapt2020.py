@@ -1,15 +1,15 @@
 """
-DAPT2020 Dataset Fetcher & Synthetic Generator
+Trình tải và tạo dữ liệu giả lập DAPT2020
 
 NGUỒN DỮ LIỆU:
   - DAPT2020 (Dynamic Adversary Profile Tracking 2020)
-  - Primary: Kaggle download (requires API key)
-  - Fallback: Generate synthetic APT chain data matching DAPT2020 structure
+  - Chính: Tải từ Kaggle (yêu cầu API key)
+  - Dự phòng: Tự sinh dữ liệu chuỗi APT giả lập theo cấu trúc DAPT2020
 
-SYNTHETIC MODE:
-  When DAPT2020 cannot be downloaded, generates realistic multi-day APT
-  sequences for validating Tier 2 Long-Term Threat Memory.
-  Structure matches DAPT2020: 5 days, multi-phase attack chains.
+CHẾ ĐỘ GIẢ LẬP (SYNTHETIC MODE):
+  Khi không tải được DAPT2020, tự động tạo chuỗi APT thực tế qua nhiều ngày
+  để kiểm định Bộ nhớ Mối đe dọa Dài hạn (Threat Memory) Tier 2.
+  Cấu trúc tương đương DAPT2020: 5 ngày, chuỗi tấn công nhiều giai đoạn.
 """
 
 import os
@@ -36,7 +36,7 @@ except ImportError:
 
 
 def download_from_kaggle():
-    """Attempt to download DAPT2020 from Kaggle using kagglehub."""
+    """Thử tải tập dữ liệu DAPT2020 từ Kaggle sử dụng thư viện kagglehub."""
     try:
         import kagglehub
         import pandas as pd
@@ -64,7 +64,7 @@ def download_from_kaggle():
         os.makedirs(DAPT_RAW_DIR, exist_ok=True)
         raw_dir = Path(DAPT_RAW_DIR)
 
-        # Map public & private files to target days
+        # Ánh xạ các tệp public & private vào các ngày mục tiêu
         day_mapping = {
             "day1": {
                 "public": "csv/enp0s3-monday.pcap_Flow.csv",
@@ -88,20 +88,20 @@ def download_from_kaggle():
             }
         }
 
-        # Step 1: Download one file to get standard headers
+        # Bước 1: Tải một tệp mẫu để lấy tiêu đề cột chuẩn
         print("[*] Downloading header reference file from Kaggle...")
         ref_path = kagglehub.dataset_download("sowmyamyneni/dapt2020", path=day_mapping["day1"]["public"])
         df_ref = pd.read_csv(ref_path, nrows=1)
         headers = df_ref.columns.tolist()
 
-        # Step 2: Download, map, and preprocess each day
+        # Bước 2: Tải, ánh xạ và tiền xử lý dữ liệu từng ngày
         for day_name, files in day_mapping.items():
             dfs = []
             for net_type, remote_path in files.items():
                 print(f"[*] Downloading {day_name} {net_type} file...")
                 local_path = kagglehub.dataset_download("sowmyamyneni/dapt2020", path=remote_path)
                 
-                # Check for header
+                # Kiểm tra xem tệp có chứa tiêu đề cột không
                 with open(local_path, "r", encoding="utf-8") as f:
                     first_line = f.readline()
                 
@@ -115,7 +115,7 @@ def download_from_kaggle():
 
                 df.columns = df.columns.str.strip()
 
-                # Normalize column headers safely avoiding duplicate columns
+                # Chuẩn hóa tiêu đề cột một cách an toàn tránh trùng lặp cột
                 rename_dict = {}
                 seen_targets = set()
                 for col in df.columns:
@@ -128,7 +128,7 @@ def download_from_kaggle():
                         seen_targets.add("label")
                 df = df.rename(columns=rename_dict)
 
-                # Standardize casing & normalize
+                # Chuẩn hóa kiểu chữ và chuẩn hóa dữ liệu
                 if "label" in df.columns:
                     df["label"] = df["label"].apply(normalize_label)
                 if "Stage" in df.columns:
@@ -151,9 +151,9 @@ def download_from_kaggle():
 
 def generate_synthetic_dapt2020():
     """
-    Generate synthetic DAPT2020-style CSV files.
-    Creates 5 day files with realistic APT attack chain data.
-    All generated data follows the standard 85-feature schema of DAPT2020.
+    Tạo các tệp dữ liệu CSV giả lập theo định dạng DAPT2020.
+    Tạo 5 tệp ngày với dữ liệu chuỗi tấn công APT thực tế.
+    Tất cả dữ liệu được tạo tuân theo schema 85 thuộc tính tiêu chuẩn của DAPT2020.
     """
     import pandas as pd
 
@@ -162,14 +162,14 @@ def generate_synthetic_dapt2020():
 
     random.seed(42)
 
-    # Define 20 unique attacker IPs (persistent across days)
+    # Định nghĩa 20 IP kẻ tấn công duy nhất (kiên trì qua nhiều ngày)
     attacker_ips = [f"192.168.{i//256}.{i%256+50}" for i in range(20)]
-    # Define 30 target IPs
+    # Định nghĩa 30 IP mục tiêu
     target_ips = [f"10.0.{i//256}.{i%256+1}" for i in range(30)]
-
-    # Real DAPT2020 attack labels
+    
+    # Các nhãn tấn công thực tế trong DAPT2020
     attack_labels_per_day = {
-        "day1": ["Normal"],  # Day 1 is 100% normal/benign
+        "day1": ["Normal"],  # Ngày 1 là 100% bình thường/không độc hại
         "day2": ["Network Scan", "Account Discovery", "Directory Bruteforce", "Web Vulnerability Scan", "Account Bruteforce"],
         "day3": ["SQL Injection", "Directory Bruteforce", "Account Bruteforce", "Account Discovery", "CSRF", "Malware Download", "Network Scan"],
         "day4": ["Network Scan", "Backdoor", "Account Discovery", "SQL Injection", "Privilege Escalation"],
@@ -182,7 +182,7 @@ def generate_synthetic_dapt2020():
         labels = attack_labels_per_day[day_name]
 
         rows = []
-        # Each attacker generates 30-100 events per day
+        # Mỗi kẻ tấn công tạo ra 30-100 sự kiện mỗi ngày
         for atk_ip in attacker_ips:
             n_events = random.randint(30, 100)
             for j in range(n_events):
@@ -190,7 +190,7 @@ def generate_synthetic_dapt2020():
                 label = random.choice(labels)
                 ts = base_time + timedelta(seconds=random.randint(0, 36000))
                 
-                # If label is Normal, Stage is Benign. Otherwise, use standard day phase.
+                # Nếu nhãn là Normal, Stage là Benign. Ngược lại, sử dụng giai đoạn chuẩn của ngày.
                 stage = "Benign" if label == "Normal" else phase
 
                 row_dict: Dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
@@ -209,7 +209,7 @@ def generate_synthetic_dapt2020():
                 
                 rows.append(row_dict)
 
-        # Add 200 benign events
+        # Thêm 200 sự kiện bình thường (benign)
         for j in range(200):
             ts = base_time + timedelta(seconds=random.randint(0, 36000))
             benign_ip = f"172.16.{random.randint(0,5)}.{random.randint(1,254)}"
@@ -232,7 +232,7 @@ def generate_synthetic_dapt2020():
             rows.append(row_dict)
 
         df = pd.DataFrame(rows)
-        # Ensure exact column ordering
+        # Đảm bảo thứ tự cột chính xác
         df = df[DAPT2020_HEADERS]
         
         path = os.path.join(DAPT_RAW_DIR, f"{day_name}.csv")
@@ -244,7 +244,7 @@ def generate_synthetic_dapt2020():
 
 
 def verify_dapt2020():
-    """Verify DAPT2020 file structure."""
+    """Xác minh cấu trúc tệp DAPT2020."""
     import pandas as pd
 
     expected_files = ["day1.csv", "day2.csv", "day3.csv", "day4.csv", "day5.csv"]
@@ -264,20 +264,20 @@ if __name__ == "__main__":
     print("[*] DAPT2020 Dataset Setup")
     print("=" * 50)
 
-    # Check if already exists
+    # Kiểm tra nếu dữ liệu đã tồn tại
     if os.path.exists(os.path.join(DAPT_RAW_DIR, "day1.csv")):
         print("[*] DAPT2020 already exists. Verifying...")
         if verify_dapt2020():
             print("[+] DAPT2020 data verified!")
             sys.exit(0)
 
-    # Try Kaggle download
+    # Thử tải xuống từ Kaggle
     print("[*] Attempting Kaggle download...")
     if not download_from_kaggle():
         print("[*] Falling back to synthetic generation...")
         generate_synthetic_dapt2020()
 
-    # Verify
+    # Xác minh tính đúng đắn
     if verify_dapt2020():
         print("\nPASS: DAPT2020 data ready!")
     else:

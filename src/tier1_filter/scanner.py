@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class VulnerabilityScanner:
-    """Wrapper for Trivy vulnerability scanner"""
+    """Lớp bọc (wrapper) cho bộ quét lỗ hổng Trivy."""
     
     def __init__(self, target_dir="/app", output_file="data/trivy-results.json"):
         self.target_dir = target_dir
@@ -28,11 +28,11 @@ class VulnerabilityScanner:
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
         
     def run_scan(self):
-        """Runs Trivy scanner on the target directory"""
+        """Chạy quét Trivy trên thư mục đích."""
         logger.info(f"Running Trivy scan on {self.target_dir}...")
         
         try:
-            # Check if trivy is installed
+            # Kiểm tra xem trivy đã được cài đặt chưa
             subprocess.run(["trivy", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             logger.warning("Trivy is not installed or not in PATH. Skipping actual scan.")
@@ -40,7 +40,7 @@ class VulnerabilityScanner:
             return self.output_file
             
         try:
-            # Run the actual scan
+            # Chạy quét thực tế
             cmd = [
                 "trivy", "fs", self.target_dir, 
                 "--format", "json", 
@@ -55,12 +55,12 @@ class VulnerabilityScanner:
             
         except subprocess.CalledProcessError as e:
             logger.error(f"Trivy scan failed: {e.stderr.decode('utf-8')}")
-            # Fallback to mock on error to keep pipeline flowing
+            # Chuyển sang kết quả giả lập nếu có lỗi để giữ pipeline hoạt động
             self._generate_mock_results()
             return self.output_file
 
     def _generate_mock_results(self):
-        """Generates mock results if Trivy is not available"""
+        """Tạo kết quả giả lập nếu Trivy không khả dụng."""
         mock_data = {
             "Results": [
                 {

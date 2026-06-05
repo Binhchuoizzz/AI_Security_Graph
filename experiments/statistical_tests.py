@@ -9,12 +9,12 @@ ABLATION_RESULTS_PATH = os.path.join(os.path.dirname(__file__), "ablation_result
 
 def mcnemar_test(y_true, y_pred1, y_pred2):
     """
-    McNemar's test de so sanh su khac biet cua 2 classifier tren cung tap du lieu.
-    Tra ve p-value.
+    Kiểm định McNemar để so sánh sự khác biệt của 2 bộ phân loại (classifier) trên cùng tập dữ liệu.
+    Trả về p-value.
     """
-    # Xay dung contingency table
-    # b: classifier 1 dung, classifier 2 sai
-    # c: classifier 1 sai, classifier 2 dung
+    # Xây dựng bảng ngẫu nhiên (contingency table)
+    # b: classifier 1 đúng, classifier 2 sai
+    # c: classifier 1 sai, classifier 2 đúng
     b = 0
     c = 0
     for yt, yp1, yp2 in zip(y_true, y_pred1, y_pred2):
@@ -26,11 +26,11 @@ def mcnemar_test(y_true, y_pred1, y_pred2):
             c += 1
 
     if b + c == 0:
-        return 1.0  # Khong co su khac biet nao
+        return 1.0  # Không có sự khác biệt nào
 
-    # McNemar chi-square statistic
+    # Giá trị kiểm định chi-bình-phương McNemar
     chi2 = ((abs(b - c) - 1) ** 2) / (b + c)
-    # p-value tu chi2 phan phoi voi 1 degree of freedom
+    # p-value từ phân phối chi-bình-phương với 1 bậc tự do
     p_value = stats.distributions.chi2.sf(chi2, 1)
     return p_value
 
@@ -63,7 +63,7 @@ def run_tests():
     print(" STATISTICAL TESTS FOR ABLATION STUDY")
     print("=" * 50)
 
-    # 1. Classification Metrics
+    # 1. Chỉ số đánh giá bộ phân loại
     metrics_A = calculate_metrics(y_true, y_pred_A)
     metrics_F = calculate_metrics(y_true, y_pred_F)
 
@@ -75,7 +75,7 @@ def run_tests():
         f"Config F (Full Sent): F1 = {metrics_F['f1']:.4f} | Prec = {metrics_F['precision']:.4f} | Rec = {metrics_F['recall']:.4f}"
     )
 
-    # 2. McNemar's Test cho Accuracy/F1
+    # 2. Kiểm định McNemar cho Accuracy/F1
     p_val_mcnemar = mcnemar_test(y_true, y_pred_A, y_pred_F)
     print("\n--- MCNEMAR'S TEST (Classification Difference) ---")
     print(f"H0: Hieu nang 2 mo hinh la tuong duong nhau.")
@@ -87,7 +87,7 @@ def run_tests():
     else:
         print(">> Ket luan: Khong du bang chung bac bo H0.")
 
-    # 3. Mann-Whitney U Test cho Latency
+    # 3. Kiểm định Mann-Whitney U cho Độ trễ
     mean_lat_A = np.mean(latencies_A)
     mean_lat_F = np.mean(latencies_F)
 

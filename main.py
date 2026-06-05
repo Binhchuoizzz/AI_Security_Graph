@@ -16,7 +16,7 @@ import argparse
 
 from dotenv import load_dotenv
 
-load_dotenv()  # Load environment variables (Security Hardening)
+load_dotenv()  # Nạp các biến môi trường (Tăng cường bảo mật)
 
 from src.streaming.subscriber import start_listening
 from src.agent.workflow import agent_app

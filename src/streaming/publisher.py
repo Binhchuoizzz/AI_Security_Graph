@@ -24,9 +24,9 @@ except Exception:
 REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
 QUEUE_NAME = _config.get("redis", {}).get("queue_name", "queue_waf")
 BATCH_DELAY_SECONDS = float(_config.get("redis", {}).get("publisher_delay_seconds", 0.5))
-MAX_QUEUE_SIZE = 10000  # Backpressure queue limit to prevent Redis OOM
+MAX_QUEUE_SIZE = 10000  # Giới hạn hàng đợi để chống nghẽn và ngăn Redis OOM
 
-# Standard column mapping to align different datasets (CSE-CIC-IDS2018 & DAPT2020)
+# Ánh xạ cột tiêu chuẩn để đồng bộ các tập dữ liệu khác nhau (CSE-CIC-IDS2018 & DAPT2020)
 COLUMN_MAPPING = {
     "src_ip": "Source IP",
     "Src IP": "Source IP",
@@ -61,7 +61,7 @@ COLUMN_MAPPING = {
 
 
 def _clean_val(v):
-    """Clean NaN, Inf, and -1 sentinel values to safe representations for JSON parsing."""
+    """Làm sạch các giá trị sentinel NaN, Inf, và -1 thành dạng an toàn cho việc phân tích cú pháp JSON."""
     if pd.isna(v):
         return 0
     if isinstance(v, float) and np.isinf(v):
@@ -72,26 +72,26 @@ def _clean_val(v):
 
 
 def _inject_ips(entry: dict, idx: int):
-    """Dynamically generate deterministic IPs based on label and index to prevent blacklist saturation."""
+    """Tạo địa chỉ IP động dựa trên nhãn và chỉ số để tránh làm bão hòa danh sách đen."""
     if "Source IP" not in entry and "src_ip" not in entry:
         label = entry.get("Label", "BENIGN")
         rng = random.Random(hashlib.sha256(f"{label}_{idx}".encode()).digest())
         if str(label).upper() not in ("BENIGN", "NORMAL"):
-            # Simulated attacker range
+            # Dải mạng giả lập của kẻ tấn công
             entry["Source IP"] = f"10.200.{rng.randint(1, 20)}.{rng.randint(2, 254)}"
         else:
-            # Simulated benign corporate subnet range
+            # Dải mạng nội bộ an toàn giả lập
             entry["Source IP"] = f"192.168.100.{rng.randint(2, 254)}"
         entry["Destination IP"] = f"192.168.100.{rng.randint(10, 50)}"
 
 
 def stream_logs_to_redis(csv_path: str):
     """
-    Simulate Data Engineering Pipeline (Streaming Ingestion):
-    Read attack logs from CSV and push continuously into Redis List (using rpush).
-    Uses a consumer queue pattern (blpop on the subscriber side) to guarantee delivery.
+    Mô phỏng đường ống kỹ thuật dữ liệu (Streaming Ingestion):
+    Đọc log tấn công từ tệp CSV và đẩy liên tục vào danh sách Redis List (dùng rpush).
+    Sử dụng mô hình hàng đợi tiêu thụ (blpop ở phía subscriber) để đảm bảo phân phối log.
     
-    Includes backpressure control and batch-level throttling to prevent Redis OOM crashes.
+    Bao gồm kiểm soát nghẽn (backpressure) và giới hạn băng thông ở mức batch để tránh crash do Redis OOM.
     """
     print(f"[*] Connecting to Redis: {REDIS_URL}")
     try:
@@ -113,14 +113,14 @@ def stream_logs_to_redis(csv_path: str):
     
     total_published = 0
     try:
-        # chunksize=500 is optimal for balancing performance and memory overhead
+        # chunksize=500 là tối ưu để cân bằng giữa hiệu suất và chi phí bộ nhớ
         for chunk_idx, chunk in enumerate(pd.read_csv(csv_path, chunksize=500)):
-            # Backpressure: Check queue size before processing the chunk to avoid per-row Redis calls
+            # Kiểm soát nghẽn: Kiểm tra kích thước hàng đợi trước khi xử lý chunk để tránh gọi Redis ở mỗi dòng
             wait_count = 0
             while r.llen(QUEUE_NAME) > MAX_QUEUE_SIZE:  # type: ignore
                 time.sleep(0.1)
                 wait_count += 1
-                if wait_count % 100 == 0:  # Every 10 seconds (100 * 0.1s)
+                if wait_count % 100 == 0:  # Mỗi 10 giây (100 * 0.1s)
                     print(
                         f"[!] Backpressure: queue={r.llen(QUEUE_NAME)} exceeds threshold {MAX_QUEUE_SIZE}. Consumer offline or slow?"
                     )
@@ -128,31 +128,31 @@ def stream_logs_to_redis(csv_path: str):
             for index, row in chunk.iterrows():
                 log_entry = row.to_dict()
 
-                # Clean invalid values (NaN -> 0, Inf -> 0.0, -1 -> 0)
+                # Làm sạch các giá trị không hợp lệ (NaN -> 0, Inf -> 0.0, -1 -> 0)
                 clean_entry = {
                     k: _clean_val(v) for k, v in log_entry.items()
                 }
 
-                # Normalize keys to standard expected format (CIC-IDS2018 headers)
+                # Chuẩn hóa các trường khóa về định dạng tiêu chuẩn (tiêu đề CIC-IDS2018)
                 normalized_entry = {}
                 for k, v in clean_entry.items():
                     key_stripped = k.strip()
                     target_key = COLUMN_MAPPING.get(key_stripped, key_stripped)
                     normalized_entry[target_key] = v
 
-                # Auto-generate simulated IPs deterministically if missing
+                # Tự động sinh IP giả lập một cách xác định nếu thiếu
                 _inject_ips(normalized_entry, index)
 
-                # Add dataset source filename to allow Tier-1/Tier-2 to differentiate context
+                # Thêm tên tệp nguồn dữ liệu để Tier-1/Tier-2 phân biệt ngữ cảnh
                 normalized_entry["dataset_source"] = os.path.basename(csv_path)
 
-                # Push to Redis List
+                # Đẩy vào Redis List
                 r.rpush(QUEUE_NAME, json.dumps(normalized_entry))
                 total_published += 1
 
             print(f"[>] Published chunk {chunk_idx + 1} (Total logs sent: {total_published}) -> Queue: {QUEUE_NAME}")
             
-            # Throttle ingestion per-chunk (not per-row) to prevent bottlenecks
+            # Giới hạn tốc độ nạp trên mỗi chunk (không phải từng dòng) để tránh nghẽn
             time.sleep(BATCH_DELAY_SECONDS)
 
         print(f"[+] Finished streaming! Total published logs: {total_published}")

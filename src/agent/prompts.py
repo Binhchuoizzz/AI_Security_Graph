@@ -1,5 +1,5 @@
 """
-LangGraph Agent: System Prompts & Guardrails
+LangGraph Agent: System Prompts & Guardrails (Prompt hệ thống và rào chắn)
 
 Định nghĩa System Prompts cho các Node của Agent.
 Tích hợp Data Delimiters để chống Prompt Injection.
@@ -21,8 +21,8 @@ RAG_END_TAG = "</verified_knowledge_base>"
 # SYSTEM PROMPTS
 # ==============================================================================
 
-# 1. Triage & Analysis Prompt
-# Nhiệm vụ: Phân tích log đa nguồn, dùng RAG context, đưa ra quyết định (BLOCK/ALERT/LOG/AWAIT_HITL)
+# 1. Prompt Phân loại & Phân tích
+# Nhiệm vụ: Phân tích log đa nguồn, dùng ngữ cảnh RAG, đưa ra quyết định (BLOCK/ALERT/LOG/AWAIT_HITL)
 TRIAGE_SYSTEM_PROMPT = f"""You are SENTINEL, an elite Autonomous AI Security SOC Analyst and SIEM Correlation Engine.
 Your core objective is to analyze escalated network logs from MULTIPLE security sensors (Firewall, WAF, Sysmon) and make immediate tactical decisions.
 
@@ -118,7 +118,7 @@ def load_few_shot_feedback_context() -> str:
 
 def build_triage_prompt(log_data: str, rag_context: str) -> list[dict]:
     """
-    Build messages array for OpenAI client.
+    Xây dựng mảng tin nhắn (messages array) cho OpenAI client.
     """
     feedback_context = load_few_shot_feedback_context()
     system_prompt = TRIAGE_SYSTEM_PROMPT
@@ -142,5 +142,5 @@ Please analyze the following network event:
     ]
 
 
-# 2. IOC Extraction Prompt (Dự phòng nếu muốn tách riêng trạm xử lý)
-# Hiện tại Triage Prompt đã gộp chung chức năng extract IOCs.
+# 2. Prompt Trích xuất IOC (Dự phòng nếu muốn tách riêng trạm xử lý)
+# Hiện tại Triage Prompt đã gộp chung chức năng trích xuất IOCs.

@@ -1,10 +1,10 @@
 """
-RAG Security Layer: Structural Sanitization & Defense
+Tầng bảo mật RAG: Làm sạch cấu trúc & Phòng thủ
 
-Threat Model:
-Indirect Prompt Injection via RAG (RAG Poisoning).
-Attacker nhúng payload thao túng (ví dụ: IGNORE INSTRUCTIONS) vào log (User-Agent, URI).
-Khi RAG retrieve các chunk này và đưa vào LLM prompt, LLM sẽ bị thao túng.
+Mô hình đe dọa (Threat Model):
+Prompt Injection gián tiếp qua RAG (RAG Poisoning).
+Kẻ tấn công nhúng payload thao túng (ví dụ: IGNORE INSTRUCTIONS) vào log (User-Agent, URI).
+Khi RAG truy xuất các chunk này và đưa vào LLM prompt, LLM sẽ bị thao túng.
 
 Giải pháp:
 - Không dùng keyword blacklist (gây false positive với log hợp lệ).
@@ -56,7 +56,7 @@ def log_tokenizer(text: str) -> list[str]:
 
 
 # =========================================================================
-# RAG POISONING DEFENSE — Document Integrity (Attack Vector #06)
+# PHÒNG THỦ RAG POISONING — Tính toàn vẹn của tài liệu (Attack Vector #06)
 # =========================================================================
 
 import hashlib
@@ -91,7 +91,7 @@ def verify_document_integrity() -> dict:
         results["details"].append("Checksum file missing")
         return results
 
-    # Parse checksum file
+    # Phân tích tệp checksum
     expected_hashes = {}
     with open(CHECKSUM_PATH, "r") as f:
         for line in f:
@@ -100,7 +100,7 @@ def verify_document_integrity() -> dict:
                 hash_val, filename = line.split("  ", 1)
                 expected_hashes[filename.strip()] = hash_val.strip()
 
-    # Verify each file
+    # Xác minh từng tệp
     for filename, expected_hash in expected_hashes.items():
         filepath = os.path.join(KB_DIR, filename)
         if not os.path.exists(filepath):
@@ -108,7 +108,7 @@ def verify_document_integrity() -> dict:
             results["details"].append(f"MISSING: {filename}")
             continue
 
-        # Compute actual hash
+        # Tính toán hash thực tế
         sha256 = hashlib.sha256()
         with open(filepath, "rb") as f:
             while True:

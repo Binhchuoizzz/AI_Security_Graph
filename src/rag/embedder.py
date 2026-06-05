@@ -135,24 +135,24 @@ def load_nist_chunks_json() -> list[dict]:
     return chunks
 
 
-# Path to NIST PDF-extracted text file
+# Đường dẫn tới tệp văn bản trích xuất từ PDF NIST
 NIST_TXT_PATH = os.path.join(BASE_DIR, "data", "knowledge", "nist_800_61r2.txt")
 
 
 def load_nist_chunks() -> list[dict]:
     """
-    Chunk NIST SP 800-61r2 full document (79 pages) into fine-grained
-    paragraph-level chunks for semantic RAG retrieval.
-    Target: 80-120 chunks.
+    Phân tách toàn bộ tài liệu NIST SP 800-61r2 (79 trang) thành các đoạn văn bản
+    nhỏ (paragraph-level chunks) để tối ưu cho việc truy xuất ngữ nghĩa (semantic RAG).
+    Mục tiêu: 80-120 đoạn.
 
-    Strategy:
-      - Source: PDF-extracted text (data/knowledge/nist_800_61r2.txt)
-      - Primary split: sentence-aware sliding window via RecursiveCharacterTextSplitter
-      - chunk_size: 1500 chars (~256 tokens for all-MiniLM-L6-v2)
-      - overlap: 190 chars (~32 tokens)
-      - Preserve section headings as metadata (IR phase tagging)
+    Chiến lược:
+      - Nguồn: Văn bản trích xuất từ PDF (data/knowledge/nist_800_61r2.txt)
+      - Phân tách: Sử dụng cửa sổ trượt dựa trên câu qua RecursiveCharacterTextSplitter
+      - chunk_size: 1500 ký tự (~256 tokens)
+      - overlap: 190 ký tự (~32 tokens)
+      - Giữ các tiêu đề phần dưới dạng siêu dữ liệu (gắn nhãn giai đoạn Incident Response)
 
-    Falls back to legacy JSON chunking if text file not found.
+    Tự động chuyển về phân tách JSON cũ nếu không tìm thấy tệp văn bản.
     """
     if not os.path.exists(NIST_TXT_PATH):
         logger.warning(
@@ -167,12 +167,12 @@ def load_nist_chunks() -> list[dict]:
     text = open(NIST_TXT_PATH, "r", encoding="utf-8", errors="ignore").read()
     original_len = len(text)
 
-    # Clean PDF artifacts
-    text = re.sub(r"\n{3,}", "\n\n", text)           # collapse excessive blank lines
-    text = re.sub(r"NIST SP 800-61.*?\n", "", text)   # remove repeated headers
-    text = re.sub(r"Page \d+\n", "", text)             # remove page numbers
-    text = re.sub(r"\f", "", text)                     # remove form feeds
-    text = re.sub(r"^\d+\s*\n", "", text, flags=re.MULTILINE)  # remove standalone page numbers
+    # Làm sạch các ký tự rác từ PDF
+    text = re.sub(r"\n{3,}", "\n\n", text)           # Thu gọn các dòng trống thừa
+    text = re.sub(r"NIST SP 800-61.*?\n", "", text)   # Loại bỏ các tiêu đề lặp lại
+    text = re.sub(r"Page \d+\n", "", text)             # Loại bỏ số trang
+    text = re.sub(r"\f", "", text)                     # Loại bỏ ký tự phân trang (form feed)
+    text = re.sub(r"^\d+\s*\n", "", text, flags=re.MULTILINE)  # Loại bỏ số trang độc lập
 
     logger.info(
         f"NIST text loaded: {original_len} chars → {len(text)} chars after cleanup"
@@ -192,8 +192,8 @@ def load_nist_chunks() -> list[dict]:
 
     raw_chunks = splitter.split_text(text)
 
-    # Tag each chunk with IR phase using multi-keyword matching
-    # Each phase has synonyms/related terms from the actual NIST document
+    # Gắn nhãn giai đoạn ứng phó sự cố (IR phase) cho mỗi đoạn bằng từ khóa khớp
+    # Mỗi giai đoạn có các từ đồng nghĩa/liên quan từ tài liệu NIST
     ir_phase_keywords = {
         "Preparation": [
             "preparation", "preparing", "prepared", "readiness",
@@ -244,7 +244,7 @@ def load_nist_chunks() -> list[dict]:
 
     chunks = []
     for i, chunk_text in enumerate(raw_chunks):
-        # Score each phase by keyword hit count
+        # Tính điểm mỗi giai đoạn dựa trên số lượng từ khóa khớp
         text_lower = chunk_text.lower()
         phase_scores = {}
         for phase, keywords in ir_phase_keywords.items():
@@ -287,19 +287,19 @@ def load_nist_chunks() -> list[dict]:
 
 def build_indexes(chunks: list[dict], index_name: str, model=None):
     """
-    Build 2 loại Index cho Hybrid Search:
-    1. FAISS IndexFlatIP (Dense Retrieval)
-    2. BM25Okapi (Sparse Retrieval)
+    Xây dựng 2 loại Index phục vụ Hybrid Search:
+    1. FAISS IndexFlatIP (Truy xuất ngữ nghĩa - Dense)
+    2. BM25Okapi (Truy xuất từ khóa - Sparse)
 
-    Args:
-        chunks: List of {text, metadata} dicts to embed.
-        index_name: Name prefix for saved files.
-        model: Pre-loaded SentenceTransformer instance.
+    Tham số:
+        chunks: Danh sách các đoạn văn bản kèm siêu dữ liệu.
+        index_name: Tiền tố tên của các tệp lưu trữ.
+        model: Thực thể SentenceTransformer đã được nạp sẵn.
 
-    Lưu:
-      - FAISS index file: {index_name}.index
-      - BM25 corpus file: {index_name}_bm25.pkl
-      - Metadata JSON: {index_name}_metadata.json
+    Lưu trữ:
+      - Tệp FAISS index: {index_name}.index
+      - Tệp BM25 corpus: {index_name}_bm25.pkl
+      - Tệp siêu dữ liệu JSON: {index_name}_metadata.json
     """
     try:
         from sentence_transformers import SentenceTransformer

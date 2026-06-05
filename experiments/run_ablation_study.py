@@ -1,7 +1,7 @@
 """
-Ablation Study: So sanh Config A (Rule-only) vs Config F (Full SENTINEL 2-Tier).
+Thử nghiệm Loại trừ (Ablation Study): So sánh Config A (Chỉ luật cứng) và Config F (SENTINEL 2 Lớp đầy đủ).
 
-Script chay tren tap Ground Truth va ghi ket qua vao JSON + MLflow.
+Script chạy trên tập dữ liệu kiểm thử (Ground Truth) và ghi kết quả ra file JSON + hệ thống MLflow.
 """
 
 import json
@@ -33,8 +33,8 @@ def run_ablation(limit=None):
         dataset = dataset[:limit]
 
 
-    # Positive Class (Attack): expected_action != "LOG"
-    # Negative Class (Benign): expected_action == "LOG"
+    # Lớp Dương tính (Tấn công): expected_action != "LOG"
+    # Lớp Âm tính (Lưu lượng sạch): expected_action == "LOG"
 
     results = {
         "Config_A": {"y_true": [], "y_pred": [], "latencies": []},
@@ -49,7 +49,7 @@ def run_ablation(limit=None):
 
 
 
-    # Ket noi MLflow
+    # Kết nối hệ thống MLflow
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
     mlflow.set_experiment("Sentinel_Ablation_Study")
 
@@ -68,10 +68,10 @@ def run_ablation(limit=None):
             )
             logs = sample.get("logs", [])
 
-            # Reset RuleEngine for each independent sample to prevent state bleed
+            # Khởi tạo lại RuleEngine cho mỗi mẫu độc lập để tránh tràn trạng thái (state bleed)
             rule_engine = RuleEngine()
             
-            # --- Config A: Rule-only ---
+            # --- Config A: Chỉ sử dụng luật cứng ---
             start_time_a = time.time()
             pred_a = 0
             for log in logs:
@@ -85,7 +85,7 @@ def run_ablation(limit=None):
             results["Config_A"]["y_pred"].append(pred_a)
             results["Config_A"]["latencies"].append(latency_a)
 
-            # --- Config F: Full Sentinel (2-Tier) ---
+            # --- Config F: Sentinel 2 Lớp đầy đủ ---
             start_time_f = time.time()
             pred_f = 0
             needs_llm = False
@@ -95,7 +95,7 @@ def run_ablation(limit=None):
                     needs_llm = True
                     break
 
-            # Capture reasoning output for Judge evaluation
+            # Lưu vết lập luận để phục vụ đánh giá bằng LLM Judge
             reasoning_output = {
                 "sample_id": sample["id"],
                 "expected_action": sample["expected_action"],
@@ -147,13 +147,13 @@ def run_ablation(limit=None):
                 f"[{idx+1}/{len(dataset)}] {sample['id']} | True: {is_attack} | Pred A: {pred_a} ({latency_a:.3f}s) | Pred F: {pred_f} ({latency_f:.3f}s)"
             )
 
-        # Luu ket qua ra JSON
+        # Lưu kết quả ra file JSON
         out_path = os.path.join(os.path.dirname(__file__), "ablation_results.json")
         with open(out_path, "w") as f:
             json.dump(results, f, indent=2)
         print(f"\n[+] Da luu ket qua vao {out_path}")
 
-        # Tinh va log metrics len MLflow
+        # Tính toán và ghi nhận các chỉ số (metrics) lên MLflow
         f1_a = f1_score(
             results["Config_A"]["y_true"],
             results["Config_A"]["y_pred"],
@@ -207,7 +207,7 @@ def run_ablation(limit=None):
         cache_stats = retriever.cache.get_stats() if hasattr(retriever, "cache") and retriever.cache else {"hit_rate": 0.0}
         cache_hit_rate = cache_stats.get("hit_rate", 0.0)
 
-        # Log metrics lên MLflow
+        # Ghi nhận các chỉ số lên MLflow
         mlflow.log_metric("Config_A_F1", f1_a)
         mlflow.log_metric("Config_A_Precision", prec_a)
         mlflow.log_metric("Config_A_Recall", rec_a)

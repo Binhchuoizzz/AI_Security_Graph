@@ -1,9 +1,9 @@
 """
-Shared configuration and constants for DAPT2020.
+Cấu hình dùng chung và các hằng số cho DAPT2020.
 """
 import pandas as pd
 
-# DAPT2020 APT phases per day (corrected mappings based on actual dataset Stage column)
+# Các giai đoạn APT theo từng ngày của DAPT2020 (đã sửa ánh xạ dựa trên cột Stage thực tế)
 APT_PHASES = {
     "day1": "Benign",
     "day2": "Reconnaissance",
@@ -15,10 +15,10 @@ APT_PHASES = {
 DAPT_RAW_DIR = "data/raw/dapt2020/"
 DAPT_PROCESSED_FILE = "data/processed/dapt2020_chains.jsonl"
 
-# Labels representing benign behavior
+# Nhãn đại diện cho hành vi an toàn (benign)
 BENIGN_LABELS = {"Normal", "BENIGN", "Benign", "normal", "benign"}
 
-# Normalization helpers
+# Các hàm hỗ trợ chuẩn hóa
 def normalize_stage(stage_val):
     if pd.isna(stage_val) or stage_val is None:
         return "Unknown"
@@ -35,7 +35,7 @@ def normalize_label(label_val):
         return "Normal"
     return lbl
 
-# Mapping of DAPT2020 attack labels to MITRE ATT&CK TTPs
+# Ánh xạ các nhãn tấn công DAPT2020 sang MITRE ATT&CK TTPs
 DAPT_LABEL_TO_MITRE = {
     "Network Scan":           "T1046",
     "Web Vulnerability Scan": "T1595.002",
@@ -51,7 +51,7 @@ DAPT_LABEL_TO_MITRE = {
     "Data Exfiltration":      "T1041",
 }
 
-# Full list of 85 columns in DAPT2020 raw dataset
+# Danh sách đầy đủ 85 cột trong tập dữ liệu thô DAPT2020
 DAPT2020_HEADERS = [
     'Flow ID', 'Src IP', 'Src Port', 'Dst IP', 'Dst Port', 'Protocol', 'Timestamp',
     'Flow Duration', 'Total Fwd Packet', 'Total Bwd packets', 'Total Length of Fwd Packet',

@@ -1,7 +1,7 @@
 """
-Output Sanitizer: Data Exfiltration Defense (Attack Vector #04)
+Bộ làm sạch đầu ra (Output Sanitizer): Phòng thủ rò rỉ dữ liệu (Vector tấn công #04)
 
-THREAT MODEL:
+MÔ HÌNH MỐI ĐE DỌA (THREAT MODEL):
   Kẻ tấn công chèn payload dạng Markdown/HTML vào log fields (User-Agent, URI).
   Khi LLM reproduce nội dung này trong output, Dashboard render markdown →
   trình duyệt tự động gửi HTTP request đến server kẻ tấn công:
@@ -45,20 +45,20 @@ class OutputSanitizer:
         (r'\[[^\]]*\]\s*\(https?://[^\)]+\)', '[LINK_STRIPPED]'),
         # HTML img tags
         (r'<img[^>]*>', '[IMG_STRIPPED]'),
-        # HTML anchor tags
+        # Thẻ HTML anchor
         (r'<a\s[^>]*>.*?</a>', '[LINK_STRIPPED]'),
-        # HTML iframe (embedded content)
+        # Thẻ HTML iframe (nội dung nhúng)
         (r'<iframe[^>]*>.*?</iframe>', '[IFRAME_STRIPPED]'),
-        # HTML script tags
+        # Thẻ HTML script
         (r'<script[^>]*>.*?</script>', '[SCRIPT_STRIPPED]'),
-        # HTML object/embed (plugin-based exfil)
+        # Thẻ HTML object/embed (rò rỉ dựa trên plugin)
         (r'<object[^>]*>.*?</object>', '[OBJECT_STRIPPED]'),
         (r'<embed[^>]*/?>', '[EMBED_STRIPPED]'),
-        # Data URIs (can encode arbitrary HTML/JS)
+        # Định dạng Data URI (có thể mã hóa mã HTML/JS tùy ý)
         (r'data:[a-zA-Z]+/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]+', '[DATA_URI_STRIPPED]'),
-        # SVG with potential JS execution
+        # Định dạng SVG có khả năng thực thi JavaScript
         (r'<svg[^>]*>.*?</svg>', '[SVG_STRIPPED]'),
-        # Style tags (CSS-based exfil via url())
+        # Thẻ style (rò rỉ dựa trên CSS qua url())
         (r'<style[^>]*>.*?</style>', '[STYLE_STRIPPED]'),
     ]
 
@@ -71,8 +71,8 @@ class OutputSanitizer:
 
     def sanitize(self, text: str) -> str:
         """
-        Sanitize output text. Strip dangerous markdown/HTML patterns.
-        Returns clean text safe for rendering.
+        Làm sạch văn bản đầu ra. Loại bỏ các cấu trúc Markdown/HTML nguy hiểm.
+        Trả về văn bản sạch an toàn để hiển thị.
         """
         if not text:
             return text
@@ -111,5 +111,5 @@ class OutputSanitizer:
         return self._strip_count
 
 
-# Singleton
+# Thực thể duy nhất (Singleton)
 output_sanitizer = OutputSanitizer()
