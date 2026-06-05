@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -54,5 +54,14 @@ jobs:
       env:
         REDIS_URL: redis://localhost:6379/0
       run: |
-        pytest
+        pytest > pytest_output.log 2>&1 || {
+          cat pytest_output.log
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ci-debug
+          git add pytest_output.log
+          git commit -m "debug: add pytest output log"
+          git push origin ci-debug -f
+          exit 2
+        }
 
