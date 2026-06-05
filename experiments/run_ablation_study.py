@@ -30,7 +30,22 @@ def load_ground_truth():
 def run_ablation(limit=None):
     dataset = load_ground_truth()
     if limit:
-        dataset = dataset[:limit]
+        # Stratified sampling: Lấy mẫu phân tầng đều từ 15 lớp tấn công khác nhau
+        by_label = {}
+        for sample in dataset:
+            lbl = sample["input"].get("cicids_label", "unknown")
+            if lbl not in by_label:
+                by_label[lbl] = []
+            by_label[lbl].append(sample)
+        
+        num_classes = len(by_label)
+        samples_per_class = max(1, (limit + num_classes - 1) // num_classes)
+        
+        selected_samples = []
+        for lbl, samples in by_label.items():
+            selected_samples.extend(samples[:samples_per_class])
+        
+        dataset = selected_samples[:limit]
 
 
     # Lớp Dương tính (Tấn công): expected_action != "LOG"
@@ -60,6 +75,20 @@ def run_ablation(limit=None):
 
         print(f"[*] Chay Ablation Study tren {len(dataset)} mau...")
 
+        # Khởi tạo và warmup RuleEngine toàn cục cho Z-score tracking
+        rule_engine = RuleEngine()
+        print("[*] Warming up Rule Engine baseline statistics...")
+        for i in range(110):
+            val = 15 + (i % 5) - 2
+            rule_engine.evaluate({
+                "Source IP": f"192.168.1.{10+i}",
+                "Destination Port": 80,
+                "Total Fwd Packets": val,
+                "Flow Bytes/s": val * 100,
+                "Flow Duration": 1000 + (i % 10) * 10
+            })
+        print("[+] Warmup complete. Rule Engine baseline established.")
+
         for idx, sample in enumerate(dataset):
             is_attack = (
                 1
@@ -68,15 +97,15 @@ def run_ablation(limit=None):
             )
             logs = sample.get("logs", [])
 
-            # Khởi tạo lại RuleEngine cho mỗi mẫu độc lập để tránh tràn trạng thái (state bleed)
-            rule_engine = RuleEngine()
+            # Reset session baseline cho IP profile độc lập của từng mẫu, giữ lại global RunningStats
+            rule_engine.session_baseline.reset_window()
             
             # --- Config A: Chỉ sử dụng luật cứng ---
             start_time_a = time.time()
             pred_a = 0
             for log in logs:
                 result = rule_engine.evaluate(log)
-                if result.get("tier1_action") == "ESCALATE":
+                if result.get("tier1_action") in ["BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"]:
                     pred_a = 1
                     break
             latency_a = time.time() - start_time_a
@@ -89,11 +118,15 @@ def run_ablation(limit=None):
             start_time_f = time.time()
             pred_f = 0
             needs_llm = False
+            tier1_verdict = "DROP"
             for log in logs:
                 result = rule_engine.evaluate(log)
-                if result.get("tier1_action") == "ESCALATE":
+                act = result.get("tier1_action")
+                if act == "ESCALATE":
                     needs_llm = True
                     break
+                elif act in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
+                    tier1_verdict = act
 
             # Lưu vết lập luận để phục vụ đánh giá bằng LLM Judge
             reasoning_output = {
@@ -134,7 +167,9 @@ def run_ablation(limit=None):
                     pred_f = 0
                     results["Config_F"]["actions"].append("ERROR")
             else:
-                results["Config_F"]["actions"].append("TIER1_LOG")
+                results["Config_F"]["actions"].append(f"TIER1_{tier1_verdict}")
+                if tier1_verdict in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
+                    pred_f = 1
 
             latency_f = time.time() - start_time_f
 

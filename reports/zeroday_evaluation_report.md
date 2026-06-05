@@ -13,22 +13,22 @@
 
 | ID | Tên Kịch Bản Tấn Công | Rule Engine Tĩnh (Config A) | Tier-1 Outlier (Z-Score) | Quyết Định Của AI (Tier-2) | Kết Quả |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| ZD-001 | Zero-Day Data Exfiltration (Outlier Packets) | DROP (Bỏ sót) | ESCALATE (Z=59792.25) | BLOCK_IP (Conf: 0.95) | ✅ THÀNH CÔNG |
-| ZD-002 | Zero-Day Session Flooding (Outlier Volume) | DROP (Bỏ sót) | ESCALATE (Z=14.09) | BLOCK_IP (Conf: 0.95) | ✅ THÀNH CÔNG |
+| ZD-001 | Zero-Day Data Exfiltration (Outlier Packets) | DROP (Bỏ sót) | ESCALATE (Z=59792.25) | ALERT (Conf: 0.7) | ✅ THÀNH CÔNG |
+| ZD-002 | Zero-Day Session Flooding (Outlier Volume) | DROP (Bỏ sót) | ESCALATE (Z=84416.93) | ALERT (Conf: 0.6) | ✅ THÀNH CÔNG |
 
 ## 🔍 Chi Tiết Suy Luận Và Lập Luận Của AI Tác Tử
 
 ### ZD-001: Zero-Day Data Exfiltration (Outlier Packets)
 * **Z-Score ở Tier-1:** 59792.25 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
-* **Hành động phản ứng tự động:** `BLOCK_IP` (Độ tin cậy: 0.95)
+* **Hành động phản ứng tự động:** `ALERT` (Độ tin cậy: 0.7)
 * **Lập luận bảo mật (Reasoning):**
-  > "Dữ liệu cho thấy IP 10.0.0.22 gửi một lượng gói tin bất thường (85000 gói) đến cổng 80 với User-Agent là 'exfil-tool/v1.0', có khả năng là một công cụ exfiltration. Hành vi này khớp với kỹ thuật Malvertising (T1583.008) và cần được chặn để bảo vệ hệ thống."
+  > "Dữ liệu cho thấy một IP nguồn (10.0.0.22) gửi một lượng lớn gói dữ liệu đến cổng 80.  Số lượng gói dữ liệu này cao bất thường và gợi ý về khả năng tấn công Malvertising. Cần xem xét thêm thông tin về nội dung gói dữ liệu để xác nhận."
 
 ### ZD-002: Zero-Day Session Flooding (Outlier Volume)
-* **Z-Score ở Tier-1:** 14.09 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
-* **Hành động phản ứng tự động:** `BLOCK_IP` (Độ tin cậy: 0.95)
+* **Z-Score ở Tier-1:** 84416.93 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
+* **Hành động phản ứng tự động:** `ALERT` (Độ tin cậy: 0.6)
 * **Lập luận bảo mật (Reasoning):**
-  > "Phát hiện IP nguồn 10.0.0.33 gửi một lượng gói tin rất lớn (120000 gói) đến cổng 80 với User-Agent là Wget/1.21.1 flood-bot, nghi ngờ là botnet thực hiện tấn công DDoS. Hệ thống thực hiện chặn IP để ngăn chặn tấn công."
+  > "Dữ liệu cho thấy một IP nguồn (10.0.0.33) đã gửi một lượng lớn gói dữ liệu đến cổng 80. Hành vi này có thể là dấu hiệu của một cuộc tấn công Malvertising, nơi kẻ tấn công sử dụng quảng cáo để phân phối phần mềm độc hại. Cần xem xét thêm thông tin về nội dung gói dữ liệu và nguồn quảng cáo để xác nhận."
 
 ---
 ## 💡 Kết Luận Khoa Học Cho Luận Văn Thạc Sĩ

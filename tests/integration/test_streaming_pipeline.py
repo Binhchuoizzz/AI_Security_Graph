@@ -104,7 +104,11 @@ class TestRuleEngineIntegration:
 
 
 class TestRedisConnectivity:
-    """Test Redis connection and queue operations."""
+    """Test Redis connection and stream operations (xadd/xreadgroup/xack)."""
+
+    TEST_STREAM = "test_sentinel_stream"
+    TEST_GROUP = "test_group"
+    TEST_CONSUMER = "test_consumer"
 
     @pytest.fixture
     def redis_client(self):
@@ -118,39 +122,95 @@ class TestRedisConnectivity:
         except Exception:
             pytest.skip("Redis not available")
 
+    @pytest.fixture(autouse=True)
+    def cleanup_streams(self, redis_client):
+        """Clean up test streams before and after each test."""
+        streams = [self.TEST_STREAM, "test_s_fw", "test_s_waf", "test_s_sys"]
+        for s in streams:
+            redis_client.delete(s)
+        yield
+        for s in streams:
+            redis_client.delete(s)
+
     def test_redis_ping(self, redis_client):
         assert redis_client.ping() is True
 
-    def test_queue_push_pop(self, redis_client):
-        test_queue = "test_sentinel_queue"
+    def test_stream_xadd_and_xreadgroup(self, redis_client):
+        """Test xadd → xreadgroup → xack round-trip (core streaming mechanism)."""
         test_data = json.dumps({"Source IP": "1.1.1.1", "test": True})
 
-        redis_client.rpush(test_queue, test_data)
-        result = redis_client.lpop(test_queue)
+        # Create consumer group
+        redis_client.xgroup_create(
+            self.TEST_STREAM, self.TEST_GROUP, id="0", mkstream=True
+        )
 
-        parsed = json.loads(result)
+        # Publish via xadd
+        msg_id = redis_client.xadd(self.TEST_STREAM, {"log": test_data})
+        assert msg_id is not None
+
+        # Consume via xreadgroup
+        response = redis_client.xreadgroup(
+            self.TEST_GROUP,
+            self.TEST_CONSUMER,
+            {self.TEST_STREAM: ">"},
+            count=1,
+            block=1000,
+        )
+        assert response is not None
+        assert len(response) == 1
+
+        stream_name, messages = response[0]
+        assert stream_name == self.TEST_STREAM
+        assert len(messages) == 1
+
+        received_id, data = messages[0]
+        parsed = json.loads(data["log"])
         assert parsed["Source IP"] == "1.1.1.1"
         assert parsed["test"] is True
 
-    def test_multi_queue_blpop(self, redis_client):
-        """Test BLPOP across multiple queues (core SIEM mechanism)."""
-        queues = ["test_q_fw", "test_q_waf", "test_q_sys"]
+        # Acknowledge
+        ack_count = redis_client.xack(self.TEST_STREAM, self.TEST_GROUP, received_id)
+        assert ack_count == 1
 
-        # Clean up
-        for q in queues:
-            redis_client.delete(q)
+    def test_multi_stream_consumer_group(self, redis_client):
+        """Test xreadgroup across multiple streams (multi-source SIEM)."""
+        streams = ["test_s_fw", "test_s_waf", "test_s_sys"]
+        group = "test_multi_group"
+        consumer = "test_multi_consumer"
 
-        # Đẩy vào WAF queue
-        redis_client.rpush("test_q_waf", json.dumps({"event": "sql_injection"}))
+        # Create consumer groups
+        for s in streams:
+            redis_client.xgroup_create(s, group, id="0", mkstream=True)
 
-        # BLPOP phải lấy từ WAF queue
-        result = redis_client.blpop(queues, timeout=1)
-        assert result is not None
-        assert result[0] == "test_q_waf"
+        # Publish to WAF stream only
+        redis_client.xadd("test_s_waf", {"log": json.dumps({"event": "sql_injection"})})
 
-        # Clean up
-        for q in queues:
-            redis_client.delete(q)
+        # xreadgroup must consume from WAF stream
+        streams_dict = {s: ">" for s in streams}
+        response = redis_client.xreadgroup(
+            group, consumer, streams_dict, count=10, block=1000
+        )
+        assert response is not None
+        assert len(response) == 1
+
+        stream_name, messages = response[0]
+        assert stream_name == "test_s_waf"
+        assert len(messages) == 1
+
+        # Verify data integrity
+        _, data = messages[0]
+        parsed = json.loads(data["log"])
+        assert parsed["event"] == "sql_injection"
+
+    def test_stream_xlen_backpressure(self, redis_client):
+        """Test xlen reports accurate stream length for backpressure control."""
+        assert redis_client.xlen(self.TEST_STREAM) == 0
+
+        # Publish 5 messages
+        for i in range(5):
+            redis_client.xadd(self.TEST_STREAM, {"log": json.dumps({"idx": i})})
+
+        assert redis_client.xlen(self.TEST_STREAM) == 5
 
 
 if __name__ == "__main__":

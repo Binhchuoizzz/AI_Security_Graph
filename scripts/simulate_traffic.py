@@ -3,7 +3,7 @@ simulate_traffic.py — Ground Truth Replay & Demo Simulator
 
 MỤC ĐÍCH:
   Script khởi chạy (entrypoint) để phát lại (replay) các mẫu tấn công
-  đã gán nhãn từ ground_truth.json lên Redis, phục vụ:
+  đã gán nhãn từ ground_truth.json lên Redis Streams, phục vụ:
     - Demo giao diện SOC Dashboard trực quan
     - Chạy Ablation Study (đánh giá Tier-1 + Tier-2)
     - Kiểm thử khả năng Guardrails với adversarial payloads
@@ -14,8 +14,8 @@ LUỒNG KHÁC PUBLISHER.PY:
 
 QUAN HỆ:
   Input:  experiments/ground_truth.json  (từ fetch_and_build_dataset.py)
-  Output: Redis Lists queue_waf / queue_firewall / queue_sysmon
-  Downstream: subscriber.py (blpop) → rule_engine.py → workflow.py
+  Output: Redis Streams queue_waf / queue_firewall / queue_sysmon
+  Downstream: subscriber.py (xreadgroup) → rule_engine.py → workflow.py
 """
 
 import json
@@ -137,15 +137,15 @@ def stream_logs_to_redis() -> None:
         for batch_start in range(0, total, BATCH_SIZE):
             batch = samples[batch_start: batch_start + BATCH_SIZE]
 
-            # ── Backpressure: check queue size once per batch ──────────────
+            # ── Backpressure: check stream length once per batch ────────────
             wait_count = 0
             for queue_name in ["queue_waf", "queue_firewall", "queue_sysmon"]:
-                while r.llen(queue_name) > MAX_QUEUE_SIZE:  # type: ignore
+                while r.xlen(queue_name) > MAX_QUEUE_SIZE:  # type: ignore
                     time.sleep(0.1)
                     wait_count += 1
                     if wait_count % 100 == 0:
                         print(
-                            f"[!] Backpressure: {queue_name}={r.llen(queue_name)} "  # type: ignore
+                            f"[!] Backpressure: {queue_name}={r.xlen(queue_name)} "  # type: ignore
                             f"exceeds {MAX_QUEUE_SIZE}. Consumer offline or slow?"
                         )
 
@@ -176,9 +176,14 @@ def stream_logs_to_redis() -> None:
                 mapped_log["gt_expected_mitre"]    = sample.get("expected_mitre_technique", "")
                 mapped_log["dataset_source"]       = "ground_truth"
 
-                # ── Route to appropriate queue ────────────────────────────
+                # ── Route to appropriate stream ───────────────────────────
                 target_queue = determine_queue(mapped_log)
-                r.rpush(target_queue, json.dumps(mapped_log))
+                r.xadd(
+                    target_queue,
+                    {"log": json.dumps(mapped_log)},
+                    maxlen=MAX_QUEUE_SIZE,
+                    approximate=True,
+                )
                 total_published += 1
 
             # ── Batch log + throttle ───────────────────────────────────────
@@ -190,7 +195,7 @@ def stream_logs_to_redis() -> None:
             )
             time.sleep(BATCH_DELAY_SECONDS)
 
-        print(f"[+] Finished! Published {total_published} samples across 3 queues.")
+        print(f"[+] Finished! Published {total_published} samples across 3 streams.")
 
     except KeyboardInterrupt:
         print("\n[*] Stopped by Admin.")

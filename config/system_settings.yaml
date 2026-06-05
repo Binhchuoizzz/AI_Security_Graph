@@ -37,8 +37,8 @@ guardrails:
   - pretend you are
   - roleplay as
   - respond without restrictions
-  - "<<<DATA_END_"
-  - ">>>>"
+  - <<<DATA_END_
+  - '>>>>'
   jailbreak_patterns:
   - DAN mode
   - Do Anything Now
@@ -85,14 +85,14 @@ rag:
     ttl_seconds: 1800
   top_k_results: 3
 redis:
-  url: redis://localhost:6379/0
-  queues:
-    - queue_firewall
-    - queue_waf
-    - queue_sysmon
-  queue_name: queue_waf
   escalated_queue: queue_hitl
   publisher_delay_seconds: 0.5
+  queue_name: queue_waf
+  queues:
+  - queue_firewall
+  - queue_waf
+  - queue_sysmon
+  url: redis://localhost:6379/0
 threat_memory:
   apt_threshold_days: 7
   apt_threshold_incidents: 5

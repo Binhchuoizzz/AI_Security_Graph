@@ -88,8 +88,8 @@ def _inject_ips(entry: dict, idx: int):
 def stream_logs_to_redis(csv_path: str):
     """
     Mô phỏng đường ống kỹ thuật dữ liệu (Streaming Ingestion):
-    Đọc log tấn công từ tệp CSV và đẩy liên tục vào danh sách Redis List (dùng rpush).
-    Sử dụng mô hình hàng đợi tiêu thụ (blpop ở phía subscriber) để đảm bảo phân phối log.
+    Đọc log tấn công từ tệp CSV và đẩy liên tục vào Redis Stream (dùng xadd).
+    Sử dụng mô hình nhóm tiêu thụ (xreadgroup ở phía subscriber) để đảm bảo phân phối log ít nhất một lần.
     
     Bao gồm kiểm soát nghẽn (backpressure) và giới hạn băng thông ở mức batch để tránh crash do Redis OOM.
     """
@@ -117,12 +117,12 @@ def stream_logs_to_redis(csv_path: str):
         for chunk_idx, chunk in enumerate(pd.read_csv(csv_path, chunksize=500)):
             # Kiểm soát nghẽn: Kiểm tra kích thước hàng đợi trước khi xử lý chunk để tránh gọi Redis ở mỗi dòng
             wait_count = 0
-            while r.llen(QUEUE_NAME) > MAX_QUEUE_SIZE:  # type: ignore
+            while r.xlen(QUEUE_NAME) > MAX_QUEUE_SIZE:  # type: ignore
                 time.sleep(0.1)
                 wait_count += 1
                 if wait_count % 100 == 0:  # Mỗi 10 giây (100 * 0.1s)
                     print(
-                        f"[!] Backpressure: queue={r.llen(QUEUE_NAME)} exceeds threshold {MAX_QUEUE_SIZE}. Consumer offline or slow?"
+                        f"[!] Backpressure: stream={r.xlen(QUEUE_NAME)} exceeds threshold {MAX_QUEUE_SIZE}. Consumer offline or slow?"
                     )
 
             for index, row in chunk.iterrows():
@@ -146,11 +146,11 @@ def stream_logs_to_redis(csv_path: str):
                 # Thêm tên tệp nguồn dữ liệu để Tier-1/Tier-2 phân biệt ngữ cảnh
                 normalized_entry["dataset_source"] = os.path.basename(csv_path)
 
-                # Đẩy vào Redis List
-                r.rpush(QUEUE_NAME, json.dumps(normalized_entry))
+                # Đẩy vào Redis Stream (giới hạn maxlen bằng approximate=True để tăng hiệu năng)
+                r.xadd(QUEUE_NAME, {"log": json.dumps(normalized_entry)}, maxlen=MAX_QUEUE_SIZE, approximate=True)
                 total_published += 1
 
-            print(f"[>] Published chunk {chunk_idx + 1} (Total logs sent: {total_published}) -> Queue: {QUEUE_NAME}")
+            print(f"[>] Published chunk {chunk_idx + 1} (Total logs sent: {total_published}) -> Stream: {QUEUE_NAME}")
             
             # Giới hạn tốc độ nạp trên mỗi chunk (không phải từng dòng) để tránh nghẽn
             time.sleep(BATCH_DELAY_SECONDS)

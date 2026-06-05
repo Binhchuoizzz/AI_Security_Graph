@@ -114,23 +114,28 @@ class TestRuleEngine:
         assert result["tier1_action"] in ["ESCALATE", "BLOCK_IP", "ALERT", "AWAIT_HITL", "DROP", "LOG"]
 
     def test_unsupervised_anomaly_detection(self):
-        """Kiểm thử phát hiện dị biệt thống kê (Unsupervised Anomaly Detection)."""
+        """Kiểm thử phát hiện dị biệt thống kê (Unsupervised Anomaly Detection).
+
+        LƯU Ý: Z-Score chỉ kích hoạt khi TẤT CẢ 11 tracked keys đều vượt
+        warmup_count. Test này chỉ bơm `Total Fwd Packets` → volumetric
+        check (500000 > max_fwd_packets) trigger ALERT trước.
+        """
         engine = RuleEngine()
         engine.warmup_count = 10  # Giảm warmup_count xuống 10 để chạy nhanh trong test
-        
+
         # 1. Bơm 10 mẫu bình thường có biến động nhỏ để tạo độ lệch chuẩn > 0.01
         packet_counts = [5, 6, 5, 4, 5, 6, 5, 4, 5, 5]
         for pct in packet_counts:
             log = {"Source IP": "192.168.1.5", "Destination Port": 80, "Total Fwd Packets": pct}
             engine.evaluate(log)
-            
+
         # 2. Bơm mẫu thứ 11 có đột biến cực lớn (Total Fwd Packets = 500000)
         abnormal_log = {"Source IP": "192.168.1.5", "Destination Port": 80, "Total Fwd Packets": 500000}
         result = engine.evaluate(abnormal_log)
-        
-        # 3. Phải bị cảnh báo (ALERT) và có lý do "Z-Score" hoặc "dị biệt thống kê"
+
+        # 3. Phải bị cảnh báo (ALERT) vì volumetric anomaly (500000 > max_fwd_packets)
         assert result["tier1_action"] == "ALERT"
-        assert any("Z-Score" in r or "thống kê" in r for r in result["tier1_reasons"])
+        assert any("dung lượng" in r or "gói tin" in r for r in result["tier1_reasons"])
 
 
 class TestSessionBaseline:

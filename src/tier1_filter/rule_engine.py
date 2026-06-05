@@ -18,6 +18,7 @@ import yaml
 import os
 import time
 import math
+import re
 from collections import defaultdict
 from typing import TypedDict, Optional, Set, Dict, List, Any
 
@@ -117,6 +118,7 @@ class SessionBaseline:
         deviation_threshold: float = 2.0,
         window_seconds: int = 300,
         ttl_seconds: int = 600,
+        max_profiles: int = 10000,
     ):
         self.profiles: Dict[str, IPProfile] = defaultdict(
             lambda: {
@@ -130,6 +132,7 @@ class SessionBaseline:
         self.deviation_threshold = deviation_threshold
         self.window_seconds = window_seconds
         self.ttl_seconds = ttl_seconds  # IP inactive > TTL → evict
+        self.max_profiles = max_profiles
         self.global_avg_request_rate = 1.0
         self._update_counter = 0  # Đếm để trigger eviction định kỳ
 
@@ -146,7 +149,8 @@ class SessionBaseline:
             if profile["last_seen"] and (now - profile["last_seen"]) > self.ttl_seconds
         ]
         for ip in stale_ips:
-            del self.profiles[ip]
+            if ip in self.profiles:
+                del self.profiles[ip]
         # Recalibrate global baseline request rate sau mỗi chu kỳ dọn dẹp
         self.update_global_baseline()
 
@@ -155,6 +159,20 @@ class SessionBaseline:
         Cập nhật baseline cho IP và trả về deviation score.
         GHI NHẬN TOÀN BỘ traffic, evict stale profiles định kỳ.
         """
+        # Kiểm soát kích thước cache để chống tấn công cạn kiệt trạng thái (State Exhaustion)
+        if source_ip not in self.profiles and len(self.profiles) >= self.max_profiles:
+            self._evict_stale_profiles()
+            # Nếu vẫn vượt ngưỡng sau khi dọn dẹp stale profiles, tiến hành xoá 10% profiles cũ nhất (FIFO/LRU-style)
+            if len(self.profiles) >= self.max_profiles:
+                sorted_ips = sorted(
+                    self.profiles.keys(),
+                    key=lambda ip: self.profiles[ip]["last_seen"] or 0
+                )
+                num_to_evict = max(1, int(self.max_profiles * 0.1))
+                for ip_to_evict in sorted_ips[:num_to_evict]:
+                    if ip_to_evict in self.profiles:
+                        del self.profiles[ip_to_evict]
+
         # Eviction check mỗi 100 updates
         self._update_counter += 1
         if self._update_counter % 100 == 0:
@@ -265,12 +283,14 @@ class RuleEngine:
 
         # Theo dõi file modification time để hot-reload
         self.last_config_mtime = os.path.getmtime(CONFIG_PATH) if os.path.exists(CONFIG_PATH) else 0
+        self.last_config_check_time = time.time()  # Chống I/O bottleneck
 
         # Session Baselining thay thế Random Sampling
         baseline_config = tier1_config.get("session_baseline", {})
         self.session_baseline = SessionBaseline(
             deviation_threshold=baseline_config.get("deviation_threshold", 2.0),
             window_seconds=baseline_config.get("window_seconds", 300),
+            max_profiles=baseline_config.get("max_profiles", 10000),
         )
 
         # Unsupervised Anomaly Detection (Zero-Day statistical profiling trên các core features có corr cao)
@@ -287,25 +307,56 @@ class RuleEngine:
             "PSH Flag Cnt": RunningStats(),
             "Flow Pkts/s": RunningStats()
         }
-        # Cần 100 mẫu để khởi tạo baseline tin cậy trước khi tính Z-score
+        # Cần 100 mẫu sạch để khởi tạo baseline tin cậy trước khi tính Z-score
         self.warmup_count = 100
         self.total_processed_logs = 0
+
+    def _check_waf_signatures(self, log_entry: dict) -> Optional[str]:
+        """
+        Bộ lọc Signature WAF siêu nhẹ để phát hiện nhanh các dấu hiệu SQLi, XSS, Path Traversal
+        ngay tại Tier-1 nhằm bảo vệ Tier-2 khỏi bị nghẽn (Resource Starvation).
+        """
+        waf_patterns = {
+            "SQL Injection (SQLi)": re.compile(
+                r"(?i)(union\s+select|select\s+.*?\s+from|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+)"
+            ),
+            "Cross-Site Scripting (XSS)": re.compile(
+                r"(?i)(<script.*?>|javascript:|onload\s*=|onerror\s*=|<img\s+.*?onerror|<svg.*?onload)"
+            ),
+            "Path Traversal / LFI": re.compile(
+                r"(?i)(\.\./\.\./|\.\.\\\.\.\\|/etc/passwd|/windows/win\.ini|boot\.ini)"
+            ),
+            "Command Injection": re.compile(
+                r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\))"
+            )
+        }
+        target_fields = ["payload", "uri", "user_agent", "User-Agent", "headers", "message", "command", "process"]
+        for field in target_fields:
+            val = log_entry.get(field) or log_entry.get(field.lower())
+            if val and isinstance(val, str):
+                for attack_type, pattern in waf_patterns.items():
+                    if pattern.search(val):
+                        return f"WAF: Phát hiện {attack_type} trong '{field}'"
+        return None
 
     def evaluate(self, log_entry: dict) -> dict:
         """
         Đánh giá log entry qua các tầng: Whitelist -> Static/Dynamic Rules -> Session Baseline -> Action.
         """
-        # Tự động reload configurations nếu file system_settings.yaml bị sửa đổi (đã gộp & bảo vệ I/O)
-        try:
-            if os.path.exists(CONFIG_PATH):
-                current_mtime = os.path.getmtime(CONFIG_PATH)
-                if current_mtime > self.last_config_mtime:
-                    self.reload_dynamic_rules()
-                    self.last_config_mtime = current_mtime
-        except (yaml.YAMLError, FileNotFoundError) as e:
-            print(f"[!] Config reload failed: {e}. Using cached configurations.")
-        except Exception as e:
-            print(f"[!] Unexpected error during config reload: {e}")
+        # Tự động reload configurations nếu file system_settings.yaml bị sửa đổi (đã gộp & bảo vệ I/O bằng cách hạn chế tần suất check)
+        now_time = time.time()
+        if now_time - self.last_config_check_time > 5.0:
+            self.last_config_check_time = now_time
+            try:
+                if os.path.exists(CONFIG_PATH):
+                    current_mtime = os.path.getmtime(CONFIG_PATH)
+                    if current_mtime > self.last_config_mtime:
+                        self.reload_dynamic_rules()
+                        self.last_config_mtime = current_mtime
+            except (yaml.YAMLError, FileNotFoundError) as e:
+                print(f"[!] Config reload failed: {e}. Using cached configurations.")
+            except Exception as e:
+                print(f"[!] Unexpected error during config reload: {e}")
 
         score = 0
         reasons = []
@@ -324,7 +375,13 @@ class RuleEngine:
             log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
             return log_entry
 
-        # --- Tầng 0.5: Cập nhật & Kiểm tra Unsupervised Statistical Anomaly ---
+        # --- Tầng 0.1: WAF Signature Check (Chống LLM Starvation) ---
+        waf_reason = self._check_waf_signatures(log_entry)
+        if waf_reason:
+            score += 50
+            reasons.append(waf_reason)
+
+        # --- Tầng 0.5: Kiểm tra Unsupervised Statistical Anomaly ---
         self.total_processed_logs += 1
         
         # Ánh xạ các trường mạng thô sang các nhóm tính năng
@@ -341,13 +398,14 @@ class RuleEngine:
             if val is not None:
                 current_values[key] = val
                 
-        # Chỉ kích hoạt cảnh báo sau giai đoạn warmup (100 log đầu vào)
+        # Chỉ kích hoạt cảnh báo sau giai đoạn warmup cho từng key cụ thể (dựa trên số lượng mẫu benign của key đó)
         max_z_score = 0.0
-        if self.total_processed_logs > self.warmup_count:
-            z_anomaly_reasons = []
-            z_anomaly_score = 0
-            for key, val in current_values.items():
-                stats = self.global_stats[key]
+        z_anomaly_reasons = []
+        z_anomaly_score = 0
+        
+        for key, val in current_values.items():
+            stats = self.global_stats[key]
+            if stats.n >= self.warmup_count:
                 mean_val = stats.mean()
                 std_val = stats.std_dev()
                 
@@ -362,14 +420,10 @@ class RuleEngine:
                         z_anomaly_reasons.append(
                             f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} lệch {z_score:.2f} lần độ lệch chuẩn (Z-Score > 3.5)"
                         )
-            if z_anomaly_reasons:
-                score += z_anomaly_score
-                reasons.extend(z_anomaly_reasons)
-
-        # Cập nhật giá trị vào bộ theo dõi thống kê chạy (sau khi đã tính Z-score để tránh tự làm nhiễu)
-        for key, val in current_values.items():
-            if key in self.global_stats:
-                self.global_stats[key].push(val)
+                        
+        if z_anomaly_reasons:
+            score += z_anomaly_score
+            reasons.extend(z_anomaly_reasons)
 
         # --- Tầng 1: Static Rules ---
         dest_port = log_entry.get("Destination Port", -1)
@@ -432,7 +486,12 @@ class RuleEngine:
             except (ValueError, TypeError):
                 pass
 
-            if dest_port_val in self.sensitive_ports and fwd_pkts_val < 200:
+            # Phát hiện tấn công web rõ ràng (SQLi/XSS/Command Inj) -> Chặn luôn để bảo vệ LLM
+            has_waf_match = any("WAF:" in r for r in reasons)
+
+            if has_waf_match:
+                log_entry["tier1_action"] = "BLOCK_IP"
+            elif dest_port_val in self.sensitive_ports and fwd_pkts_val < 200:
                 # BruteForce: port nhạy cảm, packet count trung bình → block IP
                 log_entry["tier1_action"] = "BLOCK_IP"
             elif fwd_pkts_val > self.max_fwd_packets:
@@ -445,6 +504,13 @@ class RuleEngine:
                 log_entry["tier1_action"] = "ESCALATE"
         else:
             log_entry["tier1_action"] = "DROP" if not reasons else "LOG"
+
+        # --- Tầng 0.6: Cập nhật RunningStats CHỈ với dữ liệu được coi là benign (DROP hoặc LOG) ---
+        # Điều này chống Baseline Poisoning (tấn công Slow-Rate baseline drift)
+        if log_entry["tier1_action"] in ("DROP", "LOG"):
+            for key, val in current_values.items():
+                if key in self.global_stats:
+                    self.global_stats[key].push(val)
 
         return log_entry
 
