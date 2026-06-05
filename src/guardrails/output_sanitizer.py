@@ -39,10 +39,10 @@ class OutputSanitizer:
 
     # Patterns nguy hiểm trong output
     DANGEROUS_PATTERNS = [
-        # Markdown image (exfil vector chính)
-        (r'!\[[^\]]*\]\([^\)]+\)', '[IMG_STRIPPED]'),
-        # Markdown links to external domains
-        (r'\[[^\]]*\]\(https?://[^\)]+\)', '[LINK_STRIPPED]'),
+        # Markdown image (exfil vector chính - hỗ trợ khoảng trắng tùy chọn)
+        (r'!\[[^\]]*\]\s*\([^\)]+\)', '[IMG_STRIPPED]'),
+        # Markdown links to external domains (hỗ trợ khoảng trắng tùy chọn)
+        (r'\[[^\]]*\]\s*\(https?://[^\)]+\)', '[LINK_STRIPPED]'),
         # HTML img tags
         (r'<img[^>]*>', '[IMG_STRIPPED]'),
         # HTML anchor tags

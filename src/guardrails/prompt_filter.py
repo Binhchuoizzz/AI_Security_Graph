@@ -32,6 +32,8 @@ import urllib.parse
 from collections import Counter
 from typing import Optional
 
+from src.guardrails.template_miner import LogTemplateMiner, EntropyScorer, TokenBudgetManager
+
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
@@ -429,20 +431,53 @@ class GuardrailsPipeline:
 
     def process_batch(self, logs: list) -> dict:
         """
-        Xử lý batch log. Trả về:
-        - individual_results: List kết quả từng log
-        - batch_encapsulated: Toàn bộ batch đã đóng gói
+        Xử lý batch log kết hợp nén cấu trúc (LogTemplateMiner) và cắt tỉa theo budget (TokenBudgetManager).
+        Trả về:
+        - individual_results: List kết quả quét injection/jailbreak/neutralization từng log
+        - batch_encapsulated: Toàn bộ batch log đã được nén, chọn lọc và đóng gói an toàn
         - injection_count: Số log chứa injection
         """
         results = [self.process(log) for log in logs]
         injection_count = sum(1 for r in results if r["injection_detected"])
+        
+        # Lấy danh sách logs đã được làm sạch (neutralized)
+        sanitized_logs = [r["sanitized_log"] for r in results]
 
-        # Combine toàn bộ encapsulated text
-        all_encapsulated = "\n".join(r["encapsulated_text"] for r in results)
+        # 1. Nén volume logs bằng LogTemplateMiner
+        miner = LogTemplateMiner()
+        for log in sanitized_logs:
+            miner.add_log_dict(log)
+        compressed_text = miner.format_for_llm()
+
+        # 2. Lấy danh sách logs có mức entropy cao (ưu tiên giữ nguyên raw để LLM phân tích)
+        scorer = EntropyScorer()
+        high_priority_logs = []
+        for log in sanitized_logs:
+            key_fields = ["Source IP", "Destination Port", "Protocol", "Total Fwd Packets", "Flow Duration", "payload", "uri"]
+            parts = [f"{f}={log.get(f)}" for f in key_fields if log.get(f) is not None]
+            log_str = " ".join(parts) if parts else str(log)
+            if scorer.is_high_entropy(log_str):
+                high_priority_logs.append(log_str)
+
+        # 3. Cắt tỉa logs theo token budget
+        budget_manager = TokenBudgetManager()
+        budgeted_text = budget_manager.fit_to_budget(compressed_text, high_priority_logs)
+
+        # 4. Xác định mức độ cách ly cao nhất của batch log (NORMAL < HIGH < CRITICAL)
+        max_isolation = "NORMAL"
+        for r in results:
+            if r["isolation_level"] == "CRITICAL":
+                max_isolation = "CRITICAL"
+                break
+            elif r["isolation_level"] == "HIGH":
+                max_isolation = "HIGH"
+
+        # 5. Đóng gói trong delimiter ngẫu nhiên động
+        batch_encapsulated = self.encapsulator.encapsulate(budgeted_text, max_isolation)
 
         return {
             "individual_results": results,
-            "batch_encapsulated": all_encapsulated,
+            "batch_encapsulated": batch_encapsulated,
             "injection_count": injection_count,
             "total_logs": len(logs),
             "system_instruction": self.encapsulator.get_system_instruction(),
