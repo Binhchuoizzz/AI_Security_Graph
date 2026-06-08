@@ -2,7 +2,6 @@
 Unit Tests for FeedbackValidator
 """
 
-import pytest
 from src.guardrails.feedback_validator import FeedbackValidator
 
 
@@ -33,3 +32,15 @@ def test_feedback_validator_whitelist_ip():
     v2, err2 = validator.validate_whitelist_ip("8.8.8.8")
     assert v2 is False
     assert any("trusted internal subnets" in e for e in err2)
+
+
+def test_feedback_validator_invalid_regex():
+    validator = FeedbackValidator()
+    # Thử truyền regex sai cú pháp cho trường URI
+    v1, err1 = validator.validate_rule("URI", "[invalid-regex", 50)
+    assert v1 is False
+    assert any("Invalid regex syntax" in e for e in err1)
+
+    # Thử truyền regex đúng cú pháp cho trường URI
+    v2, err2 = validator.validate_rule("URI", "^/admin/.*$", 50)
+    assert v2 is True

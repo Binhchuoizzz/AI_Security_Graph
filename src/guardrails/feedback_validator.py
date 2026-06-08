@@ -2,6 +2,7 @@
 Guardrails: Configurable Feedback Loop Validator (Zero-Trust Rules & IP Checks)
 """
 
+import re
 import logging
 import ipaddress
 from typing import Tuple, List
@@ -37,7 +38,7 @@ class FeedbackValidator:
 
         # 1. Chuẩn hóa và kiểm tra tên trường (Field Validation)
         norm_field = KEY_ALIASES.get(field.lower(), field)
-        if norm_field not in self.allowed_actions_fields():
+        if norm_field not in self.get_allowed_fields():
             errors.append(
                 f"Field '{field}' is not allowed for dynamic rules. "
                 f"Allowed fields: {self.allowed_fields}"
@@ -90,6 +91,13 @@ class FeedbackValidator:
                 except ValueError:
                     # Nếu là regex hoặc signature khác, cho phép qua
                     pass
+
+        # Validate regex syntax cho non-IP fields
+        if norm_field in ["URI", "User-Agent"]:
+            try:
+                re.compile(pattern_str)
+            except re.error as e:
+                errors.append(f"Invalid regex syntax in pattern: {e}")
 
         # 5. Kiểm tra Score
         if not (0 <= score <= 100):
@@ -148,5 +156,5 @@ class FeedbackValidator:
 
         return len(errors) == 0, errors
 
-    def allowed_actions_fields(self) -> List[str]:
+    def get_allowed_fields(self) -> List[str]:
         return self.allowed_fields
