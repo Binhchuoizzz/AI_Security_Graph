@@ -5,11 +5,9 @@ Guardrails: Phòng thủ Prompt Injection (Đóng gói dữ liệu phân vùng -
 import re
 import yaml
 import os
-import html
 import base64
 import secrets
 import urllib.parse
-from collections import Counter
 from typing import Optional
 
 from src.guardrails.template_miner import LogTemplateMiner, EntropyScorer, TokenBudgetManager
@@ -173,7 +171,22 @@ class EncodingNeutralizer:
 
     @staticmethod
     def neutralize_html_entities(text: str) -> str:
-        return html.escape(text)
+        # Loại bỏ và strip thẻ script/html độc hại thay vì chỉ encode
+        clean = re.sub(
+            r"<script[^>]*>.*?</script>",
+            "[SCRIPT_STRIPPED]",
+            text,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        clean = re.sub(r"<img[^>]*>", "[IMG_STRIPPED]", clean, flags=re.IGNORECASE)
+        clean = re.sub(
+            r"<iframe[^>]*>.*?</iframe>",
+            "[IFRAME_STRIPPED]",
+            clean,
+            flags=re.IGNORECASE | re.DOTALL
+        )
+        clean = re.sub(r"<[^>]+>", "", clean)
+        return clean
 
     @staticmethod
     def normalize_unicode(text: str) -> str:
@@ -221,7 +234,7 @@ class DelimitedDataEncapsulator:
     DELIMITER_PREFIX = "DATA"
 
     def __init__(self):
-        self._nonce = secrets.token_hex(6)
+        self._nonce = secrets.token_hex(8)
         self.data_start = f"<<<{self.DELIMITER_PREFIX}_BEGIN_{self._nonce}>>>"
         self.data_end = f"<<<{self.DELIMITER_PREFIX}_END_{self._nonce}>>>"
 
@@ -279,41 +292,7 @@ class DelimitedDataEncapsulator:
         return self.encapsulate(content, normalized_log.get("_isolation_level", "NORMAL"))
 
 
-# =========================================================================
-# 4. DDoS FEATURE EXTRACTOR
-# =========================================================================
-class FeatureExtractor:
-    """
-    Tóm tắt hành vi log DDoS.
-    """
 
-    @staticmethod
-    def summarize_behavior(logs: list) -> str:
-        if not logs:
-            return "No logs to summarize."
-
-        total = len(logs)
-        unique_ips = len(set(log.get("Source IP", log.get("src_ip", "unknown")) for log in logs))
-        unique_ports = len(set(log.get("Destination Port", log.get("dst_port", 0)) for log in logs))
-
-        paths = [str(log.get("URI", log.get("uri", log.get("Path", "N/A")))) for log in logs]
-        top_path = Counter(paths).most_common(1)
-        top_path_str = top_path[0][0] if top_path else "N/A"
-
-        user_agents = [str(log.get("User-Agent", log.get("user_agent", "N/A"))) for log in logs]
-        unique_ua = len(set(user_agents))
-
-        summary = (
-            f"DDoS Behavior Summary:\n"
-            f"  Total Events: {total}\n"
-            f"  Unique Source IPs: {unique_ips}\n"
-            f"  Unique Dest Ports: {unique_ports}\n"
-            f"  Unique User-Agents: {unique_ua}\n"
-            f"  Most Targeted Path: {top_path_str}\n"
-            f"  Pattern: {'Distributed' if unique_ips > 10 else 'Concentrated'} attack\n"
-            f"  Estimated Rate: {total / 300:.1f} req/sec (over 5-min window)"
-        )
-        return summary
 
 
 # =========================================================================

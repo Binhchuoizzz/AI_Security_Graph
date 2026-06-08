@@ -2,7 +2,6 @@
 Unit Tests for Guardrails (PromptFilter)
 """
 
-import pytest
 from src.guardrails.prompt_filter import GuardrailsPipeline, DelimitedDataEncapsulator
 
 
@@ -24,8 +23,9 @@ def test_sanitize_and_encapsulate():
     # Đảm bảo zero-width joiner bị tước bỏ
     assert "\u200d" not in output
 
-    # Đảm bảo <script> bị HTML escaped
-    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in output
+    # Đảm bảo <script> bị loại bỏ
+    assert "[SCRIPT_STRIPPED]" in output
+    assert "alert(1)" not in output
 
     # Đảm bảo payload vẫn tồn tại
     assert "SELECT * FROM users" in output
