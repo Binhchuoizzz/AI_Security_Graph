@@ -1,104 +1,114 @@
 """
-Guardrails: Log Template Miner (Volume Compression Engine)
-
-QUAN TRỌNG - RANH GIỚI TRÁCH NHIỆM:
-  Module này CHỈ phục vụ MỘT mục đích duy nhất: NÉN VOLUME.
-  Giảm 10,000 dòng log trùng lặp → N Templates (~10-50) để vừa Context Window.
-
-  Module này KHÔNG phòng thủ Prompt Injection.
-  Module này KHÔNG lọc nội dung độc hại.
-  Prompt Injection defense được xử lý hoàn toàn bởi prompt_filter.py
-  (Delimited Data Encapsulation).
-
-  Luồng xử lý đúng:
-    Raw Logs → [Template Miner: NÉN VOLUME] → [Prompt Filter: PHÒNG THỦ INJECTION]
-             → [Token Budget: CẮT TỈA] → LLM
-
-  Drain3 tách log thành:
-    - Template (static structure): "GET /login.php?user=<VAR>"
-    - Variables (dynamic params): ["admin", "root", "' OR 1=1--"]
-
-  Variables ĐƯỢC GIỮ LẠI dưới dạng Samples (3 samples/template).
-  Chúng sẽ được đóng gói bởi DelimitedDataEncapsulator trước khi vào LLM.
+Guardrails: Log Template Miner (Volume Compression Engine using Drain3)
 """
 
-import re
 import math
+import logging
 from collections import Counter
 from typing import Optional
+
+from drain3.template_miner_config import TemplateMinerConfig
+from drain3 import TemplateMiner
+from drain3.masking import MaskingInstruction
+
+from src.guardrails.constants import normalize_log_keys
+
+logger = logging.getLogger(__name__)
+
+
+# Lazy config loader to avoid circular dependency
+def load_config():
+    from src.guardrails.prompt_filter import load_config as pf_load_config
+    return pf_load_config()
 
 
 class LogTemplateMiner:
     """
-    Thuật toán nén log theo kiểu Drain3 (simplified).
-    GOM NHÓM các dòng log có cùng cấu trúc → 1 Template + frequency + samples.
-
-    Ví dụ:
-      Input:  5,000 dòng "GET /login.php?user=admin", "GET /login.php?user=root"
-      Output: Template "GET /login.php?user=<VAR>" (Count: 5000)
-              Samples: ["GET /login.php?user=admin",
-                        "GET /login.php?user=root",
-                        "GET /login.php?user=' OR 1=1--"]  ← GIỮ NGUYÊN variables
-
-    SAMPLES CHỨA NỘI DUNG GỐC (bao gồm cả payload tấn công).
-    Đây là BY DESIGN — LLM cần thấy payload để phân tích.
-    Prompt Injection defense xảy ra ở tầng SAU (Encapsulation).
+    Thuật toán nén log sử dụng thư viện Drain3 chính thức từ IBM.
+    GOM NHÓM các dòng log có cùng cấu trúc tĩnh -> 1 Template + freq + samples.
     """
 
     def __init__(self, max_samples: int = 3):
-        self.templates = {}
+        config = load_config()
+        drain_config = config.get("guardrails", {}).get("drain3", {})
+        if not isinstance(drain_config, dict):
+            drain_config = {}
+
+        # Cấu hình TemplateMinerConfig từ config dict để tránh lỗi
+        # không tìm thấy drain3.ini
+        cfg = TemplateMinerConfig()
+        cfg.drain_depth = drain_config.get("depth", 4)
+        cfg.drain_sim_th = drain_config.get("similarity_threshold", 0.4)
+        cfg.drain_max_children = drain_config.get("max_clusters", 100)
+        cfg.drain_max_clusters = drain_config.get("max_clusters", 100)
+
+        # Cấu hình luật mặt nạ (Masking Instructions)
+        cfg.masking_instructions = [
+            MaskingInstruction(
+                pattern=r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}",
+                mask_with="IP"
+            ),
+            MaskingInstruction(pattern=r"^[a-f0-9]{8,}$", mask_with="HASH"),
+            MaskingInstruction(pattern=r"^\d+$", mask_with="NUM")
+        ]
+
+        self.miner = TemplateMiner(config=cfg)
         self.max_samples = max_samples
+        self.samples = {}       # cluster_id -> list of raw logs
+        self.time_ranges = {}   # cluster_id -> [min_time, max_time]
         self.total_logs_processed = 0
 
-    def _tokenize(self, log_str: str) -> list:
-        return log_str.split()
-
-    def _generalize(self, tokens: list) -> str:
+    @property
+    def templates(self) -> dict:
         """
-        Thay thế variables bằng typed placeholders.
-        Giữ lại structure gốc để gom nhóm.
+        Bảo toàn tính tương thích ngược (backward compatibility)
+        cho các unit test suite cũ.
+        Trả về dictionary map từ template_key đến thông tin chi tiết
+        của template đó.
         """
-        generalized = []
-        for token in tokens:
-            if re.match(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", token):
-                generalized.append("<IP>")
-            elif re.match(r"^[a-f0-9]{8,}$", token, re.IGNORECASE):
-                generalized.append("<HASH>")
-            elif re.match(r"^\d+(\.\d+)?$", token):
-                generalized.append("<NUM>")
-            elif re.search(r"\d", token):
-                generalized.append("<VAR>")
-            else:
-                generalized.append(token)
-        return " ".join(generalized)
+        res = {}
+        clusters = list(self.miner.drain.clusters)
+        for c in clusters:
+            cid = c.cluster_id
+            template_key = c.get_template()
+            default_tr = [float("inf"), float("-inf")]
+            res[template_key] = {
+                "template": template_key,
+                "count": c.size,
+                "samples": self.samples.get(cid, []),
+                "time_range": self.time_ranges.get(cid, default_tr),
+            }
+        return res
 
     def add_log(self, log_str: str, timestamp: Optional[float] = None):
-        """Thêm log vào bộ template. GIỮ NGUYÊN nội dung gốc trong samples."""
+        """Thêm log vào bộ template sử dụng drain3.add_log_message."""
         self.total_logs_processed += 1
-        tokens = self._tokenize(log_str)
-        template_key = self._generalize(tokens)
 
-        if template_key not in self.templates:
-            self.templates[template_key] = {
-                "template": template_key,
-                "count": 0,
-                "samples": [],  # Giữ log GỐC (bao gồm cả injection payload)
-                "time_range": [float("inf"), float("-inf")],
-            }
+        # Đưa log message vào Drain3
+        res = self.miner.add_log_message(log_str)
+        cluster_id = res["cluster_id"]
 
-        entry = self.templates[template_key]
-        entry["count"] += 1
+        # Giữ mẫu log gốc cho từng cluster
+        if cluster_id not in self.samples:
+            self.samples[cluster_id] = []
+        if len(self.samples[cluster_id]) < self.max_samples:
+            self.samples[cluster_id].append(log_str)
 
-        # Giữ max_samples log gốc — KHÔNG lọc nội dung
-        if len(entry["samples"]) < self.max_samples:
-            entry["samples"].append(log_str)
-
+        # Cập nhật time range
         if timestamp is not None:
-            entry["time_range"][0] = min(entry["time_range"][0], timestamp)
-            entry["time_range"][1] = max(entry["time_range"][1], timestamp)
+            if cluster_id not in self.time_ranges:
+                self.time_ranges[cluster_id] = [float("inf"), float("-inf")]
+            self.time_ranges[cluster_id][0] = min(
+                self.time_ranges[cluster_id][0], timestamp
+            )
+            self.time_ranges[cluster_id][1] = max(
+                self.time_ranges[cluster_id][1], timestamp
+            )
 
     def add_log_dict(self, log_entry: dict):
-        """Thêm log dạng dict từ Redis stream."""
+        """Thêm log dạng dict, chuẩn hóa keys trước khi trích xuất."""
+        normalized = normalize_log_keys(log_entry)
+
         key_fields = [
             "Source IP",
             "Destination Port",
@@ -107,13 +117,15 @@ class LogTemplateMiner:
             "Flow Duration",
         ]
         parts = [
-            f"{f}={log_entry.get(f)}"
+            f"{f}={normalized.get(f)}"
             for f in key_fields
-            if log_entry.get(f) is not None
+            if normalized.get(f) is not None
         ]
-        log_str = " ".join(parts) if parts else str(log_entry)
+        log_str = " ".join(parts) if parts else str(normalized)
 
-        timestamp = log_entry.get("Timestamp", log_entry.get("Flow Duration"))
+        timestamp = normalized.get(
+            "Timestamp", normalized.get("Flow Duration")
+        )
         try:
             timestamp = float(timestamp) if timestamp else None
         except (ValueError, TypeError):
@@ -121,21 +133,30 @@ class LogTemplateMiner:
         self.add_log(log_str, timestamp)
 
     def get_summary(self) -> list:
-        """Trả về templates sắp xếp theo frequency giảm dần."""
-        return sorted(self.templates.values(), key=lambda x: x["count"], reverse=True)
+        """Trả về danh sách templates sắp xếp theo size giảm dần."""
+        summary = []
+        clusters = list(self.miner.drain.clusters)
+
+        for c in clusters:
+            cid = c.cluster_id
+            default_tr = [float("inf"), float("-inf")]
+            summary.append({
+                "template": c.get_template(),
+                "count": c.size,
+                "samples": self.samples.get(cid, []),
+                "time_range": self.time_ranges.get(cid, default_tr),
+            })
+
+        return sorted(summary, key=lambda x: x["count"], reverse=True)
 
     def get_compression_ratio(self) -> float:
-        """Compression Ratio = total logs / template count."""
+        cluster_count = len(self.miner.drain.clusters)
         if self.total_logs_processed == 0:
             return 0.0
-        return self.total_logs_processed / max(len(self.templates), 1)
+        return self.total_logs_processed / max(cluster_count, 1)
 
     def format_for_llm(self) -> str:
-        """
-        Format output cho LLM. Samples GỐC được giữ nguyên.
-        Output này sẽ được chuyển qua DelimitedDataEncapsulator
-        trước khi đưa vào prompt.
-        """
+        """Format output cho LLM."""
         lines = []
         for i, tmpl in enumerate(self.get_summary(), 1):
             time_str = ""
@@ -152,28 +173,31 @@ class LogTemplateMiner:
                 lines.append(f"  Sample: {sample}")
         lines.append(
             f"\n[Stats] Total: {self.total_logs_processed} logs → "
-            f"{len(self.templates)} templates "
+            f"{len(self.miner.drain.clusters)} templates "
             f"(Compression: {self.get_compression_ratio():.0f}x)"
         )
         return "\n".join(lines)
 
     def reset(self):
         """Reset sau mỗi time window."""
-        self.templates.clear()
+        self.miner = TemplateMiner(config=self.miner.config)
+        self.samples.clear()
+        self.time_ranges.clear()
         self.total_logs_processed = 0
 
 
 class EntropyScorer:
     """
     Shannon Entropy scorer cho log strings.
-    Log chứa SQLi/XSS payload thường có entropy cao hơn traffic bình thường.
-
-    Dùng để UU TIÊN (prioritize) log nào cần giữ nguyên trong Token Budget,
-    KHÔNG dùng để "lọc" hay "bảo vệ" chống injection.
     """
 
-    def __init__(self, threshold: float = 4.5):
-        self.threshold = threshold
+    def __init__(self, threshold: Optional[float] = None):
+        if threshold is not None:
+            self.threshold = threshold
+        else:
+            config = load_config()
+            val = config.get("guardrails", {}).get("entropy_threshold", 4.5)
+            self.threshold = float(val) if isinstance(val, (int, float)) else 4.5
 
     @staticmethod
     def calculate(text: str) -> float:
@@ -181,7 +205,9 @@ class EntropyScorer:
             return 0.0
         freq = Counter(text)
         length = len(text)
-        return -sum((c / length) * math.log2(c / length) for c in freq.values())
+        return -sum(
+            (c / length) * math.log2(c / length) for c in freq.values()
+        )
 
     def is_high_entropy(self, log_str: str) -> bool:
         return self.calculate(log_str) > self.threshold
@@ -197,12 +223,7 @@ class EntropyScorer:
 
 class TokenBudgetManager:
     """
-    Quản lý ngân sách token. Cắt tỉa cho vừa Context Window.
-
-    Chiến lược ưu tiên khi vượt ngân sách:
-      1. HIGH-ENTROPY logs (giữ nguyên raw — khả năng chứa payload)
-      2. Top-K Templates theo frequency (cao = nguy hiểm/phổ biến nhất)
-      3. Truncate phần còn lại + ghi chú số patterns bị cắt
+    Quản lý ngân sách token.
     """
 
     def __init__(self, budget: int = 4000):
@@ -212,17 +233,17 @@ class TokenBudgetManager:
     def estimate_tokens(text: str) -> int:
         return len(text) // 4
 
-    def fit_to_budget(self, template_text: str, high_entropy_logs: Optional[list] = None) -> str:
-        """
-        Cắt tỉa cho vừa ngân sách.
-        Output sẽ được chuyển tiếp qua DelimitedDataEncapsulator.
-        """
+    def fit_to_budget(
+        self, template_text: str, high_entropy_logs: Optional[list] = None
+    ) -> str:
         output_lines = []
         current_tokens = 0
 
         # Priority 1: High-entropy logs (40% budget)
         if high_entropy_logs:
-            output_lines.append("--- HIGH-PRIORITY LOGS (anomalous entropy) ---")
+            output_lines.append(
+                "--- HIGH-PRIORITY LOGS (anomalous entropy) ---"
+            )
             for log in high_entropy_logs:
                 line = f"  {log}"
                 t = self.estimate_tokens(line)
@@ -241,5 +262,7 @@ class TokenBudgetManager:
             output_lines.append(line)
             current_tokens += t
 
-        output_lines.append(f"--- Token usage: ~{current_tokens}/{self.budget} ---")
+        output_lines.append(
+            f"--- Token usage: ~{current_tokens}/{self.budget} ---"
+        )
         return "\n".join(output_lines)

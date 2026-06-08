@@ -66,6 +66,10 @@ def handle_escalated_batch(batch):
         current_batch_logs=batch, current_batch_size=len(batch), narrative_summary=""
     )
 
+    # Reset LoopDetector trước mỗi lần chạy đồ thị
+    from src.guardrails import loop_detector
+    loop_detector.reset()
+
     try:
         final_state = agent_app.invoke(initial_state)
         logger.info("[MAIN] LangGraph execution completed.")

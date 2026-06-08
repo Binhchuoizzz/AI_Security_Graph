@@ -127,6 +127,8 @@ def run_zeroday_evaluation():
             )
             
             start_time = time.time()
+            from src.guardrails import loop_detector
+            loop_detector.reset()
             try:
                 final_state = agent_app.invoke(initial_state)
                 decisions = final_state.get("decisions", [])

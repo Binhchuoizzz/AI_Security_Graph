@@ -144,6 +144,9 @@ def run_ablation(limit=None):
                     current_batch_size=len(logs),
                     narrative_summary="",
                 )
+                # Reset LoopDetector trước mỗi lần chạy đồ thị
+                from src.guardrails import loop_detector
+                loop_detector.reset()
                 try:
                     final_state = agent_app.invoke(initial_state)
                     decisions = final_state.get("decisions", [])

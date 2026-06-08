@@ -25,6 +25,7 @@ from typing import Optional
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
 from src.rag.security import structural_sanitize, log_tokenizer
+from src.guardrails import RAGSanitizer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -81,6 +82,8 @@ class DualRetriever:
 
             self.cache = SemanticCache(max_size=500, ttl_seconds=1800)
             logger.info("SemanticCache enabled (max_size=500, TTL=1800s)")
+
+        self.rag_sanitizer = RAGSanitizer()
 
     def _load_indexes(self, source_key: str, index_name: str):
         """Load cả FAISS, BM25 và metadata từ disk."""
@@ -188,7 +191,7 @@ class DualRetriever:
             # --- TẦNG BẢO MẬT: LÀM SẠCH CÁC ĐOẠN DỮ LIỆU TRUY XUẤT ---
             # Ngăn chặn gián tiếp Prompt Injection từ KB nếu KB bị nhiễm,
             # hoặc đảm bảo format an toàn trước khi vào LLM.
-            safe_text = structural_sanitize(entry["text"])
+            safe_text = self.rag_sanitizer.sanitize_retrieve(entry["text"])
 
             candidates.append(
                 {
@@ -209,8 +212,13 @@ class DualRetriever:
             cached = self.cache.get(query_text)
             if cached["hit"]:
                 logger.debug("SemanticCache HIT")
-                result = cached["result"]
+                result = self.rag_sanitizer.sanitize_cache_entry(cached["result"])
                 result["cache_hit"] = True
+                # Tạo dựng lại combined_prompt từ các context đã được làm sạch
+                result["combined_prompt"] = self._build_combined_prompt(
+                    result.get("mitre_context", ""),
+                    result.get("nist_context", "")
+                )
                 return result
 
         # Thực hiện Hybrid Search trên cả 2 tập dữ liệu

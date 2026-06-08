@@ -2,8 +2,6 @@
 Tests for Long-Term Threat Memory Store (APT Detection + Organizational Context)
 """
 import pytest
-import os
-import tempfile
 from src.agent.threat_memory import ThreatMemoryStore
 
 
@@ -52,7 +50,7 @@ class TestIPReputation:
         # High risk
         for _ in range(5):
             memory_store.record_incident("10.0.0.2", "BLOCK_IP")
-        
+
         high_risk = memory_store.get_high_risk_ips(min_score=50.0)
         assert len(high_risk) >= 1
         assert high_risk[0]["ip"] == "10.0.0.2"
@@ -74,7 +72,9 @@ class TestOrganizationalContext:
         assert memory_store.is_known_entity("1.2.3.4") is None
 
     def test_remove_known_entity(self, memory_store):
-        memory_store.add_known_entity("pentest_ip", "192.168.50.10", "Pentest VM")
+        memory_store.add_known_entity(
+            "pentest_ip", "192.168.50.10", "Pentest VM"
+        )
         memory_store.remove_known_entity("192.168.50.10")
         assert memory_store.is_known_entity("192.168.50.10") is None
 
@@ -177,3 +177,32 @@ class TestReputationDecay:
         memory_store.record_incident("10.0.0.1", "BLOCK_IP")
         # Should not raise
         memory_store.decay_reputation(decay_rate=0.5, inactive_days=0)
+
+
+class TestMemoryPoisoningProtection:
+    """Test làm sạch dữ liệu đầu vào chống Memory Poisoning."""
+
+    def test_record_incident_sanitization(self, memory_store):
+        # Truyền payload XSS/HTML/Markdown
+        malicious_mitre = "T1110 <script>xss()</script> ![evil](http://evil.com)"
+        memory_store.record_incident("1.2.3.4", "ALERT", malicious_mitre)
+
+        rep = memory_store.get_ip_reputation("1.2.3.4")
+        assert rep is not None
+        assert "evil.com" not in rep["last_mitre_technique"]
+        assert "<script>" not in rep["last_mitre_technique"]
+        assert "[IMG_STRIPPED]" in rep["last_mitre_technique"]
+        assert "[SCRIPT_STRIPPED]" in rep["last_mitre_technique"]
+
+    def test_add_known_entity_sanitization(self, memory_store):
+        memory_store.add_known_entity(
+            "scanner <script>alert(1)</script>",
+            "10.0.0.1",
+            "Nessus Scanner ![leak](http://leak.com)"
+        )
+        entity = memory_store.is_known_entity("10.0.0.1")
+        assert entity is not None
+        assert "<script>" not in entity["entity_type"]
+        assert "leak.com" not in entity["description"]
+        assert "[IMG_STRIPPED]" in entity["description"]
+

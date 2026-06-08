@@ -64,7 +64,16 @@ def login_screen():
         if submit:
             clean_username = username.strip()
             clean_password = password.strip()
-            
+
+            # Xác thực định dạng tài khoản tránh chèn ký tự lạ (Input Injection Prevention)
+            import re
+            if not re.match(r"^[a-zA-Z0-9_]{1,30}$", clean_username):
+                st.error(
+                    "Tên đăng nhập không hợp lệ (chỉ chấp nhận chữ cái, "
+                    "chữ số và dấu gạch dưới, tối đa 30 ký tự)."
+                )
+                return
+
             # 1. Kiểm tra trạng thái khóa (lockout) từ cơ sở dữ liệu
             attempts, lockout_until = get_login_attempts(clean_username)
             if time.time() < lockout_until:

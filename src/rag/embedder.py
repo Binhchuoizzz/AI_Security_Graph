@@ -33,6 +33,7 @@ import sys
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
 from src.rag.security import log_tokenizer
+from src.guardrails import RAGSanitizer
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -80,10 +81,11 @@ def load_mitre_chunks() -> list[dict]:
             )
 
         chunk_text = "\n".join(text_parts)
+        sanitized_text = RAGSanitizer.sanitize_ingest(chunk_text)
 
         chunks.append(
             {
-                "text": chunk_text,
+                "text": sanitized_text,
                 "metadata": {
                     "source": "mitre_attack",
                     "id": tech["id"],
@@ -118,10 +120,11 @@ def load_nist_chunks_json() -> list[dict]:
             text_parts.append(f"Response Guidance: {ctrl['response_guidance']}")
 
         chunk_text = "\n".join(text_parts)
+        sanitized_text = RAGSanitizer.sanitize_ingest(chunk_text)
 
         chunks.append(
             {
-                "text": chunk_text,
+                "text": sanitized_text,
                 "metadata": {
                     "source": "nist_800_61r2",
                     "id": ctrl["control"],
@@ -257,9 +260,11 @@ def load_nist_chunks() -> list[dict]:
         else:
             phase = "General"
 
+        sanitized_text = RAGSanitizer.sanitize_ingest(chunk_text)
+
         chunks.append(
             {
-                "text": chunk_text,
+                "text": sanitized_text,
                 "metadata": {
                     "source": "nist_800_61r2",
                     "id": f"nist_{i:03d}",

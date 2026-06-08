@@ -1,0 +1,136 @@
+"""
+Guardrails: LLM Decision Validator (Action Enum, Anti-DoS Shield, Confidence Gate, Reasoning Sanitization)
+"""
+
+import logging
+import ipaddress
+from src.guardrails.output_sanitizer import output_sanitizer
+from src.guardrails.prompt_filter import load_config
+
+logger = logging.getLogger(__name__)
+
+
+class DecisionValidator:
+    """
+    Xác thực và chuẩn hóa quyết định của LLM trước khi thực thi.
+    Giảm cấp các hành động không hợp lệ hoặc có mức độ rủi ro tự từ chối dịch vụ (Self-DoS).
+    """
+
+    def __init__(self):
+        config = load_config()
+        self.trusted_subnets = config.get("guardrails", {}).get("trusted_internal_subnets", [
+            "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
+        ])
+        self.allowed_actions = ["BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "DROP"]
+
+    def validate_decision(self, decision: dict) -> dict:
+        """
+        Xác thực và giảm cấp hành động nếu vi phạm các chính sách an toàn.
+        """
+        validated = dict(decision)
+
+        # 1. Ép buộc Action Enum hợp lệ
+        action = validated.get("action", "AWAIT_HITL")
+        if action not in self.allowed_actions:
+            logger.warning(f"[DecisionValidator] Invalid action '{action}' overridden to AWAIT_HITL")
+            validated["action"] = "AWAIT_HITL"
+            action = "AWAIT_HITL"
+
+        # 2. Kiểm tra mức độ tin cậy (Confidence Gate)
+        try:
+            confidence = float(validated.get("confidence", 0.0))
+        except (ValueError, TypeError):
+            confidence = 0.0
+        validated["confidence"] = confidence
+
+        if action == "BLOCK_IP" and confidence < 0.5:
+            logger.warning(
+                f"[DecisionValidator] BLOCK_IP downgraded to AWAIT_HITL due to low confidence ({confidence})"
+            )
+            validated["action"] = "AWAIT_HITL"
+            action = "AWAIT_HITL"
+
+        # 3. Lá chắn chống tự chặn hạ tầng (Anti-DoS Shield)
+        target = str(validated.get("target", "UNKNOWN")).strip()
+        if action == "BLOCK_IP":
+            is_critical = False
+
+            # Hàm phụ trợ parse IP/CIDR linh hoạt chống bypass
+            def parse_ip_or_network(addr_str: str):
+                addr_str = addr_str.strip()
+                # Thử parse trực tiếp IPAddress
+                try:
+                    return ipaddress.ip_address(addr_str)
+                except ValueError:
+                    pass
+
+                # Thử parse trực tiếp IPNetwork (CIDR)
+                try:
+                    return ipaddress.ip_network(addr_str, strict=False)
+                except ValueError:
+                    pass
+
+                # Thử chuyển đổi định dạng Hex/Octal/Integer
+                try:
+                    # Hex address (0x...)
+                    if addr_str.lower().startswith("0x"):
+                        val = int(addr_str, 16)
+                        if 0 <= val <= 4294967295:
+                            return ipaddress.ip_address(val)
+                    # Octal address (bắt đầu bằng 0, dài > 1 và toàn số 0-7)
+                    elif (
+                        addr_str.startswith("0")
+                        and len(addr_str) > 1
+                        and all(c in "01234567" for c in addr_str)
+                    ):
+                        val = int(addr_str, 8)
+                        if 0 <= val <= 4294967295:
+                            return ipaddress.ip_address(val)
+                    # Integer address (Decimal)
+                    elif addr_str.isdigit():
+                        val = int(addr_str)
+                        if 0 <= val <= 4294967295:
+                            return ipaddress.ip_address(val)
+                except Exception:
+                    pass
+                return None
+
+            parsed_obj = parse_ip_or_network(target)
+
+            if parsed_obj:
+                for subnet_str in self.trusted_subnets:
+                    try:
+                        network = ipaddress.ip_network(subnet_str, strict=False)
+                        if isinstance(parsed_obj, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+                            if parsed_obj in network:
+                                is_critical = True
+                                break
+                        elif isinstance(parsed_obj, (ipaddress.IPv4Network, ipaddress.IPv6Network)):
+                            if parsed_obj.overlaps(network):
+                                is_critical = True
+                                break
+                    except ValueError:
+                        pass
+            else:
+                # Nếu không thể parse, kiểm tra chuỗi tĩnh thông dụng
+                if target.lower() in ["localhost", "127.0.0.1", "::1", "10.0.0.99"]:
+                    is_critical = True
+
+            if is_critical or target in ["127.0.0.1", "::1", "10.0.0.99", "localhost"]:
+                logger.warning(
+                    f"[DecisionValidator] BLOCK_IP on critical asset '{target}' "
+                    f"downgraded to ALERT"
+                )
+                validated["action"] = "ALERT"
+                action = "ALERT"
+
+        # 4. Làm sạch trường giải trình và thông tin (Reasoning Sanitization)
+        # Ngăn chặn các cuộc tấn công tiêm nhiễm hiển thị (XSS/SSRF qua UI)
+        if "reasoning" in validated:
+            validated["reasoning"] = output_sanitizer.sanitize(str(validated["reasoning"]))
+        if "mitre_technique" in validated:
+            validated["mitre_technique"] = output_sanitizer.sanitize(str(validated["mitre_technique"]))
+        if "nist_control" in validated:
+            validated["nist_control"] = output_sanitizer.sanitize(str(validated["nist_control"]))
+
+        return validated

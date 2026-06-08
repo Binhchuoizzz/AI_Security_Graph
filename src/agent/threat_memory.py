@@ -29,6 +29,7 @@ import os
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
+from src.guardrails.output_sanitizer import output_sanitizer
 
 logger = logging.getLogger(__name__)
 
@@ -136,6 +137,9 @@ class ThreatMemoryStore:
         Ghi nhận một sự cố liên quan đến IP.
         Tự động tăng reputation score dựa trên mức độ nghiêm trọng (severity).
         """
+        ip = output_sanitizer.sanitize(ip)
+        action = output_sanitizer.sanitize(action)
+        mitre_technique = output_sanitizer.sanitize(mitre_technique)
         now = datetime.now(timezone.utc).isoformat()
         score_delta = {
             "BLOCK_IP": 30.0,
@@ -231,6 +235,10 @@ class ThreatMemoryStore:
         entity_type: 'scanner', 'pentest_ip', 'admin_tool', 'scheduled_scan'
         entity_value: IP, tên máy chủ (hostname), hoặc tên công cụ (tool name)
         """
+        entity_type = output_sanitizer.sanitize(entity_type)
+        entity_value = output_sanitizer.sanitize(entity_value)
+        description = output_sanitizer.sanitize(description)
+        added_by = output_sanitizer.sanitize(added_by)
         now = datetime.now(timezone.utc).isoformat()
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -288,6 +296,12 @@ class ThreatMemoryStore:
                          apt_phase: Optional[str] = None, apt_day: Optional[int] = None,
                          label: str = "", timestamp: str = ""):
         """Ghi nhận một sự kiện đe dọa đơn lẻ để theo dõi chuỗi APT."""
+        src_ip = output_sanitizer.sanitize(src_ip)
+        dst_ip = output_sanitizer.sanitize(dst_ip)
+        if apt_phase:
+            apt_phase = output_sanitizer.sanitize(apt_phase)
+        label = output_sanitizer.sanitize(label)
+        timestamp = output_sanitizer.sanitize(timestamp)
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
@@ -387,6 +401,10 @@ class ThreatMemoryStore:
                              confidence: float, related_ips: str = "",
                              mitre_chain: str = ""):
         """Ghi nhận APT indicator cho correlation dài hạn."""
+        indicator_type = output_sanitizer.sanitize(indicator_type)
+        indicator_value = output_sanitizer.sanitize(indicator_value)
+        related_ips = output_sanitizer.sanitize(related_ips)
+        mitre_chain = output_sanitizer.sanitize(mitre_chain)
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()

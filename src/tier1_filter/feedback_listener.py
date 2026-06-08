@@ -28,6 +28,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Optional
 from filelock import FileLock
+from src.guardrails import FeedbackValidator
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
@@ -85,8 +86,22 @@ class FeedbackListener:
         Returns:
             dict chứa thông tin rule + status
         """
-        # Validate score: clamp [1, 100]
-        score = max(1, min(score, 100))
+        # Validate dynamic rule using FeedbackValidator
+        validator = FeedbackValidator()
+        is_valid, errors = validator.validate_rule(field, pattern, score)
+        if not is_valid:
+            logger.error(f"[Feedback] Rejected dynamic rule registration: {errors}")
+            return {
+                "status": "REJECTED",
+                "errors": errors,
+                "rule": {
+                    "field": field,
+                    "pattern": pattern,
+                    "score": score,
+                    "source": source,
+                    "reason": reason,
+                }
+            }
 
         new_rule = {
             "field": field,
@@ -207,6 +222,12 @@ class FeedbackListener:
 
     def add_to_whitelist(self, ip: str) -> bool:
         """Thêm một IP vào whitelist trong config (Dùng cho luồng phê duyệt Pentest/Internal)."""
+        validator = FeedbackValidator()
+        is_valid, errors = validator.validate_whitelist_ip(ip)
+        if not is_valid:
+            logger.error(f"[Feedback] Whitelist IP '{ip}' validation failed: {errors}")
+            return False
+
         try:
             with _lock:
                 with open(CONFIG_PATH, "r") as f:

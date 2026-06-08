@@ -1,27 +1,42 @@
 """
 Guardrails: State Monitor
-
-Giám sát trạng thái LangGraph State để đảm bảo:
-  1. Context Window không bị tràn (Overflow Protection).
-  2. Đồ thị không rơi vào vòng lặp vô hạn (Infinite Loop Detection).
-  3. Ghi log kiểm toán (Audit Trail) mọi quyết định của Agent.
 """
 
-import time
 import yaml
 import os
 import sqlite3
 import json
-from datetime import datetime
+import threading
+from datetime import datetime, timezone
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
 
+# Khóa luồng (thread lock) bảo vệ ghi DB đồng thời
+_db_lock = threading.Lock()
+
 
 def load_config():
-    with open(CONFIG_PATH, "r") as f:
-        return yaml.safe_load(f)
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH, "r") as f:
+                cfg = yaml.safe_load(f)
+                if cfg:
+                    return cfg
+    except Exception:
+        pass
+    return {
+        "llm": {
+            "max_context_tokens": 8192
+        },
+        "guardrails": {
+            "token_budget": 4000
+        },
+        "logging": {
+            "audit_db_path": "logs/audit_trail.db"
+        }
+    }
 
 
 class ContextOverflowGuard:
@@ -32,8 +47,12 @@ class ContextOverflowGuard:
 
     def __init__(self):
         config = load_config()
-        self.max_tokens = config["llm"]["max_context_tokens"]
-        self.log_budget = config["guardrails"]["token_budget"]
+        self.max_tokens = int(config.get("llm", {}).get(
+            "max_context_tokens", 8192
+        ))
+        self.log_budget = int(config.get("guardrails", {}).get(
+            "token_budget", 4000
+        ))
 
     def check(self, prompt_tokens: int, log_tokens: int) -> dict:
         total = prompt_tokens + log_tokens
@@ -65,7 +84,10 @@ class LoopDetector:
                 "node": node_name,
                 "visits": count,
                 "action": "FORCE_STOP",
-                "reason": f"Infinite loop detected: Node '{node_name}' visited {count} times",
+                "reason": (
+                    f"Infinite loop detected: Node '{node_name}' "
+                    f"visited {count} times"
+                ),
             }
         return {"node": node_name, "visits": count, "action": "CONTINUE"}
 
@@ -76,65 +98,83 @@ class LoopDetector:
 class AuditLogger:
     """
     Ghi lại toàn bộ quyết định của Agent vào SQLite DB (audit_trail.db).
-    Phục vụ cho việc truy vết (Forensics) và báo cáo Ablation Study.
     """
 
     def __init__(self):
         config = load_config()
-        self.db_path = config["logging"]["audit_db_path"]
+        self.db_path = str(config.get("logging", {}).get(
+            "audit_db_path", "logs/audit_trail.db"
+        ))
         self._init_db()
 
     def _init_db(self):
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audit_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                source_ip TEXT,
-                tier1_score INTEGER,
-                tier1_action TEXT,
-                guardrail_injected BOOLEAN,
-                agent_decision TEXT,
-                agent_reasoning TEXT,
-                mitre_technique TEXT,
-                nist_control TEXT,
-                hitl_approved BOOLEAN,
-                latency_ms REAL,
-                metadata TEXT
-            )
-        """)
-        conn.commit()
-        conn.close()
+        with _db_lock:
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+            conn = sqlite3.connect(self.db_path)
+            try:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS audit_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        event_type TEXT NOT NULL,
+                        source_ip TEXT,
+                        tier1_score INTEGER,
+                        tier1_action TEXT,
+                        guardrail_injected BOOLEAN,
+                        agent_decision TEXT,
+                        agent_reasoning TEXT,
+                        mitre_technique TEXT,
+                        nist_control TEXT,
+                        hitl_approved BOOLEAN,
+                        latency_ms REAL,
+                        metadata TEXT
+                    )
+                """)
+                conn.commit()
+            finally:
+                conn.close()
 
     def log_event(self, event: dict):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO audit_log (
-                timestamp, event_type, source_ip, tier1_score, tier1_action,
-                guardrail_injected, agent_decision, agent_reasoning,
-                mitre_technique, nist_control, hitl_approved, latency_ms, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                datetime.utcnow().isoformat(),
-                event.get("event_type", "UNKNOWN"),
-                event.get("source_ip"),
-                event.get("tier1_score"),
-                event.get("tier1_action"),
-                event.get("guardrail_injected", False),
-                event.get("agent_decision"),
-                event.get("agent_reasoning"),
-                event.get("mitre_technique"),
-                event.get("nist_control"),
-                event.get("hitl_approved"),
-                event.get("latency_ms"),
-                json.dumps(event.get("metadata", {})),
-            ),
-        )
-        conn.commit()
-        conn.close()
+        """
+        Ghi sự kiện vào audit trail DB có sử dụng thread lock và try/finally
+        để bảo đảm đóng kết nối chống rò rỉ (connection leaks).
+        """
+        with _db_lock:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO audit_log (
+                        timestamp, event_type, source_ip, tier1_score,
+                        tier1_action, guardrail_injected, agent_decision,
+                        agent_reasoning, mitre_technique, nist_control,
+                        hitl_approved, latency_ms, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        datetime.now(timezone.utc).isoformat(),
+                        event.get("event_type", "UNKNOWN"),
+                        event.get("source_ip"),
+                        event.get("tier1_score"),
+                        event.get("tier1_action"),
+                        event.get("guardrail_injected", False),
+                        event.get("agent_decision"),
+                        event.get("agent_reasoning"),
+                        event.get("mitre_technique"),
+                        event.get("nist_control"),
+                        event.get("hitl_approved"),
+                        event.get("latency_ms"),
+                        json.dumps(event.get("metadata", {})),
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+
+# Khởi tạo singletons
+loop_detector = LoopDetector()
+context_overflow_guard = ContextOverflowGuard()
+audit_logger = AuditLogger()
