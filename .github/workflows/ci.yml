@@ -52,7 +52,8 @@ jobs:
         
     - name: Build RAG indexes
       run: |
-        python -m src.rag.embedder
+        python -m src.rag.embedder > embedder_debug.log 2>&1 || (cat embedder_debug.log && exit 1)
+        cat embedder_debug.log
 
     - name: Run unit and integration tests
       env:
