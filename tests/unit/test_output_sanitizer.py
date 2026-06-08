@@ -77,18 +77,18 @@ class TestDataURIStripping:
 
 
 class TestSanitizeForDB:
-    """Test DB-safe sanitization."""
+    """Test DB-safe sanitization (using parameterized queries, no manual escaping)."""
 
-    def test_escapes_single_quotes(self, sanitizer):
+    def test_retains_single_quotes(self, sanitizer):
         text = "O'Malley's attack"
         result = sanitizer.sanitize_for_db(text)
-        assert "''" in result
+        assert "O'Malley's attack" in result
 
-    def test_strips_and_escapes_combined(self, sanitizer):
+    def test_strips_but_keeps_quotes(self, sanitizer):
         text = "![x](http://evil.com) and O'Brien"
         result = sanitizer.sanitize_for_db(text)
         assert "evil.com" not in result
-        assert "''" in result
+        assert "O'Brien" in result
 
 
 class TestStripCounter:

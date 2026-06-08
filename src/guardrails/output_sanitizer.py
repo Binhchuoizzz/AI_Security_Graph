@@ -146,14 +146,11 @@ class OutputSanitizer:
     def sanitize_for_db(self, text: str) -> str:
         """
         Sanitize text trước khi ghi vào SQLite.
-        Bổ sung manual escaping để tương thích với các test suites hiện tại.
+        SQLite dùng parameterized queries — không cần manual escape.
         """
         if not text:
             return text
-        clean = self.sanitize(text)
-        # Bổ sung escaping để đảm bảo backward compatibility với bộ test suite
-        clean = clean.replace("'", "''")
-        return clean
+        return self.sanitize(text)
 
     @property
     def last_strip_count(self) -> int:
