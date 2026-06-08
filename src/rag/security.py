@@ -59,7 +59,7 @@ KB_DIR = os.path.join(
 )
 
 
-def verify_document_integrity() -> dict:
+def verify_document_integrity(exclude_generated: bool = False) -> dict:
     """
     Kiểm tra SHA-256 hash của Knowledge Base files trước khi load.
     So sánh với checksums.sha256 đã được pre-computed.
@@ -88,6 +88,8 @@ def verify_document_integrity() -> dict:
 
     # Xác minh từng tệp
     for filename, expected_hash in expected_hashes.items():
+        if exclude_generated and "faiss_index/" in filename:
+            continue
         filepath = os.path.join(KB_DIR, filename)
         if not os.path.exists(filepath):
             results["verified"] = False

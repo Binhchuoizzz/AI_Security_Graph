@@ -50,6 +50,10 @@ jobs:
         pip install drain3==0.9.11 --no-deps
         pip install jsonpickle>=1.5.1
         
+    - name: Build RAG indexes
+      run: |
+        python -m src.rag.embedder
+
     - name: Run unit and integration tests
       env:
         REDIS_URL: redis://localhost:6379/0

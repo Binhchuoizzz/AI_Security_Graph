@@ -366,10 +366,43 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
     return index
 
 
+def update_checksums_file():
+    """Tự động tính toán lại SHA-256 cho toàn bộ tệp KB và index, ghi đè checksums.sha256."""
+    import hashlib
+    
+    files_to_hash = [
+        ("mitre_attack.json", MITRE_JSON),
+        ("nist_800_61r2.json", NIST_JSON),
+        ("faiss_index/mitre_attack.index", os.path.join(INDEX_DIR, "mitre_attack.index")),
+        ("faiss_index/mitre_attack_bm25.pkl", os.path.join(INDEX_DIR, "mitre_attack_bm25.pkl")),
+        ("faiss_index/mitre_attack_metadata.json", os.path.join(INDEX_DIR, "mitre_attack_metadata.json")),
+        ("faiss_index/nist_800_61r2.index", os.path.join(INDEX_DIR, "nist_800_61r2.index")),
+        ("faiss_index/nist_800_61r2_bm25.pkl", os.path.join(INDEX_DIR, "nist_800_61r2_bm25.pkl")),
+        ("faiss_index/nist_800_61r2_metadata.json", os.path.join(INDEX_DIR, "nist_800_61r2_metadata.json")),
+    ]
+    
+    checksum_lines = []
+    for rel_name, abs_path in files_to_hash:
+        if os.path.exists(abs_path):
+            sha256 = hashlib.sha256()
+            with open(abs_path, "rb") as f:
+                while True:
+                    chunk = f.read(8192)
+                    if not chunk:
+                        break
+                    sha256.update(chunk)
+            checksum_lines.append(f"{sha256.hexdigest()}  {rel_name}")
+            
+    checksums_path = os.path.join(KB_DIR, "checksums.sha256")
+    with open(checksums_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(checksum_lines) + "\n")
+    logger.info(f"Updated {checksums_path} with {len(checksum_lines)} file hashes.")
+
+
 def build_all_indexes():
     """Build cả 2 FAISS indexes: MITRE ATT&CK + NIST SP 800-61r2."""
     from src.rag.security import verify_document_integrity
-    integrity_result = verify_document_integrity()
+    integrity_result = verify_document_integrity(exclude_generated=True)
     if not integrity_result["verified"]:
         logger.critical(f"KB integrity check FAILED: {integrity_result['details']}")
         raise RuntimeError("Knowledge Base integrity violation detected")
@@ -395,6 +428,9 @@ def build_all_indexes():
     # NIST SP 800-61r2 (Khung ứng phó sự cố bảo mật)
     nist_chunks = load_nist_chunks()
     build_indexes(nist_chunks, "nist_800_61r2", model=shared_model)
+
+    # Cập nhật mã checksum cho các index và pickle file mới tạo
+    update_checksums_file()
 
     logger.info("=" * 60)
     logger.info(f"All indexes built successfully in: {INDEX_DIR}")
