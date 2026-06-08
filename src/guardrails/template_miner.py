@@ -39,8 +39,8 @@ class LogTemplateMiner:
         cfg = TemplateMinerConfig()
         cfg.drain_depth = drain_config.get("depth", 4)
         cfg.drain_sim_th = drain_config.get("similarity_threshold", 0.4)
-        cfg.drain_max_children = drain_config.get("max_clusters", 100)
-        cfg.drain_max_clusters = drain_config.get("max_clusters", 100)
+        cfg.drain_max_children = drain_config.get("max_children", 100)
+        cfg.drain_max_clusters = drain_config.get("max_clusters", 1000)
 
         # Cấu hình luật mặt nạ (Masking Instructions)
         cfg.masking_instructions = [

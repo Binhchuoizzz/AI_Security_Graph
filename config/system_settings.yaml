@@ -16,7 +16,8 @@ evaluation:
 guardrails:
   drain3:
     depth: 4
-    max_clusters: 100
+    max_children: 100
+    max_clusters: 1000
     max_samples_per_template: 3
     similarity_threshold: 0.4
   entropy_threshold: 4.5
