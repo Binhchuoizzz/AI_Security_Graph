@@ -22,12 +22,22 @@ import json
 import os
 import time
 import redis
+import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
 
+CONFIG_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "config", "system_settings.yaml"
+)
+try:
+    with open(CONFIG_PATH, "r") as f:
+        _config = yaml.safe_load(f)
+except Exception:
+    _config = {}
+
 # ── Cấu hình ─────────────────────────────────────────────────────────────────
-REDIS_URL           = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL           = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
 GROUND_TRUTH_FILE   = "experiments/ground_truth.json"
 BATCH_SIZE          = int(os.getenv("SIMULATE_BATCH_SIZE", "50"))
 BATCH_DELAY_SECONDS = float(os.getenv("SIMULATE_DELAY", "0.5"))

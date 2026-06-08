@@ -119,6 +119,7 @@ class SessionBaseline:
         window_seconds: int = 300,
         ttl_seconds: int = 600,
         max_profiles: int = 10000,
+        eviction_interval: int = 100,
     ):
         self.profiles: Dict[str, IPProfile] = defaultdict(
             lambda: {
@@ -133,13 +134,14 @@ class SessionBaseline:
         self.window_seconds = window_seconds
         self.ttl_seconds = ttl_seconds  # IP inactive > TTL → evict
         self.max_profiles = max_profiles
+        self.eviction_interval = eviction_interval
         self.global_avg_request_rate = 1.0
         self._update_counter = 0  # Đếm để trigger eviction định kỳ
 
     def _evict_stale_profiles(self):
         """
         Dọn dẹp IP profiles đã inactive vượt TTL.
-        Chạy mỗi 100 updates để không ảnh hưởng performance.
+        Chạy mỗi eviction_interval updates để không ảnh hưởng performance.
         Đây là cơ chế chống RAM OOM khi xử lý dataset lớn.
         """
         now = time.time()
@@ -173,9 +175,9 @@ class SessionBaseline:
                     if ip_to_evict in self.profiles:
                         del self.profiles[ip_to_evict]
 
-        # Eviction check mỗi 100 updates
+        # Eviction check mỗi eviction_interval updates
         self._update_counter += 1
-        if self._update_counter % 100 == 0:
+        if self._update_counter % self.eviction_interval == 0:
             self._evict_stale_profiles()
 
         profile = self.profiles[source_ip]
@@ -290,8 +292,18 @@ class RuleEngine:
         self.session_baseline = SessionBaseline(
             deviation_threshold=baseline_config.get("deviation_threshold", 2.0),
             window_seconds=baseline_config.get("window_seconds", 300),
+            ttl_seconds=baseline_config.get("ttl_seconds", 600),
             max_profiles=baseline_config.get("max_profiles", 10000),
+            eviction_interval=baseline_config.get("eviction_interval", 100),
         )
+
+        # Compile prompt injection & jailbreak patterns từ config
+        self.config = config
+        guardrails_config = config.get("guardrails", {})
+        injection_pats = guardrails_config.get("injection_patterns", [])
+        jailbreak_pats = guardrails_config.get("jailbreak_patterns", [])
+        self.injection_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in injection_pats]
+        self.jailbreak_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in jailbreak_pats]
 
         # Unsupervised Anomaly Detection (Zero-Day statistical profiling trên các core features có corr cao)
         self.global_stats: Dict[str, RunningStats] = {
@@ -339,6 +351,24 @@ class RuleEngine:
                         return f"WAF: Phát hiện {attack_type} trong '{field}'"
         return None
 
+    def _check_injection_signatures(self, log_entry: dict) -> Optional[str]:
+        """
+        Kiểm tra các mẫu Prompt Injection và Jailbreak từ config hệ thống ngay tại Tier-1.
+        """
+        target_fields = ["payload", "uri", "user_agent", "User-Agent", "headers", "message", "command", "process"]
+        for field in target_fields:
+            val = log_entry.get(field) or log_entry.get(field.lower())
+            if val and isinstance(val, str):
+                # 1. Prompt Injection Patterns
+                for pattern in self.injection_patterns:
+                    if pattern.search(val):
+                        return f"Prompt Injection Pattern: Phát hiện '{pattern.pattern}' trong '{field}'"
+                # 2. Jailbreak Patterns
+                for pattern in self.jailbreak_patterns:
+                    if pattern.search(val):
+                        return f"Jailbreak Pattern: Phát hiện '{pattern.pattern}' trong '{field}'"
+        return None
+
     def evaluate(self, log_entry: dict) -> dict:
         """
         Đánh giá log entry qua các tầng: Whitelist -> Static/Dynamic Rules -> Session Baseline -> Action.
@@ -380,6 +410,12 @@ class RuleEngine:
         if waf_reason:
             score += 50
             reasons.append(waf_reason)
+
+        # --- Tầng 0.2: Prompt Injection / Jailbreak Signature Check ---
+        injection_reason = self._check_injection_signatures(log_entry)
+        if injection_reason:
+            score += 50
+            reasons.append(injection_reason)
 
         # --- Tầng 0.5: Kiểm tra Unsupervised Statistical Anomaly ---
         self.total_processed_logs += 1
@@ -488,9 +524,13 @@ class RuleEngine:
 
             # Phát hiện tấn công web rõ ràng (SQLi/XSS/Command Inj) -> Chặn luôn để bảo vệ LLM
             has_waf_match = any("WAF:" in r for r in reasons)
+            has_injection_match = any("Prompt Injection Pattern:" in r or "Jailbreak Pattern:" in r for r in reasons)
 
             if has_waf_match:
                 log_entry["tier1_action"] = "BLOCK_IP"
+            elif has_injection_match:
+                # Prompt Injection / Jailbreak: gửi lên Tier-2 xử lý
+                log_entry["tier1_action"] = "ESCALATE"
             elif dest_port_val in self.sensitive_ports and fwd_pkts_val < 200:
                 # BruteForce: port nhạy cảm, packet count trung bình → block IP
                 log_entry["tier1_action"] = "BLOCK_IP"
@@ -529,3 +569,19 @@ class RuleEngine:
         
         all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
+
+        # Hot-reload injection & jailbreak patterns
+        self.config = config
+        guardrails_config = config.get("guardrails", {})
+        injection_pats = guardrails_config.get("injection_patterns", [])
+        jailbreak_pats = guardrails_config.get("jailbreak_patterns", [])
+        self.injection_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in injection_pats]
+        self.jailbreak_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in jailbreak_pats]
+
+        # Hot-reload SessionBaseline parameters without wiping profiles cache
+        baseline_config = tier1_config.get("session_baseline", {})
+        self.session_baseline.deviation_threshold = baseline_config.get("deviation_threshold", self.session_baseline.deviation_threshold)
+        self.session_baseline.window_seconds = baseline_config.get("window_seconds", self.session_baseline.window_seconds)
+        self.session_baseline.ttl_seconds = baseline_config.get("ttl_seconds", self.session_baseline.ttl_seconds)
+        self.session_baseline.max_profiles = baseline_config.get("max_profiles", self.session_baseline.max_profiles)
+        self.session_baseline.eviction_interval = baseline_config.get("eviction_interval", self.session_baseline.eviction_interval)

@@ -117,12 +117,13 @@ def stream_logs_to_redis(csv_path: str):
         for chunk_idx, chunk in enumerate(pd.read_csv(csv_path, chunksize=500)):
             # Kiểm soát nghẽn: Kiểm tra kích thước hàng đợi trước khi xử lý chunk để tránh gọi Redis ở mỗi dòng
             wait_count = 0
-            while r.xlen(QUEUE_NAME) > MAX_QUEUE_SIZE:  # type: ignore
+            backpressure_threshold = int(MAX_QUEUE_SIZE * 0.9)
+            while r.xlen(QUEUE_NAME) > backpressure_threshold:  # type: ignore
                 time.sleep(0.1)
                 wait_count += 1
                 if wait_count % 100 == 0:  # Mỗi 10 giây (100 * 0.1s)
                     print(
-                        f"[!] Backpressure: stream={r.xlen(QUEUE_NAME)} exceeds threshold {MAX_QUEUE_SIZE}. Consumer offline or slow?"
+                        f"[!] Backpressure: stream={r.xlen(QUEUE_NAME)} exceeds threshold {backpressure_threshold}. Consumer offline or slow?"
                     )
 
             for index, row in chunk.iterrows():
