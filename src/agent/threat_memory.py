@@ -352,18 +352,19 @@ class ThreatMemoryStore:
             return 0
 
         count = 0
-        for line in open(chains_path):
-            chain = json.loads(line)
-            for event in chain.get("events", []):
-                self.record_apt_event(
-                    src_ip=event.get("src_ip", chain["attacker_ip"]),
-                    dst_ip=event.get("dst_ip", ""),
-                    apt_phase=event.get("phase"),
-                    apt_day=event.get("day"),
-                    label=event.get("label", ""),
-                    timestamp=event.get("timestamp", ""),
-                )
-                count += 1
+        with open(chains_path, "r", encoding="utf-8") as f:
+            for line in f:
+                chain = json.loads(line)
+                for event in chain.get("events", []):
+                    self.record_apt_event(
+                        src_ip=event.get("src_ip", chain["attacker_ip"]),
+                        dst_ip=event.get("dst_ip", ""),
+                        apt_phase=event.get("phase"),
+                        apt_day=event.get("day"),
+                        label=event.get("label", ""),
+                        timestamp=event.get("timestamp", ""),
+                    )
+                    count += 1
 
         logger.info(f"[THREAT MEMORY] Ingested {count} DAPT2020 events")
         return count
