@@ -35,6 +35,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        lfs: true
     
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v5
@@ -52,19 +54,8 @@ jobs:
         pip install jsonpickle>=1.5.1
         
     - name: Build RAG indexes
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        python -m src.rag.embedder > embedder_debug.log 2>&1 || {
-          sudo apt-get update && sudo apt-get install -y jq
-          curl -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/Binhchuoizzz/AI_Security_Graph/issues \
-            -d "{\"title\":\"CI Debug Log\",\"body\":\"$(cat embedder_debug.log | jq -Rs .)\"}"
-          exit 1
-        }
-        cat embedder_debug.log
+        python -m src.rag.embedder
 
     - name: Run unit and integration tests
       env:
