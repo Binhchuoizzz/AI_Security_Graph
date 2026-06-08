@@ -368,6 +368,12 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
 def build_all_indexes():
     """Build cả 2 FAISS indexes: MITRE ATT&CK + NIST SP 800-61r2."""
+    from src.rag.security import verify_document_integrity
+    integrity_result = verify_document_integrity()
+    if not integrity_result["verified"]:
+        logger.critical(f"KB integrity check FAILED: {integrity_result['details']}")
+        raise RuntimeError("Knowledge Base integrity violation detected")
+
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError as e:

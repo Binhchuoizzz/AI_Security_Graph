@@ -48,6 +48,13 @@ class DualRetriever:
         top_k: int = DEFAULT_TOP_K,
         use_cache: bool = True,
     ):
+        # 1. Xác thực tính toàn vẹn của Knowledge Base trước khi load (Chống RAG Poisoning)
+        from src.rag.security import verify_document_integrity
+        integrity_result = verify_document_integrity()
+        if not integrity_result["verified"]:
+            logger.critical(f"KB integrity check FAILED: {integrity_result['details']}")
+            raise RuntimeError("Knowledge Base integrity violation detected")
+
         try:
             from sentence_transformers import SentenceTransformer
             import faiss
@@ -193,9 +200,14 @@ class DualRetriever:
             # hoặc đảm bảo format an toàn trước khi vào LLM.
             safe_text = self.rag_sanitizer.sanitize_retrieve(entry["text"])
 
+            # Gắn nhãn provenance xác thực nguồn gốc tài liệu
+            from src.rag.security import add_provenance
+            provenance_file = "mitre_attack.json" if source_key == "mitre" else "nist_800_61r2.json"
+            provenance_text = add_provenance(safe_text, provenance_file, idx)
+
             candidates.append(
                 {
-                    "text": safe_text,
+                    "text": provenance_text,
                     "rrf_score": rrf_scores[idx],
                     "source": source_key,
                     "id": entry.get("id", ""),

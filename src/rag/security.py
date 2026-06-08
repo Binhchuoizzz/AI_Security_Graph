@@ -20,26 +20,12 @@ import unicodedata
 def structural_sanitize(text: str, max_length: int = 1500) -> str:
     """
     Sanitize text chunks trước khi đưa vào LLM Context.
+    Ủy quyền cho RAGSanitizer.sanitize_ingest để đảm bảo tính đồng nhất
+    và độ phủ bảo mật cao nhất (loại bỏ HTML/JS tags, Markdown images/links).
     """
-    if not text:
-        return ""
+    from src.guardrails.rag_sanitizer import RAGSanitizer
+    return RAGSanitizer.sanitize_ingest(text, max_length)
 
-    # 1. Normalize Unicode (chống Unicode homoglyph attacks)
-    text = unicodedata.normalize("NFKC", text)
-
-    # 2. Xóa các ký tự điều khiển (control characters) và tàng hình
-    # Giữ lại \n, \t, \r
-    text = re.sub(
-        r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202f\u2060-\u206f]",
-        "",
-        text,
-    )
-
-    # 3. Truncate (chặn buffer overflow / context window exhaustion)
-    if len(text) > max_length:
-        text = text[:max_length] + "... [TRUNCATED FOR SECURITY]"
-
-    return text
 
 
 def log_tokenizer(text: str) -> list[str]:
