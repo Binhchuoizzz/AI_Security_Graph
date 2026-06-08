@@ -124,9 +124,9 @@ Tài liệu này tổng hợp toàn bộ **52 tệp tin mã nguồn** trong hệ
 ## **NGÀY 3: TẦNG TRUY XUẤT TRI THỨC KÉP (DUAL-RAG SUBMODULE)**
 
 ### 22. `src/rag/embedder.py`
-*   **Mục đích:** Xây dựng và quản lý mô hình Vector Embeddings.
-*   **Tác dụng:** Tải mô hình `all-MiniLM-L6-v2`, chuyển đổi các tài liệu văn bản MITRE ATT&CK và NIST thành các vector 384 chiều và lưu trữ vào chỉ mục FAISS.
-*   **Mối quan hệ:** Được gọi bởi `scripts/build_rag_indexes.py` để khởi tạo chỉ mục.
+*   **Mục đích:** Xây dựng và quản lý mô hình Vector Embeddings và cập nhật checksum.
+*   **Tác dụng:** Tải mô hình `all-MiniLM-L6-v2`, chuyển đổi các tài liệu văn bản MITRE ATT&CK và NIST thành các vector 384 chiều, lưu trữ vào chỉ mục FAISS. Đồng thời, tự động tính toán lại SHA-256 cho toàn bộ tệp KB và index thông qua hàm `update_checksums_file()` để cập nhật vào `checksums.sha256`, tích hợp `verify_document_integrity(exclude_generated=True)` ở đầu tiến trình build index.
+*   **Mối quan hệ:** Được gọi bởi `scripts/build_rag_indexes.py` và chạy trên CI Pipeline để khởi tạo chỉ mục.
 
 ### 23. `scripts/build_rag_indexes.py`
 *   **Mục đích:** Khởi tạo cơ sở dữ liệu tri thức tĩnh ngoại tuyến.
@@ -147,8 +147,8 @@ Tài liệu này tổng hợp toàn bộ **52 tệp tin mã nguồn** trong hệ
 
 ### 26. `src/rag/security.py`
 *   **Mục đích:** Kiểm soát tính toàn vẹn của tri thức RAG vật lý.
-*   **Tác dụng:** Tính toán và kiểm tra giá trị băm SHA-256 của các tệp tri thức trên đĩa cứng trước khi tạo Vector Index, chống đòn tấn công thay đổi trực tiếp tệp tri thức RAG trên disk.
-*   **Mối quan hệ:** Gọi bởi `embedder.py` để kiểm chứng dữ liệu.
+*   **Tác dụng:** Tính toán và kiểm tra giá trị băm SHA-256 của các tệp tri thức trên đĩa cứng trước khi tạo Vector Index, chống đòn tấn công thay đổi trực tiếp tệp tri thức RAG trên disk. Hỗ trợ tham số `exclude_generated=True` để bỏ qua các file chỉ mục tự sinh trong giai đoạn build ban đầu.
+*   **Mối quan hệ:** Gọi bởi `embedder.py` và `retriever.py` để kiểm chứng dữ liệu.
 
 ### 27. `src/rag/graph_builder.py`
 *   **Mục đích:** Xây dựng đồ thị liên kết tri thức dạng Graph (nếu có mở rộng).
@@ -196,6 +196,7 @@ Tài liệu này tổng hợp toàn bộ **52 tệp tin mã nguồn** trong hệ
 *   **Mục đích:** Quản lý uy tín IP dài hạn, chuỗi APT và chống Memory Poisoning.
 *   **Tác dụng:** 
     *   Kết nối DB SQLite, ghi nhận các kỹ thuật MITRE mà IP đã thực hiện; tự động quét và cắm cờ APT nguy cấp nếu một IP vi phạm liên quan đến $\ge 3$ giai đoạn MITRE khác nhau theo thời gian.
+    *   Tải cấu trúc DAPT chain sử dụng bộ quản lý ngữ cảnh `with open` đảm bảo an toàn tài nguyên.
     *   Tích hợp `output_sanitizer` để làm sạch trường kỹ thuật MITRE, mô tả thực thể trước khi ghi DB SQLite, chống đòn tấn công Long-term Threat Memory Poisoning.
 *   **Mối quan hệ:** Được gọi bởi `node_action_executor` ở `nodes.py` để ghi vết và gọi ở `node_rag_context` để nạp lịch sử.
 
@@ -225,7 +226,7 @@ Tài liệu này tổng hợp toàn bộ **52 tệp tin mã nguồn** trong hệ
 
 ### 39. `src/ui/auth.py`
 *   **Mục đích:** Cơ chế xác thực người dùng dựa trên phân quyền (RBAC) và chống Input Injection.
-*   **Tác dụng:** Quản lý mật khẩu bằng giải thuật băm NIST PBKDF2-HMAC-SHA256 và so sánh hăm bằng `hmac.compare_digest`. Đồng thời áp dụng regex `^[a-zA-Z0-9_]{1,30}$` thắt chặt dữ liệu đầu vào cho Username nhằm chống HITL Auth Input Injection.
+*   **Tác dụng:** Quản lý mật khẩu bằng giải thuật băm NIST PBKDF2-HMAC-SHA256 và so sánh hăm bằng `hmac.compare_digest`. Đồng thời áp dụng regex `^[a-zA-Z0-9_]{1,30}$` thắt chặt dữ liệu đầu vào cho Username nhằm chống HITL Auth Input Injection. Di chuyển các module `re` và `hmac` lên đầu file để tối ưu hóa hiệu năng và tránh reimport.
 *   **Mối quan hệ:** Tích hợp kiểm tra quyền truy cập của analyst (L1) và manager (L3) trên Dashboard.
 
 ### 40. `src/ui/style.css`
