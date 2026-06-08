@@ -14,6 +14,8 @@ import streamlit as st
 import hashlib
 import os
 import time
+import re
+import hmac
 from src.response.executor import get_login_attempts, increment_login_attempts, reset_login_attempts, lock_user
 
 # Chiến lược băm mật khẩu: PBKDF2-HMAC-SHA256 (Chuẩn NIST)
@@ -66,7 +68,6 @@ def login_screen():
             clean_password = password.strip()
 
             # Xác thực định dạng tài khoản tránh chèn ký tự lạ (Input Injection Prevention)
-            import re
             if not re.match(r"^[a-zA-Z0-9_]{1,30}$", clean_username):
                 st.error(
                     "Tên đăng nhập không hợp lệ (chỉ chấp nhận chữ cái, "
@@ -115,8 +116,6 @@ def _constant_time_compare(a: str, b: str) -> bool:
     So sánh chuỗi thời gian không đổi (Constant-time comparison) chống Timing Attack (CWE-208).
     Dùng hmac.compare_digest thay vì '==' để tránh rò rỉ thông tin qua thời gian xử lý.
     """
-    import hmac
-
     return hmac.compare_digest(a.encode(), b.encode())
 
 
