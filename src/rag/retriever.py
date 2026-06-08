@@ -24,7 +24,7 @@ from typing import Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
-from src.rag.security import structural_sanitize, log_tokenizer
+from src.rag.security import log_tokenizer
 from src.guardrails import RAGSanitizer
 
 logging.basicConfig(
