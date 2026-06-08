@@ -3,8 +3,11 @@ Guardrails: RAG Poisoning Sanitizer (Structural Sanitization & Instruction Neutr
 """
 
 import re
+import logging
 import unicodedata
 from src.guardrails.prompt_filter import load_config
+
+logger = logging.getLogger(__name__)
 
 
 class RAGSanitizer:
@@ -99,13 +102,27 @@ class RAGSanitizer:
 
         # 2. Phát hiện và trung hòa Prompt Injection patterns
         for pattern_re in self.injection_res:
-            clean = pattern_re.sub(
+            new_clean = pattern_re.sub(
                 "[POISONOUS_INSTRUCTION_NEUTRALIZED]", clean
             )
+            if new_clean != clean:
+                logger.warning(
+                    f"[RAG SANITIZER] Injection pattern neutralized: "
+                    f"{pattern_re.pattern}"
+                )
+            clean = new_clean
 
         # 3. Phát hiện và trung hòa Jailbreak patterns
         for pattern_re in self.jailbreak_res:
-            clean = pattern_re.sub("[POISONOUS_JAILBREAK_NEUTRALIZED]", clean)
+            new_clean = pattern_re.sub(
+                "[POISONOUS_JAILBREAK_NEUTRALIZED]", clean
+            )
+            if new_clean != clean:
+                logger.warning(
+                    f"[RAG SANITIZER] Jailbreak pattern neutralized: "
+                    f"{pattern_re.pattern}"
+                )
+            clean = new_clean
 
         return clean
 
