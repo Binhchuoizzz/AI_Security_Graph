@@ -10,7 +10,7 @@
 
 ## 📋 Mục lục
 
-1. [Tổng Quan Về 10 Kịch Bản Demo](#1-tổng-quan-về-10-kịch-bản-demo)
+1. [Tổng Quan Về 11 Kịch Bản Demo](#1-tổng-quan-về-11-kịch-bản-demo)
 2. [Thiết Lập Môi Trường (Environment Setup)](#2-thiết-lập-môi-trường-environment-setup)
 3. [DEMO 1: Khởi Động Hạ Tầng Docker](#3-demo-1-khởi-động-hạ-tầng-docker)
 4. [DEMO 2: E2E Validation (Kiểm Thử Đầy Đủ)](#4-demo-2-e2e-validation-kiểm-thử-đầy-đủ)
@@ -22,14 +22,15 @@
 10. [DEMO 8: Adversarial Robustness Evaluation](#10-demo-8-adversarial-robustness-evaluation)
 11. [DEMO 9: Ablation Study (Đánh Giá Đóng Góp Thành Phần)](#11-demo-9-ablation-study-đánh-giá-đóng-góp-thành-phần)
 12. [DEMO 10: APT Chain Detection (Threat Memory)](#12-demo-10-apt-chain-detection-threat-memory)
-13. [Bảng Port & Endpoint Tiêu Chuẩn](#13-bảng-port--endpoint-tiêu-chuẩn)
-14. [⚡ Cheat Sheet Lệnh Nhanh](#14-cheat-sheet-lệnh-nhanh)
+13. [DEMO 11: Zero-Day Threat Detection & Model Hot-Swap](#13-demo-11-zero-day-threat-detection--model-hot-swap)
+14. [Bảng Port & Endpoint Tiêu Chuẩn](#14-bảng-port--endpoint-tiêu-chuẩn)
+15. [⚡ Cheat Sheet Lệnh Nhanh](#15-cheat-sheet-lệnh-nhanh)
 
 ---
 
-## 1. Tổng Quan Về 10 Kịch Bản Demo
+## 1. Tổng Quan Về 11 Kịch Bản Demo
 
-Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tầng Nhận Thức)** kết hợp **Tác tử AI (Agentic AI)** để giải quyết vấn đề quá tải cảnh báo (Alert Fatigue) và tối ưu hóa phản ứng sự cố mạng. 10 kịch bản demo dưới đây được thiết kế nhằm chứng minh các luận điểm khoa học và tính thực tiễn của đề tài trước Hội đồng phản biện.
+Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tầng Nhận Thức)** kết hợp **Tác tử AI (Agentic AI)** để giải quyết vấn đề quá tải cảnh báo (Alert Fatigue) và tối ưu hóa phản ứng sự cố mạng. 11 kịch bản demo dưới đây được thiết kế nhằm chứng minh các luận điểm khoa học và tính thực tiễn của đề tài trước Hội đồng phản biện.
 
 | Demo # | Tên Kịch Bản Demo | Mục Tiêu & Ý Nghĩa Khoa Học | Công Việc Xử Lý Chính |
 | :--- | :--- | :--- | :--- |
@@ -43,6 +44,7 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 | **DEMO 8** | Adversarial Robustness | Kiểm định thực nghiệm độ bền bỉ của tầng bảo vệ (Guardrails) dưới 45 mẫu tấn công nghịch đảo tinh vi. | Đo đạc tỷ lệ Defeat Rate đối với các cuộc tấn công cấu trúc, mã hóa, và nhầm lẫn ngữ nghĩa. |
 | **DEMO 9** | Ablation Study | Chứng minh giá trị khoa học của từng thành phần trong kiến trúc đề xuất (Rule, LLM, RAG, Encapsulation). | Chạy 6 cấu hình hệ thống khác nhau, đo đạc độ chính xác/F1-score và log kết quả lên MLflow Server. |
 | **DEMO 10** | APT Chain Detection | Phát hiện tấn công chuỗi APT nhiều ngày bằng SQLite Threat Memory (Bộ nhớ ngắn hạn và dài hạn). | Liên kết các hành vi đơn lẻ diễn ra cách nhau nhiều ngày dựa trên các Tactics của MITRE ATT&CK. |
+| **DEMO 11** | Zero-Day & Hot-Swap | Chứng minh thực nghiệm năng lực phát hiện Zero-Day bằng thống kê Tier-1 và khả năng tráo đổi nóng mô hình AI làm trọng tài. | Chạy script switch_model, đánh giá Zero-Day outliers, và LLM-as-Judge Llama 3 chấm điểm Gemma 2. |
 
 ---
 
@@ -65,6 +67,21 @@ python3.10 -m venv .venv
 
 ```bash
 cp .env.example .env
+```
+
+### Bước 3: Cấu hình VS Code Python Interpreter (Tránh lỗi linter IDE)
+**Mục đích:** Đảm bảo VS Code nhận diện chính xác các thư viện cài đặt trong môi trường ảo `.venv` mà không bị báo đỏ lỗi import bên thứ ba (lỗi unresolved import của Pyright).
+**Xử lý:** Sentinel sử dụng đường dẫn tương đối trong tệp cấu hình `.vscode/settings.json`. Đảm bảo tệp này tồn tại với nội dung sau:
+```json
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}"
+  ],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoSearchPaths": false,
+  "python.terminal.useEnvFile": true
+}
 ```
 
 ---
@@ -110,6 +127,12 @@ curl http://localhost:5000/v1/models
 
 ### Mục đích
 Chứng minh tính chính xác trong logic phần mềm của cả 20 module trong dự án thông qua việc chạy bộ kiểm thử tích hợp (Integration Tests) tự động.
+
+### Khởi tạo RAG Index (Bắt buộc trước khi chạy)
+Trước khi chạy kiểm thử E2E hoặc triển khai, bắt buộc phải khởi tạo các vector chỉ mục FAISS & BM25 của RAG và tính toán checksum để tránh lỗi kiểm tra tính toàn vẹn tài liệu (RAG Document Checksum Auditor):
+```bash
+.venv/bin/python src/rag/embedder.py
+```
 
 ### Lệnh thực thi
 
@@ -368,8 +391,8 @@ Mở trình duyệt web và truy cập: `http://localhost:8501`
 
 | Tài Khoản | Mật Khẩu | Vai Trò (Role) | Quyền Hạn Kỹ Thuật |
 | :--- | :--- | :--- | :--- |
-| `analyst` | `Hanoi123789@` | **L1 Analyst** | Xem màn hình giám sát, xem danh sách cảnh báo, xem Audit Trail. |
-| `manager` | `Hanoi123789@` | **L3 Manager** | Có toàn quyền: Phê duyệt/Từ chối các Rule chặn IP do Agent đề xuất, thêm IP vào Whitelist. |
+| `analyst` | `HanoiAnalyst2026@` | **L1 Analyst** | Xem màn hình giám sát, xem danh sách cảnh báo, xem Audit Trail. |
+| `manager` | `HanoiManager2026@` | **L3 Manager** | Có toàn quyền: Phê duyệt/Từ chối các Rule chặn IP do Agent đề xuất, thêm IP vào Whitelist. |
 
 ### Các bước trình diễn demo trước Hội đồng
 1.  Đăng nhập bằng tài khoản `analyst`: Chỉ ra cho hội đồng các cảnh báo đang đổ về thời gian thực (Real-time Alert Queue).
@@ -485,46 +508,6 @@ exit()
 ### Chi tiết xử lý
 *   **ThreatMemoryStore**: Sử dụng SQLite lưu trữ trạng thái lịch sử của từng IP.
 *   **APT Chain Linking**: Khi nhận một sự kiện mạng mới, thay vì đánh giá nó độc lập, bộ nhớ Threat Memory sẽ tìm kiếm lịch sử hoạt động của IP nguồn. Nếu phát hiện các hành vi tương ứng với các giai đoạn tiến trình của MITRE ATT&CK Matrix (ví dụ: Reconnaissance -> Initial Access -> Lateral Movement), hệ thống sẽ lập tức tăng mức cảnh báo lên nguy cấp (Critical Escalation).
-
----
-
-## 13. DEMO 11: Zero-Day Threat Detection & Model Hot-Swap
-
-### Mục đích
-*   **Phát hiện Zero-day:** Chứng minh thực nghiệm năng lực phát hiện các vector tấn công mới (Signature-less / Zero-day) mà Rule Engine tĩnh (Config A) hoàn toàn bỏ sót nhưng hệ thống bắt được nhờ phân tích dị biệt thống kê (Tier-1 Unsupervised) và suy luận logic (Tier-2 AI Agent).
-*   **Hot-swap Model:** Switch nhanh model LLM cục bộ làm AI Trọng tài (Llama 3 8B) chấm điểm độc lập.
-
-### Lệnh thực thi
-
-**Bước 1: Chuyển đổi Model sang Llama 3 (Làm AI Trọng tài):**
-```bash
-./scripts/switch_model.sh llama
-```
-*   *Kết quả mong đợi:* Script tự sửa `.env`, khởi động lại container `sentinel_llm` nạp model `Meta-Llama-3-8B-Instruct-Q5_K_M.gguf` và thông báo ONLINE khi model load xong.
-
-**Bước 2: Chạy đánh giá chất lượng suy luận (LLM-as-Judge):**
-```bash
-.venv/bin/python experiments/evaluate_reasoning.py
-```
-*   *Kết quả mong đợi:* AI Trọng tài Llama 3 tự động chấm điểm khách quan F1/Answer Relevancy các câu trả lời của Agent Gemma 2 và đẩy metrics lên MLflow.
-
-**Bước 3: Khôi phục lại Model mặc định Gemma 2 (Agent):**
-```bash
-./scripts/switch_model.sh gemma
-```
-*   *Kết quả mong đợi:* Hệ thống tự động chuyển lại mô hình Gemma 2 9B.
-
-**Bước 4: Chạy thử nghiệm phát hiện Zero-day (Signature-less bypass):**
-```bash
-.venv/bin/python experiments/evaluate_zeroday.py
-```
-*   *Kết quả mong đợi:* 
-    *   Mô phỏng 2 kịch bản Zero-day qua cổng 80 (Outlier packets).
-    *   Rule Engine tĩnh trả về `DROP` (Bỏ sót).
-    *   SENTINEL Tier-1 tính Z-Score $> 3.5$, nâng cấp rủi ro lên tối đa (`Risk=125`) và `ESCALATE`.
-    *   Agent Tier-2 (Gemma 2) suy luận chuẩn xác và ra lệnh chặn đứng `BLOCK_IP` với độ tin cậy `0.95`.
-    *   Vá mạng thời gian thực: Dynamic Rule được lưu động để chặn IP từ tầng mạng.
-    *   Báo cáo thực nghiệm chi tiết xuất ra tại: [zeroday_evaluation_report.md](reports/zeroday_evaluation_report.md).
 
 ---
 

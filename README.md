@@ -197,7 +197,16 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-### 2. Initialize RAG Vectors
+**Note (VS Code Interpreter):** To avoid linter errors in VS Code (unresolved imports due to lack of virtual environment paths), configure your workspace settings in `.vscode/settings.json`:
+```json
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.analysis.extraPaths": ["${workspaceFolder}"]
+}
+```
+
+### 2. Initialize RAG Vectors & Checksums
+Before running tests or deploying, you must initialize the hybrid RAG indexes (FAISS and BM25) and calculate document integrity checksums to prevent validation integrity audit failures:
 ```bash
 python src/rag/embedder.py
 ```
