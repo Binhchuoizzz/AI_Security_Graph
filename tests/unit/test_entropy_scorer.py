@@ -4,7 +4,7 @@ Unit Test cho module EntropyScorer (src/guardrails/template_miner.py).
 Kiểm tra khả năng tính Shannon Entropy và phân loại log bất thường.
 """
 
-import pytest
+import pytest  # type: ignore
 from src.guardrails.template_miner import EntropyScorer
 
 

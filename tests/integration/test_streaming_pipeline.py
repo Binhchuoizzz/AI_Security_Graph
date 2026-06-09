@@ -6,7 +6,7 @@ Kiểm thử end-to-end luồng dữ liệu từ Redis queue tới Tier 1 filter
 import sys
 import os
 import json
-import pytest
+import pytest  # type: ignore
 import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

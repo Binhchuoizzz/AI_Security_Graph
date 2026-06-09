@@ -1,4 +1,4 @@
-import pytest
+import pytest  # type: ignore
 from src.rag.graph_builder import KnowledgeGraphBuilder
 
 def test_knowledge_graph_builder_initializes_without_crashing():

@@ -5,7 +5,7 @@ Kiểm thử 3 lớp bảo vệ: Pattern Detection, Encoding Neutralization, Dyn
 
 import sys
 import os
-import pytest
+import pytest  # type: ignore
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

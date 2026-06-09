@@ -4,7 +4,7 @@ Unit Tests: Tier 1 Rule Engine + Session Baselining
 
 import sys
 import os
-import pytest
+import pytest  # type: ignore
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

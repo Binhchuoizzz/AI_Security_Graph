@@ -1,4 +1,4 @@
-import pytest
+import pytest  # type: ignore
 from src.agent.state import SentinelState
 from src.agent.workflow import create_agent_workflow
 

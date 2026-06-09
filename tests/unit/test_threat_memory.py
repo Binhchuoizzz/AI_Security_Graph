@@ -1,7 +1,7 @@
 """
 Tests for Long-Term Threat Memory Store (APT Detection + Organizational Context)
 """
-import pytest
+import pytest  # type: ignore
 from src.agent.threat_memory import ThreatMemoryStore
 
 

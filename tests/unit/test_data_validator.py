@@ -4,7 +4,7 @@ Unit Test cho module DataValidator (src/guardrails/data_validator.py).
 Kiểm tra khả năng validate schema, ép kiểu và xử lý null/NaN.
 """
 
-import pytest
+import pytest  # type: ignore
 import math
 from src.guardrails.data_validator import DataValidator
 

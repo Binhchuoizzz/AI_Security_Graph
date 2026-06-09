@@ -1,7 +1,7 @@
 """
 Tests for Output Sanitizer (Data Exfiltration Defense — Attack Vector #04)
 """
-import pytest
+import pytest  # type: ignore
 from src.guardrails.output_sanitizer import OutputSanitizer
 
 

@@ -5,7 +5,7 @@ Kiểm tra toàn bộ luồng xử lý từ log đầu vào đến quyết đị
 không cần kết nối Redis hay LLM thực (dùng mock).
 """
 
-import pytest
+import pytest  # type: ignore
 import sys
 import os
 

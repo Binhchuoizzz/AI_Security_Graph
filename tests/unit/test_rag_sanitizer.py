@@ -2,7 +2,7 @@
 Unit Tests for RAGSanitizer
 """
 
-import pytest
+import pytest  # type: ignore
 from src.guardrails.rag_sanitizer import RAGSanitizer
 
 
