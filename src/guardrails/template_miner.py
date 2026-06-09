@@ -30,9 +30,14 @@ class LogTemplateMiner:
 
     def __init__(self, max_samples: int = 3):
         config = load_config()
-        drain_config = config.get("guardrails", {}).get("drain3", {})
+        guardrails_cfg = config.get("guardrails", {})
+        if not isinstance(guardrails_cfg, dict):
+            guardrails_cfg = {}
+        drain_config = guardrails_cfg.get("drain3", {})
         if not isinstance(drain_config, dict):
             drain_config = {}
+        max_samples_val = drain_config.get("max_samples_per_template", max_samples)
+        max_samples = int(max_samples_val) if isinstance(max_samples_val, (int, float, str)) else max_samples
 
         # Cấu hình TemplateMinerConfig từ config dict để tránh lỗi
         # không tìm thấy drain3.ini
@@ -227,7 +232,12 @@ class TokenBudgetManager:
     """
 
     def __init__(self, budget: int = 4000):
-        self.budget = budget
+        config = load_config()
+        guardrails_cfg = config.get("guardrails", {})
+        if not isinstance(guardrails_cfg, dict):
+            guardrails_cfg = {}
+        budget_val = guardrails_cfg.get("token_budget", budget)
+        self.budget = int(budget_val) if isinstance(budget_val, (int, float, str)) else budget
 
     @staticmethod
     def estimate_tokens(text: str) -> int:

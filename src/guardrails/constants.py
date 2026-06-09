@@ -16,6 +16,10 @@ KEY_ALIASES = {
     "flow_duration": "Flow Duration",
     "flow duration": "Flow Duration",
     "timestamp": "Timestamp",
+    "uri": "URI",
+    "user-agent": "User-Agent",
+    "user_agent": "User-Agent",
+    "user agent": "User-Agent",
 }
 
 

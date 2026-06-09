@@ -275,7 +275,7 @@ class DelimitedDataEncapsulator:
             "destination port", "dst_port", "destination_port",
             "protocol", "total fwd packets", "total backward packets", "flow duration",
             "label", "log_source", "timestamp",
-            "payload", "message", "uri", "user_agent", "method", "headers", "command", "process",
+            "payload", "message", "uri", "URI", "user_agent", "user-agent", "User-Agent", "method", "headers", "command", "process",
             "tier1_action", "tier1_score", "tier1_reasons"
         }
 
