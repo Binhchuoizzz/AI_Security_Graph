@@ -64,15 +64,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
     severity_level = "INFO"
     css_class = "severity-info"
     icon = "ℹ️"
-    
-    # Ước tính score từ chuỗi reason nếu không có trường score riêng biệt
-    score_val = 0
-    if "0." in confidence:
-        try:
-            score_val = int(float(confidence.replace("%","")) * 10)
-        except Exception:
-            pass
-            
+
     if action == "BLOCK_IP" or action == "QUARANTINE":
         severity_level = "CRITICAL"
         css_class = "severity-critical"

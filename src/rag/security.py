@@ -14,7 +14,6 @@ Giải pháp:
 """
 
 import re
-import unicodedata
 
 
 def structural_sanitize(text: str, max_length: int = 1500) -> str:

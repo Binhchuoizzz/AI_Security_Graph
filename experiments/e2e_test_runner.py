@@ -198,10 +198,12 @@ def test_08_encoding_neutralizer(r: TestResult):
     result = neutralizer.neutralize(log)
     # Giải mã URL
     assert "%27" not in result["uri"], "URL encoding not decoded"
-    # Ký tự đặc biệt HTML (HTML escape)
-    assert "<script>" not in result["user_agent"], "HTML not escaped"
-    assert "&lt;script&gt;" in result["user_agent"], "HTML escape incorrect"
-    r.passed("URL decode + HTML escape working correctly")
+    # Thẻ <script> bị STRIP (loại bỏ) — an toàn hơn HTML-escape:
+    # EncodingNeutralizer.neutralize_html_entities thay <script>...</script>
+    # bằng [SCRIPT_STRIPPED] thay vì escape thành &lt;script&gt;.
+    assert "<script>" not in result["user_agent"], "HTML script not stripped"
+    assert "[SCRIPT_STRIPPED]" in result["user_agent"], "HTML script not neutralized"
+    r.passed("URL decode + HTML script stripping working correctly")
 
 
 # ============================================================================

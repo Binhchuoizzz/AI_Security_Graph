@@ -70,7 +70,7 @@ class ActionValidator:
         """Làm sạch trường reason trước khi ghi cơ sở dữ liệu."""
         if cls.DANGEROUS_PATTERNS.search(reason):
             logger.warning(
-                f"[ACTION VALIDATOR] Dangerous pattern in reason field. Sanitizing."
+                "[ACTION VALIDATOR] Dangerous pattern in reason field. Sanitizing."
             )
             return re.sub(r'[;|&`$]', '', reason)
         return reason

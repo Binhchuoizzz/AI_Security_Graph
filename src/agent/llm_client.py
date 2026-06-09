@@ -44,7 +44,13 @@ API_KEY = os.getenv(
 # Tham số cấu hình cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận nhất quán (deterministic), ít ảo tưởng
-DEFAULT_MODEL = "gemma-2-9b-it-Q4_K_M.gguf"
+# Tên model đọc từ env LLM_MODEL_FILE (đồng bộ với model thực tế llama.cpp đang nạp
+# và tự khớp khi hot-swap qua scripts/switch_model.sh). llama.cpp bỏ qua tên này khi
+# chỉ nạp 1 model, nhưng giữ đồng bộ để chính xác và tương thích đa-model.
+DEFAULT_MODEL = os.getenv(
+    "LLM_MODEL_FILE",
+    _config.get("llm", {}).get("model", "gemma-2-9b-it-Q6_K.gguf"),
+)
 
 
 class LLMClient:
@@ -118,7 +124,7 @@ class LLMClient:
                 )
                 if retries == self.max_retries:
                     raise
-            except openai.RateLimitError as e:
+            except openai.RateLimitError:
                 logger.warning(
                     f"LLM Rate Limit (attempt {retries+1}/{self.max_retries}): Model is busy."
                 )

@@ -4,9 +4,6 @@ LangGraph StateGraph Workflow cho SENTINEL Agent
 Lắp ráp các Node thành một quy trình (Workflow) khép kín.
 """
 
-import sys
-import os
-
 try:
     from langgraph.graph import StateGraph, END  # type: ignore
     from langgraph.graph.state import CompiledStateGraph  # type: ignore

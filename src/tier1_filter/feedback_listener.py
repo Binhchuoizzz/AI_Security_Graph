@@ -22,7 +22,6 @@ Luồng hoạt động:
 
 import yaml  # type: ignore
 import os
-import json
 import logging
 import tempfile
 from datetime import datetime, timezone
@@ -46,6 +45,10 @@ def _save_config_atomically(config: dict):
     try:
         with open(fd, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+        # mkstemp tạo file mode 0600 -> os.replace giữ nguyên khiến container (user khác
+        # uid) KHÔNG đọc được config. Đặt 0644 để các tiến trình khác (Dashboard trong
+        # Docker, RuleEngine) vẫn đọc được dynamic_rules/whitelist sau khi Agent lưu rule.
+        os.chmod(temp_path, 0o644)
         os.replace(temp_path, CONFIG_PATH)
     except Exception as e:
         if os.path.exists(temp_path):

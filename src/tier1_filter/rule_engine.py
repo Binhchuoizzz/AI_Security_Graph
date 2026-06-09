@@ -13,14 +13,13 @@ TRIẾT LÝ THIẾT KẾ:
   → dynamic_rules được load tại khởi tạo và reload khi có notify
 """
 
-import json
 import yaml  # type: ignore
 import os
 import time
 import math
 import re
 from collections import defaultdict
-from typing import TypedDict, Optional, Set, Dict, List, Any
+from typing import TypedDict, Optional, Set, Dict
 
 class IPProfile(TypedDict):
     request_count: int

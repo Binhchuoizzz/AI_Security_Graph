@@ -40,7 +40,6 @@ fl = FeedbackListener()
 fl.receive_new_rule(field="Source IP", pattern="10.2.2.2", score=40, reason="Demo ESCALATE")
 fl.approve_rule(pattern="10.2.2.2", field="Source IP")  # Approve the rule so it becomes ACTIVE
 # Force reload
-import os, time
 engine2 = RuleEngine()  # fresh instance picks up new rule
 result_web = engine2.evaluate(web_log)
 print("4. Web Attack via Dynamic Rule (ESCALATE)")

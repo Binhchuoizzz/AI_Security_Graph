@@ -12,7 +12,7 @@ class KnowledgeGraphBuilder:
     def __init__(self):
         self.uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user = os.getenv("NEO4J_USER", "neo4j")
-        self.password = os.getenv("NEO4J_PASSWORD", "SentinelSecurePass2026!")
+        self.password = os.getenv("NEO4J_PASSWORD", "SentinelGraphPass2026!")
         self.driver = None
         
         try:
