@@ -7,9 +7,9 @@ import logging
 from collections import Counter
 from typing import Optional
 
-from drain3.template_miner_config import TemplateMinerConfig
-from drain3 import TemplateMiner
-from drain3.masking import MaskingInstruction
+from drain3.template_miner_config import TemplateMinerConfig  # type: ignore
+from drain3 import TemplateMiner  # type: ignore
+from drain3.masking import MaskingInstruction  # type: ignore
 
 from src.guardrails.constants import normalize_log_keys
 

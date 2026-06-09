@@ -10,10 +10,10 @@ import sys
 import json
 import time
 from typing import Any, cast
-import redis
-from dotenv import load_dotenv
+import redis  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 
-import yaml
+import yaml  # type: ignore
 
 load_dotenv()
 

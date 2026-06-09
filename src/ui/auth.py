@@ -10,7 +10,7 @@ THIẾT KẾ BẢO MẬT:
   - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ (plaintext).
 """
 
-import streamlit as st
+import streamlit as st  # type: ignore
 import hashlib
 import os
 import time

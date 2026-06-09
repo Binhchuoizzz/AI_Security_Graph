@@ -3,8 +3,8 @@ Các component giao diện dùng lại cho Streamlit Dashboard.
 NÂNG CẤP PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
 """
 
-import streamlit as st
-import pandas as pd
+import streamlit as st  # type: ignore
+import pandas as pd  # type: ignore
 import html as html_lib
 import re
 from datetime import datetime

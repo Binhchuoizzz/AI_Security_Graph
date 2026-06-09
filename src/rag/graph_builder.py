@@ -1,8 +1,8 @@
 import json
 import logging
 import os
-from neo4j import GraphDatabase
-from neo4j.exceptions import ServiceUnavailable
+from neo4j import GraphDatabase  # type: ignore
+from neo4j.exceptions import ServiceUnavailable  # type: ignore
 
 logger = logging.getLogger(__name__)
 

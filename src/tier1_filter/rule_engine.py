@@ -14,7 +14,7 @@ TRIẾT LÝ THIẾT KẾ:
 """
 
 import json
-import yaml
+import yaml  # type: ignore
 import os
 import time
 import math

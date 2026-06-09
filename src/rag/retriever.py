@@ -17,7 +17,7 @@ CÁCH DÙNG:
 import json
 import os
 import logging
-import numpy as np
+import numpy as np  # type: ignore
 import pickle
 import sys
 from typing import Optional
@@ -56,9 +56,9 @@ class DualRetriever:
             raise RuntimeError("Knowledge Base integrity violation detected")
 
         try:
-            from sentence_transformers import SentenceTransformer
-            import faiss
-            from rank_bm25 import BM25Okapi
+            from sentence_transformers import SentenceTransformer  # type: ignore
+            import faiss  # type: ignore
+            from rank_bm25 import BM25Okapi  # type: ignore
         except ImportError as e:
             logger.error(f"Missing dependency: {e}")
             raise

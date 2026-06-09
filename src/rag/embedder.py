@@ -25,7 +25,7 @@ MÔ HÌNH EMBEDDING:
 import json
 import os
 import logging
-import numpy as np
+import numpy as np  # type: ignore
 import pickle
 import sys
 
@@ -165,7 +165,7 @@ def load_nist_chunks() -> list[dict]:
         return load_nist_chunks_json()
 
     import re
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter  # type: ignore
 
     text = open(NIST_TXT_PATH, "r", encoding="utf-8", errors="ignore").read()
     original_len = len(text)
@@ -307,9 +307,9 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
       - Tệp siêu dữ liệu JSON: {index_name}_metadata.json
     """
     try:
-        from sentence_transformers import SentenceTransformer
-        import faiss
-        from rank_bm25 import BM25Okapi
+        from sentence_transformers import SentenceTransformer  # type: ignore
+        import faiss  # type: ignore
+        from rank_bm25 import BM25Okapi  # type: ignore
     except ImportError as e:
         logger.error(
             f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu rank_bm25"
@@ -408,7 +408,7 @@ def build_all_indexes():
         raise RuntimeError("Knowledge Base integrity violation detected")
 
     try:
-        from sentence_transformers import SentenceTransformer
+        from sentence_transformers import SentenceTransformer  # type: ignore
     except ImportError as e:
         logger.error(f"Missing dependency: {e}")
         raise

@@ -2,7 +2,7 @@
 Guardrails: State Monitor
 """
 
-import yaml
+import yaml  # type: ignore
 import os
 import sqlite3
 import json

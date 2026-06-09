@@ -65,7 +65,7 @@ def load_few_shot_feedback_context() -> str:
     REJECTED rules -> Mẫu cảnh báo sai (False Positive) bị con người từ chối.
     """
     import os
-    import yaml
+    import yaml  # type: ignore
     
     config_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"

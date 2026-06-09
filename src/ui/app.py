@@ -6,13 +6,13 @@ Khởi chạy bằng lệnh: streamlit run src/ui/app.py
 import sys
 import os
 import math
-import pandas as pd
+import pandas as pd  # type: ignore
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-import streamlit as st
+import streamlit as st  # type: ignore
 import time
-from streamlit_autorefresh import st_autorefresh
+from streamlit_autorefresh import st_autorefresh  # type: ignore
 
 from src.ui.auth import require_auth, logout
 from src.ui.components import render_alert_card, render_metrics_header, render_threat_intel_tables, render_apt_events_table, is_valid_ip
@@ -85,7 +85,7 @@ def main_dashboard():
             from src.response.executor import DB_PATH as AUDIT_DB
             from src.agent.threat_memory import MEMORY_DB_PATH as THREAT_DB
             import sqlite3
-            import yaml
+            import yaml  # type: ignore
             try:
                 # 1. Xóa audit_trail
                 with sqlite3.connect(AUDIT_DB) as conn:

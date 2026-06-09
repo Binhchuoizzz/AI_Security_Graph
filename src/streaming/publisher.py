@@ -1,14 +1,14 @@
-import redis
+import redis  # type: ignore
 import json
 import time
 import os
 import hashlib
 import random
-import numpy as np
-import pandas as pd
-from dotenv import load_dotenv
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 
-import yaml
+import yaml  # type: ignore
 
 load_dotenv()
 

@@ -14,7 +14,7 @@ import time
 import logging
 import argparse
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()  # Nạp các biến môi trường (Tăng cường bảo mật)
 

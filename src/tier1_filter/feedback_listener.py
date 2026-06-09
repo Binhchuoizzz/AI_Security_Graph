@@ -20,14 +20,14 @@ Luồng hoạt động:
 - Hiện tại các ACTIVE rules không có TTL (sống mãi mãi trong file cấu hình) nhằm phục vụ demo tính ổn định. Trong môi trường production thực tế, một eviction policy (LRU hoặc Fixed TTL 24h) phải được áp dụng để đảm bảo RuleEngine không bị tràn bộ nhớ.
 """
 
-import yaml
+import yaml  # type: ignore
 import os
 import json
 import logging
 import tempfile
 from datetime import datetime, timezone
 from typing import Optional
-from filelock import FileLock
+from filelock import FileLock  # type: ignore
 from src.guardrails import FeedbackValidator
 
 CONFIG_PATH = os.path.join(

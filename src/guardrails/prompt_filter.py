@@ -3,7 +3,7 @@ Guardrails: Phòng thủ Prompt Injection (Đóng gói dữ liệu phân vùng -
 """
 
 import re
-import yaml
+import yaml  # type: ignore
 import os
 import base64
 import secrets
