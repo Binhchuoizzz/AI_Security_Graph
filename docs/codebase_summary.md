@@ -1,6 +1,6 @@
 # Tài liệu Tổng kết Cấu trúc Mã nguồn & Lộ trình Học tập (SENTINEL V5)
 
-Tài liệu này tổng hợp toàn bộ **52 tệp tin mã nguồn** trong hệ thống SENTINEL, được phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Thứ tự lộ trình học tập 5 ngày** của học viên. Mỗi file đều được phân tích rõ: Mục đích, Tác dụng, và Mối quan hệ tương tác với các cấu phần khác.
+Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ thống SENTINEL, được phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Thứ tự lộ trình học tập 5 ngày** của học viên. Mỗi file đều được phân tích rõ: Mục đích, Tác dụng, và Mối quan hệ tương tác với các cấu phần khác.
 
 ---
 
@@ -205,10 +205,6 @@ Tài liệu này tổng hợp toàn bộ **52 tệp tin mã nguồn** trong hệ
 *   **Tác dụng:** Ghi nhận nhật ký audit trail vào SQLite kèm theo tính toán giá trị băm **HMAC SHA-256** móc xích dòng trước-dòng sau để chống giả mạo logs.
 *   **Mối quan hệ:** Được gọi bởi Node Action Executor ở `nodes.py` và Web UI để verify logs.
 
-### 36. `demo_apt.py`
-*   **Mục đích:** Demo luồng tấn công Kill-chain APT dài ngày.
-*   **Tác dụng:** Chạy liên tục chuỗi logs DAPT2020 để biểu diễn cơ chế SQLite tương quan liên kết nâng mức cảnh báo của IP lên Critical khi thấy lặp lại nhiều giai đoạn.
-*   **Mối quan hệ:** Gọi trực tiếp `src/agent/workflow.py` and `src/agent/threat_memory.py`.
 
 ---
 
