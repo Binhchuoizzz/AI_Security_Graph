@@ -10,7 +10,7 @@
 
 ## 📋 Mục lục
 
-1. [Tổng Quan Về 11 Kịch Bản Demo](#1-tổng-quan-về-11-kịch-bản-demo)
+1. [Tổng Quan Về 15 Kịch Bản Demo](#1-tổng-quan-về-15-kịch-bản-demo)
 2. [Thiết Lập Môi Trường (Environment Setup)](#2-thiết-lập-môi-trường-environment-setup)
 3. [DEMO 1: Khởi Động Hạ Tầng Docker](#3-demo-1-khởi-động-hạ-tầng-docker)
 4. [DEMO 2: E2E Validation (Kiểm Thử Đầy Đủ)](#4-demo-2-e2e-validation-kiểm-thử-đầy-đủ)
@@ -23,14 +23,18 @@
 11. [DEMO 9: Ablation Study (Đánh Giá Đóng Góp Thành Phần)](#11-demo-9-ablation-study-đánh-giá-đóng-góp-thành-phần)
 12. [DEMO 10: APT Chain Detection (Threat Memory)](#12-demo-10-apt-chain-detection-threat-memory)
 13. [DEMO 11: Zero-Day Threat Detection & Model Hot-Swap](#13-demo-11-zero-day-threat-detection--model-hot-swap)
-14. [Bảng Port & Endpoint Tiêu Chuẩn](#14-bảng-port--endpoint-tiêu-chuẩn)
-15. [⚡ Cheat Sheet Lệnh Nhanh](#15-cheat-sheet-lệnh-nhanh)
+14. [DEMO 12: Đo Đạc Độ Trễ Hệ Thống (Latency Baseline Benchmark)](#14-demo-12-đo-đạc-độ-trễ-hệ-thống-latency-baseline-benchmark)
+15. [DEMO 13: Kiểm Định Giả Thuyết Thống Kê (Statistical Hypothesis Testing)](#15-demo-13-kiểm-định-giả-thuyết-thống-kê-statistical-hypothesis-testing)
+16. [DEMO 14: Vẽ Đồ Thị Kết Quả Thực Nghiệm (Plotting Evaluation Graphs)](#16-demo-14-vẽ-đồ-thị-kết-quả-thực-nghiệm-plotting-evaluation-graphs)
+17. [DEMO 15: Tiền Xử Lý Dữ Liệu & Sinh Chuỗi APT (DAPT2020 Preprocessing)](#17-demo-15-tiền-xử-lý-dữ-liệu--sinh-chuỗi-apt-dapt2020-preprocessing)
+18. [Bảng Port & Endpoint Tiêu Chuẩn](#18-bảng-port--endpoint-tiêu-chuẩn)
+19. [⚡ Cheat Sheet Lệnh Nhanh](#19-cheat-sheet-lệnh-nhanh)
 
 ---
 
-## 1. Tổng Quan Về 11 Kịch Bản Demo
+## 1. Tổng Quan Về 15 Kịch Bản Demo
 
-Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tầng Nhận Thức)** kết hợp **Tác tử AI (Agentic AI)** để giải quyết vấn đề quá tải cảnh báo (Alert Fatigue) và tối ưu hóa phản ứng sự cố mạng. 11 kịch bản demo dưới đây được thiết kế nhằm chứng minh các luận điểm khoa học và tính thực tiễn của đề tài trước Hội đồng phản biện.
+Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tầng Nhận Thức)** kết hợp **Tác tử AI (Agentic AI)** để giải quyết vấn đề quá tải cảnh báo (Alert Fatigue) và tối ưu hóa phản ứng sự cố mạng. 15 kịch bản demo dưới đây được thiết kế nhằm chứng minh các luận điểm khoa học và tính thực tiễn của đề tài trước Hội đồng phản biện.
 
 | Demo # | Tên Kịch Bản Demo | Mục Tiêu & Ý Nghĩa Khoa Học | Công Việc Xử Lý Chính |
 | :--- | :--- | :--- | :--- |
@@ -45,6 +49,10 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 | **DEMO 9** | Ablation Study | Chứng minh giá trị khoa học của từng thành phần trong kiến trúc đề xuất (Rule, LLM, RAG, Encapsulation). | Chạy 6 cấu hình hệ thống khác nhau, đo đạc độ chính xác/F1-score và log kết quả lên MLflow Server. |
 | **DEMO 10** | APT Chain Detection | Phát hiện tấn công chuỗi APT nhiều ngày bằng SQLite Threat Memory (Bộ nhớ ngắn hạn và dài hạn). | Liên kết các hành vi đơn lẻ diễn ra cách nhau nhiều ngày dựa trên các Tactics của MITRE ATT&CK. |
 | **DEMO 11** | Zero-Day & Hot-Swap | Chứng minh thực nghiệm năng lực phát hiện Zero-Day bằng thống kê Tier-1 và khả năng tráo đổi nóng mô hình AI làm trọng tài. | Chạy script switch_model, đánh giá Zero-Day outliers, và LLM-as-Judge Llama 3 chấm điểm Gemma 2. |
+| **DEMO 12** | Đo Đạc Độ Trễ | Đánh giá so sánh trực quan hiệu năng giảm tải độ trễ của hệ thống Two-Tier so với chỉ dùng LLM. | Chạy 100 log mẫu, đo và xuất báo cáo độ trễ (P95, median, mean) chứng minh tỷ lệ giảm trễ ≥ 60%. |
+| **DEMO 13** | Kiểm Định Thống Kê | Khẳng định tính tin cậy của thực nghiệm bằng kiểm định giả thuyết McNemar và Mann-Whitney U. | Đánh giá độ khác biệt hiệu năng và độ trễ của Config A vs Config F có ý nghĩa thống kê ($p < 0.05$). |
+| **DEMO 14** | Vẽ Đồ Thị Thực Nghiệm | Trực quan hóa kết quả nghiên cứu khoa học để đưa trực tiếp vào báo cáo Luận văn Thạc sĩ. | Sinh biểu đồ cột so sánh F1-score/Accuracy của Ablation configurations và lưu trữ file ảnh tĩnh. |
+| **DEMO 15** | Tiền Xử Lý Dữ Liệu | Chuẩn bị dữ liệu chuỗi tấn công APT từ tập DAPT2020 thô và mô phỏng logs mạng CICIDS2018. | Chạy script xây dựng chuỗi sự kiện theo ngày để nạp vào bộ nhớ SQLite Threat Memory dài hạn. |
 
 ---
 
@@ -551,7 +559,128 @@ exit()
 
 ---
 
-## 14. Bảng Port & Endpoint Tiêu Chuẩn
+## 14. DEMO 12: Đo Đạc Độ Trễ Hệ Thống (Latency Baseline Benchmark)
+
+### Mục đích
+Đánh giá hiệu năng giảm tải độ trễ của hệ thống bằng cách so sánh trực tiếp cấu hình Two-Tier (có sự kết hợp của Rule Engine lọc nhiễu ở Tier 1) và LLM-only Baseline (mỗi log đều gọi trực tiếp LLM). Mục tiêu khoa học là chứng minh tỷ lệ giảm trễ $\ge 60\%$.
+
+### Lệnh thực thi
+```bash
+.venv/bin/python experiments/measure_latency_baseline.py
+```
+
+### Kết quả mong đợi trên Terminal
+Chương trình chạy 100 log mẫu, đo đạc và đưa ra bảng thống kê độ trễ chi tiết (Mean, Median, P95) cho cả hai trường hợp.
+```text
+Baseline (LLM-only):
+  Mean:   1200.0 ms
+  Median: 1150.0 ms
+  P95:    1850.0 ms
+
+Two-Tier (SENTINEL):
+  Mean:   120.0 ms
+  Median: 8.5 ms
+  P95:    450.0 ms
+
+Latency Reduction: 90.0%
+Target:            ≥ 60%
+Status:            ✅ PASS
+```
+Kết quả chi tiết được xuất ra tệp JSON tại `reports/latency_benchmark.json` và thực hiện kiểm định phi tham số Mann-Whitney U test tự động để xác nhận độ trễ giữa hai hệ thống là thực sự khác biệt đáng kể.
+
+---
+
+## 15. DEMO 13: Kiểm Định Giả Thuyết Thống Kê (Statistical Hypothesis Testing)
+
+### Mục đích
+Chứng minh sự khác biệt về mặt hiệu năng phân loại (Classification Accuracy) và hiệu năng độ trễ (Latency) giữa các cấu hình thử nghiệm là có ý nghĩa thống kê (Statistically Significant), khẳng định tính thuyết phục khoa học của thực nghiệm trước Hội đồng phản biện.
+*   **McNemar's Test**: So sánh trực tiếp chất lượng phân loại giữa Config A (chỉ dùng Rule) và Config F (SENTINEL đầy đủ) trên tập dữ liệu ground truth.
+*   **Mann-Whitney U Test**: Kiểm định sự khác biệt về phân phối độ trễ (Latency distribution) giữa hai Config.
+
+### Yêu cầu trước khi chạy
+Bắt buộc phải chạy Ablation Study trước để sinh dữ liệu kết quả:
+```bash
+.venv/bin/python experiments/run_ablation_study.py
+```
+
+### Lệnh thực thi
+```bash
+.venv/bin/python experiments/statistical_tests.py
+```
+
+### Kết quả mong đợi
+```text
+==================================================
+ STATISTICAL TESTS FOR ABLATION STUDY
+==================================================
+--- PERFORMANCE METRICS ---
+Config A (Rule-only): F1 = 0.7600 | Prec = 0.9500 | Rec = 0.6333
+Config F (Full Sent): F1 = 0.9667 | Prec = 0.9667 | Rec = 0.9667
+
+--- MCNEMAR'S TEST (Classification Difference) ---
+H0: Hieu nang 2 mo hinh la tuong duong nhau.
+P-value: 0.00012
+>> Ket luan: Su khac biet ve hieu nang la CO Y NGHIA THONG KE (p < 0.05).
+
+--- MANN-WHITNEY U TEST (Latency Difference) ---
+H0: Do tre phan phoi tuong dong giua 2 Config.
+P-value: 0.00000
+>> Ket luan: Su khac biet ve do tre la CO Y NGHIA THONG KE (p < 0.05).
+==================================================
+```
+
+---
+
+## 16. DEMO 14: Vẽ Đồ Thị Kết Quả Thực Nghiệm (Plotting Evaluation Graphs)
+
+### Mục đích
+Tự động vẽ và xuất các biểu đồ so sánh trực quan hiệu năng và độ trễ của 6 cấu hình Ablation Study (A-F) để chèn trực tiếp vào báo cáo Luận văn Thạc sĩ.
+
+### Yêu cầu trước khi chạy
+Bắt buộc phải chạy Ablation Study trước để sinh dữ liệu kết quả:
+```bash
+.venv/bin/python experiments/run_ablation_study.py
+```
+
+### Lệnh thực thi
+```bash
+.venv/bin/python experiments/plot_results.py
+```
+
+### Kết quả mong đợi
+Hệ thống sẽ tạo ra các biểu đồ so sánh F1-Score, Precision, Recall và Latency giữa 6 cấu hình thử nghiệm và lưu dưới dạng ảnh tĩnh tại thư mục `experiments/plots/` (ví dụ: `ablation_metrics_comparison.png`).
+
+---
+
+## 17. DEMO 15: Tiền Xử Lý Dữ Liệu & Sinh Chuỗi APT (DAPT2020 Preprocessing)
+
+### Mục đích
+Chuẩn bị dữ liệu chuỗi tấn công APT từ tập DAPT2020 thô và mô phỏng logs mạng từ CSE-CIC-IDS2018 phục vụ cho demo và thực nghiệm:
+*   **APT Chain Builder**: Đọc nhật ký thô của DAPT2020, trích xuất và liên kết các sự kiện đơn lẻ theo địa chỉ IP nguồn để tạo ra chuỗi sự kiện phân bố theo ngày (APT Day-by-Day chain), ghi lại tệp `data/processed/dapt2020_chains.jsonl` làm đầu vào cho bộ nhớ Threat Memory dài hạn (DEMO 10).
+*   **Mô phỏng logs mạng**: Tạo các log network flows độc hại và benign từ tập CICIDS2018.
+
+### Lệnh thực thi
+Tải dữ liệu thô (nếu chưa có):
+```bash
+./scripts/download_cicids2018.sh
+```
+
+Xây dựng chuỗi APT DAPT2020:
+```bash
+.venv/bin/python scripts/build_dapt_chains.py
+```
+
+Mô phỏng log luồng mạng thời gian thực:
+```bash
+.venv/bin/python scripts/simulate_traffic.py
+```
+
+### Kết quả mong đợi
+Các tệp dữ liệu được làm sạch và định dạng sẵn được lưu trữ tại `data/processed/` phục vụ trực tiếp cho các luồng Subscriber/Publisher và E2E tests.
+
+---
+
+## 18. Bảng Port & Endpoint Tiêu Chuẩn
 
 Dưới đây là các cổng dịch vụ và API mặc định được mở trên máy chủ localhost khi khởi chạy dự án SENTINEL:
 
@@ -567,7 +696,7 @@ Dưới đây là các cổng dịch vụ và API mặc định được mở tr
 
 ---
 
-## 15. Cheat Sheet Lệnh Nhanh
+## 19. Cheat Sheet Lệnh Nhanh
 
 Anh có thể in hoặc lưu lại bảng lệnh rút gọn này để copy-paste nhanh trong quá trình demo trực tiếp trước Hội đồng:
 
@@ -605,4 +734,16 @@ docker-compose up -d
 
 # 10. Tắt hạ tầng Docker
 docker-compose down
+
+# 11. Đo đạc độ trễ cơ sở (Latency Benchmark)
+.venv/bin/python experiments/measure_latency_baseline.py
+
+# 12. Chạy kiểm định giả thuyết thống kê (McNemar / Mann-Whitney U)
+.venv/bin/python experiments/statistical_tests.py
+
+# 13. Vẽ đồ thị thực nghiệm
+.venv/bin/python experiments/plot_results.py
+
+# 14. Xây dựng chuỗi sự kiện APT từ DAPT2020
+.venv/bin/python scripts/build_dapt_chains.py
 ```

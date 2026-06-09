@@ -1,7 +1,7 @@
 """
 Xác thực cho giao diện HITL Dashboard.
 Sử dụng st.session_state để mô phỏng 2 vai trò: L1_Analyst và L3_Manager.
-Mật khẩu được băm SHA-256 một chiều (Tương thích CWE-256).
+Mật khẩu được băm PBKDF2-HMAC-SHA256 (Tương thích CWE-916 & CWE-259).
 
 THIẾT KẾ BẢO MẬT:
   - Mật khẩu KHÔNG được ghi cứng (hardcode) trong mã nguồn.

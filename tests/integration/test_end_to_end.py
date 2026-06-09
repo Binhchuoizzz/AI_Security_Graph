@@ -88,11 +88,10 @@ class TestEndToEndGuardrails:
             "payload": "admin' OR 1=1--",
         }
         result = pipeline.process(malicious)
-        # Pipeline phải phát hiện pattern injection
+        # Pipeline phải phát hiện pattern injection hoặc jailbreak
         assert (
             result.get("injection_detected", False) is True
-            or result.get("pattern_matched", False) is True
-            or "<<<DATA_BEGIN_" in result.get("encapsulated_text", "")
+            or result.get("jailbreak_detected", False) is True
         )
 
 
