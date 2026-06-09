@@ -107,7 +107,7 @@
 \section*{Tóm tắt}
 Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đang phải đối mặt với một ``Nghịch lý Dữ liệu lớn'' nghiêm trọng: khối lượng khổng lồ các sự kiện mạng phát sinh mỗi giây dẫn đến tình trạng quá tải cảnh báo, với phần lớn trong số đó là dương tính giả. Các hệ thống Phát hiện Xâm nhập (IDS) và Quản lý Sự kiện An ninh (SIEM) truyền thống thường phân tích luồng dữ liệu một cách đơn lẻ, qua đó làm suy giảm đáng kể khả năng nhận diện các chiến dịch tấn công có chủ đích tinh vi (APT). Gần đây, việc ứng dụng trực tiếp các Mô hình Ngôn ngữ Lớn (LLM) vào việc phân tích log đã được thử nghiệm; tuy nhiên, hướng đi này lại mở ra hai lỗ hổng rủi ro lớn: độ trễ suy luận quá cao không thể đáp ứng được tốc độ của luồng dữ liệu thời gian thực, và nguy cơ hệ thống LLM bị thao túng bởi các đòn tấn công Prompt Injection ẩn giấu ngay bên trong dữ liệu log độc hại.
 
-Để giải quyết triệt để những thách thức này, nghiên cứu đề xuất một kiến trúc nhận thức (cognitive architecture) kết hợp giữa một Động cơ Quy tắc (Rule Engine) xác định và một Mô hình Ngôn ngữ Lớn. Thông qua phương pháp tiếp cận hai tầng, hệ thống được kỳ vọng sẽ sàng lọc lượng lớn nhiễu ở tốc độ cao (Tầng 1), đồng thời bảo lưu năng lực suy luận sâu --- được vận hành bởi AI Tác tử dựa trên LangGraph cùng cơ chế Dual-RAG (tích hợp MITRE ATT\&CK cho nhận diện mối đe dọa và NIST SP 800-61r2 cho hướng dẫn ứng phó sự cố) --- để xử lý các mối đe dọa phức tạp và khó đoán (Tầng 2). Bên cạnh đó, một cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) cũng được giới thiệu nhằm vô hiệu hóa các nỗ lực chèn mã độc vào prompt mà không làm mất đi thông tin payload quan trọng cần thiết cho việc điều tra sự cố.
+Để giải quyết triệt để những thách thức này, nghiên cứu đề xuất một kiến trúc nhận thức (cognitive architecture) kết hợp giữa một Động cơ Quy tắc (Rule Engine) xác định và một Mô hình Ngôn ngữ Lớn. Thông qua phương pháp tiếp cận hai tầng, hệ thống được kỳ vọng sẽ sàng lọc lượng lớn nhiễu ở tốc độ cao (Tầng 1), đồng thời bảo lưu năng lực suy luận sâu --- được vận hành bởi AI Tác tử dựa trên LangGraph cùng cơ chế Dual-RAG (tích hợp MITRE ATT\&CK cho nhận diện mối đe dọa và NIST SP 800-61r2 cho hướng dẫn ứng phó sự cố) --- để xử lý các mối đe dọa phức tạp và khó đoán (Tầng 2). Bên cạnh đó, các cơ chế an toàn nâng cao được triển khai bao gồm: Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) chống Prompt Injection, xác thực mã ký SHA-256 bảo vệ tính toàn vẹn của cơ sở tri thức tĩnh chống RAG Ingestion Poisoning, làm sạch cấu trúc ngữ cảnh để ngăn chặn đầu độc bộ nhớ đệm (Semantic Cache Poisoning), bảo mật biểu mẫu xác thực bằng Regex và thuật toán PBKDF2-HMAC-SHA256, cùng cơ chế ký HMAC chuỗi logs bảo vệ tính toàn vẹn của nhật ký kiểm toán.
 
 Hệ thống đề xuất sẽ được triển khai và đánh giá trên hai bộ dữ liệu chuẩn: CSE-CIC-IDS2018 cho phát hiện xâm nhập mạng doanh nghiệp và DAPT2020 cho theo dõi tấn công APT đa giai đoạn. Các tiêu chí đánh giá sẽ được cấu trúc theo Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework) toàn diện, bao quát Chỉ số Phân loại, Chỉ số Vận hành, Mức độ Kháng lỗi, Chất lượng Ngữ cảnh và Tính Giải thích.
 
@@ -528,22 +528,22 @@ return f"{delimiter}\n{raw_data}\n{delimiter}"
     \item[Vai trò bảo mật:] Phòng chống tấn công Delimiter Smuggling / Escape Injection.
 \end{description}
 
-\paragraph{Bước 13. Structural Sanitization}
+\paragraph{Bước 13. Structural Sanitization \& Cache Hardening}
 \begin{description}[noitemsep]
-    \item[Tên bước:] Structural Sanitization.
+    \item[Tên bước:] Structural Sanitization \& Cache Hardening.
     \item[Tầng:] Guardrail Layer (Output/Input Sanitizer).
-    \item[Mục đích:] Bảo vệ công cụ RAG khỏi nhiễu ngữ nghĩa (Semantic Confusion), giải mã các obfuscation của hacker, và cấm XSS/Markdown Exfiltration khi trả kết quả về UI.
-    \item[Công nghệ sử dụng:] Unicode Normalization (NFKC), Base64/Hex decoding, HTML/Markdown Sanitization.
-    \item[Cơ chế hoạt động:] Giải mã các payload Hex/Base64 độc hại. Loại bỏ ký tự zero-width, control characters. Quét và loại bỏ các thẻ HTML nguy hiểm và cú pháp hình ảnh Markdown (\verb|!alt|) để cấm LLM đẩy dữ liệu nhạy cảm ra ngoài qua render HTML.
+    \item[Mục đích:] Bảo vệ công cụ RAG khỏi nhiễu ngữ nghĩa (Semantic Confusion), giải mã các obfuscation của hacker, cấm XSS/Markdown Exfiltration khi hiển thị, và trung hòa các mã độc tiềm ẩn lấy ra từ Semantic Cache (Cache Hit path).
+    \item[Công nghệ sử dụng:] Unicode Normalization (NFKC), Base64/Hex decoding, HTML/Markdown Sanitization, RAG Cache Sanitizer.
+    \item[Cơ chế hoạt động:] Giải mã các payload Hex/Base64 độc hại, loại bỏ ký tự zero-width và control characters. Quét loại bỏ các thẻ HTML nguy hiểm và cú pháp hình ảnh Markdown (\verb|!alt|) để cấm LLM đẩy dữ liệu nhạy cảm ra ngoài qua render HTML. Đồng thời, khi đọc dữ liệu từ Semantic Cache, phương thức \verb|sanitize_cache_entry()| sẽ làm sạch đệ quy kết quả và ngữ cảnh để tránh đầu độc bộ nhớ đệm (Semantic Cache Poisoning).
     \item[Cấu trúc mã nguồn:] \quad
     \begin{itemize}[noitemsep]
-        \item File: \verb|src/guardrails/output_sanitizer.py|
-        \item Lớp: \verb|OutputSanitizer|
-        \item Function: \verb|sanitize()|, \verb|_decode_base64()|
-        \item Input: LLM Output / Log Input $\rightarrow$ Output: Sanitized String.
+        \item File: \verb|src/guardrails/rag_sanitizer.py| \& \verb|src/rag/retriever.py|
+        \item Lớp: \verb|RAGSanitizer|
+        \item Function: \verb|sanitize_ingest()|, \verb|sanitize_cache_entry()|
+        \item Input: LLM Output / Log Input / Cache Entry $\rightarrow$ Output: Sanitized String / Sanitized Cache Dict.
     \end{itemize}
-    \item[Luồng dữ liệu:] Raw text $\rightarrow$ Normalization $\rightarrow$ Decoding $\rightarrow$ Sanitized Output.
-    \item[Vai trò bảo mật:] Phòng chống RAG Poisoning, XSS, và rò rỉ dữ liệu qua giao diện quản trị (Data Exfiltration).
+    \item[Luồng dữ liệu:] Raw text / Cache Hit Data $\rightarrow$ Normalization $\rightarrow$ RAGSanitizer Filtering $\rightarrow$ Sanitized Context.
+    \item[Vai trò bảo mật:] Phòng chống RAG Poisoning, Semantic Cache Poisoning, XSS, và rò rỉ dữ liệu qua giao diện quản trị (Data Exfiltration).
 \end{description}
 
 \subsubsection{PHẦN 4: TIER 2 --- LANGGRAPH AGENT}
@@ -576,18 +576,18 @@ workflow.add_conditional_edges("llm_triage", route_triage_decision)
 \begin{description}[noitemsep]
     \item[Tên bước:] FAISS Index 1 \& 2 (MITRE ATT\&CK \& NIST SP 800-61r2).
     \item[Tầng:] Tier 2 LangGraph Agent (RAG Sub-module).
-    \item[Mục đích:] Cung cấp tri thức chuyên sâu về kỹ thuật tấn công (MITRE ATT\&CK) và quy trình ứng phó (NIST) dựa trên ngữ nghĩa của log mạng, ngăn chặn ảo giác (Hallucination) của LLM.
-    \item[Công nghệ sử dụng:] \verb|faiss-cpu|, mô hình embedding \verb|all-MiniLM-L6-v2| (384 chiều).
-    \item[Cơ chế hoạt động:] Tài liệu MITRE và NIST được lưu trữ dưới dạng vector 384 chiều trong 2 chỉ mục FAISS. Khi có truy vấn từ log, hệ thống mã hóa nó thành vector và tìm kiếm top-K văn bản có khoảng cách Euclidean nhỏ nhất.
+    \item[Mục đích:] Cung cấp tri thức chuyên sâu về kỹ thuật tấn công (MITRE ATT\&CK) và quy trình ứng phó (NIST) dựa trên ngữ nghĩa của log mạng, ngăn chặn ảo giác (Hallucination) của LLM và đảm bảo tính toàn vẹn của tri thức tĩnh.
+    \item[Công nghệ sử dụng:] \verb|faiss-cpu|, mô hình embedding \verb|all-MiniLM-L6-v2| (384 chiều), SHA-256 verification.
+    \item[Cơ chế hoạt động:] Tài liệu MITRE và NIST được lưu dưới dạng vector 384 chiều trong 2 chỉ mục FAISS. Khi có truy vấn từ log, hệ thống mã hóa nó thành vector và tìm kiếm top-K văn bản có khoảng cách Euclidean nhỏ nhất. Đặc biệt, trước khi nạp cơ sở tri thức, hàm \verb|verify_document_integrity()| trong \verb|security.py| tự động kiểm tra chữ ký mã băm SHA-256 của toàn bộ tệp tài liệu nguồn đối chiếu với tệp \verb|checksums.sha256| để phát hiện và ngăn chặn triệt để hành vi can thiệp trái phép.
     \item[Cấu trúc mã nguồn:] \quad
     \begin{itemize}[noitemsep]
-        \item File: \verb|src/rag/embedder.py| \& \verb|src/rag/retriever.py|
+        \item File: \verb|src/rag/embedder.py| \& \verb|src/rag/retriever.py| \& \verb|src/rag/security.py|
         \item Class: \verb|DualRetriever|
-        \item Function: \verb|_retrieve_dense(query, index)|
+        \item Function: \verb|_retrieve_dense(query, index)|, \verb|verify_document_integrity()|
         \item Input: Query String $\rightarrow$ Output: List of Top-K Document Dicts.
     \end{itemize}
     \item[Luồng dữ liệu:] Query String $\rightarrow$ Embedding Model $\rightarrow$ Vector $\rightarrow$ FAISS L2 Search $\rightarrow$ Ranked Chunks.
-    \item[Vai trò bảo mật:] Đảm bảo LLM lập luận bảo mật dựa trên các khung tiêu chuẩn chính thống, giảm dương tính giả.
+    \item[Vai trò bảo mật:] Đảm bảo LLM lập luận bảo mật dựa trên các khung tiêu chuẩn chính thống, giảm dương tính giả. Đồng thời, bảo đảm tính toàn vẹn của tri thức tĩnh chống lại các tấn công RAG Poisoning.
 \end{description}
 
 \paragraph{Bước 17. BM25Okapi Sparse Keyword Matching}
@@ -704,21 +704,21 @@ rrf_scores[doc_id] += 1.0 / (k + rank)
 
 \subsubsection{PHẦN 5: HITL DASHBOARD}
 
-\paragraph{Bước 24. Streamlit UI Layout and State Management}
+\paragraph{Bước 24. Streamlit UI Layout, RBAC \& Authentication Hardening}
 \begin{description}[noitemsep]
-    \item[Tên bước:] Streamlit UI Layout and State Management.
+    \item[Tên bước:] Streamlit UI Layout, RBAC \& Authentication Hardening.
     \item[Tầng:] HITL Dashboard Layer.
-    \item[Mục đích:] Giao diện trực quan thời gian thực (Real-time GUI) cho phép chuyên gia an ninh mạng theo dõi hệ thống, điều tra sự cố và phê duyệt quy tắc mà không cần xem terminal.
-    \item[Công nghệ sử dụng:] \verb|streamlit|, \verb|streamlit-autorefresh|, \verb|st.session_state|.
-    \item[Cơ chế hoạt động:] Tổ chức giao diện dưới dạng Tabs (SIEM Monitor, Tường lửa, Quét lỗ hổng...). Sử dụng autorefresh định kỳ mỗi 3 giây để đồng bộ dữ liệu mới nhất từ cơ sở dữ liệu.
+    \item[Mục đích:] Cung cấp giao diện trực quan thời gian thực (Real-time GUI) cho phép chuyên gia an ninh mạng theo dõi hệ thống, điều tra sự cố, phê duyệt quy tắc một cách an toàn và bảo mật cao.
+    \item[Công nghệ sử dụng:] \verb|streamlit|, \verb|streamlit-autorefresh|, \verb|st.session_state|, PBKDF2-HMAC-SHA256, constant-time compare.
+    \item[Cơ chế hoạt động:] Tổ chức giao diện dưới dạng các Tabs chức năng. Tích hợp màn hình xác thực phân quyền (RBAC) cho Analyst (L1) và Manager (L3). Để chống tấn công Auth Input Injection và Brute-force, Username được lọc chặt chẽ qua biểu thức chính quy \verb|^[a-zA-Z0-9_]{1,30}$|, mật khẩu được băm bằng thuật toán an toàn PBKDF2-HMAC-SHA256 kết hợp constant-time comparison để loại bỏ rủi ro tấn công kênh kề (Side-channel Timing Attacks).
     \item[Cấu trúc mã nguồn:] \quad
     \begin{itemize}[noitemsep]
-        \item File: \verb|src/ui/app.py|
-        \item Function: \verb|main_dashboard()|
-        \item Input: User interactions $\rightarrow$ Output: Rendered HTML/CSS.
+        \item File: \verb|src/ui/app.py| \& \verb|src/ui/auth.py|
+        \item Function: \verb|main_dashboard()|, \verb|login_screen()|, \verb|hash_password()|
+        \item Input: User credentials $\rightarrow$ Output: Session State / GUI.
     \end{itemize}
-    \item[Luồng dữ liệu:] SQLite Reads / Feedback Listener Reads $\rightarrow$ Streamlit App $\rightarrow$ Browser.
-    \item[Vai trò bảo mật:] N/A — Tăng khả năng giám sát trực quan cho SOC.
+    \item[Luồng dữ liệu:] Input Credentials $\rightarrow$ Regex validation $\rightarrow$ PBKDF2 Hashing $\rightarrow$ constant-time comparison $\rightarrow$ \verb|st.session_state| configuration.
+    \item[Vai trò bảo mật:] Phòng ngừa các đòn tấn công chèn mã Form Input Injection, side-channel timing attacks, và kiểm soát truy cập phân quyền nghiêm ngặt (Zero Trust HITL Auth).
 \end{description}
 
 \paragraph{Bước 25. Quarantine Rule Review \& SOC Manager Workflow}
