@@ -122,6 +122,18 @@ class TestAPTCorrelation:
         stats = memory_store.get_stats()
         assert stats["apt_indicators"] >= 1
 
+    def test_check_apt_chain_multi_day(self, memory_store):
+        # Sự kiện 1 ngày -> không phải APT
+        memory_store.record_apt_event("10.0.0.1", apt_phase="recon", apt_day=1)
+        result = memory_store.check_apt_chain("10.0.0.1")
+        assert result["is_apt"] is False
+
+        # Sự kiện 2 ngày khác nhau -> APT
+        memory_store.record_apt_event("10.0.0.1", apt_phase="lateral", apt_day=2)
+        result = memory_store.check_apt_chain("10.0.0.1")
+        assert result["is_apt"] is True
+        assert result["chain_length"] == 2  # 2 ngày distinct
+
 
 class TestPromptContextGeneration:
     """Test context generation for LLM prompt injection."""
