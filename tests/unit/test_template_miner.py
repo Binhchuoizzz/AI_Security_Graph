@@ -118,3 +118,21 @@ class TestTokenBudgetManager:
         long_text = "\n".join([f"Long log line number {i} " * 10 for i in range(100)])
         result = self.manager.fit_to_budget(long_text)
         assert "TRUNCATED" in result
+
+
+class TestTemplateMinerEntropyScorer:
+    """Kiểm tra EntropyScorer tích hợp với TemplateMiner."""
+
+    def test_default_threshold_value(self):
+        from src.guardrails.template_miner import EntropyScorer
+        scorer = EntropyScorer()  # Ngưỡng mặc định 4.5
+        assert scorer.threshold == 4.5
+
+        # Dữ liệu entropy thấp (< 4.5)
+        low_entropy_log = "GET /index.html HTTP/1.1 200 OK"
+        assert scorer.is_high_entropy(low_entropy_log) is False
+
+        # Dữ liệu entropy cao (>= 4.5) do chứa nhiều ký tự ngẫu nhiên hoặc payload độc hại dài
+        high_entropy_log = "SELECT * FROM users WHERE id=1 OR 1=1 UNION SELECT username,password FROM admin -- aAbBcCdD"
+        assert scorer.is_high_entropy(high_entropy_log) is True
+

@@ -22,9 +22,14 @@ def test_decision_validator_allowed_actions():
 def test_decision_validator_confidence_gate():
     validator = DecisionValidator()
     # Confidence thấp (< 0.5) phải hạ cấp xuống AWAIT_HITL
-    d = {"action": "BLOCK_IP", "confidence": 0.4, "target": "1.2.3.4"}
-    res = validator.validate_decision(d)
-    assert res["action"] == "AWAIT_HITL"
+    d1 = {"action": "BLOCK_IP", "confidence": 0.4, "target": "1.2.3.4"}
+    res1 = validator.validate_decision(d1)
+    assert res1["action"] == "AWAIT_HITL"
+
+    # Confidence biên (== 0.5) KHÔNG bị hạ cấp
+    d2 = {"action": "BLOCK_IP", "confidence": 0.5, "target": "1.2.3.4"}
+    res2 = validator.validate_decision(d2)
+    assert res2["action"] == "BLOCK_IP"
 
 
 def test_decision_validator_critical_shield():
@@ -33,6 +38,11 @@ def test_decision_validator_critical_shield():
     d1 = {"action": "BLOCK_IP", "confidence": 0.9, "target": "127.0.0.1"}
     res1 = validator.validate_decision(d1)
     assert res1["action"] == "ALERT"
+
+    # IPv6 loopback ::1 cũng phải chuyển thành ALERT
+    d_v6 = {"action": "BLOCK_IP", "confidence": 0.9, "target": "::1"}
+    res_v6 = validator.validate_decision(d_v6)
+    assert res_v6["action"] == "ALERT"
 
     d2 = {"action": "BLOCK_IP", "confidence": 0.9, "target": "10.0.0.99"}
     res2 = validator.validate_decision(d2)

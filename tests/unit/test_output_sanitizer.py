@@ -134,3 +134,28 @@ class TestEdgeCases:
         result = sanitizer.sanitize(text)
         assert "phishing.com" not in result
         assert "[LINK_STRIPPED]" in result
+
+    def test_strips_zero_width_chars(self, sanitizer):
+        text = "Hello\u200bWorld\u200c!\u200d"
+        result = sanitizer.sanitize(text)
+        assert result == "HelloWorld!"
+
+    def test_strips_ansi_escapes(self, sanitizer):
+        text = "\x1B[31mRed Alert\x1B[0m"
+        result = sanitizer.sanitize(text)
+        assert result == "Red Alert"
+
+    def test_base64_obfuscation(self, sanitizer):
+        # PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg== is Base64 for <script>alert(1)</script>
+        text = "Payload: PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="
+        result = sanitizer.sanitize(text)
+        assert "[BASE64_OBFUSCATED_STRIPPED]" in result
+        assert "PHNjcmlwd" not in result
+
+    def test_hex_obfuscation(self, sanitizer):
+        # 3c7363726970743e is hex representation of <script>
+        text = "Hex: 3c7363726970743e"
+        result = sanitizer.sanitize(text)
+        assert "[HEX_OBFUSCATED_STRIPPED]" in result
+        assert "3c736372" not in result
+

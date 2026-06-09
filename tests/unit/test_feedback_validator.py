@@ -44,3 +44,29 @@ def test_feedback_validator_invalid_regex():
     # Thử truyền regex đúng cú pháp cho trường URI
     v2, err2 = validator.validate_rule("URI", "^/admin/.*$", 50)
     assert v2 is True
+
+
+def test_score_out_of_range():
+    validator = FeedbackValidator()
+    # score = -1 phải bị reject
+    v1, err1 = validator.validate_rule("src_ip", "192.168.1.100", -1)
+    assert v1 is False
+    assert any("must be clamped between 0 and 100" in e for e in err1)
+
+    # score = 101 phải bị reject
+    v2, err2 = validator.validate_rule("src_ip", "192.168.1.100", 101)
+    assert v2 is False
+    assert any("must be clamped between 0 and 100" in e for e in err2)
+
+
+def test_cidr_too_broad():
+    validator = FeedbackValidator()
+    # CIDR quá rộng /4 (prefix < 8) phải bị reject
+    v1, err1 = validator.validate_rule("src_ip", "1.0.0.0/4", 80)
+    assert v1 is False
+    assert any("too broad" in e for e in err1)
+
+    # CIDR /8 phải hợp lệ
+    v2, err2 = validator.validate_rule("src_ip", "10.0.0.0/8", 80)
+    assert v2 is True
+
