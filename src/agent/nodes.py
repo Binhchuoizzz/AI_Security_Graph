@@ -6,7 +6,7 @@ import os
 import json
 import logging
 import time
-import mlflow
+import mlflow  # type: ignore
 from typing import Dict, Any
 
 from src.agent.state import SentinelState

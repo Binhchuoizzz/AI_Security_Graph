@@ -16,11 +16,11 @@ import re
 from typing import List, Dict, Any, Optional
 
 try:
-    import openai
+    import openai  # type: ignore
 except ImportError:
     raise ImportError("Thiếu thư viện yêu cầu: hãy chạy pip install openai")
 
-import yaml
+import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 

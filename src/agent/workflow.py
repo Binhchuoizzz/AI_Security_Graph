@@ -8,8 +8,8 @@ import sys
 import os
 
 try:
-    from langgraph.graph import StateGraph, END
-    from langgraph.graph.state import CompiledStateGraph
+    from langgraph.graph import StateGraph, END  # type: ignore
+    from langgraph.graph.state import CompiledStateGraph  # type: ignore
 except ImportError:
     raise ImportError("Missing dependency: pip install langgraph")
 

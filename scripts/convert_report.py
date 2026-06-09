@@ -1,10 +1,10 @@
 import os
 import re
-from docx import Document
-from docx.shared import Pt, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
+from docx import Document  # type: ignore
+from docx.shared import Pt, Inches  # type: ignore
+from docx.enum.text import WD_ALIGN_PARAGRAPH  # type: ignore
+from docx.oxml import OxmlElement  # type: ignore
+from docx.oxml.ns import qn  # type: ignore
 
 def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
     tc = cell._tc

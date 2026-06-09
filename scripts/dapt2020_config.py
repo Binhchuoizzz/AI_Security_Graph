@@ -1,7 +1,7 @@
 """
 Cấu hình dùng chung và các hằng số cho DAPT2020.
 """
-import pandas as pd
+import pandas as pd  # type: ignore
 
 # Các giai đoạn APT theo từng ngày của DAPT2020 (đã sửa ánh xạ dựa trên cột Stage thực tế)
 APT_PHASES = {
