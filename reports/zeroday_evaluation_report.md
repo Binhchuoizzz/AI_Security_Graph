@@ -14,7 +14,7 @@
 | ID | Tên Kịch Bản Tấn Công | Rule Engine Tĩnh (Config A) | Tier-1 Outlier (Z-Score) | Quyết Định Của AI (Tier-2) | Kết Quả |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | ZD-001 | Zero-Day Data Exfiltration (Outlier Packets) | DROP (Bỏ sót) | ESCALATE (Z=59792.25) | ALERT (Conf: 0.7) | ✅ THÀNH CÔNG |
-| ZD-002 | Zero-Day Session Flooding (Outlier Volume) | DROP (Bỏ sót) | ESCALATE (Z=84416.93) | ALERT (Conf: 0.6) | ✅ THÀNH CÔNG |
+| ZD-002 | Zero-Day Session Flooding (Outlier Volume) | DROP (Bỏ sót) | ESCALATE (Z=84416.93) | ALERT (Conf: 0.7) | ✅ THÀNH CÔNG |
 
 ## 🔍 Chi Tiết Suy Luận Và Lập Luận Của AI Tác Tử
 
@@ -22,13 +22,13 @@
 * **Z-Score ở Tier-1:** 59792.25 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
 * **Hành động phản ứng tự động:** `ALERT` (Độ tin cậy: 0.7)
 * **Lập luận bảo mật (Reasoning):**
-  > "Dữ liệu cho thấy một IP nguồn (10.0.0.22) gửi một lượng lớn gói dữ liệu đến cổng 80.  Số lượng gói dữ liệu này cao bất thường và gợi ý về khả năng tấn công Malvertising. Cần xem xét thêm thông tin về nội dung gói dữ liệu để xác nhận."
+  > "Dữ liệu cho thấy một IP nguồn (10.0.0.22) gửi một lượng lớn gói dữ liệu đến cổng 80. Số lượng gói dữ liệu này cao bất thường và có thể là dấu hiệu của hoạt động malvertising. Cần xem xét thêm thông tin về nội dung gói dữ liệu để xác nhận."
 
 ### ZD-002: Zero-Day Session Flooding (Outlier Volume)
 * **Z-Score ở Tier-1:** 84416.93 (Lệch chuẩn vượt ngưỡng $3.5\sigma$)
-* **Hành động phản ứng tự động:** `ALERT` (Độ tin cậy: 0.6)
+* **Hành động phản ứng tự động:** `ALERT` (Độ tin cậy: 0.7)
 * **Lập luận bảo mật (Reasoning):**
-  > "Dữ liệu cho thấy một IP nguồn (10.0.0.33) đã gửi một lượng lớn gói dữ liệu đến cổng 80. Hành vi này có thể là dấu hiệu của một cuộc tấn công Malvertising, nơi kẻ tấn công sử dụng quảng cáo để phân phối phần mềm độc hại. Cần xem xét thêm thông tin về nội dung gói dữ liệu và nguồn quảng cáo để xác nhận."
+  > "Dữ liệu cho thấy một IP nguồn (10.0.0.33) gửi một lượng lớn gói dữ liệu đến cổng 80. Số lượng gói dữ liệu này rất lớn và có thể là dấu hiệu của hoạt động malvertising. Cần xem xét thêm thông tin về nội dung gói dữ liệu để xác nhận."
 
 ---
 ## 💡 Kết Luận Khoa Học Cho Luận Văn Thạc Sĩ
