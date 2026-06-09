@@ -16,12 +16,12 @@ CHIẾN LƯỢC:
 import os
 import argparse
 import hashlib
-import pandas as pd
+import pandas as pd  # type: ignore
 import json
 import subprocess
 import glob
 import random
-import numpy as np
+import numpy as np  # type: ignore
 from typing import Any
 from datetime import datetime
 from collections import Counter

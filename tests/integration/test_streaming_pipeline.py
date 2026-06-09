@@ -11,7 +11,7 @@ import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
@@ -112,7 +112,7 @@ class TestRedisConnectivity:
 
     @pytest.fixture
     def redis_client(self):
-        import redis
+        import redis  # type: ignore
 
         url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
         try:

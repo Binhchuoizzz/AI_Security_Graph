@@ -38,15 +38,15 @@ except ImportError:
 def download_from_kaggle():
     """Thử tải tập dữ liệu DAPT2020 từ Kaggle sử dụng thư viện kagglehub."""
     try:
-        import kagglehub
-        import pandas as pd
+        import kagglehub  # type: ignore
+        import pandas as pd  # type: ignore
     except ImportError:
         try:
             print("[*] Installing kagglehub...")
             subprocess.run([sys.executable, "-m", "pip", "install", "kagglehub", "pandas", "--quiet"],
                           capture_output=True, check=True)
-            import kagglehub
-            import pandas as pd
+            import kagglehub  # type: ignore
+            import pandas as pd  # type: ignore
         except Exception as e:
             print(f"[!] Failed to install dependencies: {e}")
             return False
@@ -155,7 +155,7 @@ def generate_synthetic_dapt2020():
     Tạo 5 tệp ngày với dữ liệu chuỗi tấn công APT thực tế.
     Tất cả dữ liệu được tạo tuân theo schema 85 thuộc tính tiêu chuẩn của DAPT2020.
     """
-    import pandas as pd
+    import pandas as pd  # type: ignore
 
     print("[*] Generating synthetic DAPT2020 data...")
     os.makedirs(DAPT_RAW_DIR, exist_ok=True)
@@ -245,7 +245,7 @@ def generate_synthetic_dapt2020():
 
 def verify_dapt2020():
     """Xác minh cấu trúc tệp DAPT2020."""
-    import pandas as pd
+    import pandas as pd  # type: ignore
 
     expected_files = ["day1.csv", "day2.csv", "day3.csv", "day4.csv", "day5.csv"]
     for f in expected_files:

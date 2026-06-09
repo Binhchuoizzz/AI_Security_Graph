@@ -21,9 +21,9 @@ QUAN HỆ:
 import json
 import os
 import time
-import redis
-import yaml
-from dotenv import load_dotenv
+import redis  # type: ignore
+import yaml  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 

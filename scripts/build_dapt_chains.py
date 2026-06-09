@@ -13,7 +13,7 @@ import glob
 import json
 from pathlib import Path
 from datetime import datetime
-import pandas as pd
+import pandas as pd  # type: ignore
 
 # Các công cụ phân tích tĩnh sẽ phân giải scripts.dapt2020_config
 # Fallback xử lý khi chạy trực tiếp trong thư mục scripts/
