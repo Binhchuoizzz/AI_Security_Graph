@@ -321,24 +321,24 @@ class ThreatMemoryStore:
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
-                """SELECT COUNT(*), MAX(apt_day), GROUP_CONCAT(DISTINCT apt_phase)
+                """SELECT COUNT(DISTINCT apt_day), MAX(apt_day), GROUP_CONCAT(DISTINCT apt_phase)
                    FROM threat_events
                    WHERE src_ip = ? AND apt_phase IS NOT NULL""",
                 (src_ip,)
             )
             row = cursor.fetchone()
 
-        event_count, max_day, phases = row
+        day_count, max_day, phases = row
 
-        if event_count and event_count >= 2:
+        if day_count and day_count >= 2:
             return {
                 "is_apt": True,
-                "chain_length": event_count,
+                "chain_length": day_count,
                 "max_day_seen": max_day,
                 "phases_seen": phases,
-                "severity_escalation": "CRITICAL" if event_count >= 3 else "HIGH",
+                "severity_escalation": "CRITICAL" if day_count >= 3 else "HIGH",
             }
-        return {"is_apt": False, "chain_length": event_count or 0}
+        return {"is_apt": False, "chain_length": day_count or 0}
 
     def ingest_dapt_chains(self, chains_path: str = "data/processed/dapt2020_chains.jsonl"):
         """

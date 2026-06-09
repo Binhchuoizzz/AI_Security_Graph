@@ -19,7 +19,7 @@ CHỐNG SEMANTIC DRIFT:
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 @dataclass
@@ -177,7 +177,7 @@ class SentinelState:
             value=value,
             severity=severity,
             source_template=source_template,
-            first_seen=datetime.utcnow().isoformat(),
+            first_seen=datetime.now(timezone.utc).isoformat(),
             context=context,
         )
         self.extracted_iocs.append(ioc.to_dict())
@@ -194,7 +194,7 @@ class SentinelState:
     ):
         """Ghi nhận quyết định mới vào audit trail."""
         decision = AgentDecision(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             action=action,
             target=target,
             confidence=confidence,
@@ -269,5 +269,5 @@ class SentinelState:
         self.pending_rules = []
         self.threat_memory_context = ""
         self.cycle_count += 1
-        self.last_updated = datetime.utcnow().isoformat()
+        self.last_updated = datetime.now(timezone.utc).isoformat()
 
