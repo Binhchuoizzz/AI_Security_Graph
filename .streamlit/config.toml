@@ -9,4 +9,10 @@ font = "sans serif"
 enableCORS = false
 enableXsrfProtection = true
 frameAncestors = ["'none'"]
+# Tắt file-watcher: container production không cần hot-reload, đồng thời tránh việc
+# watcher dò các module vision của transformers gây log noise 'No module named torchvision'.
+fileWatcherType = "none"
+
+[logger]
+level = "warning"
 

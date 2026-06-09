@@ -9,7 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt \
+    # drain3 cố ý không nằm trong requirements.txt vì metadata của nó pin
+    # cachetools==4.2.1 (xung đột phiên bản). Cài riêng với --no-deps để dùng
+    # cachetools hiện đại; jsonpickle là runtime-dep duy nhất cần bổ sung.
+    && pip install --no-cache-dir --user --no-deps drain3==0.9.11 \
+    && pip install --no-cache-dir --user "jsonpickle>=1.5.1"
 
 # ---- Production Stage ----
 FROM python:3.10-slim

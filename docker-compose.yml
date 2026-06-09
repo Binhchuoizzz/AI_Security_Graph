@@ -85,7 +85,8 @@ services:
     command: >
       mlflow server
       --backend-store-uri sqlite:///mlruns/mlflow.db
-      --default-artifact-root /mlruns
+      --artifacts-destination /mlruns
+      --serve-artifacts
       --host 0.0.0.0
     networks:
       - sentinel_net
