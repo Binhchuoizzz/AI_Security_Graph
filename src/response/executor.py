@@ -306,7 +306,7 @@ def lock_user(username: str, duration_seconds: int):
                 INSERT INTO login_attempts (username, attempts, lockout_until) 
                 VALUES (?, 5, ?)
                 ON CONFLICT(username) DO UPDATE SET lockout_until = ?, attempts = 5
-            """, (username, lockout_time, lockout_time, lockout_time))
+            """, (username, lockout_time, lockout_time))
             conn.commit()
     except Exception as e:
         logger.error(f"Lỗi khóa người dùng: {e}")

@@ -112,7 +112,7 @@ def main_dashboard():
                     with open(config_path, "r") as f:
                         config_data = yaml.safe_load(f)
                     if "tier1" in config_data:
-                        config_data["tier1"]["whitelist_ips"] = ["127.0.0.1", "10.0.0.99", "192.168.1.254", "0.0.0.0"]
+                        config_data["tier1"]["whitelist_ips"] = ["127.0.0.1", "10.0.0.99", "192.168.1.254"]
                         with open(config_path, "w") as f:
                             yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
                 
