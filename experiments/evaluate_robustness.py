@@ -163,7 +163,7 @@ def print_report(results: dict):
         blocked = stats["fully_blocked"]
         bypassed = stats["bypassed"]
         correct = sum(1 for d in stats["details"] if d["correct_prediction"])
-        defeat_rate = (blocked / total * 100) if total > 0 else 0
+        block_rate = (blocked / total * 100) if total > 0 else 0
         accuracy = (correct / total * 100) if total > 0 else 0
 
         total_all += total
@@ -174,8 +174,8 @@ def print_report(results: dict):
         print(f"  Category: {category.upper().replace('_', ' ')}")
         print(f"{'─' * 70}")
         print(f"  Total Samples:          {total}")
-        print(f"  Blocked by Guardrails:  {blocked} ({defeat_rate:.1f}%)")
-        print(f"  Bypassed:               {bypassed} ({100 - defeat_rate:.1f}%)")
+        print(f"  Blocked (resistance):   {blocked} ({block_rate:.1f}%)")
+        print(f"  Bypassed (defeat):      {bypassed} ({100 - block_rate:.1f}%)")
         print(f"  Prediction Accuracy:    {correct}/{total} ({accuracy:.1f}%)")
         print(f"  ├─ Pattern Detection:   {stats['detected_by_pattern']}")
         print(f"  ├─ Encoding Neutral.:   {stats['neutralized_encoding']}")
@@ -189,7 +189,8 @@ def print_report(results: dict):
                 print(f"    - {d['id']} ({d['attack_type']})")
 
     # Tóm tắt
-    overall_defeat = (blocked_all / total_all * 100) if total_all > 0 else 0
+    overall_block = (blocked_all / total_all * 100) if total_all > 0 else 0
+    overall_bypass = 100 - overall_block if total_all > 0 else 0
     overall_accuracy = (correct_all / total_all * 100) if total_all > 0 else 0
 
     print(f"\n{'=' * 70}")
@@ -197,7 +198,10 @@ def print_report(results: dict):
     print(f"{'=' * 70}")
     print(f"  Total Adversarial Samples:  {total_all}")
     print(
-        f"  Overall Defeat Rate:        {blocked_all}/{total_all} ({overall_defeat:.1f}%)"
+        f"  Resistance (Block) Rate:    {blocked_all}/{total_all} ({overall_block:.1f}%)"
+    )
+    print(
+        f"  Defeat (Bypass) Rate:       {total_all - blocked_all}/{total_all} ({overall_bypass:.1f}%)"
     )
     print(
         f"  Overall Prediction Acc:     {correct_all}/{total_all} ({overall_accuracy:.1f}%)"
@@ -207,14 +211,21 @@ def print_report(results: dict):
     return {
         "total": total_all,
         "blocked": blocked_all,
-        "defeat_rate": overall_defeat,
+        # NOTE: explicit, unambiguous metric names. `block_rate_pct` = % of
+        # adversarial samples the static guardrails stopped (resistance);
+        # `bypass_rate_pct` = % that got through (the true "defeat" rate).
+        "block_rate_pct": overall_block,
+        "bypass_rate_pct": overall_bypass,
         "accuracy": overall_accuracy,
         "by_category": {
             cat: {
                 "total": s["total"],
                 "blocked": s["fully_blocked"],
-                "defeat_rate": (
+                "block_rate_pct": (
                     (s["fully_blocked"] / s["total"] * 100) if s["total"] > 0 else 0
+                ),
+                "bypass_rate_pct": (
+                    (s["bypassed"] / s["total"] * 100) if s["total"] > 0 else 0
                 ),
             }
             for cat, s in results.items()

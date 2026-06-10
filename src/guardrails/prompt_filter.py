@@ -6,7 +6,10 @@ import re
 import yaml  # type: ignore
 import os
 import base64
+import codecs
+import html
 import secrets
+import unicodedata
 import urllib.parse
 from typing import Optional
 
@@ -148,6 +151,43 @@ class JailbreakDetector:
 # =========================================================================
 # 2. ENCODING NEUTRALIZER
 # =========================================================================
+
+# Cyrillic / Greek look-alike characters -> ASCII Latin (homoglyph folding).
+_CONFUSABLE_MAP = str.maketrans({
+    # Cyrillic lowercase
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
+    "ѕ": "s", "і": "i", "ј": "j", "ԛ": "q", "ԝ": "w", "ё": "e", "к": "k",
+    "м": "m", "н": "h", "т": "t", "в": "b",
+    # Cyrillic uppercase
+    "А": "A", "Е": "E", "О": "O", "Р": "P", "С": "C", "У": "Y", "Х": "X",
+    "І": "I", "Ј": "J", "К": "K", "М": "M", "Н": "H", "Т": "T", "В": "B",
+    # Greek
+    "ο": "o", "α": "a", "ρ": "p", "ε": "e", "τ": "t", "υ": "u", "ι": "i",
+    "κ": "k", "ν": "v", "Ο": "O", "Α": "A", "Ρ": "P", "Ε": "E", "Τ": "T",
+    "Ι": "I", "Κ": "K", "Ν": "N",
+})
+
+# Common leetspeak substitutions -> ASCII letters.
+_LEET_MAP = str.maketrans({
+    "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t",
+    "$": "s", "@": "a", "!": "i", "|": "l",
+})
+
+# Substrings that mark a decoded payload as an injection/jailbreak attempt.
+_DECODE_TRIGGERS = (
+    "ignore", "disregard", "previous", "instruction", "system prompt",
+    "system", "prompt", "override", "bypass", "jailbreak", "reveal",
+    "developer mode", "you are now", "act as", "sudo", "exfiltrat",
+    "password", "drop table", "<script",
+)
+
+
+def _looks_malicious(text: str) -> bool:
+    """True if the (decoded) text contains an injection/jailbreak indicator."""
+    low = text.lower()
+    return any(trigger in low for trigger in _DECODE_TRIGGERS)
+
+
 class EncodingNeutralizer:
     """
     Tầng 2: Vô hiệu hóa Encoding Bypass tricks.
@@ -171,6 +211,8 @@ class EncodingNeutralizer:
 
     @staticmethod
     def neutralize_html_entities(text: str) -> str:
+        # Giải mã HTML entities trước (&#60;script&#62; -> <script>) rồi mới strip tag
+        text = html.unescape(text)
         # Loại bỏ và strip thẻ script/html độc hại thay vì chỉ encode
         clean = re.sub(
             r"<script[^>]*>.*?</script>",
@@ -190,9 +232,38 @@ class EncodingNeutralizer:
 
     @staticmethod
     def normalize_unicode(text: str) -> str:
+        # NFKC fold neutralizes fullwidth/compatibility homoglyphs (ｉｇｎｏｒｅ -> ignore)
+        text = unicodedata.normalize("NFKC", text)
         # Strip zero-width joiners, spaces, control characters
         cleaned = re.sub(r"[\u200b\u200c\u200d\ufeff\u00ad\x00]", "", text)
         return cleaned
+
+    @staticmethod
+    def fold_homoglyphs(text: str) -> str:
+        """Map Cyrillic/Greek look-alike chars to their ASCII Latin equivalents."""
+        return text.translate(_CONFUSABLE_MAP)
+
+    @staticmethod
+    def normalize_leetspeak(text: str) -> str:
+        """Fold common leetspeak substitutions (1gn0r3 -> ignore)."""
+        return text.translate(_LEET_MAP)
+
+    @staticmethod
+    def decode_rot13(text: str) -> str:
+        """ROT13 only shifts ASCII letters; digits/symbols are untouched."""
+        return codecs.encode(text, "rot_13")
+
+    @staticmethod
+    def decode_if_base32(text: str) -> Optional[str]:
+        try:
+            clean = text.strip().upper()
+            if re.fullmatch(r"[A-Z2-7]+=*", clean) and len(clean) >= 16:
+                decoded = base64.b32decode(clean).decode("utf-8", errors="ignore")
+                if decoded.isprintable() and len(decoded) > 3:
+                    return decoded
+        except Exception:
+            pass
+        return None
 
     @staticmethod
     def decode_url_and_hex(text: str) -> str:
@@ -207,6 +278,25 @@ class EncodingNeutralizer:
         decoded = re.sub(r"\\x([0-9a-fA-F]{2})", hex_repl, decoded)
         return decoded
 
+    def _expose_obfuscated(self, text: str) -> str:
+        """Reveal base32/rot13/leetspeak/homoglyph payloads that decode to an
+        injection attempt. Guarded: only appends a marker when the *decoded*
+        variant looks malicious AND the original did not — so benign text and
+        already-flagged text are never mangled (keeps false-positive rate low)."""
+        if _looks_malicious(text):
+            return text
+        additions = []
+        candidates = [
+            ("BASE32", self.decode_if_base32(text)),
+            ("ROT13", self.decode_rot13(text)),
+            ("LEET", self.normalize_leetspeak(text)),
+            ("HOMOGLYPH", self.fold_homoglyphs(text)),
+        ]
+        for name, decoded in candidates:
+            if decoded and decoded != text and _looks_malicious(decoded):
+                additions.append(f"[{name}_DECODED: {decoded}]")
+        return f"{text} {' '.join(additions)}" if additions else text
+
     def neutralize(self, log_entry: dict) -> dict:
         """Chạy toàn bộ pipeline neutralization trên log entry."""
         neutralized = {}
@@ -218,6 +308,7 @@ class EncodingNeutralizer:
             str_value = self.normalize_unicode(str_value)
             str_value = self.decode_url_and_hex(str_value)
             str_value = self.decode_if_base64(str_value)
+            str_value = self._expose_obfuscated(str_value)
             str_value = self.neutralize_html_entities(str_value)
             neutralized[key] = str_value
         return neutralized

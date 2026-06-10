@@ -21,29 +21,27 @@ def plot_robustness():
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # 1. Biểu đồ Tỷ lệ Chặn (Defeat Rate)
-    labels = ["Structural Injection", "Encoding Bypass", "Semantic Confusion"]
-    # Phân tích dữ liệu từ category_breakdown
-    breakdown = data.get("category_breakdown", {})
+    # 1. Biểu đồ Tỷ lệ Kháng (Resistance / Block Rate) theo từng nhóm tấn công
+    summary = data.get("summary", {})
+    breakdown = summary.get("by_category", {})
     categories = []
-    defeat_pcts = []
+    block_pcts = []
 
-    for cat, stats_wrapper in breakdown.items():
+    for cat, stats in breakdown.items():
         categories.append(cat.replace("_", " ").title())
-        stats = stats_wrapper.get("stats", {})
-        total = stats.get("total", 1)
-        blocked = stats.get("fully_blocked", 0)
-        defeat_pcts.append((blocked / total) * 100)
+        total = stats.get("total", 1) or 1
+        blocked = stats.get("blocked", 0)
+        block_pcts.append((blocked / total) * 100)
 
     plt.figure(figsize=(10, 6))
     bars = plt.bar(
         categories,
-        defeat_pcts,
-        color=["#ff9999", "#66b3ff", "#99ff99", "#ffcc99"][: len(categories)],
+        block_pcts,
+        color=["#ff9999", "#66b3ff", "#99ff99", "#ffcc99", "#c2a5ff"][: len(categories)],
     )
     plt.ylim(0, 110)
-    plt.ylabel("Defeat Rate (%)", fontsize=12)
-    plt.title("Sentinel Guardrails Defeat Rate by Attack Category", fontsize=14)
+    plt.ylabel("Resistance / Block Rate (%)", fontsize=12)
+    plt.title("Sentinel Guardrails Resistance (Block) Rate by Attack Category", fontsize=14)
 
     # Thêm nhãn giá trị trên đầu cột
     for bar in bars:
@@ -58,14 +56,13 @@ def plot_robustness():
             fontweight="bold",
         )
 
-    out_file = os.path.join(OUTPUT_DIR, "robustness_defeat_rate.png")
+    out_file = os.path.join(OUTPUT_DIR, "robustness_block_rate.png")
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
-    print(f"[+] Saved Defeat Rate Plot -> {out_file}")
+    print(f"[+] Saved Resistance (Block) Rate Plot -> {out_file}")
 
     # 2. Biểu đồ tròn Tỷ lệ Chính xác Tổng thể
     plt.figure(figsize=(8, 8))
-    metrics = data.get("metrics", {})
-    acc = metrics.get("overall_prediction_accuracy", 0.0) * 100
+    acc = summary.get("accuracy", 0.0)
     err = 100 - acc
 
     plt.pie(
