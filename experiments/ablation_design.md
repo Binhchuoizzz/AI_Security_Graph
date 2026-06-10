@@ -83,15 +83,15 @@
 
 ### Switching RAG configs
 ```python
-# config/ablation_configs/config_d_mitre_only.yaml
+# config/ablation/config_d_mitre_only.yaml
 rag:
   enabled_sources: ["mitre"]  # Only MITRE ATT&CK index
 
-# config/ablation_configs/config_e_nist_only.yaml
+# config/ablation/config_e_nist_only.yaml
 rag:
   enabled_sources: ["nist"]    # Only NIST SP 800-61r2 index
 
-# config/ablation_configs/config_f_full.yaml
+# config/ablation/config_f_full.yaml
 rag:
   enabled_sources: ["mitre", "nist"]  # Dual-RAG (default)
 ```

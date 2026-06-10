@@ -8,7 +8,7 @@ Dự án SENTINEL hiện đang trong quá trình chuẩn bị bảo vệ Luận 
 - ✅ Tích hợp **Tier 2 (LLM Agent)**: Phát triển luồng suy luận bằng LangGraph sử dụng mô hình `Gemma-2-9B-IT`, tích hợp **Few-shot Active Learning** tự động lấy ví dụ dynamic rules được duyệt/từ chối từ Human-in-the-loop để cải thiện prompt.
 - ✅ Áp dụng cơ chế **Dual-RAG** (MITRE Enterprise & NIST SP 800-61r2) và bộ đệm ngữ cảnh **Semantic Cache**.
 - ✅ Thiết kế kiến trúc **Short-term Memory** (Redis), **Long-term Threat Memory** (SQLite để lưu vết APT/DAPT2020) và **Vulnerability Graph** (Neo4j).
-- ✅ Thiết lập khung đánh giá **5D Evaluation Framework** (Classification, Operational, Robustness, Explainability, Zero-day) và tự động quản lý thí nghiệm qua **MLflow**.
+- ✅ Thiết lập khung đánh giá **5D Evaluation Framework** (Classification, Operational, Robustness, Context Quality, Explainability) + đánh giá Zero-day riêng và tự động quản lý thí nghiệm qua **MLflow**.
 - ✅ Tích hợp tiện ích **Docker Model Switcher** (`switch_model.sh`) hỗ trợ hot-swap mô hình LLM trọng tài và tác tử.
 
 ## 2. Kế Hoạch Các Cột Mốc (Next Milestones)

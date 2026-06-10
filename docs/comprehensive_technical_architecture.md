@@ -24,7 +24,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
              time.sleep(random.uniform(0.01, 0.05))
      ```
    - Input: Raw CSV/Parquet file → Output: JSON strings.
-7. **LUỒNG DỮ LIỆU:** CSV trên đĩa → Chunking Memory → JSON Formatting → Redis Pub/Sub channel.
+7. **LUỒNG DỮ LIỆU:** CSV trên đĩa → Chunking Memory → JSON Formatting → Redis Streams channel.
 8. **VAI TRÒ BẢO MẬT:** N/A — performance/efficiency role only (Mô phỏng dữ liệu).
 
 ### **2. DAPT2020 Multi-stage APT Chain Loading**
@@ -41,10 +41,10 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 8. **VAI TRÒ BẢO MẬT:** N/A — performance/efficiency role only (Hỗ trợ đánh giá Contextual Correlation).
 
 ### **3. Redis Stream Ingestion and Stateful Session Tracking**
-1. **STEP NAME:** Redis Pub/Sub & Stateful Session Tracker.
+1. **STEP NAME:** Redis Streams & Stateful Session Tracker.
 2. **LAYER:** Dataset Input Layer / Middleware.
 3. **MỤC ĐÍCH:** Hoạt động như một Message Broker tốc độ cao (In-memory) giữa Data Publisher và Tier 1 Rule Engine, đồng thời duy trì trạng thái (State) của các phiên kết nối mạng mà không cần Database lưu trữ vĩnh viễn.
-4. **CÔNG NGHỆ SỬ DỤNG:** `redis-py`, Redis Pub/Sub, Redis EXPIRE (TTL) / Local sliding memory.
+4. **CÔNG NGHỆ SỬ DỤNG:** `redis-py`, Redis Streams, Redis EXPIRE (TTL) / Local sliding memory.
 5. **CƠ CHẾ HOẠT ĐỘNG:** Khi Publisher gửi log dạng JSON lên Redis Channel `sentinel_logs`, Subscriber lắng nghe. Với mỗi IP Nguồn mới, hệ thống tạo/cập nhật Session Profile trong `SessionBaseline`. Các log được liên kết phiên theo Source IP. Hệ thống thiết lập cơ chế tự dọn dẹp (eviction) các profile đã lâu không có traffic hoạt động vượt quá `ttl_seconds` để tránh cạn kiệt bộ nhớ.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/streaming/subscriber.py` & `src/tier1_filter/rule_engine.py`.
@@ -58,7 +58,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
          for ip in stale_ips:
              del self.profiles[ip]
      ```
-   - Input: JSON từ Pub/Sub → Output: In-memory Stateful IP Profiles.
+   - Input: JSON từ Redis Streams (`xreadgroup`, consumer group `sentinel_group`) → Output: In-memory Stateful IP Profiles.
 7. **LUỒNG DỮ LIỆU:** Network Stream → Redis Message Broker → Tier 1 Event Listener → Stateful Memory Update.
 8. **VAI TRÒ BẢO MẬT:** Phòng chống tấn công từ chối dịch vụ (DoS) cạn kiệt tài nguyên bộ nhớ thông qua cơ chế tự động hủy Session rác (TTL/Eviction).
 
@@ -214,7 +214,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 1. **STEP NAME:** Encoding Neutralization & Character Normalization.
 2. **LAYER:** Guardrail Layer (Output/Input Sanitizer).
 3. **MỤC ĐÍCH:** Bảo vệ công cụ RAG khỏi nhiễu ngữ nghĩa (Semantic Confusion), giải mã các obfuscation của hacker, và cấm XSS/Markdown Exfiltration khi trả kết quả về UI.
-4. **CÔNG NGHỆ SỬ DỤNG:** Unicode Normalization (NFKC), Base64/Hex decoding, HTML/Markdown Sanitization.
+4. **CÔNG NGHỆ SỬ DỤNG:** Unicode Normalization (NFKC + homoglyph fold), Base64/Base32/Hex/URL decoding, ROT13, leetspeak, numeric HTML entity, HTML/Markdown Sanitization (có cơ chế guard chống false-positive).
 5. **CƠ CHẾ HOẠT ĐỘNG:** Giải mã các payload Hex/Base64 độc hại. Loại bỏ ký tự zero-width, control characters. Quét và loại bỏ các thẻ HTML nguy hiểm và cú pháp hình ảnh Markdown (`!alt`) để cấm LLM đẩy dữ liệu nhạy cảm ra ngoài qua render HTML.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/guardrails/output_sanitizer.py`.
@@ -320,7 +320,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 7. **LUỒNG DỮ LIỆU:** Node Triage → HTTP POST Request → GPU Compute → JSON Response.
 8. **VAI TRÒ BẢO MẬT:** Thực hiện phân tích nhận thức sâu để phát hiện các mẫu tấn công tinh vi.
 
-### **21. Decision Output: BLOCK / QUARANTINE / ALERT**
+### **21. Decision Output: BLOCK_IP / AWAIT_HITL / ALERT**
 1. **STEP NAME:** Action Routing & Execution.
 2. **LAYER:** Tier 2 LangGraph Agent.
 3. **MỤC ĐÍCH:** Biến kết quả phán quyết JSON của LLM thành các hành động tác động vật lý lên tường lửa hoặc đưa vào quarantine.
@@ -328,7 +328,8 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 5. **CƠ CHẾ HOẠT ĐỘNG:** Đọc trường `action` từ JSON:
    - `BLOCK_IP`: Gọi hàm chặn IP ở mức mạng và ghi nhận quy tắc vào hàng đợi cách ly chờ phê duyệt.
    - `ALERT`: Ghi cảnh báo đỏ lên DB mà không cấm.
-   - `AWAIT_HITL` (QUARANTINE): Phán quyết mập mờ, chuyển thẳng vào hàng đợi chờ analyst duyệt.
+   - `AWAIT_HITL`: Phán quyết mập mờ (hoặc bị Tier-Consensus Guard ép xuống), chuyển thẳng vào hàng đợi chờ analyst duyệt.
+   - `LOG` / `DROP`: Ghi nhật ký / loại bỏ traffic lành tính (5 action hợp lệ: `BLOCK_IP`, `ALERT`, `AWAIT_HITL`, `LOG`, `DROP` — không có "QUARANTINE" trong enum).
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/agent/nodes.py` & `src/response/executor.py`.
    - Function: `node_action_executor()`, `block_ip()`.
@@ -452,7 +453,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 2. **LAYER:** Evaluation Framework.
 3. **MỤC ĐÍCH:** Đo lường khả năng phân loại và kiểm định ý nghĩa thống kê của việc cải thiện độ chính xác (Precision, Recall, F1, FPR).
 4. **CÔNG NGHỆ SỬ DỤNG:** `scikit-learn`, `statsmodels` (McNemar's Test).
-5. **CƠ CHẾ HOẠT ĐỘNG:** So sánh nhãn dự đoán và ground truth trên 750 mẫu. Chạy kiểm định McNemar trên ma trận nhầm lẫn để tính toán p-value: nếu p < 0.05, chứng minh cải tiến có ý nghĩa thống kê thực tế.
+5. **CƠ CHẾ HOẠT ĐỘNG:** So sánh nhãn dự đoán và ground truth trên 4,267 mẫu. Chạy kiểm định McNemar trên ma trận nhầm lẫn để tính toán p-value: nếu p < 0.05, chứng minh cải tiến có ý nghĩa thống kê thực tế.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `experiments/statistical_tests.py` & `run_ablation_study.py`.
    - Function: `compute_classification_metrics()`, `mcnemar_test()`.
@@ -474,15 +475,15 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 8. **VAI TRÒ BẢO MẬT:** Xác thực hiệu năng của màng lọc Tier 1 trong việc chống nghẽn LLM.
 
 ### **34. Robustness against Adversarial Attacks**
-1. **STEP NAME:** Adversarial Guardrail Defeat Rate Measurement.
+1. **STEP NAME:** Adversarial Guardrail Resistance (Block Rate) Measurement.
 2. **LAYER:** Evaluation Framework.
-3. **MỤC ĐÍCH:** Đánh giá độ bền bỉ và khả năng phòng thủ của hệ thống trước 45 mẫu tấn công nghịch đảo tinh vi.
-4. **CÔNG NGHỆ SỬ DỤNG:** JSON adversarial dataset (45 mẫu).
+3. **MỤC ĐÍCH:** Đánh giá độ bền bỉ và khả năng phòng thủ của hệ thống trước 120 mẫu tấn công nghịch đảo tinh vi (5 loại).
+4. **CÔNG NGHỆ SỬ DỤNG:** JSON adversarial dataset (120 mẫu / 5 loại).
 5. **CƠ CHẾ HOẠT ĐỘNG:** Nhồi các log chứa chuỗi prompt injection và encoding bypass đặc chế. Tính toán tỷ lệ phần trăm payload có thể bypass được guardrail để thao túng LLM.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `experiments/evaluate_robustness.py`.
    - Function: `run_robustness_eval()`.
-   - Input: Adversarial JSON List → Output: Defeat Rate Percentage.
+   - Input: Adversarial JSON List → Output: Block Rate / Bypass Rate Percentage (đặt tên rõ ràng, tránh nhầm "defeat rate").
 7. **LUỒNG DỮ LIỆU:** Adversarial logs → Guardrails pipeline → Block/Pass decisions.
 8. **VAI TRÒ BẢO MẬT:** Đo lường khả năng chống đỡ trước mã độc chèn prompt injection ẩn giấu trong log.
 

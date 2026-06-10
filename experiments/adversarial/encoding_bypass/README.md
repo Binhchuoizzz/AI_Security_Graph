@@ -1,8 +1,8 @@
 # Adversarial Test Dataset: Encoding Bypass in Two-Tier Architecture
 
-> **Status:** SKELETON
+> **Status:** IMPLEMENTED — 45 samples generated (`samples.json`)
 > **Priority:** #2 — Adversarial Datasets
-> **Target:** 200 samples
+> **Current result:** **100% blocked (45/45)** after `EncodingNeutralizer` was extended to cover Base32, ROT13, leetspeak, Cyrillic/Greek homoglyphs (NFKC fold), fullwidth, and numeric HTML entities — in addition to the original Base64/Hex/URL/zero-width vectors.
 
 ## Attack Vectors
 

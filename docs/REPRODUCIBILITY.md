@@ -12,8 +12,8 @@ Tài liệu này cung cấp các hướng dẫn để các nhà nghiên cứu đ
 ## 2. Dataset & Tiền xử lý
 
 - **Nguồn Dữ liệu:** Sử dụng bộ dữ liệu gốc **CSE-CIC-IDS2018** (cho Network Anomaly) và **DAPT2020** (cho APT Chains).
-- **Ground Truth:** Để đánh giá chính xác, hệ thống sử dụng tập `experiments/ground_truth.json` gồm 750 samples (15 classes, 50 samples mỗi class).
-- **Adversarial Samples:** Tập `experiments/adversarial_samples.json` gồm 45 mẫu chia làm 3 loại (Encoding Bypass, Structural Attacks, Semantic Confusion) để đo lường Defeat Rate.
+- **Ground Truth:** Để đánh giá chính xác, hệ thống sử dụng tập `experiments/ground_truth.json` gồm **4,267 samples** (14 lớp tấn công + Benign + 50 mẫu adversarial), stratified sampling với `random_state=42`.
+- **Adversarial Samples:** Bộ `experiments/adversarial/` gồm **120 mẫu** chia làm **5 loại đã sinh mẫu** (`encoding_bypass` 45, `structural_attacks` 20, `semantic_confusion` 20, `jailbreak` 20, `rag_poisoning` 15) để đo lường tỉ lệ kháng (block rate) / tỉ lệ lọt (bypass rate); loại thứ 6 `rule_injection` mới ở dạng skeleton, chưa sinh mẫu. Ngoài ra `adversarial_samples.json` (50 mẫu: 25 structural + 25 semantic) phục vụ test tích hợp.
 
 ## 3. Khung Đánh giá 5D (5D Evaluation Framework)
 
@@ -37,7 +37,7 @@ python experiments/e2e_test_runner.py --offline
 
 **3. Kháng cự (Robustness):**
 
-- Đo lường Defeat Rate (mục tiêu < 10%).
+- Đo lường **tỉ lệ kháng / block rate** ở tầng static guardrails (mục tiêu bypass rate < 10%) trên 120 mẫu adversarial; bổ sung `evaluate_adversarial_pipeline.py` đo độ kháng của FULL pipeline (LLM + Tier-Consensus Guard).
 - Lệnh: `python experiments/evaluate_robustness.py`
 
 **4. Chất lượng Ngữ cảnh (Context Quality):**
@@ -63,4 +63,4 @@ python experiments/e2e_test_runner.py --offline
 Hệ thống sử dụng **MLflow** để tự động log và phiên bản hóa mọi thông số:
 
 - Các kết quả được MLflow quản lý tại thư mục `mlruns/` (Local SQLite) và xem biểu đồ tại `http://localhost:5001`.
-- Log bao gồm Hyperparameters (Temperature=0.1) và Metrics của từng luồng thử nghiệm (F1, Latency, Defeat Rate, reasoning quality scores).
+- Log bao gồm Hyperparameters (Temperature=0.1) và Metrics của từng luồng thử nghiệm (F1, Latency, Block/Bypass Rate, reasoning quality scores).

@@ -1,8 +1,8 @@
 # Adversarial Test Dataset: Structural Attacks in Two-Tier Architecture
 
-> **Status:** SKELETON
+> **Status:** IMPLEMENTED — 20 samples generated (`samples.json`)
 > **Priority:** #2 — Adversarial Datasets
-> **Target:** 300 samples
+> **Current result:** 40% blocked at the static guardrails layer (delimiter-smuggling / pattern detection); the remaining structural injections are designed to be caught downstream by the Tier-2 LLM + Tier-Consensus Guard, not the static layer alone.
 
 ## Source Strategy
 - Adapt từ PromptBench / BIPIA vào log field context

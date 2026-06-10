@@ -138,7 +138,7 @@ Tài liệu này giải thích chi tiết mục tiêu, cơ chế hoạt động 
 ### [T17] Ground Truth Scale
 
 * **Mục đích**: Xác nhận tập dữ liệu kiểm định đạt quy mô tiêu chuẩn để đánh giá khoa học.
-* **Cách hoạt động**: Kiểm tra tệp ground truth đạt tối thiểu 700 mẫu thực tế, các lớp tấn công đều có tối thiểu 20 mẫu để tránh lệch dữ liệu (data bias), và tệp adversarial chứa đủ 45 mẫu.
+* **Cách hoạt động**: Kiểm tra tệp ground truth đạt tối thiểu 700 mẫu thực tế (hiện 4,267 mẫu), các lớp tấn công đều có tối thiểu 20 mẫu để tránh lệch dữ liệu (data bias), và tệp adversarial chứa đủ 50 mẫu.
 * **Ý nghĩa đối với Luận văn**: Chứng minh tính khách quan và tin cậy của các chỉ số hiệu năng (Accuracy/F1) báo cáo trong luận văn.
 
 ### [T18] DAPT2020 APT Chain

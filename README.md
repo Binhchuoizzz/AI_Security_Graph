@@ -123,7 +123,7 @@ SENTINEL is systematically benchmarked across five analytical axes:
 
 * **CSE-CIC-IDS2018:** Millions of rows of network traffic capturing **14 distinct attack classes** (SSH/FTP brute-force, DoS/DDoS families, Web attacks, Botnet, Infiltration, etc.). Cleaned + stratified-sampled into a **4,267-sample labelled benchmark** (`ground_truth.json`) used to score Tier-1 filtering.
 * **DAPT2020:** A multi-day Advanced Persistent Threat (APT) dataset spanning 5 phases (Reconnaissance → Establish Foothold → Lateral Movement → Data Exfiltration). The pipeline correlates per-attacker events into multi-day APT chains (**9 chains / 402 events, 324 malicious**) that feed the SQLite Threat Memory.
-* **Adversarial Suite:** **120 curated attack vectors** across 6 categories (`encoding_bypass`, `structural_attacks`, `jailbreak`, `semantic_confusion`, `rag_poisoning`, `rule_injection`) for Guardrails robustness benchmarking.
+* **Adversarial Suite:** **120 curated attack vectors** across 5 generated categories (`encoding_bypass` 45, `structural_attacks` 20, `semantic_confusion` 20, `jailbreak` 20, `rag_poisoning` 15) for Guardrails robustness benchmarking. A 6th category, `rule_injection`, is scaffolded (design README) but not yet generated.
 * **MITRE ATT&CK & NIST SP 800-61r2:** Curated textual databases indexed into FAISS vector indexes and BM25 lexicons for hybrid semantic search.
 
 ---
