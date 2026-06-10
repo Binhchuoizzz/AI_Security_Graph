@@ -154,7 +154,7 @@ CSV_FILES_2018 = [
     "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",
     "Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv",
     "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
-    # "Tuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # DDoS-LOIC-HTTP: not in LABEL_MAP
+    # "Tuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # 3.8GB — đọc riêng theo chunk trong fetch_and_build (DDoS-LOIC-HTTP)
     "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
     "Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv",
     "Wednesday-28-02-2018_TrafficForML_CICFlowMeter.csv",
