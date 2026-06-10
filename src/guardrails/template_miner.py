@@ -231,13 +231,24 @@ class TokenBudgetManager:
     Quản lý ngân sách token.
     """
 
-    def __init__(self, budget: int = 4000):
+    def __init__(self, budget: Optional[int] = None):
+        # Tham số tường minh được ưu tiên hơn config; config chỉ là mặc định
+        # khi caller không truyền budget (vd: GuardrailsPipeline.process_batch).
+        if budget is not None:
+            self.budget = budget
+            return
         config = load_config()
         guardrails_cfg = config.get("guardrails", {})
         if not isinstance(guardrails_cfg, dict):
             guardrails_cfg = {}
-        budget_val = guardrails_cfg.get("token_budget", budget)
-        self.budget = int(budget_val) if isinstance(budget_val, (int, float, str)) else budget
+        budget_val = guardrails_cfg.get("token_budget", 4000)
+        if isinstance(budget_val, (int, float, str)):
+            try:
+                self.budget = int(budget_val)
+            except ValueError:
+                self.budget = 4000
+        else:
+            self.budget = 4000
 
     @staticmethod
     def estimate_tokens(text: str) -> int:

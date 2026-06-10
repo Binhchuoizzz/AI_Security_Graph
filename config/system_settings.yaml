@@ -75,7 +75,7 @@ llm:
   request_timeout_seconds: 120
   temperature: 0.1
 logging:
-  audit_db_path: logs/audit_trail.db
+  audit_db_path: logs/guardrails_audit.db
   debug_log_path: logs/system_debug.log
   level: INFO
 mlflow:

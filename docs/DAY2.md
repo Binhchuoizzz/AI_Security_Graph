@@ -116,9 +116,9 @@ XUYÊN SUỐT:
 ### `class TokenBudgetManager` — ngân sách token
 | Hàm | Mục đích | Dòng |
 |-----|----------|------|
-| `__init__(budget=4000)` | Đọc `guardrails.token_budget` (override tham số). | [234-240](../src/guardrails/template_miner.py#L234-L240) |
-| `estimate_tokens(text)` *(static)* | Heuristic `len//4` (4 ký tự ≈ 1 token) — **không dùng tiktoken**. | [242-244](../src/guardrails/template_miner.py#L242-L244) |
-| `fit_to_budget(template_text, high_entropy_logs=None)` | 40% budget cho log entropy cao + 60% cho template; vượt → `[TRUNCATED due to token budget]`. | [246-278](../src/guardrails/template_miner.py#L246-L278) |
+| `__init__(budget=None)` | **Tham số tường minh ưu tiên hơn config**; không truyền → đọc `guardrails.token_budget` (mặc định 4000). | [234-251](../src/guardrails/template_miner.py#L234-L251) |
+| `estimate_tokens(text)` *(static)* | Heuristic `len//4` (4 ký tự ≈ 1 token) — **không dùng tiktoken**. | [253-255](../src/guardrails/template_miner.py#L253-L255) |
+| `fit_to_budget(template_text, high_entropy_logs=None)` | 40% budget cho log entropy cao + 60% cho template; vượt → `[TRUNCATED due to token budget]`. | [257-289](../src/guardrails/template_miner.py#L257-L289) |
 
 ---
 
@@ -300,12 +300,12 @@ XUYÊN SUỐT:
 ### `class AuditLogger`
 | Hàm | Mục đích | Dòng |
 |-----|----------|------|
-| `__init__()` | Đọc `audit_db_path`, gọi `_init_db()`. | [103-108](../src/guardrails/state_monitor.py#L103-L108) |
-| `_init_db()` | Tạo bảng `audit_log` (lock + try/finally đóng connection). | [110-136](../src/guardrails/state_monitor.py#L110-L136) |
-| `log_event(event)` | Insert audit (timestamp, tier1_score/action, guardrail_injected, agent_decision/reasoning, mitre/nist, latency, metadata JSON). | [138-180](../src/guardrails/state_monitor.py#L138-L180) |
+| `__init__()` | Đọc `audit_db_path` (`logs/guardrails_audit.db`), gọi `_init_db()`. | [107-112](../src/guardrails/state_monitor.py#L107-L112) |
+| `_init_db()` | Tạo bảng `audit_log` (lock + try/finally đóng connection). | [114-140](../src/guardrails/state_monitor.py#L114-L140) |
+| `log_event(event)` | Insert audit (timestamp, tier1_score/action, guardrail_injected, agent_decision/reasoning, mitre/nist, latency, metadata JSON). | [142-184](../src/guardrails/state_monitor.py#L142-L184) |
 
 > **Singletons:** `loop_detector`, `context_overflow_guard`, `audit_logger`.
-> *(Lưu ý: `audit_log` ở `logs/audit_trail.db` — KHÁC bảng `audit_trail` HMAC ở `config/audit_trail.db` của `response/executor.py`, Ngày 4.)*
+> *(Lưu ý: `audit_log` ở `logs/guardrails_audit.db` (metadata nghiên cứu) — KHÁC bảng `audit_trail` HMAC ở `config/audit_trail.db` của `response/executor.py`, Ngày 4. Tên file đã tách riêng để tránh nhầm lẫn.)*
 
 ---
 
@@ -340,8 +340,8 @@ XUYÊN SUỐT:
 |---|--------|----------------|--------|
 | 1 | 🟢 Tốt | `load_config()` của `prompt_filter` là **single source of truth** cho injection/jailbreak patterns; `rag_sanitizer` import lại → đồng bộ tuyệt đối. | [prompt_filter.py:21](../src/guardrails/prompt_filter.py#L21) |
 | 2 | 🟢 Tốt | `enforce_tier_consensus` đóng lỗ hổng social-engineering ngữ nghĩa (compromise 16.7%→0%). | [decision_validator.py:138](../src/guardrails/decision_validator.py#L138) |
-| 3 | 🟡 Vừa | **Hai DB audit** trùng tên: `logs/audit_trail.db` bảng `audit_log` (state_monitor, metadata research) vs `config/audit_trail.db` bảng `audit_trail` (executor, HMAC chain UI) — chủ ý nhưng dễ nhầm. | state_monitor / executor |
-| 4 | 🟡 Vừa | `TokenBudgetManager(budget=100)` trong test bị config `token_budget:4000` override → test vẫn pass nhưng giá trị tham số bị "nuốt". | [template_miner.py:234](../src/guardrails/template_miner.py#L234) |
+| 3 | 🟢 Đã sửa | **Hai DB audit** từng trùng tên → đã tách: `logs/guardrails_audit.db` bảng `audit_log` (state_monitor, metadata research) vs `config/audit_trail.db` bảng `audit_trail` (executor, HMAC chain UI). | [state_monitor.py:107](../src/guardrails/state_monitor.py#L107) |
+| 4 | 🟢 Đã sửa | `TokenBudgetManager(budget=...)` từng bị config `token_budget:4000` nuốt tham số → nay tham số tường minh ưu tiên, config chỉ là mặc định khi không truyền. | [template_miner.py:234](../src/guardrails/template_miner.py#L234) |
 | 5 | 🟢 Thấp | `SemanticCache` (Ngày 3) là **exact-match SHA-256** chứ không phải cosine — `rag_sanitizer.sanitize_cache_entry` vẫn cần vì cache lưu trước khi sanitize retrieve. | [rag_sanitizer.py:129](../src/guardrails/rag_sanitizer.py#L129) |
 | 6 | 🟢 Thấp | `EncodingNeutralizer` **strip** `<script>` thành `[SCRIPT_STRIPPED]` (an toàn hơn HTML-escape) — test E2E T08 đã đồng bộ theo hành vi này. | [prompt_filter.py:172](../src/guardrails/prompt_filter.py#L172) |
 

@@ -34,7 +34,7 @@ def load_config():
             "token_budget": 4000
         },
         "logging": {
-            "audit_db_path": "logs/audit_trail.db"
+            "audit_db_path": "logs/guardrails_audit.db"
         }
     }
 
@@ -97,13 +97,17 @@ class LoopDetector:
 
 class AuditLogger:
     """
-    Ghi lại toàn bộ quyết định của Agent vào SQLite DB (audit_trail.db).
+    Ghi lại toàn bộ quyết định của Agent vào SQLite DB (guardrails_audit.db).
+
+    LƯU Ý: DB này (metadata nghiên cứu, bảng `audit_log`) tách biệt với
+    `config/audit_trail.db` (chuỗi HMAC pháp lý, bảng `audit_trail`) của
+    response/executor.py — tên file khác nhau để tránh nhầm lẫn.
     """
 
     def __init__(self):
         config = load_config()
         self.db_path = str(config.get("logging", {}).get(
-            "audit_db_path", "logs/audit_trail.db"
+            "audit_db_path", "logs/guardrails_audit.db"
         ))
         self._init_db()
 
