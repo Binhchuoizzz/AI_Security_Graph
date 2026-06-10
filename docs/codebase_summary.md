@@ -23,7 +23,7 @@ Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ
 
 ### 4. `scripts/build_dapt_chains.py`
 *   **Mục đích:** Xử lý và cấu trúc dữ liệu DAPT2020 thành các chuỗi tấn công (Kill-chain) theo thời gian của từng địa chỉ IP.
-*   **Tác dụng:** Đọc dữ liệu DAPT2020 đã được xử lý sơ bộ, thực hiện gom nhóm theo IP nguồn (`src_ip`), sắp xếp sự kiện theo trình tự thời gian chính xác, thực hiện lấy mẫu cân bằng (10 sự kiện tấn công + 10 sự kiện benign) để bảo toàn tín hiệu đe dọa, đóng gói thành `dapt2020_chains.jsonl`.
+*   **Tác dụng:** Đọc dữ liệu DAPT2020 đã được xử lý sơ bộ, thực hiện gom nhóm theo IP nguồn (`src_ip`), sắp xếp sự kiện theo trình tự thời gian chính xác, ưu tiên giữ NHIỀU sự kiện tấn công (tối đa 50 attack + 10 benign mỗi chuỗi) để có càng nhiều log tấn công APT càng tốt, đóng gói thành `dapt2020_chains.jsonl`.
 *   **Mối quan hệ:** Phụ thuộc vào dữ liệu từ `scripts/fetch_dapt2020.py`. Đầu ra dùng cho các kịch bản kiểm thử APT của Tier-2.
 
 ### 5. `src/streaming/publisher.py`
@@ -76,7 +76,7 @@ Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ
 
 ### 13. `src/guardrails/template_miner.py`
 *   **Mục đích:** Khử trùng lặp logs và quản lý token đầu vào LLM.
-*   **Tác dụng:** Sử dụng thư viện `drain3` để phân tích logs thô, trích xuất cấu trúc tĩnh (Template) và gom nhóm logs cùng loại kèm tần suất; sử dụng tiktoken để tính toán token budget, cắt tỉa logs nếu vượt ngưỡng. Đảm bảo ép kiểu an toàn cho các tham số cấu hình từ file YAML.
+*   **Tác dụng:** Sử dụng thư viện `drain3` để phân tích logs thô, trích xuất cấu trúc tĩnh (Template) và gom nhóm logs cùng loại kèm tần suất; ước lượng token budget bằng heuristic (`len(text)//4` ký tự ≈ 1 token), cắt tỉa logs nếu vượt ngưỡng. Đảm bảo ép kiểu an toàn cho các tham số cấu hình từ file YAML.
 *   **Mối quan hệ:** Nhận logs bị leo thang từ Tier 1, nén lại và chuyển tiếp sang `src/guardrails/prompt_filter.py`.
 
 ### 14. `src/guardrails/prompt_filter.py`
@@ -106,7 +106,7 @@ Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ
 
 ### 19. `src/guardrails/decision_validator.py`
 *   **Mục đích:** Thẩm định và làm sạch quyết định đầu ra của LLM Agent (chống Hallucination & Self-DoS).
-*   **Tác dụng:** Ép kiểu JSON đầu ra, downgrade phán quyết `BLOCK_IP` đối với các IP hạ tầng quan trọng xuống mức `ALERT` nhằm tránh tự tấn công từ chối dịch vụ (Self-DoS), đồng thời làm sạch trường giải thích `reasoning` chống Markdown/HTML XSS, SSRF.
+*   **Tác dụng:** Ép kiểu JSON đầu ra, downgrade phán quyết `BLOCK_IP` đối với các IP hạ tầng quan trọng xuống mức `ALERT` nhằm tránh tự tấn công từ chối dịch vụ (Self-DoS), làm sạch trường `reasoning` chống Markdown/HTML XSS-SSRF. Bổ sung **`enforce_tier_consensus`** — lá chắn chống social-engineering ngữ nghĩa: nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM bị thao túng hạ cấp xuống `LOG/DROP`, hệ thống KHÔNG tin LLM mà buộc `AWAIT_HITL`.
 *   **Mối quan hệ:** Được gọi bởi `node_llm_triage` ở `src/agent/nodes.py` để kiểm duyệt quyết định trước khi thực thi.
 
 ### 20. `src/guardrails/feedback_validator.py`
@@ -142,7 +142,7 @@ Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ
 
 ### 25. `src/rag/semantic_cache.py`
 *   **Mục đích:** Giảm thiểu độ trễ suy luận RAG bằng kỹ thuật cache thông minh.
-*   **Tác dụng:** Lưu trữ các câu hỏi truy vấn trước đó kèm kết quả RAG tương ứng; nếu truy vấn mới có khoảng cách cosine rất nhỏ với truy vấn cũ thì trả kết quả cache ngay lập tức.
+*   **Tác dụng:** LRU cache (OrderedDict + TTL) lưu kết quả RAG theo khóa băm SHA-256 exact-match của query (đã chuẩn hóa qua template). Nếu query trùng khớp chính xác thì trả kết quả cache ngay, tránh embed + FAISS lại — an toàn (không có false cache hit).
 *   **Mối quan hệ:** Được gọi trực tiếp bên trong `src/rag/retriever.py`.
 
 ### 26. `src/rag/security.py`
@@ -195,7 +195,7 @@ Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ
 ### 34. `src/agent/threat_memory.py`
 *   **Mục đích:** Quản lý uy tín IP dài hạn, chuỗi APT và chống Memory Poisoning.
 *   **Tác dụng:** 
-    *   Kết nối DB SQLite, ghi nhận các kỹ thuật MITRE mà IP đã thực hiện; tự động quét và cắm cờ APT nguy cấp nếu một IP vi phạm liên quan đến $\ge 3$ giai đoạn MITRE khác nhau theo thời gian.
+    *   Kết nối DB SQLite, ghi nhận các kỹ thuật MITRE mà IP đã thực hiện; tự động cắm cờ APT (`check_apt_chain`) nếu một IP xuất hiện trong sự kiện thuộc $\ge 2$ ngày khác nhau (`COUNT(DISTINCT apt_day) >= 2`), nâng mức CRITICAL khi $\ge 3$ ngày.
     *   Tải cấu trúc DAPT chain sử dụng bộ quản lý ngữ cảnh `with open` đảm bảo an toàn tài nguyên.
     *   Tích hợp `output_sanitizer` để làm sạch trường kỹ thuật MITRE, mô tả thực thể trước khi ghi DB SQLite, chống đòn tấn công Long-term Threat Memory Poisoning.
 *   **Mối quan hệ:** Được gọi bởi `node_action_executor` ở `nodes.py` để ghi vết và gọi ở `node_rag_context` để nạp lịch sử.
@@ -242,8 +242,8 @@ Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ
 
 ### 43. `experiments/evaluate_robustness.py`
 *   **Mục đích:** Đánh giá tính kháng nhiễu nghịch đảo của Guardrail.
-*   **Tác dụng:** Bơm các payload prompt injection/obfuscation phức tạp qua hệ thống, tính toán tỷ lệ bypass thành công để chứng minh độ cứng cáp của Tầng Guardrail.
-*   **Mối quan hệ:** Đánh giá độc lập tính an sau prompt.
+*   **Tác dụng:** Bơm **120 mẫu adversarial KHÓ** (5 nhóm: encoding đa lớp, structural, semantic social-engineering, jailbreak, RAG poisoning — sinh bởi `scripts/build_adversarial_suite.py`) qua lớp Guardrail TĨNH, tính tỷ lệ chặn (37.5%). Cặp với `evaluate_adversarial_pipeline.py` đẩy mẫu khó qua FULL pipeline (Tier-2 LLM kháng 100% sau khi vá consensus guard).
+*   **Mối quan hệ:** Đánh giá độc lập độ bền Guardrail tĩnh; bổ trợ bởi `evaluate_adversarial_pipeline.py` cho lớp LLM.
 
 ### 44. `experiments/evaluate_reasoning.py`
 *   **Mục đích:** Đánh giá độ tin cậy tri thức của Agent và chất lượng RAG.
