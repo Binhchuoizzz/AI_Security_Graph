@@ -30,9 +30,10 @@ ADVERSARIAL_DIR = os.path.join(os.path.dirname(__file__), "adversarial")
 
 
 def load_adversarial_samples():
-    """Tải toàn bộ mẫu adversarial từ 3 nhóm tấn công."""
+    """Tải toàn bộ mẫu adversarial từ 5 nhóm tấn công."""
     all_samples = []
-    categories = ["encoding_bypass", "structural_attacks", "semantic_confusion"]
+    categories = ["encoding_bypass", "structural_attacks", "semantic_confusion",
+                  "jailbreak", "rag_poisoning"]
 
     for cat in categories:
         sample_path = os.path.join(ADVERSARIAL_DIR, cat, "samples.json")
