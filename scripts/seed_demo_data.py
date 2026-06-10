@@ -33,7 +33,7 @@ ATTACK_CLASSES = [
     "SSH-Bruteforce", "FTP-BruteForce",
     "DoS attacks-Hulk", "DoS attacks-GoldenEye",
     "DoS attacks-Slowloris", "DoS attacks-SlowHTTPTest",
-    "DDOS attack-HOIC", "DDOS attack-LOIC-UDP",
+    "DDOS attack-HOIC", "DDOS attack-LOIC-UDP", "DDoS attacks-LOIC-HTTP",
     "Brute Force -Web", "Brute Force -XSS",
     "SQL Injection", "Infilteration", "Bot",
 ]

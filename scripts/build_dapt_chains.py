@@ -149,13 +149,16 @@ def build_chains():
     output_path = Path(DAPT_PROCESSED_FILE)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
+        # Ưu tiên giữ NHIỀU sự kiện TẤN CÔNG (tối đa 50/chuỗi) + ít benign làm ngữ cảnh,
+        # để có càng nhiều log tấn công APT càng tốt.
+        MAX_ATTACK_PER_CHAIN = 50
+        MAX_BENIGN_PER_CHAIN = 10
         for ip, events in apt_chains.items():
-            if len(events) > 20:
-                print(f"  [INFO] {ip}: {len(events)} events -> sampling 10 attack + 10 benign events")
-                # Chọn tối đa 10 sự kiện tấn công và 10 sự kiện bình thường để giữ tín hiệu
-                attack_evts = [e for e in events if e["label"] not in BENIGN_LABELS]
-                benign_evts = [e for e in events if e["label"] in BENIGN_LABELS]
-                sampled = attack_evts[:10] + benign_evts[:10]
+            attack_evts = [e for e in events if e["label"] not in BENIGN_LABELS]
+            benign_evts = [e for e in events if e["label"] in BENIGN_LABELS]
+            if len(attack_evts) > MAX_ATTACK_PER_CHAIN or len(benign_evts) > MAX_BENIGN_PER_CHAIN:
+                print(f"  [INFO] {ip}: {len(events)} events -> {min(len(attack_evts),MAX_ATTACK_PER_CHAIN)} attack + {min(len(benign_evts),MAX_BENIGN_PER_CHAIN)} benign")
+                sampled = attack_evts[:MAX_ATTACK_PER_CHAIN] + benign_evts[:MAX_BENIGN_PER_CHAIN]
             else:
                 sampled = events
             

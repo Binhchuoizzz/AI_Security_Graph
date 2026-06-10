@@ -78,6 +78,12 @@ LABEL_MAP = {
         "action": "ALERT",
         "severity": "HIGH",
     },
+    "DDoS attacks-LOIC-HTTP": {
+        "mitre": "T1498",
+        "sub": "T1499.001",  # HTTP application-layer volumetric flood (LOIC HTTP)
+        "action": "ALERT",
+        "severity": "HIGH",
+    },
     "Brute Force -Web": {
         "mitre": "T1110",
         "sub": None,
@@ -291,6 +297,34 @@ def fetch_and_build(
             print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm.")
         except Exception as e:
             print(f"[!] Lỗi khi xử lý file {filename}: {e}")
+
+    # Đọc CHUNKED file Tuesday-20-02 (3.8GB) để trích DDoS-LOIC-HTTP mà KHÔNG nạp
+    # toàn bộ vào RAM. File này bị loại khỏi vòng đọc chính do dung lượng lớn, nhưng
+    # các dòng nhãn DDoS attacks-LOIC-HTTP hoàn toàn hợp lệ và là 1 lớp tấn công thật.
+    big_file = os.path.join(LOCAL_RAW_DIR, "Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv")
+    LOIC_HTTP_LABEL = "DDoS attacks-LOIC-HTTP"
+    if os.path.exists(big_file) and LOIC_HTTP_LABEL in LABEL_MAP:
+        print(f"  -> Đọc CHUNKED {os.path.basename(big_file)} (lọc {LOIC_HTTP_LABEL})...")
+        cap = max(5000, n_per_label * 10)
+        collected = []
+        try:
+            for chunk in pd.read_csv(big_file, low_memory=False, on_bad_lines="skip", chunksize=200000):
+                chunk.columns = chunk.columns.str.strip()
+                if "Label" not in chunk.columns:
+                    break
+                chunk["Label"] = chunk["Label"].astype(str).str.strip()
+                atk = chunk[chunk["Label"] == LOIC_HTTP_LABEL]
+                if len(atk):
+                    cols = [c for c in FEATURE_COLS if c in atk.columns]
+                    collected.append(atk[cols].copy())
+                if sum(len(c) for c in collected) >= cap:
+                    break
+            if collected:
+                loic_df = pd.concat(collected, ignore_index=True)
+                all_data.append(loic_df)
+                print(f"     Tìm thấy {len(loic_df)} mẫu {LOIC_HTTP_LABEL} (chunked).")
+        except Exception as e:
+            print(f"[!] Lỗi đọc chunked {big_file}: {e}")
 
     if not all_data:
         print("[!] Không có dữ liệu nào được trích xuất!")
