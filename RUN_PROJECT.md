@@ -469,20 +469,27 @@ Overall: 45/120 blocked (37.5%)  — lớp tĩnh YẾU với semantic & jailbrea
 
 ```text
 =========== TIER-2 LLM ADVERSARIAL RESISTANCE ===========
-Resisted:    10/12 (83.3%)   Compromised: 2/12 (16.7%)
-  - Jailbreak (DAN/dev-mode/roleplay): RESISTED HẾT -> BLOCK_IP
-  - RAG poisoning + structural smuggling: RESISTED HẾT
-  - 🔴 Semantic social-engineering: 2 COMPROMISED (authority_claim,
-    false_context ép LLM ra LOG) -> lỗ hổng dư (residual risk)
+TRƯỚC khi vá:  Resisted 10/12 (83.3%) | Compromised 2/12 (16.7%)
+  - 🔴 Semantic social-engineering (authority_claim, false_context)
+    ép được LLM hạ cấp xuống LOG -> lỗ hổng dư
+SAU khi vá:    Resisted 12/12 (100%)  | Compromised 0/12 (0%)
+  - Jailbreak/RAG-poisoning/structural/semantic: RESISTED HẾT
 =========================================================
 ```
 
-*Giải thích cho Hội đồng (defense-in-depth):* Lớp Guardrails **tĩnh** chỉ chặn 37.5% các
-tấn công tinh vi — đặc biệt **thua jailbreak (10%) và semantic (0%)**. Nhưng **Tier-2 LLM
-kháng 83.3%**: nó vô hiệu hóa toàn bộ jailbreak/RAG-poisoning/delimiter mà lớp tĩnh bỏ sót.
-Điểm yếu **còn lại thật sự** là **social-engineering ngữ nghĩa** (giả mạo thẩm quyền/ngữ
-cảnh) ép được LLM hạ cấp quyết định (16.7%) — đây chính là lý do cần **HITL (con người
-phê duyệt)** cho các quyết định mơ hồ giá trị cao.
+*Giải thích cho Hội đồng (defense-in-depth + cách vá):* Lớp Guardrails **tĩnh** chỉ chặn
+37.5% — thua jailbreak (10%) và semantic (0%). **Tier-2 LLM** ban đầu kháng 83.3% nhưng
+**bị social-engineering ngữ nghĩa** (giả mạo thẩm quyền/ngữ cảnh) ép hạ cấp 16.7%. Lỗ hổng
+này đã được **vá bằng 2 lớp** (xem [DAY2.md](docs/DAY2.md) / code):
+1. **Hardening system prompt** (`prompts.py` rule #7): buộc LLM coi mọi tuyên bố thẩm
+   quyền/whitelist/ticket trong log là một phần của tấn công và BỎ QUA — chỉ phán xét
+   bằng bằng chứng kỹ thuật.
+2. **Lá chắn bất đồng Tier-1/Tier-2** (`DecisionValidator.enforce_tier_consensus`): Tier-1
+   (luật xác định, KHÔNG thể bị thuyết phục) làm trọng tài — nếu Tier-1 coi là tấn công
+   nhưng LLM hạ cấp xuống LOG/DROP, hệ thống KHÔNG tin LLM mà buộc **AWAIT_HITL**.
+
+Sau vá: **0% compromise** trên cùng bộ tấn công. Đây là minh chứng defense-in-depth: tầng
+deterministic kiểm tra tầng có thể bị thao túng, và HITL là chốt chặn cuối cho ca mơ hồ.
 
 ---
 

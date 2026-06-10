@@ -186,6 +186,18 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     # 2. CHẠY QUYẾT ĐỊNH QUA LLM DECISION VALIDATOR (Enforce Enum, Shield critical, Sanitize reasoning)
     validated_decision = decision_validator.validate_decision(decision_json)
 
+    # 2b. LÁ CHẮN BẤT ĐỒNG TIER-1/TIER-2 (chống social-engineering ngữ nghĩa):
+    # Nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM hạ cấp xuống bỏ qua,
+    # buộc AWAIT_HITL — Tier-1 không thể bị "nói chuyện" hạ cấp như LLM.
+    tier1_flagged_attack = any(
+        log.get("tier1_action") in ("BLOCK_IP", "ESCALATE", "AWAIT_HITL", "ALERT")
+        or float(log.get("tier1_score", 0) or 0) >= 30
+        for log in state.current_batch_logs
+    )
+    validated_decision = decision_validator.enforce_tier_consensus(
+        validated_decision, tier1_flagged_attack
+    )
+
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
     reasoning = validated_decision.get("reasoning", "No reasoning provided.")

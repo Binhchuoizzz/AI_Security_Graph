@@ -134,3 +134,29 @@ class DecisionValidator:
             validated["nist_control"] = output_sanitizer.sanitize(str(validated["nist_control"]))
 
         return validated
+
+    def enforce_tier_consensus(self, validated: dict, tier1_flagged_attack: bool) -> dict:
+        """
+        Lá chắn chống Social-Engineering ngữ nghĩa (Tier-1/Tier-2 Consensus Guard).
+
+        Tier-1 (rule engine xác định) KHÔNG thể bị thao túng bằng ngôn ngữ thuyết phục.
+        Nếu Tier-1 đã đánh giá luồng này là TẤN CÔNG nhưng LLM (có thể bị giả mạo thẩm
+        quyền/ngữ cảnh) lại HẠ CẤP xuống LOG/DROP (bỏ qua), KHÔNG tin LLM — buộc chuyển
+        AWAIT_HITL để con người xác minh. Đây là hiện thực hóa defense-in-depth: tầng
+        deterministic làm trọng tài kiểm tra tầng có thể bị thao túng.
+        """
+        action = str(validated.get("action", "AWAIT_HITL"))
+        if tier1_flagged_attack and action in ("LOG", "DROP"):
+            logger.warning(
+                "[DecisionValidator] Tier-1/Tier-2 DISAGREEMENT: Tier-1 flagged attack but "
+                f"LLM downgraded to {action}. Possible semantic social-engineering — overriding to AWAIT_HITL."
+            )
+            validated["action"] = "AWAIT_HITL"
+            validated["_tier_consensus_override"] = True
+            note = (
+                "[GIÁM SÁT BẤT ĐỒNG TIER-1/TIER-2] Tier-1 (luật xác định) đánh giá đây là "
+                "tấn công nhưng LLM hạ cấp xuống bỏ qua — nghi ngờ bị thao túng ngữ nghĩa "
+                "(giả mạo thẩm quyền/ngữ cảnh). Chuyển con người kiểm duyệt."
+            )
+            validated["reasoning"] = note + " | " + str(validated.get("reasoning", ""))
+        return validated

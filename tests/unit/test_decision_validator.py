@@ -12,11 +12,40 @@ def test_decision_validator_allowed_actions():
     d1 = {"action": "BLOCK_IP", "confidence": 0.9, "target": "1.2.3.4"}
     res1 = validator.validate_decision(d1)
     assert res1["action"] == "BLOCK_IP"
-    
+
     # Action lạ phải chuyển thành AWAIT_HITL
     d2 = {"action": "HACK_BACK", "confidence": 0.9, "target": "1.2.3.4"}
     res2 = validator.validate_decision(d2)
     assert res2["action"] == "AWAIT_HITL"
+
+
+def test_tier_consensus_guard_blocks_semantic_manipulation():
+    """Tier-1 coi là tấn công + LLM hạ xuống LOG/DROP -> buộc AWAIT_HITL."""
+    validator = DecisionValidator()
+    # LLM bị social-engineering hạ xuống LOG
+    for downgraded in ("LOG", "DROP"):
+        d = {"action": downgraded, "confidence": 0.4, "target": "45.13.1.1", "reasoning": "Người dùng nói đã được duyệt"}
+        res = validator.enforce_tier_consensus(d, tier1_flagged_attack=True)
+        assert res["action"] == "AWAIT_HITL"
+        assert res.get("_tier_consensus_override") is True
+
+
+def test_tier_consensus_guard_respects_legit_log():
+    """Tier-1 KHÔNG flag tấn công -> LLM nói LOG vẫn được giữ (không override)."""
+    validator = DecisionValidator()
+    d = {"action": "LOG", "confidence": 0.6, "target": "10.0.0.5"}
+    res = validator.enforce_tier_consensus(d, tier1_flagged_attack=False)
+    assert res["action"] == "LOG"
+    assert "_tier_consensus_override" not in res
+
+
+def test_tier_consensus_guard_keeps_block_decisions():
+    """LLM ra BLOCK_IP/ALERT thì consensus guard không can thiệp."""
+    validator = DecisionValidator()
+    for act in ("BLOCK_IP", "ALERT", "AWAIT_HITL"):
+        d = {"action": act, "confidence": 0.9, "target": "45.13.1.1"}
+        res = validator.enforce_tier_consensus(d, tier1_flagged_attack=True)
+        assert res["action"] == act
 
 
 def test_decision_validator_confidence_gate():
