@@ -1,299 +1,160 @@
-# Tài liệu Tổng kết Cấu trúc Mã nguồn & Lộ trình Học tập (SENTINEL V5)
+# Tài liệu Tổng kết Cấu trúc Mã nguồn & Lộ trình Học tập (SENTINEL)
 
-Tài liệu này tổng hợp toàn bộ **50 tệp tin mã nguồn** trong hệ thống SENTINEL, được phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Thứ tự lộ trình học tập 5 ngày** của học viên. Mỗi file đều được phân tích rõ: Mục đích, Tác dụng, và Mối quan hệ tương tác với các cấu phần khác.
+Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng dữ liệu (Dataflow)** và **Lộ trình học tập theo ngày**. Mỗi file được phân tích: Mục đích, Tác dụng, Mối quan hệ với các cấu phần khác.
+
+> **Tiến độ hiện tại:** Đã đi qua **NGÀY 1** (Tầng dữ liệu đầu vào & Bộ lọc Tier-1) và
+> **NGÀY 2** (Tầng an toàn Guardrails) — 21 file, được mô tả CHI TIẾT & đối chiếu sát với
+> code hiện tại bên dưới. Các **Ngày 3 → 5** (RAG, LangGraph Agent, UI & Thực nghiệm)
+> **CHƯA đi qua** — chỉ liệt kê outline ngắn ở cuối để định hướng.
 
 ---
 
 ## **NGÀY 1: TẦNG DỮ LIỆU ĐẦU VÀO & BỘ LỌC TỐC ĐỘ CAO TIER 1**
 
 ### 1. `scripts/fetch_and_build_dataset.py`
-*   **Mục đích:** Tự động tải và định dạng hóa bộ dữ liệu an ninh mạng chuẩn CSE-CIC-IDS2018 phục vụ nghiên cứu.
-*   **Tác dụng:** Tải tệp dữ liệu tĩnh CSV của bộ dữ liệu CSE-CIC-IDS2018 từ nguồn công khai, thực hiện ETL ban đầu để làm sạch dữ liệu.
-*   **Mối quan hệ:** Đầu ra ghi vào thư mục `data/raw/cicids2018/`. Được gọi thủ công khi cài đặt môi trường.
+*   **Mục đích:** Trích xuất & chuẩn hóa bộ dữ liệu CSE-CIC-IDS2018 thành tập `ground_truth.json` cho thực nghiệm/demo.
+*   **Tác dụng:** Đọc các tệp CSV thô CIC-IDS2018, lọc theo `LABEL_MAP` (14 lớp tấn công + Benign), ánh xạ mỗi lớp sang MITRE + hành động kỳ vọng, tiền xử lý (ép kiểu số, xử lý inf/NaN, dedup), lấy mẫu phân tầng `n_per_label` (mặc định 300) ghi ra `experiments/ground_truth.json`. **Đã bổ sung lớp thứ 14 `DDoS attacks-LOIC-HTTP`** bằng cách đọc CHUNKED (200k dòng/chunk) file Tuesday-20-02 (3.8GB) để tránh OOM. Sinh kèm 50 mẫu adversarial cho kiểm thử Guardrails.
+*   **Mối quan hệ:** Đọc từ `data/raw/cicids2018/`. Đầu ra `ground_truth.json` dùng cho Ablation Study, dashboard seed và các script đánh giá.
 
 ### 2. `scripts/fetch_dapt2020.py`
-*   **Mục đích:** Tải bộ dữ liệu tấn công chuỗi dài ngày DAPT2020 phục vụ nghiên cứu kịch bản tấn công APT.
-*   **Tác dụng:** Tải các tệp dữ liệu thô DAPT2020, làm sạch ban đầu, xử lý các ngày hoạt động (Day 1 - Day 5) để phân cấp các sự kiện.
-*   **Mối quan hệ:** Lưu trữ dữ liệu thô vào `data/raw/dapt2020/`.
+*   **Mục đích:** Tải/chuẩn bị bộ dữ liệu tấn công chuỗi dài ngày DAPT2020 (kịch bản APT).
+*   **Tác dụng:** Tải các tệp thô DAPT2020, làm sạch ban đầu, phân cấp sự kiện theo ngày hoạt động (Day 1 → Day 5).
+*   **Mối quan hệ:** Lưu dữ liệu thô vào `data/raw/dapt2020/`.
 
 ### 3. `scripts/dapt2020_config.py`
-*   **Mục đích:** Lưu trữ cấu hình ánh xạ nhãn, các hằng số và chuẩn hóa cột cho dữ liệu DAPT2020.
-*   **Tác dụng:** Định nghĩa bảng ánh xạ các nhãn tấn công sang mã kỹ thuật MITRE ATT&CK (`DAPT_LABEL_TO_MITRE`) và các giai đoạn APT (`APT_PHASES`).
-*   **Mối quan hệ:** Được import và sử dụng chung bởi `scripts/fetch_dapt2020.py` và `scripts/build_dapt_chains.py`.
+*   **Mục đích:** Cấu hình ánh xạ nhãn, hằng số và chuẩn hóa cột cho DAPT2020.
+*   **Tác dụng:** Định nghĩa `DAPT_LABEL_TO_MITRE` (nhãn tấn công → mã MITRE ATT&CK) và `APT_PHASES` (giai đoạn kill-chain theo ngày).
+*   **Mối quan hệ:** Được import bởi `scripts/fetch_dapt2020.py` và `scripts/build_dapt_chains.py`.
 
 ### 4. `scripts/build_dapt_chains.py`
-*   **Mục đích:** Xử lý và cấu trúc dữ liệu DAPT2020 thành các chuỗi tấn công (Kill-chain) theo thời gian của từng địa chỉ IP.
-*   **Tác dụng:** Đọc dữ liệu DAPT2020 đã được xử lý sơ bộ, thực hiện gom nhóm theo IP nguồn (`src_ip`), sắp xếp sự kiện theo trình tự thời gian chính xác, ưu tiên giữ NHIỀU sự kiện tấn công (tối đa 50 attack + 10 benign mỗi chuỗi) để có càng nhiều log tấn công APT càng tốt, đóng gói thành `dapt2020_chains.jsonl`.
-*   **Mối quan hệ:** Phụ thuộc vào dữ liệu từ `scripts/fetch_dapt2020.py`. Đầu ra dùng cho các kịch bản kiểm thử APT của Tier-2.
+*   **Mục đích:** Cấu trúc DAPT2020 thành các chuỗi tấn công APT (kill-chain) theo thời gian của từng IP.
+*   **Tác dụng:** Đọc 5 ngày DAPT2020, gom nhóm theo `src_ip`, sắp xếp theo thời gian, chỉ giữ chuỗi đa-ngày (≥2 ngày) có ít nhất 1 sự kiện tấn công. **Ưu tiên giữ NHIỀU sự kiện tấn công (tối đa 50 attack + 10 benign mỗi chuỗi)** để tối đa hóa log tấn công APT; đóng gói ra `data/processed/dapt2020_chains.jsonl` (giữ nhãn chi tiết + `mitre_ttp`).
+*   **Mối quan hệ:** Đầu ra dùng cho `threat_memory.ingest_dapt_chains()` và các kịch bản kiểm thử APT của Tier-2.
 
 ### 5. `src/streaming/publisher.py`
 *   **Mục đích:** Mô phỏng dòng lưu lượng mạng doanh nghiệp thời gian thực.
-*   **Tác dụng:** Đọc cấu hình kết nối Redis trực tiếp từ file cấu hình trung tâm `config/system_settings.yaml` (loại bỏ các khóa cấu hình tĩnh dư thừa); đọc tập dữ liệu đã chuẩn hóa, chuyển đổi từng dòng log (flow) thành JSON và đẩy liên tục lên Redis Pub/Sub channel ở tốc độ tùy chỉnh (mô phỏng wire-speed).
-*   **Mối quan hệ:** Đẩy dữ liệu lên Redis. Được import và gọi bởi `scripts/simulate_traffic.py`.
+*   **Tác dụng:** Đọc `REDIS_URL` từ `.env`/`system_settings.yaml`, đọc CSV (Demo-Attack/CICIDS), chuẩn hóa & sinh IP xác định (`_inject_ips`), đẩy từng flow JSON vào **Redis Stream** bằng `xadd` (maxlen giới hạn chống OOM) với độ trễ tùy chỉnh (wire-speed). *(Lưu ý: dùng Redis Streams — KHÔNG phải Pub/Sub.)*
+*   **Mối quan hệ:** Đẩy vào Stream `queue_waf`; subscriber tiêu thụ qua consumer group.
 
 ### 6. `scripts/simulate_traffic.py`
-*   **Mục đích:** Script thực thi dòng lưu lượng mạng mô phỏng.
-*   **Tác dụng:** Điểm khởi chạy (entrypoint) để bắt đầu tiến trình stream dữ liệu logs mạng. Hỗ trợ ánh xạ 17 trường mạng từ tập dữ liệu thô sang các trường chuẩn hóa của Rule Engine thông qua alias khóa (`_KEY_ALIASES` và `_RAW_TO_CANONICAL`).
-*   **Mối quan hệ:** Khởi tạo instance và gọi hàm từ `src/streaming/publisher.py`.
+*   **Mục đích:** Entrypoint chạy mô phỏng dòng lưu lượng mạng.
+*   **Tác dụng:** Khởi chạy tiến trình stream logs; hỗ trợ ánh xạ các trường mạng thô → chuẩn hóa của Rule Engine qua alias khóa.
+*   **Mối quan hệ:** Gọi hàm từ `src/streaming/publisher.py`.
 
 ### 7. `src/streaming/subscriber.py`
-*   **Mục đích:** Lắng nghe và gom batch dữ liệu logs từ Redis.
-*   **Tác dụng:** Đăng ký lắng nghe kênh Redis (cấu hình đọc động từ `system_settings.yaml`), nhận JSON log mạng, tích lũy logs theo từng cửa sổ trượt thời gian (time window) và đẩy sang Rule Engine của Tier 1 để đánh giá.
-*   **Mối quan hệ:** Nhận logs từ Redis Pub/Sub, chuyển tiếp dữ liệu đến `src/tier1_filter/rule_engine.py` và gọi tác tử LangGraph ở `src/agent/workflow.py` nếu có escalate.
+*   **Mục đích:** Lắng nghe & gom batch logs từ Redis để chuyển cho Tier-1/Tier-2.
+*   **Tác dụng:** Tạo/tham gia **consumer group `sentinel_group`** trên các **Redis Stream** (`queue_firewall`, `queue_waf`) qua `xreadgroup`; với mỗi log gọi `RuleEngine.evaluate`, rồi định tuyến theo `tier1_action`: `ESCALATE` → gom batch gọi LangGraph Agent; `BLOCK_IP` → blacklist Redis; `AWAIT_HITL` → đẩy queue HITL; `ALERT/LOG` → ghi `queue_decisions`. Trigger Agent theo batch_size hoặc timeout.
+*   **Mối quan hệ:** Nhận từ Redis Streams, gọi `rule_engine.py` (Tier-1) và `agent/workflow.py` (Tier-2) khi escalate.
 
 ### 8. `src/tier1_filter/rule_engine.py` *(Cực kỳ quan trọng)*
-*   **Mục đích:** Màng lọc thô heuristics và phát hiện dị biệt thống kê phi giám sát trực tuyến.
-*   **Tác dụng:** 
-    *   Class `RunningStats`: Cài đặt thuật toán Welford trực tuyến cập nhật Mean/StdDev với độ phức tạp $O(1)$ RAM/CPU.
-    *   Class `SessionBaseline`: Quản lý IP profiles, theo dõi hành vi quét cổng (Port scan) và cơ chế tự dọn dẹp (eviction) IP rác quá TTL để chống OOM.
-    *   Đo lường Z-Score và so sánh với blacklist/rate-limit để tính tổng điểm rủi ro. Quyết định DROP, LOG, ALERT, hoặc ESCALATE.
-    *   Đồng bộ hóa 100% với cấu hình cổng nhạy cảm `sensitive_ports` (loại bỏ các cổng Web chuẩn như 80/443 để tránh chặn nhầm các cuộc tấn công tầng ứng dụng SQLi/XSS cần LLM phân tích) và loại bỏ hoàn toàn IP `0.0.0.0` khỏi whitelist để tránh bypass.
-*   **Mối quan hệ:** Nhận logs đầu vào từ `subscriber.py`, đọc cấu hình từ `system_settings.yaml` (thông qua `feedback_listener.py`), trả quyết định chặn về cho hệ thống.
+*   **Mục đích:** Màng lọc heuristics tốc độ cao + phát hiện dị biệt thống kê phi giám sát trực tuyến.
+*   **Tác dụng:**
+    *   Class `RunningStats`: thuật toán **Welford** cập nhật Mean/StdDev trực tuyến, $O(1)$ RAM/CPU.
+    *   Class `SessionBaseline`: quản lý IP profiles, phát hiện **port scan** (>10 cổng non-HTTP), tần suất cao, dung lượng bất thường; cơ chế **eviction TTL** chống OOM.
+    *   `evaluate()` xử lý theo tầng: Whitelist → **WAF signature** (`_check_waf_signatures`: SQLi/XSS/Path-Traversal/Cmd-Inj) → **Prompt-Injection/Jailbreak signature** (`_check_injection_signatures`) → **Z-Score anomaly** (warmup 100 mẫu sạch, lệch >3.5σ → phạt zero-day) → Static rules (cổng nhạy cảm, volumetric) → **Dynamic rules (chỉ status `ACTIVE`)** → Session baseline → phân luồng action (DROP/LOG/ALERT/BLOCK_IP/AWAIT_HITL/ESCALATE).
+    *   **Chống Baseline Poisoning:** chỉ nạp flow được coi là benign (DROP/LOG) vào `global_stats`. **Hot-reload** config mỗi 5s khi YAML đổi.
+    *   Đồng bộ `sensitive_ports` (loại 80/443 để tấn công tầng ứng dụng SQLi/XSS được ESCALATE lên LLM) và loại `0.0.0.0` khỏi whitelist.
+*   **Mối quan hệ:** Nhận logs từ `subscriber.py`, đọc/hot-reload config từ `system_settings.yaml`, trả quyết định Tier-1.
 
 ### 9. `src/tier1_filter/feedback_listener.py`
-*   **Mục đích:** Cầu nối phản hồi thời gian thực giúp đồng bộ cấu hình hệ thống.
-*   **Tác dụng:** Lắng nghe các thay đổi trong cấu hình rules từ UI và cập nhật nạp nóng (hot-reload) vào class `RuleEngine` mà không cần restart. Sử dụng cơ chế ghi đè an toàn (atomic write) kết hợp `FileLock` trên file YAML cấu hình rules động, đồng thời đảm bảo điểm số rủi ro (risk score) luôn được giới hạn (clamp) trong khoảng `[0, 100]`.
-*   **Mối quan hệ:** Được gọi bởi Web UI ở `src/ui/app.py` để đồng bộ xuống `src/tier1_filter/rule_engine.py`.
+*   **Mục đích:** Vòng phản hồi (Feedback Loop) đồng bộ cấu hình rule động giữa UI/Agent ↔ Tier-1.
+*   **Tác dụng:** Nhận rule mới (qua `FeedbackValidator`), persist vào `system_settings.yaml` bằng **atomic write** (`mkstemp` + `chmod 0644` + `os.replace`) kết hợp `FileLock`. Quản lý vòng đời `PENDING_APPROVAL → ACTIVE/REJECTED` (HITL approval), whitelist, và clamp risk score `[0,100]`.
+*   **Mối quan hệ:** Gọi bởi `node_action_executor` (Agent) và Web UI; RuleEngine hot-reload các rule `ACTIVE`.
 
 ### 10. `src/tier1_filter/scanner.py`
-*   **Mục đích:** Phân hệ quét lỗ hổng bảo mật tĩnh phụ thuộc (SCA - Software Composition Analysis).
-*   **Tác dụng:** Tích hợp công cụ Trivy để quét mã nguồn và dependencies của chính hệ thống nhằm phát hiện CVE tĩnh, phục vụ kiểm thử tính tự an toàn (Self-Securing) của hệ thống.
-*   **Mối quan hệ:** Chạy độc lập dưới dạng tác vụ DevSecOps của hệ thống; kết quả quét được lưu xuống ổ đĩa dạng JSON và đồng bộ hóa làm tri thức RAG/Knowledge Graph.
+*   **Mục đích:** Phân hệ quét lỗ hổng phụ thuộc (SCA) bằng Trivy.
+*   **Tác dụng:** Tích hợp Trivy quét mã nguồn & dependencies của chính hệ thống (Self-Securing/DevSecOps), kết quả JSON dùng nạp vào Knowledge Graph (Neo4j, V2 tùy chọn).
+*   **Mối quan hệ:** Chạy độc lập; đầu ra đồng bộ làm tri thức RAG/Graph.
 
 ### 11. `demo_tier1.py`
-*   **Mục đích:** Demo chạy riêng phân hệ Tier 1.
-*   **Tác dụng:** Cung cấp script tương tác dòng lệnh để kiểm tra thuật toán Welford và Z-Score. Khắc phục lỗi Case 4 bằng cách tích hợp xử lý đúng trạng thái phê duyệt của rule động (`ACTIVE` và `PENDING_APPROVAL`), đảm bảo kịch bản leo thang (ESCALATE) chạy chuẩn xác.
-*   **Mối quan hệ:** Gọi trực tiếp `src/tier1_filter/rule_engine.py`.
+*   **Mục đích:** Demo chạy riêng Tier-1.
+*   **Tác dụng:** Script CLI minh họa 6 loại action (DROP/BLOCK_IP/ALERT/ESCALATE/AWAIT_HITL) + Welford Z-Score zero-day; xử lý đúng trạng thái rule động (`ACTIVE`/`PENDING_APPROVAL`).
+*   **Mối quan hệ:** Gọi trực tiếp `rule_engine.py`.
 
 ---
 
 ## **NGÀY 2: TẦNG AN TOÀN VÀ NÉN DỮ LIỆU (GUARDRAILS)**
 
 ### 12. `src/guardrails/constants.py`
-*   **Mục đích:** Quản lý tập trung ánh xạ tên trường logs mạng giữa các tầng.
-*   **Tác dụng:** Định nghĩa dictionary `KEY_ALIASES` dùng chung nhằm chuyển đổi đồng bộ các trường dữ liệu Redis (như `src_ip`, `dst_port`) thành định dạng chuẩn hóa (như `Source IP`, `Destination Port`) trên toàn bộ hệ thống guardrails, ngăn chặn sai lệch cấu trúc dữ liệu.
-*   **Mối quan hệ:** Được import và sử dụng trực tiếp bởi `data_validator.py`, `feedback_validator.py` và các module phân tích logs mạng.
+*   **Mục đích:** Tập trung ánh xạ tên trường log giữa các tầng.
+*   **Tác dụng:** `KEY_ALIASES` + `normalize_log_keys()` chuyển các biến thể (`src_ip`, `dst_port`, `user_agent`...) về tên chuẩn (`Source IP`, `Destination Port`, `User-Agent`...), chống sai lệch cấu trúc dữ liệu.
+*   **Mối quan hệ:** Dùng bởi `data_validator.py`, `feedback_validator.py`, `template_miner.py`, `prompt_filter.py`.
 
 ### 13. `src/guardrails/template_miner.py`
-*   **Mục đích:** Khử trùng lặp logs và quản lý token đầu vào LLM.
-*   **Tác dụng:** Sử dụng thư viện `drain3` để phân tích logs thô, trích xuất cấu trúc tĩnh (Template) và gom nhóm logs cùng loại kèm tần suất; ước lượng token budget bằng heuristic (`len(text)//4` ký tự ≈ 1 token), cắt tỉa logs nếu vượt ngưỡng. Đảm bảo ép kiểu an toàn cho các tham số cấu hình từ file YAML.
-*   **Mối quan hệ:** Nhận logs bị leo thang từ Tier 1, nén lại và chuyển tiếp sang `src/guardrails/prompt_filter.py`.
+*   **Mục đích:** Nén volume logs + quản lý token đầu vào LLM.
+*   **Tác dụng:** `LogTemplateMiner` dùng `drain3` gom logs cùng cấu trúc thành Template + count + mẫu; `EntropyScorer` tính Shannon entropy ưu tiên log bất thường; `TokenBudgetManager` ước lượng token bằng heuristic (`len//4`) và cắt theo ngân sách (đọc `token_budget` từ config). Có guard ép kiểu an toàn cho tham số YAML.
+*   **Mối quan hệ:** Nhận logs escalate từ Tier-1, nén & chuyển cho `prompt_filter.py`.
 
 ### 14. `src/guardrails/prompt_filter.py`
-*   **Mục đích:** Vô hiệu hóa đòn tấn công chèn lệnh trực tiếp (Direct Prompt Injection).
-*   **Tác dụng:** Sinh khóa Delimiter ngẫu nhiên bảo mật bằng `secrets.token_hex(8)` để bọc payload log mạng gửi sang LLM; thực hiện quét Regex phát hiện và loại bỏ các nỗ lực smuggling (delimiter giả mạo trong logs).
-*   **Mối quan hệ:** Nhận log đã nén từ `template_miner.py`, thực hiện đóng gói bảo mật trước khi nạp vào hệ thống Prompt của Agent.
+*   **Mục đích:** 3 tầng phòng thủ Prompt Injection trước khi log vào LLM.
+*   **Tác dụng:** `load_config` (nguồn config trung tâm + fallback); `PromptInjectionDetector` & `JailbreakDetector` (regex pattern + `role_play_re`, set isolation `HIGH`/`CRITICAL`); `EncodingNeutralizer` (giải base64/URL/hex, strip zero-width & HTML/script); `DelimitedDataEncapsulator` (sinh **nonce `secrets.token_hex(8)`**, strip delimiter smuggling `<<<...>>>`, chỉ giữ `ALLOWED_FIELDS`); `GuardrailsPipeline` orchestrate cả `process()` và `process_batch()` (kết hợp template miner + entropy + token budget).
+*   **Mối quan hệ:** Nhận log đã nén từ `template_miner.py`, đóng gói an toàn trước khi vào prompt Agent.
 
 ### 15. `src/guardrails/output_sanitizer.py`
-*   **Mục đích:** Làm sạch dữ liệu đầu ra và chống XSS/Markdown Exfiltration.
-*   **Tác dụng:** Quét nội dung phản hồi của LLM hoặc logs thô, giải mã Base64/Hex để phát hiện payload ẩn, loại bỏ ký tự zero-width điều khiển bypass, và strip sạch các thẻ script/markdown hình ảnh độc hại trước khi hiển thị hoặc lưu trữ.
-*   **Mối quan hệ:** Xử lý kết quả đầu ra của Agent trước khi hiển thị tại Web UI `src/ui/app.py` hoặc lưu vào cơ sở dữ liệu.
+*   **Mục đích:** Làm sạch ĐẦU RA LLM, chống Data Exfiltration / XSS / Markdown.
+*   **Tác dụng:** Singleton `output_sanitizer`: strip zero-width & ANSI; thay 11 pattern nguy hiểm (markdown image/link, `<script>/<img>/<iframe>/<svg>`, data URI...) bằng placeholder; quét **base64/hex obfuscation sâu** để bắt payload ẩn.
+*   **Mối quan hệ:** Dùng bởi `decision_validator`, `threat_memory`, `nodes` (double-sanitize) trước khi hiển thị UI/ghi DB.
 
 ### 16. `src/guardrails/data_validator.py`
-*   **Mục đích:** Xác thực cấu trúc dữ liệu đầu vào chống Schema Abuse.
-*   **Tác dụng:** Đảm bảo logs mạng đẩy lên Tier 2 tuân thủ đúng định dạng JSON schema bắt buộc bằng cách ánh xạ thông qua `KEY_ALIASES`. Từ chối và bắt lỗi chi tiết thay vì để lọt dữ liệu invalid vào Agent.
-*   **Mối quan hệ:** Chốt chặn kiểm soát định dạng dữ liệu đầu vào cho hệ thống Guardrail Layer.
+*   **Mục đích:** Xác thực schema log đầu vào (chống Schema Abuse).
+*   **Tác dụng:** Chuẩn hóa key, ép kiểu an toàn, kiểm IP (`ipaddress`), port `[0,65535]`, protocol `[0,255]`; gắn `_is_valid`/`_validation_errors`; hỗ trợ batch với `filter_invalid`/`raise_on_error`.
+*   **Mối quan hệ:** Chốt chặn định dạng đầu vào cho Guardrail Layer.
 
 ### 17. `src/guardrails/state_monitor.py`
-*   **Mục đích:** Giám sát trạng thái an toàn, ghi log kiểm toán và ngăn chặn vòng lặp vô hạn.
-*   **Tác dụng:** Ghi nhận logs kiểm toán vào DB SQLite bằng cơ chế an toàn. Triển khai lớp `LoopDetector` bảo vệ bằng `threading.Lock` để tránh xung đột luồng và hàm `reset()` để xóa sạch counter giữa các chu kỳ chạy đồ thị.
-*   **Mối quan hệ:** Ghi nhận sự kiện kiểm toán và giám sát chu kỳ hoạt động của các Nodes trong LangGraph.
+*   **Mục đích:** Giám sát runtime: audit log, chống vòng lặp vô hạn, kiểm soát context.
+*   **Tác dụng:** `AuditLogger` ghi SQLite an toàn (`threading.Lock` + try/finally); `LoopDetector` (đếm visit, `FORCE_STOP` khi vượt, `reset()` giữa các cycle); `ContextOverflowGuard` kiểm tra ngân sách token. Xuất singletons `loop_detector`, `audit_logger`, `context_overflow_guard`.
+*   **Mối quan hệ:** Ghi audit & giám sát các Node LangGraph.
 
 ### 18. `src/guardrails/rag_sanitizer.py`
-*   **Mục đích:** Bảo vệ hệ thống khỏi tấn công RAG Poisoning và Semantic Cache Poisoning.
-*   **Tác dụng:** Thực hiện lọc thô ngữ nghĩa (Semantic structural sanitization) trên các tài liệu thu thập (Ingestion) và ngữ cảnh truy vấn (Retrieval). Bổ sung phương thức `sanitize_cache_entry()` để trung hòa mã độc khi đọc từ Semantic Cache (Cache Hit path).
-*   **Mối quan hệ:** Được import và tích hợp vào module RAG tại `src/rag/retriever.py`.
+*   **Mục đích:** Chống RAG Poisoning & Semantic Cache Poisoning.
+*   **Tác dụng:** `sanitize_ingest` (NFKC, strip control/zero-width/HTML/markdown, truncate) lúc nạp tài liệu; `sanitize_retrieve` (strip delimiter, trung hòa injection/jailbreak) lúc truy xuất; `sanitize_cache_entry` làm sạch khi đọc Semantic Cache (cache-hit path).
+*   **Mối quan hệ:** Tích hợp vào `src/rag/retriever.py` và `src/rag/security.py`.
 
 ### 19. `src/guardrails/decision_validator.py`
-*   **Mục đích:** Thẩm định và làm sạch quyết định đầu ra của LLM Agent (chống Hallucination & Self-DoS).
-*   **Tác dụng:** Ép kiểu JSON đầu ra, downgrade phán quyết `BLOCK_IP` đối với các IP hạ tầng quan trọng xuống mức `ALERT` nhằm tránh tự tấn công từ chối dịch vụ (Self-DoS), làm sạch trường `reasoning` chống Markdown/HTML XSS-SSRF. Bổ sung **`enforce_tier_consensus`** — lá chắn chống social-engineering ngữ nghĩa: nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM bị thao túng hạ cấp xuống `LOG/DROP`, hệ thống KHÔNG tin LLM mà buộc `AWAIT_HITL`.
-*   **Mối quan hệ:** Được gọi bởi `node_llm_triage` ở `src/agent/nodes.py` để kiểm duyệt quyết định trước khi thực thi.
+*   **Mục đích:** Thẩm định & làm sạch quyết định LLM (chống Hallucination / Self-DoS / Social-Engineering).
+*   **Tác dụng:** Ép Action Enum hợp lệ; **Confidence Gate** (BLOCK_IP cần ≥0.5); **Anti-Self-DoS Shield** downgrade BLOCK_IP→ALERT cho IP hạ tầng (parse cả hex/octal/integer chống bypass); sanitize `reasoning`/`mitre`/`nist`. **`enforce_tier_consensus`** — lá chắn chống social-engineering ngữ nghĩa: nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM bị thao túng hạ xuống `LOG/DROP` thì KHÔNG tin LLM, buộc `AWAIT_HITL`.
+*   **Mối quan hệ:** Gọi bởi `node_llm_triage` (`nodes.py`) trước khi thực thi quyết định.
 
 ### 20. `src/guardrails/feedback_validator.py`
-*   **Mục đích:** Xác thực an toàn cho các quy tắc động (Dynamic rules) và whitelist được đẩy về Tier-1.
-*   **Tác dụng:** Áp dụng nguyên lý Zero-Trust, ngăn chặn các rule bypass dạng wildcard rộng (`0.0.0.0/0`, `*`), giới hạn prefix CIDR tối thiểu từ `/8`, và ngăn chặn chặn nhầm IP thiết bị nội bộ quan trọng.
-*   **Mối quan hệ:** Tích hợp trực tiếp vào `FeedbackListener` để kiểm duyệt các rule do con người hoặc Agent thiết lập.
+*   **Mục đích:** Zero-Trust cho rule động & whitelist đẩy về Tier-1.
+*   **Tác dụng:** Chặn wildcard (`0.0.0.0/0`, `*`, `any`), giới hạn CIDR ≥ `/8`, cấm chặn IP hạ tầng nội bộ; validate regex cho URI/User-Agent; chỉ cho whitelist IP trong subnet tin cậy.
+*   **Mối quan hệ:** Tích hợp vào `FeedbackListener` để kiểm duyệt rule (con người/Agent).
 
 ### 21. `demo_guardrails.py`
-*   **Mục đích:** Demo chạy riêng phân hệ Guardrail tích hợp đầy đủ.
-*   **Tác dụng:** Trực quan hóa toàn bộ 8 lớp phòng thủ AI an toàn cao bao gồm phát hiện prompt injection, bọc nonce delimiter, làm sạch RAG poisoning, kiểm định quyết định LLM và xác thực feedback loop.
-*   **Mối quan hệ:** Gọi trực tiếp các cấu phần trong thư mục `src/guardrails/`.
+*   **Mục đích:** Demo tích hợp đầy đủ Guardrails.
+*   **Tác dụng:** Trực quan hóa 8 lớp phòng thủ: injection/jailbreak detection, nonce delimiter, encoding neutralize, RAG poison sanitize, decision validate, feedback validate, output sanitize.
+*   **Mối quan hệ:** Gọi trực tiếp các module `src/guardrails/`.
 
 ---
 
-## **NGÀY 3: TẦNG TRUY XUẤT TRI THỨC KÉP (DUAL-RAG SUBMODULE)**
+## ⏳ **CÁC NGÀY TIẾP THEO (CHƯA ĐI QUA — OUTLINE ĐỊNH HƯỚNG)**
 
-### 22. `src/rag/embedder.py`
-*   **Mục đích:** Xây dựng và quản lý mô hình Vector Embeddings và cập nhật checksum.
-*   **Tác dụng:** Tải mô hình `all-MiniLM-L6-v2`, chuyển đổi các tài liệu văn bản MITRE ATT&CK và NIST thành các vector 384 chiều, lưu trữ vào chỉ mục FAISS. Đồng thời, tự động tính toán lại SHA-256 cho toàn bộ tệp KB và index thông qua hàm `update_checksums_file()` để cập nhật vào `checksums.sha256`, tích hợp `verify_document_integrity(exclude_generated=True)` ở đầu tiến trình build index.
-*   **Mối quan hệ:** Được gọi bởi `scripts/build_rag_indexes.py` và chạy trên CI Pipeline để khởi tạo chỉ mục.
+> Các tầng dưới đây **đã có code** và chạy được, nhưng **chưa được học/đối chiếu chi tiết**
+> trong lộ trình hiện tại. Phần này chỉ là outline ngắn; sẽ mở rộng chi tiết khi đi tới.
 
-### 23. `scripts/build_rag_indexes.py`
-*   **Mục đích:** Khởi tạo cơ sở dữ liệu tri thức tĩnh ngoại tuyến.
-*   **Tác dụng:** Đọc tệp nguồn tài liệu MITRE và NIST, chạy phân mảnh (chunking) và gọi `embedder.py` để ghi đè chỉ mục FAISS lên đĩa cứng.
-*   **Mối quan hệ:** Chạy một lần duy nhất lúc cài đặt dự án.
+### **NGÀY 3 — Tầng truy xuất tri thức kép (Dual-RAG)**
+*   `src/rag/embedder.py` — embed MITRE/NIST (all-MiniLM-L6-v2, 384d) → FAISS; cập nhật `checksums.sha256`.
+*   `src/rag/retriever.py` *(quan trọng)* — Hybrid Search FAISS (dense) + BM25 (sparse) hợp nhất bằng RRF; sanitize cache-hit chống Semantic Cache Poisoning.
+*   `src/rag/semantic_cache.py` — LRU cache (OrderedDict + TTL) khóa **băm SHA-256 exact-match** (không phải cosine).
+*   `src/rag/security.py` — kiểm tra toàn vẹn SHA-256 file tri thức trước khi build index (`verify_document_integrity`).
+*   `src/rag/graph_builder.py` — Knowledge Graph Neo4j (V2 tùy chọn) liên kết MITRE ↔ NIST.
+*   `scripts/build_rag_indexes.py`, `demo_rag.py` — build index & demo CLI.
 
-### 24. `src/rag/retriever.py` *(Cực kỳ quan trọng)*
-*   **Mục đích:** Tìm kiếm tri thức bảo mật lai an toàn (Hybrid Search & Cache Defense).
-*   **Tác dụng:** 
-    *   Thực hiện tìm kiếm song song: Dense Vector Search (FAISS) và Sparse Lexical Search (BM25Okapi); hợp nhất bằng thuật toán RRF.
-    *   Tích hợp `RAGSanitizer.sanitize_cache_entry()` trên luồng cache hit để lọc sạch các payload độc hại trước khi chèn vào prompt, ngăn ngừa Semantic Cache Poisoning.
-*   **Mối quan hệ:** Được gọi bởi các nodes của LangGraph tại `src/agent/nodes.py` để lấy ngữ cảnh tri thức an toàn.
+### **NGÀY 4 — Cỗ máy trạng thái LangGraph & phản hồi an ninh**
+*   `src/agent/state.py` — schema `SentinelState` (batch logs, RAG context, decisions, IOCs...).
+*   `src/agent/workflow.py` — `StateGraph` + node + conditional edge (Block/Alert/HITL/End).
+*   `src/agent/nodes.py` *(quan trọng)* — `node_guardrails` / `node_rag_context` (query RAG từ **metadata flow thật**: service/port/tier1 reasons) / `node_llm_triage` (DecisionValidator + **enforce_tier_consensus** + AuditLogger) / `node_action_executor`.
+*   `src/agent/prompts.py` — system prompt (có **rule #7 chống social-engineering**) + few-shot Active Learning.
+*   `src/agent/llm_client.py` — client OpenAI-compatible → llama.cpp (Gemma-2-9B), `DEFAULT_MODEL` đọc từ env.
+*   `src/agent/threat_memory.py` — uy tín IP, chuỗi APT (`check_apt_chain` ≥2 ngày), chống Memory Poisoning.
+*   `src/response/executor.py` — audit trail SQLite + **HMAC SHA-256 log-chaining** chống giả mạo.
 
-### 25. `src/rag/semantic_cache.py`
-*   **Mục đích:** Giảm thiểu độ trễ suy luận RAG bằng kỹ thuật cache thông minh.
-*   **Tác dụng:** LRU cache (OrderedDict + TTL) lưu kết quả RAG theo khóa băm SHA-256 exact-match của query (đã chuẩn hóa qua template). Nếu query trùng khớp chính xác thì trả kết quả cache ngay, tránh embed + FAISS lại — an toàn (không có false cache hit).
-*   **Mối quan hệ:** Được gọi trực tiếp bên trong `src/rag/retriever.py`.
-
-### 26. `src/rag/security.py`
-*   **Mục đích:** Kiểm soát tính toàn vẹn của tri thức RAG vật lý.
-*   **Tác dụng:** Tính toán và kiểm tra giá trị băm SHA-256 của các tệp tri thức trên đĩa cứng trước khi tạo Vector Index, chống đòn tấn công thay đổi trực tiếp tệp tri thức RAG trên disk. Hỗ trợ tham số `exclude_generated=True` để bỏ qua các file chỉ mục tự sinh trong giai đoạn build ban đầu.
-*   **Mối quan hệ:** Gọi bởi `embedder.py` và `retriever.py` để kiểm chứng dữ liệu.
-
-### 27. `src/rag/graph_builder.py`
-*   **Mục đích:** Xây dựng đồ thị liên kết tri thức dạng Graph (nếu có mở rộng).
-*   **Tác dụng:** Liên kết các thực thể kỹ thuật MITRE với các bước quy trình NIST tương ứng.
-*   **Mối quan hệ:** Bổ trợ cấu trúc ngữ cảnh cho RAG.
-
-### 28. `demo_rag.py`
-*   **Mục đích:** Demo chạy riêng phân hệ Hybrid RAG.
-*   **Tác dụng:** Kiểm tra tính năng tìm kiếm tích hợp FAISS + BM25 bằng CLI.
-*   **Mối quan hệ:** Gọi trực tiếp `src/rag/retriever.py`.
+### **NGÀY 5 — Giao diện SOC & khung đánh giá thực nghiệm**
+*   `src/ui/app.py`, `components.py`, `auth.py` (PBKDF2-HMAC-SHA256), `style.css` — Dashboard HITL Streamlit (5 tab: Alerts/Rules/APT/Blocklist/Graph).
+*   `experiments/run_ablation_study.py`, `statistical_tests.py` (McNemar + Mann-Whitney U), `evaluate_robustness.py` (**120 mẫu adversarial / 5 nhóm**), `evaluate_adversarial_pipeline.py` (kháng LLM), `evaluate_reasoning.py` (LLM-as-Judge/RAGAS), `evaluate_zeroday.py`, `measure_latency_baseline.py`, `plot_results.py`, `e2e_test_runner.py` (20/20).
+*   `scripts/build_adversarial_suite.py`, `seed_demo_data.py` — sinh bộ adversarial & seed Dashboard từ data thật.
+*   `main.py` — entrypoint tích hợp (mode server/scan/full).
 
 ---
 
-## **NGÀY 4: CỖ MÁY TRẠNG THÁI LANGGRAPH & PHẢN HỒI AN NINH**
-
-### 29. `src/agent/state.py`
-*   **Mục đích:** Định nghĩa Schema bộ nhớ trạng thái của tác tử LangGraph.
-*   **Tác dụng:** Khai báo cấu trúc dữ liệu `SentinelState` (một `TypedDict`) chứa các trường: `current_batch_logs`, `rag_mitre_context`, `decisions`, `cycle_count`,...
-*   **Mối quan hệ:** Được import bởi tất cả các file trong cấu phần `src/agent/`.
-
-### 30. `src/agent/workflow.py`
-*   **Mục đích:** Định nghĩa kiến trúc đồ thị nhận thức của tác tử.
-*   **Tác dụng:** Khởi tạo `StateGraph`, đăng ký các Node xử lý, kết nối các Edge và định nghĩa Conditional Edge để định tuyến rẽ nhánh (Block/Quarantine/Alert/HITL/End).
-*   **Mối quan hệ:** Compile ra đối tượng ứng dụng Agent chạy chính; import các node từ `src/agent/nodes.py`.
-
-### 31. `src/agent/nodes.py` *(Cực kỳ quan trọng)*
-*   **Mục đích:** Triển khai chi tiết logic xử lý tại các "Trạm" của đồ thị.
-*   **Tác dụng:** 
-    *   `node_rag_context`: Gọi RAG để lấy ngữ cảnh hỗ trợ.
-    *   `node_llm_triage`: Đóng gói prompt và gọi LLM, tích hợp bộ `DecisionValidator` để làm sạch quyết định và `AuditLogger` để ghi log kiểm toán.
-    *   `node_action_executor`: Xử lý phán quyết, tích hợp `LoopDetector` ngăn chặn vô hạn chu kỳ và gọi `FeedbackListener` để đẩy rule về Tier-1.
-*   **Mối quan hệ:** Gọi `DualRetriever` từ tầng RAG, gọi `llm_client` để suy luận, gọi `threat_memory` để tương quan logs, và gọi `executor.py` để phản hồi.
-
-### 32. `src/agent/prompts.py`
-*   **Mục đích:** Quản lý kho mẫu Prompt (System & User Instruct).
-*   **Tác dụng:** Cấu trúc prompt mẫu cho LLM. Tự động đọc lịch sử analyst từ file cấu hình để tiêm các ví dụ Few-shot Active Learning (Analyst Approve/Reject trước đây) vào prompt.
-*   **Mối quan hệ:** Được gọi bởi `node_llm_triage` ở file `nodes.py`.
-
-### 33. `src/agent/llm_client.py`
-*   **Mục đích:** API Client giao tiếp với mô hình AI cục bộ phục vụ offline.
-*   **Tác dụng:** Gửi HTTP POST request theo chuẩn OpenAI API sang cổng dịch vụ của server `llama.cpp` đang chạy Gemma-2-9B-IT; kiểm soát tham số `temperature=0.1` để ép định dạng đầu ra JSON sạch.
-*   **Mối quan hệ:** Được gọi bởi `node_llm_triage` tại `nodes.py`.
-
-### 34. `src/agent/threat_memory.py`
-*   **Mục đích:** Quản lý uy tín IP dài hạn, chuỗi APT và chống Memory Poisoning.
-*   **Tác dụng:** 
-    *   Kết nối DB SQLite, ghi nhận các kỹ thuật MITRE mà IP đã thực hiện; tự động cắm cờ APT (`check_apt_chain`) nếu một IP xuất hiện trong sự kiện thuộc $\ge 2$ ngày khác nhau (`COUNT(DISTINCT apt_day) >= 2`), nâng mức CRITICAL khi $\ge 3$ ngày.
-    *   Tải cấu trúc DAPT chain sử dụng bộ quản lý ngữ cảnh `with open` đảm bảo an toàn tài nguyên.
-    *   Tích hợp `output_sanitizer` để làm sạch trường kỹ thuật MITRE, mô tả thực thể trước khi ghi DB SQLite, chống đòn tấn công Long-term Threat Memory Poisoning.
-*   **Mối quan hệ:** Được gọi bởi `node_action_executor` ở `nodes.py` để ghi vết và gọi ở `node_rag_context` để nạp lịch sử.
-
-### 35. `src/response/executor.py`
-*   **Mục đích:** Ghi nhận nhật ký kiểm toán không thể chối cãi.
-*   **Tác dụng:** Ghi nhận nhật ký audit trail vào SQLite kèm theo tính toán giá trị băm **HMAC SHA-256** móc xích dòng trước-dòng sau để chống giả mạo logs.
-*   **Mối quan hệ:** Được gọi bởi Node Action Executor ở `nodes.py` và Web UI để verify logs.
-
-
----
-
-## **NGÀY 5: GIAO DIỆN SOC & KHUNG ĐÁNH GIÁ THỰC NGHIỆM**
-
-### 37. `src/ui/app.py`
-*   **Mục đích:** File khởi chạy Web Dashboard Streamlit.
-*   **Tác dụng:** Tổ chức giao diện Tabs của SOC Dashboard: SIEM Real-time, Quarantine Rules Review, Active Firewall Rules, và RAGAS Evaluation metrics.
-*   **Mối quan hệ:** Đọc DB SQLite trực tiếp để hiển thị thông tin; gọi `feedback_listener.py` khi quản trị viên Approve/Reject rules.
-
-### 38. `src/ui/components.py`
-*   **Mục đích:** Cấu phần hiển thị và giao diện trực quan hóa.
-*   **Tác dụng:** Cung cấp thiết kế cho Neon metric cards, thanh tiến trình, biểu diễn dòng thời gian sự kiện của IP (chronological event timeline) tương tác.
-*   **Mối quan hệ:** Được import và render bởi `src/ui/app.py`.
-
-### 39. `src/ui/auth.py`
-*   **Mục đích:** Cơ chế xác thực người dùng dựa trên phân quyền (RBAC) và chống Input Injection.
-*   **Tác dụng:** Quản lý mật khẩu bằng giải thuật băm NIST PBKDF2-HMAC-SHA256 và so sánh hăm bằng `hmac.compare_digest`. Đồng thời áp dụng regex `^[a-zA-Z0-9_]{1,30}$` thắt chặt dữ liệu đầu vào cho Username nhằm chống HITL Auth Input Injection. Di chuyển các module `re` và `hmac` lên đầu file để tối ưu hóa hiệu năng và tránh reimport.
-*   **Mối quan hệ:** Tích hợp kiểm tra quyền truy cập của analyst (L1) và manager (L3) trên Dashboard.
-
-### 40. `src/ui/style.css`
-*   **Mục đích:** Thiết lập ngôn ngữ thiết kế thị giác của SOC Dashboard.
-*   **Tác dụng:** Định nghĩa các CSS variables, tạo hiệu ứng Glassmorphism, Neon Glow và Dark Mode tùy biến cho Dashboard Streamlit.
-*   **Mối quan hệ:** Được load tự động bên trong `src/ui/app.py`.
-
-### 41. `experiments/run_ablation_study.py`
-*   **Mục đích:** Tự động hóa chạy thực nghiệm Ablation Study.
-*   **Tác dụng:** Nạp cấu hình từ 6 file YAML (A -> F), cho chạy toàn bộ tập dữ liệu Ground Truth qua pipeline tương ứng, đo lường các chỉ số Precision, Recall, FPR, F1, độ trễ và đẩy kết quả lên MLflow.
-*   **Mối quan hệ:** Khởi động và chạy toàn bộ hệ thống ở các cấu hình khác nhau.
-
-### 42. `experiments/statistical_tests.py` *(Cực kỳ quan trọng)*
-*   **Mục đích:** Kiểm định ý nghĩa thống kê của kết quả nghiên cứu.
-*   **Tác dụng:** Cài đặt và thực thi thuật toán kiểm định phi tham số **McNemar's Test** cho độ chính xác phân loại và **Mann-Whitney U Test** cho độ trễ hệ thống.
-*   **Mối quan hệ:** Được gọi sau khi chạy xong Ablation Study để kiểm chứng độ tin cậy thực tế của số liệu.
-
-### 43. `experiments/evaluate_robustness.py`
-*   **Mục đích:** Đánh giá tính kháng nhiễu nghịch đảo của Guardrail.
-*   **Tác dụng:** Bơm **120 mẫu adversarial KHÓ** (5 nhóm: encoding đa lớp, structural, semantic social-engineering, jailbreak, RAG poisoning — sinh bởi `scripts/build_adversarial_suite.py`) qua lớp Guardrail TĨNH, tính tỷ lệ chặn (37.5%). Cặp với `evaluate_adversarial_pipeline.py` đẩy mẫu khó qua FULL pipeline (Tier-2 LLM kháng 100% sau khi vá consensus guard).
-*   **Mối quan hệ:** Đánh giá độc lập độ bền Guardrail tĩnh; bổ trợ bởi `evaluate_adversarial_pipeline.py` cho lớp LLM.
-
-### 44. `experiments/evaluate_reasoning.py`
-*   **Mục đích:** Đánh giá độ tin cậy tri thức của Agent và chất lượng RAG.
-*   **Tác dụng:** Triển khai mô hình làm trọng tài (LLM-as-a-Judge) chấm điểm chất lượng RAG (Context Precision, Faithfulness, Relevancy) theo chuẩn RAGAS; kiểm tra tính giải thích được qua việc validate cấu trúc dữ liệu JSON.
-*   **Mối quan hệ:** Kết nối server để chấm điểm kết quả từ Gemma-2.
-
-### 45. `experiments/evaluate_zeroday.py`
-*   **Mục đích:** Đánh giá năng lực phát hiện mối đe dọa Zero-day chưa có nhãn.
-*   **Tác dụng:** Mô phỏng các cuộc tấn công Zero-day để đo lường tính hiệu quả của Welford Outlier so với các rule tĩnh.
-*   **Mối quan hệ:** Phụ thuộc vào `rule_engine.py`.
-
-### 46. `experiments/measure_latency_baseline.py`
-*   **Mục đích:** Đo lường độ trễ nền tảng làm cơ sở so sánh.
-*   **Tác dụng:** Tính toán độ trễ tối thiểu khi suy luận của LLM trần trụi trước khi tích hợp các cơ chế caching và filtering.
-*   **Mối quan hệ:** Bổ sung số liệu so sánh cho Mann-Whitney U test.
-
-### 47. `experiments/plot_results.py`
-*   **Mục đích:** Trực quan hóa số liệu thực nghiệm.
-*   **Tác dụng:** Vẽ các biểu đồ cột so sánh F1-Score, biểu đồ hộp (Boxplot) phân bố độ trễ xử lý logs giữa các cấu hình của Ablation Study để đưa vào bài báo cáo/luận văn.
-*   **Mối quan hệ:** Đọc dữ liệu đầu ra từ MLflow/tệp CSV kết quả thực nghiệm.
-
-### 48. `experiments/e2e_test_runner.py` *(Quan trọng cho việc kiểm thử)*
-*   **Mục đích:** Chạy kiểm thử tự động tích hợp (E2E Integration Tests) của toàn bộ hệ thống.
-*   **Tác dụng:** Chạy 20/20 kịch bản kiểm định chất lượng cho hệ thống bao gồm: Rule Engine, Delimiter Guardrails, Dual-RAG, SQLite Threat Memory, và logic Agent.
-*   **Mối quan hệ:** Đóng vai trò là chốt chặn đảm bảo tính toàn vẹn của mã nguồn trước khi đẩy mã nguồn lên Production hoặc chạy thực nghiệm.
-
----
-
-## **CÁC TỆP KIỂM THỬ ĐƠN VỊ CỦA LỚP PHÒNG THỦ GUARDRAILS MỚI BỔ SUNG**
-
-### 49. `tests/unit/test_rag_sanitizer.py`
-*   **Mục đích:** Kiểm thử tính an toàn của module `RAGSanitizer`.
-*   **Tác dụng:** Verify khả năng lọc sạch mã độc RAG Poisoning trong cả quá trình Ingestion, Retrieval cũng như trung hòa các mã độc từ Semantic Cache.
-*   **Mối quan hệ:** Được thực thi bởi `pytest` trong bộ test của Guardrail.
-
-### 50. `tests/unit/test_decision_validator.py`
-*   **Mục đích:** Kiểm thử tính an toàn của module `DecisionValidator`.
-*   **Tác dụng:** Đảm bảo downgrade chặn IP hạ tầng quan trọng thành công và strip sạch các thẻ HTML/Markdown chứa mã độc trong reasoning của LLM.
-*   **Mối quan hệ:** Được thực thi bởi `pytest` trong bộ test của Guardrail.
-
-### 51. `tests/unit/test_feedback_validator.py`
-*   **Mục đích:** Kiểm thử tính an toàn của module `FeedbackValidator`.
-*   **Tác dụng:** Đảm bảo từ chối các rule động không an toàn (wildcard `*`, dải IP ngoài mạng tin cậy, rule ảnh hưởng tới IP hạ tầng quan trọng).
-*   **Mối quan hệ:** Được thực thi bởi `pytest` trong bộ test của Guardrail.
-
----
-
-## **FILE TÍCH HỢP HỆ THỐNG GỐC (ROOT)**
-
-### 52. `main.py`
-*   **Mục đích:** Điểm khởi chạy tích hợp của toàn dự án.
-*   **Tác dụng:** Khởi động đồng thời các tiến trình Redis Subscriber chạy nền và chạy ứng dụng Streamlit Web UI để khởi chạy Sentinel ở môi trường đồ họa, tích hợp reset LoopDetector trước mỗi chu kỳ.
-*   **Mối quan hệ:** File tích hợp gọi tất cả các cấu phần chính trong `src/`.
+> **Kiểm thử đơn vị (xuyên suốt):** `tests/unit/` (data_validator, decision_validator + tier-consensus guard, feedback_validator, output_sanitizer, prompt_filter, rag_sanitizer, template_miner, threat_memory) + `tests/integration/` + `tests/test_adversarial.py`. Trạng thái hiện tại: **pytest 161 passed, E2E 20/20**.
