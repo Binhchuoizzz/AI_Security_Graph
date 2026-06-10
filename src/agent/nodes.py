@@ -87,15 +87,32 @@ def node_rag_context(state: SentinelState) -> Dict[str, Any]:
     query_text = ""
     if state.current_batch_logs:
         first_log = state.current_batch_logs[0]
-        query_text = (
-            str(first_log.get("message", "")) + " " + str(first_log.get("payload", ""))
-        )
-    elif state.narrative_summary:
-        query_text = state.narrative_summary
-    else:
-        query_text = "suspicious network activity"
+        parts = []
+        # 1. Web/app attacks: nội dung payload/message (nếu có)
+        msg = (str(first_log.get("message", "")) + " " + str(first_log.get("payload", ""))).strip()
+        if msg:
+            parts.append(msg)
+        # 2. Flow-based attacks (CICIDS): không có payload -> dựng query từ
+        #    metadata flow THẬT (service/port/protocol) để RAG map đúng MITRE.
+        svc = first_log.get("service") or first_log.get("Service")
+        if svc:
+            parts.append(f"service {svc}")
+        port = first_log.get("Destination Port") or first_log.get("dst_port")
+        if port not in (None, "", 0):
+            parts.append(f"destination port {port}")
+        uri = first_log.get("uri") or first_log.get("URI")
+        if uri:
+            parts.append(f"uri {uri}")
+        # 3. Bối cảnh phát hiện của Tier-1 (lý do escalate: brute force, port scan,
+        #    volumetric, WAF/injection...) — tín hiệu mạnh để truy xuất kỹ thuật phù hợp.
+        for reason in (first_log.get("tier1_reasons") or [])[:3]:
+            parts.append(str(reason))
+        query_text = " ".join(parts).strip()
 
-    query_text = query_text.strip()[:200]
+    if not query_text:
+        query_text = state.narrative_summary or "suspicious network activity"
+
+    query_text = query_text.strip()[:300]
 
     # 2. Truy xuất RAG (đã được RAGSanitizer xử lý ngầm định trong retriever)
     results = retriever.retrieve(query_text)
