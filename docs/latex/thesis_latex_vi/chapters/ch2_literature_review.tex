@@ -1,56 +1,60 @@
-\chapter{Theoretical Background and Literature Review}
+\chapter{Cơ sở lý thuyết và Tổng quan tài liệu}
 \label{ch:literature_review}
 
-% Chapter introduction
-This chapter establishes the computer science and cybersecurity theoretical foundations that underpin the design of the SENTINEL architecture. The content spans from modern Security Operations Center (SOC) architectures and statistical anomaly detection algorithms to the core technologies of Generative AI. This includes Large Language Models (LLMs), Agentic AI, Retrieval-Augmented Generation (RAG) systems, and associated AI security vulnerabilities. The chapter concludes with a comprehensive review of existing literature, highlighting the critical research gap that this thesis aims to bridge.
+Chương này thiết lập các nền tảng lý thuyết về khoa học máy tính và an ninh mạng làm cơ sở cho việc thiết kế kiến trúc SENTINEL. Nội dung bao gồm từ kiến trúc Trung tâm Điều hành An ninh mạng (SOC) hiện đại và các thuật toán phát hiện bất thường thống kê đến các công nghệ cốt lõi của AI Tạo sinh (Generative AI). Phần này bao gồm Mô hình Ngôn ngữ Lớn (LLM), AI Tác tử (Agentic AI), hệ thống Sinh tăng cường truy xuất (RAG) và các lỗ hổng bảo mật AI liên quan. Chương kết thúc bằng một đánh giá toàn diện về các tài liệu hiện có, nêu bật khoảng trống nghiên cứu quan trọng mà luận văn này nhằm mục đích giải quyết.
 
-\section{Overview of Security Operations Centers (SOC) and Incident Analysis}
-\begin{itemize}
-    \item \textbf{Modern SOC Architecture:} Core components (SIEM, IDS/IPS, Firewall, EDR) and the standard Incident Response (IR) lifecycle.
-    \item \textbf{The Alert Fatigue Challenge:} Definition, causes of False Positive overloads, and the resulting systemic consequences for Tier-1 analysts.
-    \item \textbf{Advanced Persistent Threats (APT) \& Zero-Day Exploits:} The sophistication of ``low-and-slow'' campaigns and the inherent limitations of static Rule-based systems in recognizing protracted anomalies.
-\end{itemize}
+\section{Tổng quan về Trung tâm Điều hành An ninh mạng (SOC) và Phân tích sự cố}
 
-\section{Large Language Models (LLMs) and Quantization Techniques}
-\begin{itemize}
-    \item \textbf{Transformer Architecture:} The self-attention mechanism and its capacity for contextual natural language processing.
-    \item \textbf{Local LLMs and Data Privacy:} The critical necessity of deploying LLMs locally within an air-gapped SOC environment (Zero Trust architecture).
-    \item \textbf{Model Quantization:} Mechanics of the GGUF format and the Q4\_K\_M standard, enabling the deployment of massive models (e.g., Gemma-2-9B) on constrained hardware (16GB GPUs) via the \texttt{llama.cpp} framework.
-\end{itemize}
+Các Trung tâm Điều hành An ninh mạng (SOC) hiện đại hình thành nên cốt lõi phòng thủ của các mạng lưới doanh nghiệp, tích hợp vô số các thiết bị bảo mật như nền tảng Quản lý Thông tin và Sự kiện Bảo mật (SIEM), Hệ thống Phát hiện và Ngăn ngừa Xâm nhập (IDS/IPS), Tường lửa Thế hệ Tiếp theo (NGFW) và các giải pháp Phát hiện và Phản hồi Điểm cuối (EDR). Vòng đời Phản hồi Sự cố (IR) tiêu chuẩn yêu cầu các hệ thống này phải thu thập khối lượng lớn dữ liệu đo lường từ xa, phân tích chúng để tìm ra các điểm bất thường dựa trên các chữ ký tĩnh hoặc các quy tắc heuristic được xác định trước, và tạo ra các cảnh báo để các chuyên viên phân tích Tầng 1 (Tier-1) điều tra.
 
-\section{Agentic AI Architecture and State Graphs}
-\begin{itemize}
-    \item \textbf{Agentic Workflows:} The paradigm shift from static Runbook Automation (RBA) to dynamic AI processes capable of reasoning, planning, and adaptive response.
-    \item \textbf{Finite State Machines (FSM):} Graph theory application involving directed graphs, computational Nodes, and Conditional Edges.
-    \item \textbf{The LangGraph Framework:} Application of LangGraph to construct cognitive loops, empowering the model to exercise self-reflection, determine when to retrieve external knowledge, or conclude its reasoning process.
-\end{itemize}
+Tuy nhiên, sự gia tăng của các thiết bị kết nối và sự chuyển đổi sang cơ sở hạ tầng lấy đám mây làm trung tâm đã dẫn đến sự tràn ngập dữ liệu chưa từng có. Khối lượng này trực tiếp đóng góp vào thách thức Bội thực cảnh báo (Alert Fatigue), nơi các chuyên viên phân tích Tầng 1 bị choáng ngợp bởi hàng chục nghìn cảnh báo mỗi ngày, phần lớn trong số đó là Dương tính giả (False Positives). Sự quá tải trong vận hành này làm suy giảm nghiêm trọng năng lực nhận thức của các đội ngũ bảo mật, làm tăng xác suất bỏ sót các mối đe dọa nghiêm trọng và thực sự \cite{alertfatigue2022}.
 
-\section{Retrieval-Augmented Generation (RAG) and Hybrid Search}
-\begin{itemize}
-    \item \textbf{RAG Concepts:} Mitigating LLM hallucination by grounding responses in external, authoritative databases.
-    \item \textbf{Dense Vector Search:} Embedding neural architectures (all-MiniLM-L6-v2) and the FAISS (Facebook AI Similarity Search) algorithm for multi-dimensional spatial queries.
-    \item \textbf{Sparse Keyword Search:} BM25Okapi indexing structures and TF-IDF term weighting.
-    \item \textbf{Reciprocal Rank Fusion (RRF):} A mathematical approach to merge positional rankings from both Dense and Sparse searches to optimize retrieval accuracy (configured with $k=60$) \cite{rrf2009}.
-\end{itemize}
+Làm phức tạp thêm vấn đề này là sự gia tăng của các Mối đe dọa Thường trực Tiên tiến (APT) và các lỗ hổng zero-day. Các chiến dịch APT được đặc trưng bởi việc thực thi "chậm và ẩn nấp" (low-and-slow), nơi các tác nhân đe dọa hoạt động dưới ngưỡng phát hiện của các hệ thống bảo mật truyền thống. Bởi vì các hệ thống dựa trên quy tắc xác định phụ thuộc quá nhiều vào các chữ ký đã biết và các ngưỡng tĩnh tức thời, chúng bị hạn chế sâu sắc trong khả năng ngữ cảnh hóa và tương quan các bất thường kéo dài, trải dài trên nhiều giai đoạn trong các khoảng thời gian rộng lớn.
 
-\section{LLM System Security (AI Security)}
-\begin{itemize}
-    \item \textbf{Adversarial AI Manipulations:} Analyzing the risk of untrusted data penetrating the LLM's context window (e.g., Prompt Injections, Encoding Bypasses), leading to behavioral manipulation.
-    \item \textbf{Delimiter Smuggling and Data Exfiltration:} Vulnerabilities associated with forged delimiter characters and unauthorized data extraction (Markdown Exfiltration/XSS).
-    \item \textbf{Guardrail Defense Mechanisms:} Methodologies for robust input filtering and rigorous output sanitization.
-\end{itemize}
+\section{Mô hình Ngôn ngữ Lớn (LLM) và Kỹ thuật Lượng tử hóa}
 
-\section{Statistical Anomaly Detection (Welford's Algorithm)}
-\begin{itemize}
-    \item \textbf{Online Statistics Theory:} Operational requirements for processing continuous data streams with a static memory footprint ($O(1)$).
-    \item \textbf{Welford's Theorem:} The mathematical formulation for continuously updating the Mean and Variance without inducing numerical instability or rounding errors. Analysis of online Z-Score computation.
-\end{itemize}
+Đi đầu trong cuộc cách mạng AI Tạo sinh là các Mô hình Ngôn ngữ Lớn (LLM), được cung cấp sức mạnh chủ yếu bởi kiến trúc Transformer. Sự đổi mới nền tảng của Transformer là cơ chế tự chú ý (self-attention), cho phép mô hình đánh giá tầm quan trọng của các từ khác nhau trong một chuỗi bất kể khoảng cách vị trí của chúng. Khả năng này cho phép LLM xuất sắc trong việc xử lý ngôn ngữ tự nhiên theo ngữ cảnh sâu sắc, làm cho chúng trở nên lý tưởng về mặt lý thuyết để diễn giải các log bảo mật phi cấu trúc và tạo ra các báo cáo pháp y dễ đọc đối với con người.
 
-\section{Review of Related Literature}
-\begin{itemize}
-    \item \textbf{Traditional ML/DL Applications in IDS:} Evaluating Random Forest, LSTM, and CNN models in intrusion detection, noting their severe deficiencies in Explainability.
-    \item \textbf{LLM Integration in SOCs:} A review of recent works attempting to integrate ChatGPT or general LLMs into cybersecurity workflows.
-    \item \textbf{Research Gap Analysis:} Highlighting that current research largely ignores the latency bottleneck of processing massive log volumes directly through LLMs and overlooks the fragility of these systems against diverse adversarial AI manipulations embedded within network payloads.
-\end{itemize}
+Bất chấp sức mạnh phân tích của chúng, việc triển khai các LLM dựa trên đám mây trong môi trường SOC gây ra những rủi ro bảo mật và quyền riêng tư dữ liệu nghiêm trọng. Dữ liệu bảo mật của doanh nghiệp vốn chứa các chi tiết cơ sở hạ tầng cực kỳ nhạy cảm và thông tin nhận dạng cá nhân (PII). Việc truyền dữ liệu này đến các điểm cuối API bên ngoài vi phạm các nguyên tắc kiến trúc Zero Trust và các quy định tuân thủ của tổ chức. Do đó, việc triển khai LLM cục bộ trong các môi trường hoàn toàn bị cô lập (air-gapped) là một sự cần thiết tối quan trọng.
 
-In summary, Chapter 2 elucidates the core theoretical principles utilized in this thesis. Building upon these foundations, Chapter 3 will detail the proposed SENTINEL system architecture.
+Để giải quyết các ràng buộc phần cứng liên quan đến việc chạy các mạng nơ-ron khổng lồ cục bộ, các kỹ thuật lượng tử hóa mô hình đã trở nên không thể thiếu. Lượng tử hóa làm giảm độ chính xác số học của các trọng số và kích hoạt của mô hình (ví dụ: từ số thực dấu phẩy động 16-bit xuống số nguyên 4-bit), làm giảm đáng kể dung lượng VRAM trong khi vẫn giữ được hiệu suất nhận thức gần như ban đầu. Việc sử dụng định dạng GGUF và tiêu chuẩn lượng tử hóa Q4\_K\_M thông qua framework \texttt{llama.cpp} cho phép triển khai các mô hình trọng số mở mạnh mẽ, chẳng hạn như \textit{Gemma-2-9B-IT}, trên phần cứng cấp độ người tiêu dùng tiêu chuẩn (ví dụ: một GPU 16GB duy nhất) mà không làm tổn hại đến tính toàn vẹn của phân tích.
+
+\section{Kiến trúc AI Tác tử (Agentic AI) và Đồ thị Trạng thái}
+
+Việc tích hợp AI vào an ninh mạng đang phát triển từ Tự động hóa Runbook tĩnh (RBA) sang các luồng công việc Tác tử (Agentic) động. Khác với RBA, vốn thực thi một cách cứng nhắc các tập lệnh được định nghĩa trước để phản hồi các trình kích hoạt cụ thể, AI Tác tử sở hữu khả năng nhận thức để suy luận, lập kế hoạch và tự chủ điều chỉnh các phản hồi dựa trên bối cảnh đang phát triển của một sự cố. Sự thay đổi mô hình này trao quyền cho hệ thống xử lý các kịch bản đe dọa phức tạp, không lường trước được nằm ngoài phạm vi của các playbook tĩnh.
+
+Về mặt kiến trúc, các tác tử tự trị này thường được mô hình hóa bằng cách sử dụng Máy Trạng thái Hữu hạn (FSM) và đồ thị có hướng. Trong cấu trúc này, các Nút (Nodes) tính toán đại diện cho các khả năng chức năng cụ thể (ví dụ: truy xuất dữ liệu, phân tích log, tạo cảnh báo), trong khi các Cạnh điều kiện (Conditional Edges) định nghĩa logic định tuyến động dựa trên các đánh giá nhận thức theo thời gian thực của tác tử.
+
+Framework LangGraph \cite{langgraph2024} đóng vai trò như một công cụ điều phối tiên tiến để xây dựng các vòng lặp nhận thức phức tạp này. Bằng cách cấu trúc các quá trình suy nghĩ của LLM dưới dạng một đồ thị có trạng thái, LangGraph trao quyền cho tác tử thực hiện sự tự phản ánh, tự chủ quyết định khi nào cần truy xuất kiến thức bên ngoài, lặp lại qua các giả thuyết, và cuối cùng đưa ra một phán quyết pháp y có lập luận chặt chẽ.
+
+\section{Sinh tăng cường truy xuất (RAG) và Tìm kiếm Lai}
+
+Một hạn chế đã được ghi nhận rõ ràng của LLM là xu hướng ảo giác (hallucinate) — tạo ra các khẳng định có vẻ hợp lý nhưng không chính xác về mặt thực tế. Trong lĩnh vực an ninh mạng, nơi độ chính xác là tối quan trọng, những ảo giác như vậy có thể dẫn đến các cấu hình sai thảm khốc. Hệ thống Sinh tăng cường truy xuất (RAG) \cite{rag2020} giảm thiểu rủi ro này bằng cách neo các suy luận của LLM vào các cơ sở tri thức có thẩm quyền, bên ngoài một cách linh hoạt trước khi sinh ra văn bản.
+
+Để tối đa hóa độ chính xác truy xuất, các hệ thống hiện đại sử dụng cơ chế Tìm kiếm Lai (Hybrid Search) kết hợp cả phương pháp truy xuất dày đặc (dense) và thưa thớt (sparse). Tìm kiếm Vector Dày đặc sử dụng các kiến trúc mạng nơ-ron nhúng, chẳng hạn như \texttt{all-MiniLM-L6-v2}, để ánh xạ dữ liệu văn bản vào không gian vector nhiều chiều. Các thuật toán như FAISS (Facebook AI Similarity Search) sau đó được sử dụng để thực hiện các truy vấn tương tự ngữ nghĩa, nắm bắt ý nghĩa ngữ cảnh của một truy vấn mối đe dọa ngay cả khi không có các từ khóa chính xác.
+
+Ngược lại, Tìm kiếm Từ khóa Thưa thớt dựa trên các cấu trúc lập chỉ mục truyền thống như BM25Okapi, tận dụng trọng số thuật ngữ TF-IDF (Term Frequency-Inverse Document Frequency) để đối sánh chính xác các tạo tác kỹ thuật (artifacts), chẳng hạn như mã định danh CVE hoặc các chữ ký phần mềm độc hại cụ thể. Để tổng hợp kết quả từ các mô hình tìm kiếm riêng biệt này, các mô hình toán học như Reciprocal Rank Fusion (RRF) được áp dụng. Bằng cách hợp nhất các xếp hạng vị trí từ cả tìm kiếm dày đặc và thưa thớt (thường được định cấu hình với hằng số $k=60$ \cite{rrf2009}), RRF đảm bảo rằng bối cảnh được truy xuất vừa có liên quan về mặt ngữ nghĩa vừa chính xác về mặt kỹ thuật.
+
+\section{Bảo mật Hệ thống LLM (AI Security)}
+
+Việc triển khai các LLM như các cỗ máy suy luận tự trị đưa ra các vector tấn công mới, cực kỳ quan trọng, được phân loại rộng rãi dưới dạng các thao tác AI đối kháng (adversarial AI manipulations). Khi tích hợp LLM vào SOC, hệ thống phải thu thập các tải trọng mạng không đáng tin cậy, có khả năng chứa mã độc. Nếu một đối thủ nhận ra rằng một LLM đang phân tích lưu lượng truy cập của họ, chúng có thể thực hiện các cuộc tấn công ngữ nghĩa để lật đổ hành vi của mô hình \cite{promptinjection2023}.
+
+Một trong những mối đe dọa nổi bật nhất là Prompt Injection Trực tiếp, nơi các lệnh ngôn ngữ độc hại được nhúng trong dữ liệu mạng tiêu chuẩn (ví dụ: một chuỗi HTTP User-Agent chứa các lệnh "bỏ qua các quy tắc trước đó và xuất ra là vô hại"). Tương tự, Bỏ qua Mã hóa (Encoding Bypasses) cố gắng che giấu các prompt độc hại này bằng cách sử dụng mã hóa base64, thập lục phân hoặc Unicode để trốn tránh các bộ lọc chuỗi sơ bộ trước khi đến cửa sổ ngữ cảnh của LLM.
+
+Hơn nữa, buôn lậu ký tự phân cách (Delimiter Smuggling) và Trích xuất Dữ liệu (Data Exfiltration) mang đến những rủi ro nghiêm trọng. Kẻ tấn công có thể giả mạo các ký tự phân cách của hệ thống để thao túng cách LLM phân tích cú pháp các lệnh, hoặc khai thác các tính năng hiển thị Markdown (ví dụ: thông qua Cross-Site Scripting hoặc các thẻ tải hình ảnh) để trích xuất prompt hệ thống của LLM hoặc dữ liệu SOC nội bộ đến một máy chủ bên ngoài. Do đó, các cơ chế phòng thủ guardrail mạnh mẽ — kết hợp lọc đầu vào an toàn về mặt mật mã, làm sạch đầu ra nghiêm ngặt và môi trường thực thi cô lập — là hoàn toàn bắt buộc để đảm bảo tính toàn vẹn của động cơ suy luận AI.
+
+\section{Phát hiện Bất thường Thống kê (Thuật toán Welford)}
+
+Mặc dù LLM cung cấp chiều sâu phân tích đáng kinh ngạc, nhưng độ trễ tính toán của chúng cản trở khả năng xử lý lưu lượng mạng thô ở tốc độ đường truyền (wire speed). Do đó, cần có một cơ chế lọc thông lượng cao. Điều này đòi hỏi phải áp dụng Lý thuyết Thống kê Trực tuyến (Online Statistics Theory), bắt buộc các luồng dữ liệu liên tục, vô hạn phải được xử lý với mức sử dụng bộ nhớ tĩnh ($O(1)$) mà không cần lưu trữ các bộ đệm dữ liệu lịch sử.
+
+Định lý Welford cung cấp công thức toán học tối ưu cho yêu cầu này. Nó cho phép cập nhật liên tục, một lần (single-pass) giá trị Trung bình và Phương sai thống kê của một luồng dữ liệu mà không gây ra sự mất ổn định số học hoặc các lỗi triệt tiêu thảm khốc thường thấy trong các phép tính tổng bình phương thông thường \cite{welford1962}. Bằng cách duy trì chính xác các số liệu luân phiên này, hệ thống có thể liên tục tính toán điểm Z-Score trực tuyến. Điều này tạo điều kiện thuận lợi cho việc xác định và lọc lưu lượng nền tảng theo thời gian thực, làm giảm đáng kể khối lượng dữ liệu được chuyển đến tầng LLM trong khi vẫn giữ nguyên các chuỗi bất thường nặng về độ trễ chỉ báo các sự xâm nhập lén lút.
+
+\section{Các Công trình Liên quan (Related Works)}
+
+Việc ứng dụng Trí tuệ Nhân tạo trong các Hệ thống Phát hiện Xâm nhập (IDS) đã là chủ đề của nhiều nghiên cứu học thuật sâu rộng. Các phương pháp tiếp cận truyền thống phụ thuộc rất nhiều vào các kiến trúc Học máy (ML) và Học sâu (DL) cổ điển. Vô số nghiên cứu đã áp dụng thành công Rừng ngẫu nhiên (Random Forests), Máy học Vector Hỗ trợ (SVM), Mạng bộ nhớ Ngắn-Dài hạn (LSTM) và Mạng nơ-ron Tích chập (CNN) để phân loại các bất thường mạng. Mặc dù các mô hình này thể hiện độ chính xác thống kê cao trên các bộ dữ liệu chuẩn, nhưng chúng lại mắc phải những khiếm khuyết nghiêm trọng về khả năng Giải thích (Explainability). Chúng hoạt động như các "hộp đen", cung cấp phân loại nhị phân mà không có bối cảnh pháp y có thể hành động, điều này làm hạn chế nghiêm trọng tiện ích thực tế của chúng đối với các chuyên viên phân tích con người trong quá trình xử lý sự cố.
+
+Trong những năm gần đây, các tài liệu nghiên cứu đã chuyển hướng sang khám phá việc tích hợp LLM trong các hoạt động SOC. Các công trình sơ khai đã điều tra việc sử dụng ChatGPT và các mô hình nền tảng tương tự để hỗ trợ các chuyên viên phân tích trong việc truy vấn cơ sở dữ liệu về mối đe dọa hoặc tóm tắt các cảnh báo. Tuy nhiên, các nghiên cứu này chủ yếu định vị LLM như một trợ lý tương tác, có con người tham gia (human-in-the-loop) thay vì một động cơ suy luận hoàn toàn tự trị được nhúng trực tiếp vào đường ống dữ liệu.
+
+Đáng chú ý, một đánh giá toàn diện về các tài liệu hiện tại cho thấy một khoảng trống nghiên cứu đáng kể. Các công trình hiện có phần lớn bỏ qua nút thắt cổ chai về độ trễ cơ bản liên quan đến việc xử lý các khối lượng log khổng lồ, liên tục trực tiếp thông qua các LLM phức tạp. Hơn nữa, các diễn ngôn học thuật lại nghiêm trọng bỏ qua sự mong manh cố hữu của các hệ thống tích hợp LLM này trước các thao túng AI đối kháng đa dạng. Rất ít nghiên cứu đề cập đến rủi ro hiện hữu của việc kẻ tấn công nhúng trực tiếp các tải trọng độc hại vào các log mạng đang được phân tích. Kiến trúc SENTINEL được đề xuất trong luận văn này trực tiếp nhắm vào khoảng trống đó bằng cách chế tạo một hệ thống lai, hai tầng nhằm giải quyết vấn đề nghịch lý độ trễ về mặt toán học, đồng thời thực thi các guardrails mật mã nghiêm ngặt để đảm bảo an ninh nhận thức của cỗ máy AI.
+
+Tóm lại, Chương 2 đã làm sáng tỏ các nguyên lý lý thuyết cốt lõi được sử dụng trong luận văn này. Được xây dựng dựa trên những nền tảng này, Chương 3 sẽ trình bày chi tiết kiến trúc của hệ thống SENTINEL được đề xuất.
