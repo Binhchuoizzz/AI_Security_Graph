@@ -117,6 +117,8 @@ SENTINEL is systematically benchmarked across five analytical axes:
 | **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3 8B) | `experiments/evaluate_reasoning.py` |
 | **5. Explainability**| Completeness Index $= 100\%$ (Audit Trail) | Deterministic schema checks | `experiments/evaluate_reasoning.py` |
 
+> **Supplementary (beyond the 5 axes):** multi-day **APT detection (emergent)** and **signature-less zero-day** detection are validated together in a single time-ordered stream by `experiments/evaluate_unified_stream.py` (report: `reports/unified_stream_evaluation_report.md`) — memory starts clean, so the APT verdict emerges incrementally rather than being pre-seeded.
+
 ---
 
 ## 📂 Datasets

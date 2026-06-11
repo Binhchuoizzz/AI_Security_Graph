@@ -1,5 +1,5 @@
 """
-Bộ Kiểm thử Tích hợp Đầu-cuối (E2E) của SENTINEL — 20 Bài Kiểm thử Thành phần
+Bộ Kiểm thử Tích hợp Đầu-cuối (E2E) của SENTINEL — 21 Bài Kiểm thử Thành phần
 
 Pha 3+4: Kiểm chứng toàn bộ module hoạt động theo đúng tài liệu đặc tả.
 Các bài test 1-12 chạy ngoại tuyến (OFFLINE - không cần LLM/Redis).
@@ -8,7 +8,7 @@ Các bài test 16-20: Kiểm chứng 5 bản sửa lỗi quan trọng (NIST, GT,
 
 Cách dùng:
   python experiments/e2e_test_runner.py
-  python experiments/e2e_test_runner.py --offline  # Chỉ chạy T1-T18, T20
+  python experiments/e2e_test_runner.py --offline  # Chỉ chạy T1-T18, T20-T21
 
 Kết quả đầu ra:
   reports/test_report_YYYYMMDD.md
@@ -501,6 +501,29 @@ def test_20_rank_bm25(r: TestResult):
 
 
 # ============================================================================
+# TEST 21: Unified Streaming Evaluation (merged real data, emergent APT)
+# ============================================================================
+def test_21_unified_stream(r: TestResult):
+    """Kiểm chứng luồng gộp (CICIDS + DAPT + zero-day) hợp lệ: data thật được
+    TRỘN xen kẽ, có IP APT đa-ngày thật. Smoke-test offline, không ghi file."""
+    from experiments.evaluate_unified_stream import build_stream
+
+    warmup, main, apt_truth, n_chains = build_stream()
+
+    sources = {ev["source"] for ev in main}
+    assert {"cicids", "dapt", "zeroday"}.issubset(sources), f"Thiếu nguồn: {sources}"
+    assert len(warmup) >= 100, f"Warmup quá ít cho Welford: {len(warmup)}"
+    assert len(apt_truth) >= 1, "Không có IP APT đa-ngày thật trong DAPT"
+
+    # Trộn thật sự: đếm số lần ĐỔI nguồn liên tiếp (xếp khối => rất ít)
+    switches = sum(1 for i in range(1, len(main)) if main[i]["source"] != main[i - 1]["source"])
+    assert switches >= 50, f"Luồng chưa trộn (chỉ {switches} lần đổi nguồn)"
+
+    r.passed(f"Unified stream: {len(main)} sự kiện trộn ({len(sources)} nguồn, "
+             f"{switches} lần đổi nguồn), {len(apt_truth)} IP APT thật")
+
+
+# ============================================================================
 # REPORT GENERATOR
 # ============================================================================
 def generate_report():
@@ -551,8 +574,8 @@ if __name__ == "__main__":
     offline_only = "--offline" in sys.argv
 
     print("=" * 60)
-    print("  SENTINEL E2E Validation Suite (20 Tests)")
-    print(f"  Mode: {'OFFLINE (T1-T18, T20)' if offline_only else 'FULL'}")
+    print("  SENTINEL E2E Validation Suite (21 Tests)")
+    print(f"  Mode: {'OFFLINE (T1-T18, T20-T21)' if offline_only else 'FULL'}")
     print("=" * 60)
 
     run_test("T01", "Ground Truth File Valid", test_01_ground_truth)
@@ -575,6 +598,7 @@ if __name__ == "__main__":
     run_test("T18", "DAPT2020 APT Chain", test_18_dapt_chain)
     run_test("T19", "Latency Benchmark", test_19_latency_benchmark)
     run_test("T20", "rank_bm25 Import & Usage", test_20_rank_bm25)
+    run_test("T21", "Unified Streaming Eval (merged, emergent APT)", test_21_unified_stream)
 
     report_path = generate_report()
 

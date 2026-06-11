@@ -1,6 +1,6 @@
-# Tài liệu Kiến trúc Kỹ thuật Toàn diện (35 Bước - SENTINEL V5)
+# Tài liệu Kiến trúc Kỹ thuật Toàn diện (36 Bước - SENTINEL V5)
 
-Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong toàn bộ luồng hoạt động của hệ thống SENTINEL (Cognitive Two-Tier Architecture), phân bổ xuyên suốt qua 6 phân hệ cốt lõi từ tầng Dataset đầu vào cho đến tầng Đánh giá (Evaluation).
+Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong toàn bộ luồng hoạt động của hệ thống SENTINEL (Cognitive Two-Tier Architecture), phân bổ xuyên suốt qua 6 phân hệ cốt lõi từ tầng Dataset đầu vào cho đến tầng Đánh giá (Evaluation).
 
 ---
 
@@ -500,3 +500,20 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
    - Input: LLM JSON response → Output: Completeness percentage.
 7. **LUỒNG DỮ LIỆU:** Output JSON → Key validator → Completeness metric.
 8. **VAI TRÒ BẢO MẬT:** Đảm bảo hệ thống đạt chuẩn Explainable AI (XAI) cho ứng cứu sự cố SOC, tránh hiện tượng hộp đen AI.
+
+---
+
+# **PHẦN 6 (BỔ SUNG): UNIFIED STREAMING EVALUATION**
+
+### **36. Unified Streaming Evaluation (Phân loại + APT emergent + Zero-day)**
+1. **STEP NAME:** Unified Time-Ordered Streaming Evaluation.
+2. **LAYER:** Evaluation Framework.
+3. **MỤC ĐÍCH:** Thay thế phương pháp 3 luồng tách rời cũ (CICIDS / DAPT nạp-sẵn / zero-day chạy riêng), vốn có lỗ hổng **circular** (đổ toàn bộ chuỗi DAPT vào Threat Memory rồi mới `check_apt_chain` = đã báo trước đáp án). Gộp cả 3 nguồn vào **MỘT luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật với **bộ nhớ khởi tạo SẠCH**.
+4. **CÔNG NGHỆ SỬ DỤNG:** `RuleEngine` (Welford Z-Score), `ThreatMemoryStore` (SQLite tạm + xóa sạch), trộn xen kẽ bằng khóa thời gian golden-ratio.
+5. **CƠ CHẾ HOẠT ĐỘNG:** Đo đồng thời 3 năng lực trên cùng dòng thời gian: (1) **Phân loại Tier-1** trên stream trộn; (2) **APT EMERGENT** — mỗi sự kiện ghi vào memory KHI tới rồi mới hỏi, bản án chỉ bật sau khi tích lũy đủ sự kiện đa-ngày (đo "độ trễ phát hiện"); (3) **Zero-day signature-less** — outlier mà rule tĩnh bỏ sót nhưng Welford bắt được (baseline học ngay từ benign trong cùng luồng).
+6. **CẤU TRÚC MÃ NGUỒN:**
+   - File: `experiments/evaluate_unified_stream.py`.
+   - Function: `build_stream()`, `run()`.
+   - Output: `experiments/results/unified_stream_results.json` + `reports/unified_stream_evaluation_report.md`.
+7. **LUỒNG DỮ LIỆU:** 3 nguồn data THẬT → chuẩn hóa + gán khóa thời gian → sort 1 luồng → stream incremental → Tier-1 + Threat Memory → metrics (F1 gate, APT recall + lag, zero-day TPR).
+8. **VAI TRÒ BẢO MẬT:** Chứng minh năng lực phát hiện APT low-and-slow và zero-day signature-less một cách **trung thực** (memory sạch, không tra đáp án nạp sẵn).

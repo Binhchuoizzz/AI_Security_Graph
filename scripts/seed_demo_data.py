@@ -103,7 +103,12 @@ def run_real_pipeline_on_cicids():
 
 
 def ingest_real_apt():
-    """Nạp 9 chuỗi APT DAPT2020 THẬT vào threat_memory."""
+    """Nạp 9 chuỗi APT DAPT2020 THẬT vào threat_memory.
+
+    LƯU Ý: đây là SEED cho DASHBOARD (để UI có sẵn lịch sử APT hiển thị) — KHÔNG
+    phải benchmark phát hiện APT. Việc đánh giá năng lực phát hiện APT (emergent,
+    bộ nhớ sạch, không nạp-sẵn) nằm ở `experiments/evaluate_unified_stream.py`.
+    """
     from src.agent.threat_memory import ThreatMemoryStore
     s = ThreatMemoryStore()
     n = s.ingest_dapt_chains(DAPT_PATH)
