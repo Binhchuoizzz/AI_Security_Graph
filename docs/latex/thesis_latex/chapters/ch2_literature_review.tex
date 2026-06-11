@@ -74,9 +74,9 @@ More advanced techniques like \textbf{Encoding Bypasses} utilize Base64 or Hexad
 
 \section{Welford's Online Statistical Algorithm}
 
-While Agentic AI provides unparalleled forensic analysis capabilities, the immense computational complexity of LLMs ((N^2)$ where N is the input sequence length for the Attention mechanism) creates a paradox: they cannot process massive volumes of raw network data streams at wire-speed. To resolve this problem, a high-throughput preprocessing data filtration mechanism operating with an optimal space and time complexity of (1)$ is mandatory.
+While Agentic AI provides unparalleled forensic analysis capabilities, the immense computational complexity of LLMs ($O(N^2)$ where N is the input sequence length for the Attention mechanism) creates a paradox: they cannot process massive volumes of raw network data streams at wire-speed. To resolve this problem, a high-throughput preprocessing data filtration mechanism operating with an optimal space and time complexity of $O(1)$ is mandatory.
 
-Welford's Online Algorithm \cite{welford1962} provides a precise and numerically stable mathematical formulation for computing variance over streaming data. Instead of storing the entire historical dataset to compute the sum of squares (which poses risks of catastrophic cancellation and high complexity), Welford's algorithm updates the Mean ($\mu_k$) and the Sum of Squared Differences ({2,k}$) for each new data point $ using recurrence relations:
+Welford's Online Algorithm \cite{welford1962} provides a precise and numerically stable mathematical formulation for computing variance over streaming data. Instead of storing the entire historical dataset to compute the sum of squares (which poses risks of catastrophic cancellation and high complexity), Welford's algorithm updates the Mean ($\mu_k$) and the Sum of Squared Differences ($M_{2,k}$) for each new data point $x_k$ using recurrence relations:
 
 \begin{equation}
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}
@@ -90,7 +90,7 @@ Welford's Online Algorithm \cite{welford1962} provides a precise and numerically
     \sigma_k^2 = \frac{M_{2,k}}{k}
 \end{equation}
 
-By continuously maintaining rolling variance and mean with a constant (1)$ memory footprint, the system instantaneously computes a normalized Z-Score for each packet. This technique almost entirely eliminates benign background network traffic, thoroughly resolving the LLM latency bottleneck, while perfectly preserving lightweight anomalous event sequences, maintaining the context for low-and-slow APT infiltrations.
+By continuously maintaining rolling variance and mean with a constant $O(1)$ memory footprint, the system instantaneously computes a normalized Z-Score for each packet. This technique almost entirely eliminates benign background network traffic, thoroughly resolving the LLM latency bottleneck, while perfectly preserving lightweight anomalous event sequences, maintaining the context for low-and-slow APT infiltrations.
 
 \vspace{1em}
 In summary, Chapter 2 has synthesized and profoundly dissected the theoretical principles, mathematical tools, and associated cognitive risks, forming a robust academic foundation. Building upon this theoretical basis, Chapter 3 will detail the technical design of the SENTINEL dual-tier hybrid architecture.

@@ -38,7 +38,8 @@ jobs:
     - name: Run pip-audit (CVE scan)
       run: |
         # Audit project dependencies, ignoring pip itself (tooling, not project dep)
-        pip-audit --desc --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357
+        # CVE-2025-3000 is ignored as torch.jit.script is not utilized in SENTINEL (transitive dependency of sentence-transformers)
+        pip-audit --desc --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357 --ignore-vuln CVE-2025-3000
 
 
   secrets-scan:
