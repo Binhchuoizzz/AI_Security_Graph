@@ -48,11 +48,11 @@ python experiments/e2e_test_runner.py --offline
   2. Lệnh: `python experiments/evaluate_reasoning.py`
   3. Chạy `./scripts/switch_model.sh gemma` để khôi phục lại Agent mặc định.
 
-**5. Đánh giá Zero-day (Zero-Day Anomaly Detection):**
+**5. Đánh giá Luồng Gộp Thống Nhất (Unified Streaming — Phân loại + APT + Zero-day):**
 
-- Đánh giá khả năng chặn logs Signature-less thông qua Unsupervised Anomaly Detection ở Tier-1 và Zero-shot reasoning ở Tier-2.
-- Lệnh: `python experiments/evaluate_zeroday.py`
-- Kết quả và phân tích chi tiết được lưu tại `reports/zeroday_evaluation_report.md`.
+- **Thay thế** phương pháp 3 luồng tách rời cũ. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với bộ nhớ **khởi tạo sạch** — phát hiện APT là **emergent** (không nạp sẵn đáp án, xóa bỏ tính circular), và zero-day signature-less bị Welford bắt khi rule tĩnh bỏ sót.
+- Lệnh: `python experiments/evaluate_unified_stream.py`
+- Kết quả và phân tích chi tiết được lưu tại `reports/unified_stream_evaluation_report.md`.
 
 **6. Giải thích (Explainability):**
 

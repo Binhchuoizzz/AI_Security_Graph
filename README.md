@@ -150,7 +150,7 @@ AI_Security_Graph/
 │   ├── evaluate_robustness.py        # Static Guardrails bypass benchmark
 │   ├── evaluate_adversarial_pipeline.py # Full-LLM-pipeline adversarial resistance test
 │   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation (Llama 3)
-│   ├── evaluate_zeroday.py           # Simulates and evaluates Zero-Day outlier threats
+│   ├── evaluate_unified_stream.py    # Unified stream eval: CICIDS + DAPT (emergent APT) + zero-day in one time-ordered stream
 │   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
 │   ├── statistical_tests.py          # McNemar / Mann-Whitney U significance tests
 │   └── e2e_test_runner.py            # Automated E2E integration test suite
@@ -160,7 +160,7 @@ AI_Security_Graph/
 │   └── faiss_index/                  # Embedded FAISS and BM25 vector indexes
 ├── reports/
 │   ├── test_report_FINAL.md          # E2E 20/20 PASS verification report
-│   └── zeroday_evaluation_report.md  # Zero-Day threat detection evaluation report
+│   └── unified_stream_evaluation_report.md  # Unified streaming eval report (classification + APT + zero-day)
 ├── scripts/
 │   └── switch_model.sh               # Utility script to hot-swap LLM models in Docker
 ├── src/

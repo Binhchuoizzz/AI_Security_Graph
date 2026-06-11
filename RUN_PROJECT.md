@@ -598,20 +598,32 @@ exit()
 ```
 *   *Kết quả mong đợi:* Hệ thống tự động chuyển lại mô hình Gemma 2 9B.
 
-**Bước 4: Chạy thử nghiệm phát hiện Zero-day (Signature-less bypass):**
+**Bước 4: Chạy đánh giá luồng gộp thống nhất (Phân loại + APT + Zero-day trong MỘT luồng):**
 ```bash
-.venv/bin/python experiments/evaluate_zeroday.py
+.venv/bin/python experiments/evaluate_unified_stream.py
 ```
-*   *Kết quả thực đo (2026-06-09):*
-    *   Baseline 100 log → phân phối chuẩn Welford **μ=15.00, σ=1.42**.
-    *   Mô phỏng 2 kịch bản Zero-day (Data Exfiltration + Session Flooding) qua cổng 80.
-    *   Rule Engine tĩnh trả về `DROP` (**Bỏ sót cả 2**).
-    *   SENTINEL Tier-1 (Welford Z-Score) tính **Z=59,792** và **Z=84,416** ($\gg 3.5$), `Risk=55` và `ESCALATE`.
-    *   Agent Tier-2 (Gemma 2) suy luận và ra quyết định **`ALERT` với độ tin cậy `0.70`** (latency thật ~6–7s/incident), MITRE T1583.008.
-    *   Báo cáo thực nghiệm chi tiết xuất ra tại: [zeroday_evaluation_report.md](reports/zeroday_evaluation_report.md).
+*   *Vì sao gộp:* phương pháp 3 luồng tách rời cũ (`evaluate_zeroday.py` + nạp-sẵn DAPT) có
+    **lỗ hổng circular** — DAPT bị đổ toàn bộ chuỗi vào Threat Memory rồi mới `check_apt_chain`,
+    tức đã báo trước đáp án. Script này **gộp CICIDS + DAPT2020 + Zero-day vào một luồng sắp
+    theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với
+    **bộ nhớ khởi tạo SẠCH**.
+*   *Kết quả thực đo (2026-06-10, offline, tất định — không cần LLM):*
+    *   **Phân loại (Tier-1 gate)** trên luồng trộn 4,294 sự kiện: F1 **0.65**, Precision **0.96**,
+        Recall **0.49** (recall thấp là đúng thiết kế — Tier-1 chỉ chặn tấn công lộ rõ, đẩy phần
+        tinh vi lên Tier-2; F1 toàn hệ thống đo ở Ablation Config F).
+    *   **APT (DAPT) — phát hiện EMERGENT, KHÔNG nạp sẵn:** bộ nhớ rỗng lúc đầu; mỗi sự kiện
+        ghi vào memory khi tới rồi mới hỏi. **3/3 IP APT phát hiện đúng (recall 1.0)**, bản án
+        chỉ bật ở **ngày 3–4** (ngày 1 = chưa APT), độ trễ TB **8.33 sự kiện** → đã xóa bỏ
+        tính circular.
+    *   **Zero-day (signature-less):** 3/3 kịch bản (Flow-Duration / Flow-Pkts/s / Bwd-volume
+        outlier) — Rule tĩnh trả `DROP` (**bỏ sót cả 3**), Welford bắt được với **Z ≈ 25,815 /
+        30,470 / 40,627** ($\gg 3.5$) → `ESCALATE`.
+    *   Báo cáo chi tiết: `reports/unified_stream_evaluation_report.md`; JSON:
+        `experiments/unified_stream_results.json`.
 
-> **Ghi chú:** Quyết định cụ thể (ALERT vs BLOCK_IP) và độ tin cậy phụ thuộc suy luận
-> của LLM cục bộ tại thời điểm chạy — giá trị trên là đo thực tế, có thể dao động giữa các lần chạy.
+> **Ghi chú:** Tầng LLM Tier-2 + Tier-Consensus Guard được đánh giá riêng ở
+> `evaluate_adversarial_pipeline.py` (kháng social-engineering) và `evaluate_reasoning.py`
+> (LLM-as-Judge). Độ trễ phát hiện APT phụ thuộc thứ tự sự kiện thật trong dataset.
 
 ---
 
@@ -776,8 +788,8 @@ docker-compose up -d
 # 4. Chạy kiểm thử đầy đủ kết nối LLM (Online)
 .venv/bin/python experiments/e2e_test_runner.py
 
-# 5. Đánh giá phát hiện tấn công Zero-day (Outliers)
-.venv/bin/python experiments/evaluate_zeroday.py
+# 5. Đánh giá luồng gộp thống nhất (Phân loại + APT emergent + Zero-day)
+.venv/bin/python experiments/evaluate_unified_stream.py
 
 # 6. Chạy luồng Full Pipeline (Thời gian thực)
 # Mở Terminal 1 (AI Agent):

@@ -151,7 +151,7 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 
 ### **NGÀY 5 — Giao diện SOC & khung đánh giá thực nghiệm**
 *   `src/ui/app.py`, `components.py`, `auth.py` (PBKDF2-HMAC-SHA256), `style.css` — Dashboard HITL Streamlit (5 tab: Alerts/Rules/APT/Blocklist/Graph).
-*   `experiments/run_ablation_study.py`, `statistical_tests.py` (McNemar + Mann-Whitney U), `evaluate_robustness.py` (**120 mẫu adversarial / 5 nhóm**), `evaluate_adversarial_pipeline.py` (kháng LLM), `evaluate_reasoning.py` (LLM-as-Judge/RAGAS), `evaluate_zeroday.py`, `measure_latency_baseline.py`, `plot_results.py`, `e2e_test_runner.py` (20/20).
+*   `experiments/run_ablation_study.py`, `statistical_tests.py` (McNemar + Mann-Whitney U), `evaluate_robustness.py` (**120 mẫu adversarial / 5 nhóm**), `evaluate_adversarial_pipeline.py` (kháng LLM), `evaluate_reasoning.py` (LLM-as-Judge/RAGAS), `evaluate_unified_stream.py` (**luồng gộp CICIDS+DAPT+zero-day, phát hiện APT emergent, thay phương pháp 3 luồng cũ**), `measure_latency_baseline.py`, `plot_results.py`, `e2e_test_runner.py` (20/20).
 *   `scripts/build_adversarial_suite.py`, `seed_demo_data.py` — sinh bộ adversarial & seed Dashboard từ data thật.
 *   `main.py` — entrypoint tích hợp (mode server/scan/full).
 

@@ -1,0 +1,450 @@
+"""
+SENTINEL — Unified Streaming Evaluation
+========================================
+THAY THẾ phương pháp đánh giá "3 luồng tách rời" cũ (CICIDS / DAPT nạp-sẵn /
+zero-day chạy riêng), vốn có 2 nhược điểm:
+  - DAPT bị nạp TOÀN BỘ chuỗi vào Threat Memory rồi mới `check_apt_chain`
+    -> vòng luẩn quẩn (đã báo trước đáp án), không chứng minh được năng lực
+    phát hiện APT nổi lên dần.
+  - Zero-day và CICIDS chạy ở hai script riêng, không phản ánh một SOC thực tế
+    nơi mọi traffic trộn lẫn trên cùng một dòng thời gian.
+
+Cách làm MỚI: gộp cả 3 nguồn vào MỘT luồng sự kiện sắp theo thời gian, stream
+TĂNG DẦN qua hệ thống THẬT (Tier-1 RuleEngine + Welford + Threat Memory) với
+bộ nhớ KHỞI TẠO SẠCH. Nhờ đó:
+  1. Phân loại (CICIDS): đo trên stream trộn thật.
+  2. APT (DAPT): bộ nhớ tích lũy TỪ stream; `check_apt_chain` chỉ bật sau khi
+     đủ sự kiện đa ngày -> phát hiện EMERGENT, đo "độ trễ phát hiện".
+  3. Zero-day: outlier signature-less, rule tĩnh bỏ sót nhưng Welford bắt được,
+     baseline học ngay từ traffic benign trong cùng luồng.
+
+Chạy offline (Tier-1 + Memory, tất định, không cần LLM server):
+    .venv/bin/python experiments/evaluate_unified_stream.py
+"""
+
+import json
+import math
+import os
+import sqlite3
+import sys
+from collections import defaultdict
+from datetime import datetime
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
+from src.agent.threat_memory import ThreatMemoryStore  # noqa: E402
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
+DAPT_PATH = os.path.join(ROOT, "data", "processed", "dapt2020_chains.jsonl")
+EVAL_MEM_DB = os.path.join(ROOT, "experiments", ".unified_eval_memory.db")
+OUT_JSON = os.path.join(ROOT, "experiments", "unified_stream_results.json")
+REPORT_MD = os.path.join(ROOT, "reports", "unified_stream_evaluation_report.md")
+
+THREAT_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"}
+BENIGN_ACTIONS = {"DROP", "LOG"}
+BENIGN_PHASES = {"Benign", "benign", "Normal", "normal", "", None, "Unknown"}
+
+
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
+def _safe_int(v, default=0):
+    try:
+        f = float(v)
+        return int(f) if math.isfinite(f) else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _is_threat(action: str) -> bool:
+    return action in THREAT_ACTIONS
+
+
+def map_cicids(nl: dict) -> dict:
+    """network_layer (ground_truth) -> schema CICIDS mà RuleEngine mong đợi."""
+    return {
+        "Source IP": nl.get("src_ip", "0.0.0.0"),
+        "Destination IP": nl.get("dst_ip", "0.0.0.0"),
+        "Destination Port": nl.get("dst_port", 0),
+        "Protocol": nl.get("protocol", 6),
+        "Flow Duration": nl.get("flow_duration_us", 0),
+        "Total Fwd Packets": nl.get("fwd_packets", 0),
+        "Total Backward Packets": nl.get("bwd_packets", 0),
+        "Total Length of Fwd Packets": nl.get("fwd_bytes", 0),
+        "Total Length of Bwd Packets": nl.get("bwd_bytes", 0),
+        "Flow Pkts/s": nl.get("flow_pkts_s", 0.0),
+        "Fwd Seg Size Min": nl.get("fwd_seg_size_min", 0),
+        "Init Fwd Win Byts": nl.get("init_fwd_win_byts", 0),
+        "Init Bwd Win Byts": nl.get("init_bwd_win_byts", 0),
+        "Bwd Pkt Len Min": nl.get("bwd_pkt_len_min", 0),
+        "PSH Flag Cnt": nl.get("psh_flag_cnt", 0),
+        "service": nl.get("service", ""),
+    }
+
+
+def static_only_action(engine: RuleEngine, log: dict) -> str:
+    """Mô phỏng "Config A" (chỉ luật tĩnh, KHÔNG Welford) để đối chứng zero-day."""
+    port = _safe_int(log.get("Destination Port"))
+    fwd = _safe_int(log.get("Total Fwd Packets"))
+    if port in engine.sensitive_ports:
+        return "BLOCK_IP"
+    if engine._check_waf_signatures(log) or engine._check_injection_signatures(log):
+        return "BLOCK_IP"
+    if fwd > engine.max_fwd_packets:
+        return "ALERT"
+    return "DROP"
+
+
+# --------------------------------------------------------------------------- #
+# Build unified, time-ordered event stream
+# --------------------------------------------------------------------------- #
+def build_stream():
+    """Trả về (warmup_events, main_events, apt_truth).
+
+    - warmup_events: traffic benign CICIDS để Welford học baseline trước.
+    - main_events: CICIDS tấn công + sự kiện DAPT (đa ngày) + zero-day, đã trộn
+      và sắp theo khóa thời gian `t` (1.0..5.x = ngày 1..5 của cửa sổ sự cố).
+    - apt_truth: tập IP THẬT là APT (có sự kiện tấn công ở >= 2 ngày khác nhau).
+    """
+    gt = json.load(open(GT_PATH, encoding="utf-8"))
+    samples = gt if isinstance(gt, list) else gt.get("samples", gt)
+
+    warmup, main = [], []
+
+    # --- CICIDS ---------------------------------------------------------- #
+    attack_idx = 0
+    for s in samples:
+        nl = s.get("input", {}).get("network_layer", {})
+        if not nl:
+            continue
+        log = map_cicids(nl)
+        label = s.get("input", {}).get("cicids_label", "")
+        expected = s.get("expected_action", "")
+        is_benign = label == "Benign" or expected == "LOG"
+        ev = {
+            "source": "cicids",
+            "log": log,
+            "expected_threat": not is_benign,
+            "label": label,
+        }
+        if is_benign:
+            warmup.append(ev)  # benign -> warmup baseline
+        else:
+            # rải traffic tấn công CICIDS đều khắp 5 ngày làm nền nhiễu
+            ev["t"] = 1.0 + (attack_idx % 5) + 1e-7 * attack_idx
+            main.append(ev)
+            attack_idx += 1
+
+    # --- DAPT2020 (sự kiện đa ngày) -------------------------------------- #
+    apt_attack_days = defaultdict(set)
+    chains = [json.loads(line) for line in open(DAPT_PATH, encoding="utf-8")]
+    seq = 0
+    for chain in chains:
+        for e in chain.get("events", []):
+            phase = e.get("phase")
+            label = e.get("label", "")
+            is_attack = (phase not in BENIGN_PHASES) and (label not in BENIGN_PHASES)
+            if not is_attack:
+                continue  # chỉ đưa sự kiện TẤN CÔNG vào memory (như SOC thật)
+            ip = e.get("src_ip", chain.get("attacker_ip", ""))
+            day = _safe_int(e.get("day"), 1)
+            apt_attack_days[ip].add(day)
+            seq += 1
+            main.append({
+                "source": "dapt",
+                "ip": ip,
+                "dst_ip": e.get("dst_ip", ""),
+                "phase": phase,
+                "day": day,
+                "label": label,
+                "timestamp": e.get("timestamp", ""),
+                # flow tối thiểu, tín hiệu THẤP (mỗi sự kiện APT lẻ trông vô hại)
+                "log": {
+                    "Source IP": ip,
+                    "Destination IP": e.get("dst_ip", ""),
+                    "Destination Port": 443,
+                    "Total Fwd Packets": 20,
+                },
+                "t": float(day) + 1e-6 * seq,
+            })
+
+    apt_truth = {ip for ip, days in apt_attack_days.items() if len(days) >= 2}
+
+    # --- Zero-day (signature-less outliers, tiêm vào ngày 3) ------------- #
+    # Cổng cho phép + Total Fwd Packets thấp (< max_fwd_packets) + không signature
+    # => luật TĨNH bỏ sót; nhưng EXTREME trên feature không có ngưỡng tĩnh
+    # (Flow Duration / Bwd Packets / Flow Pkts/s) => Welford Z-score bắt được.
+    zerodays = [
+        {
+            "id": "ZD-001", "name": "Zero-Day Exfil (Flow-Duration outlier)",
+            "log": {"Source IP": "10.0.0.22", "Destination IP": "203.0.113.9",
+                    "Destination Port": 80, "Total Fwd Packets": 60,
+                    "Flow Duration": 9_000_000_000,
+                    "Total Length of Bwd Packets": 50_000_000,
+                    "user_agent": "Mozilla/5.0 exfil-tool/1.0"},
+            "mitre": "T1048 Exfiltration Over Alternative Protocol",
+        },
+        {
+            "id": "ZD-002", "name": "Zero-Day Beacon (Flow-Pkts/s outlier)",
+            "log": {"Source IP": "10.0.0.33", "Destination IP": "198.51.100.7",
+                    "Destination Port": 443, "Total Fwd Packets": 120,
+                    "Flow Pkts/s": 750_000.0,
+                    "Total Backward Packets": 90_000,
+                    "user_agent": "Mozilla/5.0 beacon/2.1"},
+            "mitre": "T1071 Application Layer Protocol (C2)",
+        },
+        {
+            "id": "ZD-003", "name": "Zero-Day Tunnel (Bwd-volume outlier)",
+            "log": {"Source IP": "10.0.0.44", "Destination IP": "192.0.2.55",
+                    "Destination Port": 8080, "Total Fwd Packets": 200,
+                    "Total Backward Packets": 120_000,
+                    "Init Bwd Win Byts": 65_000_000,
+                    "user_agent": "curl/7.88 tunnel"},
+            "mitre": "T1572 Protocol Tunneling",
+        },
+    ]
+    for k, zd in enumerate(zerodays):
+        zd["source"] = "zeroday"
+        zd["t"] = 3.0 + 0.5 + 1e-6 * k  # giữa luồng, sau khi đã ấm baseline
+        main.append(zd)
+
+    main.sort(key=lambda x: x["t"])
+    return warmup, main, apt_truth, len(chains)
+
+
+# --------------------------------------------------------------------------- #
+# Run the unified stream through the real system
+# --------------------------------------------------------------------------- #
+def run():
+    print("=" * 70)
+    print("  SENTINEL — UNIFIED STREAMING EVALUATION (1 luồng gộp, memory sạch)")
+    print("=" * 70)
+
+    # Bộ nhớ THẬT nhưng dùng DB tạm + xóa sạch (không đụng production threat_memory)
+    if os.path.exists(EVAL_MEM_DB):
+        os.remove(EVAL_MEM_DB)
+    memory = ThreatMemoryStore(db_path=EVAL_MEM_DB)
+    with sqlite3.connect(EVAL_MEM_DB) as c:
+        c.execute("DELETE FROM threat_events")
+
+    engine = RuleEngine()
+
+    warmup, main, apt_truth, n_chains = build_stream()
+    print(f"\n[*] Nguồn: {len(warmup)} benign (warmup) | {len(main)} sự kiện luồng chính")
+    print(f"[*] DAPT: {n_chains} chuỗi | IP là APT thật (>=2 ngày tấn công): {len(apt_truth)}")
+
+    # Phân loại (tính trên CẢ benign warmup lẫn tấn công ở luồng chính) -- #
+    cls = {"tp": 0, "fp": 0, "tn": 0, "fn": 0}
+
+    # ---- Phase warmup: học baseline Welford từ benign -------------------- #
+    # Các flow này expected = benign -> đóng góp TN/FP cho confusion matrix.
+    for ev in warmup:
+        res = engine.evaluate(ev["log"])
+        flagged = _is_threat(res["tier1_action"])
+        cls["fp" if flagged else "tn"] += 1
+
+    # ---- Phase chính: stream trộn theo thời gian ------------------------- #
+    # APT
+    apt_detected = {}          # ip -> {first_attack_event, fire_event, fire_day, days_at_fire}
+    apt_event_counter = defaultdict(int)
+    # zero-day
+    zd_results = []
+
+    ev_index = 0
+    for ev in main:
+        ev_index += 1
+        src = ev["source"]
+
+        if src == "cicids":
+            res = engine.evaluate(ev["log"])
+            flagged = _is_threat(res["tier1_action"])
+            if ev["expected_threat"]:
+                cls["tp" if flagged else "fn"] += 1
+            else:
+                cls["fp" if flagged else "tn"] += 1
+
+        elif src == "dapt":
+            # Mỗi sự kiện APT vẫn đi qua Tier-1 (thường DROP/LOG vì tín hiệu thấp)
+            engine.evaluate(ev["log"])
+            ip = ev["ip"]
+            apt_event_counter[ip] += 1
+            # GHI vào bộ nhớ TỪ stream (tích lũy dần), rồi HỎI lại
+            before = memory.check_apt_chain(ip)
+            memory.record_apt_event(
+                src_ip=ip, dst_ip=ev["dst_ip"], apt_phase=ev["phase"],
+                apt_day=ev["day"], label=ev["label"], timestamp=ev["timestamp"],
+            )
+            after = memory.check_apt_chain(ip)
+            if ip not in apt_detected:
+                apt_detected[ip] = {
+                    "first_event_idx": ev_index,
+                    "first_day": ev["day"],
+                    "fired": False,
+                }
+            # ghi lại khoảnh khắc bản án LẬT từ False -> True
+            if (not before["is_apt"]) and after["is_apt"] and not apt_detected[ip]["fired"]:
+                apt_detected[ip].update({
+                    "fired": True,
+                    "fire_event_idx": ev_index,
+                    "fire_day": ev["day"],
+                    "events_until_fire": apt_event_counter[ip],
+                    "phases_at_fire": after.get("phases_seen", ""),
+                })
+
+        elif src == "zeroday":
+            static_act = static_only_action(engine, ev["log"])
+            res = engine.evaluate(ev["log"])
+            zd_results.append({
+                "id": ev["id"], "name": ev["name"], "mitre": ev["mitre"],
+                "static_only_action": static_act,
+                "full_action": res["tier1_action"],
+                "z_score": round(res.get("tier1_z_score", 0.0), 2),
+                "tier1_score": res.get("tier1_score", 0),
+                "caught_by_welford": static_act in BENIGN_ACTIONS
+                                     and _is_threat(res["tier1_action"]),
+            })
+
+    # ---- Metrics --------------------------------------------------------- #
+    tp, fp, tn, fn = cls["tp"], cls["fp"], cls["tn"], cls["fn"]
+    precision = tp / (tp + fp) if (tp + fp) else 0.0
+    recall = tp / (tp + fn) if (tp + fn) else 0.0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
+    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) else 0.0
+
+    apt_fired = {ip: d for ip, d in apt_detected.items() if d.get("fired")}
+    apt_truth_seen = apt_truth & set(apt_detected.keys())
+    apt_tp = len(apt_truth & set(apt_fired.keys()))
+    apt_fn = len(apt_truth_seen) - apt_tp
+    lags = [d["events_until_fire"] for ip, d in apt_fired.items() if ip in apt_truth]
+    avg_lag = sum(lags) / len(lags) if lags else 0.0
+
+    zd_caught = sum(1 for z in zd_results if z["caught_by_welford"])
+
+    summary = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "stream": {"warmup_benign": len(warmup), "main_events": len(main),
+                   "dapt_chains": n_chains, "apt_truth_ips": len(apt_truth)},
+        "classification_cicids": {
+            "tp": tp, "fp": fp, "tn": tn, "fn": fn,
+            "precision": round(precision, 4), "recall": round(recall, 4),
+            "f1": round(f1, 4), "accuracy": round(accuracy, 4),
+        },
+        "apt_dapt": {
+            "apt_truth_ips": len(apt_truth),
+            "apt_truth_seen_in_stream": len(apt_truth_seen),
+            "detected": apt_tp, "missed": apt_fn,
+            "recall": round(apt_tp / len(apt_truth_seen), 4) if apt_truth_seen else 0.0,
+            "avg_detection_lag_events": round(avg_lag, 2),
+        },
+        "zeroday": {
+            "total": len(zd_results),
+            "caught_by_welford_static_missed": zd_caught,
+        },
+    }
+
+    details = {"apt_detected": apt_detected, "zeroday": zd_results}
+    with open(OUT_JSON, "w", encoding="utf-8") as f:
+        json.dump({"summary": summary, "details": details}, f, indent=2, ensure_ascii=False)
+
+    _print_console(summary, apt_fired, apt_truth, zd_results)
+    _write_report(summary, apt_fired, apt_truth, zd_results)
+    print(f"\n[+] JSON: {OUT_JSON}\n[+] Report: {REPORT_MD}")
+    return summary
+
+
+def _print_console(summary, apt_fired, apt_truth, zd_results):
+    c = summary["classification_cicids"]
+    a = summary["apt_dapt"]
+    print("\n" + "-" * 70)
+    print("  [1] CLASSIFICATION (CICIDS, trên luồng trộn)")
+    print(f"      F1={c['f1']}  Acc={c['accuracy']}  P={c['precision']}  R={c['recall']}")
+    print(f"      TP={c['tp']} FP={c['fp']} TN={c['tn']} FN={c['fn']}")
+    print("  [2] APT (DAPT, phát hiện EMERGENT từ memory sạch)")
+    print(f"      APT thật thấy trong stream: {a['apt_truth_seen_in_stream']}"
+          f" | phát hiện: {a['detected']} | sót: {a['missed']}")
+    print(f"      Recall={a['recall']}  | Độ trễ TB: {a['avg_detection_lag_events']} sự kiện")
+    for ip, d in sorted(apt_fired.items()):
+        if ip in apt_truth:
+            print(f"        - {ip}: day1=KHÔNG-APT -> BẬT ở ngày {d['fire_day']}"
+                  f" (sau {d['events_until_fire']} sự kiện)")
+    print("  [3] ZERO-DAY (signature-less; static bỏ sót, Welford bắt)")
+    for z in zd_results:
+        mark = "✅ Welford bắt" if z["caught_by_welford"] else "⚠️ "
+        print(f"        - {z['id']}: static={z['static_only_action']}"
+              f" -> full={z['full_action']} (Z={z['z_score']}) {mark}")
+    print("-" * 70)
+
+
+def _write_report(summary, apt_fired, apt_truth, zd_results):
+    c = summary["classification_cicids"]
+    a = summary["apt_dapt"]
+    z = summary["zeroday"]
+    lines = []
+    lines.append("# Báo Cáo: Đánh Giá Luồng Gộp Thống Nhất (Unified Streaming Evaluation)\n")
+    lines.append("> **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + "
+                 "Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ "
+                 "thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.\n")
+    lines.append(f"> **Sinh lúc:** {summary['timestamp']}\n")
+    lines.append("---\n")
+    lines.append("## 0. Luồng dữ liệu\n")
+    s = summary["stream"]
+    lines.append(f"- Warmup benign (học baseline Welford): **{s['warmup_benign']}**")
+    lines.append(f"- Sự kiện luồng chính (CICIDS tấn công + DAPT + zero-day): **{s['main_events']}**")
+    lines.append(f"- DAPT chuỗi: **{s['dapt_chains']}** | IP là APT thật (≥2 ngày tấn công): **{s['apt_truth_ips']}**\n")
+
+    lines.append("## 1. Phân loại ở TẦNG LỌC Tier-1 (gate) trên luồng trộn\n")
+    lines.append("> Đây là số của **riêng tầng Tier-1** (rule tĩnh + Welford), tức cổng "
+                 "lọc thô. Tier-1 cố tình chỉ chặn phần tấn công lộ rõ ở tầng mạng và "
+                 "**đẩy phần tinh vi lên Tier-2** (vì vậy recall ở đây thấp là đúng thiết "
+                 "kế). F1 của TOÀN hệ thống (Tier-1 + LLM) được đo ở Ablation `Config F`.\n")
+    lines.append("| Metric (Tier-1 gate) | Giá trị |")
+    lines.append("| :--- | :---: |")
+    lines.append(f"| F1 | **{c['f1']}** |")
+    lines.append(f"| Accuracy | {c['accuracy']} |")
+    lines.append(f"| Precision | {c['precision']} |")
+    lines.append(f"| Recall (attack) | {c['recall']} |")
+    lines.append(f"| TP / FP / TN / FN | {c['tp']} / {c['fp']} / {c['tn']} / {c['fn']} |\n")
+
+    lines.append("## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn\n")
+    lines.append("Bộ nhớ bắt đầu **rỗng**; mỗi sự kiện APT được ghi vào memory KHI nó "
+                 "tới trong luồng, rồi mới hỏi `check_apt_chain`. Bản án APT chỉ bật sau "
+                 "khi tích lũy đủ sự kiện **đa ngày** — chứng minh phát hiện nổi lên dần, "
+                 "**không** phải tra đáp án nạp sẵn.\n")
+    lines.append(f"- APT thật xuất hiện trong stream: **{a['apt_truth_seen_in_stream']}**")
+    lines.append(f"- Phát hiện đúng: **{a['detected']}** | Bỏ sót: **{a['missed']}** "
+                 f"| Recall: **{a['recall']}**")
+    lines.append(f"- Độ trễ phát hiện trung bình: **{a['avg_detection_lag_events']} sự kiện**\n")
+    lines.append("| Attacker IP | Ngày BẬT cảnh báo APT | Sự kiện tới khi bật |")
+    lines.append("| :--- | :---: | :---: |")
+    for ip, d in sorted(apt_fired.items()):
+        if ip in apt_truth:
+            lines.append(f"| {ip} | ngày {d['fire_day']} (ngày 1 = chưa APT) | {d['events_until_fire']} |")
+    lines.append("")
+
+    lines.append("## 3. Zero-day (signature-less) — static bỏ sót, Welford bắt\n")
+    lines.append(f"Tổng: **{z['total']}** | Welford bắt được (mà static bỏ sót): "
+                 f"**{z['caught_by_welford_static_missed']}/{z['total']}**\n")
+    lines.append("| ID | Kịch bản | Rule tĩnh (Config A) | Full Tier-1 (Welford) | Z-Score |")
+    lines.append("| :--- | :--- | :---: | :---: | :---: |")
+    for zr in zd_results:
+        mark = "✅" if zr["caught_by_welford"] else "⚠️"
+        lines.append(f"| {zr['id']} | {zr['name']} | {zr['static_only_action']} (bỏ sót) "
+                     f"| **{zr['full_action']}** | {zr['z_score']} {mark} |")
+    lines.append("")
+    lines.append("---\n")
+    lines.append("## Kết luận\n")
+    lines.append("Một luồng thống nhất chứng minh đồng thời 3 năng lực trên cùng dòng thời "
+                 "gian thực tế: (1) phân loại Tier-1, (2) phát hiện APT **nổi lên dần** từ "
+                 "bộ nhớ sạch (đã loại bỏ tính circular của phương pháp nạp-sẵn cũ), và "
+                 "(3) bắt zero-day outlier mà luật tĩnh bỏ sót. Tầng LLM (Tier-2) + "
+                 "Tier-Consensus Guard được đánh giá ở `evaluate_adversarial_pipeline.py`.\n")
+
+    os.makedirs(os.path.dirname(REPORT_MD), exist_ok=True)
+    with open(REPORT_MD, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
+if __name__ == "__main__":
+    run()
