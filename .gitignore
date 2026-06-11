@@ -53,3 +53,15 @@ docs/proposal_latex/compile_*.log
 data/trivy-results.json
 
 
+
+# LaTeX thesis compile files
+docs/latex/thesis_latex*/*.aux
+docs/latex/thesis_latex*/*.log
+docs/latex/thesis_latex*/*.out
+docs/latex/thesis_latex*/*.toc
+docs/latex/thesis_latex*/*.fls
+docs/latex/thesis_latex*/*.fdb_latexmk
+docs/latex/thesis_latex*/*.synctex*
+docs/latex/thesis_latex*/*.lof
+docs/latex/thesis_latex*/*.lot
+

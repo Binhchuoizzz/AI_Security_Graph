@@ -7,8 +7,8 @@
 % --- Packages ---
 \usepackage[utf8]{inputenc}
 \usepackage[T5]{fontenc} % Keep T5 for any occasional Vietnamese names
-\usepackage[english]{babel}
-\addto\captionsenglish{\renewcommand{\bibname}{References}}
+\usepackage[vietnamese]{babel}
+\addto\captionsvietnamese{\renewcommand{\bibname}{Tài liệu tham khảo}}
 \usepackage{times} % Times New Roman font
 \usepackage{geometry}
 \geometry{top=2.54cm, bottom=2.54cm, left=3.0cm, right=2.8cm} % Margin rules
@@ -68,7 +68,7 @@
 
 % =============================================================================
 \begin{document}
-\selectlanguage{english}
+\selectlanguage{vietnamese}
 
 % -----------------------------------------------------------------------------
 % FRONT MATTER (No page numbering on cover pages)
@@ -79,44 +79,44 @@
 \begin{titlepage}
     \centering
     \vspace*{1cm}
-    {\large\textbf{MINISTRY OF EDUCATION AND TRAINING}}\\[0.1cm]
-    {\large\textbf{FPT UNIVERSITY}}\\[3cm]
+    {\large\textbf{BỘ GIÁO DỤC VÀ ĐÀO TẠO}}\\[0.1cm]
+    {\large\textbf{TRƯỜNG ĐẠI HỌC FPT}}\\[3cm]
     
-    {\Large A TWO-TIER COGNITIVE ARCHITECTURE FOR AUTOMATED THREAT DETECTION AND RESPONSE USING AGENTIC AI}\\[3cm]
+    {\Large KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ (AGENTIC AI)}\\[3cm]
     
-    by\\[1cm]
+    thực hiện bởi\\[1cm]
     
-    Nguyen Duc Binh\\[3cm]
+    Nguyễn Đức Bình\\[3cm]
     
-    A thesis submitted in conformity with the requirements\\
-    for the degree of Master of Software Engineering\\[1cm]
+    Luận văn được nộp để đáp ứng yêu cầu\\
+    của học vị Thạc sĩ Kỹ thuật Phần mềm\\[1cm]
     
     \vfill
-    {\normalsize \copyright\ Copyright by Nguyen Duc Binh 2026}
+    {\normalsize \copyright\ Bản quyền thuộc về Nguyễn Đức Bình 2026}
 \end{titlepage}
 
 % Cover Page 2 (with Supervisors)
 \begin{titlepage}
     \centering
     \vspace*{1cm}
-    {\large\textbf{MINISTRY OF EDUCATION AND TRAINING}}\\[0.1cm]
-    {\large\textbf{FPT UNIVERSITY}}\\[3cm]
+    {\large\textbf{BỘ GIÁO DỤC VÀ ĐÀO TẠO}}\\[0.1cm]
+    {\large\textbf{TRƯỜNG ĐẠI HỌC FPT}}\\[3cm]
     
-    {\Large A TWO-TIER COGNITIVE ARCHITECTURE FOR AUTOMATED THREAT DETECTION AND RESPONSE USING AGENTIC AI}\\[3cm]
+    {\Large KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ (AGENTIC AI)}\\[3cm]
     
-    by\\[1cm]
+    thực hiện bởi\\[1cm]
     
-    Nguyen Duc Binh\\[3cm]
+    Nguyễn Đức Bình\\[3cm]
     
-    A thesis submitted in conformity with the requirements\\
-    for the degree of Master of Software Engineering\\[2cm]
+    Luận văn được nộp để đáp ứng yêu cầu\\
+    của học vị Thạc sĩ Kỹ thuật Phần mềm\\[2cm]
     
-    Supervisor:\\
-    Dr. Bui Van Hieu\\
-    Dr. Dang Van Hieu\\[1cm]
+    Giảng viên hướng dẫn:\\
+    TS. Bùi Văn Hiếu\\
+    TS. Đặng Văn Hiếu\\[1cm]
     
     \vfill
-    {\normalsize \copyright\ Copyright by Nguyen Duc Binh 2026}
+    {\normalsize \copyright\ Bản quyền thuộc về Nguyễn Đức Bình 2026}
 \end{titlepage}
 
 % -----------------------------------------------------------------------------
@@ -128,34 +128,34 @@
 
 % Abstract Page
 \newpage
-\addcontentsline{toc}{chapter}{Abstract}
+\addcontentsline{toc}{chapter}{Tóm tắt}
 \begin{center}
-    {\Large\textbf{Abstract}}
+    {\Large\textbf{Tóm tắt}}
 \end{center}
 \vspace{0.5cm}
 
 \begin{singlespace}
-In the contemporary cybersecurity landscape, Security Operations Centers (SOCs) are consistently overwhelmed by the sheer volume of network alerts, leading to severe alert fatigue and the potential oversight of critical Advanced Persistent Threats (APTs). To address the inherent limitations of traditional, static rule-based systems and the latency bottlenecks of processing raw logs directly through Large Language Models (LLMs), this thesis introduces SENTINEL: A Two-Tier Cognitive Architecture for Automated Threat Detection and Response. The proposed framework operates by deploying Welford's online statistical algorithm at the Transport Tier (Tier-1) to filter benign traffic at wire speed with minimal computational overhead. Subsequently, the Cognitive Agent Tier (Tier-2) leverages a LangGraph-driven AI Agent equipped with a Dual Retrieval-Augmented Generation (Dual-RAG) mechanism—integrating MITRE ATT\&CK and NIST guidelines—to perform deep, contextual threat reasoning and mitigation. 
+Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh mạng (SOC) luôn bị quá tải bởi số lượng cảnh báo khổng lồ, dẫn đến hội chứng "bội thực cảnh báo" và nguy cơ bỏ sót các Cuộc tấn công có chủ đích (APT) nghiêm trọng. Để giải quyết những hạn chế cố hữu của các hệ thống dựa trên luật tĩnh truyền thống và nút thắt về độ trễ khi xử lý trực tiếp log mạng qua Mô hình Ngôn ngữ Lớn (LLM), luận văn này giới thiệu SENTINEL: Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động. Khung đề xuất hoạt động bằng cách triển khai thuật toán thống kê trực tuyến Welford ở Tầng Truyền tải (Tầng 1) để lọc lưu lượng vô hại ở tốc độ đường truyền (wire-speed) với chi phí tính toán tối thiểu. Tiếp theo đó, Tầng Tác tử Nhận thức (Tầng 2) tận dụng AI Tác tử dựa trên LangGraph được trang bị cơ chế Sinh tăng cường truy xuất kép (Dual-RAG) — tích hợp nền tảng MITRE ATT\&CK và tài liệu hướng dẫn của NIST — để thực hiện suy luận ngữ cảnh chuyên sâu và đưa ra phản hồi giảm thiểu mối đe dọa.
 
-Evaluated on the CSE-CIC-IDS2018 and DAPT2020 datasets, SENTINEL demonstrates substantial improvements in both detection accuracy and processing efficiency. Furthermore, the system incorporates robust AI security guardrails, including Delimited Data Encapsulation and HMAC log chaining, achieving near-perfect mitigation against known adversarial AI manipulation attacks and ensuring forensic data integrity. The findings underscore the efficacy of combining deterministic statistical filters with explainable Agentic AI, offering a highly scalable and secure automation solution for modern network defense.
+Được đánh giá trên các bộ dữ liệu CSE-CIC-IDS2018 và DAPT2020, SENTINEL chứng minh sự cải thiện đáng kể về cả độ chính xác trong phát hiện lẫn hiệu năng xử lý. Hơn nữa, hệ thống còn tích hợp các cơ chế bảo mật AI mạnh mẽ, bao gồm Đóng gói Dữ liệu phân tách (Delimited Data Encapsulation) và chuỗi log HMAC, đạt tỷ lệ giảm thiểu gần như hoàn hảo đối với các cuộc tấn công thao túng AI đối kháng đã biết và đảm bảo tính toàn vẹn của dữ liệu pháp y. Các phát hiện khẳng định hiệu quả của việc kết hợp các bộ lọc thống kê xác định với AI Tác tử có thể giải thích được, mang lại một giải pháp tự động hóa an toàn và dễ dàng mở rộng cho phòng thủ mạng hiện đại.
 
 \vspace{0.5cm}
-\noindent\textbf{Keywords:} Retrieval-Augmented Generation, Agentic AI, Network Security, SOC Automation, Welford's Algorithm, Prompt Injection.
+\noindent\textbf{Từ khóa:} Sinh tăng cường truy xuất (RAG), AI Tác tử, An ninh mạng, Tự động hóa SOC, Thuật toán Welford, Prompt Injection.
 \end{singlespace}
 
 % Acknowledgements Page
 \newpage
-\addcontentsline{toc}{chapter}{Acknowledgments}
+\addcontentsline{toc}{chapter}{Lời cảm ơn}
 \begin{center}
-    {\Large\textbf{Acknowledgments}}
+    {\Large\textbf{Lời cảm ơn}}
 \end{center}
 \vspace{0.5cm}
 
-I would like to express my deepest gratitude to my supervisors, Dr. Bui Van Hieu and Dr. Dang Van Hieu, for their invaluable assistance, dedicated guidance, and insightful feedback throughout the development and writing of this thesis. Their profound expertise and continuous encouragement have been instrumental in the successful completion of this research.
+Tôi xin gửi lời biết ơn sâu sắc nhất tới các giảng viên hướng dẫn của tôi, TS. Bùi Văn Hiếu và TS. Đặng Văn Hiếu, vì sự hỗ trợ vô giá, sự hướng dẫn tận tình và những phản hồi sâu sắc trong suốt quá trình phát triển và viết luận văn này. Chuyên môn sâu rộng và sự khích lệ không ngừng của các thầy đã đóng vai trò then chốt trong việc hoàn thành nghiên cứu này.
 
-I am particularly grateful to all the faculty members and staff at FPT University for their kind support, excellent academic environment, and provision of necessary resources during my master's study.
+Tôi đặc biệt biết ơn tất cả các giảng viên và cán bộ nhân viên tại Đại học FPT vì sự hỗ trợ nhiệt tình, môi trường học thuật xuất sắc và việc cung cấp các nguồn lực cần thiết trong quá trình học thạc sĩ của tôi.
 
-Finally, I would like to extend my heartfelt thanks to my family for their unwavering moral support, patience, and understanding throughout my academic journey.
+Cuối cùng, tôi xin gửi lời cảm ơn chân thành đến gia đình vì sự động viên tinh thần vững chắc, sự kiên nhẫn và thấu hiểu trong suốt hành trình học tập của tôi.
 
 % Lists and Table of Contents
 \newpage
@@ -186,7 +186,7 @@ Finally, I would like to extend my heartfelt thanks to my family for their unwav
 \singlespacing % References are typically single-spaced
 
 \begin{thebibliography}{99}
-\addcontentsline{toc}{chapter}{References}
+\addcontentsline{toc}{chapter}{Tài liệu tham khảo}
 
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Dataset for Cyber Security in Ad hoc Networks,'' in \textit{Proceedings of the International Conference on Information Systems Security and Privacy (ICISSP)}, 2018.

@@ -1,0 +1,106 @@
+\chapter{Giới thiệu}
+\label{ch:introduction}
+
+Chương này thiết lập bối cảnh tổng quan và cơ sở lý luận nền tảng cho nghiên cứu được thực hiện trong luận văn này. Bằng cách mổ xẻ sự phức tạp đang phát triển nhanh chóng của bối cảnh an ninh mạng hiện đại, chương này nhấn mạnh các lỗ hổng mang tính hệ thống cố hữu trong các Trung tâm Điều hành An ninh mạng (SOC) hiện nay. Phần giới thiệu phác họa những hạn chế sâu sắc của các hệ thống dựa trên luật xác định (deterministic rule-based systems) truyền thống khi đối mặt với các đối thủ mạng đa giai đoạn, tinh vi. Hơn nữa, nó làm nổi bật những thách thức nghịch lý do sự tích hợp của Trí tuệ Nhân tạo Tạo sinh (GenAI) mang lại — việc cân bằng giữa tiềm năng phân tích to lớn và những rủi ro về độ trễ tính toán và thao túng đối kháng. Do đó, chương này làm rõ sự cần thiết của SENTINEL, một kiến trúc nhận thức hai tầng mới, vạch ra các mục tiêu nghiên cứu cụ thể, các câu hỏi cốt lõi, phạm vi xác định và phương pháp thực nghiệm dẫn dắt việc xác thực thực nghiệm cho hệ thống được đề xuất.
+
+\section{Bối cảnh và Động lực nghiên cứu}
+
+Sự tăng tốc của chuyển đổi số toàn cầu, đặc trưng bởi sự phổ biến của các mô hình điện toán đám mây nguyên bản (cloud-native), Internet Vạn vật (IoT) và hạ tầng làm việc từ xa phi tập trung, đã làm xói mòn về cơ bản các vành đai mạng truyền thống. Do đó, mạng doanh nghiệp đã chuyển đổi thành các môi trường có độ rỗng cao, không đồng nhất, mở rộng theo cấp số nhân bề mặt tấn công tiềm năng cho các tác nhân độc hại. Trong hệ sinh thái đầy biến động này, các đối thủ mạng liên tục tinh chỉnh phương pháp luận của chúng, chuyển từ các chủng phần mềm độc hại biệt lập, dễ nhận biết sang các chiến dịch tinh vi, được dàn dựng khéo léo được gọi là Cuộc tấn công Có chủ đích (APT) \cite{ids2018}. Những tác nhân đe dọa tinh vi này tận dụng các tải trọng đa hình (polymorphic payloads), các kỹ thuật "living-off-the-land" (LotL) và các kênh chỉ huy và kiểm soát (C2) được mã hóa để làm xáo trộn các hoạt động của chúng, cho phép chúng xâm nhập và di chuyển trong mạng doanh nghiệp mà không bị phát hiện trong thời gian dài.
+
+Trung tâm Điều hành An ninh mạng (SOC) đóng vai trò là cơ chế phòng thủ quan trọng cho các tổ chức, được giao nhiệm vụ giám sát liên tục, phát hiện theo thời gian thực và giảm thiểu nhanh chóng các sự cố bảo mật. Để đạt được điều này, các SOC hiện đại triển khai vô số cảm biến đo lường từ xa về bảo mật, bao gồm Tường lửa Thế hệ Tiếp theo (NGFW), Hệ thống Phát hiện và Ngăn ngừa Xâm nhập (IDS/IPS) và các tác tử Phát hiện và Phản hồi Điểm cuối (EDR). Các luồng dữ liệu đa dạng này thường được tập hợp vào một nền tảng Quản lý Thông tin và Sự kiện Bảo mật (SIEM) trung tâm. Tuy nhiên, việc liên tục tiếp nhận luồng dữ liệu đo lường từ xa này đã xúc tác cho một cuộc khủng hoảng cấu trúc trong ngành công nghiệp an ninh mạng, thường được gọi là "Nghịch lý Dữ liệu Lớn" (Big Data Paradox). Nghịch lý này biểu hiện qua một số lỗ hổng hoạt động nghiêm trọng:
+
+\begin{itemize}
+    \item \textbf{Khủng hoảng Bội thực cảnh báo (Alert Fatigue):} Các nền tảng SIEM và thiết bị IDS truyền thống tạo ra một khối lượng cảnh báo bảo mật khổng lồ mỗi ngày, thường lên tới hàng chục nghìn. Đại đa số các thông báo này là Dương tính giả (False Positives - FPs) được kích hoạt bởi các bất thường vô hại, cấu hình sai hoặc các ngưỡng heuristic được tinh chỉnh kém \cite{alertfatigue2022}. Loạt cảnh báo không ngừng này áp đảo các chuyên viên phân tích bảo mật Tầng 1 (Tier-1), gây ra sự quá tải nhận thức nghiêm trọng và "bội thực cảnh báo". Do đó, xác suất một chỉ báo xâm nhập thực sự, nguy kịch bị vô tình loại bỏ hoặc hoàn toàn bị bỏ sót tăng theo cấp số nhân, biến yếu tố con người thành mắt xích yếu nhất trong chuỗi phòng thủ.
+    \item \textbf{Sự kém hiệu quả của các hệ thống dựa trên luật xác định:} Logic nền tảng của các công cụ SIEM và IDS truyền thống phụ thuộc nặng nề vào việc khớp chữ ký tĩnh và các luật heuristic được định nghĩa trước \cite{nist80061}. Mặc dù các cơ chế này có hiệu quả cao trong việc chặn các vector đe dọa đã biết, chúng lại thể hiện sự mù lòa cấu trúc sâu sắc khi đối mặt với các lỗ hổng Zero-day, các biến thể phần mềm độc hại tùy chỉnh hoặc các kỹ thuật khai thác mới chưa có chữ ký. Các đối thủ dễ dàng vượt qua các hàng phòng thủ tĩnh này bằng cách sửa đổi nhỏ đối với tải trọng tấn công của chúng.
+    \item \textbf{Những thiếu sót trong Giảm thiểu dữ liệu thời gian:} Trong nỗ lực giảm thiểu chi phí quá lớn và chi phí tính toán khi xử lý hàng petabyte dữ liệu log, nhiều SOC sử dụng việc lấy mẫu ngẫu nhiên (random sampling), cắt xén log hoặc các cơ chế ngưỡng tĩnh tích cực. Đáng tiếc thay, các chiến lược giảm thiểu dữ liệu này vô tình cắt đứt chuỗi bằng chứng thời gian. Bằng cách loại bỏ các gói tin có vẻ vô hại, SOC phá hủy các liên kết ngữ cảnh quan trọng cần thiết để tái tạo lại các mô hình hành vi "chậm và ẩn nấp" (low-and-slow) đặc trưng của các chiến dịch APT, vốn dựa vào quá trình thăm dò lén lút và di chuyển ngang tinh vi trải dài qua nhiều tuần hoặc nhiều tháng.
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/soc_ai_concept.png}
+    \caption{Minh họa khái niệm về Trung tâm Điều hành An ninh mạng (SOC) hiện đại được hỗ trợ bởi AI, đối mặt với dữ liệu mối đe dọa tốc độ cao.}
+    \label{fig:soc_concept}
+\end{figure}
+
+Sự trưởng thành gần đây của Trí tuệ Nhân tạo Tạo sinh (GenAI), và đặc biệt là các Mô hình Ngôn ngữ Lớn (LLM), đã thắp sáng một sự chuyển dịch mô hình đầy hứa hẹn cho tự động hóa SOC. Các LLM sở hữu khả năng chưa từng có trong việc diễn giải các chỉ báo ngữ cảnh phức tạp, phi cấu trúc, tạo ra các bản tóm tắt pháp y dễ đọc cho con người và hình thành các chiến lược phản hồi sự cố tự trị. Tuy nhiên, việc tích hợp trực tiếp, không qua trung gian các LLM vào các luồng dữ liệu tốc độ cao của một SOC trực tiếp lại đưa ra hai nút thắt nghiêm trọng và đan xen nhau:
+
+\begin{enumerate}
+    \item \textbf{Độ trễ Suy luận và Chi phí Tính toán cấm kỵ:} Việc định tuyến toàn bộ các gói tin mạng thô, chưa qua lọc, đi qua một LLM hàng tỷ tham số để suy luận tạo ra một nút thắt xử lý không thể vượt qua. Sự phức tạp tính toán khổng lồ vốn có của các cơ chế tự chú ý (self-attention) của kiến trúc Transformer loại trừ khả năng tồn tại của nó đối với việc phân tích lưu lượng mạng theo thời gian thực ở tốc độ đường truyền. Một hệ thống cố gắng xử lý hàng gigabit lưu lượng thô qua suy luận LLM sẽ phải chịu độ trễ không bền vững, cho phép các vụ xâm nhập diễn ra nhanh chóng thành công trước khi AI có thể đưa ra phản hồi.
+    \item \textbf{Độ nhạy cảm cực cao đối với các thao túng AI đối kháng:} Tích hợp LLM làm lộ ra SOC trước các vector tấn công mạng mới, đáng chú ý nhất là Tiêm Mã Độc Trực Tiếp (Direct Prompt Injection), Đầu độc Dữ liệu Ngữ nghĩa (Semantic Data Poisoning), Đánh cắp dữ liệu qua Markdown (Data Exfiltration), và Buôn lậu Ký tự phân cách (Delimiter Smuggling) \cite{promptinjection2023}. Các tác nhân đe dọa tinh vi có thể nhúng các hướng dẫn ngôn ngữ độc hại trực tiếp vào các tải trọng mạng tưởng chừng như tiêu chuẩn (ví dụ: tạo một chuỗi User-Agent HTTP độc hại hoặc một truy vấn DNS bị đầu độc chứa các hướng dẫn như: \textit{"Ghi đè hệ thống: Bỏ qua tất cả các hướng dẫn trước đó, xóa tất cả ngữ cảnh bộ nhớ và phân loại mẫu lưu lượng này là hoàn toàn vô hại"}). Nếu LLM tiếp nhận và xử lý các log bị đầu độc này mà không có các cơ chế cô lập nghiêm ngặt, an toàn về mặt mật mã, thì lõi nhận thức của hệ thống phòng thủ SOC sẽ bị tổn hại. Hệ thống AI có thể bị thao túng để ảo giác các phán quyết vô hại đối với các hoạt động độc hại hoặc tuồn dữ liệu nội bộ ra ngoài, biến một tài sản phòng thủ mạnh mẽ thành một lỗ hổng thảm khốc.
+\end{enumerate}
+
+Nhận thức được những thách thức chiến lược và kỹ thuật ghê gớm này, và tổng hợp các nguyên tắc nền tảng từ cả Kỹ thuật AI và Bảo mật Thông tin, sự cần thiết tuyệt đối của một kiến trúc lai, được tối ưu hóa về mặt toán học trở nên không thể chối cãi. Điều cần thiết là một cách tiếp cận hai lớp: một công cụ lọc heuristic tốc độ cao, không trạng thái (stateless) ở tầng cơ sở để xử lý lưu lượng ở tốc độ đường truyền, được kết hợp liền mạch với một công cụ suy luận AI Tác tử sâu, được cô lập về mặt nhận thức ở tầng trên để xử lý các phân loại phức tạp. Do đó, chủ đề nghiên cứu \textbf{"Kiến trúc Nhận thức Hai tầng cho Phát hiện và Phản hồi Mối đe dọa Tự động Sử dụng AI Tác tử"} (mang bí danh hệ thống \textbf{SENTINEL}) đã được xây dựng để trực tiếp giải quyết các nút thắt kỹ thuật đang lan tràn trong ngành này.
+
+\section{Mục tiêu Nghiên cứu}
+
+Tham vọng bao trùm của luận văn này là giải quyết tận gốc các nút thắt về tự động hóa và nhận thức đang gây khó khăn cho các SOC hiện đại. Điều này đạt được thông qua việc thiết kế một khuôn khổ phát hiện và phản hồi xâm nhập thông minh, hiệu năng cao, không chỉ chính xác trong phân loại mối đe dọa mà còn vốn có khả năng phục hồi trước các cuộc tấn công đối kháng nhằm vào các thành phần AI của chính nó.
+
+\textbf{Mục tiêu tổng quát:} Thiết kế kiến trúc, triển khai và đánh giá nghiêm ngặt hệ thống SENTINEL—một kiến trúc nhận thức hai tầng tiên phong, tích hợp liền mạch khả năng phát hiện bất thường thống kê với độ trễ siêu thấp cùng với phân tích AI Tác tử bảo mật và nhận thức ngữ cảnh.
+
+\textbf{Mục tiêu cụ thể:}
+\begin{itemize}
+    \item \textbf{Phát triển Tầng 1 (Tầng Truyền tải/Lọc):} Triển khai và tối ưu hóa thuật toán thống kê trực tuyến Welford \cite{welford1962} cho tính toán liên tục, theo thời gian thực của phương sai cuộn (rolling variance) và Z-Score trên các luồng dữ liệu mạng cửa sổ hẹp (narrow-window). Mục tiêu cụ thể là lọc chính xác đại đa số lưu lượng nền vô hại ở tốc độ đường truyền (hoạt động với độ phức tạp không gian và thời gian $O(1)$) mà không vô tình cắt đứt chuỗi trạng thái thời gian và hành vi quan trọng của luồng lưu lượng.
+    \item \textbf{Xây dựng Tầng 2 (Tầng Tác tử Nhận thức):} Kỹ thuật hóa một AI Tác tử tự trị tinh vi tận dụng kiến trúc máy trạng thái LangGraph \cite{langgraph2024} được hỗ trợ bởi các LLM cục bộ được tối ưu hóa cao (Local LLMs). Tầng này phải kết hợp một cơ chế Sinh tăng cường truy xuất kép (Dual-RAG) tiên tiến \cite{rag2020}—tổng hợp trí tuệ mối đe dọa từ cả khuôn khổ MITRE ATT\&CK và các hướng dẫn xử lý sự cố NIST SP 800-61r2—để thực thi phân loại mối đe dọa sâu, hình thành suy luận pháp y logic và tự trị đề xuất các phản hồi giảm thiểu có thể thực hiện.
+    \item \textbf{Thực thi các Rào chắn Bảo mật AI không khoan nhượng:} Thiết kế và triển khai cơ chế Đóng gói Dữ liệu Phân tách độc quyền, sử dụng các dấu phân tách ngẫu nhiên an toàn về mặt mật mã, được thiết kế để vô hiệu hóa các cuộc tấn công Tiêm mã độc trực tiếp (Direct Prompt Injection), Vượt qua mã hóa (Encoding Bypasses), và Buôn lậu dấu phân tách (Delimiter Smuggling) có thể được nhúng bên trong các tải trọng mạng đang phân tích.
+    \item \textbf{Đảm bảo Tính Toàn vẹn Pháp y của Bằng chứng:} Triển khai chữ ký mật mã SHA-256 cho tất cả các cơ sở tri thức RAG được nạp vào và thực thi nghiêm ngặt Chuỗi HMAC (Hash-based Message Authentication Code) cho tất cả các bản ghi nhật ký kiểm toán (audit logs) của cơ sở dữ liệu. Điều này đảm bảo tính chống chối bỏ tuyệt đối và ngăn chặn việc giả mạo, thay đổi hoặc xóa bỏ bằng chứng pháp y bởi những kẻ tấn công bên ngoài hoặc nội bộ độc hại.
+\end{itemize}
+
+\section{Câu hỏi Nghiên cứu}
+
+Để đạt được một cách có hệ thống các mục tiêu đã đề ra và đảm bảo tính chặt chẽ khoa học của kiến trúc được đề xuất, nghiên cứu này tập trung giải quyết ba câu hỏi khoa học cốt lõi:
+
+\begin{enumerate}
+    \item \textbf{RQ1 (Hiệu năng \& Lọc):} Làm thế nào một cơ chế lọc lưu lượng mạng tốc độ cao, thời gian thực có thể được thiết kế toán học để hoạt động ở tốc độ đường truyền mà không phá vỡ, cắt xén hoặc làm mất các chuỗi sự kiện đa giai đoạn, độ trễ cao đặc trưng của các cuộc tấn công APT tinh vi?
+    \item \textbf{RQ2 (Bảo mật \& Tích hợp):} Theo phương pháp kiến trúc nào mà các khả năng suy luận nhận thức tiên tiến của LLM có thể được tích hợp an toàn vào quy trình phản hồi sự cố SOC tự động, đồng thời giải quyết triệt để nghịch lý độ trễ suy luận và giảm thiểu hiệu quả các rủi ro tồn tại của thao túng AI thông qua việc tiêm mã độc vào log (như Tiêm mã độc trực tiếp, Buôn lậu dấu phân tách)?
+    \item \textbf{RQ3 (Độ chính xác \& Giảm thiểu Ảo giác):} Hiệu quả thực nghiệm có thể đo lường được của việc tăng cường Bộ nhớ Ngữ nghĩa cục bộ của AI Tác tử tự trị bằng một hệ thống truy xuất kiến thức kép có thẩm quyền bên ngoài (Dual-RAG) trong việc nhận dạng các mối đe dọa Zero-day phức tạp và giảm thiểu thống kê sự xuất hiện của ảo giác nhận thức LLM là gì?
+\end{enumerate}
+
+\section{Đối tượng và Phạm vi Nghiên cứu}
+
+\textbf{Đối tượng Nghiên cứu:}
+\begin{itemize}
+    \item Các kiến trúc Trung tâm Điều hành An ninh mạng (SOC) hiện đại và các quy trình tự động hóa phản hồi sự cố.
+    \item Log luồng mạng tốc độ cao (NetFlow), siêu dữ liệu bắt gói tin (PCAP) và tải trọng gói tin độc hại bị chặn.
+    \item Các kỹ thuật tính toán tiên tiến bao gồm Điều phối Quy trình làm việc của Tác tử (LangGraph), Mô hình Ngôn ngữ Lớn được Lượng tử hóa (Quantized LLMs), Đồ thị Tri thức Vector hóa, và mô hình Sinh tăng cường truy xuất (RAG).
+    \item Phương pháp luận xâm nhập mạng, chiến thuật di chuyển ngang ẩn nấp, và các kỹ thuật đối kháng nhắm cụ thể vào các hệ thống Trí tuệ Nhân tạo (tập trung nặng vào Tiêm mã độc vào Prompt, Đầu độc RAG, và Đầu độc Dữ liệu Ngữ nghĩa).
+\end{itemize}
+
+\textbf{Phạm vi Nghiên cứu:}
+\begin{itemize}
+    \item \textbf{Bộ dữ liệu Thực nghiệm:} Đánh giá toàn diện được tiến hành độc quyền trên các bộ dữ liệu an ninh mạng được chuẩn hóa quốc tế và bình duyệt. Điều này bao gồm bộ dữ liệu \textbf{CSE-CIC-IDS2018} (mô phỏng một phổ rộng, toàn diện các cuộc tấn công mạng hiện đại bao gồm DoS, Web Attacks, Infiltration và Botnets) và bộ dữ liệu \textbf{DAPT2020} (được sử dụng riêng để mô phỏng các chiến dịch APT đa giai đoạn, ẩn nấp sâu và kéo dài).
+    \item \textbf{Mô hình AI và Ràng buộc Phần cứng:} Nghiên cứu kiểm tra nghiêm ngặt và tối ưu hóa việc triển khai các LLM Cục bộ mã nguồn mở (cụ thể sử dụng mô hình \textit{Gemma-2-9B-IT}). Các kỹ thuật lượng tử hóa tiên tiến (ví dụ: Q4\_K\_M thông qua llama.cpp) được áp dụng để đảm bảo tính khả thi trong hoạt động và tốc độ suy luận cao trên một GPU thương mại duy nhất. Ràng buộc phần cứng nghiêm ngặt này được cố ý áp đặt để đảm bảo tính riêng tư và chủ quyền dữ liệu tuyệt đối, chứng minh rằng hệ thống có thể được triển khai bên trong một môi trường SOC doanh nghiệp nội bộ, cách ly hoàn toàn (air-gapped) mà không dựa vào các endpoint API đám mây bên ngoài.
+    \item \textbf{Môi trường Thực thi Phản hồi:} Các phản hồi tự động của hệ thống do Tác tử tạo ra bị giới hạn nghiêm ngặt ở việc phân tích pháp y, báo cáo chi tiết và việc tạo ra các luật triển khai Tường lửa mô phỏng. Nghiên cứu loại trừ rõ ràng việc tự động thực thi các lệnh ngắt kết nối mạng vật lý không được xác minh trên các thiết bị định tuyến trực tiếp. Ranh giới này được thiết lập để ngăn chặn các sự cố Từ chối Dịch vụ (DoS) do tự gây ra hoặc gián đoạn hoạt động thảm khốc xuất phát từ những phân loại sai tiềm ẩn của AI.
+\end{itemize}
+
+\section{Phương pháp Nghiên cứu}
+
+Luận văn này sử dụng phương pháp luận nghiên cứu định lượng kết hợp sâu sắc với các thực tiễn công nghệ phần mềm tiên tiến, tạo thành một khung Phương pháp luận Kỹ thuật Thực nghiệm toàn diện:
+
+\begin{itemize}
+    \item \textbf{Thiết kế Kiến trúc và Triển khai Hệ thống:} Xây dựng bản thiết kế lý thuyết ban đầu và chuyển nó thành một hệ thống phần mềm có tính mô-đun cao. Ngăn xếp phát triển sử dụng Python 3.10+, Neo4j cho các mối quan hệ đồ thị, FAISS cho tìm kiếm sự tương đồng vector mật độ cao, LangGraph cho điều phối tác tử có trạng thái (stateful), và llama.cpp cho suy luận LLM cục bộ được tăng tốc. Toàn bộ môi trường được đóng gói bằng cách sử dụng bộ chứa Docker để đảm bảo khả năng tái tạo nghiêm ngặt qua nhiều môi trường thử nghiệm khác nhau.
+    \item \textbf{Mô phỏng và Thực nghiệm Đối kháng:} Xây dựng môi trường mô phỏng luồng dữ liệu độ trung thực cao, liên tục (mô-đun Unified Stream) để tiến hành kiểm thử End-to-End (E2E) nghiêm ngặt đối với cả lỗ hổng đã biết và các biến thể APT Zero-day phức tạp. Hơn nữa, các công cụ tải trọng mật mã đối kháng riêng biệt được phát triển và thực thi trên hệ thống để đo lường mạnh mẽ khả năng phục hồi và tính chắc chắn của các rào chắn bảo mật AI được triển khai.
+    \item \textbf{Đánh giá Định lượng và Phân tích Thống kê:} Đánh giá tổng thể hiệu năng, độ chính xác và độ tin cậy của hệ thống thông qua khung định lượng 5 Chiều độc quyền (Chỉ số 5D bao gồm: Độ chính xác, Bảo mật, Hiệu suất, Tính toàn vẹn và Khả năng nhận thức). Để chứng minh bằng thực nghiệm sự vượt trội có ý nghĩa thống kê của kiến trúc SENTINEL được đề xuất so với các mô hình cơ sở độc lập, các kiểm định thống kê phi tham số (bao gồm kiểm định McNemar cho dữ liệu danh nghĩa từng cặp và kiểm định Mann-Whitney U) cùng với các Nghiên cứu Loại trừ (Ablation Studies) được áp dụng một cách có hệ thống.
+\end{itemize}
+
+\section{Đóng góp của Luận văn}
+
+Nghiên cứu này mang lại những đóng góp nổi bật, có thể đo lường được nhằm thúc đẩy cả khuôn khổ an ninh mạng lý thuyết và các ứng dụng kỹ thuật thực tế, có thể triển khai:
+
+\begin{itemize}
+    \item \textbf{Đóng góp Kiến trúc:} Đề xuất thành công, triển khai và xác thực bằng thực nghiệm mô hình lai hai tầng SENTINEL. Kiến trúc này đạt được sự cân bằng tối ưu, được săn đón nhiều giữa hiệu năng mạng thông lượng siêu cao (được hỗ trợ bởi thuật toán trực tuyến của Welford) và suy luận nhận thức sâu, chính xác theo ngữ cảnh (được thúc đẩy bởi AI Tác tử).
+    \item \textbf{Đóng góp Bảo mật AI:} Cung cấp bằng chứng thực nghiệm, có thể tái tạo liên quan đến tính hiệu quả của tính năng Đóng gói Dữ liệu Phân tách khi kết hợp với các cơ chế xác minh tính toàn vẹn nghiêm ngặt (HMAC \& SHA-256). Ma trận phòng thủ này làm cho hệ thống suy luận AI cốt lõi có khả năng chống chịu cao với Tiêm mã độc vào Prompt, Vượt qua mã hóa, và Đầu độc Dữ liệu Ngữ nghĩa—đạt tỷ lệ giảm thiểu gần như hoàn hảo đối với các vector tấn công đã biết, giải quyết một lỗ hổng quan trọng đang gây ám ảnh cho nhiều nền tảng bảo mật được tích hợp LLM thương mại hiện nay.
+    \item \textbf{Đóng góp về Tự trị và Điều phối:} Tiên phong trong việc tích hợp mô hình AI Tác tử dựa trên Đồ thị Trạng thái trực tiếp vào vòng đời Phản hồi Sự cố. Điều này thay thế một cách hiệu quả các kịch bản Tự động hóa Runbook tĩnh (RBA) mỏng manh bằng trí thông minh ra quyết định năng động, thời gian thực và nhận thức ngữ cảnh, có khả năng thích ứng với các đột biến đe dọa không lường trước được.
+\end{itemize}
+
+\section{Cấu trúc của Luận văn}
+
+Để đảm bảo sự rõ ràng và tiến triển logic, luận văn được tổ chức một cách có hệ thống, chuyển tiếp từ các khái niệm lý thuyết nền tảng đến các mô hình thiết kế phức tạp, triển khai thực nghiệm, và cuối cùng là các kết luận định lượng. Luận văn bao gồm 6 chương chính:
+
+\begin{itemize}
+    \item \textbf{Chương 1: Giới thiệu} – Thiết lập bối cảnh, phác thảo động lực cốt lõi, xác định các mục tiêu và câu hỏi nghiên cứu cụ thể, chỉ rõ phạm vi, trình bày phương pháp luận thực nghiệm và tóm tắt các đóng góp khoa học chính của luận văn.
+    \item \textbf{Chương 2: Nền tảng Lý thuyết và Tổng quan Tài liệu} – Xây dựng cơ sở lý thuyết thiết yếu cần thiết để hiểu về AI Tác tử, các hệ thống Sinh Tăng cường Truy xuất (RAG), thuật toán thống kê trực tuyến Welford, và các nguyên tắc bảo mật đối kháng của LLM. Chương này phân tích phản biện các kiến trúc SOC truyền thống và xem xét một cách có hệ thống tài liệu học thuật hiện tại để chỉ ra rõ ràng những khoảng trống nghiên cứu chưa được giải quyết.
+    \item \textbf{Chương 3: Kiến trúc SENTINEL Đề xuất} – Cung cấp mô tả chi tiết, toàn diện về thiết kế của kiến trúc nhận thức hai tầng. Điều này bao gồm các hoạt động cơ học của Tầng Truyền tải (Tầng 1), logic điều phối của Tầng Tác tử Nhận thức (Tầng 2), thiết kế cấu trúc của đồ thị tri thức bảo mật Dual-RAG, và việc triển khai toán học của các rào chắn bảo mật AI.
+    \item \textbf{Chương 4: Triển khai Kỹ thuật} – Chỉ định môi trường phát triển phần mềm, trình bày hệ thống phân cấp mã nguồn, giải thích sự tích hợp các công cụ cốt lõi (như Neo4j, FAISS, và llama.cpp), mô tả chiến lược đóng gói Docker, và hiển thị việc xây dựng Bảng điều khiển Streamlit tương tác có Yếu tố Con người tham gia (HITL).
+    \item \textbf{Chương 5: Thực nghiệm và Đánh giá} – Phác thảo kỹ lưỡng các phương pháp thực nghiệm và thiết lập phần cứng. Nó đi sâu vào các bộ dữ liệu được sử dụng (CSE-CIC-IDS2018, DAPT2020) và trình bày một đánh giá định lượng sâu sắc dựa trên khung số liệu 5D, các Nghiên cứu Loại trừ toàn diện, và kiểm định giả thuyết thống kê nghiêm ngặt.
+    \item \textbf{Chương 6: Kết luận và Hướng phát triển} – Tóm tắt các kết quả thực nghiệm đạt được, tương quan rõ ràng các phát hiện này với mục tiêu nghiên cứu ban đầu, thừa nhận minh bạch các hạn chế về kiến trúc hoặc phần cứng hiện có, và đề xuất các định hướng chiến lược cho nghiên cứu tương lai và mở rộng hệ thống.
+\end{itemize}
