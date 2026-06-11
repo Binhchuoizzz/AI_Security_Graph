@@ -13,7 +13,7 @@ CHỨC NĂNG:
   Nếu server không hoạt động, kiểm thử sẽ được bỏ qua (SKIP) an toàn.
 
 KẾT QUẢ ĐẦU RA:
-  reports/latency_benchmark.json
+  experiments/results/latency_benchmark.json
 """
 
 import sys
@@ -145,10 +145,10 @@ def run(n_events: int = 100):
         print("       Then re-run this script.")
 
         # Lưu kết quả bỏ qua (skip)
-        Path("reports").mkdir(exist_ok=True)
+        Path("experiments/results").mkdir(exist_ok=True)
         json.dump(
             {"status": "SKIPPED", "reason": "LLM server not available"},
-            open("reports/latency_benchmark.json", "w"),
+            open("experiments/results/latency_benchmark.json", "w"),
             indent=2,
         )
         return False
@@ -202,9 +202,9 @@ Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
         "per_event_baseline_ms": [round(x, 2) for x in baseline_latencies],
     }
 
-    Path("reports").mkdir(exist_ok=True)
-    json.dump(results, open("reports/latency_benchmark.json", "w"), indent=2)
-    print("Saved: reports/latency_benchmark.json")
+    Path("experiments/results").mkdir(exist_ok=True)
+    json.dump(results, open("experiments/results/latency_benchmark.json", "w"), indent=2)
+    print("Saved: experiments/results/latency_benchmark.json")
 
     # Kiểm định thống kê Mann-Whitney U
     try:

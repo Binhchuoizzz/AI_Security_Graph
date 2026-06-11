@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 ROBUSTNESS_RESULTS_PATH = os.path.join(
-    os.path.dirname(__file__), "robustness_results.json"
+    os.path.dirname(__file__), "results", "robustness_results.json"
 )
-OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "plots")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "results", "plots")
 
 
 def plot_robustness():

@@ -4,7 +4,7 @@ import numpy as np
 from scipy import stats
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 
-ABLATION_RESULTS_PATH = os.path.join(os.path.dirname(__file__), "ablation_results.json")
+ABLATION_RESULTS_PATH = os.path.join(os.path.dirname(__file__), "results", "ablation_results.json")
 
 
 def mcnemar_test(y_true, y_pred1, y_pred2):

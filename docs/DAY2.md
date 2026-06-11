@@ -1,6 +1,6 @@
 # SENTINEL — Tài liệu tham chiếu hàm (Function Reference) — NGÀY 2
 
-> **Phạm vi:** Mô tả **chi tiết từng hàm** của **11 file** thuộc **Tầng An toàn Guardrails** (`src/guardrails/` + `demo_guardrails.py`) — lá chắn AI nằm giữa Tier-1 và LLM Agent.
+> **Phạm vi:** Mô tả **chi tiết từng hàm** của **11 file** thuộc **Tầng An toàn Guardrails** (`src/guardrails/` + `demos/demo_guardrails.py`) — lá chắn AI nằm giữa Tier-1 và LLM Agent.
 > **Cập nhật:** 2026-06-10 (sau khi bổ sung `enforce_tier_consensus` chống social-engineering + đồng bộ data 14 lớp).
 > **Quy ước:** Mỗi hàm ghi rõ *Mục đích → Tham số → Trả về → Luồng xử lý → Tham chiếu dòng*.
 
@@ -24,7 +24,7 @@
 - [NHÓM 5 — Giám sát runtime & Đóng gói](#nhom-5)
   - [G9. `src/guardrails/state_monitor.py`](#g9-state_monitorpy)
   - [G10. `src/guardrails/__init__.py`](#g10-__init__py)
-  - [G11. `demo_guardrails.py`](#g11-demo_guardrailspy)
+  - [G11. `demos/demo_guardrails.py`](#g11-demo_guardrailspy)
 - [Phụ lục — Bảng đồng bộ & điểm cần lưu ý](#phụ-lục)
 
 ---
@@ -317,7 +317,7 @@ XUYÊN SUỐT:
 ---
 
 <a name="g11-demo_guardrailspy"></a>
-## G11. `demo_guardrails.py`
+## G11. `demos/demo_guardrails.py`
 **Vai trò:** Script minh họa 8 lớp phòng thủ Guardrails (chạy tuần tự, không có hàm).
 
 | # | Lớp minh họa | Module |

@@ -186,7 +186,7 @@ def run_ablation(limit=None):
             )
 
         # Lưu kết quả ra file JSON
-        out_path = os.path.join(os.path.dirname(__file__), "ablation_results.json")
+        out_path = os.path.join(os.path.dirname(__file__), "results", "ablation_results.json")
         with open(out_path, "w") as f:
             json.dump(results, f, indent=2)
         print(f"\n[+] Da luu ket qua vao {out_path}")

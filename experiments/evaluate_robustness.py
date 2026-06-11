@@ -251,7 +251,7 @@ if __name__ == "__main__":
     summary = print_report(results)
 
     # Lưu kết quả ra file JSON
-    output_path = os.path.join(os.path.dirname(__file__), "robustness_results.json")
+    output_path = os.path.join(os.path.dirname(__file__), "results", "robustness_results.json")
     with open(output_path, "w") as f:
         json.dump(
             {

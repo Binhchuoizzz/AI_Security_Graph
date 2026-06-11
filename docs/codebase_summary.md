@@ -66,7 +66,7 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 *   **Tác dụng:** Tích hợp Trivy quét mã nguồn & dependencies của chính hệ thống (Self-Securing/DevSecOps), kết quả JSON dùng nạp vào Knowledge Graph (Neo4j, V2 tùy chọn).
 *   **Mối quan hệ:** Chạy độc lập; đầu ra đồng bộ làm tri thức RAG/Graph.
 
-### 11. `demo_tier1.py`
+### 11. `demos/demo_tier1.py`
 *   **Mục đích:** Demo chạy riêng Tier-1.
 *   **Tác dụng:** Script CLI minh họa 6 loại action (DROP/BLOCK_IP/ALERT/ESCALATE/AWAIT_HITL) + Welford Z-Score zero-day; xử lý đúng trạng thái rule động (`ACTIVE`/`PENDING_APPROVAL`).
 *   **Mối quan hệ:** Gọi trực tiếp `rule_engine.py`.
@@ -120,7 +120,7 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 *   **Tác dụng:** Chặn wildcard (`0.0.0.0/0`, `*`, `any`), giới hạn CIDR ≥ `/8`, cấm chặn IP hạ tầng nội bộ; validate regex cho URI/User-Agent; chỉ cho whitelist IP trong subnet tin cậy.
 *   **Mối quan hệ:** Tích hợp vào `FeedbackListener` để kiểm duyệt rule (con người/Agent).
 
-### 21. `demo_guardrails.py`
+### 21. `demos/demo_guardrails.py`
 *   **Mục đích:** Demo tích hợp đầy đủ Guardrails.
 *   **Tác dụng:** Trực quan hóa 8 lớp phòng thủ: injection/jailbreak detection, nonce delimiter, encoding neutralize, RAG poison sanitize, decision validate, feedback validate, output sanitize.
 *   **Mối quan hệ:** Gọi trực tiếp các module `src/guardrails/`.
@@ -138,7 +138,7 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 *   `src/rag/semantic_cache.py` — LRU cache (OrderedDict + TTL) khóa **băm SHA-256 exact-match** (không phải cosine).
 *   `src/rag/security.py` — kiểm tra toàn vẹn SHA-256 file tri thức trước khi build index (`verify_document_integrity`).
 *   `src/rag/graph_builder.py` — Knowledge Graph Neo4j (V2 tùy chọn) liên kết MITRE ↔ NIST.
-*   `scripts/build_rag_indexes.py`, `demo_rag.py` — build index & demo CLI.
+*   `scripts/build_rag_indexes.py`, `demos/demo_rag.py` — build index & demo CLI.
 
 ### **NGÀY 4 — Cỗ máy trạng thái LangGraph & phản hồi an ninh**
 *   `src/agent/state.py` — schema `SentinelState` (batch logs, RAG context, decisions, IOCs...).

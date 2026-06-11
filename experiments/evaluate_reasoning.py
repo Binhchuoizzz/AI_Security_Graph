@@ -31,10 +31,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LLM_API_BASE = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
 
 ABLATION_RESULTS_PATH = os.path.join(
-    os.path.dirname(__file__), "ablation_results.json"
+    os.path.dirname(__file__), "results", "ablation_results.json"
 )
 OUTPUT_PATH = os.path.join(
-    os.path.dirname(__file__), "reasoning_eval_results.json"
+    os.path.dirname(__file__), "results", "reasoning_eval_results.json"
 )
 
 JUDGE_SYSTEM_PROMPT = """You are an expert cybersecurity analyst acting as an independent judge.

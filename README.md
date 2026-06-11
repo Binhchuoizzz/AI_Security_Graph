@@ -142,8 +142,8 @@ AI_Security_Graph/
 │   ├── raw/dapt2020/                 # Day-by-day APT events
 │   ├── knowledge/                    # Source PDF/TXT playbooks for RAG
 │   └── processed/                    # Structured APT chains
-├── experiments/
-│   ├── adversarial/                  # 120-sample suite across 6 attack categories
+├── experiments/                      # Evaluation SCRIPTS + benchmarks + results
+│   ├── adversarial/                  # 120-sample adversarial suite (5 generated categories)
 │   ├── ground_truth.json             # 4,267-sample labelled benchmark (14 classes + benign + adversarial)
 │   ├── adversarial_samples.json      # 50 adversarial vectors (25 structural + 25 semantic)
 │   ├── run_ablation_study.py         # Runs ablation tests across A-F configs
@@ -153,7 +153,9 @@ AI_Security_Graph/
 │   ├── evaluate_unified_stream.py    # Unified stream eval: CICIDS + DAPT (emergent APT) + zero-day in one time-ordered stream
 │   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
 │   ├── statistical_tests.py          # McNemar / Mann-Whitney U significance tests
-│   └── e2e_test_runner.py            # Automated E2E integration test suite
+│   ├── e2e_test_runner.py            # Automated E2E integration test suite
+│   └── results/                      # All result JSONs + plots/ (ablation, robustness, reasoning, unified, latency)
+├── demos/                            # Standalone CLI demos (demo_tier1.py, demo_guardrails.py, demo_rag.py)
 ├── knowledge_base/
 │   ├── mitre_attack.json             # Structured MITRE TTPs
 │   ├── nist_800_61r2.json            # Structured NIST incident response playbooks
@@ -171,6 +173,10 @@ AI_Security_Graph/
 │   ├── agent/                        # LangGraph workflow engine, agent states, LLM APIs
 │   ├── response/                     # Action executor, DB client, lockout, & HMAC log signer
 │   └── ui/                           # Glassmorphism Streamlit UI & authentication logic
+├── docs/
+│   ├── guides/                       # ablation_design.md, E2E_TESTS_GUIDE.md
+│   ├── latex/                        # Thesis/proposal LaTeX sources + Template
+│   └── *.md                          # Architecture, DAY1/DAY2, threat model, reproducibility...
 ├── tests/
 │   ├── unit/                         # Pytest unit tests
 │   └── integration/                  # End-to-end flow tests

@@ -458,7 +458,7 @@ def test_19_latency_benchmark(r: TestResult):
         return
 
     # Nếu LLM hoạt động, kiểm tra kết quả đã lưu trước
-    benchmark_path = "reports/latency_benchmark.json"
+    benchmark_path = "experiments/results/latency_benchmark.json"
     if os.path.exists(benchmark_path):
         with open(benchmark_path) as f:
             data = json.load(f)

@@ -18,7 +18,7 @@
   - [T1. `src/tier1_filter/rule_engine.py`](#t1-rule_enginepy)
   - [T2. `src/tier1_filter/feedback_listener.py`](#t2-feedback_listenerpy)
   - [T3. `src/tier1_filter/scanner.py`](#t3-scannerpy)
-  - [T4. `demo_tier1.py`](#t4-demo_tier1py)
+  - [T4. `demos/demo_tier1.py`](#t4-demo_tier1py)
 - [PIPELINE B — Bộ nhớ APT dài hạn (DAPT2020)](#pipeline-b)
   - [B1. `scripts/dapt2020_config.py`](#b1-dapt2020_configpy)
   - [B2. `scripts/fetch_dapt2020.py`](#b2-fetch_dapt2020py)
@@ -327,18 +327,18 @@ PIPELINE B — Batch / APT memory (DAPT2020):
 ---
 
 <a name="t4-demo_tier1py"></a>
-## T4. `demo_tier1.py`
+## T4. `demos/demo_tier1.py`
 **Vai trò:** Script minh họa 7 case chứng minh đủ 6 action + Z-score của `RuleEngine`. Không có hàm, chạy tuần tự.
 
 | Case | Input | Action kỳ vọng | Cơ chế | Dòng |
 |------|-------|----------------|--------|------|
-| 1 | port 8080, 1 gói | `DROP` | score=0 | [9-15](../demo_tier1.py#L9-L15) |
-| 2 | port 22, 5 gói | `BLOCK_IP` | port nhạy cảm + fwd<200 | [17-23](../demo_tier1.py#L17-L23) |
-| 3 | port 80, 5000 gói | `ALERT` | volumetric > max | [25-31](../demo_tier1.py#L25-L31) |
-| 4 | port 80, 300 gói + dynamic rule | `ESCALATE` | rule động + không brute | [33-49](../demo_tier1.py#L33-L49) |
-| 5 | quét 12 port non-HTTP | `AWAIT_HITL` | session baseline port scan | [51-63](../demo_tier1.py#L51-L63) |
-| 6 | IP 127.0.0.1 | `DROP` | whitelist | [65-71](../demo_tier1.py#L65-L71) |
-| 7 | warmup 110 + outlier Flow Duration | Z-score path | Welford zero-day | [73-114](../demo_tier1.py#L73-L114) |
+| 1 | port 8080, 1 gói | `DROP` | score=0 | [10-16](../demos/demo_tier1.py#L10-L16) |
+| 2 | port 22, 5 gói | `BLOCK_IP` | port nhạy cảm + fwd<200 | [18-24](../demos/demo_tier1.py#L18-L24) |
+| 3 | port 80, 5000 gói | `ALERT` | volumetric > max | [26-32](../demos/demo_tier1.py#L26-L32) |
+| 4 | port 80, 300 gói + dynamic rule | `ESCALATE` | rule động + không brute | [34-50](../demos/demo_tier1.py#L34-L50) |
+| 5 | quét 12 port non-HTTP | `AWAIT_HITL` | session baseline port scan | [52-64](../demos/demo_tier1.py#L52-L64) |
+| 6 | IP 127.0.0.1 | `DROP` | whitelist | [66-72](../demos/demo_tier1.py#L66-L72) |
+| 7 | warmup 110 + outlier Flow Duration | Z-score path | Welford zero-day | [74-115](../demos/demo_tier1.py#L74-L115) |
 
 > ⚠️ Demo dùng default code (threshold 30, sensitive_ports [21,22,23,3389]); giá trị chạy thật lấy từ YAML có thể khác → cần đối chiếu config khi diễn giải kết quả.
 

@@ -39,7 +39,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
 DAPT_PATH = os.path.join(ROOT, "data", "processed", "dapt2020_chains.jsonl")
 EVAL_MEM_DB = os.path.join(ROOT, "experiments", ".unified_eval_memory.db")
-OUT_JSON = os.path.join(ROOT, "experiments", "unified_stream_results.json")
+OUT_JSON = os.path.join(ROOT, "experiments", "results", "unified_stream_results.json")
 REPORT_MD = os.path.join(ROOT, "reports", "unified_stream_evaluation_report.md")
 
 THREAT_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"}

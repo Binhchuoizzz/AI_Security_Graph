@@ -2,7 +2,7 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-06-11T10:14:14
+> **Sinh lúc:** 2026-06-11T10:27:51
 
 ---
 
@@ -20,11 +20,11 @@ Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ `d
 
 | Metric (Tier-1 gate) | Giá trị |
 | :--- | :---: |
-| F1 | **0.5975** |
-| Accuracy | 0.4511 |
-| Precision | 0.939 |
-| Recall (attack) | 0.4381 |
-| TP / FP / TN / FN | 1738 / 113 / 187 / 2229 |
+| F1 | **0.5941** |
+| Accuracy | 0.4479 |
+| Precision | 0.9385 |
+| Recall (attack) | 0.4346 |
+| TP / FP / TN / FN | 1724 / 113 / 187 / 2243 |
 
 ## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn
 

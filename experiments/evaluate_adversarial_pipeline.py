@@ -96,7 +96,7 @@ def run():
     print(f"  Compromised: {results['compromised']}/{n} ({100-rr:.1f}%)")
     print("=" * 60)
 
-    out = os.path.join(os.path.dirname(__file__), "adversarial_pipeline_results.json")
+    out = os.path.join(os.path.dirname(__file__), "results", "adversarial_pipeline_results.json")
     json.dump({"resistance_rate_pct": rr, **results}, open(out, "w"), ensure_ascii=False, indent=1)
     print(f"[+] Saved: {out}")
 

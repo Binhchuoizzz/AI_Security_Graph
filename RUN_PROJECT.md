@@ -254,7 +254,7 @@ Bảo vệ tầng suy luận của LLM (Tier 2) khỏi các hình thức tấn c
 Chạy trực tiếp file script demo:
 
 ```bash
-.venv/bin/python demo_guardrails.py
+.venv/bin/python demos/demo_guardrails.py
 ```
 
 Hoặc nếu muốn chạy thủ công trong Python REPL:
@@ -313,7 +313,7 @@ Tìm kiếm và thu hồi ngữ cảnh bảo mật từ kho tài liệu kỹ thu
 Chạy trực tiếp file script demo:
 
 ```bash
-.venv/bin/python demo_rag.py
+.venv/bin/python demos/demo_rag.py
 ```
 
 Hoặc nếu muốn chạy thủ công trong Python REPL:
@@ -619,7 +619,7 @@ exit()
         outlier) — Rule tĩnh trả `DROP` (**bỏ sót cả 3**), Welford bắt được với **Z ≈ 25,815 /
         30,470 / 40,627** ($\gg 3.5$) → `ESCALATE`.
     *   Báo cáo chi tiết: `reports/unified_stream_evaluation_report.md`; JSON:
-        `experiments/unified_stream_results.json`.
+        `experiments/results/unified_stream_results.json`.
 
 > **Ghi chú:** Tầng LLM Tier-2 + Tier-Consensus Guard được đánh giá riêng ở
 > `evaluate_adversarial_pipeline.py` (kháng social-engineering) và `evaluate_reasoning.py`
@@ -650,7 +650,7 @@ Latency Reduction: <reduction>%   Target: ≥ 60%   Status: PASS/FAIL
 > trong khi baseline LLM-only phải gọi LLM cho *mọi* log. Kiểm định **Mann-Whitney U: p=0.0016**
 > xác nhận khác biệt độ trễ giữa 2 hệ thống là **có ý nghĩa thống kê** (xem DEMO 13).
 > Con số reduction % cụ thể phụ thuộc N và tỷ lệ escalate của tập mẫu tại thời điểm chạy.
-> Kết quả lưu tại `reports/latency_benchmark.json`.
+> Kết quả lưu tại `experiments/results/latency_benchmark.json`.
 
 ---
 
@@ -722,7 +722,7 @@ Bắt buộc phải chạy Ablation Study trước để sinh dữ liệu kết 
 ```
 
 ### Kết quả mong đợi
-Hệ thống sẽ tạo ra các biểu đồ so sánh F1-Score, Precision, Recall và Latency giữa 6 cấu hình thử nghiệm và lưu dưới dạng ảnh tĩnh tại thư mục `experiments/plots/` (ví dụ: `ablation_metrics_comparison.png`).
+Hệ thống sẽ tạo ra các biểu đồ so sánh F1-Score, Precision, Recall và Latency giữa 6 cấu hình thử nghiệm và lưu dưới dạng ảnh tĩnh tại thư mục `experiments/results/plots/` (ví dụ: `ablation_metrics_comparison.png`).
 
 ---
 
