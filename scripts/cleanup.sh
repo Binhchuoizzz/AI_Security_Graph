@@ -6,10 +6,11 @@ echo "[*] Cleaning up SENTINEL temporary artifacts..."
 echo "[+] Removing MLflow artifacts (mlruns/, mlflow.db, mlflow.log)..."
 rm -rf mlruns/ mlflow.db mlflow.log
 
-# Remove experiment output json files (keep ground truth!)
-echo "[+] Removing experiment temporary JSON results..."
-rm -rf experiments/ablation_results.json
-rm -rf experiments/robustness_results.json
+# Remove experiment output files (keep benchmarks: ground_truth.json, adversarial_samples.json)
+echo "[+] Removing experiment result artifacts (experiments/results/ + temp eval DB)..."
+rm -f experiments/results/*.json
+rm -f experiments/results/plots/*.png
+rm -f experiments/.unified_eval_memory.db
 
 # Remove FAISS indexes
 echo "[+] Removing FAISS index caches (will be rebuilt on next embedder run)..."

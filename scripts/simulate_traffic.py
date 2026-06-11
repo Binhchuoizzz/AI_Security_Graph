@@ -10,7 +10,7 @@ MỤC ĐÍCH:
 
 LUỒNG KHÁC PUBLISHER.PY:
   publisher.py      → stream raw CSV (hàng triệu rows, production load test)
-  simulate_traffic.py → replay ground_truth.json (750 mẫu, evaluation/demo)
+  simulate_traffic.py → replay ground_truth.json (4267 mẫu, evaluation/demo)
 
 QUAN HỆ:
   Input:  experiments/ground_truth.json  (từ fetch_and_build_dataset.py)
