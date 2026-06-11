@@ -2,14 +2,16 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-06-11T10:00:26
+> **Sinh lúc:** 2026-06-11T10:14:14
 
 ---
 
-## 0. Luồng dữ liệu
+## 0. Luồng dữ liệu (toàn DATA THẬT, trộn xen kẽ)
 
-- Warmup benign (học baseline Welford): **300**
-- Sự kiện luồng chính (CICIDS tấn công + DAPT + zero-day): **4294**
+Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ `dapt2020_chains.jsonl`); chỉ 3 mẫu zero-day là tổng hợp bắt buộc. Các nguồn được **trộn xen kẽ trong từng ngày** bằng khóa thời gian golden-ratio (không xếp khối theo nguồn); DAPT giữ nguyên ngày thật.
+
+- Warmup benign CICIDS (học baseline Welford): **150**
+- Luồng chính trộn (benign nền + tấn công CICIDS + mọi sự kiện DAPT + zero-day): **4522** sự kiện
 - DAPT chuỗi: **9** | IP là APT thật (≥2 ngày tấn công): **3**
 
 ## 1. Phân loại ở TẦNG LỌC Tier-1 (gate) trên luồng trộn
@@ -18,11 +20,11 @@
 
 | Metric (Tier-1 gate) | Giá trị |
 | :--- | :---: |
-| F1 | **0.6487** |
-| Accuracy | 0.506 |
-| Precision | 0.9572 |
-| Recall (attack) | 0.4905 |
-| TP / FP / TN / FN | 1946 / 87 / 213 / 2021 |
+| F1 | **0.5975** |
+| Accuracy | 0.4511 |
+| Precision | 0.939 |
+| Recall (attack) | 0.4381 |
+| TP / FP / TN / FN | 1738 / 113 / 187 / 2229 |
 
 ## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn
 
@@ -44,9 +46,9 @@ Tổng: **3** | Welford bắt được (mà static bỏ sót): **3/3**
 
 | ID | Kịch bản | Rule tĩnh (Config A) | Full Tier-1 (Welford) | Z-Score |
 | :--- | :--- | :---: | :---: | :---: |
-| ZD-001 | Zero-Day Exfil (Flow-Duration outlier) | DROP (bỏ sót) | **ESCALATE** | 25815.06 ✅ |
-| ZD-002 | Zero-Day Beacon (Flow-Pkts/s outlier) | DROP (bỏ sót) | **ESCALATE** | 30470.55 ✅ |
-| ZD-003 | Zero-Day Tunnel (Bwd-volume outlier) | DROP (bỏ sót) | **ESCALATE** | 40627.62 ✅ |
+| ZD-003 | Zero-Day Tunnel (Bwd-volume outlier) | DROP (bỏ sót) | **ESCALATE** | 38407.34 ✅ |
+| ZD-002 | Zero-Day Beacon (Flow-Pkts/s outlier) | DROP (bỏ sót) | **ESCALATE** | 29861.63 ✅ |
+| ZD-001 | Zero-Day Exfil (Flow-Duration outlier) | DROP (bỏ sót) | **ESCALATE** | 25948.05 ✅ |
 
 ---
 

@@ -101,19 +101,36 @@ def static_only_action(engine: RuleEngine, log: dict) -> str:
 # Build unified, time-ordered event stream
 # --------------------------------------------------------------------------- #
 def build_stream():
-    """Trả về (warmup_events, main_events, apt_truth).
+    """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
-    - warmup_events: traffic benign CICIDS để Welford học baseline trước.
-    - main_events: CICIDS tấn công + sự kiện DAPT (đa ngày) + zero-day, đã trộn
-      và sắp theo khóa thời gian `t` (1.0..5.x = ngày 1..5 của cửa sổ sự cố).
-    - apt_truth: tập IP THẬT là APT (có sự kiện tấn công ở >= 2 ngày khác nhau).
+    Tất cả sự kiện đều là DATA THẬT (CICIDS từ ground_truth, DAPT từ chains);
+    chỉ 3 mẫu zero-day là tổng hợp bắt buộc (không dataset nào chứa zero-day thật).
+
+    - warmup_events: 150 benign CICIDS ĐẦU để Welford học baseline trước.
+    - main_events: phần benign CICIDS còn lại + TẤT CẢ tấn công CICIDS + MỌI sự
+      kiện DAPT (tấn công lẫn benign nền) + zero-day, được **TRỘN XEN KẼ** trong
+      từng ngày bằng khóa `t = ngày + offset golden-ratio` rồi sort — KHÔNG xếp
+      khối theo nguồn.
+    - apt_truth: tập IP THẬT là APT (sự kiện tấn công ở >= 2 ngày khác nhau).
     """
     gt = json.load(open(GT_PATH, encoding="utf-8"))
     samples = gt if isinstance(gt, list) else gt.get("samples", gt)
 
+    WARMUP_N = 150                      # benign dành riêng cho warmup baseline
+    GOLDEN = 0.6180339887498949
+    _oi = [0]                           # order-index dùng cho dãy golden-ratio
+
+    def tkey(day: int) -> float:
+        """Phần nguyên = ngày (giữ thứ tự đa ngày của APT); phần thập phân = dãy
+        golden-ratio -> rải đều & **xen kẽ mọi nguồn** trong cùng một ngày."""
+        t = day + (_oi[0] * GOLDEN) % 1.0
+        _oi[0] += 1
+        return t
+
     warmup, main = [], []
 
-    # --- CICIDS ---------------------------------------------------------- #
+    # --- CICIDS: 150 benign -> warmup; phần còn lại TRỘN vào luồng chính --- #
+    benign_seen = 0
     attack_idx = 0
     for s in samples:
         nl = s.get("input", {}).get("network_layer", {})
@@ -121,39 +138,36 @@ def build_stream():
             continue
         log = map_cicids(nl)
         label = s.get("input", {}).get("cicids_label", "")
-        expected = s.get("expected_action", "")
-        is_benign = label == "Benign" or expected == "LOG"
-        ev = {
-            "source": "cicids",
-            "log": log,
-            "expected_threat": not is_benign,
-            "label": label,
-        }
+        is_benign = label == "Benign" or s.get("expected_action", "") == "LOG"
         if is_benign:
-            warmup.append(ev)  # benign -> warmup baseline
+            benign_seen += 1
+            ev = {"source": "cicids", "log": log, "expected_threat": False, "label": label}
+            if benign_seen <= WARMUP_N:
+                warmup.append(ev)                       # prefix warmup
+            else:
+                ev["t"] = tkey(1 + benign_seen % 5)     # benign nền, trộn khắp 5 ngày
+                main.append(ev)
         else:
-            # rải traffic tấn công CICIDS đều khắp 5 ngày làm nền nhiễu
-            ev["t"] = 1.0 + (attack_idx % 5) + 1e-7 * attack_idx
+            ev = {"source": "cicids", "log": log, "expected_threat": True, "label": label}
+            ev["t"] = tkey(1 + attack_idx % 5)
             main.append(ev)
             attack_idx += 1
 
-    # --- DAPT2020 (sự kiện đa ngày) -------------------------------------- #
+    # --- DAPT2020: đưa CẢ sự kiện tấn công LẪN benign (nền) vào luồng ------ #
     apt_attack_days = defaultdict(set)
     chains = [json.loads(line) for line in open(DAPT_PATH, encoding="utf-8")]
-    seq = 0
     for chain in chains:
         for e in chain.get("events", []):
             phase = e.get("phase")
             label = e.get("label", "")
             is_attack = (phase not in BENIGN_PHASES) and (label not in BENIGN_PHASES)
-            if not is_attack:
-                continue  # chỉ đưa sự kiện TẤN CÔNG vào memory (như SOC thật)
             ip = e.get("src_ip", chain.get("attacker_ip", ""))
             day = _safe_int(e.get("day"), 1)
-            apt_attack_days[ip].add(day)
-            seq += 1
+            if is_attack:
+                apt_attack_days[ip].add(day)            # chỉ tấn công mới tính chuỗi APT
             main.append({
                 "source": "dapt",
+                "is_attack": is_attack,                 # benign DAPT = nền, KHÔNG ghi memory
                 "ip": ip,
                 "dst_ip": e.get("dst_ip", ""),
                 "phase": phase,
@@ -167,7 +181,7 @@ def build_stream():
                     "Destination Port": 443,
                     "Total Fwd Packets": 20,
                 },
-                "t": float(day) + 1e-6 * seq,
+                "t": tkey(day),
             })
 
     apt_truth = {ip for ip, days in apt_attack_days.items() if len(days) >= 2}
@@ -205,9 +219,9 @@ def build_stream():
             "mitre": "T1572 Protocol Tunneling",
         },
     ]
-    for k, zd in enumerate(zerodays):
+    for zd in zerodays:
         zd["source"] = "zeroday"
-        zd["t"] = 3.0 + 0.5 + 1e-6 * k  # giữa luồng, sau khi đã ấm baseline
+        zd["t"] = tkey(3)  # ngày 3, trộn xen kẽ; warmup prefix đảm bảo baseline đã ấm
         main.append(zd)
 
     main.sort(key=lambda x: x["t"])
@@ -266,8 +280,10 @@ def run():
                 cls["fp" if flagged else "tn"] += 1
 
         elif src == "dapt":
-            # Mỗi sự kiện APT vẫn đi qua Tier-1 (thường DROP/LOG vì tín hiệu thấp)
+            # Mỗi sự kiện DAPT vẫn đi qua Tier-1 (thường DROP/LOG vì tín hiệu thấp)
             engine.evaluate(ev["log"])
+            if not ev.get("is_attack"):
+                continue  # benign DAPT = nền nhiễu, KHÔNG ghi vào memory APT
             ip = ev["ip"]
             apt_event_counter[ip] += 1
             # GHI vào bộ nhớ TỪ stream (tích lũy dần), rồi HỎI lại
@@ -388,10 +404,15 @@ def _write_report(summary, apt_fired, apt_truth, zd_results):
                  "thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.\n")
     lines.append(f"> **Sinh lúc:** {summary['timestamp']}\n")
     lines.append("---\n")
-    lines.append("## 0. Luồng dữ liệu\n")
+    lines.append("## 0. Luồng dữ liệu (toàn DATA THẬT, trộn xen kẽ)\n")
     s = summary["stream"]
-    lines.append(f"- Warmup benign (học baseline Welford): **{s['warmup_benign']}**")
-    lines.append(f"- Sự kiện luồng chính (CICIDS tấn công + DAPT + zero-day): **{s['main_events']}**")
+    lines.append("Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ "
+                 "`dapt2020_chains.jsonl`); chỉ 3 mẫu zero-day là tổng hợp bắt buộc. Các "
+                 "nguồn được **trộn xen kẽ trong từng ngày** bằng khóa thời gian golden-"
+                 "ratio (không xếp khối theo nguồn); DAPT giữ nguyên ngày thật.\n")
+    lines.append(f"- Warmup benign CICIDS (học baseline Welford): **{s['warmup_benign']}**")
+    lines.append(f"- Luồng chính trộn (benign nền + tấn công CICIDS + mọi sự kiện DAPT + "
+                 f"zero-day): **{s['main_events']}** sự kiện")
     lines.append(f"- DAPT chuỗi: **{s['dapt_chains']}** | IP là APT thật (≥2 ngày tấn công): **{s['apt_truth_ips']}**\n")
 
     lines.append("## 1. Phân loại ở TẦNG LỌC Tier-1 (gate) trên luồng trộn\n")
