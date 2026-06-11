@@ -37,7 +37,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
    - File: `scripts/fetch_dapt2020.py` & `scripts/build_dapt_chains.py`.
    - Function: `process_dapt2020()`, `build_chains()`.
    - Input: DAPT2020 JSON → Output: Mapped Normalized JSON.
-7. **LUỒNG DỮ LIỆU:** Raw DAPT2020 logs → Data Normalizer (Đồng nhất schema với CIC-IDS) → Redis Channel.
+7. **LUỒNG DỮ LIỆU:** Raw DAPT2020 logs → build_dapt_chains → Threat Memory (SQLite); đánh giá phát hiện APT EMERGENT qua `evaluate_unified_stream.py` (KHÔNG stream qua Redis).
 8. **VAI TRÒ BẢO MẬT:** N/A — performance/efficiency role only (Hỗ trợ đánh giá Contextual Correlation).
 
 ### **3. Redis Stream Ingestion and Stateful Session Tracking**
@@ -342,7 +342,7 @@ Tài liệu này đặc tả chi tiết 35 bước xử lý kỹ thuật trong t
 2. **LAYER:** Tier 2 LangGraph Agent (Memory).
 3. **MỤC ĐÍCH:** Lưu trữ uy tín (Reputation) dài hạn của các IP vi phạm và kết nối các hành vi đơn lẻ qua nhiều ngày để phát hiện các chiến dịch APT low-and-slow.
 4. **CÔNG NGHỆ SỬ DỤNG:** Cơ sở dữ liệu SQLite, IP Reputation Scoring.
-5. **CƠ CHẾ HOẠT ĐỘNG:** Lưu vết mọi incident vi phạm vào SQLite. Khi có IP mới bị leo thang, hệ thống tra cứu SQLite xem IP này đã thực hiện các kỹ thuật gì. Nếu IP vi phạm liên quan đến >= 3 giai đoạn khác nhau trong ma trận MITRE ATT&CK theo thời gian → Đánh dấu cảnh báo APT nguy cấp và nâng mức cảnh báo của IP lên critical.
+5. **CƠ CHẾ HOẠT ĐỘNG:** Lưu vết mọi incident vi phạm vào SQLite. Khi có IP mới bị leo thang, hệ thống tra cứu SQLite xem IP này đã thực hiện các kỹ thuật gì. Nếu IP vi phạm xuất hiện ở >= 2 NGÀY khác nhau (đúng logic `check_apt_chain`) → Đánh dấu cảnh báo APT nguy cấp và nâng mức cảnh báo của IP lên critical.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/agent/threat_memory.py`.
    - Class: `ThreatMemoryManager`.

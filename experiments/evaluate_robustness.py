@@ -2,7 +2,7 @@
 Hệ thống Đánh giá Tấn công Adversarial — BẢN ĐẦY ĐỦ
 
 Chạy toàn bộ tập kiểm thử adversarial qua pipeline Guardrails.
-Đo lường Tỷ lệ Chặn (Defeat Rate) theo từng nhóm tấn công.
+Đo lường Tỷ lệ Kháng / Block Rate (số mẫu adversarial bị chặn) theo từng nhóm tấn công.
 
 Cách dùng:
     python experiments/evaluate_robustness.py

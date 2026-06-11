@@ -2,9 +2,9 @@
 
 Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng dữ liệu (Dataflow)** và **Lộ trình học tập theo ngày**. Mỗi file được phân tích: Mục đích, Tác dụng, Mối quan hệ với các cấu phần khác.
 
-> **Tiến độ hiện tại:** Đã đi qua **NGÀY 1** (Tầng dữ liệu đầu vào & Bộ lọc Tier-1) và
-> **NGÀY 2** (Tầng an toàn Guardrails) — 21 file, được mô tả CHI TIẾT & đối chiếu sát với
-> code hiện tại bên dưới. Các **Ngày 3 → 5** (RAG, LangGraph Agent, UI & Thực nghiệm)
+> **Tiến độ hiện tại:** Đã đi qua **NGÀY 1** (Tầng dữ liệu đầu vào & Bộ lọc Tier-1),
+> **NGÀY 2** (Tầng an toàn Guardrails) và **NGÀY 3** (Tầng truy xuất tri thức kép Dual-RAG) — 28 file,
+> được mô tả CHI TIẾT & đối chiếu sát với code hiện tại bên dưới. Các **Ngày 4 → 5** (LangGraph Agent, UI & Thực nghiệm)
 > **CHƯA đi qua** — chỉ liệt kê outline ngắn ở cuối để định hướng.
 
 ---
@@ -127,18 +127,54 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 
 ---
 
+## **NGÀY 3: TẦNG TRUY XUẤT TRI THỨC KÉP (DUAL-RAG) & ĐỒ THỊ TRI THỨC**
+
+### 22. `src/rag/embedder.py`
+*   **Mục đích:** Xây dựng và cập nhật Vector Index (FAISS & BM25) từ cơ sở dữ liệu tri thức thô.
+*   **Tác dụng:** Phân tách các kỹ thuật MITRE ATT&CK và quy trình NIST SP 800-61r2 (dạng văn bản thô đầy đủ) thành các chunk có kích thước phù hợp (~256 tokens), làm sạch qua `RAGSanitizer.sanitize_ingest()`, sau đó sử dụng `SentenceTransformer` với mô hình `all-MiniLM-L6-v2` để sinh vector nhúng 384 chiều. Ghi đè chữ ký số SHA-256 của các file index/JSON thô vào tệp `checksums.sha256` để kiểm soát tính toàn vẹn.
+*   **Mối quan hệ:** Đọc từ `knowledge_base/` và ghi các file vector/metadata đã được nhúng vào `knowledge_base/faiss_index/`.
+
+### 23. `scripts/build_rag_indexes.py`
+*   **Mục đích:** CLI wrapper để chạy tiến trình xây dựng chỉ mục.
+*   **Tác dụng:** Cấu hình PYTHONPATH và kích hoạt `build_all_indexes()` của embedder.
+*   **Mối quan hệ:** Gọi trực tiếp module `src/rag/embedder.py`.
+
+### 24. `src/rag/security.py`
+*   **Mục đích:** Thiết lập lá chắn bảo mật cho tầng RAG nhằm chống lại RAG Poisoning.
+*   **Tác dụng:**
+    *   `verify_document_integrity()`: Xác thực chữ ký SHA-256 của toàn bộ tệp KB và index trên disk so với chữ ký trong `checksums.sha256` trước khi nạp; nếu có sai khác sẽ lập tức ngắt tiến trình.
+    *   `log_tokenizer()`: Tokenizer tối ưu cho log an ninh mạng (giữ nguyên định dạng CVE IDs và địa chỉ IP).
+    *   `add_provenance()`: Gắn tag chứng thực nguồn gốc `[SOURCE: ... | VERIFIED: SENTINEL_KB]` vào tri thức để giúp LLM phân biệt dữ liệu tri thức đáng tin cậy với log mạng.
+*   **Mối quan hệ:** Cung cấp các kiểm tra bảo mật cho `retriever.py` và `embedder.py`.
+
+### 25. `src/rag/semantic_cache.py`
+*   **Mục đích:** Giảm thiểu độ trễ truy xuất bằng bộ đệm ngữ nghĩa.
+*   **Tác dụng:** Triển khai bộ nhớ đệm LRU Cache (sử dụng `OrderedDict` của Python) với khóa băm SHA-256 của query text (log template). Hỗ trợ giới hạn số lượng `max_size=500` và thời gian sống `ttl_seconds=1800`.
+*   **Mối quan hệ:** Tích hợp trực tiếp vào `retriever.py` giúp bỏ qua embedding/search đối với các log trùng lặp template (như DDoS, Brute Force).
+
+### 26. `src/rag/retriever.py`
+*   **Mục đích:** Bộ truy xuất tri thức an toàn kết hợp Dense & Sparse search.
+*   **Tác dụng:**
+    *   Thực hiện kiểm tra chữ ký số ở khởi tạo. Tra cứu `SemanticCache` để trả kết quả tức thì nếu cache hit.
+    *   `_hybrid_search()`: Truy vấn Dense Search (FAISS IndexFlatIP) và Sparse Search (BM25Okapi) đồng thời, dung hòa thứ hạng bằng thuật toán Reciprocal Rank Fusion (RRF, k=60), lọc theo ngưỡng `MIN_SCORE_THRESHOLD=0.15`, đưa qua `RAGSanitizer.sanitize_retrieve()` làm sạch và gắn provenance tag.
+*   **Mối quan hệ:** Nhận logs từ Agent Tier-2, truy xuất tri thức và trả về prompt ngữ cảnh RAG tổng hợp (`combined_prompt`).
+
+### 27. `demos/demo_rag.py`
+*   **Mục đích:** Demo CLI của RAG layer.
+*   **Tác dụng:** Thực thi tìm kiếm lai và trực quan hóa ngữ cảnh thu được từ MITRE và NIST đối với một truy vấn log mẫu.
+*   **Mối quan hệ:** Gọi trực tiếp `src/rag/retriever.py`.
+
+### 28. `src/rag/graph_builder.py`
+*   **Mục đích:** Quản lý đồ thị tri thức phụ thuộc an toàn thông tin (Knowledge Graph).
+*   **Tác dụng:** Sử dụng driver Neo4j (Bolt protocol) đọc kết quả quét Trivy (`data/trivy-results.json`), thiết lập các nút `Component`, `SubComponent` (ví dụ: requirements.txt) và `Vulnerability` (CVE) cùng các quan hệ `CONTAINS`, `HAS_VULNERABILITY`. Tự động xuất mock JSON nếu Neo4j offline.
+*   **Mối quan hệ:** Quét lỗ hổng tĩnh và nạp vào Neo4j Graph.
+
+---
+
 ## ⏳ **CÁC NGÀY TIẾP THEO (CHƯA ĐI QUA — OUTLINE ĐỊNH HƯỚNG)**
 
 > Các tầng dưới đây **đã có code** và chạy được, nhưng **chưa được học/đối chiếu chi tiết**
 > trong lộ trình hiện tại. Phần này chỉ là outline ngắn; sẽ mở rộng chi tiết khi đi tới.
-
-### **NGÀY 3 — Tầng truy xuất tri thức kép (Dual-RAG)**
-*   `src/rag/embedder.py` — embed MITRE/NIST (all-MiniLM-L6-v2, 384d) → FAISS; cập nhật `checksums.sha256`.
-*   `src/rag/retriever.py` *(quan trọng)* — Hybrid Search FAISS (dense) + BM25 (sparse) hợp nhất bằng RRF; sanitize cache-hit chống Semantic Cache Poisoning.
-*   `src/rag/semantic_cache.py` — LRU cache (OrderedDict + TTL) khóa **băm SHA-256 exact-match** (không phải cosine).
-*   `src/rag/security.py` — kiểm tra toàn vẹn SHA-256 file tri thức trước khi build index (`verify_document_integrity`).
-*   `src/rag/graph_builder.py` — Knowledge Graph Neo4j (V2 tùy chọn) liên kết MITRE ↔ NIST.
-*   `scripts/build_rag_indexes.py`, `demos/demo_rag.py` — build index & demo CLI.
 
 ### **NGÀY 4 — Cỗ máy trạng thái LangGraph & phản hồi an ninh**
 *   `src/agent/state.py` — schema `SentinelState` (batch logs, RAG context, decisions, IOCs...).

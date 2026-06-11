@@ -1,24 +1,52 @@
 \chapter{Kiến trúc hệ thống đề xuất SENTINEL}
 \label{ch:proposed_solution}
 
-Chương này trình bày kiến trúc đề xuất SENTINEL (Cognitive Two-Tier Architecture) giúp tự động hóa phân loại và ứng cứu sự cố trong SOC. Chương này bao gồm: Mô tả tổng quan luồng dữ liệu 2 tầng; Công thức toán học của Thuật toán Welford trực tuyến tại Tier 1; Thiết kế Tầng Guardrail bảo vệ; Mô hình tác tử LangGraph điều khiển suy luận RAG tại Tier 2; Cơ chế bộ nhớ SQLite Threat Memory; và hệ thống bảo đảm logs toàn vẹn HMAC Log Chaining.
+% Giới thiệu ngắn
+Chương này mô tả chi tiết thiết kế hệ thống SENTINEL (Cognitive Two-Tier Architecture). Đây là cốt lõi khoa học của luận văn, nhằm giải quyết bài toán phát hiện và phản hồi mối đe dọa (TDIR) một cách tự động, tốc độ cao và an toàn tuyệt đối trước các nỗ lực thao túng AI. Nội dung bao quát từ tổng quan luồng dữ liệu 2 tầng, bộ lọc Welford trực tuyến, mô hình Tác tử LangGraph với Dual-RAG, cho đến các kiến trúc bảo mật tiên tiến (Guardrails, HMAC Chaining).
 
-\section{Tổng quan kiến trúc hai tầng}
-Trình bày sơ đồ khối kiến trúc và giải thích cơ chế phối hợp giảm tải logs từ Tier 1 (Rule-based) lên Tier 2 (LLM Agent).
+\section{Tổng quan Kiến trúc Nhận thức Hai tầng (Two-Tier Architecture)}
+\begin{itemize}
+    \item \textbf{Sơ đồ khối hệ thống tổng thể:} Trình bày flow biểu đồ luồng dữ liệu bắt đầu từ hệ thống sinh log, qua Tier-1 (Tầng Vận chuyển/Bộ lọc) đến Tier-2 (Tầng Nhận thức/AI Agent) và hệ thống Database/Dashboard.
+    \item \textbf{Triết lý thiết kế (Design Philosophy):} Sự phân chia trách nhiệm: Tier-1 chịu trách nhiệm lọc nhiễu ở tốc độ đường truyền (Wire-speed), Tier-2 cung cấp khả năng phân tích ngữ cảnh sâu và giải quyết tính mù lòa của Zero-day.
+\end{itemize}
 
-\section{Thuật toán Outlier Detection thống kê trực tuyến Welford}
-Đặc tả chi tiết công thức toán học cập nhật trung bình và phương sai liên tục của Welford. Giải thích cơ chế tính toán Z-Score trực tuyến với độ phức tạp không gian và thời gian tối ưu $O(1)$ để phát hiện Zero-day.
+\section{Tầng 1 (Tier-1): Động cơ lọc lưu lượng thời gian thực (RuleEngine \& Welford)}
+\begin{itemize}
+    \item \textbf{Quản lý Baseline và Phiên (Session Baseline):} Cách lưu trữ và cập nhật trạng thái kết nối mạng theo thời gian.
+    \item \textbf{Cơ chế Welford trực tuyến (Online Welford's Algorithm):} Đặc tả chi tiết triển khai toán học tính Z-Score tại mỗi luồng log. Khi Z-Score vượt ngưỡng $\alpha$, hệ thống sinh nhãn cảnh báo (ESCALATE) cho Tier-2 thay vì thả (DROP).
+    \item \textbf{Luật tĩnh kết hợp (Static Rule Engine):} Tích hợp các bộ luật signature-based tĩnh cơ bản (DROP, WARN) để loại trừ ngay lập tức các mẫu tấn công sơ cấp.
+\end{itemize}
 
-\section{Thiết kế Tầng Guardrail bảo vệ Prompt}
-Mô tả chi tiết 3 lớp phòng ngự: Template Mining (Drain3) để nén logs, Đóng gói dấu phân cách ngẫu nhiên cryptographically secure delimiter để chống Prompt Injection, và bộ lọc Smuggling Detection và Output Sanitizer.
+\section{Tầng 2 (Tier-2): Tác tử AI LangGraph (Cognitive Agent)}
+\begin{itemize}
+    \item \textbf{Thiết kế StateGraph (Đồ thị trạng thái):} Cấu trúc của đối tượng \texttt{SentinelState} mang thông tin phiên chạy. Định nghĩa các Node: Phân tích (Analyze), Truy xuất tri thức (Retrieve), Giải quyết (Resolve).
+    \item \textbf{Điều hướng có điều kiện (Conditional Edges):} Luồng tư duy nội tại của AI Agent. Khi AI thiếu kiến thức, nó tự động nhảy sang trạng thái \texttt{retrieve\_knowledge} và sau đó quay lại đánh giá.
+\end{itemize}
 
-\section{Mô hình Tác tử nhận thức LangGraph và Dual-RAG}
-Đặc tả cấu trúc `SentinelState`, đồ thị trạng thái LangGraph (Nodes và Conditional Edges) và quy trình truy xuất Hybrid Search hợp nhất bằng RRF từ chỉ mục MITRE ATT\&CK và NIST.
+\section{Cơ chế Truy xuất Tri thức Kép (Dual-RAG) và Bộ nhớ Semantic}
+\begin{itemize}
+    \item \textbf{Kiến trúc Dual-RAG:} Hợp nhất hai cơ sở kiến thức đặc thù: MITRE ATT\&CK (Định danh TTPs) và NIST SP 800-61r2 (Sổ tay hướng dẫn ứng phó sự cố).
+    \item \textbf{Thuật toán lai (Hybrid Search):} Quá trình kết hợp điểm số Dense (FAISS) và Sparse (BM25) sử dụng RRF.
+    \item \textbf{Semantic Cache (Bộ nhớ đệm ngữ nghĩa):} Cơ chế băm nhúng ngữ nghĩa (Semantic Hashing) để bỏ qua LLM nếu luồng log tương tự đã được phân tích thành công trước đó trong ngày, giảm tối đa độ trễ.
+\end{itemize}
 
-\section{SQLite Threat Memory và liên kết chuỗi APT}
-Giải thích cơ chế chấm điểm danh tiếng IP dài hạn và logic xâu chuỗi tương quan các kỹ thuật tấn công xảy ra rải rác qua nhiều ngày để phát hiện chiến dịch tấn công APT low-and-slow.
+\section{Bộ nhớ Đe dọa (Threat Memory) và Tương quan Chiến dịch APT}
+\begin{itemize}
+    \item \textbf{Lưu trữ dữ liệu đồ thị / tương quan IP (SQLite/Neo4j):} Logic theo dõi điểm uy tín (Reputation Score) của địa chỉ IP theo thời gian.
+    \item \textbf{Cơ chế liên kết APT (APT Correlation):} Thuật toán xâu chuỗi các sự kiện mức độ thấp (Low-severity anomalies) xảy ra rải rác qua nhiều ngày để hình thành một bản án nâng cao (Escalate to High-severity).
+\end{itemize}
 
-\section{Bảo vệ toàn vẹn chứng cứ logs bằng HMAC Log Chaining}
-Trình bày cấu trúc chuỗi liên kết băm băm mật mã học (mỗi dòng log chứa HMAC được tính từ nội dung log hiện tại và hash của dòng trước đó) giúp phát hiện giả mạo logs.
+\section{Hệ thống Phòng vệ AI Guardrails (AI Security Layer)}
+\begin{itemize}
+    \item \textbf{Đóng gói Dấu phân cách ngẫu nhiên (Delimited Data Encapsulation):} Thuật toán sinh token mật mã ngẫu nhiên cho mỗi phiên (ví dụ: \texttt{<|PAYLOAD\_A7F9|>}), đóng khung dữ liệu ngoại lai để LLM không thực thi các mệnh lệnh lẩn khuất (Prompt Injection).
+    \item \textbf{Quản lý ngân sách Token (Token Budget Manager) \& Nén Log (LogTemplateMiner):} Ứng dụng Drain3 để loại bỏ các biến động text ngẫu nhiên, gom cụm log để tránh tấn công DoS Token nhắm vào LLM.
+    \item \textbf{Bộ lọc Output Sanitization:} Chuẩn hóa nghiêm ngặt đầu ra JSON của LLM.
+\end{itemize}
 
-Tóm lại, Chương 3 đã mô tả toàn diện thiết kế kiến trúc hệ thống SENTINEL. Chương tiếp theo sẽ đi sâu vào mô tả chi tiết quá trình triển khai mã nguồn thực tế.
+\section{Bảo vệ Toàn vẹn Chứng cứ (Data Integrity \& HMAC)}
+\begin{itemize}
+    \item \textbf{Chuỗi băm sự kiện (HMAC Log Chaining):} Thuật toán liên kết hàm băm mật mã học từ log trước sang log sau, đảm bảo mọi hành vi sửa xóa log (Tampering) của kẻ tấn công nội bộ đều làm đứt gãy chuỗi và bị phát hiện.
+    \item \textbf{Ký băm RAG (RAG SHA-256 Checksum):} Đảm bảo cơ sở dữ liệu vector RAG không bị chèn ép các tài liệu sai lệch (Data Poisoning).
+\end{itemize}
+
+Tóm lại, Chương 3 đã thiết lập bộ khung lý thuyết vững chắc về kiến trúc của hệ thống SENTINEL, giải quyết toàn vẹn cả hiệu năng (Tier-1) và nhận thức sâu, an toàn (Tier-2). Chương tiếp theo sẽ đặc tả quy trình chuyển hóa kiến trúc này thành mã nguồn kỹ thuật.

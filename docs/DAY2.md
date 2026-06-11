@@ -1,7 +1,7 @@
 # SENTINEL — Tài liệu tham chiếu hàm (Function Reference) — NGÀY 2
 
 > **Phạm vi:** Mô tả **chi tiết từng hàm** của **11 file** thuộc **Tầng An toàn Guardrails** (`src/guardrails/` + `demos/demo_guardrails.py`) — lá chắn AI nằm giữa Tier-1 và LLM Agent.
-> **Cập nhật:** 2026-06-10 (sau khi bổ sung `enforce_tier_consensus` chống social-engineering + đồng bộ data 14 lớp).
+> **Cập nhật:** 2026-06-11 (đồng bộ lại số dòng theo code thực tế sau đợt mở rộng `EncodingNeutralizer` + refactor cấu trúc thư mục).
 > **Quy ước:** Mỗi hàm ghi rõ *Mục đích → Tham số → Trả về → Luồng xử lý → Tham chiếu dòng*.
 
 ---
@@ -146,45 +146,53 @@ XUYÊN SUỐT:
 **Vai trò:** 3 tầng chống Direct Prompt Injection + orchestrator nén/đóng gói batch trước khi vào LLM.
 
 ### Hằng số & hàm module
-- `CONFIG_PATH` — đường dẫn `system_settings.yaml`. **Dòng:** [16-18](../src/guardrails/prompt_filter.py#L16-L18)
-- `load_config()` — **nguồn config trung tâm** (được `rag_sanitizer`, `decision_validator`, `template_miner` import lại); fallback hardcode 18 `injection_patterns` + 15 `jailbreak_patterns`. **Dòng:** [21-49](../src/guardrails/prompt_filter.py#L21-L49)
+- `CONFIG_PATH` — đường dẫn `system_settings.yaml`. **Dòng:** [19-21](../src/guardrails/prompt_filter.py#L19-L21)
+- `load_config()` — **nguồn config trung tâm** (được `rag_sanitizer`, `decision_validator`, `template_miner` import lại); fallback hardcode 17 `injection_patterns` + 15 `jailbreak_patterns`. **Dòng:** [24-52](../src/guardrails/prompt_filter.py#L24-L52)
 
 ### `class PromptInjectionDetector` *(Tầng 1)*
 | Hàm | Mục đích | Dòng |
 |-----|----------|------|
-| `__init__(patterns=None)` | Load + compile regex `injection_patterns` (IGNORECASE). | [60-63](../src/guardrails/prompt_filter.py#L60-L63) |
-| `scan(log_entry)` | Normalize key → match từng field (bỏ field `_`) → **chỉ đánh dấu, không xóa**: `_injection_detected/_patterns/_fields/_isolation_level` (HIGH/NORMAL). | [65-91](../src/guardrails/prompt_filter.py#L65-L91) |
+| `__init__(patterns=None)` | Load + compile regex `injection_patterns` (IGNORECASE). | [63-66](../src/guardrails/prompt_filter.py#L63-L66) |
+| `scan(log_entry)` | Normalize key → match từng field (bỏ field `_`) → **chỉ đánh dấu, không xóa**: `_injection_detected/_patterns/_fields/_isolation_level` (HIGH/NORMAL). | [68-94](../src/guardrails/prompt_filter.py#L68-L94) |
 
 ### `class JailbreakDetector` *(Tầng 1b)*
 | Hàm | Mục đích | Dòng |
 |-----|----------|------|
-| `__init__(patterns=None)` | Load `jailbreak_patterns` + regex `role_play_re` (you are now / act as / pretend...). | [102-112](../src/guardrails/prompt_filter.py#L102-L112) |
-| `scan(log_entry)` | Phát hiện DAN/Developer Mode/roleplay → set `_isolation_level=CRITICAL`. | [114-145](../src/guardrails/prompt_filter.py#L114-L145) |
+| `__init__(patterns=None)` | Load `jailbreak_patterns` + regex `role_play_re` (you are now / act as / pretend...). | [105-115](../src/guardrails/prompt_filter.py#L105-L115) |
+| `scan(log_entry)` | Phát hiện DAN/Developer Mode/roleplay → set `_isolation_level=CRITICAL`. | [117-148](../src/guardrails/prompt_filter.py#L117-L148) |
 
 ### `class EncodingNeutralizer` *(Tầng 2)*
+
+> ⚠️ **Mở rộng so với phiên bản gốc:** Nay bổ sung thêm `_CONFUSABLE_MAP` (Cyrillic/Greek homoglyph folding, [156-168](../src/guardrails/prompt_filter.py#L156-L168)), `_LEET_MAP` (leetspeak, [171-174](../src/guardrails/prompt_filter.py#L171-L174)), `_DECODE_TRIGGERS` + `_looks_malicious()` ([177-188](../src/guardrails/prompt_filter.py#L177-L188)), và 4 decoder mới (`fold_homoglyphs`, `normalize_leetspeak`, `decode_rot13`, `decode_if_base32`) cùng `_expose_obfuscated()` tổng hợp.
+
 | Hàm | Mục đích | Dòng |
 |-----|----------|------|
-| `decode_if_base64(text)` *(static)* | Decode base64; nếu chứa `<script`/`javascript:`/`onload=` → phơi bày `[BASE64_DECODED: …]`. | [156-170](../src/guardrails/prompt_filter.py#L156-L170) |
-| `neutralize_html_entities(text)` *(static)* | `<script>/<img>/<iframe>` → placeholder; tag còn lại xóa. | [172-189](../src/guardrails/prompt_filter.py#L172-L189) |
-| `normalize_unicode(text)` *(static)* | Xóa zero-width (`​-‍`, `﻿`, `­`, `\x00`). | [191-195](../src/guardrails/prompt_filter.py#L191-L195) |
-| `decode_url_and_hex(text)` *(static)* | URL-decode + `\xNN` hex-escape. | [197-208](../src/guardrails/prompt_filter.py#L197-L208) |
-| `neutralize(log_entry)` | Pipeline mỗi field: unicode → url/hex → base64 → html. | [210-223](../src/guardrails/prompt_filter.py#L210-L223) |
+| `decode_if_base64(text)` *(static)* | Decode base64; nếu printable → phơi bày `[BASE64_DECODED: …]`. | [197-210](../src/guardrails/prompt_filter.py#L197-L210) |
+| `neutralize_html_entities(text)` *(static)* | `<script>/<img>/<iframe>` → placeholder; tag còn lại xóa. | [213-231](../src/guardrails/prompt_filter.py#L213-L231) |
+| `normalize_unicode(text)` *(static)* | NFKC normalize + xóa zero-width (`​-‍`, `﻿`, `­`, `\x00`). | [234-239](../src/guardrails/prompt_filter.py#L234-L239) |
+| `fold_homoglyphs(text)` *(static)* 🆕 | Map Cyrillic/Greek look-alike chars → ASCII Latin (chống homoglyph bypass). | [242-244](../src/guardrails/prompt_filter.py#L242-L244) |
+| `normalize_leetspeak(text)` *(static)* 🆕 | Fold leetspeak (`1gn0r3` → `ignore`). | [247-249](../src/guardrails/prompt_filter.py#L247-L249) |
+| `decode_rot13(text)` *(static)* 🆕 | ROT13 decode (chỉ shift ASCII letters). | [252-254](../src/guardrails/prompt_filter.py#L252-L254) |
+| `decode_if_base32(text)` *(static)* 🆕 | Decode base32 nếu ≥16 ký tự, trả decoded hoặc `None`. | [257-266](../src/guardrails/prompt_filter.py#L257-L266) |
+| `decode_url_and_hex(text)` *(static)* | URL-decode + `\xNN` hex-escape. | [269-279](../src/guardrails/prompt_filter.py#L269-L279) |
+| `_expose_obfuscated(text)` 🆕 | Thử base32/rot13/leet/homoglyph → nếu decoded chứa trigger injection mà original không → append `[XXX_DECODED: …]`. Guarded: không mangle text benign. | [281-298](../src/guardrails/prompt_filter.py#L281-L298) |
+| `neutralize(log_entry)` | Pipeline mỗi field: unicode → url/hex → base64 → **expose_obfuscated** → html. | [300-314](../src/guardrails/prompt_filter.py#L300-L314) |
 
 ### `class DelimitedDataEncapsulator` *(Tầng 3 — Core Defense)*
 | Hàm | Mục đích | Dòng |
 |-----|----------|------|
-| `__init__()` | Sinh **nonce `secrets.token_hex(8)`** → `data_start/data_end` riêng mỗi instance (kẻ tấn công không đoán được). | [236-239](../src/guardrails/prompt_filter.py#L236-L239) |
-| `_sanitize_delimiter_smuggling(text)` | Regex `<<<[^>]*>>>` → `[DELIMITER_STRIPPED]` (chống giả mạo delimiter thoát vùng data). | [241-244](../src/guardrails/prompt_filter.py#L241-L244) |
-| `get_system_instruction()` | Sinh system prompt động chứa delimiter thật + chỉ thị "treat as DATA ONLY". | [246-257](../src/guardrails/prompt_filter.py#L246-L257) |
-| `encapsulate(text, isolation_level="NORMAL")` | Bọc text trong delimiter; `HIGH` → thêm cảnh báo. | [259-269](../src/guardrails/prompt_filter.py#L259-L269) |
-| `encapsulate_fields(log_entry)` | **Chỉ giữ `ALLOWED_FIELDS`** (Source IP, Port, payload, URI, User-Agent...) rồi encapsulate — chống leak field nội bộ `_*`. | [271-292](../src/guardrails/prompt_filter.py#L271-L292) |
+| `__init__()` | Sinh **nonce `secrets.token_hex(8)`** → `data_start/data_end` riêng mỗi instance (kẻ tấn công không đoán được). | [327-330](../src/guardrails/prompt_filter.py#L327-L330) |
+| `_sanitize_delimiter_smuggling(text)` | Regex `<<<[^>]*>>>` → `[DELIMITER_STRIPPED]` (chống giả mạo delimiter thoát vùng data). | [332-335](../src/guardrails/prompt_filter.py#L332-L335) |
+| `get_system_instruction()` | Sinh system prompt động chứa delimiter thật + chỉ thị "treat as DATA ONLY". | [337-348](../src/guardrails/prompt_filter.py#L337-L348) |
+| `encapsulate(text, isolation_level="NORMAL")` | Bọc text trong delimiter; `HIGH` → thêm cảnh báo. | [350-360](../src/guardrails/prompt_filter.py#L350-L360) |
+| `encapsulate_fields(log_entry)` | **Chỉ giữ `ALLOWED_FIELDS`** (Source IP, Port, payload, URI, User-Agent...) rồi encapsulate — chống leak field nội bộ `_*`. | [362-383](../src/guardrails/prompt_filter.py#L362-L383) |
 
 ### `class GuardrailsPipeline` — Orchestrator
 | Hàm | Mục đích & Luồng | Dòng |
 |-----|------------------|------|
-| `__init__()` | Khởi tạo 4 component (Injection, Jailbreak, Encoding, Encapsulator). | [306-310](../src/guardrails/prompt_filter.py#L306-L310) |
-| `process(log_entry)` | `normalize → injection_scan → jailbreak_scan → neutralize → encapsulate_fields`; trả `{sanitized_log, encapsulated_text, injection/jailbreak_detected, isolation_level, system_instruction}`. | [312-332](../src/guardrails/prompt_filter.py#L312-L332) |
-| `process_batch(logs)` | `process` từng log → nén `LogTemplateMiner` → ưu tiên `EntropyScorer` → cắt `TokenBudgetManager` → chọn isolation cao nhất → encapsulate. | [334-382](../src/guardrails/prompt_filter.py#L334-L382) |
+| `__init__()` | Khởi tạo 4 component (Injection, Jailbreak, Encoding, Encapsulator). | [397-401](../src/guardrails/prompt_filter.py#L397-L401) |
+| `process(log_entry)` | `normalize → injection_scan → jailbreak_scan → neutralize → encapsulate_fields`; trả `{sanitized_log, encapsulated_text, injection/jailbreak_detected, isolation_level, system_instruction}`. | [403-423](../src/guardrails/prompt_filter.py#L403-L423) |
+| `process_batch(logs)` | `process` từng log → nén `LogTemplateMiner` → ưu tiên `EntropyScorer` → cắt `TokenBudgetManager` → chọn isolation cao nhất → encapsulate. | [425-473](../src/guardrails/prompt_filter.py#L425-L473) |
 
 ---
 
@@ -203,7 +211,7 @@ XUYÊN SUỐT:
 | `_sanitize_hex(text)` | Tương tự với hex ≥8 → `[HEX_OBFUSCATED_STRIPPED]`. | [83-106](../src/guardrails/output_sanitizer.py#L83-L106) |
 | `sanitize(text)` | Pipeline: strip zero-width → strip ANSI → 11 regex → base64 sâu → hex sâu → log cảnh báo. | [108-144](../src/guardrails/output_sanitizer.py#L108-L144) |
 | `sanitize_for_db(text)` | Wrapper cho path ghi DB (SQLite dùng parameterized query). | [146-153](../src/guardrails/output_sanitizer.py#L146-L153) |
-| `last_strip_count` (property) | Số pattern bị strip lần gần nhất (metrics). | [155-158](../src/guardrails/output_sanitizer.py#L155-L158) |
+| `last_strip_count` (property) | Số pattern bị strip lần gần nhất (metrics). | [156-158](../src/guardrails/output_sanitizer.py#L156-L158) |
 
 > **Singleton:** `output_sanitizer = OutputSanitizer()` — dùng bởi `decision_validator`, `threat_memory`, `nodes`.
 
@@ -215,6 +223,7 @@ XUYÊN SUỐT:
 
 ### `class DecisionValidator`
 - `__init__()` — load `trusted_internal_subnets`; `allowed_actions=["BLOCK_IP","ALERT","AWAIT_HITL","LOG","DROP"]`. **Dòng:** [19-24](../src/guardrails/decision_validator.py#L19-L24)
+- **Lưu ý:** `class DecisionValidator` khai báo ở [dòng 13](../src/guardrails/decision_validator.py#L13).
 
 ### `validate_decision(decision) -> dict` — 4 lớp bảo vệ
 | Lớp | Việc | Dòng |
@@ -338,12 +347,13 @@ XUYÊN SUỐT:
 
 | # | Mức độ | Vấn đề / Lưu ý | Vị trí |
 |---|--------|----------------|--------|
-| 1 | 🟢 Tốt | `load_config()` của `prompt_filter` là **single source of truth** cho injection/jailbreak patterns; `rag_sanitizer` import lại → đồng bộ tuyệt đối. | [prompt_filter.py:21](../src/guardrails/prompt_filter.py#L21) |
+| 1 | 🟢 Tốt | `load_config()` của `prompt_filter` là **single source of truth** cho injection/jailbreak patterns; `rag_sanitizer` import lại → đồng bộ tuyệt đối. | [prompt_filter.py:24](../src/guardrails/prompt_filter.py#L24) |
 | 2 | 🟢 Tốt | `enforce_tier_consensus` đóng lỗ hổng social-engineering ngữ nghĩa (compromise 16.7%→0%). | [decision_validator.py:138](../src/guardrails/decision_validator.py#L138) |
 | 3 | 🟢 Đã sửa | **Hai DB audit** từng trùng tên → đã tách: `logs/guardrails_audit.db` bảng `audit_log` (state_monitor, metadata research) vs `config/audit_trail.db` bảng `audit_trail` (executor, HMAC chain UI). | [state_monitor.py:107](../src/guardrails/state_monitor.py#L107) |
 | 4 | 🟢 Đã sửa | `TokenBudgetManager(budget=...)` từng bị config `token_budget:4000` nuốt tham số → nay tham số tường minh ưu tiên, config chỉ là mặc định khi không truyền. | [template_miner.py:234](../src/guardrails/template_miner.py#L234) |
 | 5 | 🟢 Thấp | `SemanticCache` (Ngày 3) là **exact-match SHA-256** chứ không phải cosine — `rag_sanitizer.sanitize_cache_entry` vẫn cần vì cache lưu trước khi sanitize retrieve. | [rag_sanitizer.py:129](../src/guardrails/rag_sanitizer.py#L129) |
-| 6 | 🟢 Thấp | `EncodingNeutralizer` **strip** `<script>` thành `[SCRIPT_STRIPPED]` (an toàn hơn HTML-escape) — test E2E T08 đã đồng bộ theo hành vi này. | [prompt_filter.py:172](../src/guardrails/prompt_filter.py#L172) |
+| 6 | 🟢 Thấp | `EncodingNeutralizer` **strip** `<script>` thành `[SCRIPT_STRIPPED]` (an toàn hơn HTML-escape) — test E2E T08 đã đồng bộ theo hành vi này. | [prompt_filter.py:213](../src/guardrails/prompt_filter.py#L213) |
+| 7 | 🟢 Mới | `EncodingNeutralizer` bổ sung **6 phương thức mới** (homoglyph/leet/rot13/base32/expose_obfuscated) đóng lỗ hổng encoding bypass, `neutralize()` nay gọi `_expose_obfuscated()` trước `neutralize_html_entities()`. | [prompt_filter.py:191-314](../src/guardrails/prompt_filter.py#L191-L314) |
 
 ### Cải tiến tích cực (nên nêu trước hội đồng)
 - ✅ **Defense-in-depth đầu vào:** 3 tầng (pattern detect → encoding neutralize → nonce encapsulation) + chỉ giữ `ALLOWED_FIELDS`.

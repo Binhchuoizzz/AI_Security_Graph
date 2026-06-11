@@ -2,65 +2,84 @@
 \label{ch:introduction}
 
 % Chương cần bắt đầu bằng một đoạn văn ngắn giới thiệu nội dung chương
-Chương này giới thiệu bối cảnh nghiên cứu về an ninh mạng trong các Trung tâm Điều hành An ninh (SOC), nêu bật những thách thức của các tiếp cận hiện tại và lý do nghiên cứu đề xuất giải pháp kiến trúc nhận thức hai tầng SENTINEL. Tiếp theo, chương trình bày mục tiêu nghiên cứu, câu hỏi nghiên cứu, đối tượng, phương pháp và phạm vi của đề tài.
+Chương này cung cấp cái nhìn tổng quan và cơ sở nền tảng cho việc thực hiện luận văn nghiên cứu. Nội dung chương bắt đầu bằng việc phân tích bối cảnh an ninh mạng hiện đại, đặc biệt là những thách thức mà các Trung tâm Điều hành An ninh (SOC) đang phải đối mặt. Từ việc phân tích những hạn chế của các hệ thống truyền thống và những rủi ro khi ứng dụng AI tạo sinh, chương làm rõ lý do hình thành và lựa chọn đề tài kiến trúc nhận thức hai tầng SENTINEL. Tiếp theo, chương xác định rõ ràng mục tiêu, câu hỏi nghiên cứu, đối tượng, phương pháp và phạm vi nghiên cứu, đồng thời tóm tắt những đóng góp chính và cấu trúc tổng thể của luận văn.
 
 \section{Bối cảnh nghiên cứu và Lý do chọn đề tài}
-Trong kỷ nguyên số, các tổ chức và doanh nghiệp đang đối mặt với tần suất và độ phức tạp ngày càng tăng của các cuộc tấn công mạng. Để bảo vệ tài sản số thông tin, các Trung tâm Điều hành An ninh (SOC) đóng vai trò nòng cốt trong việc giám sát, phát hiện và ứng cứu sự cố. Tuy nhiên, các SOC hiện đại đang gặp phải "Nghịch lý Dữ liệu lớn":
+Trong kỷ nguyên chuyển đổi số và điện toán đám mây, các tổ chức, doanh nghiệp đang phải đối mặt với một chiến trường không gian mạng ngày càng phức tạp. Các bề mặt tấn công không ngừng mở rộng, kết hợp với sự tinh vi của các tác nhân đe dọa có tổ chức (APT - Advanced Persistent Threats) đã khiến các phương thức phòng thủ truyền thống trở nên quá sức. Để bảo vệ tài sản thông tin, các Trung tâm Điều hành An ninh (SOC) được xây dựng đóng vai trò nòng cốt trong việc giám sát, phát hiện và ứng cứu sự cố. Tuy nhiên, kiến trúc vận hành của các SOC hiện đại đang gặp phải "Nghịch lý Dữ liệu lớn" (Big Data Paradox), bộc lộ ba điểm yếu cốt lõi:
+
 \begin{itemize}
-    \item \textbf{Vấn nạn Alert Fatigue (Mệt mỏi vì cảnh báo):} Lượng log khổng lồ phát sinh từ thiết bị tường lửa, IDS/IPS và SIEM tạo ra hàng triệu cảnh báo mỗi ngày, trong đó tỷ lệ báo động giả (False Positive) rất lớn, dẫn đến việc chuyên gia phân tích SOC bỏ sót các cuộc tấn công thực tế.
-    \item \textbf{Giới hạn của các hệ thống dựa trên Luật (Rule-based):} Các hệ thống truyền thống chỉ phát hiện các mẫu tấn công đã biết (signatures), không có khả năng phát hiện các cuộc tấn công chưa có mẫu (Zero-day).
-    \item \textbf{Hạn chế của phương pháp Random Sampling:} Một số tiếp cận lọc giảm tải log bằng cách lấy mẫu ngẫu nhiên (chỉ giữ lại 1-3% log sạch). Phương pháp này vô tình xóa bỏ bằng chứng của các chiến dịch tấn công APT "Low-and-Slow" vốn thực hiện các bước thăm dò cực kỳ kín kẽ và kéo dài nhiều ngày.
+    \item \textbf{Vấn nạn Alert Fatigue (Mệt mỏi vì cảnh báo):} Sự bùng nổ của các thiết bị tường lửa (Firewall), hệ thống phát hiện/ngăn ngừa xâm nhập (IDS/IPS) và hệ thống quản lý thông tin và sự kiện bảo mật (SIEM) tạo ra hàng triệu cảnh báo mỗi ngày. Tỷ lệ báo động giả (False Positive) từ các hệ thống này thường rất lớn, làm quá tải đội ngũ chuyên gia phân tích (Tier-1 Analysts), dẫn đến hiện tượng "bỏ qua cảnh báo" khiến các cuộc tấn công thực tế bị lọt lưới.
+    \item \textbf{Giới hạn của các hệ thống dựa trên Luật (Rule-based):} Các công cụ SIEM/IDS truyền thống hoạt động chủ yếu dựa trên chữ ký (signatures) và các tập luật tĩnh. Dù hiệu quả với các cuộc tấn công đã biết, chúng hoàn toàn mù lòa trước các cuộc tấn công chưa có mẫu (Zero-day) hoặc các biến thể tấn công đa hình.
+    \item \textbf{Hạn chế của phương pháp giảm tải dữ liệu truyền thống:} Để đối phó với lưu lượng log khổng lồ, nhiều SOC áp dụng cơ chế lấy mẫu ngẫu nhiên (Random Sampling) hoặc lấy mẫu theo ngưỡng tĩnh (Static Thresholding). Phương pháp này vô tình cắt đứt các chuỗi bằng chứng thời gian, làm mất đi các mắt xích quan trọng của các chiến dịch tấn công APT "Low-and-Slow" vốn thực hiện các bước thăm dò cực kỳ kín kẽ, kéo dài hàng tuần hoặc hàng tháng.
 \end{itemize}
 
-Sự xuất hiện của các Mô hình Ngôn ngữ Lớn (LLM) mở ra tiềm năng ứng dụng trí tuệ nhân tạo để đọc hiểu logs và tự động hóa ứng cứu. Tuy nhiên, việc áp dụng trực tiếp LLM trong SOC vấp phải hai rào cản lớn:
+Sự trỗi dậy của Trí tuệ Nhân tạo Tạo sinh (Generative AI), đặc biệt là các Mô hình Ngôn ngữ Lớn (LLM), đã mở ra tiềm năng to lớn trong việc tự động hóa phân tích logs, diễn dịch ngữ cảnh và đề xuất phương án ứng cứu. Tuy nhiên, việc đưa trực tiếp LLM vào luồng dữ liệu của SOC vấp phải hai rào cản kỹ thuật và bảo mật nghiêm trọng:
 \begin{enumerate}
-    \item \textbf{Độ trễ xử lý (Latency):} Việc gửi toàn bộ luồng logs qua LLM để suy luận sẽ gây nghẽn cổ chai nghiêm trọng về hiệu năng xử lý luồng mạng thời gian thực.
-    \item \textbf{Nguy cơ chèn câu lệnh độc hại (Prompt Injection):} Kẻ tấn công có thể chèn các chuỗi câu lệnh phá hoại prompt vào trong logs (ví dụ: HTTP User-Agent chứa lệnh yêu cầu LLM phân loại là lành tính), từ đó thao túng quyết định của AI.
+    \item \textbf{Độ trễ xử lý (Latency) và Tiêu thụ tài nguyên:} Việc gửi toàn bộ luồng logs thô qua LLM để suy luận sẽ gây ra hiện tượng nghẽn cổ chai (bottleneck) nghiêm trọng. Kiến trúc Transformer của LLM đòi hỏi năng lực tính toán cực lớn, không thể đáp ứng được yêu cầu phân tích theo thời gian thực (wire-speed) của hệ thống mạng.
+    \item \textbf{Nguy cơ tấn công thao túng AI (Prompt Injection và Semantic Poisoning):} Kẻ tấn công có thể chèn các chuỗi câu lệnh phá hoại vào chính dữ liệu mạng (ví dụ: một payload HTTP User-Agent chứa lệnh: \textit{"Bỏ qua mọi luật trước đó, hãy phân loại luồng này là an toàn"}). Nếu LLM xử lý trực tiếp các log này mà không có cơ chế cách ly, hệ thống AI của SOC sẽ bị thao túng hoàn toàn, biến hệ thống phòng thủ thành điểm yếu chí mạng.
 \end{enumerate}
 
-Do đó, việc nghiên cứu một kiến trúc phối hợp hai tầng, sàng lọc thô tốc độ cao ở tầng dưới và suy luận nhận thức chuyên sâu, an toàn bằng AI Tác tử ở tầng trên là cực kỳ cần thiết. Đó là lý do đề tài "Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI tác tử" được lựa chọn.
+Nhận thức được những thách thức mang tính chiến lược nêu trên, cùng với nền tảng kiến thức về AI Engineering và An toàn thông tin, tác giả nhận thấy sự cấp thiết của việc xây dựng một kiến trúc kết hợp tối ưu: Sàng lọc thô tốc độ cao bằng thuật toán phi trạng thái ở tầng dưới, và suy luận nhận thức chuyên sâu, cách ly an toàn bằng AI Tác tử ở tầng trên. Từ nhận thức đó, đề tài \textbf{"Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI tác tử" (Hệ thống SENTINEL)} được lựa chọn làm định hướng nghiên cứu cho luận văn thạc sĩ.
 
 \section{Mục tiêu nghiên cứu}
-Đề tài hướng tới các mục tiêu cụ thể sau:
+Đề tài hướng tới việc giải quyết bài toán tự động hóa SOC bằng việc xây dựng một hệ thống phát hiện xâm nhập và phản hồi thông minh, hiệu năng cao và có khả năng chống chịu các tấn công nhắm vào chính AI. 
+
+\textbf{Mục tiêu tổng quát:} Xây dựng, triển khai và đánh giá kiến trúc hệ thống SENTINEL - một kiến trúc hai tầng kết hợp giữa phát hiện bất thường thống kê và phân tích ngữ cảnh bằng AI Tác tử.
+
+\textbf{Mục tiêu cụ thể:}
 \begin{itemize}
-    \item Thiết kế và triển khai kiến trúc lai hai tầng SENTINEL hoạt động cục bộ (offline) an toàn.
-    \item Phát triển thuật toán thống kê trực tuyến Welford tại Tier 1 để lọc nhiễu lưu lượng lành tính ở tốc độ đường truyền mà không cần giám sát.
-    \item Xây dựng tác tử Tier 2 sử dụng LangGraph kết hợp cơ chế Dual-RAG (MITRE ATT\&CK và NIST) đưa ra phán quyết ứng phó sự cố chính xác và có tính giải thích cao.
-    \item Đề xuất cơ chế bảo vệ Guardrail chống lại Prompt Injection bằng kỹ thuật mã hóa dấu phân cách ngẫu nhiên.
-    \item Đảm bảo tính toàn vẹn chứng cứ nhật ký hệ thống bằng chuỗi băm HMAC.
+    \item \textbf{Phát triển Tier 1 (Tầng Vận chuyển):} Tích hợp thuật toán thống kê trực tuyến Welford để đánh giá độ lệch chuẩn (Z-Score) liên tục trên dòng dữ liệu không gian hẹp. Mục tiêu là lọc bỏ phần lớn lưu lượng lành tính ở tốc độ đường truyền (thời gian thực O(1) về mặt bộ nhớ) mà không làm mất trạng thái của luồng.
+    \item \textbf{Xây dựng Tier 2 (Tầng Nhận thức):} Phát triển AI Agent dựa trên kiến trúc LangGraph và LLM cục bộ (Local LLM), kết hợp với cơ chế truy xuất tri thức kép Dual-RAG (sử dụng cơ sở dữ liệu MITRE ATT\&CK và NIST SP 800-61r2) để phân loại mối đe dọa, lập luận và đưa ra khuyến nghị phản hồi tự động.
+    \item \textbf{Đảm bảo an toàn cho AI:} Thiết kế cơ chế Delimited Data Encapsulation (đóng gói bằng dấu phân cách ngẫu nhiên) để vô hiệu hóa hoàn toàn các tấn công Prompt Injection nhúng trong payload mạng.
+    \item \textbf{Đảm bảo tính toàn vẹn hệ thống:} Xây dựng cơ chế xác thực toàn vẹn bằng chữ ký SHA-256 cho hệ thống tri thức RAG và ứng dụng chuỗi băm HMAC (HMAC Chaining) cho database audit log nhằm chống lại sự giả mạo chứng cứ của kẻ tấn công nội bộ.
 \end{itemize}
 
 \section{Câu hỏi nghiên cứu}
-Đề tài tập trung trả lời ba câu hỏi nghiên cứu chính:
+Để đạt được các mục tiêu đã đề ra, nghiên cứu tập trung giải quyết và trả lời ba câu hỏi cốt lõi sau đây:
 \begin{enumerate}
-    \item Làm thế nào để lọc bỏ nhiễu logs lưu lượng mạng lớn mà không làm đứt gãy hay mất dấu vết của các chuỗi tấn công dài ngày (APT)?
-    \item Làm thế nào để tích hợp LLM vào quy trình phân tích logs mà vẫn đảm bảo độ trễ thời gian thực và ngăn chặn hoàn toàn nguy cơ tấn công Prompt Injection thông qua logs độc hại?
-    \item Cơ chế tự học chủ động (Active Learning) không cần fine-tune giúp cải thiện độ chính xác và giảm tỷ lệ cảnh báo sai (FPR) của mô hình trong vận hành thực tế như thế nào?
+    \item \textbf{CQ1:} Làm thế nào để thiết kế một cơ chế sàng lọc nhiễu lưu lượng mạng khối lượng lớn theo thời gian thực mà không làm đứt gãy hay mất dấu vết của các chuỗi sự kiện có độ trễ cao đặc trưng cho tấn công APT?
+    \item \textbf{CQ2:} Bằng phương pháp nào để tích hợp sức mạnh suy luận của LLM vào quy trình phân tích SOC tự động mà vẫn giải quyết được nghịch lý về độ trễ xử lý, đồng thời ngăn chặn triệt để các rủi ro thao túng AI thông qua mã độc nhúng trong log (Prompt Injection)?
+    \item \textbf{CQ3:} Sự kết hợp giữa bộ nhớ ngữ nghĩa của Tác tử (Agent Memory) và hệ thống truy xuất tri thức ngoài (Dual-RAG) mang lại hiệu quả như thế nào trong việc nhận diện các mối đe dọa Zero-day và giảm thiểu tỷ lệ hoang tưởng (Hallucination) của LLM?
 \end{enumerate}
 
-\section{Đối tượng và Phương pháp nghiên cứu}
+\section{Đối tượng và Phạm vi nghiên cứu}
+\textbf{Đối tượng nghiên cứu:}
 \begin{itemize}
-    \item \textbf{Đối tượng nghiên cứu:} Luồng lưu lượng mạng doanh nghiệp (mô phỏng trên tập dữ liệu CSE-CIC-IDS2018 và chuỗi tấn công APT DAPT2020), các kỹ thuật tác tử AI (Agentic AI), RAG và an toàn prompt.
-    \item \textbf{Phương pháp nghiên cứu:} Phương pháp nghiên cứu thực nghiệm. Xây dựng hệ thống hoàn chỉnh chạy thử nghiệm trên các kịch bản tấn công thực tế, tiến hành đo lường định lượng và phân tích thống kê để kiểm chứng giả thuyết.
+    \item Dữ liệu luồng lưu lượng mạng (Network Flow Logs) và dữ liệu đánh chặn gói tin chứa mã độc.
+    \item Các kỹ thuật của AI Tác tử (Agentic AI), Mô hình ngôn ngữ lớn (LLM), Đồ thị tri thức (Knowledge Graph) và Kỹ thuật sinh bổ sung kết xuất (RAG).
+    \item Các phương thức tấn công xâm nhập mạng và các kỹ thuật tấn công nhắm vào hệ thống AI (Prompt Injection, Semantic Poisoning).
 \end{itemize}
 
-\section{Phạm vi nghiên cứu}
-Nghiên cứu tập trung vào:
+\textbf{Phạm vi nghiên cứu:}
 \begin{itemize}
-    \item Phân tích luồng logs ở cấp độ flow-level (các thông số thống kê lưu lượng) và một số trường thông tin text trong payload logs.
-    \item Mô hình ngôn ngữ lớn hoạt động offline (khảo sát trên Gemma-2-9B-IT) chạy trên cấu hình phần cứng GPU đơn lập để mô phỏng môi trường bảo mật độc lập của doanh nghiệp.
-    \item Không bao gồm các phản ứng mạng tác động vật lý phá hủy hoặc can thiệp trực tiếp vào thiết bị của nhà cung cấp bên thứ ba ngoài mô phỏng firewall rules.
+    \item \textbf{Dữ liệu thực nghiệm:} Đánh giá trên các bộ dữ liệu chuẩn quốc tế bao gồm CSE-CIC-IDS2018 (mô phỏng các hình thái tấn công mạng diện rộng) và DAPT2020 (mô phỏng các chiến dịch APT dài ngày).
+    \item \textbf{Mô hình AI:} Tập trung khảo sát và tối ưu hóa các Local LLM mã nguồn mở (cụ thể là Gemma-2-9B-IT) được lượng tử hóa (Quantization) để có thể vận hành cục bộ trên một GPU duy nhất, đáp ứng yêu cầu bảo mật dữ liệu tuyệt đối của mô hình SOC nội bộ.
+    \item \textbf{Môi trường phản hồi:} Các phản ứng của hệ thống (Mitigation) được giới hạn ở mức phân tích, xuất báo cáo và sinh ra các tập luật tường lửa (Firewall Rules) mô phỏng. Nghiên cứu không bao gồm việc tự động thực thi các tác động vật lý cắt đứt kết nối mạng trên thiết bị thật để tránh rủi ro sập hệ thống (Denial of Service tự gây ra) do lỗi nhận định của AI.
+\end{itemize}
+
+\section{Phương pháp nghiên cứu}
+Đề tài sử dụng phương pháp nghiên cứu định lượng kết hợp thực nghiệm kỹ thuật sâu (Experimental Engineering Methodology):
+\begin{itemize}
+    \item \textbf{Phương pháp Thiết kế và Xây dựng (Design \& Implementation):} Lên kiến trúc, lập trình hệ thống phần mềm (Python, Neo4j, FAISS, LangGraph, llama.cpp), đóng gói Docker và thiết lập các kịch bản kiểm thử (Testbeds).
+    \item \textbf{Phương pháp Mô phỏng và Thực nghiệm:} Thiết lập môi trường mô phỏng luồng dữ liệu liên tục (Unified Stream) để kiểm tra luồng chạy từ đầu đến cuối (End-to-End) của hệ thống trước các biến thể tấn công (Zero-day, APT). Chạy các công cụ tấn công mã hóa để kiểm thử Guardrail bảo mật AI.
+    \item \textbf{Phương pháp Đánh giá và Thống kê (Evaluation \& Statistical Analysis):} Đánh giá hiệu năng và độ chính xác thông qua khung định lượng 5 chiều (5D Metrics: Accuracy, Security, Performance, Integrity, Cognitive). Áp dụng các kiểm định thống kê (McNemar's test, Mann-Whitney U test) và phương pháp phân tích cắt lớp (Ablation Study) để chứng minh tính ưu việt có ý nghĩa thống kê của mô hình kiến trúc đề xuất so với các mô hình độc lập (baseline).
+\end{itemize}
+
+\section{Đóng góp của luận văn}
+Luận văn mang lại những đóng góp nổi bật ở cả khía cạnh lý thuyết và thực tiễn kỹ thuật:
+\begin{itemize}
+    \item \textbf{Đóng góp về kiến trúc (Architectural):} Đề xuất thành công mô hình lai SENTINEL hai tầng, cân bằng hoàn hảo giữa hiệu năng (xử lý dòng lưu lượng lớn thông qua Welford's algorithm) và năng lực nhận thức sâu (Agentic AI).
+    \item \textbf{Đóng góp về an ninh AI (AI Security):} Chứng minh thực nghiệm phương pháp đóng gói dữ liệu an toàn (Delimited Data Encapsulation) kết hợp cơ chế kiểm tra toàn vẹn tri thức (HMAC \& SHA-256), giúp hệ thống phòng thủ miễn nhiễm hoàn toàn với các nỗ lực Prompt Injection và Data Poisoning - một lỗ hổng nghiêm trọng của các hệ thống tích hợp LLM hiện nay.
+    \item \textbf{Đóng góp về tính tự chủ (Autonomy):} Đưa khái niệm AI Tác tử dựa trên đồ thị trạng thái (State Graph) vào quy trình Incident Response, thay thế quy trình RBA (Runbook Automation) tĩnh bằng quy trình ra quyết định động dựa trên ngữ cảnh thực tế theo thời gian thực.
 \end{itemize}
 
 \section{Cấu trúc của luận văn}
-Báo cáo luận văn được cấu trúc thành các chương sau:
+Luận văn được tổ chức một cách logic, từ nền tảng lý thuyết đến thiết kế, triển khai thực nghiệm và kết luận. Cấu trúc cụ thể bao gồm 6 chương:
 \begin{itemize}
-    \item \textbf{Chương 1: Mở đầu} - Giới thiệu bối cảnh, lý do chọn đề tài, mục tiêu, câu hỏi, đối tượng, phương pháp, phạm vi và cấu trúc luận văn.
-    \item \textbf{Chương 2: Cơ sở lý thuyết và các nghiên cứu liên quan} - Trình bày các kiến thức nền tảng về Agentic AI, RAG, thuật toán thống kê, an toàn prompt và tổng quan các công trình nghiên cứu liên quan.
-    \item \textbf{Chương 3: Kiến trúc hệ thống đề xuất SENTINEL} - Mô tả chi tiết mô hình kiến trúc hai tầng, các thuật toán Welford trực tuyến, cơ chế đóng gói dấu phân cách an toàn, workflow LangGraph và cấu trúc HMAC Chaining.
-    \item \textbf{Chương 4: Triển khai kỹ thuật} - Đặc tả chi tiết mã nguồn, môi trường Docker và thiết kế giao diện dashboard Streamlit hỗ trợ Human-in-the-Loop.
-    \item \textbf{Chương 5: Thực nghiệm và Đánh giá kết quả} - Trình bày kết quả đo lường định lượng 5 chiều (5D), phân tích ablation study và các kiểm định thống kê McNemar, Mann-Whitney U.
-    \item \textbf{Chương 6: Kết luận và Hướng phát triển} - Tổng kết các đóng góp chính, chỉ ra các hạn chế và định hướng các nghiên cứu tiếp theo.
+    \item \textbf{Chương 1: Mở đầu} - Trình bày bối cảnh, lý do chọn đề tài, mục tiêu, câu hỏi nghiên cứu, đối tượng, phương pháp, phạm vi và những đóng góp chính của luận văn.
+    \item \textbf{Chương 2: Cơ sở lý thuyết và Các nghiên cứu liên quan} - Cung cấp nền tảng lý thuyết về Agentic AI, hệ thống RAG, thuật toán thống kê trực tuyến Welford, an toàn LLM và phân tích các hệ thống SOC truyền thống. Chương cũng tổng quan các công trình nghiên cứu hiện có để làm nổi bật khoảng trống nghiên cứu.
+    \item \textbf{Chương 3: Kiến trúc hệ thống đề xuất SENTINEL} - Trình bày thiết kế tổng thể của kiến trúc nhận thức hai tầng, chi tiết thiết kế Tầng Vận chuyển (Tier 1), Tầng Nhận thức Tác tử (Tier 2), Đồ thị tri thức bảo mật (Dual-RAG) và các cơ chế phòng thủ bảo vệ hệ thống AI.
+    \item \textbf{Chương 4: Triển khai kỹ thuật} - Đặc tả chi tiết môi trường phát triển, thiết kế mã nguồn hệ thống, tích hợp các công cụ (Neo4j, FAISS, llama.cpp), đóng gói vùng chứa (Docker containerization) và xây dựng giao diện tương tác (Streamlit Dashboard).
+    \item \textbf{Chương 5: Thực nghiệm và Đánh giá kết quả} - Trình bày chi tiết các thiết lập thí nghiệm, bộ dữ liệu (CSE-CIC-IDS2018, DAPT2020), và phân tích đánh giá kết quả định lượng sâu sắc dựa trên các độ đo 5D, Ablation Study và phân tích thống kê.
+    \item \textbf{Chương 6: Kết luận và Hướng phát triển} - Tổng kết lại các kết quả đạt được, đối chiếu với mục tiêu nghiên cứu ban đầu, chỉ ra những hạn chế còn tồn tại và đề xuất các định hướng nghiên cứu phát triển mở rộng trong tương lai.
 \end{itemize}
-
-Tóm lại, Chương 1 đã phác thảo bức tranh tổng quan về đề tài nghiên cứu. Chương tiếp theo sẽ đi sâu vào các cơ sở lý thuyết khoa học làm nền tảng cho việc thiết kế kiến trúc hệ thống đề xuất.

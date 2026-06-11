@@ -423,7 +423,7 @@ PIPELINE B — Batch / APT memory (DAPT2020):
 
 | # | Mức độ | Vấn đề | Vị trí |
 |---|--------|--------|--------|
-| 1 | 🟢 Đã sửa | Mẫu adversarial từng **bị DROP âm thầm ở Tier-1** → nay **Tầng 0.2 `_check_injection_signatures`** (+50 điểm, action `ESCALATE`) bắt delimiter/injection/jailbreak bằng patterns từ config và đẩy LÊN Tier-2 Guardrails xử lý. | [rule_engine.py:353](../src/tier1_filter/rule_engine.py#L353), [rule_engine.py:528-531](../src/tier1_filter/rule_engine.py#L528-L531) |
+| 1 | 🟢 Đã sửa | Mẫu adversarial từng **bị DROP âm thầm ở Tier-1** → nay **Tầng 0.2 `_check_injection_signatures`** (+50 điểm, action `ESCALATE`) bắt delimiter/injection/jailbreak bằng patterns từ config và đẩy LÊN Tier-2 Guardrails xử lý. | [rule_engine.py:353](../src/tier1_filter/rule_engine.py#L353), [rule_engine.py:528-532](../src/tier1_filter/rule_engine.py#L528-L532) |
 | 2 | 🟢 Đã sửa | `session_baseline.ttl_seconds` & `eviction_interval` nay **được wire đầy đủ** vào `SessionBaseline` (cả `__init__` lẫn hot-reload, không xóa cache profiles). | [rule_engine.py:288-297](../src/tier1_filter/rule_engine.py#L288-L297), [rule_engine.py:580-586](../src/tier1_filter/rule_engine.py#L580-L586) |
 | 3 | 🟢 Đã sửa | `simulate_traffic.py` nay đọc `REDIS_URL` theo thứ tự **env → YAML config → default** — đồng bộ với publisher/subscriber. | [simulate_traffic.py:40](../scripts/simulate_traffic.py#L40) |
 | 4 | 🟢 Thấp | Trộn Streams (ingestion) + List (`queue_hitl`, `queue_decisions` qua `rpush`) — chủ ý, nhưng dashboard phải đọc đúng kiểu. | [subscriber.py:101-127](../src/streaming/subscriber.py#L101-L127) |

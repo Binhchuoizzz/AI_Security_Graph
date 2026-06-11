@@ -1,28 +1,40 @@
 \chapter{Kết luận và Hướng phát triển}
 \label{ch:conclusion}
 
-Chương này tổng kết lại toàn bộ nghiên cứu về hệ thống SENTINEL. Nội dung chương bao gồm: Tổng hợp các kết quả đạt được; Các hạn chế hiện tại của hệ thống; và hướng phát triển nghiên cứu trong tương lai.
+% Giới thiệu ngắn
+Chương cuối cùng này đúc kết lại toàn bộ hành trình nghiên cứu của đề tài "Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI Tác tử" (SENTINEL). Chương tổng hợp các kết quả khoa học đã được chứng minh, tự nhận xét những mặt còn hạn chế trong khuôn khổ luận văn thạc sĩ và mở ra các chân trời nghiên cứu mới cho ngành an ninh mạng kết hợp Trí tuệ Nhân tạo.
 
-\section{Các kết quả đạt được}
-Tóm tắt các đóng góp khoa học và thực tiễn của đề tài:
+\section{Tổng hợp các Kết quả Nghiên cứu Đạt được}
 \begin{itemize}
-    \item Đã thiết kế và cài đặt thành công kiến trúc nhận thức hai tầng hoạt động offline ổn định, tin cậy.
-    \item Phát triển thuật toán thống kê Welford trực tuyến giúp phát hiện dị thường hiệu quả với độ trễ tối thiểu và không bị tràn bộ nhớ.
-    \item Xây dựng tác tử LangGraph kết hợp Hybrid Dual-RAG cung cấp phán quyết an toàn, có tính giải thích cao.
-    \item Đưa ra giải pháp Guardrail mã hóa delimiter bảo vệ prompt và cơ chế HMAC Log Chaining chống giả mạo logs.
-    \item Chứng minh tính hiệu quả qua các kiểm định thống kê McNemar và Mann-Whitney U.
+    \item \textbf{Trả lời các câu hỏi nghiên cứu:} Khẳng định lại việc giải quyết thành công bài toán độ trễ và Alert Fatigue thông qua kiến trúc phân lớp Tier-1 Welford và Tier-2 LangGraph Agent.
+    \item \textbf{Bảo mật hệ thống AI (AI Security):} Chứng minh tính khả thi của kỹ thuật Delimited Data Encapsulation và cấu trúc HMAC Chaining trong việc phòng chống các rủi ro thao túng hệ thống nhận thức nội bộ của doanh nghiệp (Prompt Injection, Data Tampering).
+    \item \textbf{Giải quyết bài toán Zero-day \& APT:} Sự kết hợp xuất sắc giữa kỹ thuật theo dõi chuỗi cảnh báo lịch sử (Threat Memory) và kho dữ liệu lai (Dual-RAG MITRE + NIST) mang đến nhận thức ngữ cảnh sâu rộng, giúp hệ thống phơi bày các chiến dịch tinh vi nhất.
+    \item \textbf{Kiểm định tính đúng đắn:} Các thành quả trên không dừng ở mặt lý thuyết mà được xác thực mạnh mẽ bởi các độ đo 5D và kiểm định thống kê chuẩn mực (McNemar, Mann-Whitney U) trên dữ liệu thực tế.
 \end{itemize}
 
-\section{Hạn chế của hệ thống}
-Chỉ ra một số hạn chế cần khắc phục:
+\section{Đóng góp Khoa học và Thực tiễn}
 \begin{itemize}
-    \item Hệ thống mới chỉ thử nghiệm trên logs mạng flow-level và một số trường thông tin text tĩnh, cần kiểm thử trên các định dạng log đa dạng khác (như OS logs, auditd, syslog).
-    \item Tốc độ suy luận của LLM offline vẫn phụ thuộc nhiều vào năng lực phần cứng GPU, cần tối ưu thêm các kỹ thuật suy luận song song.
+    \item \textbf{Giá trị khoa học:} Cung cấp một khung kiến trúc tiêu chuẩn (framework) có tính module hóa cao về việc kết hợp Thống kê Toán học và Mô hình Ngôn ngữ Lớn trong an ninh mạng. Củng cố kho tàng lý thuyết về bảo mật LLM.
+    \item \textbf{Giá trị thực tiễn:} Sản phẩm hoàn thiện SENTINEL có thể được sử dụng làm công cụ lõi hoặc công cụ hỗ trợ độc lập cho các doanh nghiệp vừa và nhỏ (SMBs) không đủ ngân sách vận hành đội ngũ SOC Tier-1 quy mô lớn, mà vẫn đảm bảo tính bảo mật Zero Trust khi vận hành offline.
 \end{itemize}
 
-\section{Hướng phát triển tương lai}
-Định hướng các nghiên cứu tiếp theo:
+\section{Những Hạn chế còn Tồn đọng}
+Mặc dù hệ thống thể hiện sự ưu việt, nghiên cứu vẫn còn những rào cản nhất định:
 \begin{itemize}
-    \item Nghiên cứu mở rộng hệ thống bằng cơ chế học liên kết (Federated Learning) để chia sẻ tri thức về mối đe dọa giữa các tổ chức mà không làm lộ dữ liệu thô nhạy cảm.
-    \item Tích hợp thêm các tác tử con (sub-agents) chuyên biệt cho từng loại thiết bị bảo mật để tăng cường khả năng tự động hóa phản hồi.
+    \item \textbf{Định dạng log đầu vào:} Hệ thống hiện thử nghiệm sâu trên lưu lượng mạng (Network Flow logs) và HTTP payload. Căn cứ thực tế đòi hỏi xử lý thêm rất nhiều định dạng log phi cấu trúc khác (Windows Event Logs, Linux Syslogs, CloudTrail) dẫn đến yêu cầu tinh chỉnh parser lớn hơn.
+    \item \textbf{Rào cản Phần cứng:} Tốc độ suy luận dù đã được tăng tốc bằng bộ đệm (Semantic Cache) nhưng khi gặp cảnh báo hoàn toàn mới, LLM vẫn cần tốn thời gian suy luận, đòi hỏi ngân sách đầu tư GPU phần cứng chuyên dụng khá cao nếu quy mô luồng mạng hàng trăm Gigabit/s.
+    \item \textbf{Thiết kế Mitigation Vật lý:} Nghiên cứu cố tình đóng khung hệ thống ở mức đề xuất (Recommend Firewall Rules) thay vì can thiệp vật lý vào router để tránh tấn công tự từ chối dịch vụ (Self-DoS), tuy nhiên điều này hạn chế khả năng Real-time Blocking thực thụ.
 \end{itemize}
+
+\section{Định hướng Phát triển Tương lai}
+Từ những hạn chế trên, hướng đi mở rộng cho hệ thống bao gồm:
+\begin{itemize}
+    \item \textbf{Học liên kết (Federated Learning):} Mở rộng SENTINEL thành kiến trúc phi tập trung. Thay vì chia sẻ logs mạng (vi phạm quyền riêng tư), các điểm cuối SOC chỉ chia sẻ tham số mô hình đã học được về các biến thể mã độc mới cho nhau.
+    \item \textbf{Kiến trúc Đa Tác tử (Multi-Agent System):} Phân rã LangGraph Agent thành nhiều tác tử chuyên biệt: Malware Analyst Agent, Network Analyst Agent, Threat Intel Agent tranh luận với nhau trước khi đưa ra bản án chung thẩm, nâng cao hơn nữa độ chính xác.
+    \item \textbf{Kiểm thử Tự động (Automated Red Teaming):} Xây dựng một tác tử Red Team nội bộ liên tục sinh ra các payload tấn công tinh vi nhắm vào Sentinel để tự đánh giá và nâng cấp khả năng phòng thủ của hệ thống.
+\end{itemize}
+
+\vspace{1cm}
+\begin{flushright}
+    \textit{Khép lại một công trình nhỏ, nhưng mở ra những khát vọng lớn lao trong nỗ lực bảo vệ không gian số bằng sức mạnh của AI Tác tử.}
+\end{flushright}

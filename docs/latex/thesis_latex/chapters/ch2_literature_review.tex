@@ -1,21 +1,56 @@
 \chapter{Cơ sở lý thuyết và các nghiên cứu liên quan}
 \label{ch:literature_review}
 
-Chương này trình bày các lý thuyết nền tảng khoa học máy tính và an ninh mạng làm cơ sở thiết kế cho hệ thống SENTINEL. Nội dung chương bao gồm: Tổng quan mô hình ngôn ngữ lớn hoạt động offline và kỹ thuật lượng tử hóa; Kiến trúc tác tử AI và cỗ máy trạng thái; Công nghệ RAG và thuật toán xếp hạng lai; Các nguy cơ an toàn đối với hệ thống LLM; và tổng quan các nghiên cứu liên quan gần đây.
+% Giới thiệu ngắn về chương
+Chương này cung cấp các nền tảng lý thuyết khoa học máy tính và an ninh mạng làm cơ sở vững chắc cho việc thiết kế kiến trúc SENTINEL. Nội dung bao quát từ kiến trúc hệ thống giám sát an ninh (SOC), thuật toán phát hiện dị thường thống kê, cho đến các công nghệ cốt lõi của AI tạo sinh bao gồm Mô hình ngôn ngữ lớn (LLM), AI Tác tử (Agentic AI), hệ thống RAG và các nguy cơ bảo mật AI liên quan. Cuối chương là tổng quan các nghiên cứu đã có, nhằm làm nổi bật khoảng trống nghiên cứu mà đề tài hướng tới.
 
-\section{Mô hình ngôn ngữ lớn offline và Lượng tử hóa mô hình}
-Trình bày về các kiến trúc transformer, kỹ thuật phục vụ cục bộ bằng llama.cpp và lượng tử hóa mô hình (GGUF, Q4\_K\_M) để chạy mượt mà trên phần cứng giới hạn (GPU RTX 4060 Ti 16GB).
+\section{Tổng quan về Trung tâm Điều hành An ninh (SOC) và Phân tích Sự cố}
+\begin{itemize}
+    \item \textbf{Cấu trúc SOC hiện đại:} Các thành phần cốt lõi (SIEM, IDS/IPS, Firewall, EDR) và quy trình chuẩn xử lý sự cố (Incident Response - IR).
+    \item \textbf{Thách thức Alert Fatigue:} Định nghĩa, nguyên nhân gây ra quá tải cảnh báo giả (False Positives) và hệ lụy đối với đội ngũ chuyên gia phân tích (Tier-1 Analysts).
+    \item \textbf{Khái niệm tấn công APT (Advanced Persistent Threats) \& Zero-day:} Sự tinh vi của các chiến dịch ``low-and-slow'', khó khăn của các hệ thống Rule-based trong việc nhận diện dị thường kéo dài.
+\end{itemize}
 
-\section{Kiến trúc AI Agent và Đồ thị trạng thái}
-Trình bày về LangGraph, StateGraph và vai trò của tác tử trong việc thực thi vòng lặp phản hồi nhận thức có điều kiện thay vì suy luận tuyến tính thông thường.
+\section{Mô hình Ngôn ngữ Lớn (LLM) và Kỹ thuật Lượng tử hóa (Quantization)}
+\begin{itemize}
+    \item \textbf{Kiến trúc Transformer:} Cơ chế tự chú ý (Self-Attention) và khả năng xử lý ngôn ngữ tự nhiên trong ngữ cảnh.
+    \item \textbf{Khái niệm Local LLM và Bảo mật Dữ liệu:} Tầm quan trọng của việc chạy LLM cục bộ trong môi trường Air-gapped của SOC (Zero Trust).
+    \item \textbf{Kỹ thuật Lượng tử hóa (Quantization):} Cơ chế GGUF, chuẩn Q4\_K\_M để giảm thiểu dung lượng VRAM cần thiết nhằm vận hành mô hình lớn (như Gemma-2-9B) trên phần cứng giới hạn (GPU 16GB) thông qua framework \texttt{llama.cpp}.
+\end{itemize}
 
-\section{Retrieval-Augmented Generation (RAG) và Tìm kiếm lai}
-Trình bày cơ chế Dense Search (sử dụng FAISS và mô hình all-MiniLM-L6-v2), Sparse Search (sử dụng BM25Okapi), và thuật toán kết hợp thứ hạng Reciprocal Rank Fusion (RRF, k=60) nhằm tối ưu hóa độ chính xác tri thức đầu vào cho LLM.
+\section{Kiến trúc AI Tác tử (Agentic AI) và Đồ thị trạng thái}
+\begin{itemize}
+    \item \textbf{Agentic Workflow:} Sự chuyển dịch từ RBA (Runbook Automation) tĩnh sang quy trình AI có khả năng lập luận, lập kế hoạch và phản hồi linh hoạt.
+    \item \textbf{Đồ thị trạng thái hữu hạn (Finite State Machine):} Lý thuyết về đồ thị có hướng, nút (Nodes) và cạnh có điều kiện (Conditional Edges).
+    \item \textbf{Framework LangGraph:} Ứng dụng cụ thể của LangGraph để xây dựng vòng lặp nhận thức cho tác tử, giúp mô hình tự nhận thức khi cần tra cứu thêm thông tin hoặc kết thúc suy luận.
+\end{itemize}
 
-\section{Các vector tấn công nghịch đảo vào LLM và Tầng Guardrail}
-Trình bày về Prompt Injection, Delimiter Smuggling, RAG Poisoning và cơ chế phòng vệ chống rò rỉ dữ liệu (XSS/Markdown Exfiltration).
+\section{Kỹ thuật Truy xuất Tri thức (RAG) và Tìm kiếm Lai (Hybrid Search)}
+\begin{itemize}
+    \item \textbf{Khái niệm Retrieval-Augmented Generation (RAG):} Giải quyết vấn đề hoang tưởng (Hallucination) của LLM bằng cơ sở dữ liệu ngoài.
+    \item \textbf{Tìm kiếm Vector (Dense Search):} Kiến trúc mạng nhúng Embedding (all-MiniLM-L6-v2) và thuật toán FAISS (Facebook AI Similarity Search) xử lý không gian vector nhiều chiều.
+    \item \textbf{Tìm kiếm Từ khóa (Sparse Search):} Cấu trúc chỉ mục BM25Okapi và thuật toán TF-IDF.
+    \item \textbf{Thuật toán lai Reciprocal Rank Fusion (RRF):} Phương pháp toán học kết hợp thứ hạng từ Dense và Sparse Search để tối ưu kết quả (cấu hình $k=60$).
+\end{itemize}
 
-\section{Tổng quan các nghiên cứu liên quan}
-Phân tích, đánh giá ưu nhược điểm của các tiếp cận hiện tại về tự động hóa phân tích log trong SOC bằng AI và chỉ ra các điểm Sentinel cải tiến.
+\section{An toàn cho Hệ thống LLM (AI Security)}
+\begin{itemize}
+    \item \textbf{Tấn công Prompt Injection:} Phân tích rủi ro khi dữ liệu không tin cậy thâm nhập vào ngữ cảnh của LLM, dẫn đến thao túng hành vi.
+    \item \textbf{Tấn công Delimiter Smuggling và Data Exfiltration:} Rủi ro chèn ký tự phân cách giả mạo và trích xuất dữ liệu trái phép (Markdown Exfiltration/XSS).
+    \item \textbf{Cơ chế bảo vệ Guardrails:} Các phương pháp luận về bảo vệ đầu vào (Input filtering) và làm sạch đầu ra (Output sanitization).
+\end{itemize}
 
-Tóm lại, Chương 2 đã làm sáng tỏ các lý thuyết cốt lõi sử dụng trong đề tài. Chương tiếp theo sẽ giới thiệu chi tiết kiến trúc đề xuất SENTINEL.
+\section{Thuật toán Phát hiện Dị thường Thống kê (Welford's Algorithm)}
+\begin{itemize}
+    \item \textbf{Lý thuyết thống kê trực tuyến (Online Statistics):} Yêu cầu xử lý dòng dữ liệu liên tục với bộ nhớ tĩnh ($O(1)$).
+    \item \textbf{Định lý Welford:} Công thức toán học cập nhật trung bình (Mean) và phương sai (Variance) liên tục mà không bị sai số làm tròn (numerical instability). Phân tích cách tính Z-Score trực tuyến.
+\end{itemize}
+
+\section{Tổng quan các Nghiên cứu Liên quan}
+\begin{itemize}
+    \item \textbf{Ứng dụng ML/DL truyền thống trong IDS:} Đánh giá các mô hình Random Forest, LSTM, CNN trong phát hiện xâm nhập và những hạn chế về tính giải thích (Explainability).
+    \item \textbf{Ứng dụng LLM trong SOC:} Điểm qua các công trình tích hợp ChatGPT/LLM vào an ninh mạng gần đây.
+    \item \textbf{Khoảng trống nghiên cứu (Research Gap):} Nhấn mạnh các nghiên cứu hiện tại bỏ qua vấn đề độ trễ (Latency bottleneck) khi xử lý trực tiếp log khối lượng lớn bằng LLM và sự mong manh trước các cuộc tấn công Prompt Injection nhúng trong log mạng.
+\end{itemize}
+
+Tóm lại, Chương 2 đã làm sáng tỏ các lý thuyết cốt lõi sử dụng trong đề tài. Dựa trên các cơ sở này, Chương 3 sẽ đi vào giới thiệu chi tiết kiến trúc giải pháp hệ thống đề xuất SENTINEL.
