@@ -92,5 +92,7 @@ Welford's Online Algorithm \cite{welford1962} provides a precise and numerically
 
 By continuously maintaining rolling variance and mean with a constant $O(1)$ memory footprint, the system instantaneously computes a normalized Z-Score for each packet. This technique almost entirely eliminates benign background network traffic, thoroughly resolving the LLM latency bottleneck, while perfectly preserving lightweight anomalous event sequences, maintaining the context for low-and-slow APT infiltrations.
 
+To mathematically validate zero-day threat detection capabilities without introducing synthetic data bias, the architecture leverages a real-derived zero-day modeling paradigm. By isolating genuine benign network flows from the ground truth and systematically elevating a single statistical feature (such as flow duration or cumulative byte count) to its extreme mathematical boundary, the system forces a significant deviation in Welford's rolling calculations. This generates an anomalous Z-score, mimicking a completely unknown statistical outlier. Consequently, the signature-less zero-day threat is caught by the Tier-1 filter and escalated to the Tier-2 cognitive agent, bypassing the limitations of static signature engines.
+
 \vspace{1em}
 In summary, Chapter 2 has synthesized and profoundly dissected the theoretical principles, mathematical tools, and associated cognitive risks, forming a robust academic foundation. Building upon this theoretical basis, Chapter 3 will detail the technical design of the SENTINEL dual-tier hybrid architecture.
