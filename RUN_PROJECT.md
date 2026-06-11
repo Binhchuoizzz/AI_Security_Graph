@@ -167,7 +167,7 @@ Trước khi chạy kiểm thử E2E hoặc triển khai, bắt buộc phải kh
 ```
 
 *   *Lưu ý:* Sử dụng tham số `--offline` để chạy kiểm thử bỏ qua các bài kiểm thử yêu cầu kết nối với LLM server (phù hợp khi chưa bật Docker hoặc muốn kiểm tra nhanh logic mã nguồn).
-*   Nếu muốn chạy kiểm thử đầy đủ 20/20 bài test (bao gồm kiểm thử độ trễ LLM): Bật Docker trước, sau đó chạy lệnh:
+*   Nếu muốn chạy kiểm thử đầy đủ 22/22 bài test (bao gồm kiểm thử độ trễ LLM): Bật Docker trước, sau đó chạy lệnh:
 
 ```bash
 .venv/bin/python experiments/e2e_test_runner.py
@@ -184,13 +184,13 @@ Kịch bản kiểm thử sẽ duyệt qua các module:
 **Kết quả mong đợi trên Terminal:**
 
 ```text
-FINAL: 20/20 PASSED | 0 FAILED | 0 SKIPPED  (cả --offline lẫn online)
+FINAL: 22/22 PASSED | 0 FAILED | 0 SKIPPED  (cả --offline lẫn online)
 ✅ ALL TESTS PASSED — THESIS READY
 ```
 
-> **Số liệu thực đo (2026-06-09):** `--offline` cho **20/20 PASSED** (sau khi đồng bộ
-> assertion T08 Encoding Neutralizer với hành vi strip `[SCRIPT_STRIPPED]` hiện tại).
-> Bộ pytest đầy đủ (`.venv/bin/pytest tests/`) cho **158 passed, 0 failed**.
+> **Số liệu thực đo (2026-06-11):** `--offline` cho **22/22 PASSED** (gồm T21 Unified
+> Streaming Eval offline và T22 Unified ONLINE Publisher — metadata + queue routing).
+> Bộ pytest đầy đủ (`.venv/bin/pytest tests/`) cho **165 passed, 0 failed**.
 
 ---
 
@@ -615,11 +615,37 @@ exit()
         ghi vào memory khi tới rồi mới hỏi. **3/3 IP APT phát hiện đúng (recall 1.0)**, bản án
         chỉ bật ở **ngày 3–4** (ngày 1 = chưa APT), độ trễ TB **8.33 sự kiện** → đã xóa bỏ
         tính circular.
-    *   **Zero-day (signature-less):** 3/3 kịch bản (Flow-Duration / Flow-Pkts/s / Bwd-volume
-        outlier) — Rule tĩnh trả `DROP` (**bỏ sót cả 3**), Welford bắt được với **Z ≈ 25,815 /
-        30,470 / 40,627** ($\gg 3.5$) → `ESCALATE`.
+    *   **Zero-day (signature-less, REAL-DERIVED):** 7/7 kịch bản — nền là flow benign THẬT
+        từ ground_truth, chỉ đẩy **một** feature lên cực trị (Bwd-volume / Flow-Pkts/s / Init-Win
+        / Flow-Duration / Bwd-packets / Fwd-volume / Fwd-Win), rải qua **ngày 2–5**. Rule tĩnh
+        trả `DROP` (**bỏ sót cả 7**), Welford bắt được với **Z từ ~7.5 đến ~318,000** ($\gg 3.5$)
+        → `AWAIT_HITL`/`ESCALATE`.
     *   Báo cáo chi tiết: `reports/unified_stream_evaluation_report.md`; JSON:
         `experiments/results/unified_stream_results.json`.
+
+**Bước 5 (tùy chọn): Demo ONLINE luồng gộp qua TOÀN BỘ hệ thống (Redis → Tier-1 → APT emergent → LLM Agent → Dashboard):**
+
+```bash
+# (tùy chọn) xóa threat_memory để bản án APT nổi lên từ đầu trong demo
+rm -f config/threat_memory.db
+
+# Terminal 1 — LLM server (cần cho các event ESCALATE)
+./scripts/switch_model.sh gemma
+
+# Terminal 2 — hệ thống thật (subscriber + Tier-1 + Agent)
+.venv/bin/python main.py --mode server
+
+# Terminal 3 — phát CÙNG luồng gộp (4672 sự kiện thật, trộn golden-ratio) lên Redis
+.venv/bin/python experiments/stream_unified_online.py
+# (kiểm tra logic không cần Redis: thêm --dry-run)
+```
+
+*   *Cơ chế:* publisher phát luồng gộp kèm metadata DAPT (`apt_phase`/`apt_day`); `subscriber.py`
+    ghi dần chuỗi APT vào Threat Memory — khi `check_apt_chain` BẬT (đủ đa-ngày) thì ép
+    `ESCALATE` chuỗi APT qua full pipeline (Guardrails → RAG → LLM → Executor → Audit → Dashboard).
+*   *Phân vai:* **Offline (Bước 4) = số liệu benchmark tất định** cho luận văn; **Online (Bước 5)
+    = chứng minh end-to-end realtime** — chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC),
+    số liệu online không dùng làm benchmark vì phụ thuộc timing/LLM.
 
 > **Ghi chú:** Tầng LLM Tier-2 + Tier-Consensus Guard được đánh giá riêng ở
 > `evaluate_adversarial_pipeline.py` (kháng social-engineering) và `evaluate_reasoning.py`
@@ -794,8 +820,9 @@ docker-compose up -d
 # 6. Chạy luồng Full Pipeline (Thời gian thực)
 # Mở Terminal 1 (AI Agent):
 .venv/bin/python main.py --mode server --log-level INFO
-# Mở Terminal 2 (Log Publisher):
-.venv/bin/python src/streaming/publisher.py
+# Mở Terminal 2 (Log Publisher) — chọn MỘT trong hai:
+.venv/bin/python src/streaming/publisher.py                    # raw CSV demo
+.venv/bin/python experiments/stream_unified_online.py          # luồng gộp CICIDS+DAPT+zero-day (APT emergent online)
 
 # 7. Mở giao diện Streamlit Dashboard (Nếu chạy ngoài Docker)
 .venv/bin/streamlit run src/ui/app.py

@@ -198,15 +198,16 @@ PIPELINE B — Batch / APT memory (DAPT2020):
 - **Tham số:** `on_batch_ready` = callback khi đủ batch ESCALATE (nối tới Agent Workflow — `main.py` truyền `handle_escalated_batch`); `None` → chế độ standalone (in console).
 - **Luồng:**
   1. Kết nối Redis → tạo consumer group `sentinel_group` cho từng stream (`xgroup_create` + `mkstream`; bỏ qua `BUSYGROUP`).
-  2. Khởi tạo `RuleEngine()`.
+  2. Khởi tạo `RuleEngine()` + `ThreatMemoryStore()` (ghi chuỗi APT emergent từ luồng).
   3. Vòng lặp: **`xreadgroup(group, consumer, streams, count=batch_size, block=1000)`**.
   4. Mỗi message: `json.loads(data["log"])` → gắn `log_source` (provenance) → **`engine.evaluate()`** → lấy `tier1_action`.
-  5. **Định tuyến** ([101-127](../src/streaming/subscriber.py#L101-L127)): `ESCALATE`→`batch_buffer`; `AWAIT_HITL`→`rpush(queue_hitl)`; `BLOCK_IP`→`setex(blacklist:<ip>, 3600)` + `rpush(queue_decisions)`; `ALERT/LOG`→`rpush(queue_decisions)`; `DROP`→bỏ.
-  6. **`xack(stream, group, msg_id)`** xác nhận đã xử lý.
-  7. **Gom batch:** đủ `batch_size` hoặc quá `timeout_sec` → gọi `on_batch_ready`/in console.
-  8. **Xử lý lỗi bền bỉ:** `ConnectionError`→retry 5s; `JSONDecodeError`→skip; lỗi khác→log & tiếp tục.
-- **Lưu ý:** PEL (Pending Entries List) recovery chưa cài (ghi rõ tại [67-71](../src/streaming/subscriber.py#L67-L71)).
-- **Dòng:** [41-164](../src/streaming/subscriber.py#L41-L164)
+  5. **APT EMERGENT** ([119-147](../src/streaming/subscriber.py#L119-L147)): nếu message mang metadata DAPT (`apt_phase` + `apt_is_attack` — từ `experiments/stream_unified_online.py`) → `record_apt_event()` rồi `check_apt_chain()`; khi bản án LẬT False→True (đủ đa-ngày) → ép `action = ESCALATE` đẩy chuỗi APT lên Agent. Traffic thường không có metadata → bỏ qua bước này.
+  6. **Định tuyến** ([149-173](../src/streaming/subscriber.py#L149-L173)): `ESCALATE`→`batch_buffer`; `AWAIT_HITL`→`rpush(queue_hitl)`; `BLOCK_IP`→`setex(blacklist:<ip>, 3600)` + `rpush(queue_decisions)`; `ALERT/LOG`→`rpush(queue_decisions)`; `DROP`→bỏ.
+  7. **`xack(stream, group, msg_id)`** xác nhận đã xử lý.
+  8. **Gom batch:** đủ `batch_size` hoặc quá `timeout_sec` → gọi `on_batch_ready`/in console.
+  9. **Xử lý lỗi bền bỉ:** `ConnectionError`→retry 5s; `JSONDecodeError`→skip; lỗi khác→log & tiếp tục.
+- **Lưu ý:** PEL (Pending Entries List) recovery chưa cài (ghi rõ tại [77-81](../src/streaming/subscriber.py#L77-L81)).
+- **Dòng:** [51-209](../src/streaming/subscriber.py#L51-L209)
 
 ---
 

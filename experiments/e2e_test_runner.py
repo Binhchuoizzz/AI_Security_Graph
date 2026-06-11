@@ -1,5 +1,5 @@
 """
-Bộ Kiểm thử Tích hợp Đầu-cuối (E2E) của SENTINEL — 21 Bài Kiểm thử Thành phần
+Bộ Kiểm thử Tích hợp Đầu-cuối (E2E) của SENTINEL — 22 Bài Kiểm thử Thành phần
 
 Pha 3+4: Kiểm chứng toàn bộ module hoạt động theo đúng tài liệu đặc tả.
 Các bài test 1-12 chạy ngoại tuyến (OFFLINE - không cần LLM/Redis).
@@ -8,7 +8,7 @@ Các bài test 16-20: Kiểm chứng 5 bản sửa lỗi quan trọng (NIST, GT,
 
 Cách dùng:
   python experiments/e2e_test_runner.py
-  python experiments/e2e_test_runner.py --offline  # Chỉ chạy T1-T18, T20-T21
+  python experiments/e2e_test_runner.py --offline  # Chỉ chạy T1-T18, T20-T22
 
 Kết quả đầu ra:
   reports/test_report_YYYYMMDD.md
@@ -524,6 +524,38 @@ def test_21_unified_stream(r: TestResult):
 
 
 # ============================================================================
+# TEST 22: Unified ONLINE publisher (mang metadata DAPT/zero-day, định tuyến queue)
+# ============================================================================
+def test_22_unified_online(r: TestResult):
+    """Kiểm chứng publisher ONLINE (`stream_unified_online.py`): cùng luồng gộp thật
+    được enrich đủ metadata (DAPT apt_phase/day, zero-day zd_id/mitre) và định tuyến
+    đúng queue. Offline thuần (không cần Redis)."""
+    from experiments.stream_unified_online import build_sequence, enrich, determine_queue
+
+    seq, warmup, main, apt_truth, n_chains = build_sequence()
+    srcs, queues = set(), set()
+    dapt_attack_meta = 0
+    zd_meta = 0
+    for ev in seq:
+        log = enrich(ev)
+        srcs.add(ev["source"])
+        queues.add(determine_queue(log))
+        if ev["source"] == "dapt" and log.get("apt_is_attack"):
+            if log.get("apt_phase") and log.get("apt_day") is not None:
+                dapt_attack_meta += 1
+        if ev["source"] == "zeroday" and log.get("zd_id") and log.get("zd_mitre"):
+            zd_meta += 1
+
+    assert {"cicids", "dapt", "zeroday"}.issubset(srcs), f"Thiếu nguồn: {srcs}"
+    assert queues.issubset({"queue_waf", "queue_firewall"}), f"Queue lạ: {queues}"
+    assert dapt_attack_meta > 0, "DAPT attack không mang metadata APT (subscriber sẽ không ghi chuỗi)"
+    assert zd_meta == sum(1 for e in seq if e["source"] == "zeroday"), "zero-day thiếu metadata"
+
+    r.passed(f"Online publisher: {len(seq)} sự kiện enrich, {dapt_attack_meta} DAPT-attack "
+             f"mang apt_meta, {zd_meta} zero-day mang zd_meta, route -> {sorted(queues)}")
+
+
+# ============================================================================
 # REPORT GENERATOR
 # ============================================================================
 def generate_report():
@@ -574,8 +606,8 @@ if __name__ == "__main__":
     offline_only = "--offline" in sys.argv
 
     print("=" * 60)
-    print("  SENTINEL E2E Validation Suite (21 Tests)")
-    print(f"  Mode: {'OFFLINE (T1-T18, T20-T21)' if offline_only else 'FULL'}")
+    print("  SENTINEL E2E Validation Suite (22 Tests)")
+    print(f"  Mode: {'OFFLINE (T1-T18, T20-T22)' if offline_only else 'FULL'}")
     print("=" * 60)
 
     run_test("T01", "Ground Truth File Valid", test_01_ground_truth)
@@ -599,6 +631,7 @@ if __name__ == "__main__":
     run_test("T19", "Latency Benchmark", test_19_latency_benchmark)
     run_test("T20", "rank_bm25 Import & Usage", test_20_rank_bm25)
     run_test("T21", "Unified Streaming Eval (merged, emergent APT)", test_21_unified_stream)
+    run_test("T22", "Unified ONLINE Publisher (metadata + queue routing)", test_22_unified_online)
 
     report_path = generate_report()
 

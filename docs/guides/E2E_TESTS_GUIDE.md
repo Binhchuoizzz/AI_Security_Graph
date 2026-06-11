@@ -1,10 +1,10 @@
 # 📖 Hướng Dẫn Chi Tiết Bộ Kiểm Thử Tích Hợp (E2E Validation Suite)
 
-Tài liệu này giải thích chi tiết mục tiêu, cơ chế hoạt động và ý nghĩa khoa học của **20 bài kiểm thử tích hợp** trong tệp [e2e_test_runner.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/e2e_test_runner.py) thuộc dự án **SENTINEL**.
+Tài liệu này giải thích chi tiết mục tiêu, cơ chế hoạt động và ý nghĩa khoa học của **22 bài kiểm thử tích hợp** trong tệp [e2e_test_runner.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/e2e_test_runner.py) thuộc dự án **SENTINEL**.
 
 ---
 
-## 📋 Bảng Tổng Quan 20 Bài Kiểm Thử
+## 📋 Bảng Tổng Quan 22 Bài Kiểm Thử
 
 | Mã Test | Tên Bài Kiểm Thử | Tầng Kiến Trúc | Chế Độ Chạy |
 | :--- | :--- | :--- | :--- |
@@ -28,6 +28,8 @@ Tài liệu này giải thích chi tiết mục tiêu, cơ chế hoạt động 
 | **T18** | DAPT2020 APT Chain | Tier 2 (Threat Memory) | Offline |
 | **T19** | Latency Benchmark | Hiệu năng hệ thống | **Online** (Cần LLM) |
 | **T20** | rank_bm25 Import & Usage | RAG (Truy xuất Tri thức) | Offline |
+| **T21** | Unified Streaming Eval (merged, emergent APT) | Khung Đánh giá (Luồng gộp) | Offline |
+| **T22** | Unified ONLINE Publisher (metadata + queue routing) | Streaming (Luồng gộp online) | Offline |
 
 ---
 
@@ -158,3 +160,15 @@ Tài liệu này giải thích chi tiết mục tiêu, cơ chế hoạt động 
 * **Mục đích**: Kiểm tra thư viện chấm điểm từ khóa BM25 hoạt động bình thường.
 * **Cách hoạt động**: Nạp văn bản mẫu, chạy thuật toán so khớp từ khóa và kiểm tra điểm số xếp hạng.
 * **Ý nghĩa đối với Luận văn**: Đảm bảo module Lexical Search hoạt động ổn định để ghép nối RRF trong DualRetriever.
+
+### [T21] Unified Streaming Eval (merged, emergent APT)
+
+* **Mục đích**: Kiểm chứng luồng gộp (CICIDS + DAPT2020 + zero-day) hợp lệ — thay thế phương pháp 3 luồng tách rời cũ.
+* **Cách hoạt động**: Gọi `build_stream()` của `evaluate_unified_stream.py`; assert đủ 3 nguồn, warmup ≥ 100 benign cho Welford, có IP APT đa-ngày thật, và luồng được TRỘN xen kẽ thật sự (≥ 50 lần đổi nguồn liên tiếp — xếp khối theo nguồn sẽ gần như không đổi).
+* **Ý nghĩa đối với Luận văn**: Bảo đảm benchmark APT là **emergent** (memory sạch, không nạp-sẵn đáp án) — xóa bỏ tính circular của phương pháp cũ.
+
+### [T22] Unified ONLINE Publisher (metadata + queue routing)
+
+* **Mục đích**: Kiểm chứng publisher ONLINE (`stream_unified_online.py`) phát CÙNG luồng gộp với đầy đủ metadata để chạy end-to-end qua Redis.
+* **Cách hoạt động**: Gọi `build_sequence()` + `enrich()` + `determine_queue()`; assert mọi DAPT-attack mang `apt_phase`/`apt_day` (điều kiện để subscriber ghi chuỗi APT), mọi zero-day mang `zd_id`/`zd_mitre`, và mọi event định tuyến vào đúng queue (`queue_waf`/`queue_firewall`). Chạy thuần offline, KHÔNG cần Redis.
+* **Ý nghĩa đối với Luận văn**: Bảo đảm đường demo realtime (Redis → Tier-1 → APT emergent → LLM Agent → Dashboard) nhận đủ thông tin từ luồng gộp — phiên bản online đồng nhất với benchmark offline.

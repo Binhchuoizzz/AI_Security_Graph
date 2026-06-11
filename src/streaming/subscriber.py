@@ -1,8 +1,17 @@
 """
-Log Subscriber & Kích hoạt Tier 1
+Log Subscriber & Kích hoạt Tier 1 (+ APT emergent)
 
 Kết nối vào Redis Streams qua consumer group 'sentinel_group', dùng `xreadgroup`
 để đảm bảo at-least-once delivery. Sau khi xử lý, `xack` xác nhận tin nhắn đã hoàn tất.
+
+Mỗi log đi qua Tier-1 (RuleEngine + Welford) rồi ĐỊNH TUYẾN theo mức độ:
+  DROP/LOG (lành tính) · BLOCK_IP (chặn ngay) · AWAIT_HITL (đẩy người) ·
+  ESCALATE (đáng ngờ -> Agent/LLM). Đa số log dừng ở Tier-1; chỉ ESCALATE mới gọi Tier-2.
+
+APT EMERGENT (kích hoạt khi message mang metadata DAPT — vd luồng gộp online
+`experiments/stream_unified_online.py`): mỗi sự kiện APT lẻ tín hiệu thấp được GHI
+dần vào Threat Memory; khi tích lũy đủ đa-ngày, `check_apt_chain` BẬT -> escalate
+chuỗi APT lên Agent. Traffic thường không có metadata APT nên đường production không đổi.
 """
 
 import os
@@ -21,6 +30,7 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.tier1_filter.rule_engine import RuleEngine
+from src.agent.threat_memory import ThreatMemoryStore
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
@@ -33,7 +43,7 @@ except Exception:
 
 # Nhận config theo chuẩn OS Env hoặc YAML fallback
 REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
-# Hỗ trợ cấu trúc Multi-source cho Log Correlation (MAWILab)
+# Hỗ trợ cấu trúc Multi-source cho Log Correlation (CICIDS2018 + DAPT2020)
 QUEUES = _config.get("redis", {}).get("queues", ["queue_firewall", "queue_waf", "queue_sysmon"])
 ESCALATED_QUEUE = _config.get("redis", {}).get("escalated_queue", "queue_hitl")
 
@@ -75,6 +85,12 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
     print(f"[*] Subscribed and listening on multiple streams via group '{GROUP_NAME}': {QUEUES}...")
 
+    # Threat Memory để ghi chuỗi APT EMERGENT từ luồng (chỉ kích hoạt khi message
+    # mang metadata DAPT, ví dụ stream_unified_online.py). Traffic thường không có
+    # apt_phase nên đường production không bị ảnh hưởng.
+    memory = ThreatMemoryStore()
+    apt_fired: set[str] = set()   # IP đã bật cảnh báo APT (tránh leo thang lặp)
+
     # Bộ đệm gom sự cố (Incident-Level Aggregation Buffers)
     batch_buffer = []
     last_batch_time = time.time()
@@ -99,6 +115,36 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                         # Gọi ngay Tier 1 Rule Engine để cân nhắc
                         evaluated_log = engine.evaluate(raw_log)
                         action = evaluated_log.get("tier1_action", "DROP")
+
+                        # ── APT EMERGENT: ghi chuỗi từ luồng + leo thang khi bản án bật ──
+                        # Chỉ chạy với event mang metadata DAPT (apt_phase + apt_is_attack).
+                        # Mỗi sự kiện APT lẻ tín hiệu THẤP (thường DROP/LOG ở Tier-1) nên
+                        # bản án "is_apt" phải NỔI LÊN DẦN từ Threat Memory đa-ngày, không
+                        # phải từ một flow đơn — đúng với cơ chế offline.
+                        if raw_log.get("apt_phase") and raw_log.get("apt_is_attack"):
+                            apt_ip = raw_log.get("Source IP") or raw_log.get("src_ip", "")
+                            if apt_ip:
+                                before = memory.check_apt_chain(apt_ip)
+                                memory.record_apt_event(
+                                    src_ip=apt_ip,
+                                    dst_ip=raw_log.get("Destination IP", ""),
+                                    apt_phase=raw_log.get("apt_phase"),
+                                    apt_day=raw_log.get("apt_day"),
+                                    label=raw_log.get("apt_label", ""),
+                                    timestamp=raw_log.get("apt_timestamp", ""),
+                                )
+                                after = memory.check_apt_chain(apt_ip)
+                                if (not before["is_apt"]) and after["is_apt"] and apt_ip not in apt_fired:
+                                    apt_fired.add(apt_ip)
+                                    evaluated_log["apt_emergent"] = True
+                                    evaluated_log["apt_phases"] = after.get("phases_seen", "")
+                                    evaluated_log["tier1_reasons"] = (
+                                        evaluated_log.get("tier1_reasons") or []
+                                    ) + [f"APT chain emergent: {after.get('chain_length')} ngày "
+                                         f"(phases={after.get('phases_seen')})"]
+                                    print(f"[APT] EMERGENT chain {apt_ip} @ ngày "
+                                          f"{after.get('max_day_seen')} -> ESCALATE lên Agent")
+                                    action = "ESCALATE"   # đẩy APT qua full pipeline (LLM)
 
                         # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
                         if action == "ESCALATE":

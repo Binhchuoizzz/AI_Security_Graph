@@ -17,7 +17,7 @@ Tài liệu này cung cấp các hướng dẫn để các nhà nghiên cứu đ
 
 ## 3. Khung Đánh giá 5D (5D Evaluation Framework)
 
-Toàn bộ 20 bài Test thành phần có thể được xác thực qua script E2E:
+Toàn bộ 22 bài Test thành phần có thể được xác thực qua script E2E:
 
 ```bash
 python experiments/e2e_test_runner.py --offline
@@ -53,6 +53,7 @@ python experiments/e2e_test_runner.py --offline
 - **Thay thế** phương pháp 3 luồng tách rời cũ. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với bộ nhớ **khởi tạo sạch** — phát hiện APT là **emergent** (không nạp sẵn đáp án, xóa bỏ tính circular), và zero-day signature-less bị Welford bắt khi rule tĩnh bỏ sót.
 - Lệnh: `python experiments/evaluate_unified_stream.py`
 - Kết quả và phân tích chi tiết được lưu tại `reports/unified_stream_evaluation_report.md`.
+- **Biến thể ONLINE (demo end-to-end, không dùng làm benchmark):** `python experiments/stream_unified_online.py` phát CÙNG luồng gộp lên Redis qua toàn pipeline (Tier-1 → APT emergent ở subscriber → LLM Agent → Dashboard); cần Redis + `main.py --mode server`. Số liệu tái lập (deterministic) lấy từ bản offline ở trên.
 
 **6. Giải thích (Explainability):**
 

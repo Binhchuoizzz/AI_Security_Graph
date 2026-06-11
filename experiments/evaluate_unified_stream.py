@@ -98,13 +98,73 @@ def static_only_action(engine: RuleEngine, log: dict) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Zero-day REAL-DERIVED: nền là flow benign THẬT, chỉ đẩy MỘT feature Welford lên
+# cực trị. Mỗi spec: (id, tên, feature đẩy, giá trị cực trị, IP đích ngoài (narrative
+# exfil/C2), MITRE, ngày tiêm). KHÔNG đẩy "Total Fwd Packets" vì > max_fwd_packets sẽ
+# bị luật TĨNH bắt -> mất tính "signature-less". Rải qua nhiều ngày + nhiều loại outlier.
+# --------------------------------------------------------------------------- #
+ZD_SPECS = [
+    ("ZD-001", "Exfil khối lượng Bwd cực lớn",        "Total Length of Bwd Packets", 50_000_000,    "203.0.113.9",   "T1048 Exfiltration Over Alternative Protocol", 2),
+    ("ZD-002", "Beacon tần suất gói cực cao",          "Flow Pkts/s",                 750_000.0,     "198.51.100.7",  "T1071 Application Layer Protocol (C2)",         2),
+    ("ZD-003", "Tunnel cửa sổ Bwd bất thường",         "Init Bwd Win Byts",           65_000_000,    "192.0.2.55",    "T1572 Protocol Tunneling",                     3),
+    ("ZD-004", "Phiên kéo dài bất thường (low&slow)",  "Flow Duration",               9_000_000_000, "203.0.113.77",  "T1041 Exfiltration Over C2 Channel",           3),
+    ("ZD-005", "Bùng nổ gói Bwd (volumetric mới)",     "Total Backward Packets",      900_000,       "198.51.100.42", "T1498 Network Denial of Service (novel)",      4),
+    ("ZD-006", "Payload Fwd khổng lồ",                 "Total Length of Fwd Packets", 80_000_000,    "192.0.2.200",   "T1030 Data Transfer Size Limits",              4),
+    ("ZD-007", "Cửa sổ Fwd dị thường",                 "Init Fwd Win Byts",           60_000_000,    "203.0.113.150", "T1095 Non-Application Layer Protocol",          5),
+]
+
+
+def _build_zerodays(samples, tkey):
+    """Sinh zero-day REAL-DERIVED từ flow benign THẬT.
+
+    Nền mỗi mẫu là một flow benign THẬT trong ground_truth, chọn các flow "static-clean"
+    (cổng KHÔNG nhạy cảm + fwd <= max_fwd_packets + không signature) để luật TĨNH chắc
+    chắn bỏ sót. Chỉ ĐÚNG MỘT feature Welford bị đặt lên cực trị (outlier signature-less);
+    mọi feature flow KHÁC giữ NGUYÊN giá trị thật. Chỉ IP (truy vết nội bộ + đích ngoài
+    cho narrative) là được đặt lại — IP không ảnh hưởng tới Z-score nên không làm sai lệch.
+    """
+    SENSITIVE = {21, 22, 23, 53, 139, 445, 3389}
+    pool = []
+    for s in samples:
+        if s.get("input", {}).get("cicids_label", "") != "Benign":
+            continue
+        nl = s.get("input", {}).get("network_layer", {})
+        if not nl:
+            continue
+        if _safe_int(nl.get("dst_port")) in SENSITIVE:
+            continue
+        if _safe_int(nl.get("fwd_packets")) > 1000:
+            continue
+        pool.append(nl)
+
+    out = []
+    for i, (zid, name, feat, val, dst, mitre, day) in enumerate(ZD_SPECS):
+        if pool:
+            base_nl = pool[(i * 37) % len(pool)]      # rải đều nền benign, tất định
+        else:
+            base_nl = {"dst_port": 443, "fwd_packets": 40, "service": "HTTPS"}
+        log = map_cicids(base_nl)                       # flow benign THẬT làm nền
+        log[feat] = val                                 # đẩy ĐÚNG 1 feature lên cực trị
+        log["Source IP"] = f"10.0.0.{220 + i}"          # host nội bộ (truy vết)
+        log["Destination IP"] = dst                     # đích ngoài (narrative exfil/C2)
+        log["user_agent"] = f"zero-day-probe/{zid}"
+        out.append({
+            "id": zid, "name": f"Zero-Day {name}", "mitre": mitre,
+            "source": "zeroday", "base_feature": feat, "day": day,
+            "t": tkey(day), "log": log,
+        })
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Build unified, time-ordered event stream
 # --------------------------------------------------------------------------- #
 def build_stream():
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
-    Tất cả sự kiện đều là DATA THẬT (CICIDS từ ground_truth, DAPT từ chains);
-    chỉ 3 mẫu zero-day là tổng hợp bắt buộc (không dataset nào chứa zero-day thật).
+    Tất cả sự kiện đều là DATA THẬT (CICIDS từ ground_truth, DAPT từ chains). Zero-day
+    là biến thể REAL-DERIVED: nền là flow benign THẬT trong ground_truth, chỉ đẩy ĐÚNG
+    MỘT feature lên cực trị (không dataset nào chứa zero-day có nhãn sẵn) — xem `_build_zerodays`.
 
     - warmup_events: 150 benign CICIDS ĐẦU để Welford học baseline trước.
     - main_events: phần benign CICIDS còn lại + TẤT CẢ tấn công CICIDS + MỌI sự
@@ -186,43 +246,11 @@ def build_stream():
 
     apt_truth = {ip for ip, days in apt_attack_days.items() if len(days) >= 2}
 
-    # --- Zero-day (signature-less outliers, tiêm vào ngày 3) ------------- #
-    # Cổng cho phép + Total Fwd Packets thấp (< max_fwd_packets) + không signature
-    # => luật TĨNH bỏ sót; nhưng EXTREME trên feature không có ngưỡng tĩnh
-    # (Flow Duration / Bwd Packets / Flow Pkts/s) => Welford Z-score bắt được.
-    zerodays = [
-        {
-            "id": "ZD-001", "name": "Zero-Day Exfil (Flow-Duration outlier)",
-            "log": {"Source IP": "10.0.0.22", "Destination IP": "203.0.113.9",
-                    "Destination Port": 80, "Total Fwd Packets": 60,
-                    "Flow Duration": 9_000_000_000,
-                    "Total Length of Bwd Packets": 50_000_000,
-                    "user_agent": "Mozilla/5.0 exfil-tool/1.0"},
-            "mitre": "T1048 Exfiltration Over Alternative Protocol",
-        },
-        {
-            "id": "ZD-002", "name": "Zero-Day Beacon (Flow-Pkts/s outlier)",
-            "log": {"Source IP": "10.0.0.33", "Destination IP": "198.51.100.7",
-                    "Destination Port": 443, "Total Fwd Packets": 120,
-                    "Flow Pkts/s": 750_000.0,
-                    "Total Backward Packets": 90_000,
-                    "user_agent": "Mozilla/5.0 beacon/2.1"},
-            "mitre": "T1071 Application Layer Protocol (C2)",
-        },
-        {
-            "id": "ZD-003", "name": "Zero-Day Tunnel (Bwd-volume outlier)",
-            "log": {"Source IP": "10.0.0.44", "Destination IP": "192.0.2.55",
-                    "Destination Port": 8080, "Total Fwd Packets": 200,
-                    "Total Backward Packets": 120_000,
-                    "Init Bwd Win Byts": 65_000_000,
-                    "user_agent": "curl/7.88 tunnel"},
-            "mitre": "T1572 Protocol Tunneling",
-        },
-    ]
-    for zd in zerodays:
-        zd["source"] = "zeroday"
-        zd["t"] = tkey(3)  # ngày 3, trộn xen kẽ; warmup prefix đảm bảo baseline đã ấm
-        main.append(zd)
+    # --- Zero-day: REAL-DERIVED (nền = flow benign THẬT, đẩy 1 feature Welford lên
+    #     cực trị), RẢI nhiều ngày (2..5), NHIỀU loại outlier — xem `_build_zerodays`.
+    #     Cổng cho phép + fwd thấp + không signature => luật TĨNH bỏ sót; nhưng lệch
+    #     baseline cực mạnh => Welford Z-score bắt. warmup prefix đảm bảo baseline đã ấm.
+    main.extend(_build_zerodays(samples, tkey))
 
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)
@@ -407,8 +435,9 @@ def _write_report(summary, apt_fired, apt_truth, zd_results):
     lines.append("## 0. Luồng dữ liệu (toàn DATA THẬT, trộn xen kẽ)\n")
     s = summary["stream"]
     lines.append("Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ "
-                 "`dapt2020_chains.jsonl`); chỉ 3 mẫu zero-day là tổng hợp bắt buộc. Các "
-                 "nguồn được **trộn xen kẽ trong từng ngày** bằng khóa thời gian golden-"
+                 "`dapt2020_chains.jsonl`); zero-day là biến thể **REAL-DERIVED** — nền là "
+                 "flow benign THẬT, chỉ đẩy **một** feature lên cực trị, rải qua nhiều ngày. "
+                 "Các nguồn được **trộn xen kẽ trong từng ngày** bằng khóa thời gian golden-"
                  "ratio (không xếp khối theo nguồn); DAPT giữ nguyên ngày thật.\n")
     lines.append(f"- Warmup benign CICIDS (học baseline Welford): **{s['warmup_benign']}**")
     lines.append(f"- Luồng chính trộn (benign nền + tấn công CICIDS + mọi sự kiện DAPT + "

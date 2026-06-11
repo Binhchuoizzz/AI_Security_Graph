@@ -42,9 +42,9 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 *   **Mối quan hệ:** Gọi hàm từ `src/streaming/publisher.py`.
 
 ### 7. `src/streaming/subscriber.py`
-*   **Mục đích:** Lắng nghe & gom batch logs từ Redis để chuyển cho Tier-1/Tier-2.
-*   **Tác dụng:** Tạo/tham gia **consumer group `sentinel_group`** trên các **Redis Stream** (`queue_firewall`, `queue_waf`) qua `xreadgroup`; với mỗi log gọi `RuleEngine.evaluate`, rồi định tuyến theo `tier1_action`: `ESCALATE` → gom batch gọi LangGraph Agent; `BLOCK_IP` → blacklist Redis; `AWAIT_HITL` → đẩy queue HITL; `ALERT/LOG` → ghi `queue_decisions`. Trigger Agent theo batch_size hoặc timeout.
-*   **Mối quan hệ:** Nhận từ Redis Streams, gọi `rule_engine.py` (Tier-1) và `agent/workflow.py` (Tier-2) khi escalate.
+*   **Mục đích:** Lắng nghe & gom batch logs từ Redis để chuyển cho Tier-1/Tier-2; ghi chuỗi APT emergent từ luồng.
+*   **Tác dụng:** Tạo/tham gia **consumer group `sentinel_group`** trên các **Redis Stream** (`queue_firewall`, `queue_waf`) qua `xreadgroup`; với mỗi log gọi `RuleEngine.evaluate`, rồi định tuyến theo `tier1_action`: `ESCALATE` → gom batch gọi LangGraph Agent; `BLOCK_IP` → blacklist Redis; `AWAIT_HITL` → đẩy queue HITL; `ALERT/LOG` → ghi `queue_decisions`. Trigger Agent theo batch_size hoặc timeout. **APT EMERGENT (online):** message mang metadata DAPT (`apt_phase`/`apt_day`/`apt_is_attack` — từ `stream_unified_online.py`) được ghi dần vào Threat Memory (`record_apt_event`); khi `check_apt_chain` BẬT (đủ đa-ngày) → ép `ESCALATE` chuỗi APT lên Agent. Traffic thường (không metadata) đi đường cũ, không đổi.
+*   **Mối quan hệ:** Nhận từ Redis Streams, gọi `rule_engine.py` (Tier-1), `agent/threat_memory.py` (APT) và `agent/workflow.py` (Tier-2) khi escalate.
 
 ### 8. `src/tier1_filter/rule_engine.py` *(Cực kỳ quan trọng)*
 *   **Mục đích:** Màng lọc heuristics tốc độ cao + phát hiện dị biệt thống kê phi giám sát trực tuyến.
@@ -187,10 +187,10 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 
 ### **NGÀY 5 — Giao diện SOC & khung đánh giá thực nghiệm**
 *   `src/ui/app.py`, `components.py`, `auth.py` (PBKDF2-HMAC-SHA256), `style.css` — Dashboard HITL Streamlit (5 tab: Alerts/Rules/APT/Blocklist/Graph).
-*   `experiments/run_ablation_study.py`, `statistical_tests.py` (McNemar + Mann-Whitney U), `evaluate_robustness.py` (**120 mẫu adversarial / 5 nhóm**), `evaluate_adversarial_pipeline.py` (kháng LLM), `evaluate_reasoning.py` (LLM-as-Judge/RAGAS), `evaluate_unified_stream.py` (**luồng gộp CICIDS+DAPT+zero-day, phát hiện APT emergent, thay phương pháp 3 luồng cũ**), `measure_latency_baseline.py`, `plot_results.py`, `e2e_test_runner.py` (20/20).
+*   `experiments/run_ablation_study.py`, `statistical_tests.py` (McNemar + Mann-Whitney U), `evaluate_robustness.py` (**120 mẫu adversarial / 5 nhóm**), `evaluate_adversarial_pipeline.py` (kháng LLM), `evaluate_reasoning.py` (LLM-as-Judge/RAGAS), `evaluate_unified_stream.py` (**luồng gộp CICIDS+DAPT+zero-day, phát hiện APT emergent, thay phương pháp 3 luồng cũ**), `stream_unified_online.py` (**publisher ONLINE phát cùng luồng gộp qua Redis → toàn pipeline, demo realtime**), `measure_latency_baseline.py`, `plot_results.py`, `e2e_test_runner.py` (22/22).
 *   `scripts/build_adversarial_suite.py`, `seed_demo_data.py` — sinh bộ adversarial & seed Dashboard từ data thật.
 *   `main.py` — entrypoint tích hợp (mode server/scan/full).
 
 ---
 
-> **Kiểm thử đơn vị (xuyên suốt):** `tests/unit/` (data_validator, decision_validator + tier-consensus guard, feedback_validator, output_sanitizer, prompt_filter, rag_sanitizer, template_miner, threat_memory) + `tests/integration/` + `tests/test_adversarial.py`. Trạng thái hiện tại: **pytest 161 passed, E2E 20/20**.
+> **Kiểm thử đơn vị (xuyên suốt):** `tests/unit/` (data_validator, decision_validator + tier-consensus guard, feedback_validator, output_sanitizer, prompt_filter, rag_sanitizer, template_miner, threat_memory) + `tests/integration/` + `tests/test_adversarial.py`. Trạng thái hiện tại: **pytest 165 passed, E2E 22/22**.

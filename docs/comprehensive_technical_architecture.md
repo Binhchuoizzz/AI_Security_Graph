@@ -512,8 +512,9 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 4. **CÔNG NGHỆ SỬ DỤNG:** `RuleEngine` (Welford Z-Score), `ThreatMemoryStore` (SQLite tạm + xóa sạch), trộn xen kẽ bằng khóa thời gian golden-ratio.
 5. **CƠ CHẾ HOẠT ĐỘNG:** Đo đồng thời 3 năng lực trên cùng dòng thời gian: (1) **Phân loại Tier-1** trên stream trộn; (2) **APT EMERGENT** — mỗi sự kiện ghi vào memory KHI tới rồi mới hỏi, bản án chỉ bật sau khi tích lũy đủ sự kiện đa-ngày (đo "độ trễ phát hiện"); (3) **Zero-day signature-less** — outlier mà rule tĩnh bỏ sót nhưng Welford bắt được (baseline học ngay từ benign trong cùng luồng).
 6. **CẤU TRÚC MÃ NGUỒN:**
-   - File: `experiments/evaluate_unified_stream.py`.
-   - Function: `build_stream()`, `run()`.
+   - File: `experiments/evaluate_unified_stream.py` (OFFLINE benchmark) + `experiments/stream_unified_online.py` (ONLINE publisher).
+   - Function: `build_stream()`, `run()` (offline); `build_sequence()`, `enrich()`, `publish()` (online).
    - Output: `experiments/results/unified_stream_results.json` + `reports/unified_stream_evaluation_report.md`.
 7. **LUỒNG DỮ LIỆU:** 3 nguồn data THẬT → chuẩn hóa + gán khóa thời gian → sort 1 luồng → stream incremental → Tier-1 + Threat Memory → metrics (F1 gate, APT recall + lag, zero-day TPR).
 8. **VAI TRÒ BẢO MẬT:** Chứng minh năng lực phát hiện APT low-and-slow và zero-day signature-less một cách **trung thực** (memory sạch, không tra đáp án nạp sẵn).
+9. **CHẾ ĐỘ ONLINE (demo end-to-end):** `stream_unified_online.py` phát **CÙNG luồng gộp** (dùng chung `build_stream()`) lên **Redis Streams** với metadata theo nguồn (DAPT: `apt_phase`/`apt_day`/`apt_is_attack`; zero-day: `zd_id`/`zd_mitre`); `subscriber.py` ghi dần chuỗi APT vào Threat Memory (`record_apt_event` → `check_apt_chain`), khi bản án APT **nổi lên** thì ép `ESCALATE` qua toàn pipeline (Guardrails → RAG → LLM → Executor → Audit → Dashboard). Offline = số liệu benchmark tất định; Online = chứng minh realtime, chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC).

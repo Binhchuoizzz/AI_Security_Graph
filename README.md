@@ -117,7 +117,7 @@ SENTINEL is systematically benchmarked across five analytical axes:
 | **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3 8B) | `experiments/evaluate_reasoning.py` |
 | **5. Explainability**| Completeness Index $= 100\%$ (Audit Trail) | Deterministic schema checks | `experiments/evaluate_reasoning.py` |
 
-> **Supplementary (beyond the 5 axes):** multi-day **APT detection (emergent)** and **signature-less zero-day** detection are validated together in a single time-ordered stream by `experiments/evaluate_unified_stream.py` (report: `reports/unified_stream_evaluation_report.md`) — memory starts clean, so the APT verdict emerges incrementally rather than being pre-seeded.
+> **Supplementary (beyond the 5 axes):** multi-day **APT detection (emergent)** and **signature-less zero-day** detection are validated together in a single time-ordered stream by `experiments/evaluate_unified_stream.py` (report: `reports/unified_stream_evaluation_report.md`) — memory starts clean, so the APT verdict emerges incrementally rather than being pre-seeded. The **same merged stream** can also be replayed **online end-to-end** (Redis → Tier-1 → emergent APT → LLM Agent → Dashboard) via `experiments/stream_unified_online.py` for the live demo; the offline run remains the deterministic benchmark.
 
 ---
 
@@ -153,6 +153,7 @@ AI_Security_Graph/
 │   ├── evaluate_adversarial_pipeline.py # Full-LLM-pipeline adversarial resistance test
 │   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation (Llama 3)
 │   ├── evaluate_unified_stream.py    # Unified stream eval: CICIDS + DAPT (emergent APT) + zero-day in one time-ordered stream
+│   ├── stream_unified_online.py      # ONLINE publisher: replays the SAME merged stream via Redis through the full pipeline (live demo)
 │   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
 │   ├── statistical_tests.py          # McNemar / Mann-Whitney U significance tests
 │   ├── e2e_test_runner.py            # Automated E2E integration test suite
@@ -163,7 +164,7 @@ AI_Security_Graph/
 │   ├── nist_800_61r2.json            # Structured NIST incident response playbooks
 │   └── faiss_index/                  # Embedded FAISS and BM25 vector indexes
 ├── reports/
-│   ├── test_report_FINAL.md          # E2E 20/20 PASS verification report
+│   ├── test_report_FINAL.md          # E2E PASS verification report (current suite: 22 tests)
 │   └── unified_stream_evaluation_report.md  # Unified streaming eval report (classification + APT + zero-day)
 ├── scripts/
 │   └── switch_model.sh               # Utility script to hot-swap LLM models in Docker
