@@ -58,7 +58,7 @@ class DualRetriever:
         try:
             from sentence_transformers import SentenceTransformer  # type: ignore
             import faiss  # type: ignore
-            from rank_bm25 import BM25Okapi  # type: ignore
+            from rank_bm25 import BM25Okapi  # type: ignore  # noqa: F401  (kiểm tra dep tồn tại, fail-fast)
         except ImportError as e:
             logger.error(f"Missing dependency: {e}")
             raise

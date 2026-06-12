@@ -51,7 +51,8 @@ def run_real_pipeline_on_cicids():
     from src.agent.state import SentinelState
     from src.guardrails import loop_detector
 
-    gt = json.load(open(GT_PATH))
+    with open(GT_PATH) as f:
+        gt = json.load(f)
     by_class = {}
     for s in gt:
         lbl = s.get("input", {}).get("cicids_label", "?")
@@ -118,7 +119,8 @@ def ingest_real_apt():
     s = ThreatMemoryStore()
     n = s.ingest_dapt_chains(DAPT_PATH)
     # Đánh dấu APT indicator cho các attacker IP đa-ngày thật
-    chains = [json.loads(l) for l in open(DAPT_PATH)]
+    with open(DAPT_PATH) as f:
+        chains = [json.loads(l) for l in f]
     apt_ips = 0
     for c in chains:
         ip = c["attacker_ip"]

@@ -19,7 +19,6 @@ import os
 import json
 import time
 from datetime import datetime
-from collections import OrderedDict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -413,7 +412,8 @@ def test_18_dapt_chain(r: TestResult):
     chains_path = "data/processed/dapt2020_chains.jsonl"
     assert os.path.exists(chains_path), f"Missing: {chains_path}"
 
-    chains = [json.loads(l) for l in open(chains_path)]
+    with open(chains_path) as f:
+        chains = [json.loads(l) for l in f]
     multi_day = [c for c in chains if len(c["days_spanned"]) >= 2]
     assert len(multi_day) >= 5, f"Need ≥5 multi-day chains, got {len(multi_day)}"
 

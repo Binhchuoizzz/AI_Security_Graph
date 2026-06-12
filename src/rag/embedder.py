@@ -167,7 +167,8 @@ def load_nist_chunks() -> list[dict]:
     import re
     from langchain_text_splitters import RecursiveCharacterTextSplitter  # type: ignore
 
-    text = open(NIST_TXT_PATH, "r", encoding="utf-8", errors="ignore").read()
+    with open(NIST_TXT_PATH, "r", encoding="utf-8", errors="ignore") as fh:
+        text = fh.read()
     original_len = len(text)
 
     # Làm sạch các ký tự rác từ PDF

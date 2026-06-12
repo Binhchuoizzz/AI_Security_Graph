@@ -177,7 +177,8 @@ def test_zerodays_real_derived_invariants():
     )
     from src.tier1_filter.rule_engine import RuleEngine
 
-    gt = json.load(open(GT_PATH, encoding="utf-8"))
+    with open(GT_PATH, encoding="utf-8") as f:
+        gt = json.load(f)
     zds = _build_zerodays(gt, tkey=lambda day: float(day))
 
     assert len(zds) == len(ZD_SPECS) == 7

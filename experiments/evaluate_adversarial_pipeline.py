@@ -31,7 +31,8 @@ def load_hard_samples(limit_per_cat: int):
     for cat in HARD_CATEGORIES:
         p = os.path.join(ADV_DIR, cat, "samples.json")
         if os.path.exists(p):
-            data = json.load(open(p))
+            with open(p) as fh:
+                data = json.load(fh)
             samples.extend(data[:limit_per_cat])
     return samples
 
@@ -97,7 +98,8 @@ def run():
     print("=" * 60)
 
     out = os.path.join(os.path.dirname(__file__), "results", "adversarial_pipeline_results.json")
-    json.dump({"resistance_rate_pct": rr, **results}, open(out, "w"), ensure_ascii=False, indent=1)
+    with open(out, "w") as fh:
+        json.dump({"resistance_rate_pct": rr, **results}, fh, ensure_ascii=False, indent=1)
     print(f"[+] Saved: {out}")
 
 

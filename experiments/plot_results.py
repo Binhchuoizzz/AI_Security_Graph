@@ -1,7 +1,6 @@
 import json
 import os
 import matplotlib.pyplot as plt
-import numpy as np
 
 ROBUSTNESS_RESULTS_PATH = os.path.join(
     os.path.dirname(__file__), "results", "robustness_results.json"

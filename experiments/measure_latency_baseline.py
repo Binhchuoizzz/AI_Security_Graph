@@ -203,7 +203,8 @@ Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
     }
 
     Path("experiments/results").mkdir(exist_ok=True)
-    json.dump(results, open("experiments/results/latency_benchmark.json", "w"), indent=2)
+    with open("experiments/results/latency_benchmark.json", "w") as fh:
+        json.dump(results, fh, indent=2)
     print("Saved: experiments/results/latency_benchmark.json")
 
     # Kiểm định thống kê Mann-Whitney U

@@ -177,7 +177,8 @@ def build_stream():
       khối theo nguồn.
     - apt_truth: tập IP THẬT là APT (sự kiện tấn công ở >= 2 ngày khác nhau).
     """
-    gt = json.load(open(GT_PATH, encoding="utf-8"))
+    with open(GT_PATH, encoding="utf-8") as f:
+        gt = json.load(f)
     samples = gt if isinstance(gt, list) else gt.get("samples", gt)
 
     WARMUP_N = 150                      # benign dành riêng cho warmup baseline
@@ -219,7 +220,8 @@ def build_stream():
 
     # --- DAPT2020: đưa CẢ sự kiện tấn công LẪN benign (nền) vào luồng ------ #
     apt_attack_days = defaultdict(set)
-    chains = [json.loads(line) for line in open(DAPT_PATH, encoding="utf-8")]
+    with open(DAPT_PATH, encoding="utf-8") as f:
+        chains = [json.loads(line) for line in f]
     for chain in chains:
         for e in chain.get("events", []):
             phase = e.get("phase")
