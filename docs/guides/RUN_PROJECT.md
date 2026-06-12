@@ -221,7 +221,8 @@ safe_log = {"Source IP": "10.0.0.50", "Destination Port": 8080, "Total Fwd Packe
 result = engine.evaluate(safe_log)
 print(f"Safe Log Result: {result['tier1_action']} (Reason: {result.get('tier1_reasons')})")
 
-# Kịch bản 2: Log truy cập SSH port 22 nguy hiểm (ESCALATE) -> Chuyển tiếp lên Tier 2
+# Kịch bản 2: Log truy cập SSH port 22 nguy hiểm (BLOCK_IP) -> Chặn ngay ở Tier 1
+# (cổng nhạy cảm + fwd<200 + score>=threshold = chống brute-force; KHÔNG cần phiền LLM)
 ssh_log = {"Source IP": "192.168.1.100", "Destination Port": 22, "Total Fwd Packets": 5}
 result_ssh = engine.evaluate(ssh_log)
 print(f"SSH Log Result: {result_ssh['tier1_action']} (Score: {result_ssh['tier1_score']})")
@@ -232,7 +233,7 @@ for port in range(1, 16):
     result_scan = engine.evaluate({"Source IP": "10.99.99.99", "Destination Port": port, "Total Fwd Packets": 1})
 print(f"Scan Final Result: {result_scan['tier1_action']} (Reason: {result_scan['tier1_reasons']})")
 
-# Kịch bản 4: IP thuộc Whitelist (WHITELIST_DROP) -> Tự động bỏ qua nhanh
+# Kịch bản 4: IP thuộc Whitelist -> DROP ngay (reason "IP nằm trong Whitelist"), bỏ qua mọi luật
 wl_log = {"Source IP": "127.0.0.1", "Destination Port": 22, "Total Fwd Packets": 9999}
 result_wl = engine.evaluate(wl_log)
 print(f"Whitelist Log Result: {result_wl['tier1_action']} (Reason: {result_wl['tier1_reasons']})")
