@@ -115,7 +115,16 @@ def main_dashboard():
                         config_data["tier1"]["whitelist_ips"] = ["127.0.0.1", "10.0.0.99", "192.168.1.254"]
                         with open(config_path, "w") as f:
                             yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
-                
+
+                # 6. Reset counter log thô THẬT (file pipeline_stats.json)
+                try:
+                    _stats_f = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                                            "config", "pipeline_stats.json")
+                    if os.path.exists(_stats_f):
+                        os.remove(_stats_f)
+                except Exception:
+                    pass
+
                 st.success("Đã reset toàn bộ dữ liệu hệ thống về trạng thái ban đầu!")
                 time.sleep(0.7)
                 st.rerun()
@@ -201,11 +210,27 @@ def main_dashboard():
     total_reviewed = approved_rules_count + rejected_rules_count
     live_fpr = (rejected_rules_count / total_reviewed) * 100 if total_reviewed > 0 else 0.0
     
-    # Tính toán tổng số log thô giả lập dựa trên tỷ lệ lọc thực tế của Tier 1
-    raw_logs_count = max(len(all_alerts) * 35, 120) if len(all_alerts) > 0 else 0
-    
+    # Số liệu THẬT (không ước lượng): đọc counter do subscriber ghi vào Redis khi
+    # xử lý log thô qua Tier-1. raw_logs_total = tổng log đã phân tích; tier1_dropped
+    # = số bị Tier-1 lọc bỏ -> Noise Reduction = dropped/raw (đo trực tiếp, không bịa).
+    raw_logs_count = 0
+    noise_reduction = None  # None -> header tự tính (fallback khi chưa có dữ liệu thật)
+    try:
+        import json as _json
+        _stats_p = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                                "config", "pipeline_stats.json")
+        with open(_stats_p) as _sf:
+            _ps = _json.load(_sf)
+        raw_logs_count = int(_ps.get("raw_logs_total", 0))
+        _dropped = int(_ps.get("tier1_dropped_total", 0))
+        if raw_logs_count > 0:
+            noise_reduction = (_dropped / raw_logs_count) * 100
+    except Exception:
+        pass
+
     # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
-    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules), raw_logs_count, live_fpr)
+    render_metrics_header(len(all_alerts), len(pending_rules), len(active_rules),
+                          raw_logs_count, live_fpr, noise_reduction)
 
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Nhật ký SIEM & Audit Trail", 

@@ -169,11 +169,16 @@ def render_ioc_table(iocs):
     st.dataframe(df, width="stretch")
 
 
-def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_logs=0, live_fpr=0.0):
-    """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism."""
-    noise_reduction = 0.0
-    if total_raw_logs > 0:
-        noise_reduction = ((total_raw_logs - total_alerts) / total_raw_logs) * 100
+def render_metrics_header(total_alerts, pending_rules, active_rules, total_raw_logs=0, live_fpr=0.0, noise_reduction=None):
+    """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
+
+    noise_reduction: nếu được truyền (đo THẬT từ counter Tier-1) thì dùng trực tiếp;
+    None -> fallback ước lượng (raw-alerts)/raw cho tương thích ngược.
+    """
+    if noise_reduction is None:
+        noise_reduction = 0.0
+        if total_raw_logs > 0:
+            noise_reduction = ((total_raw_logs - total_alerts) / total_raw_logs) * 100
         
     # Xác định màu sắc cho live_fpr (dưới 10% xanh lá, dưới 25% vàng, ngược lại đỏ)
     fpr_color = "#52c41a"  # green

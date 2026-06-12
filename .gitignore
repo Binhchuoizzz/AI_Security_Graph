@@ -64,3 +64,4 @@ docs/latex/thesis_latex*/*.synctex*
 docs/latex/thesis_latex*/*.lof
 docs/latex/thesis_latex*/*.lot
 
+config/pipeline_stats.json

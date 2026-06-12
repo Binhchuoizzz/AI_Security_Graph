@@ -115,6 +115,28 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     # Chuẩn bị luồng đọc (dùng dict[Any, Any] để tránh lỗi ép kiểu static analysis của redis-py)
     streams_dict: dict[Any, Any] = {str(q): ">" for q in QUEUES}
 
+    # Counter THẬT cho Dashboard (chống "ước lượng ×35"): ghi ra file chia sẻ qua volume
+    # config/ — container Dashboard đọc TIN CẬY (Redis chỉ reach được từ host). Tích lũy
+    # qua nhiều lần chạy: nạp lại file cũ khi khởi động.
+    _stats_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "pipeline_stats.json")
+    try:
+        with open(_stats_path) as _sf:
+            _s = json.load(_sf)
+        raw_logs_total = int(_s.get("raw_logs_total", 0))
+        tier1_dropped_total = int(_s.get("tier1_dropped_total", 0))
+    except Exception:
+        raw_logs_total = tier1_dropped_total = 0
+
+    def _flush_stats():
+        try:
+            _tmp = _stats_path + ".tmp"
+            with open(_tmp, "w") as _f:
+                json.dump({"raw_logs_total": raw_logs_total,
+                           "tier1_dropped_total": tier1_dropped_total}, _f)
+            os.replace(_tmp, _stats_path)
+        except Exception:
+            pass
+
     while True:
         try:
             # XREADGROUP lắng nghe trên nhiều stream cùng lúc.
@@ -132,6 +154,12 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                         # Gọi ngay Tier 1 Rule Engine để cân nhắc
                         evaluated_log = engine.evaluate(raw_log)
                         action = evaluated_log.get("tier1_action", "DROP")
+
+                        # ── Số liệu THẬT cho Dashboard: đếm log thô qua Tier-1 + số bị
+                        # lọc (DROP) -> Noise Reduction THẬT (ghi ra file cuối mỗi batch).
+                        raw_logs_total += 1
+                        if action in ("DROP", "WHITELIST_DROP"):
+                            tier1_dropped_total += 1
 
                         # ── APT EMERGENT: ghi chuỗi từ luồng + leo thang khi bản án bật ──
                         # Chỉ chạy với event mang metadata DAPT (apt_phase + apt_is_attack).
@@ -192,6 +220,9 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
 
                         # Xác nhận đã xử lý xong tin nhắn trong stream (XACK)
                         r.xack(stream_name, GROUP_NAME, msg_id)
+
+                # Ghi counter THẬT ra file (Dashboard container đọc qua volume config/)
+                _flush_stats()
 
             # Kiểm tra xem có cần trigger batch không
             current_time = time.time()
