@@ -18,8 +18,14 @@ class DecisionValidator:
 
     def __init__(self):
         config = load_config()
-        self.trusted_subnets = config.get("guardrails", {}).get("trusted_internal_subnets", [
-            "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"
+        # Lá chắn chống TỰ CHẶN HẠ TẦNG (Anti-Self-DoS): CHỈ bảo vệ các IP/dải HẠ TẦNG
+        # TRỌNG YẾU cụ thể (loopback, gateway, DNS, DC, host giám sát) khỏi bị BLOCK_IP.
+        # KHÔNG dùng `trusted_internal_subnets` (toàn bộ RFC1918) ở đây — nếu coi cả 10/8,
+        # 172.16/12, 192.168/16 là "không được chặn" thì hệ thống KHÔNG THỂ cô lập kẻ tấn
+        # công nội bộ (lateral movement / insider / host bị chiếm), và luồng HITL sinh-luật
+        # (chỉ kích hoạt khi BLOCK_IP) sẽ không bao giờ chạy. Dải này phải HẸP và tường minh.
+        self.critical_infra_subnets = config.get("guardrails", {}).get("critical_infrastructure_subnets", [
+            "127.0.0.0/8", "10.0.0.99/32", "192.168.1.254/32"
         ])
         self.allowed_actions = ["BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "DROP"]
 
@@ -98,7 +104,7 @@ class DecisionValidator:
             parsed_obj = parse_ip_or_network(target)
 
             if parsed_obj:
-                for subnet_str in self.trusted_subnets:
+                for subnet_str in self.critical_infra_subnets:
                     try:
                         network = ipaddress.ip_network(subnet_str, strict=False)
                         if isinstance(parsed_obj, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
