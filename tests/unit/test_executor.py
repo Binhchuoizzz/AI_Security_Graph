@@ -2,10 +2,11 @@
 Unit Tests for Executor Module (Action Validation, Audit Trail Integrity, Login Lockout)
 """
 
-import os
 import pytest # type: ignore
 import sqlite3
 import time
+
+import src.response.executor as executor
 from src.response.executor import (
     block_ip,
     quarantine_host,
@@ -18,24 +19,19 @@ from src.response.executor import (
     reset_login_attempts,
     lock_user,
     ActionValidator,
-    DB_PATH
 )
 
 
 @pytest.fixture(autouse=True)
-def clean_audit_db():
-    """Clear database before and after each test to ensure isolation."""
-    # Ensure the DB path directory exists
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM audit_trail")
-        conn.execute("DELETE FROM login_attempts")
-        conn.commit()
+def isolated_audit_db(tmp_path, monkeypatch):
+    """CÔ LẬP audit DB vào file TẠM — tuyệt đối KHÔNG đụng config/audit_trail.db
+    production (trước đây fixture xóa thẳng bảng trên DB thật -> chạy pytest là
+    trắng audit demo). Mọi hàm executor đọc DB_PATH module-global tại call-time
+    nên monkeypatch là đủ."""
+    test_db = str(tmp_path / "audit_test.db")
+    monkeypatch.setattr(executor, "DB_PATH", test_db)
+    executor._init_db()
     yield
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("DELETE FROM audit_trail")
-        conn.execute("DELETE FROM login_attempts")
-        conn.commit()
 
 
 def test_action_validator_allowed_actions():
@@ -104,7 +100,7 @@ def test_audit_trail_integrity_verification():
     assert "toàn vẹn" in msg.lower() or "integrity" in msg.lower()
 
     # Tamper with the database manually to simulate log tampering
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(executor.DB_PATH) as conn:
         conn.execute("UPDATE audit_trail SET reason = 'Modified reason' WHERE id = (SELECT min(id) FROM audit_trail)")
         conn.commit()
 

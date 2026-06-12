@@ -1,5 +1,9 @@
 """
-Thử nghiệm Loại trừ (Ablation Study): So sánh Config A (Chỉ luật cứng) và Config F (SENTINEL 2 Lớp đầy đủ).
+Thử nghiệm Loại trừ (Ablation Study): So sánh Config A và Config F (SENTINEL 2 Lớp đầy đủ).
+
+Config A = Tier-1 Rule Engine ĐẦY ĐỦ nhưng KHÔNG LLM (luật tĩnh + Welford Z-score +
+session baseline). KHÁC với baseline "static-only" trong evaluate_unified_stream.py
+(baseline đó tách cả Welford ra, chỉ dùng để đối chứng zero-day).
 
 Script chạy trên tập dữ liệu kiểm thử (Ground Truth) và ghi kết quả ra file JSON + hệ thống MLflow.
 """

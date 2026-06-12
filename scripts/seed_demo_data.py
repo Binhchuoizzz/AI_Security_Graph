@@ -108,6 +108,11 @@ def ingest_real_apt():
     LƯU Ý: đây là SEED cho DASHBOARD (để UI có sẵn lịch sử APT hiển thị) — KHÔNG
     phải benchmark phát hiện APT. Việc đánh giá năng lực phát hiện APT (emergent,
     bộ nhớ sạch, không nạp-sẵn) nằm ở `experiments/evaluate_unified_stream.py`.
+
+    Muốn DEMO APT emergent SỐNG trên dashboard (bản án nổi lên dần thay vì lịch sử
+    nạp sẵn): KHÔNG chạy hàm này; thay vào đó xóa `config/threat_memory.db` rồi chạy
+    `experiments/stream_unified_online.py` + `main.py --mode server`
+    (docs/guides/RUN_PROJECT.md — Bước 5).
     """
     from src.agent.threat_memory import ThreatMemoryStore
     s = ThreatMemoryStore()

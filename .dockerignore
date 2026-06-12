@@ -12,7 +12,7 @@ mlruns/
 logs/
 data/raw/
 docs/
-experiments/plots/
+experiments/results/
 
 # IDE files
 .vscode/

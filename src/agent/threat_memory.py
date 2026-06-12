@@ -465,12 +465,23 @@ class ThreatMemoryStore:
                 f"{entity['description']}. Consider FALSE POSITIVE."
             )
 
-        # 3. Kiểm tra mẫu APT (APT check)
+        # 3. Kiểm tra mẫu APT (APT check — dựa trên lịch sử incidents)
         apt = self.check_apt_pattern(source_ip)
         if apt and apt["is_apt_candidate"]:
             parts.append(
                 f"  🔴 APT CANDIDATE: Active for {apt['days_active']} days, "
                 f"{apt['total_incidents']} incidents. ESCALATE SEVERITY."
+            )
+
+        # 3b. Chuỗi APT đa-ngày từ threat_events (cơ chế EMERGENT của luồng gộp —
+        # record_apt_event tích lũy dần; bản án bật khi đủ >=2 ngày tấn công).
+        chain = self.check_apt_chain(source_ip)
+        if chain.get("is_apt"):
+            parts.append(
+                f"  🔴 APT CHAIN (multi-day): {chain['chain_length']} distinct days, "
+                f"phases: {chain.get('phases_seen', 'N/A')} — severity "
+                f"{chain.get('severity_escalation', 'HIGH')}. "
+                f"Treat as an ONGOING APT campaign, not an isolated event."
             )
 
         if not parts:

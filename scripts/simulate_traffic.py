@@ -8,9 +8,15 @@ MỤC ĐÍCH:
     - Chạy Ablation Study (đánh giá Tier-1 + Tier-2)
     - Kiểm thử khả năng Guardrails với adversarial payloads
 
-LUỒNG KHÁC PUBLISHER.PY:
-  publisher.py      → stream raw CSV (hàng triệu rows, production load test)
-  simulate_traffic.py → replay ground_truth.json (4267 mẫu, evaluation/demo)
+BA PUBLISHER — BA MỤC ĐÍCH (không trùng vai):
+  src/streaming/publisher.py            → stream raw CSV chunked (hàng triệu rows,
+                                          production load test, không nhãn)
+  scripts/simulate_traffic.py           → replay ground_truth.json (4267 mẫu CICIDS
+                                          có nhãn, demo dashboard / ablation)
+  experiments/stream_unified_online.py  → phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
+                                          metadata APT (demo end-to-end APT emergent
+                                          + zero-day qua full pipeline — khuyến nghị
+                                          cho demo luồng gộp realtime)
 
 QUAN HỆ:
   Input:  experiments/ground_truth.json  (từ fetch_and_build_dataset.py)

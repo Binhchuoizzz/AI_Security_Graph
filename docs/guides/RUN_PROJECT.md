@@ -188,9 +188,11 @@ FINAL: 22/22 PASSED | 0 FAILED | 0 SKIPPED  (cả --offline lẫn online)
 ✅ ALL TESTS PASSED — THESIS READY
 ```
 
-> **Số liệu thực đo (2026-06-11):** `--offline` cho **22/22 PASSED** (gồm T21 Unified
+> **Số liệu thực đo (2026-06-12):** `--offline` cho **22/22 PASSED** (gồm T21 Unified
 > Streaming Eval offline và T22 Unified ONLINE Publisher — metadata + queue routing).
-> Bộ pytest đầy đủ (`.venv/bin/pytest tests/`) cho **165 passed, 0 failed**.
+> Bộ pytest đầy đủ (`.venv/bin/pytest tests/`) cho **194 passed, 0 failed** (gồm các
+> test mới: chống lộ nhãn dataset vào LLM, bất biến zero-day real-derived, APT-chain
+> context, semantic_cache, feedback_listener, auth; test_executor đã cô lập DB tạm).
 
 ---
 

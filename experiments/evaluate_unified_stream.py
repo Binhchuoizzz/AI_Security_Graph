@@ -85,7 +85,11 @@ def map_cicids(nl: dict) -> dict:
 
 
 def static_only_action(engine: RuleEngine, log: dict) -> str:
-    """Mô phỏng "Config A" (chỉ luật tĩnh, KHÔNG Welford) để đối chứng zero-day."""
+    """Đối chứng STATIC-ONLY (chỉ luật tĩnh, KHÔNG Welford) cho zero-day.
+
+    LƯU Ý: đây KHÔNG phải "Config A" của Ablation Study — Config A trong
+    `run_ablation_study.py` là Tier-1 ĐẦY ĐỦ không LLM (bao gồm cả Welford).
+    Baseline này tách riêng Welford ra để chứng minh đóng góp của Z-score."""
     port = _safe_int(log.get("Destination Port"))
     fwd = _safe_int(log.get("Total Fwd Packets"))
     if port in engine.sensitive_ports:
@@ -476,7 +480,7 @@ def _write_report(summary, apt_fired, apt_truth, zd_results):
     lines.append("## 3. Zero-day (signature-less) — static bỏ sót, Welford bắt\n")
     lines.append(f"Tổng: **{z['total']}** | Welford bắt được (mà static bỏ sót): "
                  f"**{z['caught_by_welford_static_missed']}/{z['total']}**\n")
-    lines.append("| ID | Kịch bản | Rule tĩnh (Config A) | Full Tier-1 (Welford) | Z-Score |")
+    lines.append("| ID | Kịch bản | Rule tĩnh (static-only, đối chứng) | Full Tier-1 (Welford) | Z-Score |")
     lines.append("| :--- | :--- | :---: | :---: | :---: |")
     for zr in zd_results:
         mark = "✅" if zr["caught_by_welford"] else "⚠️"

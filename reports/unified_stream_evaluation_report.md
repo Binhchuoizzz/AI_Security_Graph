@@ -2,7 +2,7 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-06-11T20:53:56
+> **Sinh lúc:** 2026-06-12T10:02:52
 
 ---
 
@@ -44,7 +44,7 @@ Bộ nhớ bắt đầu **rỗng**; mỗi sự kiện APT được ghi vào memo
 
 Tổng: **7** | Welford bắt được (mà static bỏ sót): **7/7**
 
-| ID | Kịch bản | Rule tĩnh (Config A) | Full Tier-1 (Welford) | Z-Score |
+| ID | Kịch bản | Rule tĩnh (static-only, đối chứng) | Full Tier-1 (Welford) | Z-Score |
 | :--- | :--- | :---: | :---: | :---: |
 | ZD-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **AWAIT_HITL** | 7.52 ✅ |
 | ZD-001 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **AWAIT_HITL** | 22075.95 ✅ |

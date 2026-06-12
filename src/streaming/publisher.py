@@ -1,3 +1,15 @@
+"""
+Data Publisher — stream CSV THÔ lên Redis (production-scale ingestion).
+
+Vai trò trong bộ BA PUBLISHER (không trùng nhau):
+  - src/streaming/publisher.py (file này): đọc CSV thô CHUNKED (chunksize=500,
+    file hàng triệu dòng/GB không nạp hết RAM), backpressure + chống Redis OOM.
+    Dùng cho LOAD TEST / chứng minh tầng ingestion; KHÔNG mang nhãn ground-truth
+    hay metadata APT.
+  - scripts/simulate_traffic.py: replay ground_truth.json (có nhãn, demo dashboard).
+  - experiments/stream_unified_online.py: phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
+    metadata APT (demo end-to-end APT emergent — khuyến nghị cho demo luồng gộp).
+"""
 import redis  # type: ignore
 import json
 import time

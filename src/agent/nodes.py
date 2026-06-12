@@ -276,6 +276,8 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
             mitre_technique=validated_decision.get("mitre_technique", "")
         )
         apt_check = threat_memory.check_apt_pattern(target)
+        # Chuỗi APT đa-ngày EMERGENT (threat_events — tích lũy từ luồng gộp online)
+        apt_chain = threat_memory.check_apt_chain(target)
         if apt_check and apt_check["is_apt_candidate"]:
             logger.warning(
                 f"[APT DETECTION] IP {target} flagged as APT candidate: "
@@ -287,6 +289,18 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
                 confidence=confidence,
                 related_ips=target,
                 mitre_chain=validated_decision.get("mitre_technique", "")
+            )
+        elif apt_chain.get("is_apt"):
+            logger.warning(
+                f"[APT DETECTION] IP {target} part of multi-day APT chain: "
+                f"{apt_chain['chain_length']} days, phases={apt_chain.get('phases_seen', '')}"
+            )
+            threat_memory.record_apt_indicator(
+                indicator_type="multi_day_chain",
+                indicator_value=target,
+                confidence=confidence,
+                related_ips=target,
+                mitre_chain=str(apt_chain.get("phases_seen", ""))[:120],
             )
 
     return {

@@ -155,6 +155,22 @@ class TestPromptContextGeneration:
         assert "KNOWN INTERNAL ENTITY" in ctx
         assert "Qualys Scanner" in ctx
 
+    def test_context_includes_multiday_apt_chain(self, memory_store):
+        """Mục 3b: chuỗi APT EMERGENT (threat_events, >=2 ngày) phải được
+        inject vào LLM context — cầu nối memory đa-ngày -> Tier-2 suy luận."""
+        ip = "10.9.9.9"
+        # 1 ngày: chưa có chuỗi -> context KHÔNG nhắc APT CHAIN
+        memory_store.record_apt_event(ip, apt_phase="Reconnaissance", apt_day=1)
+        assert "APT CHAIN" not in memory_store.get_context_for_prompt(ip)
+
+        # Ngày thứ 2 (cùng IP): bản án bật -> context PHẢI có chuỗi + phases
+        memory_store.record_apt_event(ip, apt_phase="Lateral Movement", apt_day=2)
+        ctx = memory_store.get_context_for_prompt(ip)
+        assert "APT CHAIN" in ctx
+        assert "2 distinct days" in ctx
+        assert "Reconnaissance" in ctx and "Lateral Movement" in ctx
+        assert "ONGOING APT campaign" in ctx
+
 
 class TestStats:
     """Test dashboard statistics."""

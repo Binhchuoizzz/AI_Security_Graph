@@ -193,4 +193,4 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 
 ---
 
-> **Kiểm thử đơn vị (xuyên suốt):** `tests/unit/` (data_validator, decision_validator + tier-consensus guard, feedback_validator, output_sanitizer, prompt_filter, rag_sanitizer, template_miner, threat_memory) + `tests/integration/` + `tests/test_adversarial.py`. Trạng thái hiện tại: **pytest 165 passed, E2E 22/22**.
+> **Kiểm thử đơn vị (xuyên suốt):** `tests/unit/` (data_validator, decision_validator + tier-consensus guard, feedback_validator, feedback_listener, output_sanitizer, prompt_filter, rag_sanitizer, template_miner, threat_memory + APT-chain-context, subscriber **chống lộ nhãn dataset vào LLM**, semantic_cache, auth, executor — đã cô lập DB tạm) + `tests/integration/` (unified stream + bất biến zero-day real-derived + hợp đồng enrich↔strip) + `tests/test_adversarial.py`. Trạng thái hiện tại: **pytest 194 passed, E2E 22/22**.

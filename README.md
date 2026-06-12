@@ -177,7 +177,7 @@ AI_Security_Graph/
 │   ├── response/                     # Action executor, DB client, lockout, & HMAC log signer
 │   └── ui/                           # Glassmorphism Streamlit UI & authentication logic
 ├── docs/
-│   ├── guides/                       # ablation_design.md, E2E_TESTS_GUIDE.md
+│   ├── guides/                       # RUN_PROJECT.md, ablation_design.md, E2E_TESTS_GUIDE.md
 │   ├── latex/                        # Thesis/proposal LaTeX sources + Template
 │   └── *.md                          # Architecture, DAY1/DAY2, threat model, reproducibility...
 ├── tests/
@@ -193,7 +193,7 @@ AI_Security_Graph/
 
 ## 🚀 Quick Start
 
-For detailed step-by-step instructions on deploying the full stack, please consult [RUN_PROJECT.md](RUN_PROJECT.md).
+For detailed step-by-step instructions on deploying the full stack, please consult [RUN_PROJECT.md](docs/guides/RUN_PROJECT.md).
 
 ### 1. Environment Setup
 ```bash

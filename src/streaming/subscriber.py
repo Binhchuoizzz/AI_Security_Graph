@@ -47,6 +47,23 @@ REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://
 QUEUES = _config.get("redis", {}).get("queues", ["queue_firewall", "queue_waf", "queue_sysmon"])
 ESCALATED_QUEUE = _config.get("redis", {}).get("escalated_queue", "queue_hitl")
 
+# Các khóa NHÃN DATASET (mang "đáp án" ground-truth / DAPT / zero-day) — phải LOẠI
+# khỏi log TRƯỚC khi đưa lên Agent/LLM, nếu không prompt sẽ bị lộ đáp án (label
+# leakage) làm mất giá trị demo online. GIỮ `gt_id` (định danh mờ, phục vụ đối
+# chiếu hậu kiểm) và các trường tier1_*/apt_emergent/apt_phases (enrichment do
+# HỆ THỐNG tự suy ra — tương đương SIEM context thật, không phải đáp án).
+_DATASET_LABEL_KEYS = frozenset({
+    "gt_cicids_label", "gt_expected_action", "gt_expected_severity", "gt_expected_mitre",
+    "gt_label", "expected_threat",
+    "apt_phase", "apt_day", "apt_label", "apt_timestamp", "apt_is_attack",
+    "zd_id", "zd_name", "zd_mitre",
+})
+
+
+def _strip_dataset_labels(log: dict) -> dict:
+    """Bản sao log KHÔNG còn nhãn dataset — an toàn để đưa vào prompt LLM."""
+    return {k: v for k, v in log.items() if k not in _DATASET_LABEL_KEYS}
+
 
 def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     """
@@ -150,7 +167,10 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                         if action == "ESCALATE":
                             alert_msg = f"[!] ESCALATE TO AI | Source: {stream_name} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
                             print(alert_msg)
-                            batch_buffer.append(evaluated_log)
+                            # Loại nhãn dataset trước khi lên LLM (chống label leakage);
+                            # bản FULL (kèm nhãn) vẫn nằm ở queue_decisions/queue_hitl
+                            # để đối chiếu hậu kiểm.
+                            batch_buffer.append(_strip_dataset_labels(evaluated_log))
 
                         elif action == "AWAIT_HITL":
                             # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
