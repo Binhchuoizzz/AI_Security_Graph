@@ -4,47 +4,66 @@ Sử dụng st.session_state để mô phỏng 2 vai trò: L1_Analyst và L3_Man
 Mật khẩu được băm PBKDF2-HMAC-SHA256 (Tương thích CWE-916 & CWE-259).
 
 THIẾT KẾ BẢO MẬT:
-  - Mật khẩu KHÔNG được ghi cứng (hardcode) trong mã nguồn.
-  - Đọc từ biến môi trường (OS Environment Variables).
-  - Nếu không có biến môi trường, sử dụng giá trị mặc định ĐÃ BĂM SẴN.
-  - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ (plaintext).
+  - KHÔNG ghi cứng mật khẩu DẠNG RÕ (plaintext) trong mã nguồn (CWE-798): chỉ lưu
+    HASH đã tính sẵn. Mật khẩu rõ của bộ demo nằm trong tài liệu triển khai
+    (docs/guides/RUN_PROJECT.md), KHÔNG nằm trong source.
+  - Ưu tiên đọc HASH + SALT từ biến môi trường (OS Environment Variables).
+  - Khi rơi về HASH/SALT demo mặc định -> CẢNH BÁO rõ ràng (không dùng cho production).
+  - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ.
 """
 
 import streamlit as st  # type: ignore
 import hashlib
+import logging
 import os
 import time
 import re
 import hmac
 from src.response.executor import get_login_attempts, increment_login_attempts, reset_login_attempts, lock_user
 
-# Chiến lược băm mật khẩu: PBKDF2-HMAC-SHA256 (Chuẩn NIST)
-# Sử dụng salt từ biến môi trường, nếu không có thì dùng salt mặc định an toàn
-SALT = os.getenv("SENTINEL_AUTH_SALT", "sentinel_security_2026_default_salt").encode()
+logger = logging.getLogger(__name__)
+
+# Chiến lược băm mật khẩu: PBKDF2-HMAC-SHA256 (Chuẩn NIST SP 800-132)
+# SALT đọc từ biến môi trường; salt demo mặc định CHỈ để chạy thử ngay được.
+_DEFAULT_DEMO_SALT = "sentinel_security_2026_default_salt"
+SALT = os.getenv("SENTINEL_AUTH_SALT", _DEFAULT_DEMO_SALT).encode()
 ITERATIONS = 100000
 
 def hash_password(password: str) -> str:
     """Băm mật khẩu dùng PBKDF2 để chống tấn công Brute-force/Bẻ khóa bằng GPU."""
     return hashlib.pbkdf2_hmac(
-        'sha256', 
-        password.encode(), 
-        SALT, 
+        'sha256',
+        password.encode(),
+        SALT,
         ITERATIONS
     ).hex()
 
-DEFAULT_ANALYST_HASH = hash_password("HanoiAnalyst2026@")
-DEFAULT_MANAGER_HASH = hash_password("HanoiManager2026@")
+# HASH DEMO TÍNH SẴN (PBKDF2-HMAC-SHA256, salt demo mặc định, 100k vòng).
+# KHÔNG còn plaintext password trong source. Mật khẩu rõ của bộ demo được tài liệu
+# hóa riêng trong RUN_PROJECT.md; production PHẢI đặt SENTINEL_*_HASH + SENTINEL_AUTH_SALT.
+_DEFAULT_ANALYST_HASH = "0999ca36c62e69601515210699602ce665f6ff1ffd452fcd136d351b73fb86fb"
+_DEFAULT_MANAGER_HASH = "edf6fd717ffe8e326b1d4becb7e22a4f0781c81cb1b7cd419944c2be530207d1"
 
 USERS = {
     "analyst": {
-        "password_hash": os.getenv("SENTINEL_ANALYST_HASH", DEFAULT_ANALYST_HASH),
+        "password_hash": os.getenv("SENTINEL_ANALYST_HASH", _DEFAULT_ANALYST_HASH),
         "role": "L1_Analyst",
     },
     "manager": {
-        "password_hash": os.getenv("SENTINEL_MANAGER_HASH", DEFAULT_MANAGER_HASH),
+        "password_hash": os.getenv("SENTINEL_MANAGER_HASH", _DEFAULT_MANAGER_HASH),
         "role": "L3_Manager",
     },
 }
+
+# Fail-loud: nếu đang chạy bằng HASH/SALT demo (chưa cấu hình env) -> cảnh báo để
+# người triển khai biết KHÔNG được dùng cấu hình này cho môi trường thật.
+if (SALT == _DEFAULT_DEMO_SALT.encode()
+        or USERS["analyst"]["password_hash"] == _DEFAULT_ANALYST_HASH
+        or USERS["manager"]["password_hash"] == _DEFAULT_MANAGER_HASH):
+    logger.warning(
+        "[AUTH] Đang dùng thông tin đăng nhập DEMO mặc định. Production PHẢI đặt "
+        "SENTINEL_AUTH_SALT + SENTINEL_ANALYST_HASH + SENTINEL_MANAGER_HASH."
+    )
 
 # Bảo vệ chống brute-force
 MAX_LOGIN_ATTEMPTS = 5
