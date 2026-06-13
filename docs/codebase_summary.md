@@ -44,6 +44,7 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 ### 7. `src/streaming/subscriber.py`
 *   **Mục đích:** Lắng nghe & gom batch logs từ Redis để chuyển cho Tier-1/Tier-2; ghi chuỗi APT emergent từ luồng.
 *   **Tác dụng:** Tạo/tham gia **consumer group `sentinel_group`** trên các **Redis Stream** (`queue_firewall`, `queue_waf`) qua `xreadgroup`; với mỗi log gọi `RuleEngine.evaluate`, rồi định tuyến theo `tier1_action`: `ESCALATE` → gom batch gọi LangGraph Agent; `BLOCK_IP` → blacklist Redis; `AWAIT_HITL` → đẩy queue HITL; `ALERT/LOG` → ghi `queue_decisions`. Trigger Agent theo batch_size hoặc timeout. **APT EMERGENT (online):** message mang metadata DAPT (`apt_phase`/`apt_day`/`apt_is_attack` — từ `stream_unified_online.py`) được ghi dần vào Threat Memory (`record_apt_event`); khi `check_apt_chain` BẬT (đủ đa-ngày) → ép `ESCALATE` chuỗi APT lên Agent. Traffic thường (không metadata) đi đường cũ, không đổi.
+*   **Số liệu THẬT:** đếm log thô qua Tier-1 + số bị DROP, ghi `config/pipeline_stats.json` (atomic, chia sẻ qua volume) cho Dashboard tính Noise Reduction thật — KHÔNG dùng Redis vì container Dashboard không reach được redis (redis bind host loopback).
 *   **Mối quan hệ:** Nhận từ Redis Streams, gọi `rule_engine.py` (Tier-1), `agent/threat_memory.py` (APT) và `agent/workflow.py` (Tier-2) khi escalate.
 
 ### 8. `src/tier1_filter/rule_engine.py` *(Cực kỳ quan trọng)*
@@ -112,7 +113,7 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 
 ### 19. `src/guardrails/decision_validator.py`
 *   **Mục đích:** Thẩm định & làm sạch quyết định LLM (chống Hallucination / Self-DoS / Social-Engineering).
-*   **Tác dụng:** Ép Action Enum hợp lệ; **Confidence Gate** (BLOCK_IP cần ≥0.5); **Anti-Self-DoS Shield** downgrade BLOCK_IP→ALERT cho IP hạ tầng (parse cả hex/octal/integer chống bypass); sanitize `reasoning`/`mitre`/`nist`. **`enforce_tier_consensus`** — lá chắn chống social-engineering ngữ nghĩa: nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM bị thao túng hạ xuống `LOG/DROP` thì KHÔNG tin LLM, buộc `AWAIT_HITL`.
+*   **Tác dụng:** Ép Action Enum hợp lệ; **Confidence Gate** (BLOCK_IP cần ≥0.5); **Anti-Self-DoS Shield** downgrade BLOCK_IP→ALERT chỉ cho **`critical_infrastructure_subnets`** (HẸP: loopback + hạ tầng cụ thể, parse cả hex/octal/integer chống bypass) — **KHÔNG** dùng toàn RFC1918 (nếu rộng sẽ không chặn được attacker nội bộ/lateral, vá 2026-06); sanitize `reasoning`/`mitre`/`nist`. **`enforce_tier_consensus`** — lá chắn chống social-engineering ngữ nghĩa: nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM bị thao túng hạ xuống `LOG/DROP` thì KHÔNG tin LLM, buộc `AWAIT_HITL`.
 *   **Mối quan hệ:** Gọi bởi `node_llm_triage` (`nodes.py`) trước khi thực thi quyết định.
 
 ### 20. `src/guardrails/feedback_validator.py`
@@ -180,13 +181,13 @@ Tài liệu này tổng hợp mã nguồn hệ thống SENTINEL theo **Luồng d
 *   `src/agent/state.py` — schema `SentinelState` (batch logs, RAG context, decisions, IOCs...).
 *   `src/agent/workflow.py` — `StateGraph` + node + conditional edge (Block/Alert/HITL/End).
 *   `src/agent/nodes.py` *(quan trọng)* — `node_guardrails` / `node_rag_context` (query RAG từ **metadata flow thật**: service/port/tier1 reasons) / `node_llm_triage` (DecisionValidator + **enforce_tier_consensus** + AuditLogger) / `node_action_executor`.
-*   `src/agent/prompts.py` — system prompt (có **rule #7 chống social-engineering**) + few-shot Active Learning.
+*   `src/agent/prompts.py` — system prompt (**rule #7 chống social-engineering** + hướng dẫn **BLOCK_IP cho brute-force/scan rõ ràng** từ IP ngoài whitelist trên cổng nhạy cảm) + few-shot Active Learning.
 *   `src/agent/llm_client.py` — client OpenAI-compatible → llama.cpp (Gemma-2-9B), `DEFAULT_MODEL` đọc từ env.
-*   `src/agent/threat_memory.py` — uy tín IP, chuỗi APT (`check_apt_chain` ≥2 ngày), chống Memory Poisoning.
-*   `src/response/executor.py` — audit trail SQLite + **HMAC SHA-256 log-chaining** chống giả mạo.
+*   `src/agent/threat_memory.py` — uy tín IP, chuỗi APT (`check_apt_chain` ≥2 ngày, inject vào LLM context), chống Memory Poisoning.
+*   `src/response/executor.py` — audit trail SQLite + **HMAC SHA-256 log-chaining** chống giả mạo. `block_ip()` = **`[FIREWALL MOCK]`** (ghi audit; enforcement thật = luật ACTIVE ở Tier-1, KHÔNG chạm firewall OS).
 
 ### **NGÀY 5 — Giao diện SOC & khung đánh giá thực nghiệm**
-*   `src/ui/app.py`, `components.py`, `auth.py` (PBKDF2-HMAC-SHA256), `style.css` — Dashboard HITL Streamlit (5 tab: Alerts/Rules/APT/Blocklist/Graph).
+*   `src/ui/app.py`, `components.py`, `auth.py` (PBKDF2-HMAC-SHA256, **không hardcode plaintext** — hash tính sẵn + fail-loud demo), `style.css` — Dashboard HITL Streamlit (5 tab: Alerts/Rules/APT/Blocklist/Graph). KPI "Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (**số THẬT** do subscriber ghi, không còn ước lượng ×35).
 *   `experiments/run_ablation_study.py`, `statistical_tests.py` (McNemar + Mann-Whitney U), `evaluate_robustness.py` (**120 mẫu adversarial / 5 nhóm**), `evaluate_adversarial_pipeline.py` (kháng LLM), `evaluate_reasoning.py` (LLM-as-Judge/RAGAS), `evaluate_unified_stream.py` (**luồng gộp CICIDS+DAPT+zero-day, phát hiện APT emergent, thay phương pháp 3 luồng cũ**), `stream_unified_online.py` (**publisher ONLINE phát cùng luồng gộp qua Redis → toàn pipeline, demo realtime**), `measure_latency_baseline.py`, `plot_results.py`, `e2e_test_runner.py` (22/22).
 *   `scripts/build_adversarial_suite.py`, `seed_demo_data.py` — sinh bộ adversarial & seed Dashboard từ data thật.
 *   `main.py` — entrypoint tích hợp (mode server/scan/full).

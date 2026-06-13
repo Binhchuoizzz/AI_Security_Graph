@@ -323,19 +323,19 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 ### **21. Decision Output: BLOCK_IP / AWAIT_HITL / ALERT**
 1. **STEP NAME:** Action Routing & Execution.
 2. **LAYER:** Tier 2 LangGraph Agent.
-3. **MỤC ĐÍCH:** Biến kết quả phán quyết JSON của LLM thành các hành động tác động vật lý lên tường lửa hoặc đưa vào quarantine.
-4. **CÔNG NGHỆ SỬ DỤNG:** Python API Callbacks, OS Firewall command scripting.
+3. **MỤC ĐÍCH:** Biến kết quả phán quyết JSON của LLM thành hành động ứng phó + sinh luật chặn cho hàng đợi HITL.
+4. **CÔNG NGHỆ SỬ DỤNG:** Python API Callbacks; `block_ip()` hiện là **FIREWALL MOCK** (điểm tích hợp — production thay bằng API tường lửa/nftables thật).
 5. **CƠ CHẾ HOẠT ĐỘNG:** Đọc trường `action` từ JSON:
-   - `BLOCK_IP`: Gọi hàm chặn IP ở mức mạng và ghi nhận quy tắc vào hàng đợi cách ly chờ phê duyệt.
+   - `BLOCK_IP`: ghi audit qua `block_ip()` (**MOCK ở tầng OS** — KHÔNG gọi iptables thật) **VÀ** sinh luật `Source IP` PENDING_APPROVAL vào `dynamic_rules` (HITL). Khi manager duyệt → ACTIVE → Tier-1 ENFORCE traffic IP đó (score=100). Prompt hướng dẫn: brute-force/scan rõ ràng từ IP ngoài whitelist trên cổng nhạy cảm = BLOCK_IP (khớp ground-truth).
    - `ALERT`: Ghi cảnh báo đỏ lên DB mà không cấm.
    - `AWAIT_HITL`: Phán quyết mập mờ (hoặc bị Tier-Consensus Guard ép xuống), chuyển thẳng vào hàng đợi chờ analyst duyệt.
    - `LOG` / `DROP`: Ghi nhật ký / loại bỏ traffic lành tính (5 action hợp lệ: `BLOCK_IP`, `ALERT`, `AWAIT_HITL`, `LOG`, `DROP` — không có "QUARANTINE" trong enum).
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/agent/nodes.py` & `src/response/executor.py`.
-   - Function: `node_action_executor()`, `block_ip()`.
-   - Input: Parsed JSON Dictionary → Output: Action Executions.
-7. **LUỒNG DỮ LIỆU:** LLM Output JSON → Callback Router → Execution / Database write.
-8. **VAI TRÒ BẢO MẬT:** Cô lập tấn công, phản ứng ngăn chặn kịp thời (Threat Neutralization).
+   - Function: `node_action_executor()`, `block_ip()` (`[FIREWALL MOCK]` — ghi audit), `FeedbackListener.receive_new_rule()`.
+   - Input: Parsed JSON Dictionary → Output: Audit write + luật PENDING.
+7. **LUỒNG DỮ LIỆU:** LLM Output JSON → Callback Router → audit_trail + dynamic_rules (PENDING) → (HITL duyệt) → Tier-1 enforce.
+8. **VAI TRÒ BẢO MẬT:** Đề xuất chặn có người duyệt (HITL); enforcement thật nằm trong pipeline SENTINEL (Tier-1 chặn traffic tương lai), tầng OS-firewall để mock cho hệ nghiên cứu.
 
 ### **22 & 23. Long-Term Threat Memory & APT Chain Tracking Logic**
 1. **STEP NAME:** Stateful Threat Memory & APT Correlation.
@@ -360,13 +360,13 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 2. **LAYER:** HITL Dashboard Layer.
 3. **MỤC ĐÍCH:** Giao diện trực quan thời gian thực (Real-time GUI) cho phép chuyên gia an ninh mạng theo dõi hệ thống, điều tra sự cố và phê duyệt quy tắc mà không cần xem terminal.
 4. **CÔNG NGHỆ SỬ DỤNG:** `streamlit`, `streamlit-autorefresh`, `st.session_state`.
-5. **CƠ CHẾ HOẠT ĐỘNG:** Tổ chức giao diện dưới dạng Tabs (SIEM Monitor, Tường lửa, Quét lỗ hổng...). Sử dụng autorefresh định kỳ mỗi 3 giây để đồng bộ dữ liệu mới nhất từ cơ sở dữ liệu.
+5. **CƠ CHẾ HOẠT ĐỘNG:** Tổ chức giao diện dưới dạng Tabs (SIEM Monitor, Tường lửa, Quét lỗ hổng...). Sử dụng autorefresh định kỳ mỗi 3 giây để đồng bộ dữ liệu mới nhất từ cơ sở dữ liệu. **KPI "Logs thô đầu vào" + "Noise Reduction" là SỐ THẬT** (đo trực tiếp): `subscriber.py` đếm log thô qua Tier-1 + số bị DROP, ghi `config/pipeline_stats.json` (chia sẻ qua volume mount); Dashboard đọc file đó → Noise Reduction = dropped/raw (KHÔNG còn ước lượng `×35` cũ). Lưu ý hạ tầng: container Dashboard KHÔNG reach được Redis (redis chỉ bind host loopback) nên dùng file thay Redis.
 6. **CẤU TRÚC MÃ NGUỒN:**
-   - File: `src/ui/app.py`.
-   - Function: `main_dashboard()`.
-   - Input: User interactions → Output: Rendered HTML/CSS.
-7. **LUỒNG DỮ LIỆU:** SQLite Reads / Feedback Listener Reads → Streamlit App → Browser.
-8. **VAI TRÒ BẢO MẬT:** N/A — Tăng khả năng giám sát trực quan cho SOC.
+   - File: `src/ui/app.py`, `src/ui/components.py`, `src/streaming/subscriber.py`.
+   - Function: `main_dashboard()`, `render_metrics_header(..., noise_reduction)`.
+   - Input: User interactions + `config/pipeline_stats.json` → Output: Rendered HTML/CSS.
+7. **LUỒNG DỮ LIỆU:** SQLite Reads + pipeline_stats.json (file mount) → Streamlit App → Browser.
+8. **VAI TRÒ BẢO MẬT:** N/A — Tăng khả năng giám sát trực quan cho SOC. Thực đo: 550 log thô → Tier-1 lọc 548 (DROP) → **Noise Reduction 99.6%**.
 
 ### **25. Quarantine Rule Review & SOC Manager Workflow**
 1. **STEP NAME:** Role-Based Access Control (RBAC) & Human-In-The-Loop Workflow.

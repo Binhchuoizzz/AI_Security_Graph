@@ -27,6 +27,9 @@ knowledge_base/faiss_index/*_metadata.json
 *.md
 !README.md
 !**/README.md
+!SECURITY.md
+!CONTRIBUTING.md
+!CODE_OF_CONDUCT.md
 !reports/test_report_FINAL.md
 !reports/unified_stream_evaluation_report.md
 reports/test_report_*.md

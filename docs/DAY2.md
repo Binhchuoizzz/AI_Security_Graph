@@ -222,7 +222,7 @@ XUYÊN SUỐT:
 **Vai trò:** Thẩm định & làm an toàn quyết định LLM trước khi thực thi — chống Hallucination / Self-DoS / **Social-Engineering ngữ nghĩa**.
 
 ### `class DecisionValidator`
-- `__init__()` — load `trusted_internal_subnets`; `allowed_actions=["BLOCK_IP","ALERT","AWAIT_HITL","LOG","DROP"]`. **Dòng:** [19-24](../src/guardrails/decision_validator.py#L19-L24)
+- `__init__()` — load **`critical_infrastructure_subnets`** (HẸP: loopback + IP hạ tầng cụ thể, KHÔNG phải toàn RFC1918); `allowed_actions=["BLOCK_IP","ALERT","AWAIT_HITL","LOG","DROP"]`. **Dòng:** [19-30](../src/guardrails/decision_validator.py#L19-L30)
 - **Lưu ý:** `class DecisionValidator` khai báo ở [dòng 13](../src/guardrails/decision_validator.py#L13).
 
 ### `validate_decision(decision) -> dict` — 4 lớp bảo vệ
@@ -230,7 +230,7 @@ XUYÊN SUỐT:
 |-----|------|------|
 | 1 — Action Enum Guard | Action ngoài enum → ép `AWAIT_HITL` (chặn `HACK_BACK`...). | [32-37](../src/guardrails/decision_validator.py#L32-L37) |
 | 2 — Confidence Gate | `BLOCK_IP` & `confidence<0.5` → hạ `AWAIT_HITL`. | [39-51](../src/guardrails/decision_validator.py#L39-L51) |
-| 3 — Anti-Self-DoS Shield | `BLOCK_IP` lên IP trusted → hạ `ALERT`. Closure `parse_ip_or_network` parse **dotted/CIDR/hex `0x`/octal/decimal** chống bypass. | [53-125](../src/guardrails/decision_validator.py#L53-L125) |
+| 3 — Anti-Self-DoS Shield | `BLOCK_IP` lên **hạ tầng trọng yếu** (`critical_infrastructure_subnets` HẸP: loopback + gateway/DNS cụ thể) → hạ `ALERT`. Closure `parse_ip_or_network` parse **dotted/CIDR/hex `0x`/octal/decimal** chống bypass. **KHÔNG dùng toàn RFC1918** — nếu coi cả 10/8, 172.16/12, 192.168/16 là "không chặn" thì attacker nội bộ/lateral/insider sẽ KHÔNG bao giờ bị BLOCK (vá 2026-06). | [53-125](../src/guardrails/decision_validator.py#L53-L125) |
 | 4 — Reasoning Sanitization | `output_sanitizer.sanitize()` cho `reasoning/mitre/nist` (chống XSS-SSRF UI). | [127-136](../src/guardrails/decision_validator.py#L127-L136) |
 - **Dòng tổng:** [26-136](../src/guardrails/decision_validator.py#L26-L136)
 
