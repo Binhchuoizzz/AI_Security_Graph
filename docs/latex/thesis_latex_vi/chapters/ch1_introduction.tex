@@ -51,17 +51,17 @@ Mặc dù LLM có thể tự động hóa quy trình phân loại bằng cách t
 
 \begin{table}[H]
     \centering
-    \caption{Ánh xạ giữa Câu hỏi Nghiên cứu, Mục tiêu Nghiên cứu và các Thành phần Hệ thống.}
-    \label{tab:rq_objective_mapping}
-    \begin{tabular}{p{0.12\textwidth}p{0.33\textwidth}p{0.33\textwidth}p{0.18\textwidth}}
+    \caption{Ánh xạ giữa Câu hỏi Nghiên cứu và các Thành phần Hệ thống.}
+    \label{tab:rq_component_mapping}
+    \begin{tabular}{p{0.12\textwidth}p{0.48\textwidth}p{0.34\textwidth}}
         \toprule
-        \textbf{Mã RQ} & \textbf{Tóm tắt Câu hỏi Nghiên cứu} & \textbf{Mục tiêu tương ứng} & \textbf{Thành phần Hệ thống} \\
+        \textbf{Mã RQ} & \textbf{Tóm tắt Câu hỏi Nghiên cứu} & \textbf{Thành phần Hệ thống Hướng tới} \\
         \midrule
-        RQ1 & Lọc dữ liệu tốc độ đường truyền mà không làm đứt chuỗi ngữ cảnh APT & Mục tiêu 1: Tính toán thống kê trực tuyến Welford ($O(1)$) để lập baseline & Tầng 1: Bộ lọc bất thường (RuleEngine) \\
+        RQ1 & Lọc dữ liệu tốc độ đường truyền mà không làm đứt chuỗi ngữ cảnh APT & Tầng 1: Bộ lọc bất thường (RuleEngine) \\
         \midrule
-        RQ2 & Tích hợp LLM cục bộ tránh trễ và ngăn ngừa tấn công tiêm prompt đối kháng & Mục tiêu 2: Thiết kế máy trạng thái LangGraph với rào chắn bảo vệ & Tầng 2: Tác tử nhận thức và Guardrails \\
+        RQ2 & Tích hợp LLM cục bộ tránh trễ và ngăn ngừa tấn công tiêm prompt đối kháng & Tầng 2: Tác tử nhận thức và Guardrails \\
         \midrule
-        RQ3 & Hiệu quả của hệ thống truy xuất tri thức kép và thuật toán gộp xếp hạng RRF & Mục tiêu 3: Tích hợp cơ sở tri thức MITRE \& NIST với thuật toán RRF & Bộ phận RAG kép và Hybrid Retriever \\
+        RQ3 & Hiệu quả của hệ thống truy xuất tri thức kép và thuật toán gộp xếp hạng RRF & Bộ phận RAG kép và Hybrid Retriever \\
         \bottomrule
     \end{tabular}
 \end{table}

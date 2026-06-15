@@ -51,17 +51,17 @@ To guide the empirical validation of the proposed architecture, this research ad
 
 \begin{table}[H]
     \centering
-    \caption{Mapping of Research Questions to Research Objectives and Targeted System Components.}
-    \label{tab:rq_objective_mapping}
-    \begin{tabular}{p{0.12\textwidth}p{0.33\textwidth}p{0.33\textwidth}p{0.18\textwidth}}
+    \caption{Mapping of Research Questions to Targeted System Components.}
+    \label{tab:rq_component_mapping}
+    \begin{tabular}{p{0.12\textwidth}p{0.48\textwidth}p{0.34\textwidth}}
         \toprule
-        \textbf{RQ} & \textbf{Research Question Summary} & \textbf{Corresponding Objective} & \textbf{Targeted Component} \\
+        \textbf{RQ} & \textbf{Research Question Summary} & \textbf{Targeted System Component} \\
         \midrule
-        RQ1 & Real-time wire-speed filtration without losing APT session context & Objective 1: Welford statistical anomaly baseline calculation ($O(1)$) & Tier-1 filter engine (RuleEngine) \\
+        RQ1 & Real-time wire-speed filtration without losing APT session context & Tier-1 filter engine (RuleEngine) \\
         \midrule
-        RQ2 & Safe local LLM integration to eliminate latency and prompt injection risks & Objective 2: Stateful LangGraph FSM design with secure encapsulation & Tier-2 cognitive agent and guardrails \\
+        RQ2 & Safe local LLM integration to eliminate latency and prompt injection risks & Tier-2 cognitive agent and guardrails \\
         \midrule
-        RQ3 & Efficacy of dual RAG knowledge retrieval and Reciprocal Rank Fusion & Objective 3: Dual RAG (MITRE \& NIST) with RRF rank consolidation & Semantic RAG and hybrid retriever \\
+        RQ3 & Efficacy of dual RAG knowledge retrieval and Reciprocal Rank Fusion & Semantic RAG and hybrid retriever \\
         \bottomrule
     \end{tabular}
 \end{table}
