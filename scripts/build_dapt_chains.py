@@ -8,26 +8,35 @@ Các chuỗi kéo dài ≥ 2 ngày và chứa ít nhất một sự kiện tấn
 đại diện cho hành vi APT thực tế (kẻ tấn công kiên trì).
 """
 
-import os
 import glob
 import json
-from pathlib import Path
+import os
 from datetime import datetime
+from pathlib import Path
+
 import pandas as pd  # type: ignore
 
 # Các công cụ phân tích tĩnh sẽ phân giải scripts.dapt2020_config
 # Fallback xử lý khi chạy trực tiếp trong thư mục scripts/
 try:
     from scripts.dapt2020_config import (
-        APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
-        BENIGN_LABELS, normalize_stage, normalize_label,
-        DAPT_LABEL_TO_MITRE
+        APT_PHASES,
+        BENIGN_LABELS,
+        DAPT_LABEL_TO_MITRE,
+        DAPT_PROCESSED_FILE,
+        DAPT_RAW_DIR,
+        normalize_label,
+        normalize_stage,
     )
 except ImportError:
     from dapt2020_config import (  # type: ignore  # noqa: E402
-        APT_PHASES, DAPT_RAW_DIR, DAPT_PROCESSED_FILE,
-        BENIGN_LABELS, normalize_stage, normalize_label,
-        DAPT_LABEL_TO_MITRE
+        APT_PHASES,
+        BENIGN_LABELS,
+        DAPT_LABEL_TO_MITRE,
+        DAPT_PROCESSED_FILE,
+        DAPT_RAW_DIR,
+        normalize_label,
+        normalize_stage,
     )
 
 
@@ -83,7 +92,11 @@ def build_chains():
             df["apt_phase"] = phase
 
         # Chỉ chọn các cột cần thiết để tiết kiệm bộ nhớ
-        cols_to_keep = [c for c in ["src_ip", "dst_ip", "label", "apt_phase", "apt_day", "timestamp"] if c in df.columns]
+        cols_to_keep = [
+            c
+            for c in ["src_ip", "dst_ip", "label", "apt_phase", "apt_day", "timestamp"]
+            if c in df.columns
+        ]
         df = df[cols_to_keep]
 
         all_events.append(df)
@@ -98,9 +111,7 @@ def build_chains():
     # Đảm bảo src_ip tồn tại, nếu không có thì tạo IP giả lập
     if "src_ip" not in combined.columns:
         print("WARNING: src_ip not found. Using mock IP from index.")
-        combined["src_ip"] = (combined.index % 50).apply(
-            lambda x: f"192.168.{x // 256}.{x % 256}"
-        )
+        combined["src_ip"] = (combined.index % 50).apply(lambda x: f"192.168.{x // 256}.{x % 256}")
 
     # Xây dựng các chuỗi theo IP kẻ tấn công
     chains = {}
@@ -108,17 +119,19 @@ def build_chains():
         ip = str(row.get("src_ip", "unknown"))
         if ip not in chains:
             chains[ip] = []
-        
+
         lbl_val = str(row.get("label", "Normal"))
-        chains[ip].append({
-            "day": safe_int(row.get("apt_day", 0)),
-            "phase": str(row.get("apt_phase", "Unknown")),
-            "label": lbl_val,
-            "mitre_ttp": DAPT_LABEL_TO_MITRE.get(lbl_val, None),
-            "src_ip": ip,
-            "dst_ip": str(row.get("dst_ip", "10.0.0.1")),
-            "timestamp": str(row.get("timestamp", "")),
-        })
+        chains[ip].append(
+            {
+                "day": safe_int(row.get("apt_day", 0)),
+                "phase": str(row.get("apt_phase", "Unknown")),
+                "label": lbl_val,
+                "mitre_ttp": DAPT_LABEL_TO_MITRE.get(lbl_val, None),
+                "src_ip": ip,
+                "dst_ip": str(row.get("dst_ip", "10.0.0.1")),
+                "timestamp": str(row.get("timestamp", "")),
+            }
+        )
 
     def parse_dapt_timestamp(ts_str):
         try:
@@ -142,8 +155,7 @@ def build_chains():
     }
 
     print(f"Multi-day APT chains found (with attack events): {len(apt_chains)} attacker IPs")
-    assert len(apt_chains) >= 5, \
-        f"Need >= 5 multi-day chains, got {len(apt_chains)}"
+    assert len(apt_chains) >= 5, f"Need >= 5 multi-day chains, got {len(apt_chains)}"
 
     # Write to JSONL
     output_path = Path(DAPT_PROCESSED_FILE)
@@ -157,27 +169,36 @@ def build_chains():
             attack_evts = [e for e in events if e["label"] not in BENIGN_LABELS]
             benign_evts = [e for e in events if e["label"] in BENIGN_LABELS]
             if len(attack_evts) > MAX_ATTACK_PER_CHAIN or len(benign_evts) > MAX_BENIGN_PER_CHAIN:
-                print(f"  [INFO] {ip}: {len(events)} events -> {min(len(attack_evts),MAX_ATTACK_PER_CHAIN)} attack + {min(len(benign_evts),MAX_BENIGN_PER_CHAIN)} benign")
+                print(
+                    f"  [INFO] {ip}: {len(events)} events -> {min(len(attack_evts), MAX_ATTACK_PER_CHAIN)} attack + {min(len(benign_evts), MAX_BENIGN_PER_CHAIN)} benign"
+                )
                 sampled = attack_evts[:MAX_ATTACK_PER_CHAIN] + benign_evts[:MAX_BENIGN_PER_CHAIN]
             else:
                 sampled = events
-            
+
             # Sắp xếp lại để duy trì trình tự thời gian
             sampled.sort(key=lambda x: (x["day"], parse_dapt_timestamp(x.get("timestamp", ""))))
 
-            f.write(json.dumps({
-                "attacker_ip": ip,
-                "chain_length": len(events),
-                "days_spanned": sorted(set(e["day"] for e in events)),
-                "phases": list(dict.fromkeys(e["phase"] for e in events)),
-                "events": sampled,
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "attacker_ip": ip,
+                        "chain_length": len(events),
+                        "days_spanned": sorted(set(e["day"] for e in events)),
+                        "phases": list(dict.fromkeys(e["phase"] for e in events)),
+                        "events": sampled,
+                    }
+                )
+                + "\n"
+            )
 
     # Thống kê tóm tắt
     chain_lengths = [len(v) for v in apt_chains.values()]
-    print(f"Chain stats: min={min(chain_lengths)}, "
-          f"max={max(chain_lengths)}, "
-          f"avg={sum(chain_lengths) / len(chain_lengths):.1f}")
+    print(
+        f"Chain stats: min={min(chain_lengths)}, "
+        f"max={max(chain_lengths)}, "
+        f"avg={sum(chain_lengths) / len(chain_lengths):.1f}"
+    )
 
     print("\nPASS: DAPT2020 APT chains built successfully")
     print(f"Output: {DAPT_PROCESSED_FILE}")

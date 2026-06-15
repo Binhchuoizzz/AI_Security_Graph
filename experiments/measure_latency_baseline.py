@@ -82,7 +82,7 @@ def measure_two_tier(events: list) -> list:
     from src.tier1_filter.rule_engine import RuleEngine
 
     engine = RuleEngine()
-    miner = LogTemplateMiner()
+    LogTemplateMiner()
     guardrails = GuardrailsPipeline()
     retriever = DualRetriever(use_cache=False)
     llm = LLMClient()

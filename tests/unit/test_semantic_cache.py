@@ -29,8 +29,8 @@ class TestHitMiss:
 
     def test_hit_rate_metric(self, cache):
         cache.put("q", {"r": 1})
-        cache.get("q")        # hit
-        cache.get("khác")     # miss (chưa put)
+        cache.get("q")  # hit
+        cache.get("khác")  # miss (chưa put)
         stats = cache.get_stats()
         assert stats["hits"] == 1 and stats["misses"] >= 1
         assert 0.0 < stats["hit_rate"] <= 0.5 + 1e-9
@@ -52,8 +52,8 @@ class TestLRU:
     def test_eviction_when_full_removes_oldest(self, cache):
         for i in range(3):
             cache.put(f"q{i}", {"i": i})
-        cache.get("q0")              # q0 thành mới nhất (LRU move_to_end)
-        cache.put("q3", {"i": 3})    # đầy -> evict cũ nhất = q1
+        cache.get("q0")  # q0 thành mới nhất (LRU move_to_end)
+        cache.put("q3", {"i": 3})  # đầy -> evict cũ nhất = q1
         assert cache.get("q1")["hit"] is False
         assert cache.get("q0")["hit"] is True
         assert cache.get("q3")["hit"] is True

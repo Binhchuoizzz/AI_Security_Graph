@@ -2,8 +2,8 @@
 Conftest: Đảm bảo project root nằm trong sys.path cho tất cả test files.
 """
 
-import sys
 import os
+import sys
 
 # Thêm project root vào sys.path để import src.* và scripts.* hoạt động
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

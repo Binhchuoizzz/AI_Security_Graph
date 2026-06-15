@@ -19,23 +19,34 @@ Cách hoạt động (chính danh):
 Chạy SAU CÙNG, ngay trước khi demo:
     .venv/bin/python scripts/seed_demo_data.py
 """
-import sys
-import os
+
 import json
+import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 GT_PATH = os.path.join(os.path.dirname(__file__), "..", "experiments", "ground_truth.json")
-DAPT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "processed", "dapt2020_chains.jsonl")
+DAPT_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "data", "processed", "dapt2020_chains.jsonl"
+)
 
 # Các lớp tấn công CICIDS cần phủ đầy đủ (bỏ Benign/Adversarial — không phải "cảnh báo")
 ATTACK_CLASSES = [
-    "SSH-Bruteforce", "FTP-BruteForce",
-    "DoS attacks-Hulk", "DoS attacks-GoldenEye",
-    "DoS attacks-Slowloris", "DoS attacks-SlowHTTPTest",
-    "DDOS attack-HOIC", "DDOS attack-LOIC-UDP", "DDoS attacks-LOIC-HTTP",
-    "Brute Force -Web", "Brute Force -XSS",
-    "SQL Injection", "Infilteration", "Bot",
+    "SSH-Bruteforce",
+    "FTP-BruteForce",
+    "DoS attacks-Hulk",
+    "DoS attacks-GoldenEye",
+    "DoS attacks-Slowloris",
+    "DoS attacks-SlowHTTPTest",
+    "DDOS attack-HOIC",
+    "DDOS attack-LOIC-UDP",
+    "DDoS attacks-LOIC-HTTP",
+    "Brute Force -Web",
+    "Brute Force -XSS",
+    "SQL Injection",
+    "Infilteration",
+    "Bot",
 ]
 # Số flow gộp thành 1 incident. Một cuộc tấn công thật (brute force/DoS) là MỘT
 # nguồn tạo NHIỀU flow; ground_truth đã tách rời thành các flow đơn lẻ với IP tổng
@@ -46,10 +57,10 @@ FLOWS_PER_INCIDENT = 15
 
 def run_real_pipeline_on_cicids():
     """Chạy pipeline THẬT (Tier-1 + LangGraph Agent + LLM) trên mẫu CICIDS thật."""
-    from src.tier1_filter.rule_engine import RuleEngine
-    from src.agent.workflow import agent_app
     from src.agent.state import SentinelState
+    from src.agent.workflow import agent_app
     from src.guardrails import loop_detector
+    from src.tier1_filter.rule_engine import RuleEngine
 
     with open(GT_PATH) as f:
         gt = json.load(f)
@@ -80,7 +91,7 @@ def run_real_pipeline_on_cicids():
         evaluated = []
         for log in flows:
             e = dict(log)
-            e["src_ip"] = attacker_ip          # consolidate nguồn (đặc trưng flow giữ nguyên)
+            e["src_ip"] = attacker_ip  # consolidate nguồn (đặc trưng flow giữ nguyên)
             e["dataset_source"] = "CSE-CIC-IDS2018"
             e["log_source"] = "queue_waf"
             evaluated.append(engine.evaluate(e))  # Tier-1 thật, tích lũy baseline
@@ -96,7 +107,9 @@ def run_real_pipeline_on_cicids():
             final = agent_app.invoke(state)
             dec = (final.get("decisions") or [{}])[-1] if isinstance(final, dict) else {}
             t1 = evaluated[-1]
-            print(f"  [{cls:24s}] T1={t1.get('tier1_action')}({t1.get('tier1_score')}) -> LLM {dec.get('action','?')} {dec.get('target','?')} | {str(dec.get('mitre_technique',''))[:34]} (exp {expected.get('expected_action')}/{expected.get('expected_mitre_technique')})")
+            print(
+                f"  [{cls:24s}] T1={t1.get('tier1_action')}({t1.get('tier1_score')}) -> LLM {dec.get('action', '?')} {dec.get('target', '?')} | {str(dec.get('mitre_technique', ''))[:34]} (exp {expected.get('expected_action')}/{expected.get('expected_mitre_technique')})"
+            )
             done += 1
         except Exception as e:
             print(f"  [{cls:24s}] pipeline error: {e}")
@@ -116,11 +129,12 @@ def ingest_real_apt():
     (docs/guides/RUN_PROJECT.md — Bước 5).
     """
     from src.agent.threat_memory import ThreatMemoryStore
+
     s = ThreatMemoryStore()
     n = s.ingest_dapt_chains(DAPT_PATH)
     # Đánh dấu APT indicator cho các attacker IP đa-ngày thật
     with open(DAPT_PATH) as f:
-        chains = [json.loads(l) for l in f]
+        chains = [json.loads(line) for line in f]
     apt_ips = 0
     for c in chains:
         ip = c["attacker_ip"]
@@ -128,7 +142,9 @@ def ingest_real_apt():
             chain = s.check_apt_chain(ip)
             if chain.get("is_apt"):
                 s.record_apt_indicator(
-                    "dapt2020_apt", ip, 0.9,
+                    "dapt2020_apt",
+                    ip,
+                    0.9,
                     related_ips=ip,
                     mitre_chain="→".join([str(p) for p in c.get("phases", [])][:5]),
                 )
@@ -140,11 +156,17 @@ def ingest_real_apt():
 def seed_known_entities():
     """Bối cảnh tổ chức (config hợp lệ do admin định nghĩa — KHÔNG phải 'kết quả')."""
     from src.agent.threat_memory import ThreatMemoryStore
+
     s = ThreatMemoryStore()
     entities = [
         ("scanner", "10.10.10.5", "Nessus Vulnerability Scanner (scheduled scan)", "admin"),
         ("pentest_ip", "192.168.50.10", "Red Team pentest VM - authorized engagement", "manager"),
-        ("backup_server", "192.168.1.30", "Veeam backup server (large outbound is normal)", "admin"),
+        (
+            "backup_server",
+            "192.168.1.30",
+            "Veeam backup server (large outbound is normal)",
+            "admin",
+        ),
     ]
     added = 0
     for t, v, d, by in entities:
@@ -162,4 +184,6 @@ if __name__ == "__main__":
     ingest_real_apt()
     print("\n[3/3] Bối cảnh tổ chức (known entities)...")
     seed_known_entities()
-    print("\n✅ Done. Dashboard (http://localhost:8501) hiển thị quyết định LLM THẬT trên data THẬT.")
+    print(
+        "\n✅ Done. Dashboard (http://localhost:8501) hiển thị quyết định LLM THẬT trên data THẬT."
+    )

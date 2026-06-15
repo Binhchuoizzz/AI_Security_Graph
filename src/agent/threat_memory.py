@@ -118,7 +118,7 @@ class ThreatMemoryStore:
                 c.execute(
                     """
                     INSERT INTO known_entities (entity_type, entity_value, description, added_by, added_at, is_active)
-                    VALUES 
+                    VALUES
                     ('Jump_Host', '192.168.1.254', 'Máy chủ nhảy quản trị nội bộ', 'system', ?, 1),
                     ('Security_Scanner', '10.0.0.99', 'Máy quét bảo mật Nessus định kỳ', 'system', ?, 1),
                     ('Active_Directory', '192.168.1.10', 'Máy chủ AD Domain Controller', 'system', ?, 1)
@@ -167,7 +167,7 @@ class ThreatMemoryStore:
                 alert_delta = 1 if action == "ALERT" else 0
                 c.execute(
                     """
-                    UPDATE ip_reputation 
+                    UPDATE ip_reputation
                     SET total_incidents = ?, reputation_score = ?, last_seen = ?,
                         total_blocks = total_blocks + ?, total_alerts = total_alerts + ?,
                         last_mitre_technique = ?
@@ -178,8 +178,8 @@ class ThreatMemoryStore:
             else:
                 c.execute(
                     """
-                    INSERT INTO ip_reputation 
-                    (ip, total_incidents, total_blocks, total_alerts, first_seen, last_seen, 
+                    INSERT INTO ip_reputation
+                    (ip, total_incidents, total_blocks, total_alerts, first_seen, last_seen,
                      reputation_score, last_mitre_technique)
                     VALUES (?, 1, ?, ?, ?, ?, ?, ?)
                 """,
@@ -214,9 +214,9 @@ class ThreatMemoryStore:
             c = conn.cursor()
             c.execute(
                 """
-                SELECT * FROM ip_reputation 
-                WHERE reputation_score >= ? 
-                ORDER BY reputation_score DESC 
+                SELECT * FROM ip_reputation
+                WHERE reputation_score >= ?
+                ORDER BY reputation_score DESC
                 LIMIT ?
             """,
                 (min_score, limit),
@@ -233,7 +233,7 @@ class ThreatMemoryStore:
             c = conn.cursor()
             c.execute(
                 """
-                UPDATE ip_reputation 
+                UPDATE ip_reputation
                 SET reputation_score = reputation_score * ?
                 WHERE last_seen < ? AND reputation_score > 1.0
             """,
@@ -267,7 +267,7 @@ class ThreatMemoryStore:
                 c = conn.cursor()
                 c.execute(
                     """
-                    INSERT OR REPLACE INTO known_entities 
+                    INSERT OR REPLACE INTO known_entities
                     (entity_type, entity_value, description, added_by, added_at, is_active)
                     VALUES (?, ?, ?, ?, ?, 1)
                 """,
@@ -297,7 +297,7 @@ class ThreatMemoryStore:
             c = conn.cursor()
             c.execute(
                 """
-                SELECT * FROM known_entities 
+                SELECT * FROM known_entities
                 WHERE entity_value = ? AND is_active = 1
             """,
                 (value,),
@@ -457,7 +457,7 @@ class ThreatMemoryStore:
             # Kiểm tra xem đã tồn tại chưa
             c.execute(
                 """
-                SELECT id, occurrence_count FROM apt_indicators 
+                SELECT id, occurrence_count FROM apt_indicators
                 WHERE indicator_type = ? AND indicator_value = ?
             """,
                 (indicator_type, indicator_value),
@@ -467,7 +467,7 @@ class ThreatMemoryStore:
             if row:
                 c.execute(
                     """
-                    UPDATE apt_indicators 
+                    UPDATE apt_indicators
                     SET occurrence_count = ?, last_detected = ?, confidence = ?,
                         related_ips = ?, mitre_chain = ?
                     WHERE id = ?
@@ -477,8 +477,8 @@ class ThreatMemoryStore:
             else:
                 c.execute(
                     """
-                    INSERT INTO apt_indicators 
-                    (indicator_type, indicator_value, confidence, first_detected, 
+                    INSERT INTO apt_indicators
+                    (indicator_type, indicator_value, confidence, first_detected,
                      last_detected, related_ips, mitre_chain)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,

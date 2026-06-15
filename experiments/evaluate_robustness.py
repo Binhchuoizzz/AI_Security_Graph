@@ -61,7 +61,7 @@ def evaluate_guardrails_defense(samples: list) -> dict:
     Chạy từng mẫu adversarial qua pipeline Guardrails.
     Đo lường: (1) Phát hiện mẫu định sẵn, (2) Hóa giải mã hóa, (3) Lọc ký tự phân tách.
     """
-    pipeline = GuardrailsPipeline()
+    GuardrailsPipeline()
     detector = PromptInjectionDetector()
     neutralizer = EncodingNeutralizer()
 

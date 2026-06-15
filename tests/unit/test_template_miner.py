@@ -4,7 +4,6 @@ Unit Test cho module LogTemplateMiner (src/guardrails/template_miner.py).
 Kiểm tra khả năng gom nhóm log, nén volume và format output cho LLM.
 """
 
-import pytest  # type: ignore
 from src.guardrails.template_miner import LogTemplateMiner, TokenBudgetManager
 
 
@@ -125,6 +124,7 @@ class TestTemplateMinerEntropyScorer:
 
     def test_default_threshold_value(self):
         from src.guardrails.template_miner import EntropyScorer
+
         scorer = EntropyScorer()  # Ngưỡng mặc định 4.5
         assert scorer.threshold == 4.5
 
@@ -135,4 +135,3 @@ class TestTemplateMinerEntropyScorer:
         # Dữ liệu entropy cao (>= 4.5) do chứa nhiều ký tự ngẫu nhiên hoặc payload độc hại dài
         high_entropy_log = "SELECT * FROM users WHERE id=1 OR 1=1 UNION SELECT username,password FROM admin -- aAbBcCdD"
         assert scorer.is_high_entropy(high_entropy_log) is True
-

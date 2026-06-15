@@ -20,7 +20,7 @@ import tempfile
 import pytest  # type: ignore
 
 from experiments.evaluate_unified_stream import build_stream
-from experiments.stream_unified_online import build_sequence, enrich, determine_queue
+from experiments.stream_unified_online import build_sequence, determine_queue, enrich
 from src.agent.threat_memory import ThreatMemoryStore
 
 
@@ -37,9 +37,7 @@ def test_stream_merges_real_sources_interleaved():
     assert n_chains >= 5
 
     # Trộn thật sự: nhiều lần đổi nguồn liên tiếp (xếp khối => gần như không đổi)
-    switches = sum(
-        1 for i in range(1, len(main)) if main[i]["source"] != main[i - 1]["source"]
-    )
+    switches = sum(1 for i in range(1, len(main)) if main[i]["source"] != main[i - 1]["source"])
     assert switches >= 50, f"Luồng chưa trộn xen kẽ (chỉ {switches} lần đổi nguồn)"
 
     # DAPT giữ thứ tự đa-ngày: với mỗi IP, các 'day' xuất hiện không giảm
@@ -144,9 +142,12 @@ def test_online_apt_recording_contract_matches_subscriber():
                 continue
             before = store.check_apt_chain(multi_day_ip)
             store.record_apt_event(
-                src_ip=multi_day_ip, dst_ip=ev.get("dst_ip", ""),
-                apt_phase=ev.get("phase"), apt_day=ev.get("day"),
-                label=ev.get("label", ""), timestamp=ev.get("timestamp", ""),
+                src_ip=multi_day_ip,
+                dst_ip=ev.get("dst_ip", ""),
+                apt_phase=ev.get("phase"),
+                apt_day=ev.get("day"),
+                label=ev.get("label", ""),
+                timestamp=ev.get("timestamp", ""),
             )
             days_recorded.add(ev["day"])
             after = store.check_apt_chain(multi_day_ip)
@@ -186,7 +187,7 @@ def test_zerodays_real_derived_invariants():
     assert {z["day"] for z in zds} == {2, 3, 4, 5}, "zero-day phải rải ngày 2-5"
 
     engine = RuleEngine()
-    for z, (zid, _name, feat, val, _dst, _mitre, day) in zip(zds, ZD_SPECS):
+    for z, (zid, _name, feat, val, _dst, _mitre, day) in zip(zds, ZD_SPECS, strict=False):
         log = z["log"]
         assert z["id"] == zid and z["day"] == day
         assert log[feat] == val, f"{zid}: feature {feat} không được đẩy cực trị"

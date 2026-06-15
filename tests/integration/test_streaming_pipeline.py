@@ -3,11 +3,11 @@ Integration Tests: Streaming Pipeline (Publisher → Redis → Subscriber → Ru
 Kiểm thử end-to-end luồng dữ liệu từ Redis queue tới Tier 1 filter.
 """
 
-import sys
-import os
 import json
+import os
+import sys
+
 import pytest  # type: ignore
-import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -140,9 +140,7 @@ class TestRedisConnectivity:
         test_data = json.dumps({"Source IP": "1.1.1.1", "test": True})
 
         # Create consumer group
-        redis_client.xgroup_create(
-            self.TEST_STREAM, self.TEST_GROUP, id="0", mkstream=True
-        )
+        redis_client.xgroup_create(self.TEST_STREAM, self.TEST_GROUP, id="0", mkstream=True)
 
         # Publish via xadd
         msg_id = redis_client.xadd(self.TEST_STREAM, {"log": test_data})
@@ -187,9 +185,7 @@ class TestRedisConnectivity:
 
         # xreadgroup must consume from WAF stream
         streams_dict = {s: ">" for s in streams}
-        response = redis_client.xreadgroup(
-            group, consumer, streams_dict, count=10, block=1000
-        )
+        response = redis_client.xreadgroup(group, consumer, streams_dict, count=10, block=1000)
         assert response is not None
         assert len(response) == 1
 

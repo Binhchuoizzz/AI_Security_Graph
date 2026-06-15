@@ -47,7 +47,7 @@ def run_ablation(limit=None):
         samples_per_class = max(1, (limit + num_classes - 1) // num_classes)
 
         selected_samples = []
-        for lbl, samples in by_label.items():
+        for _lbl, samples in by_label.items():
             selected_samples.extend(samples[:samples_per_class])
 
         dataset = selected_samples[:limit]

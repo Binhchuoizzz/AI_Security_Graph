@@ -10,6 +10,7 @@ Chạy:
     .venv/bin/python scripts/build_knowledge_base.py            # mở rộng KB + rebuild index
     .venv/bin/python scripts/build_knowledge_base.py --no-index # chỉ mở rộng KB, KHÔNG rebuild
 """
+
 import argparse
 import json
 import os
@@ -28,18 +29,18 @@ ALL_MITRE = [
             "vulnerability scanner signatures",
             "web content/path wordlist scanning",
             "IP block sweeps",
-            "T1595"
+            "T1595",
         ],
         "log_patterns": [
             "scanner user-agents (nmap, nikto, nuclei)",
             "bursts of 404s from path fuzzing",
-            "broad IP-range probing"
+            "broad IP-range probing",
         ],
         "response_actions": [
             "block scanning source at edge",
             "fingerprint scanner tooling",
-            "watch targeted assets for exploitation"
-        ]
+            "watch targeted assets for exploitation",
+        ],
     },
     {
         "id": "T1595.002",
@@ -49,36 +50,26 @@ ALL_MITRE = [
         "detection_indicators": [
             "version-probing requests",
             "CVE-targeted scan patterns",
-            "T1595.002"
+            "T1595.002",
         ],
         "log_patterns": [
             "requests probing known-vulnerable paths/versions",
-            "scanner fingerprint in user-agent"
+            "scanner fingerprint in user-agent",
         ],
         "response_actions": [
             "patch exposed vulnerable services",
             "block scanner IPs",
-            "harden version disclosure"
-        ]
+            "harden version disclosure",
+        ],
     },
     {
         "id": "T1592",
         "name": "Gather Victim Host Information",
         "tactic": "Reconnaissance",
         "description": "Adversaries may gather information about the victim's hosts (hardware, software, firmware, configuration) used during targeting.",
-        "detection_indicators": [
-            "banner grabbing",
-            "OS/service fingerprinting",
-            "T1592"
-        ],
-        "log_patterns": [
-            "service banner enumeration",
-            "fingerprint probes to many services"
-        ],
-        "response_actions": [
-            "minimize banner/version disclosure",
-            "alert on enumeration patterns"
-        ]
+        "detection_indicators": ["banner grabbing", "OS/service fingerprinting", "T1592"],
+        "log_patterns": ["service banner enumeration", "fingerprint probes to many services"],
+        "response_actions": ["minimize banner/version disclosure", "alert on enumeration patterns"],
     },
     {
         "id": "T1590",
@@ -89,17 +80,14 @@ ALL_MITRE = [
             "DNS enumeration",
             "WHOIS/range lookups",
             "subdomain brute forcing",
-            "T1590"
+            "T1590",
         ],
-        "log_patterns": [
-            "high-volume DNS queries enumerating zone",
-            "AXFR zone-transfer attempts"
-        ],
+        "log_patterns": ["high-volume DNS queries enumerating zone", "AXFR zone-transfer attempts"],
         "response_actions": [
             "restrict zone transfers",
             "rate-limit DNS",
-            "monitor subdomain enumeration"
-        ]
+            "monitor subdomain enumeration",
+        ],
     },
     {
         "id": "T1584",
@@ -109,16 +97,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "traffic to compromised legitimate hosts",
             "newly-malicious known-good domains",
-            "T1584"
+            "T1584",
         ],
-        "log_patterns": [
-            "beaconing to previously-benign domains",
-            "C2 on compromised CDN/host"
-        ],
-        "response_actions": [
-            "block confirmed-compromised infra",
-            "share IOCs to threat intel"
-        ]
+        "log_patterns": ["beaconing to previously-benign domains", "C2 on compromised CDN/host"],
+        "response_actions": ["block confirmed-compromised infra", "share IOCs to threat intel"],
     },
     {
         "id": "T1588",
@@ -128,16 +110,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "use of commodity malware/exploit kits",
             "stolen code-signing certs",
-            "T1588"
+            "T1588",
         ],
-        "log_patterns": [
-            "known malware family signatures",
-            "exploit-kit landing patterns"
-        ],
-        "response_actions": [
-            "block known tooling hashes/certs",
-            "update detection content"
-        ]
+        "log_patterns": ["known malware family signatures", "exploit-kit landing patterns"],
+        "response_actions": ["block known tooling hashes/certs", "update detection content"],
     },
     {
         "id": "T1566",
@@ -147,17 +123,17 @@ ALL_MITRE = [
         "detection_indicators": [
             "malicious email links/attachments",
             "credential-harvesting landing pages",
-            "T1566"
+            "T1566",
         ],
         "log_patterns": [
             "clicks to known-malicious URLs from corp net",
-            "macro-enabled attachment execution"
+            "macro-enabled attachment execution",
         ],
         "response_actions": [
             "purge malicious email org-wide",
             "block sender/URL",
-            "reset credentials of clickers"
-        ]
+            "reset credentials of clickers",
+        ],
     },
     {
         "id": "T1199",
@@ -167,16 +143,13 @@ ALL_MITRE = [
         "detection_indicators": [
             "access via trusted partner/VPN connection",
             "anomalous third-party account activity",
-            "T1199"
+            "T1199",
         ],
-        "log_patterns": [
-            "partner-network access outside normal pattern",
-            "MSP account anomalies"
-        ],
+        "log_patterns": ["partner-network access outside normal pattern", "MSP account anomalies"],
         "response_actions": [
             "scope and revoke trusted access",
-            "enforce least-privilege for partners"
-        ]
+            "enforce least-privilege for partners",
+        ],
     },
     {
         "id": "T1189",
@@ -186,17 +159,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "browser exploitation traffic",
             "redirect to exploit kit",
-            "T1189"
+            "T1189",
         ],
-        "log_patterns": [
-            "malicious iframe/redirect chains",
-            "exploit-kit traffic to client"
-        ],
+        "log_patterns": ["malicious iframe/redirect chains", "exploit-kit traffic to client"],
         "response_actions": [
             "block malicious domains",
             "patch browsers",
-            "isolate affected client"
-        ]
+            "isolate affected client",
+        ],
     },
     {
         "id": "T1203",
@@ -206,17 +176,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "malformed documents/exploits",
             "client app crash + spawn",
-            "T1203"
+            "T1203",
         ],
-        "log_patterns": [
-            "office app spawning shell/script host",
-            "exploit payload in document"
-        ],
-        "response_actions": [
-            "patch client software",
-            "isolate host",
-            "block delivery vector"
-        ]
+        "log_patterns": ["office app spawning shell/script host", "exploit payload in document"],
+        "response_actions": ["patch client software", "isolate host", "block delivery vector"],
     },
     {
         "id": "T1053",
@@ -226,17 +189,17 @@ ALL_MITRE = [
         "detection_indicators": [
             "new/unusual scheduled tasks",
             "cron entries spawning network connections",
-            "T1053"
+            "T1053",
         ],
         "log_patterns": [
             "creation of scheduled task running script/binary",
-            "cron job with C2 callout"
+            "cron job with C2 callout",
         ],
         "response_actions": [
             "remove malicious tasks",
             "audit scheduled-task creation",
-            "baseline legitimate jobs"
-        ]
+            "baseline legitimate jobs",
+        ],
     },
     {
         "id": "T1059.001",
@@ -246,17 +209,17 @@ ALL_MITRE = [
         "detection_indicators": [
             "encoded/obfuscated PowerShell",
             "PowerShell downloading from internet",
-            "T1059.001"
+            "T1059.001",
         ],
         "log_patterns": [
             "powershell -enc / -nop / IEX (New-Object Net.WebClient)",
-            "EncodedCommand usage"
+            "EncodedCommand usage",
         ],
         "response_actions": [
             "enable PowerShell script-block logging",
             "constrained language mode",
-            "isolate host"
-        ]
+            "isolate host",
+        ],
     },
     {
         "id": "T1505.003",
@@ -266,17 +229,17 @@ ALL_MITRE = [
         "detection_indicators": [
             "web shell files in web root",
             "command execution via HTTP params",
-            "T1505.003"
+            "T1505.003",
         ],
         "log_patterns": [
             "POST to suspicious .php/.jsp/.aspx with cmd params",
-            "web server spawning shell"
+            "web server spawning shell",
         ],
         "response_actions": [
             "quarantine the web shell file",
             "block source IP at WAF",
-            "audit web root integrity"
-        ]
+            "audit web root integrity",
+        ],
     },
     {
         "id": "T1098",
@@ -286,17 +249,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "unexpected privilege/group changes",
             "new credentials added to account",
-            "T1098"
+            "T1098",
         ],
-        "log_patterns": [
-            "account added to admin group",
-            "new SSH key / app password added"
-        ],
+        "log_patterns": ["account added to admin group", "new SSH key / app password added"],
         "response_actions": [
             "revert unauthorized changes",
             "rotate credentials",
-            "audit privileged group membership"
-        ]
+            "audit privileged group membership",
+        ],
     },
     {
         "id": "T1136",
@@ -306,17 +266,17 @@ ALL_MITRE = [
         "detection_indicators": [
             "unexpected new account creation",
             "rogue admin accounts",
-            "T1136"
+            "T1136",
         ],
         "log_patterns": [
             "new user/admin account outside change process",
-            "service account creation anomaly"
+            "service account creation anomaly",
         ],
         "response_actions": [
             "disable rogue accounts",
             "alert on account creation",
-            "review IAM change logs"
-        ]
+            "review IAM change logs",
+        ],
     },
     {
         "id": "T1547",
@@ -326,16 +286,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "new autostart registry/services entries",
             "startup-folder implants",
-            "T1547"
+            "T1547",
         ],
-        "log_patterns": [
-            "modification of Run keys / startup items",
-            "new auto-start service"
-        ],
-        "response_actions": [
-            "remove malicious autostart entries",
-            "baseline autostart locations"
-        ]
+        "log_patterns": ["modification of Run keys / startup items", "new auto-start service"],
+        "response_actions": ["remove malicious autostart entries", "baseline autostart locations"],
     },
     {
         "id": "T1068",
@@ -345,36 +299,26 @@ ALL_MITRE = [
         "detection_indicators": [
             "local privilege-escalation exploit",
             "kernel exploit indicators",
-            "T1068"
+            "T1068",
         ],
         "log_patterns": [
             "process unexpectedly running as SYSTEM/root",
-            "known privesc CVE exploitation"
+            "known privesc CVE exploitation",
         ],
         "response_actions": [
             "patch vulnerable component",
             "isolate host",
-            "hunt for follow-on actions"
-        ]
+            "hunt for follow-on actions",
+        ],
     },
     {
         "id": "T1548",
         "name": "Abuse Elevation Control Mechanism",
         "tactic": "Privilege Escalation",
         "description": "Adversaries may circumvent mechanisms designed to control elevated privileges (sudo, UAC, setuid) to gain higher-level permissions.",
-        "detection_indicators": [
-            "sudo/UAC bypass patterns",
-            "setuid abuse",
-            "T1548"
-        ],
-        "log_patterns": [
-            "unexpected sudo usage",
-            "UAC-bypass technique execution"
-        ],
-        "response_actions": [
-            "audit sudoers/UAC config",
-            "restrict elevation paths"
-        ]
+        "detection_indicators": ["sudo/UAC bypass patterns", "setuid abuse", "T1548"],
+        "log_patterns": ["unexpected sudo usage", "UAC-bypass technique execution"],
+        "response_actions": ["audit sudoers/UAC config", "restrict elevation paths"],
     },
     {
         "id": "T1134",
@@ -384,59 +328,40 @@ ALL_MITRE = [
         "detection_indicators": [
             "token theft/impersonation",
             "process running with stolen token",
-            "T1134"
+            "T1134",
         ],
-        "log_patterns": [
-            "token duplication/impersonation API usage",
-            "privilege context change"
-        ],
+        "log_patterns": ["token duplication/impersonation API usage", "privilege context change"],
         "response_actions": [
             "isolate host",
             "rotate impacted credentials",
-            "audit token-manipulation events"
-        ]
+            "audit token-manipulation events",
+        ],
     },
     {
         "id": "T1070",
         "name": "Indicator Removal",
         "tactic": "Stealth",
         "description": "Adversaries may delete or modify artifacts (logs, files, command history) to remove evidence of their presence and hinder detection.",
-        "detection_indicators": [
-            "log clearing",
-            "shell history deletion",
-            "timestomping",
-            "T1070"
-        ],
+        "detection_indicators": ["log clearing", "shell history deletion", "timestomping", "T1070"],
         "log_patterns": [
             "Windows event log cleared (1102)",
             "auth.log/secure truncated",
-            "history file emptied"
+            "history file emptied",
         ],
         "response_actions": [
             "forward logs off-host (immutable)",
             "alert on log-clearing",
-            "restore from backups"
-        ]
+            "restore from backups",
+        ],
     },
     {
         "id": "T1027",
         "name": "Obfuscated Files or Information",
         "tactic": "Stealth",
         "description": "Adversaries may obfuscate/encode files or commands (base64, packing, encryption) to evade detection and analysis.",
-        "detection_indicators": [
-            "base64/packed payloads",
-            "high-entropy content",
-            "T1027"
-        ],
-        "log_patterns": [
-            "encoded command-lines",
-            "packed binaries with high entropy"
-        ],
-        "response_actions": [
-            "deobfuscate and analyze",
-            "entropy-based detection",
-            "isolate host"
-        ]
+        "detection_indicators": ["base64/packed payloads", "high-entropy content", "T1027"],
+        "log_patterns": ["encoded command-lines", "packed binaries with high entropy"],
+        "response_actions": ["deobfuscate and analyze", "entropy-based detection", "isolate host"],
     },
     {
         "id": "T1562",
@@ -446,18 +371,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "security service stopped/disabled",
             "firewall/AV tampering",
-            "T1562"
+            "T1562",
         ],
-        "log_patterns": [
-            "EDR/AV service stop",
-            "firewall rule deletion",
-            "logging disabled"
-        ],
+        "log_patterns": ["EDR/AV service stop", "firewall rule deletion", "logging disabled"],
         "response_actions": [
             "re-enable and alert on defense tampering",
             "tamper-protect security tools",
-            "isolate host"
-        ]
+            "isolate host",
+        ],
     },
     {
         "id": "T1036",
@@ -467,17 +388,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "process name/path mismatch",
             "system-process impersonation",
-            "T1036"
+            "T1036",
         ],
-        "log_patterns": [
-            "svchost/lsass running from wrong path",
-            "double-extension files"
-        ],
+        "log_patterns": ["svchost/lsass running from wrong path", "double-extension files"],
         "response_actions": [
             "compare process path/hash to baseline",
             "alert on masquerading",
-            "quarantine artifact"
-        ]
+            "quarantine artifact",
+        ],
     },
     {
         "id": "T1497",
@@ -487,17 +405,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "sandbox/VM detection checks",
             "execution stalling/delays",
-            "T1497"
+            "T1497",
         ],
-        "log_patterns": [
-            "VM-artifact checks",
-            "long sleeps before payload"
-        ],
+        "log_patterns": ["VM-artifact checks", "long sleeps before payload"],
         "response_actions": [
             "use hardened analysis env",
             "extend detonation time",
-            "behavioral detection"
-        ]
+            "behavioral detection",
+        ],
     },
     {
         "id": "T1003",
@@ -508,18 +423,18 @@ ALL_MITRE = [
             "LSASS memory access",
             "SAM/NTDS access",
             "credential dumping tools",
-            "T1003"
+            "T1003",
         ],
         "log_patterns": [
             "procdump/mimikatz on lsass",
             "shadow/SAM file read",
-            "NTDS.dit extraction"
+            "NTDS.dit extraction",
         ],
         "response_actions": [
             "rotate exposed credentials",
             "enable Credential Guard",
-            "isolate and investigate"
-        ]
+            "isolate and investigate",
+        ],
     },
     {
         "id": "T1555",
@@ -529,17 +444,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "access to browser/keychain credential stores",
             "password-manager DB access",
-            "T1555"
+            "T1555",
         ],
-        "log_patterns": [
-            "read of browser login data DB",
-            "keychain/credential vault access"
-        ],
+        "log_patterns": ["read of browser login data DB", "keychain/credential vault access"],
         "response_actions": [
             "rotate stored credentials",
             "alert on credential-store access",
-            "isolate host"
-        ]
+            "isolate host",
+        ],
     },
     {
         "id": "T1552",
@@ -549,17 +461,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "credentials in plaintext files/scripts",
             "cloud metadata credential access",
-            "T1552"
+            "T1552",
         ],
-        "log_patterns": [
-            "grep for password/secret in files",
-            "access to 169.254.169.254 metadata"
-        ],
+        "log_patterns": ["grep for password/secret in files", "access to 169.254.169.254 metadata"],
         "response_actions": [
             "remove hardcoded secrets, use vaults",
             "restrict metadata access",
-            "rotate exposed keys"
-        ]
+            "rotate exposed keys",
+        ],
     },
     {
         "id": "T1557",
@@ -570,18 +479,18 @@ ALL_MITRE = [
             "ARP spoofing",
             "LLMNR/NBT-NS poisoning",
             "rogue gateway",
-            "T1557"
+            "T1557",
         ],
         "log_patterns": [
             "gratuitous ARP anomalies",
             "LLMNR/NBT-NS response from non-DNS host",
-            "MAC-IP binding changes"
+            "MAC-IP binding changes",
         ],
         "response_actions": [
             "enable dynamic ARP inspection",
             "disable LLMNR/NBT-NS",
-            "isolate rogue host"
-        ]
+            "isolate rogue host",
+        ],
     },
     {
         "id": "T1083",
@@ -591,54 +500,28 @@ ALL_MITRE = [
         "detection_indicators": [
             "recursive directory listing",
             "search for sensitive file types",
-            "T1083"
+            "T1083",
         ],
-        "log_patterns": [
-            "mass dir/file enumeration",
-            "search for *.kdbx/*.pem/*.config"
-        ],
-        "response_actions": [
-            "alert on mass enumeration",
-            "monitor sensitive-file access"
-        ]
+        "log_patterns": ["mass dir/file enumeration", "search for *.kdbx/*.pem/*.config"],
+        "response_actions": ["alert on mass enumeration", "monitor sensitive-file access"],
     },
     {
         "id": "T1087",
         "name": "Account Discovery",
         "tactic": "Discovery",
         "description": "Adversaries may enumerate accounts (local, domain, cloud, email) to understand the environment and plan further actions.",
-        "detection_indicators": [
-            "enumeration of users/groups",
-            "LDAP/AD account queries",
-            "T1087"
-        ],
-        "log_patterns": [
-            "net user/net group enumeration",
-            "bulk LDAP account queries"
-        ],
-        "response_actions": [
-            "alert on bulk account enumeration",
-            "limit directory read access"
-        ]
+        "detection_indicators": ["enumeration of users/groups", "LDAP/AD account queries", "T1087"],
+        "log_patterns": ["net user/net group enumeration", "bulk LDAP account queries"],
+        "response_actions": ["alert on bulk account enumeration", "limit directory read access"],
     },
     {
         "id": "T1135",
         "name": "Network Share Discovery",
         "tactic": "Discovery",
         "description": "Adversaries may look for shared folders and drives on remote systems to identify data and lateral-movement targets.",
-        "detection_indicators": [
-            "SMB share enumeration",
-            "net view / share scans",
-            "T1135"
-        ],
-        "log_patterns": [
-            "enumeration of network shares",
-            "SMB tree-connect sweep"
-        ],
-        "response_actions": [
-            "audit share permissions",
-            "alert on share enumeration"
-        ]
+        "detection_indicators": ["SMB share enumeration", "net view / share scans", "T1135"],
+        "log_patterns": ["enumeration of network shares", "SMB tree-connect sweep"],
+        "response_actions": ["audit share permissions", "alert on share enumeration"],
     },
     {
         "id": "T1049",
@@ -648,16 +531,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "netstat / connection enumeration",
             "active session listing",
-            "T1049"
+            "T1049",
         ],
-        "log_patterns": [
-            "netstat/ss execution",
-            "enumeration of established sessions"
-        ],
-        "response_actions": [
-            "baseline normal discovery",
-            "alert on recon from non-admin hosts"
-        ]
+        "log_patterns": ["netstat/ss execution", "enumeration of established sessions"],
+        "response_actions": ["baseline normal discovery", "alert on recon from non-admin hosts"],
     },
     {
         "id": "T1550",
@@ -668,77 +545,53 @@ ALL_MITRE = [
             "pass-the-hash/ticket patterns",
             "NTLM relay",
             "Kerberos ticket reuse",
-            "T1550"
+            "T1550",
         ],
         "log_patterns": [
             "overpass-the-hash logon",
             "PtH NTLM auth from unusual host",
-            "golden/silver ticket usage"
+            "golden/silver ticket usage",
         ],
         "response_actions": [
             "rotate krbtgt and impacted creds",
             "enable Credential Guard",
-            "monitor anomalous Kerberos"
-        ]
+            "monitor anomalous Kerberos",
+        ],
     },
     {
         "id": "T1563",
         "name": "Remote Service Session Hijacking",
         "tactic": "Lateral Movement",
         "description": "Adversaries may take control of preexisting remote sessions (RDP, SSH) to move laterally using already-authenticated access.",
-        "detection_indicators": [
-            "hijacked RDP/SSH session",
-            "session takeover patterns",
-            "T1563"
-        ],
-        "log_patterns": [
-            "RDP session reconnect anomaly",
-            "SSH session multiplexing abuse"
-        ],
+        "detection_indicators": ["hijacked RDP/SSH session", "session takeover patterns", "T1563"],
+        "log_patterns": ["RDP session reconnect anomaly", "SSH session multiplexing abuse"],
         "response_actions": [
             "terminate suspicious sessions",
             "alert on session hijack",
-            "isolate hosts"
-        ]
+            "isolate hosts",
+        ],
     },
     {
         "id": "T1005",
         "name": "Data from Local System",
         "tactic": "Collection",
         "description": "Adversaries may search local system sources (file systems, databases) to collect data of interest prior to exfiltration.",
-        "detection_indicators": [
-            "bulk local data access",
-            "staging of collected files",
-            "T1005"
-        ],
-        "log_patterns": [
-            "mass read of documents/DB files",
-            "archive creation before exfil"
-        ],
+        "detection_indicators": ["bulk local data access", "staging of collected files", "T1005"],
+        "log_patterns": ["mass read of documents/DB files", "archive creation before exfil"],
         "response_actions": [
             "DLP on sensitive data",
             "alert on bulk collection",
-            "investigate staging"
-        ]
+            "investigate staging",
+        ],
     },
     {
         "id": "T1119",
         "name": "Automated Collection",
         "tactic": "Collection",
         "description": "Adversaries may use automated techniques (scripts) to gather internal data, often with other discovery techniques.",
-        "detection_indicators": [
-            "scripted mass collection",
-            "scheduled data gathering",
-            "T1119"
-        ],
-        "log_patterns": [
-            "automated archive of many files",
-            "loop-based file collection"
-        ],
-        "response_actions": [
-            "alert on automated collection patterns",
-            "DLP and access monitoring"
-        ]
+        "detection_indicators": ["scripted mass collection", "scheduled data gathering", "T1119"],
+        "log_patterns": ["automated archive of many files", "loop-based file collection"],
+        "response_actions": ["alert on automated collection patterns", "DLP and access monitoring"],
     },
     {
         "id": "T1039",
@@ -748,17 +601,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "bulk access to network shares",
             "copying from file servers",
-            "T1039"
+            "T1039",
         ],
-        "log_patterns": [
-            "mass file reads from SMB shares",
-            "staging from network drives"
-        ],
+        "log_patterns": ["mass file reads from SMB shares", "staging from network drives"],
         "response_actions": [
             "audit share access",
             "DLP on file servers",
-            "alert on bulk share reads"
-        ]
+            "alert on bulk share reads",
+        ],
     },
     {
         "id": "T1105",
@@ -768,17 +618,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "download of tooling from internet",
             "LOLBin file download",
-            "T1105"
+            "T1105",
         ],
-        "log_patterns": [
-            "certutil/bitsadmin/curl downloading executable",
-            "tool transfer over C2"
-        ],
+        "log_patterns": ["certutil/bitsadmin/curl downloading executable", "tool transfer over C2"],
         "response_actions": [
             "block download sources",
             "alert on LOLBin downloads",
-            "quarantine transferred tools"
-        ]
+            "quarantine transferred tools",
+        ],
     },
     {
         "id": "T1573",
@@ -788,37 +635,26 @@ ALL_MITRE = [
         "detection_indicators": [
             "TLS C2 to suspicious endpoints",
             "custom-encrypted beacon",
-            "T1573"
+            "T1573",
         ],
-        "log_patterns": [
-            "self-signed/JA3-anomalous TLS to C2",
-            "periodic encrypted beacon"
-        ],
+        "log_patterns": ["self-signed/JA3-anomalous TLS to C2", "periodic encrypted beacon"],
         "response_actions": [
             "TLS inspection/JA3 fingerprinting",
             "block C2 destinations",
-            "isolate host"
-        ]
+            "isolate host",
+        ],
     },
     {
         "id": "T1568",
         "name": "Dynamic Resolution",
         "tactic": "Command And Control",
         "description": "Adversaries may dynamically establish C2 by changing infrastructure (DGA, fast flux, DNS calculation) to evade blocking.",
-        "detection_indicators": [
-            "DGA domains",
-            "fast-flux DNS",
-            "high NXDOMAIN rate",
-            "T1568"
-        ],
+        "detection_indicators": ["DGA domains", "fast-flux DNS", "high NXDOMAIN rate", "T1568"],
         "log_patterns": [
             "many algorithmically-generated domain lookups",
-            "rapidly-changing A records"
+            "rapidly-changing A records",
         ],
-        "response_actions": [
-            "DGA detection and DNS sinkholing",
-            "block resolved C2 IPs"
-        ]
+        "response_actions": ["DGA detection and DNS sinkholing", "block resolved C2 IPs"],
     },
     {
         "id": "T1090.003",
@@ -828,16 +664,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "traffic to TOR entry/exit nodes",
             "multi-hop relay chains",
-            "T1090.003"
+            "T1090.003",
         ],
-        "log_patterns": [
-            "connections to known TOR nodes",
-            "chained proxy hops"
-        ],
-        "response_actions": [
-            "block TOR infrastructure",
-            "alert on anonymization-network use"
-        ]
+        "log_patterns": ["connections to known TOR nodes", "chained proxy hops"],
+        "response_actions": ["block TOR infrastructure", "alert on anonymization-network use"],
     },
     {
         "id": "T1567",
@@ -847,17 +677,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "upload to cloud storage/paste sites",
             "data to code repositories",
-            "T1567"
+            "T1567",
         ],
-        "log_patterns": [
-            "large uploads to pastebin/dropbox/github",
-            "exfil to web service API"
-        ],
+        "log_patterns": ["large uploads to pastebin/dropbox/github", "exfil to web service API"],
         "response_actions": [
             "DLP on web-service uploads",
             "restrict/monitor cloud egress",
-            "block confirmed exfil services"
-        ]
+            "block confirmed exfil services",
+        ],
     },
     {
         "id": "T1030",
@@ -867,16 +694,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "uniform-sized periodic transfers",
             "chunked exfiltration",
-            "T1030"
+            "T1030",
         ],
-        "log_patterns": [
-            "repeated equal-sized outbound transfers",
-            "low-and-slow exfil pattern"
-        ],
-        "response_actions": [
-            "correlate chunked transfers over time",
-            "DLP on cumulative volume"
-        ]
+        "log_patterns": ["repeated equal-sized outbound transfers", "low-and-slow exfil pattern"],
+        "response_actions": ["correlate chunked transfers over time", "DLP on cumulative volume"],
     },
     {
         "id": "T1020",
@@ -886,16 +707,10 @@ ALL_MITRE = [
         "detection_indicators": [
             "scripted/scheduled exfiltration",
             "automated upload routines",
-            "T1020"
+            "T1020",
         ],
-        "log_patterns": [
-            "scheduled outbound transfer jobs",
-            "automated exfil after collection"
-        ],
-        "response_actions": [
-            "alert on automated exfil patterns",
-            "DLP and egress monitoring"
-        ]
+        "log_patterns": ["scheduled outbound transfer jobs", "automated exfil after collection"],
+        "response_actions": ["alert on automated exfil patterns", "DLP and egress monitoring"],
     },
     {
         "id": "T1486",
@@ -906,57 +721,40 @@ ALL_MITRE = [
             "mass file encryption",
             "ransom notes",
             "shadow-copy deletion",
-            "T1486"
+            "T1486",
         ],
         "log_patterns": [
             "rapid file modification/rename to encrypted extensions",
             "vssadmin delete shadows",
-            "ransom note creation"
+            "ransom note creation",
         ],
         "response_actions": [
             "isolate affected hosts immediately",
             "restore from offline backups",
-            "block ransomware C2/spread"
-        ]
+            "block ransomware C2/spread",
+        ],
     },
     {
         "id": "T1490",
         "name": "Inhibit System Recovery",
         "tactic": "Impact",
         "description": "Adversaries may delete or disable recovery features (shadow copies, backups, recovery console) to maximize impact of destructive attacks.",
-        "detection_indicators": [
-            "shadow copy/backup deletion",
-            "recovery disabled",
-            "T1490"
-        ],
-        "log_patterns": [
-            "vssadmin/wbadmin delete",
-            "bcdedit recovery disable"
-        ],
-        "response_actions": [
-            "maintain offline immutable backups",
-            "alert on recovery tampering"
-        ]
+        "detection_indicators": ["shadow copy/backup deletion", "recovery disabled", "T1490"],
+        "log_patterns": ["vssadmin/wbadmin delete", "bcdedit recovery disable"],
+        "response_actions": ["maintain offline immutable backups", "alert on recovery tampering"],
     },
     {
         "id": "T1489",
         "name": "Service Stop",
         "tactic": "Impact",
         "description": "Adversaries may stop or disable services to render systems unusable or to aid further attacks (e.g., stopping DBs before ransomware).",
-        "detection_indicators": [
-            "critical services stopped",
-            "DB/backup services killed",
-            "T1489"
-        ],
-        "log_patterns": [
-            "mass service stop",
-            "termination of database/security services"
-        ],
+        "detection_indicators": ["critical services stopped", "DB/backup services killed", "T1489"],
+        "log_patterns": ["mass service stop", "termination of database/security services"],
         "response_actions": [
             "alert on critical-service stop",
             "restore services",
-            "investigate intent"
-        ]
+            "investigate intent",
+        ],
     },
     {
         "id": "T1496",
@@ -966,17 +764,14 @@ ALL_MITRE = [
         "detection_indicators": [
             "cryptomining traffic/processes",
             "sustained high CPU/GPU",
-            "T1496"
+            "T1496",
         ],
-        "log_patterns": [
-            "connections to mining pools",
-            "miner process/user-agent"
-        ],
+        "log_patterns": ["connections to mining pools", "miner process/user-agent"],
         "response_actions": [
             "block mining pools",
             "kill miner and isolate host",
-            "investigate initial access"
-        ]
+            "investigate initial access",
+        ],
     },
     {
         "id": "T1046",
@@ -987,20 +782,20 @@ ALL_MITRE = [
             "Port scanning across many distinct destination ports",
             "High count of unique destination ports from a single source IP",
             "SYN scan / connect scan patterns",
-            "T1046"
+            "T1046",
         ],
         "log_patterns": [
             "single Source IP contacting > 10 non-HTTP ports in short window",
             "sequential or randomized destination port access",
             "low packet count per flow across many ports",
-            "Tier-1 session baseline: Port scan detected"
+            "Tier-1 session baseline: Port scan detected",
         ],
         "response_actions": [
             "rate-limit or block scanning Source IP at firewall",
             "correlate with subsequent exploitation attempts",
             "enable port-scan detection signatures on IDS",
-            "monitor the scanned hosts for follow-on access"
-        ]
+            "monitor the scanned hosts for follow-on access",
+        ],
     },
     {
         "id": "T1078",
@@ -1012,19 +807,19 @@ ALL_MITRE = [
             "login from anomalous geolocation or ASN",
             "concurrent sessions for the same account",
             "service account interactive logon",
-            "T1078"
+            "T1078",
         ],
         "log_patterns": [
             "failed brute-force burst followed by a single SUCCESS for same account",
             "authentication from new/unrecognized Source IP",
-            "off-hours privileged login"
+            "off-hours privileged login",
         ],
         "response_actions": [
             "force password reset and revoke active sessions",
             "enforce MFA on the account",
             "review account privileges for least-privilege",
-            "hunt for lateral movement from the account"
-        ]
+            "hunt for lateral movement from the account",
+        ],
     },
     {
         "id": "T1041",
@@ -1035,19 +830,19 @@ ALL_MITRE = [
             "large outbound data volume to a known C2 endpoint",
             "asymmetric flow (small inbound, large outbound)",
             "data transfer correlated with beaconing host",
-            "T1041"
+            "T1041",
         ],
         "log_patterns": [
             "Total Length of Fwd Packets anomalously high to external IP",
             "sustained outbound flow to non-business destination",
-            "exfil over already-flagged C2 session"
+            "exfil over already-flagged C2 session",
         ],
         "response_actions": [
             "block the C2 destination and isolate the source host",
             "capture full PCAP for forensic scoping",
             "identify what data left the network (DLP review)",
-            "rotate any credentials/secrets potentially exposed"
-        ]
+            "rotate any credentials/secrets potentially exposed",
+        ],
     },
     {
         "id": "T1018",
@@ -1058,18 +853,18 @@ ALL_MITRE = [
             "host sweeping via ICMP/ARP across subnet",
             "enumeration of SMB/AD hosts",
             "many short-lived connections to internal hosts",
-            "T1018"
+            "T1018",
         ],
         "log_patterns": [
             "single internal IP contacting many other internal IPs",
             "ping sweep pattern within RFC1918 range",
-            "discovery activity preceding lateral movement"
+            "discovery activity preceding lateral movement",
         ],
         "response_actions": [
             "isolate the discovering host pending review",
             "tighten east-west segmentation",
-            "alert on internal reconnaissance from non-admin hosts"
-        ]
+            "alert on internal reconnaissance from non-admin hosts",
+        ],
     },
     {
         "id": "T1110.002",
@@ -1079,18 +874,18 @@ ALL_MITRE = [
         "detection_indicators": [
             "preceding credential dumping activity",
             "sudden valid-account access after data theft",
-            "T1110.002"
+            "T1110.002",
         ],
         "log_patterns": [
             "access to SAM/LSASS or shadow files",
             "AS-REP roasting requests",
-            "successful logon with cracked credentials"
+            "successful logon with cracked credentials",
         ],
         "response_actions": [
             "rotate all potentially-exposed credentials",
             "increase password hash iteration/length policy",
-            "monitor for offline-cracked account usage"
-        ]
+            "monitor for offline-cracked account usage",
+        ],
     },
     {
         "id": "T1110.003",
@@ -1101,18 +896,18 @@ ALL_MITRE = [
             "one password tried against many distinct usernames",
             "low failure rate per account but high across the org",
             "distributed login attempts over time",
-            "T1110.003"
+            "T1110.003",
         ],
         "log_patterns": [
             "many accounts each with 1-2 failed logins from same Source IP",
             "authentication failures spread across user base",
-            "spray pattern below per-account lockout threshold"
+            "spray pattern below per-account lockout threshold",
         ],
         "response_actions": [
             "block source IP and enforce org-wide MFA",
             "implement smart lockout / risk-based auth",
-            "alert on horizontal authentication anomalies"
-        ]
+            "alert on horizontal authentication anomalies",
+        ],
     },
     {
         "id": "T1110.004",
@@ -1123,18 +918,18 @@ ALL_MITRE = [
             "high-volume automated login attempts to web auth endpoint",
             "rotating Source IPs with consistent user-agent",
             "known-breached credential pairs",
-            "T1110.004"
+            "T1110.004",
         ],
         "log_patterns": [
             "burst of POST /login from botnet IPs",
             "high request rate to authentication URI",
-            "credential-stuffing tooling user-agent"
+            "credential-stuffing tooling user-agent",
         ],
         "response_actions": [
             "deploy CAPTCHA / bot mitigation at login",
             "block offending IP ranges and enforce MFA",
-            "monitor for successful stuffed logins"
-        ]
+            "monitor for successful stuffed logins",
+        ],
     },
     {
         "id": "T1498.001",
@@ -1145,18 +940,18 @@ ALL_MITRE = [
             "abnormal spike in inbound packets/sec",
             "SYN/UDP flood signatures",
             "bandwidth saturation toward one service",
-            "T1498.001"
+            "T1498.001",
         ],
         "log_patterns": [
             "Flow Pkts/s far above baseline toward single destination",
             "high Total Fwd Packets volumetric pattern",
-            "many half-open connections"
+            "many half-open connections",
         ],
         "response_actions": [
             "engage upstream DDoS scrubbing / BGP blackhole",
             "rate-limit at edge, do NOT block (often spoofed)",
-            "scale or failover the targeted service"
-        ]
+            "scale or failover the targeted service",
+        ],
     },
     {
         "id": "T1499.001",
@@ -1167,18 +962,18 @@ ALL_MITRE = [
             "many slow/incomplete connections held open",
             "connection table exhaustion on host",
             "Slowloris HTTP partial requests",
-            "T1499.001"
+            "T1499.001",
         ],
         "log_patterns": [
             "high count of long-duration low-throughput flows",
             "Flow Duration anomalously high with tiny packet payloads",
-            "concurrent half-open sessions to web server"
+            "concurrent half-open sessions to web server",
         ],
         "response_actions": [
             "lower connection timeouts and cap per-IP connections",
             "deploy reverse proxy that buffers slow requests",
-            "block offending Source IPs"
-        ]
+            "block offending Source IPs",
+        ],
     },
     {
         "id": "T1095",
@@ -1189,18 +984,18 @@ ALL_MITRE = [
             "unusual ICMP/raw-socket traffic volume",
             "C2 over non-standard transport",
             "data encoded in ICMP echo payloads",
-            "T1095"
+            "T1095",
         ],
         "log_patterns": [
             "abnormal ICMP request size/frequency",
             "non-TCP/UDP protocol numbers in flow records",
-            "periodic beacon over transport protocol"
+            "periodic beacon over transport protocol",
         ],
         "response_actions": [
             "block non-essential ICMP/raw protocols at egress",
             "inspect payloads of allowed non-app protocols",
-            "isolate beaconing host"
-        ]
+            "isolate beaconing host",
+        ],
     },
     {
         "id": "T1571",
@@ -1211,18 +1006,18 @@ ALL_MITRE = [
             "known protocol running on unexpected port",
             "HTTP/TLS on non-standard ports",
             "C2 over uncommon high ports",
-            "T1571"
+            "T1571",
         ],
         "log_patterns": [
             "TLS handshake on non-443 port",
             "Destination Port unusual for the observed protocol",
-            "outbound to high non-standard port sustained"
+            "outbound to high non-standard port sustained",
         ],
         "response_actions": [
             "enforce egress allowlist by port",
             "deep-packet-inspect protocol/port mismatches",
-            "block anomalous port usage to external IPs"
-        ]
+            "block anomalous port usage to external IPs",
+        ],
     },
     {
         "id": "T1572",
@@ -1233,18 +1028,18 @@ ALL_MITRE = [
             "DNS queries with high-entropy/large TXT payloads",
             "SSH connections used as SOCKS proxy",
             "encapsulated protocol inside another",
-            "T1572"
+            "T1572",
         ],
         "log_patterns": [
             "abnormally high DNS query volume to one domain",
             "long-lived SSH session with port forwarding",
-            "HTTP CONNECT to arbitrary hosts"
+            "HTTP CONNECT to arbitrary hosts",
         ],
         "response_actions": [
             "restrict and monitor DNS to approved resolvers",
             "block unauthorized tunneling/proxy use",
-            "alert on DNS exfiltration heuristics"
-        ]
+            "alert on DNS exfiltration heuristics",
+        ],
     },
     {
         "id": "T1090",
@@ -1255,18 +1050,18 @@ ALL_MITRE = [
             "traffic relayed through intermediary hosts",
             "use of TOR / open proxies",
             "multi-hop or chained connections",
-            "T1090"
+            "T1090",
         ],
         "log_patterns": [
             "connections to known proxy/TOR exit nodes",
             "internal host acting as relay between others",
-            "domain-fronted TLS SNI mismatch"
+            "domain-fronted TLS SNI mismatch",
         ],
         "response_actions": [
             "block known proxy/TOR infrastructure",
             "investigate internal relay hosts",
-            "enforce direct, logged egress paths"
-        ]
+            "enforce direct, logged egress paths",
+        ],
     },
     {
         "id": "T1048",
@@ -1277,18 +1072,18 @@ ALL_MITRE = [
             "large outbound transfer over FTP/SMTP/DNS not used for C2",
             "data sent to a different endpoint than C2",
             "unusual protocol carrying bulk data out",
-            "T1048"
+            "T1048",
         ],
         "log_patterns": [
             "bulk outbound over FTP/SMTP to external IP",
             "DNS exfiltration with encoded subdomains",
-            "off-channel data transfer to new destination"
+            "off-channel data transfer to new destination",
         ],
         "response_actions": [
             "DLP inspection and block on alternative egress protocols",
             "isolate source host and scope data loss",
-            "restrict outbound protocols by policy"
-        ]
+            "restrict outbound protocols by policy",
+        ],
     },
     {
         "id": "T1556",
@@ -1299,18 +1094,18 @@ ALL_MITRE = [
             "unauthorized changes to PAM/LSA modules",
             "rogue authentication packages registered",
             "MFA bypass configuration changes",
-            "T1556"
+            "T1556",
         ],
         "log_patterns": [
             "modification of /etc/pam.d or security packages",
             "new auth provider registered",
-            "authentication succeeding without expected factor"
+            "authentication succeeding without expected factor",
         ],
         "response_actions": [
             "restore authentication config from known-good baseline",
             "rotate credentials and re-enroll MFA",
-            "audit authentication module integrity"
-        ]
+            "audit authentication module integrity",
+        ],
     },
     {
         "id": "T1212",
@@ -1321,18 +1116,18 @@ ALL_MITRE = [
             "exploitation attempts against auth services",
             "anomalous DC/Kerberos traffic",
             "known credential-access CVE exploitation",
-            "T1212"
+            "T1212",
         ],
         "log_patterns": [
             "malformed authentication protocol requests",
             "exploit signature against LDAP/Kerberos/SMB",
-            "credential-access exploit matching known CVE"
+            "credential-access exploit matching known CVE",
         ],
         "response_actions": [
             "patch the exploited authentication service immediately",
             "rotate domain/krbtgt credentials if DC affected",
-            "block exploit source and hunt for follow-on access"
-        ]
+            "block exploit source and hunt for follow-on access",
+        ],
     },
     {
         "id": "T1210",
@@ -1343,18 +1138,18 @@ ALL_MITRE = [
             "exploitation of SMB/RDP/SSH on internal hosts",
             "lateral RCE attempts east-west",
             "known remote-service CVE traffic",
-            "T1210"
+            "T1210",
         ],
         "log_patterns": [
             "exploit signature against internal SMB/RDP",
             "internal host triggering RCE pattern on peer",
-            "lateral movement following exploitation"
+            "lateral movement following exploitation",
         ],
         "response_actions": [
             "isolate exploited and source hosts",
             "patch vulnerable remote services network-wide",
-            "enforce internal segmentation and disable legacy SMBv1"
-        ]
+            "enforce internal segmentation and disable legacy SMBv1",
+        ],
     },
     {
         "id": "T1570",
@@ -1365,18 +1160,18 @@ ALL_MITRE = [
             "binaries copied to admin shares (C$, ADMIN$)",
             "file transfer between internal hosts",
             "staging of tooling on multiple hosts",
-            "T1570"
+            "T1570",
         ],
         "log_patterns": [
             "SMB write of executable to remote admin share",
             "internal file copy preceding execution",
-            "lateral transfer of known tool hashes"
+            "lateral transfer of known tool hashes",
         ],
         "response_actions": [
             "block executable writes to admin shares",
             "quarantine transferred tooling and source host",
-            "hunt for the tool across all endpoints"
-        ]
+            "hunt for the tool across all endpoints",
+        ],
     },
     {
         "id": "T1133",
@@ -1387,19 +1182,19 @@ ALL_MITRE = [
             "external login to VPN/RDP gateway from new IP",
             "brute force against remote access portal",
             "valid-account access from untrusted network",
-            "T1133"
+            "T1133",
         ],
         "log_patterns": [
             "authentication to internet-facing VPN/RDP from anomalous geo",
             "remote service login outside business hours",
-            "repeated failures then success on remote portal"
+            "repeated failures then success on remote portal",
         ],
         "response_actions": [
             "enforce MFA on all external remote services",
             "geo-fence and conditional-access policies",
-            "block source and review remote-access logs"
-        ]
-    }
+            "block source and review remote-access logs",
+        ],
+    },
 ]
 
 ALL_NIST = [
@@ -1409,7 +1204,7 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for ransomware (MITRE T1486 Data Encrypted for Impact, T1490 Inhibit System Recovery, T1489 Service Stop) where data is encrypted for extortion.",
         "applicability": "Relevant when detecting rapid mass file encryption, ransom notes, shadow-copy/backup deletion, or service-stop activity preceding encryption.",
-        "response_guidance": "DETECTION & ANALYSIS: Identify patient-zero, encryption scope, and ransomware family. CONTAINMENT: Immediately isolate affected hosts from the network (keep powered on for forensics), block spread via SMB/admin shares, and disable affected accounts. ERADICATION & RECOVERY: Remove the ransomware, rebuild encrypted hosts, and restore from OFFLINE/immutable backups (do NOT pay). POST-INCIDENT: Close the initial-access vector, enforce offline backups + EDR, and segment to limit blast radius."
+        "response_guidance": "DETECTION & ANALYSIS: Identify patient-zero, encryption scope, and ransomware family. CONTAINMENT: Immediately isolate affected hosts from the network (keep powered on for forensics), block spread via SMB/admin shares, and disable affected accounts. ERADICATION & RECOVERY: Remove the ransomware, rebuild encrypted hosts, and restore from OFFLINE/immutable backups (do NOT pay). POST-INCIDENT: Close the initial-access vector, enforce offline backups + EDR, and segment to limit blast radius.",
     },
     {
         "control": "NIST.IR.CREDACCESS",
@@ -1417,7 +1212,7 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for credential access (MITRE T1003 OS Credential Dumping, T1555 Password Stores, T1552 Unsecured Credentials, T1557 AiTM) where account secrets are stolen.",
         "applicability": "Relevant when detecting LSASS/SAM/shadow access, credential-store reads, ARP/LLMNR poisoning, or use of cracked/dumped credentials.",
-        "response_guidance": "DETECTION & ANALYSIS: Determine which credentials were exposed and how. CONTAINMENT: Force-reset and revoke sessions for all exposed accounts, enforce MFA, and isolate the dumping host. ERADICATION & RECOVERY: Rotate service/domain credentials (krbtgt twice if DC affected), enable Credential Guard, and remove the dumping tooling. POST-INCIDENT: Deploy LSASS protection, disable LLMNR/NBT-NS, and monitor for pass-the-hash/ticket."
+        "response_guidance": "DETECTION & ANALYSIS: Determine which credentials were exposed and how. CONTAINMENT: Force-reset and revoke sessions for all exposed accounts, enforce MFA, and isolate the dumping host. ERADICATION & RECOVERY: Rotate service/domain credentials (krbtgt twice if DC affected), enable Credential Guard, and remove the dumping tooling. POST-INCIDENT: Deploy LSASS protection, disable LLMNR/NBT-NS, and monitor for pass-the-hash/ticket.",
     },
     {
         "control": "NIST.IR.WEBSHELL",
@@ -1425,7 +1220,7 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for web shells / server software component backdoors (MITRE T1505.003) providing persistent command execution on web servers.",
         "applicability": "Relevant when detecting suspicious files in web roots, command execution via HTTP parameters, or web servers spawning shells.",
-        "response_guidance": "DETECTION & ANALYSIS: Locate the web shell file(s) and review web/access logs for the upload vector and commands executed. CONTAINMENT: Quarantine the web shell, block the attacker IP at the WAF, and take the affected app offline if active compromise. ERADICATION & RECOVERY: Patch the exploited web vulnerability, audit web-root integrity, and rebuild if backdoors are widespread. POST-INCIDENT: Add file-integrity monitoring on web roots and WAF rules for the exploit."
+        "response_guidance": "DETECTION & ANALYSIS: Locate the web shell file(s) and review web/access logs for the upload vector and commands executed. CONTAINMENT: Quarantine the web shell, block the attacker IP at the WAF, and take the affected app offline if active compromise. ERADICATION & RECOVERY: Patch the exploited web vulnerability, audit web-root integrity, and rebuild if backdoors are widespread. POST-INCIDENT: Add file-integrity monitoring on web roots and WAF rules for the exploit.",
     },
     {
         "control": "NIST.IR.RECON",
@@ -1433,7 +1228,7 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for handling reconnaissance activity such as port scanning, host sweeping, and network/remote system discovery (MITRE T1046, T1018) that typically precedes exploitation.",
         "applicability": "Relevant when the agent detects a single Source IP touching many distinct ports, ping/host sweeps across an internal subnet, or service enumeration patterns from the Tier-1 session baseline.",
-        "response_guidance": "DETECTION & ANALYSIS: Confirm scan source, scope (which hosts/ports), and whether it is internal (potential lateral recon) or external. CONTAINMENT: Rate-limit or block the scanning Source IP at the firewall; for internal sources, isolate the host pending review. ERADICATION & RECOVERY: Patch any exposed vulnerable services discovered, tighten firewall egress/ingress rules and network segmentation. POST-INCIDENT: Tune IDS port-scan thresholds; treat recon as an early-warning indicator and watch the scanned assets for follow-on access."
+        "response_guidance": "DETECTION & ANALYSIS: Confirm scan source, scope (which hosts/ports), and whether it is internal (potential lateral recon) or external. CONTAINMENT: Rate-limit or block the scanning Source IP at the firewall; for internal sources, isolate the host pending review. ERADICATION & RECOVERY: Patch any exposed vulnerable services discovered, tighten firewall egress/ingress rules and network segmentation. POST-INCIDENT: Tune IDS port-scan thresholds; treat recon as an early-warning indicator and watch the scanned assets for follow-on access.",
     },
     {
         "control": "NIST.IR.LATERAL",
@@ -1441,7 +1236,7 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for handling lateral movement across the internal network (MITRE T1021 Remote Services, T1210 Exploitation of Remote Services, T1570 Lateral Tool Transfer) during multi-stage / APT intrusions.",
         "applicability": "Relevant when the agent correlates a Source IP across multiple internal hosts/sensors, observes east-west exploitation, SMB admin-share writes, or APT chain events spanning multiple days (DAPT2020 chains).",
-        "response_guidance": "DETECTION & ANALYSIS: Map the movement path (source host -> targets), identify the pivot account and technique. CONTAINMENT: Isolate all hosts on the lateral path, disable the compromised account, and block internal RDP/SMB between the affected segments. ERADICATION & RECOVERY: Patch exploited remote services, remove transferred tooling, rotate credentials used for movement, and rebuild confirmed-compromised hosts. POST-INCIDENT: Enforce micro-segmentation, disable legacy protocols (SMBv1), and add detection for admin-share executable writes."
+        "response_guidance": "DETECTION & ANALYSIS: Map the movement path (source host -> targets), identify the pivot account and technique. CONTAINMENT: Isolate all hosts on the lateral path, disable the compromised account, and block internal RDP/SMB between the affected segments. ERADICATION & RECOVERY: Patch exploited remote services, remove transferred tooling, rotate credentials used for movement, and rebuild confirmed-compromised hosts. POST-INCIDENT: Enforce micro-segmentation, disable legacy protocols (SMBv1), and add detection for admin-share executable writes.",
     },
     {
         "control": "NIST.IR.BOTNET",
@@ -1449,7 +1244,7 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for handling botnet infections and C2 communications (MITRE T1071 Application Layer Protocol, T1095 Non-Application Layer Protocol, T1571 Non-Standard Port, T1572 Protocol Tunneling, T1090 Proxy).",
         "applicability": "Relevant when the agent detects periodic beaconing, traffic to known C2/TOR infrastructure, protocol/port mismatches, DNS tunneling, or hosts acting as relays.",
-        "response_guidance": "DETECTION & ANALYSIS: Identify the C2 destination(s), beacon interval, and all hosts beaconing. CONTAINMENT: Sinkhole/block the C2 domains and IPs at the firewall and DNS, isolate beaconing hosts. ERADICATION & RECOVERY: Remove the malware/implant, rebuild hosts if persistence is confirmed, and rotate exposed credentials. POST-INCIDENT: Add egress allowlisting, monitor for beaconing heuristics and DNS exfiltration, and share C2 IOCs to threat intel."
+        "response_guidance": "DETECTION & ANALYSIS: Identify the C2 destination(s), beacon interval, and all hosts beaconing. CONTAINMENT: Sinkhole/block the C2 domains and IPs at the firewall and DNS, isolate beaconing hosts. ERADICATION & RECOVERY: Remove the malware/implant, rebuild hosts if persistence is confirmed, and rotate exposed credentials. POST-INCIDENT: Add egress allowlisting, monitor for beaconing heuristics and DNS exfiltration, and share C2 IOCs to threat intel.",
     },
     {
         "control": "NIST.IR.ZERODAY",
@@ -1457,13 +1252,13 @@ ALL_NIST = [
         "domain": "Incident Response Life Cycle",
         "description": "Playbook for handling signature-less / zero-day threats detected via statistical anomaly (Tier-1 Welford Z-Score) where no known signature matches, requiring Tier-2 LLM reasoning to triage.",
         "applicability": "Relevant when Tier-1 escalates a flow with a high Z-Score (> 3.5) on core features (Flow Duration, packet/byte volumes) but no static rule or WAF signature fires — i.e., a novel or evasive attack.",
-        "response_guidance": "DETECTION & ANALYSIS: Treat the anomaly as suspicious-by-default; capture full context (which feature deviated, by how many sigma) and full PCAP for the flow. CONTAINMENT: Apply a conservative containment (ALERT + monitor, or AWAIT_HITL for high-value assets) rather than auto-block, to limit false-positive impact; escalate to a human analyst. ERADICATION & RECOVERY: If confirmed malicious, derive a new signature/dynamic rule and push it to Tier-1 via the feedback loop; patch the targeted asset. POST-INCIDENT: Feed the confirmed sample back to retrain/recalibrate the baseline and update detection content; document the novel TTP."
-    }
+        "response_guidance": "DETECTION & ANALYSIS: Treat the anomaly as suspicious-by-default; capture full context (which feature deviated, by how many sigma) and full PCAP for the flow. CONTAINMENT: Apply a conservative containment (ALERT + monitor, or AWAIT_HITL for high-value assets) rather than auto-block, to limit false-positive impact; escalate to a human analyst. ERADICATION & RECOVERY: If confirmed malicious, derive a new signature/dynamic rule and push it to Tier-1 via the feedback loop; patch the targeted asset. POST-INCIDENT: Feed the confirmed sample back to retrain/recalibrate the baseline and update detection content; document the novel TTP.",
+    },
 ]
 
 
 def _load(path):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -1497,15 +1292,22 @@ def extend_knowledge_base():
     nist["_total_controls"] = len(controls)
     _save(NIST_PATH, nist)
 
-    print(f"[MITRE] +{added_m} ky thuat (tong {len(mitre)})".replace("ky thuat", "k\u1ef9 thu\u1eadt").replace("tong", "t\u1ed5ng"))
+    print(
+        f"[MITRE] +{added_m} ky thuat (tong {len(mitre)})".replace(
+            "ky thuat", "k\u1ef9 thu\u1eadt"
+        ).replace("tong", "t\u1ed5ng")
+    )
     print(f"[NIST]  +{added_n} playbook (tong {len(controls)})".replace("tong", "t\u1ed5ng"))
     return added_m, added_n
 
 
 def main():
     ap = argparse.ArgumentParser(description="Xay dung/mo rong tri thuc RAG trong 1 lan")
-    ap.add_argument("--no-index", action="store_true",
-                    help="Chi mo rong KB JSON, KHONG rebuild FAISS/BM25 index")
+    ap.add_argument(
+        "--no-index",
+        action="store_true",
+        help="Chi mo rong KB JSON, KHONG rebuild FAISS/BM25 index",
+    )
     args = ap.parse_args()
 
     print("=== [1/2] Mo rong tri thuc (MITRE ATT&CK + NIST SP 800-61r2) ===")
@@ -1517,8 +1319,10 @@ def main():
 
     print("\n=== [2/2] Rebuild FAISS + BM25 index + checksum ===")
     import sys
+
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-    from src.rag.embedder import update_checksums_file, build_all_indexes
+    from src.rag.embedder import build_all_indexes, update_checksums_file
+
     build_all_indexes()
     update_checksums_file()
     print("\nDone: tri thuc da mo rong + index/checksum da rebuild (1 lan xay dung).")

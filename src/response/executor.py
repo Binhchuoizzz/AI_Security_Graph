@@ -274,7 +274,7 @@ def increment_login_attempts(username: str) -> int:
             c = conn.cursor()
             c.execute(
                 """
-                INSERT INTO login_attempts (username, attempts, lockout_until) 
+                INSERT INTO login_attempts (username, attempts, lockout_until)
                 VALUES (?, 1, 0.0)
                 ON CONFLICT(username) DO UPDATE SET attempts = attempts + 1
             """,
@@ -295,7 +295,7 @@ def reset_login_attempts(username: str):
             c = conn.cursor()
             c.execute(
                 """
-                INSERT INTO login_attempts (username, attempts, lockout_until) 
+                INSERT INTO login_attempts (username, attempts, lockout_until)
                 VALUES (?, 0, 0.0)
                 ON CONFLICT(username) DO UPDATE SET attempts = 0, lockout_until = 0.0
             """,
@@ -316,7 +316,7 @@ def lock_user(username: str, duration_seconds: int):
             c = conn.cursor()
             c.execute(
                 """
-                INSERT INTO login_attempts (username, attempts, lockout_until) 
+                INSERT INTO login_attempts (username, attempts, lockout_until)
                 VALUES (?, 5, ?)
                 ON CONFLICT(username) DO UPDATE SET lockout_until = ?, attempts = 5
             """,

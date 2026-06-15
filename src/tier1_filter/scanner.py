@@ -34,9 +34,7 @@ class VulnerabilityScanner:
 
         try:
             # Kiểm tra xem trivy đã được cài đặt chưa
-            subprocess.run(
-                ["trivy", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
-            )
+            subprocess.run(["trivy", "--version"], capture_output=True, check=True)
         except (subprocess.CalledProcessError, FileNotFoundError):
             logger.warning("Trivy is not installed or not in PATH. Skipping actual scan.")
             self._generate_mock_results()
@@ -59,7 +57,7 @@ class VulnerabilityScanner:
                 "--skip-dirs",
                 "knowledge_base",
             ]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            subprocess.run(cmd, check=True, capture_output=True)
             logger.info(f"Trivy scan completed. Results saved to {self.output_file}")
             return self.output_file
 

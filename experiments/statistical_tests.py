@@ -18,7 +18,7 @@ def mcnemar_test(y_true, y_pred1, y_pred2):
     # c: classifier 1 sai, classifier 2 đúng
     b = 0
     c = 0
-    for yt, yp1, yp2 in zip(y_true, y_pred1, y_pred2):
+    for yt, yp1, yp2 in zip(y_true, y_pred1, y_pred2, strict=False):
         c1_correct = yt == yp1
         c2_correct = yt == yp2
         if c1_correct and not c2_correct:

@@ -27,27 +27,26 @@ QUAN HỆ:
 import json
 import os
 import time
+
 import redis  # type: ignore
 import yaml  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "config", "system_settings.yaml"
-)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "system_settings.yaml")
 try:
-    with open(CONFIG_PATH, "r") as f:
+    with open(CONFIG_PATH) as f:
         _config = yaml.safe_load(f)
 except Exception:
     _config = {}
 
 # ── Cấu hình ─────────────────────────────────────────────────────────────────
-REDIS_URL           = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
-GROUND_TRUTH_FILE   = "experiments/ground_truth.json"
-BATCH_SIZE          = int(os.getenv("SIMULATE_BATCH_SIZE", "50"))
+REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://localhost:6379/0"))
+GROUND_TRUTH_FILE = "experiments/ground_truth.json"
+BATCH_SIZE = int(os.getenv("SIMULATE_BATCH_SIZE", "50"))
 BATCH_DELAY_SECONDS = float(os.getenv("SIMULATE_DELAY", "0.5"))
-MAX_QUEUE_SIZE      = 10_000
+MAX_QUEUE_SIZE = 10_000
 
 
 # ── Queue routing ─────────────────────────────────────────────────────────────
@@ -60,8 +59,8 @@ def determine_queue(log_entry: dict) -> str:
     Port được ưu tiên hơn payload để tránh SSH+adversarial-payload bị gửi
     nhầm vào queue_waf thay vì queue_firewall.
     """
-    port       = int(log_entry.get("Destination Port", 0))
-    payload    = log_entry.get("payload", "") or ""
+    port = int(log_entry.get("Destination Port", 0))
+    payload = log_entry.get("payload", "") or ""
     user_agent = log_entry.get("user_agent", "") or ""
 
     # Tier 1 — critical service ports (Firewall / IDS sensor)
@@ -90,32 +89,29 @@ def map_to_cicids(network_layer: dict, app_layer: dict) -> dict:
     """
     mapped = {
         # Core routing fields
-        "Source IP":          network_layer.get("src_ip", "0.0.0.0"),
-        "Destination IP":     network_layer.get("dst_ip", "0.0.0.0"),
-        "Source Port":        network_layer.get("src_port", 0),
-        "Destination Port":   network_layer.get("dst_port", 0),
-        "Protocol":           network_layer.get("protocol", 6),
-        "timestamp":          network_layer.get("timestamp", ""),
-
+        "Source IP": network_layer.get("src_ip", "0.0.0.0"),
+        "Destination IP": network_layer.get("dst_ip", "0.0.0.0"),
+        "Source Port": network_layer.get("src_port", 0),
+        "Destination Port": network_layer.get("dst_port", 0),
+        "Protocol": network_layer.get("protocol", 6),
+        "timestamp": network_layer.get("timestamp", ""),
         # Flow stats (rule engine thresholds)
-        "Flow Duration":      network_layer.get("flow_duration_us", 0),
-        "Total Fwd Packets":  network_layer.get("fwd_packets", 0),
-        "Total Bwd Packets":  network_layer.get("bwd_packets", 0),
-        "Total Fwd Bytes":    network_layer.get("fwd_bytes", 0),
-        "Total Bwd Bytes":    network_layer.get("bwd_bytes", 0),
-        "Flow Pkts/s":        network_layer.get("flow_pkts_s", 0.0),
-
+        "Flow Duration": network_layer.get("flow_duration_us", 0),
+        "Total Fwd Packets": network_layer.get("fwd_packets", 0),
+        "Total Bwd Packets": network_layer.get("bwd_packets", 0),
+        "Total Fwd Bytes": network_layer.get("fwd_bytes", 0),
+        "Total Bwd Bytes": network_layer.get("bwd_bytes", 0),
+        "Flow Pkts/s": network_layer.get("flow_pkts_s", 0.0),
         # Discriminative features (Z-score baseline)
-        "Fwd Seg Size Min":   network_layer.get("fwd_seg_size_min", 0),
-        "Init Fwd Win Byts":  network_layer.get("init_fwd_win_byts", 0),
-        "Init Bwd Win Byts":  network_layer.get("init_bwd_win_byts", 0),
-        "Bwd Pkt Len Min":    network_layer.get("bwd_pkt_len_min", 0),
-        "PSH Flag Cnt":       network_layer.get("psh_flag_cnt", 0),
-        "service":            network_layer.get("service", ""),
-
+        "Fwd Seg Size Min": network_layer.get("fwd_seg_size_min", 0),
+        "Init Fwd Win Byts": network_layer.get("init_fwd_win_byts", 0),
+        "Init Bwd Win Byts": network_layer.get("init_bwd_win_byts", 0),
+        "Bwd Pkt Len Min": network_layer.get("bwd_pkt_len_min", 0),
+        "PSH Flag Cnt": network_layer.get("psh_flag_cnt", 0),
+        "service": network_layer.get("service", ""),
         # Application layer (Guardrails injection)
-        "user_agent":         (app_layer or {}).get("user_agent", "") or "",
-        "payload":            (app_layer or {}).get("payload_snippet", "") or "",
+        "user_agent": (app_layer or {}).get("user_agent", "") or "",
+        "payload": (app_layer or {}).get("payload_snippet", "") or "",
     }
     return mapped
 
@@ -142,16 +138,18 @@ def stream_logs_to_redis() -> None:
         print(f"[!] Ground truth file not found: {GROUND_TRUTH_FILE}")
         return
 
-    with open(GROUND_TRUTH_FILE, "r", encoding="utf-8") as f:
+    with open(GROUND_TRUTH_FILE, encoding="utf-8") as f:
         samples = json.load(f)
 
     total = len(samples)
-    print(f"[*] Loaded {total} samples | batch_size={BATCH_SIZE} | delay={BATCH_DELAY_SECONDS}s/batch")
+    print(
+        f"[*] Loaded {total} samples | batch_size={BATCH_SIZE} | delay={BATCH_DELAY_SECONDS}s/batch"
+    )
 
     total_published = 0
     try:
         for batch_start in range(0, total, BATCH_SIZE):
-            batch = samples[batch_start: batch_start + BATCH_SIZE]
+            batch = samples[batch_start : batch_start + BATCH_SIZE]
 
             # ── Backpressure: check stream length once per batch ────────────
             wait_count = 0
@@ -170,27 +168,27 @@ def stream_logs_to_redis() -> None:
                 # Build base log entry
                 if "input" in sample:
                     network_layer = sample["input"].get("network_layer", {})
-                    app_layer     = sample["input"].get("application_layer", {})
-                    mapped_log    = map_to_cicids(network_layer, app_layer)
+                    app_layer = sample["input"].get("application_layer", {})
+                    mapped_log = map_to_cicids(network_layer, app_layer)
                 elif "logs" in sample and sample["logs"]:
                     # Fallback: adversarial samples that have logs[] not input{}
                     raw = sample["logs"][0]
                     network_layer = raw
                     app_layer = {
                         "payload_snippet": raw.get("payload", ""),
-                        "user_agent":      raw.get("user_agent", ""),
+                        "user_agent": raw.get("user_agent", ""),
                     }
                     mapped_log = map_to_cicids(network_layer, app_layer)
                 else:
                     continue
 
                 # ── Ground truth metadata (for E2E correlation) ──────────
-                mapped_log["gt_id"]               = sample.get("id", "")
-                mapped_log["gt_cicids_label"]      = sample.get("input", {}).get("cicids_label", "")
-                mapped_log["gt_expected_action"]   = sample.get("expected_action", "")
+                mapped_log["gt_id"] = sample.get("id", "")
+                mapped_log["gt_cicids_label"] = sample.get("input", {}).get("cicids_label", "")
+                mapped_log["gt_expected_action"] = sample.get("expected_action", "")
                 mapped_log["gt_expected_severity"] = sample.get("expected_severity", "")
-                mapped_log["gt_expected_mitre"]    = sample.get("expected_mitre_technique", "")
-                mapped_log["dataset_source"]       = "ground_truth"
+                mapped_log["gt_expected_mitre"] = sample.get("expected_mitre_technique", "")
+                mapped_log["dataset_source"] = "ground_truth"
 
                 # ── Route to appropriate stream ───────────────────────────
                 target_queue = determine_queue(mapped_log)

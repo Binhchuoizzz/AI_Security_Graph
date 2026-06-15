@@ -1,7 +1,9 @@
 """
 Tests for Long-Term Threat Memory Store (APT Detection + Organizational Context)
 """
+
 import pytest  # type: ignore
+
 from src.agent.threat_memory import ThreatMemoryStore
 
 
@@ -72,14 +74,13 @@ class TestOrganizationalContext:
         assert memory_store.is_known_entity("1.2.3.4") is None
 
     def test_remove_known_entity(self, memory_store):
-        memory_store.add_known_entity(
-            "pentest_ip", "192.168.50.10", "Pentest VM"
-        )
+        memory_store.add_known_entity("pentest_ip", "192.168.50.10", "Pentest VM")
         memory_store.remove_known_entity("192.168.50.10")
         assert memory_store.is_known_entity("192.168.50.10") is None
 
     def test_get_all_entities(self, memory_store):
         import sqlite3
+
         with sqlite3.connect(memory_store.db_path) as conn:
             conn.execute("DELETE FROM known_entities")
             conn.commit()
@@ -111,13 +112,19 @@ class TestAPTCorrelation:
 
     def test_record_apt_indicator(self, memory_store):
         memory_store.record_apt_indicator(
-            "persistent_ip", "172.16.0.100", 0.85,
-            related_ips="172.16.0.100", mitre_chain="T1110→T1078"
+            "persistent_ip",
+            "172.16.0.100",
+            0.85,
+            related_ips="172.16.0.100",
+            mitre_chain="T1110→T1078",
         )
         # Record again — should increment
         memory_store.record_apt_indicator(
-            "persistent_ip", "172.16.0.100", 0.90,
-            related_ips="172.16.0.100", mitre_chain="T1110→T1078→T1059"
+            "persistent_ip",
+            "172.16.0.100",
+            0.90,
+            related_ips="172.16.0.100",
+            mitre_chain="T1110→T1078→T1059",
         )
         stats = memory_store.get_stats()
         assert stats["apt_indicators"] >= 1
@@ -177,6 +184,7 @@ class TestStats:
 
     def test_initial_stats(self, memory_store):
         import sqlite3
+
         with sqlite3.connect(memory_store.db_path) as conn:
             conn.execute("DELETE FROM known_entities")
             conn.commit()
@@ -188,6 +196,7 @@ class TestStats:
 
     def test_stats_after_operations(self, memory_store):
         import sqlite3
+
         with sqlite3.connect(memory_store.db_path) as conn:
             conn.execute("DELETE FROM known_entities")
             conn.commit()
@@ -226,11 +235,10 @@ class TestMemoryPoisoningProtection:
         memory_store.add_known_entity(
             "scanner <script>alert(1)</script>",
             "10.0.0.1",
-            "Nessus Scanner ![leak](http://leak.com)"
+            "Nessus Scanner ![leak](http://leak.com)",
         )
         entity = memory_store.is_known_entity("10.0.0.1")
         assert entity is not None
         assert "<script>" not in entity["entity_type"]
         assert "leak.com" not in entity["description"]
         assert "[IMG_STRIPPED]" in entity["description"]
-

@@ -400,8 +400,8 @@ def test_16_nist_index_size(r: TestResult):
     phase_hits = 0
     for query, expected_phase in ir_queries:
         q_vec = model.encode([query], normalize_embeddings=True).astype(np.float32)
-        D, I = nist_faiss.search(q_vec, k=3)
-        top_phases = [meta[i].get("ir_phase", "") for i in I[0] if i >= 0]
+        D, indices = nist_faiss.search(q_vec, k=3)
+        top_phases = [meta[i].get("ir_phase", "") for i in indices[0] if i >= 0]
         if any(expected_phase in p for p in top_phases):
             phase_hits += 1
 
@@ -453,7 +453,7 @@ def test_18_dapt_chain(r: TestResult):
     assert os.path.exists(chains_path), f"Missing: {chains_path}"
 
     with open(chains_path) as f:
-        chains = [json.loads(l) for l in f]
+        chains = [json.loads(line) for line in f]
     multi_day = [c for c in chains if len(c["days_spanned"]) >= 2]
     assert len(multi_day) >= 5, f"Need ≥5 multi-day chains, got {len(multi_day)}"
 

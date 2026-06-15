@@ -18,14 +18,13 @@ OUTPUT:
     └── nist_800_61r2_metadata.json
 """
 
-import sys
 import os
+import sys
 
 # Đảm bảo thư mục gốc dự án nằm trong PYTHONPATH
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.rag.embedder import build_all_indexes
-
 
 if __name__ == "__main__":
     print("=" * 60)

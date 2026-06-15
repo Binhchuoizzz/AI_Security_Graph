@@ -3,17 +3,18 @@ Adversarial Tests: Guardrails Prompt Injection Defense
 Kiểm thử 3 lớp bảo vệ: Pattern Detection, Encoding Neutralization, Dynamic Delimiters.
 """
 
-import sys
 import os
+import sys
+
 import pytest  # type: ignore
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.guardrails.prompt_filter import (
-    PromptInjectionDetector,
-    EncodingNeutralizer,
     DelimitedDataEncapsulator,
+    EncodingNeutralizer,
     GuardrailsPipeline,
+    PromptInjectionDetector,
 )
 
 

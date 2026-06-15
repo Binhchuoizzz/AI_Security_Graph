@@ -17,29 +17,46 @@ class TestStripDatasetLabels:
     def test_removes_every_dataset_label_key(self):
         """Mọi khóa trong strip-set phải biến mất; trường hệ thống phải GIỮ."""
         log = {k: "leak" for k in _DATASET_LABEL_KEYS}
-        log.update({
-            "Source IP": "1.2.3.4",
-            "Destination Port": 443,
-            "tier1_action": "ESCALATE",
-            "tier1_score": 55,
-            "tier1_reasons": ["APT chain emergent: 2 ngày"],
-            "gt_id": "GT-001",          # định danh mờ — giữ để đối chiếu hậu kiểm
-            "apt_emergent": True,        # enrichment HỆ THỐNG tự suy ra — giữ
-            "apt_phases": "Recon,Lateral",
-            "log_source": "queue_waf",
-        })
+        log.update(
+            {
+                "Source IP": "1.2.3.4",
+                "Destination Port": 443,
+                "tier1_action": "ESCALATE",
+                "tier1_score": 55,
+                "tier1_reasons": ["APT chain emergent: 2 ngày"],
+                "gt_id": "GT-001",  # định danh mờ — giữ để đối chiếu hậu kiểm
+                "apt_emergent": True,  # enrichment HỆ THỐNG tự suy ra — giữ
+                "apt_phases": "Recon,Lateral",
+                "log_source": "queue_waf",
+            }
+        )
         out = _strip_dataset_labels(log)
 
         for k in _DATASET_LABEL_KEYS:
             assert k not in out, f"khóa nhãn '{k}' vẫn lọt lên LLM"
-        for k in ("Source IP", "Destination Port", "tier1_action", "tier1_score",
-                  "tier1_reasons", "gt_id", "apt_emergent", "apt_phases", "log_source"):
+        for k in (
+            "Source IP",
+            "Destination Port",
+            "tier1_action",
+            "tier1_score",
+            "tier1_reasons",
+            "gt_id",
+            "apt_emergent",
+            "apt_phases",
+            "log_source",
+        ):
             assert k in out, f"trường hệ thống '{k}' bị strip nhầm"
 
     def test_answer_bearing_keys_are_in_strip_set(self):
         """Các khóa mang 'đáp án' kinh điển bắt buộc nằm trong strip-set."""
-        for k in ("gt_expected_action", "gt_expected_mitre", "gt_cicids_label",
-                  "expected_threat", "apt_is_attack", "zd_mitre"):
+        for k in (
+            "gt_expected_action",
+            "gt_expected_mitre",
+            "gt_cicids_label",
+            "expected_threat",
+            "apt_is_attack",
+            "zd_mitre",
+        ):
             assert k in _DATASET_LABEL_KEYS
 
     def test_does_not_mutate_original(self):
@@ -59,12 +76,28 @@ def test_online_enrich_labels_fully_covered_by_strip_set():
 
     PROVENANCE_OK = {"dataset_source", "unified_source"}  # nguồn gốc, không phải đáp án
     sample_events = [
-        {"source": "cicids", "log": {"Destination Port": 80},
-         "expected_threat": True, "label": "Bot"},
-        {"source": "dapt", "log": {"Source IP": "10.1.1.1"}, "phase": "Reconnaissance",
-         "day": 2, "label": "Network Scan", "is_attack": True, "timestamp": "t1"},
-        {"source": "zeroday", "log": {"Destination Port": 443}, "id": "ZD-001",
-         "mitre": "T1048", "name": "ZD hợp đồng"},
+        {
+            "source": "cicids",
+            "log": {"Destination Port": 80},
+            "expected_threat": True,
+            "label": "Bot",
+        },
+        {
+            "source": "dapt",
+            "log": {"Source IP": "10.1.1.1"},
+            "phase": "Reconnaissance",
+            "day": 2,
+            "label": "Network Scan",
+            "is_attack": True,
+            "timestamp": "t1",
+        },
+        {
+            "source": "zeroday",
+            "log": {"Destination Port": 443},
+            "id": "ZD-001",
+            "mitre": "T1048",
+            "name": "ZD hợp đồng",
+        },
     ]
     for ev in sample_events:
         added = set(enrich(ev)) - set(ev["log"])

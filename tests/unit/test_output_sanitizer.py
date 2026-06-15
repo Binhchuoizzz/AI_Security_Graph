@@ -1,7 +1,9 @@
 """
 Tests for Output Sanitizer (Data Exfiltration Defense — Attack Vector #04)
 """
+
 import pytest  # type: ignore
+
 from src.guardrails.output_sanitizer import OutputSanitizer
 
 
@@ -114,11 +116,7 @@ class TestEdgeCases:
         assert sanitizer.sanitize(None) is None
 
     def test_multiple_patterns(self, sanitizer):
-        text = (
-            "![img](http://evil.com/a) "
-            "<script>alert(1)</script> "
-            '<img src="http://evil.com/b">'
-        )
+        text = '![img](http://evil.com/a) <script>alert(1)</script> <img src="http://evil.com/b">'
         result = sanitizer.sanitize(text)
         assert "evil.com" not in result
         assert sanitizer.last_strip_count >= 3
@@ -141,7 +139,7 @@ class TestEdgeCases:
         assert result == "HelloWorld!"
 
     def test_strips_ansi_escapes(self, sanitizer):
-        text = "\x1B[31mRed Alert\x1B[0m"
+        text = "\x1b[31mRed Alert\x1b[0m"
         result = sanitizer.sanitize(text)
         assert result == "Red Alert"
 
@@ -158,4 +156,3 @@ class TestEdgeCases:
         result = sanitizer.sanitize(text)
         assert "[HEX_OBFUSCATED_STRIPPED]" in result
         assert "3c736372" not in result
-

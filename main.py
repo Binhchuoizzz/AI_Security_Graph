@@ -6,23 +6,21 @@ Khởi chạy và kết nối 2 Tier:
 - Tier 2: LangGraph Agent (Guardrails + RAG + LLM)
 """
 
-import logging
 import argparse
+import logging
 
 from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()  # Nạp các biến môi trường (Tăng cường bảo mật)
 
-from src.streaming.subscriber import start_listening
-from src.agent.workflow import agent_app
 from src.agent.state import SentinelState
-from src.tier1_filter.scanner import VulnerabilityScanner
+from src.agent.workflow import agent_app
 from src.rag.graph_builder import KnowledgeGraphBuilder
+from src.streaming.subscriber import start_listening
+from src.tier1_filter.scanner import VulnerabilityScanner
 
 # Cấu hình logging mặc định
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +61,7 @@ def handle_escalated_batch(batch):
 
     # Reset LoopDetector trước mỗi lần chạy đồ thị
     from src.guardrails import loop_detector
+
     loop_detector.reset()
 
     try:
@@ -81,9 +80,23 @@ def handle_escalated_batch(batch):
 
 def main():
     parser = argparse.ArgumentParser(description="SENTINEL System Entrypoint")
-    parser.add_argument("--mode", type=str, choices=["server", "scan", "full"], default="server", help="Chế độ chạy: server (lắng nghe traffic), scan (quét lỗ hổng), full (cả hai)")
-    parser.add_argument("--config", type=str, default="config/default.yaml", help="Đường dẫn file cấu hình")
-    parser.add_argument("--log-level", type=str, choices=["DEBUG", "INFO", "WARNING", "ERROR"], default="INFO", help="Mức độ log")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["server", "scan", "full"],
+        default="server",
+        help="Chế độ chạy: server (lắng nghe traffic), scan (quét lỗ hổng), full (cả hai)",
+    )
+    parser.add_argument(
+        "--config", type=str, default="config/default.yaml", help="Đường dẫn file cấu hình"
+    )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Mức độ log",
+    )
     args = parser.parse_args()
 
     setup_logger(args.log_level)
@@ -103,9 +116,7 @@ def main():
     # Chế độ Server / Full: Khởi chạy APT Detection Engine
     logger.info("[MAIN] Starting Tier 1 Subscriber Loop (APT Detection Engine)...")
     try:
-        start_listening(
-            on_batch_ready=handle_escalated_batch, batch_size=10, timeout_sec=5
-        )
+        start_listening(on_batch_ready=handle_escalated_batch, batch_size=10, timeout_sec=5)
     except KeyboardInterrupt:
         logger.info("[MAIN] Shutting down SENTINEL system.")
 

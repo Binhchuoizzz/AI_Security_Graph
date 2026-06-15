@@ -246,7 +246,7 @@ class SessionBaseline:
             return
         total_rates = []
         now = time.time()
-        for ip, profile in self.profiles.items():
+        for _ip, profile in self.profiles.items():
             if profile["first_seen"]:
                 elapsed = max(now - profile["first_seen"], 1)
                 total_rates.append(profile["request_count"] / elapsed)

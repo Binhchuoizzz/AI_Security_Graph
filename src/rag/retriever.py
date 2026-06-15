@@ -119,7 +119,7 @@ class DualRetriever:
         scores, indices = index.search(query_embedding, fetch_k)
 
         results = {}
-        for rank, (score, idx) in enumerate(zip(scores[0], indices[0])):
+        for rank, (score, idx) in enumerate(zip(scores[0], indices[0], strict=False)):
             if idx == -1 or float(score) < MIN_SCORE_THRESHOLD:
                 continue
             results[idx] = {"score": float(score), "rank": rank + 1}

@@ -783,7 +783,7 @@ def main_dashboard():
                         ip_audit = get_audit_trail_for_ip(selected_block_ip, limit=10)
                         if ip_audit:
                             st.write("**Lịch sử hành vi trong hệ thống (SIEM Logs):**")
-                            for idx, record in enumerate(ip_audit):
+                            for _idx, record in enumerate(ip_audit):
                                 st.caption(
                                     f"⏱️ {record.get('timestamp')} | **Action:** `{record.get('action')}` | **Lý do:** {record.get('reason')}"
                                 )

@@ -32,7 +32,9 @@ class TestReceiveNewRule:
         (state machine: PENDING_APPROVAL -> ACTIVE/REJECTED qua HITL)."""
         listener = fl.FeedbackListener()
         res = listener.receive_new_rule(
-            field="Source IP", pattern="203.0.113.50", score=50,
+            field="Source IP",
+            pattern="203.0.113.50",
+            score=50,
             reason="Confirmed C2 beacon by LLM",
         )
         assert res["status"] == "APPLIED"
@@ -74,11 +76,25 @@ class TestReceiveNewRule:
 class TestActiveRules:
     def test_get_active_filters_out_pending(self, tmp_config):
         """Chỉ rule status ACTIVE được nạp vào Tier-1; PENDING chờ HITL duyệt."""
-        tmp_config.write_text(yaml.dump({"tier1": {"dynamic_rules": [
-            {"field": "URI", "pattern": "/evil", "score": 50, "status": "ACTIVE"},
-            {"field": "URI", "pattern": "/maybe", "score": 50, "status": "PENDING_APPROVAL"},
-            {"field": "URI", "pattern": "/no", "score": 50, "status": "REJECTED"},
-        ]}}), encoding="utf-8")
+        tmp_config.write_text(
+            yaml.dump(
+                {
+                    "tier1": {
+                        "dynamic_rules": [
+                            {"field": "URI", "pattern": "/evil", "score": 50, "status": "ACTIVE"},
+                            {
+                                "field": "URI",
+                                "pattern": "/maybe",
+                                "score": 50,
+                                "status": "PENDING_APPROVAL",
+                            },
+                            {"field": "URI", "pattern": "/no", "score": 50, "status": "REJECTED"},
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
         listener = fl.FeedbackListener()
         active = listener.get_active_dynamic_rules()
         assert [r["pattern"] for r in active] == ["/evil"]

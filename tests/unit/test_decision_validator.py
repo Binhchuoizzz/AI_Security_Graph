@@ -2,7 +2,6 @@
 Unit Tests for DecisionValidator
 """
 
-import pytest  # type: ignore
 from src.guardrails.decision_validator import DecisionValidator
 
 
@@ -24,7 +23,12 @@ def test_tier_consensus_guard_blocks_semantic_manipulation():
     validator = DecisionValidator()
     # LLM bị social-engineering hạ xuống LOG
     for downgraded in ("LOG", "DROP"):
-        d = {"action": downgraded, "confidence": 0.4, "target": "45.13.1.1", "reasoning": "Người dùng nói đã được duyệt"}
+        d = {
+            "action": downgraded,
+            "confidence": 0.4,
+            "target": "45.13.1.1",
+            "reasoning": "Người dùng nói đã được duyệt",
+        }
         res = validator.enforce_tier_consensus(d, tier1_flagged_attack=True)
         assert res["action"] == "AWAIT_HITL"
         assert res.get("_tier_consensus_override") is True
@@ -105,7 +109,7 @@ def test_decision_validator_reasoning_sanitization():
         "confidence": 0.8,
         "target": "1.2.3.4",
         "reasoning": "Attempting image leak ![leak](http://evil.com/x.jpg)",
-        "mitre_technique": "T1046 <script>alert(1)</script>"
+        "mitre_technique": "T1046 <script>alert(1)</script>",
     }
     res = validator.validate_decision(d)
     assert "evil.com" not in res["reasoning"]

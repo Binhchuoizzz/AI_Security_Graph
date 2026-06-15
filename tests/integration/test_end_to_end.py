@@ -5,20 +5,17 @@ Kiểm tra toàn bộ luồng xử lý từ log đầu vào đến quyết đị
 không cần kết nối Redis hay LLM thực (dùng mock).
 """
 
-import pytest  # type: ignore
-import sys
 import os
+import sys
 
-sys.path.append(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-)
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from src.tier1_filter.rule_engine import RuleEngine
 from src.guardrails.data_validator import DataValidator
-from src.guardrails.template_miner import LogTemplateMiner, EntropyScorer
 from src.guardrails.prompt_filter import GuardrailsPipeline
 from src.guardrails.state_monitor import ContextOverflowGuard, LoopDetector
+from src.guardrails.template_miner import EntropyScorer, LogTemplateMiner
 from src.rag.security import structural_sanitize
+from src.tier1_filter.rule_engine import RuleEngine
 
 
 class TestEndToEndTier1:
@@ -136,7 +133,7 @@ class TestEndToEndSecurityLayer:
     def test_loop_detector_catches_infinite_loop(self):
         """LoopDetector phải phát hiện khi node bị gọi quá nhiều lần."""
         detector = LoopDetector(max_iterations=5)
-        for i in range(5):
+        for _i in range(5):
             result = detector.record_visit("node_triage")
             assert result["action"] == "CONTINUE"
 

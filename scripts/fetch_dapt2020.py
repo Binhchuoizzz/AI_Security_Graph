@@ -13,25 +13,30 @@ CHẾ ĐỘ GIẢ LẬP (SYNTHETIC MODE):
 """
 
 import os
-import sys
 import random
 import subprocess
-from pathlib import Path
+import sys
 from datetime import datetime, timedelta
-
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any
 
 # Static analysis tools (VS Code/Pyright) will resolve scripts.dapt2020_config
 # Fallback handles direct execution within scripts/ directory
 try:
     from scripts.dapt2020_config import (
-        APT_PHASES, DAPT_RAW_DIR, DAPT2020_HEADERS,
-        normalize_label, normalize_stage
+        APT_PHASES,
+        DAPT2020_HEADERS,
+        DAPT_RAW_DIR,
+        normalize_label,
+        normalize_stage,
     )
 except ImportError:
     from dapt2020_config import (  # type: ignore  # noqa: E402
-        APT_PHASES, DAPT_RAW_DIR, DAPT2020_HEADERS,
-        normalize_label, normalize_stage
+        APT_PHASES,
+        DAPT2020_HEADERS,
+        DAPT_RAW_DIR,
+        normalize_label,
+        normalize_stage,
     )
 
 
@@ -43,8 +48,11 @@ def download_from_kaggle():
     except ImportError:
         try:
             print("[*] Installing kagglehub...")
-            subprocess.run([sys.executable, "-m", "pip", "install", "kagglehub", "pandas", "--quiet"],
-                          capture_output=True, check=True)
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "kagglehub", "pandas", "--quiet"],
+                capture_output=True,
+                check=True,
+            )
             import kagglehub  # type: ignore
             import pandas as pd  # type: ignore
         except Exception as e:
@@ -53,7 +61,11 @@ def download_from_kaggle():
 
     kaggle_json = os.path.expanduser("~/.kaggle/kaggle.json")
     kaggle_token = os.path.expanduser("~/.kaggle/access_token")
-    if not os.path.exists(kaggle_json) and not os.path.exists(kaggle_token) and "KAGGLE_API_TOKEN" not in os.environ:
+    if (
+        not os.path.exists(kaggle_json)
+        and not os.path.exists(kaggle_token)
+        and "KAGGLE_API_TOKEN" not in os.environ
+    ):
         print("[!] Kaggle API key not found at ~/.kaggle/kaggle.json or ~/.kaggle/access_token")
         print("    ACTION REQUIRED:")
         print("    1. Go to: https://www.kaggle.com/datasets/sowmyamyneni/dapt2020")
@@ -68,29 +80,31 @@ def download_from_kaggle():
         day_mapping = {
             "day1": {
                 "public": "csv/enp0s3-monday.pcap_Flow.csv",
-                "pvt": "csv/enp0s3-monday-pvt.pcap_Flow.csv"
+                "pvt": "csv/enp0s3-monday-pvt.pcap_Flow.csv",
             },
             "day2": {
                 "public": "csv/enp0s3-public-tuesday.pcap_Flow.csv",
-                "pvt": "csv/enp0s3-pvt-tuesday.pcap_Flow.csv"
+                "pvt": "csv/enp0s3-pvt-tuesday.pcap_Flow.csv",
             },
             "day3": {
                 "public": "csv/enp0s3-public-wednesday.pcap_Flow.csv",
-                "pvt": "csv/enp0s3-pvt-wednesday.pcap_Flow.csv"
+                "pvt": "csv/enp0s3-pvt-wednesday.pcap_Flow.csv",
             },
             "day4": {
                 "public": "csv/enp0s3-public-thursday.pcap_Flow.csv",
-                "pvt": "csv/enp0s3-pvt-thursday.pcap_Flow.csv"
+                "pvt": "csv/enp0s3-pvt-thursday.pcap_Flow.csv",
             },
             "day5": {
                 "public": "csv/enp0s3-tcpdump-friday.pcap_Flow.csv",
-                "pvt": "csv/enp0s3-tcpdump-pvt-friday.pcap_Flow.csv"
-            }
+                "pvt": "csv/enp0s3-tcpdump-pvt-friday.pcap_Flow.csv",
+            },
         }
 
         # Bước 1: Tải một tệp mẫu để lấy tiêu đề cột chuẩn
         print("[*] Downloading header reference file from Kaggle...")
-        ref_path = kagglehub.dataset_download("sowmyamyneni/dapt2020", path=day_mapping["day1"]["public"])
+        ref_path = kagglehub.dataset_download(
+            "sowmyamyneni/dapt2020", path=day_mapping["day1"]["public"]
+        )
         df_ref = pd.read_csv(ref_path, nrows=1)
         headers = df_ref.columns.tolist()
 
@@ -100,11 +114,11 @@ def download_from_kaggle():
             for net_type, remote_path in files.items():
                 print(f"[*] Downloading {day_name} {net_type} file...")
                 local_path = kagglehub.dataset_download("sowmyamyneni/dapt2020", path=remote_path)
-                
+
                 # Kiểm tra xem tệp có chứa tiêu đề cột không
-                with open(local_path, "r", encoding="utf-8") as f:
+                with open(local_path, encoding="utf-8") as f:
                     first_line = f.readline()
-                
+
                 has_header = "Flow ID" in first_line or "Src IP" in first_line
                 if has_header:
                     df = pd.read_csv(local_path, low_memory=False)
@@ -133,7 +147,7 @@ def download_from_kaggle():
                     df["label"] = df["label"].apply(normalize_label)
                 if "Stage" in df.columns:
                     df["Stage"] = df["Stage"].apply(normalize_stage)
-                
+
                 dfs.append(df)
 
             if dfs:
@@ -163,16 +177,36 @@ def generate_synthetic_dapt2020():
     random.seed(42)
 
     # Định nghĩa 20 IP kẻ tấn công duy nhất (kiên trì qua nhiều ngày)
-    attacker_ips = [f"192.168.{i//256}.{i%256+50}" for i in range(20)]
+    attacker_ips = [f"192.168.{i // 256}.{i % 256 + 50}" for i in range(20)]
     # Định nghĩa 30 IP mục tiêu
-    target_ips = [f"10.0.{i//256}.{i%256+1}" for i in range(30)]
-    
+    target_ips = [f"10.0.{i // 256}.{i % 256 + 1}" for i in range(30)]
+
     # Các nhãn tấn công thực tế trong DAPT2020
     attack_labels_per_day = {
         "day1": ["Normal"],  # Ngày 1 là 100% bình thường/không độc hại
-        "day2": ["Network Scan", "Account Discovery", "Directory Bruteforce", "Web Vulnerability Scan", "Account Bruteforce"],
-        "day3": ["SQL Injection", "Directory Bruteforce", "Account Bruteforce", "Account Discovery", "CSRF", "Malware Download", "Network Scan"],
-        "day4": ["Network Scan", "Backdoor", "Account Discovery", "SQL Injection", "Privilege Escalation"],
+        "day2": [
+            "Network Scan",
+            "Account Discovery",
+            "Directory Bruteforce",
+            "Web Vulnerability Scan",
+            "Account Bruteforce",
+        ],
+        "day3": [
+            "SQL Injection",
+            "Directory Bruteforce",
+            "Account Bruteforce",
+            "Account Discovery",
+            "CSRF",
+            "Malware Download",
+            "Network Scan",
+        ],
+        "day4": [
+            "Network Scan",
+            "Backdoor",
+            "Account Discovery",
+            "SQL Injection",
+            "Privilege Escalation",
+        ],
         "day5": ["Network Scan", "Command Injection", "Data Exfiltration"],
     }
 
@@ -185,16 +219,18 @@ def generate_synthetic_dapt2020():
         # Mỗi kẻ tấn công tạo ra 30-100 sự kiện mỗi ngày
         for atk_ip in attacker_ips:
             n_events = random.randint(30, 100)
-            for j in range(n_events):
+            for _j in range(n_events):
                 target = random.choice(target_ips)
                 label = random.choice(labels)
                 ts = base_time + timedelta(seconds=random.randint(0, 36000))
-                
+
                 # Nếu nhãn là Normal, Stage là Benign. Ngược lại, sử dụng giai đoạn chuẩn của ngày.
                 stage = "Benign" if label == "Normal" else phase
 
-                row_dict: Dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
-                row_dict["Flow ID"] = f"{atk_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([22, 80, 443, 445, 3389, 53, 8080])}-{random.choice([6, 17])}"
+                row_dict: dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
+                row_dict["Flow ID"] = (
+                    f"{atk_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([22, 80, 443, 445, 3389, 53, 8080])}-{random.choice([6, 17])}"
+                )
                 row_dict["Src IP"] = atk_ip
                 row_dict["Src Port"] = random.randint(1024, 65535)
                 row_dict["Dst IP"] = target
@@ -206,17 +242,19 @@ def generate_synthetic_dapt2020():
                 row_dict["Total Bwd packets"] = random.randint(0, 150)
                 row_dict["label"] = normalize_label(label)
                 row_dict["Stage"] = normalize_stage(stage)
-                
+
                 rows.append(row_dict)
 
         # Thêm 200 sự kiện bình thường (benign)
-        for j in range(200):
+        for _j in range(200):
             ts = base_time + timedelta(seconds=random.randint(0, 36000))
-            benign_ip = f"172.16.{random.randint(0,5)}.{random.randint(1,254)}"
+            benign_ip = f"172.16.{random.randint(0, 5)}.{random.randint(1, 254)}"
             target = random.choice(target_ips)
-            
-            row_dict: Dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
-            row_dict["Flow ID"] = f"{benign_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([80, 443, 8080])}-6"
+
+            row_dict: dict[str, Any] = {col: 0 for col in DAPT2020_HEADERS}
+            row_dict["Flow ID"] = (
+                f"{benign_ip}-{target}-{random.randint(1024, 65535)}-{random.choice([80, 443, 8080])}-6"
+            )
             row_dict["Src IP"] = benign_ip
             row_dict["Src Port"] = random.randint(1024, 65535)
             row_dict["Dst IP"] = target
@@ -228,13 +266,13 @@ def generate_synthetic_dapt2020():
             row_dict["Total Bwd packets"] = random.randint(1, 20)
             row_dict["label"] = "Normal"
             row_dict["Stage"] = "Benign"
-            
+
             rows.append(row_dict)
 
         df = pd.DataFrame(rows)
         # Đảm bảo thứ tự cột chính xác
         df = df[DAPT2020_HEADERS]
-        
+
         path = os.path.join(DAPT_RAW_DIR, f"{day_name}.csv")
         df.to_csv(path, index=False)
         print(f"  {day_name}.csv: {len(df)} events ({phase})")
