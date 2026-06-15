@@ -49,6 +49,23 @@ Mặc dù LLM có thể tự động hóa quy trình phân loại bằng cách t
     \item \textbf{RQ3:} Hiệu quả thực nghiệm của việc tăng cường bộ nhớ tác tử bằng hệ thống truy xuất tri thức kép sử dụng thuật toán Reciprocal Rank Fusion trong việc tối ưu hóa độ chính xác và giảm thiểu ảo giác của LLM là gì?
 \end{enumerate}
 
+\begin{table}[H]
+    \centering
+    \caption{Ánh xạ giữa Câu hỏi Nghiên cứu, Mục tiêu Nghiên cứu và các Thành phần Hệ thống.}
+    \label{tab:rq_objective_mapping}
+    \begin{tabular}{p{0.12\textwidth}p{0.33\textwidth}p{0.33\textwidth}p{0.18\textwidth}}
+        \toprule
+        \textbf{Mã RQ} & \textbf{Tóm tắt Câu hỏi Nghiên cứu} & \textbf{Mục tiêu tương ứng} & \textbf{Thành phần Hệ thống} \\
+        \midrule
+        RQ1 & Lọc dữ liệu tốc độ đường truyền mà không làm đứt chuỗi ngữ cảnh APT & Mục tiêu 1: Tính toán thống kê trực tuyến Welford ($O(1)$) để lập baseline & Tầng 1: Bộ lọc bất thường (RuleEngine) \\
+        \midrule
+        RQ2 & Tích hợp LLM cục bộ tránh trễ và ngăn ngừa tấn công tiêm prompt đối kháng & Mục tiêu 2: Thiết kế máy trạng thái LangGraph với rào chắn bảo vệ & Tầng 2: Tác tử nhận thức và Guardrails \\
+        \midrule
+        RQ3 & Hiệu quả của hệ thống truy xuất tri thức kép và thuật toán gộp xếp hạng RRF & Mục tiêu 3: Tích hợp cơ sở tri thức MITRE \& NIST với thuật toán RRF & Bộ phận RAG kép và Hybrid Retriever \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \section{Đối tượng và Phạm vi Nghiên cứu}
 
 \textbf{Đối tượng Nghiên cứu:} Đối tượng nghiên cứu của luận văn bao gồm các quy trình tự động hóa phản hồi sự cố mạng trong Trung tâm Điều hành An ninh (SOC) hiện đại; các loại log luồng mạng tốc độ cao (NetFlow/IPFIX) và siêu dữ liệu bắt gói tin (PCAP); cơ chế điều phối và duy trì trạng thái nhận thức của tác tử (LangGraph); các mô hình ngôn ngữ lớn cục bộ được lượng tử hóa để tối ưu hiệu năng; và các vector tấn công đối kháng nhắm vào cỗ máy AI (như tiêm prompt từ log, buôn lậu dấu phân tách, đầu độc tri thức RAG).

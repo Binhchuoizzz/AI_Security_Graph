@@ -72,6 +72,27 @@ The cogs are exposed to critical cognitive manipulation risks via log-substrate 
 
 Furthermore, attackers use advanced techniques such as encoding bypasses (Base64/hex) and delimiter smuggling to evade filters. The consequences of these exploits range from incorrect threat classifications to unauthorized data exfiltration.
 
+\begin{table}[H]
+    \centering
+    \caption{Summary of LLM Cognitive Vulnerabilities and SENTINEL's Mitigation Strategies.}
+    \label{tab:vulnerabilities_mitigations}
+    \begin{tabular}{p{0.22\textwidth}p{0.38\textwidth}p{0.34\textwidth}}
+        \toprule
+        \textbf{Attack Vector} & \textbf{Threat Mechanism} & \textbf{Mitigation Strategy} \\
+        \midrule
+        Direct Prompt Injection & Attackers embed instruction hijacking payloads in user inputs & Regex-based prompt pattern filters and structural prompts \\
+        \midrule
+        Log-Substrate Injection & Malicious instructions embedded in log streams (e.g. User-Agent) & Delimited Data Encapsulation with dynamic randomized tokens \\
+        \midrule
+        Encoding Bypass & Obfuscated instructions (Base64/Hex/URL) to bypass regex filters & Multi-layer decoding and normalization pipelines \\
+        \midrule
+        Delimiter Smuggling & Smuggling control markers to terminate data scopes & Delimiter sanitization and strict token budget enforcement \\
+        \midrule
+        Semantic Poisoning & Injecting falsified information into vector databases & SHA-256 data checksum validation and source provenance tags \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \section{Welford's Online Statistical Algorithm}
 
 While Agentic AI provides robust threat reasoning, the quadratic computational complexity of LLM attention mechanisms prevents them from analyzing massive raw log streams at wire-speed. A low-overhead preprocessing filter with $O(1)$ time and space complexity is required.

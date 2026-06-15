@@ -49,6 +49,23 @@ To guide the empirical validation of the proposed architecture, this research ad
     \item \textbf{RQ3:} What is the empirical efficacy of augmenting an autonomous agent's memory with an external dual knowledge retrieval system using Reciprocal Rank Fusion to optimize threat classification accuracy and minimize hallucinations?
 \end{enumerate}
 
+\begin{table}[H]
+    \centering
+    \caption{Mapping of Research Questions to Research Objectives and Targeted System Components.}
+    \label{tab:rq_objective_mapping}
+    \begin{tabular}{p{0.12\textwidth}p{0.33\textwidth}p{0.33\textwidth}p{0.18\textwidth}}
+        \toprule
+        \textbf{RQ} & \textbf{Research Question Summary} & \textbf{Corresponding Objective} & \textbf{Targeted Component} \\
+        \midrule
+        RQ1 & Real-time wire-speed filtration without losing APT session context & Objective 1: Welford statistical anomaly baseline calculation ($O(1)$) & Tier-1 filter engine (RuleEngine) \\
+        \midrule
+        RQ2 & Safe local LLM integration to eliminate latency and prompt injection risks & Objective 2: Stateful LangGraph FSM design with secure encapsulation & Tier-2 cognitive agent and guardrails \\
+        \midrule
+        RQ3 & Efficacy of dual RAG knowledge retrieval and Reciprocal Rank Fusion & Objective 3: Dual RAG (MITRE \& NIST) with RRF rank consolidation & Semantic RAG and hybrid retriever \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \section{Scope and Object of Study}
 
 \textbf{Objects of Study:} The objects of study encompass automated incident response and mitigation workflows within modern Security Operations Centers (SOCs); high-velocity network flow telemetry protocols (NetFlow/IPFIX) and raw packet capture metadata (PCAP); stateful cognitive agent orchestration frameworks (LangGraph); local quantized Large Language Models optimized for resource-constrained inference; and adversarial AI attack vectors (including log-substrate prompt injections, delimiter smuggling, and semantic knowledge base poisoning) that threaten LLM-integrated security systems.

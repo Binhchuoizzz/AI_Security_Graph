@@ -72,6 +72,27 @@ Kiến trúc suy luận của hệ thống đối mặt với nguy cơ thao tún
 
 Bên cạnh đó, các tác nhân đe dọa còn sử dụng các kỹ thuật tinh vi khác như mã hóa ngụy trang (Base64/hex) hoặc buôn lậu dấu phân tách (delimiter smuggling) nhằm vô hiệu hóa các bộ lọc regex tĩnh. Hệ quả của các hành vi khai thác này vô cùng đa dạng, từ việc làm chệch hướng phân loại của tác tử cho đến nguy cơ rò rỉ thông tin nhạy cảm của hệ thống.
 
+\begin{table}[H]
+    \centering
+    \caption{Tóm tắt các Lỗ hổng Nhận thức của LLM và Biện pháp Giảm thiểu trong SENTINEL.}
+    \label{tab:vulnerabilities_mitigations}
+    \begin{tabular}{p{0.22\textwidth}p{0.38\textwidth}p{0.34\textwidth}}
+        \toprule
+        \textbf{Vector Tấn công} & \textbf{Cơ chế Đe dọa} & \textbf{Biện pháp Giảm thiểu trong SENTINEL} \\
+        \midrule
+        Tiêm Prompt Trực tiếp & Kẻ tấn công nhúng lệnh độc hại để kiểm soát luồng hoạt động & Bộ lọc mẫu prompt dựa trên biểu thức chính quy \\
+        \midrule
+        Tiêm Prompt từ Log & Nhúng chỉ dẫn độc hại vào nhật ký hệ thống (User-Agent) & Đóng gói dữ liệu phân tách với token ngẫu nhiên động \\
+        \midrule
+        Vượt qua Mã hóa & Ngụy trang chỉ dẫn (Base64/Hex/URL) nhằm lướt qua bộ lọc tĩnh & Giải mã đa tầng và chuẩn hóa chuỗi đầu vào \\
+        \midrule
+        Buôn lậu Dấu phân tách & Chèn ký tự đặc biệt nhằm phá vỡ cấu trúc khoanh vùng dữ liệu & Làm sạch dấu phân tách và quản lý ngân sách token chặt chẽ \\
+        \midrule
+        Đầu độc Ngữ nghĩa & Nhúng dữ liệu giả mạo vào cơ sở dữ liệu vector & Xác thực checksum SHA-256 tri thức và gắn nhãn nguồn gốc \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \section{Thuật toán Thống kê Trực tuyến Welford}
 
 Mặc dù kiến trúc AI Tác tử cung cấp năng lực lập luận ngữ cảnh sâu sắc, độ phức tạp tính toán bậc hai của cơ chế attention trong LLM khiến chúng không thể đảm đương việc phân tích luồng nhật ký mạng thô khổng lồ ở tốc độ đường truyền. Điều này đòi hỏi sự tích hợp của một bộ lọc tiền xử lý siêu nhẹ với độ phức tạp thời gian và không gian tối ưu $O(1)$.
