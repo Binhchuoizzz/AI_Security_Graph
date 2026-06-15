@@ -36,7 +36,7 @@ To resolve these bottlenecks, the SENTINEL system proposes a dual-tier model: a 
 \textbf{Specific Objectives:}
 \begin{itemize}
     \item \textbf{Objective 1:} Implement Welford's online statistical algorithm for $O(1)$ rolling calculation of variance and Z-Scores to filter benign network traffic at wire-speed.
-    \item \textbf{Objective 2:} Design a stateful autonomous agent using LangGraph and local quantized LLMs, integrated with input-output guardrails, to securely analyze anomalies.
+    \item \textbf{Objective 2:} Design a stateful autonomous agent using LangGraph and local quantized LLMs, integrated with input-output guardrails, to securely analyze anomalies and mitigate adversarial attack vectors targeting LLM-integrated systems.
     \item \textbf{Objective 3:} Build a dual RAG system integrating MITRE ATT\&CK and NIST SP 800-61r2 playbooks to ground agent decisions and minimize hallucinations.
 \end{itemize}
 
@@ -45,13 +45,13 @@ To resolve these bottlenecks, the SENTINEL system proposes a dual-tier model: a 
 To guide the empirical validation of the proposed architecture, this research addresses three core questions:
 \begin{enumerate}
     \item \textbf{RQ1:} How can a real-time network traffic filtration mechanism be mathematically designed using online statistical baselines to operate at wire-speed and eliminate alert fatigue while preserving the temporal event chains of APT attacks?
-    \item \textbf{RQ2:} By what architectural methodology can local LLMs be integrated into the automated incident response pipeline alongside secure input-output encapsulation to eliminate latency and prevent prompt injections?
+    \item \textbf{RQ2:} By what architectural methodology can local LLMs be integrated into the automated incident response pipeline alongside secure input-output encapsulation to eliminate latency and mitigate adversarial attack vectors targeting the system?
     \item \textbf{RQ3:} What is the empirical efficacy of augmenting an autonomous agent's memory with an external dual knowledge retrieval system using Reciprocal Rank Fusion to optimize threat classification accuracy and minimize hallucinations?
 \end{enumerate}
 
 \section{Scope and Object of Study}
 
-\textbf{Objects of Study:} Modern SOC incident response workflows, high-velocity network flow telemetry (NetFlow/PCAP), stateful agent orchestration (LangGraph), local quantized LLMs, and adversarial AI vulnerabilities.
+\textbf{Objects of Study:} The objects of study encompass automated incident response and mitigation workflows within modern Security Operations Centers (SOCs); high-velocity network flow telemetry protocols (NetFlow/IPFIX) and raw packet capture metadata (PCAP); stateful cognitive agent orchestration frameworks (LangGraph); local quantized Large Language Models optimized for resource-constrained inference; and adversarial AI attack vectors (including log-substrate prompt injections, delimiter smuggling, and semantic knowledge base poisoning) that threaten LLM-integrated security systems.
 
 \textbf{Research Scope:}
 \begin{itemize}

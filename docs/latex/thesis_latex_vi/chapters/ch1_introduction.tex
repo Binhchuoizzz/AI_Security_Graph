@@ -36,7 +36,7 @@ Mặc dù LLM có thể hỗ trợ tóm tắt log và lập kế hoạch phản 
 \textbf{Mục tiêu cụ thể:}
 \begin{itemize}
     \item \textbf{Mục tiêu 1:} Triển khai thuật toán thống kê trực tuyến Welford với độ phức tạp $O(1)$ để tính toán phương sai cuộn và Z-Score nhằm lọc lưu lượng mạng vô hại ở tốc độ đường truyền.
-    \item \textbf{Mục tiêu 2:} Thiết kế tác tử tự trị có trạng thái bằng LangGraph và LLM lượng tử hóa cục bộ, tích hợp rào chắn bảo mật đầu vào-đầu ra để phân tích an toàn các cảnh báo bất thường.
+    \item \textbf{Mục tiêu 2:} Thiết kế tác tử tự trị có trạng thái bằng LangGraph và LLM lượng tử hóa cục bộ, tích hợp các rào chắn bảo mật đầu vào-đầu ra nhằm phân tích an toàn các cảnh báo bất thường và ngăn ngừa các vector tấn công đối kháng nhắm vào hệ thống khi tích hợp LLM.
     \item \textbf{Mục tiêu 3:} Xây dựng hệ thống truy xuất kiến thức kép (Dual-RAG) tích hợp MITRE ATT\&CK và NIST SP 800-61r2 nhằm làm nền tảng tri thức cho quyết định của tác tử và giảm thiểu ảo giác.
 \end{itemize}
 
@@ -45,13 +45,13 @@ Mặc dù LLM có thể hỗ trợ tóm tắt log và lập kế hoạch phản 
 Để kiểm chứng khoa học cho kiến trúc đề xuất, nghiên cứu này tập trung giải quyết ba câu hỏi:
 \begin{enumerate}
     \item \textbf{RQ1:} Làm thế nào thiết kế toán học một cơ chế lọc lưu lượng mạng thời gian thực dựa trên baseline thống kê trực tuyến để hoạt động ở tốc độ đường truyền nhằm loại bỏ cảnh báo nhiễu nhưng vẫn bảo toàn chuỗi sự kiện của APT?
-    \item \textbf{RQ2:} Bằng phương pháp kiến trúc nào có thể tích hợp LLM cục bộ vào quy trình phản hồi sự cố tự động kết hợp đóng gói dữ liệu an toàn để loại bỏ độ trễ và ngăn chặn tiêm prompt từ log?
+    \item \textbf{RQ2:} Bằng phương pháp kiến trúc nào có thể tích hợp LLM cục bộ vào quy trình phản hồi sự cố tự động kết hợp đóng gói dữ liệu an toàn để loại bỏ độ trễ và ngăn ngừa các vector tấn công đối kháng nhắm vào hệ thống khi tích hợp LLM?
     \item \textbf{RQ3:} Hiệu quả thực nghiệm của việc tăng cường bộ nhớ tác tử bằng hệ thống truy xuất tri thức kép sử dụng thuật toán Reciprocal Rank Fusion trong việc tối ưu hóa độ chính xác và giảm thiểu ảo giác của LLM là gì?
 \end{enumerate}
 
 \section{Đối tượng và Phạm vi Nghiên cứu}
 
-\textbf{Đối tượng Nghiên cứu:} Quy trình phản hồi sự cố tự động trong SOC, log luồng mạng (NetFlow/PCAP), điều phối tác tử có trạng thái (LangGraph), LLM cục bộ lượng tử hóa và các lỗ hổng bảo mật đối kháng AI.
+\textbf{Đối tượng Nghiên cứu:} Đối tượng nghiên cứu của luận văn bao gồm các quy trình tự động hóa phản hồi sự cố mạng trong Trung tâm Điều hành An ninh (SOC) hiện đại; các loại log luồng mạng tốc độ cao (NetFlow/IPFIX) và siêu dữ liệu bắt gói tin (PCAP); cơ chế điều phối và duy trì trạng thái nhận thức của tác tử (LangGraph); các mô hình ngôn ngữ lớn cục bộ được lượng tử hóa để tối ưu hiệu năng; và các vector tấn công đối kháng nhắm vào cỗ máy AI (như tiêm prompt từ log, buôn lậu dấu phân tách, đầu độc tri thức RAG).
 
 \textbf{Phạm vi Nghiên cứu:}
 \begin{itemize}
