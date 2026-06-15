@@ -7,7 +7,7 @@ This chapter details the architectural design, mathematical formulations, and so
 
 To protect enterprise environments without incurring prohibitive computational latencies, the SENTINEL system splits the threat detection and response pipeline into two distinct, specialized operational tiers. This architectural separation of concerns is illustrated by the holistic system block diagram in Figure~\ref{fig:soc_ai_concept}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.72\textheight,keepaspectratio]{images/soc_ai_concept.png}
     \caption{The holistic architecture of the SENTINEL system, illustrating the two-tier data flow and structural components.}
@@ -18,7 +18,7 @@ The first tier, designated as Tier-1, acts as a stateless, high-velocity transpo
 
 The detailed step-by-step runtime flow of the data processing and decision-making logic throughout the system is represented in the system execution flow diagram shown in Figure~\ref{fig:sentinel_flow}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{images/sentinel_flow.png}
     \caption{Detailed runtime execution flow and data processing logic within the SENTINEL pipeline.}

@@ -7,7 +7,7 @@ Chương này trình bày chi tiết thiết kế kỹ thuật, mô hình hóa t
 
 Để bảo vệ môi trường mạng doanh nghiệp mà không phải đánh đổi bằng độ trễ tính toán quá lớn, hệ thống SENTINEL chia quy trình phát hiện và phản hồi mối đe dọa thành hai tầng hoạt động chuyên biệt và riêng biệt. Sự phân tách trách nhiệm kiến trúc (architectural separation of concerns) này được minh họa trực quan thông qua sơ đồ khối hệ thống tổng thể trong Hình~\ref{fig:soc_ai_concept}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.72\textheight,keepaspectratio]{images/soc_ai_concept.png}
     \caption{Sơ đồ kiến trúc tổng thể của hệ thống SENTINEL, minh họa luồng dữ liệu hai tầng và các thành phần cấu trúc.}
@@ -18,7 +18,7 @@ Tầng thứ nhất, được ký hiệu là Tầng 1 (Tầng 1), hoạt động
 
 Quy trình hoạt động và luồng xử lý dữ liệu chi tiết theo thời gian thực của hệ thống được minh họa thông qua sơ đồ luồng chạy trong Hình~\ref{fig:sentinel_flow}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{images/sentinel_flow.png}
     \caption{Sơ đồ luồng xử lý và luồng dữ liệu chi tiết theo thời gian thực của hệ thống SENTINEL.}
