@@ -1,19 +1,42 @@
 \relax 
-\@writefile{toc}{\contentsline {chapter}{\numberline {3}Kiến trúc SENTINEL Đề xuất}{21}{}\protected@file@percent }
+\citation{langgraph2024}
+\@writefile{toc}{\contentsline {chapter}{\numberline {3}Thiết kế Hệ thống và Triển khai Kỹ thuật}{22}{}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\newlabel{ch:proposed_solution}{{3}{21}{Tóm tắt chương}{}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {3.1}Tổng quan về Kiến trúc Nhận thức Hai tầng}{21}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.2}Tầng 1: Bộ lọc Lưu lượng Mạng Thời gian thực (RuleEngine và Welford)}{21}{}\protected@file@percent }
+\newlabel{ch:system_design_implementation}{{3}{22}{Tóm tắt chương}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}Tổng quan về Kiến trúc Nhận thức Hai tầng}{22}{}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Sơ đồ kiến trúc tổng thể của hệ thống SENTINEL, minh họa luồng dữ liệu hai tầng và các thành phần cấu trúc.}}{22}{}\protected@file@percent }
+\newlabel{fig:soc_ai_concept}{{4}{22}{Tổng quan về Kiến trúc Nhận thức Hai tầng}{}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces Sơ đồ luồng xử lý và luồng dữ liệu chi tiết theo thời gian thực của hệ thống SENTINEL.}}{24}{}\protected@file@percent }
+\newlabel{fig:sentinel_flow}{{5}{24}{Tổng quan về Kiến trúc Nhận thức Hai tầng}{}{}}
+\citation{welford1962}
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}Tầng 1: Bộ lọc Lưu lượng Mạng Thời gian thực (RuleEngine và Welford)}{25}{}\protected@file@percent }
+\citation{langgraph2024}
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}Tầng 2: Tác tử AI Nhận thức LangGraph}{26}{}\protected@file@percent }
 \citation{nist80061}
-\@writefile{toc}{\contentsline {section}{\numberline {3.3}Tầng 2: Tác tử AI Nhận thức LangGraph}{22}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.4}Cơ chế Sinh Tăng cường Truy xuất Kép (Dual-RAG) và Bộ nhớ Ngữ nghĩa}{22}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.5}Bộ nhớ Đe dọa và Liên kết Chiến dịch APT}{22}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.6}Tầng Rào chắn Bảo mật AI (Guardrails)}{23}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3.7}Toàn vẹn Dữ liệu và Bảo vệ bằng Chuỗi HMAC}{23}{}\protected@file@percent }
+\citation{rag2020}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Ma trận chuyển trạng thái của FSM Tác tử Nhận thức Tầng 2.}}{27}{}\protected@file@percent }
+\newlabel{tab:agent_fsm_transitions}{{2}{27}{Tầng 2: Tác tử AI Nhận thức LangGraph}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}Cơ chế Sinh Tăng cường Truy xuất Kép (Dual-RAG) và Bộ nhớ Ngữ nghĩa}{27}{}\protected@file@percent }
+\citation{faiss2019}
+\citation{bm25_2009}
+\citation{rrf2009}
+\citation{apt_stealth2021}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces So sánh các mô hình truy xuất trong chiến lược tìm kiếm lai.}}{28}{}\protected@file@percent }
+\newlabel{tab:search_comparison}{{3}{28}{Cơ chế Sinh Tăng cường Truy xuất Kép (Dual-RAG) và Bộ nhớ Ngữ nghĩa}{}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}Bộ nhớ Đe dọa và Liên kết Chiến dịch APT}{29}{}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Thông số kỹ thuật lược đồ cơ sở dữ liệu Bộ nhớ Đe dọa.}}{29}{}\protected@file@percent }
+\newlabel{tab:threat_memory_schema}{{4}{29}{Bộ nhớ Đe dọa và Liên kết Chiến dịch APT}{}{}}
+\citation{promptinjection2023}
+\citation{watchtower2026}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}Tầng Rào chắn Bảo mật AI (Guardrails)}{30}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}Toàn vẹn Dữ liệu và Bảo vệ bằng Chuỗi HMAC}{30}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.8}Giao diện Streamlit Bảng điều khiển Giám sát SOC (Streamlit UI)}{31}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.9}Kiến trúc ảo hóa Docker và Triển khai hạ tầng}{31}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.10}Tóm tắt chương}{32}{}\protected@file@percent }
 \@setckpt{chapters/ch3_proposed_solution}{
-\setcounter{page}{24}
-\setcounter{equation}{0}
+\setcounter{page}{33}
+\setcounter{equation}{7}
 \setcounter{enumi}{0}
 \setcounter{enumii}{0}
 \setcounter{enumiii}{0}
@@ -22,13 +45,13 @@
 \setcounter{mpfootnote}{0}
 \setcounter{part}{0}
 \setcounter{chapter}{3}
-\setcounter{section}{7}
+\setcounter{section}{10}
 \setcounter{subsection}{0}
 \setcounter{subsubsection}{0}
 \setcounter{paragraph}{0}
 \setcounter{subparagraph}{0}
-\setcounter{figure}{3}
-\setcounter{table}{1}
+\setcounter{figure}{5}
+\setcounter{table}{4}
 \setcounter{parentequation}{0}
 \setcounter{LT@tables}{1}
 \setcounter{LT@chunks}{1}

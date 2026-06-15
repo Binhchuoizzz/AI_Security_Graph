@@ -1,7 +1,7 @@
-\chapter{Kiến trúc SENTINEL Đề xuất}
-\label{ch:proposed_solution}
+\chapter{Thiết kế Hệ thống và Triển khai Kỹ thuật}
+\label{ch:system_design_implementation}
 
-Chương này trình bày chi tiết thiết kế kỹ thuật và mô hình hóa toán học của kiến trúc nhận thức hai tầng SENTINEL. Được cấu trúc như một quy trình phát hiện đe dọa và phản hồi sự cố lai (hybrid), hệ thống này được thiết kế nhằm san lấp khoảng cách hiệu năng giữa xử lý gói tin mạng ở tốc độ đường truyền (wire-speed) và khả năng suy luận tiêu tốn tài nguyên của Mô hình Ngôn ngữ Lớn (LLM), đồng thời thiết lập các rào chắn nhận thức (cognitive guardrails) mạnh mẽ để cách ly LLM khỏi các hành vi thao túng đối kháng. Nội dung chương tập trung phân tích sơ đồ khối hệ thống tổng quát, các thuật toán tiền lọc thống kê trực tuyến, quy trình điều phối nhận thức dựa trên đồ thị trạng thái, cơ chế truy xuất kép Dual-RAG, và các tầng bảo vệ toàn vẹn dữ liệu bằng mật mã học.
+Chương này trình bày chi tiết thiết kế kỹ thuật, mô hình hóa toán học và quy trình triển khai phần mềm của khung bảo mật nhận thức hai tầng SENTINEL. Được cấu trúc như một quy trình phát hiện đe dọa và phản hồi sự cố lai (hybrid), hệ thống này được thiết kế nhằm san lấp khoảng cách hiệu năng giữa xử lý gói tin mạng ở tốc độ đường truyền (wire-speed) và khả năng suy luận tiêu tốn tài nguyên của Mô hình Ngôn ngữ Lớn (LLM), đồng thời thiết lập các rào chắn nhận thức (cognitive guardrails) mạnh mẽ để cách ly LLM khỏi các hành vi thao túng đối kháng. Nội dung chương tập trung phân tích sơ đồ khối hệ thống tổng quát, các thuật toán tiền lọc thống kê trực tuyến, quy trình điều phối nhận thức dựa trên đồ thị trạng thái, cơ chế truy xuất kép Dual-RAG, lược đồ cơ sở dữ liệu Bộ nhớ Đe dọa SQLite, rào chắn bảo mật AI, chuỗi liên kết log bảo mật HMAC, giao diện người dùng dashboard Streamlit và mô hình triển khai ảo hóa Docker.
 
 \section{Tổng quan về Kiến trúc Nhận thức Hai tầng}
 
@@ -14,11 +14,22 @@ Chương này trình bày chi tiết thiết kế kỹ thuật và mô hình hó
     \label{fig:soc_ai_concept}
 \end{figure}
 
-Tầng thứ nhất, được ký hiệu là Tầng 1 (Tier-1), hoạt động như một tầng vận chuyển và lọc dữ liệu phi trạng thái (stateless) với vận tốc cao, được bố trí trực tiếp tại ranh giới mạng. Dữ liệu đo lường từ tường lửa, các cảm biến mạng và tác tử trên máy chủ (host agent) được nạp vào dưới dạng dòng gói tin bắt được (packet capture) hoặc nhật ký luồng (flow logs). Tầng 1 vận hành ở tốc độ đường truyền, tính toán các độ lệch thống kê theo thời gian thực trên dữ liệu đo lường đầu vào để ngay lập tức loại bỏ hoặc ghi nhật ký các gói tin lành tính, đồng thời chuyển tiếp các nhật ký bất thường lên Tầng 2. Ngược lại, Tầng 2 (Tier-2) được thiết kế như một tầng nhận thức có trạng thái (stateful) với khả năng suy luận chuyên sâu. Được điều phối bởi một tác tử AI tự trị thông qua LangGraph \cite{langgraph2024}, Tầng 2 tiếp nhận các cảnh báo được leo thang, truy xuất tri thức an ninh mạng chuyên biệt, xâu chuỗi ngữ cảnh lịch sử, và đưa ra các quyết định phản hồi có cấu trúc (ví dụ: đề xuất cập nhật cấu hình tường lửa). Thiết kế lai này giải quyết triệt để nút thắt độ trễ của LLM bằng cách giảm tải tới 95\% lưu lượng lành tính ngay tại Tầng 1, chỉ dành riêng tài nguyên suy luận LLM chuyên sâu cho các cuộc điều tra mối đe dọa phức tạp.
+Tầng thứ nhất, được ký hiệu là Tầng 1 (Tầng 1), hoạt động như một tầng vận chuyển và lọc dữ liệu phi trạng thái (stateless) với vận tốc cao, được bố trí trực tiếp tại ranh giới mạng. Dữ liệu đo lường từ tường lửa, các cảm biến mạng và tác tử trên máy chủ (host agent) được nạp vào dưới dạng dòng gói tin bắt được (packet capture) hoặc nhật ký luồng (flow logs). Tầng 1 vận hành ở tốc độ đường truyền, tính toán các độ lệch thống kê theo thời gian thực trên dữ liệu đo lường đầu vào để ngay lập tức loại bỏ hoặc ghi nhật ký các gói tin lành tính, đồng thời chuyển tiếp các nhật ký bất thường lên Tầng 2. Ngược lại, Tầng 2 (Tầng 2) được thiết kế như một tầng nhận thức có trạng thái (stateful) với khả năng suy luận chuyên sâu. Được điều phối bởi một tác tử AI tự trị thông qua LangGraph \cite{langgraph2024}, Tầng 2 tiếp nhận các cảnh báo được leo thang, truy xuất tri thức an ninh mạng chuyên biệt, xâu chuỗi ngữ cảnh lịch sử, và đưa ra các quyết định phản hồi có cấu trúc (ví dụ: đề xuất cập nhật cấu hình tường lửa). Thiết kế lai này giải quyết triệt để nút thắt độ trễ của LLM bằng cách giảm tải tới 95\% lưu lượng lành tính ngay tại Tầng 1, chỉ dành riêng tài nguyên suy luận LLM chuyên sâu cho các cuộc điều tra mối đe dọa phức tạp.
+
+Quy trình hoạt động và luồng xử lý dữ liệu chi tiết theo thời gian thực của hệ thống được minh họa thông qua sơ đồ luồng chạy trong Hình~\ref{fig:sentinel_flow}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/sentinel_flow.png}
+    \caption{Sơ đồ luồng xử lý và luồng dữ liệu chi tiết theo thời gian thực của hệ thống SENTINEL.}
+    \label{fig:sentinel_flow}
+\end{figure}
+
+Như được trình bày trong sơ đồ luồng chạy, quy trình bắt đầu ngay khi nhật ký sự kiện mạng đầu vào được thu nạp. Bộ lọc Tầng 1 sẽ kiểm tra luật tĩnh bằng Rule Engine. Nếu phát hiện khớp với chữ ký tấn công đã biết, hệ thống lập tức thực thi hành động DROP hoặc WARN. Trường hợp ngược lại, các thuộc tính số của log được đưa vào bộ tính toán Welford để xác định điểm Z-Score. Các dòng dữ liệu lành tính được ghi trực tiếp vào cơ sở dữ liệu, trong khi các dòng dị thường có Z-Score vượt ngưỡng sẽ bị leo thang. Tầng 2 tiếp nhận dữ liệu leo thang, thực hiện đóng gói dữ liệu phân tách, chạy bộ khai thác Drain3 để nén thông điệp và kiểm tra Bộ đệm Ngữ nghĩa. Nếu trúng bộ đệm (cache hit), hành động được thực thi trực tiếp; nếu trượt bộ đệm (cache miss), tác tử LangGraph được kích hoạt. Tác tử này truy vấn Bộ nhớ Đe dọa và chạy nút phân loại LLM, định tuyến động qua nút RAG nếu thiếu tri thức chuyên môn. Sau khi ra quyết định, kết quả được kiểm định, làm sạch, ghi vào cơ sở dữ liệu với HMAC an toàn và thực thi chặn tự động hoặc đưa vào hàng đợi chờ chuyên viên SOC phê duyệt thông qua giao diện Streamlit UI.
 
 \section{Tầng 1: Bộ lọc Lưu lượng Mạng Thời gian thực (RuleEngine và Welford)}
 
-Bộ lọc Tầng 1 chịu trách nhiệm thu nạp và xử lý theo thời gian thực luồng nhật ký tốc độ cao. Để quản lý trạng thái kết nối mà không gây ra nút thắt cổ chai về đọc/ghi đĩa (disk I/O), bộ lọc tích hợp một trình quản lý đường cơ sở phiên tạm thời (temporal session baseline manager) để ánh xạ các địa chỉ IP nguồn đang hoạt động. Đối với mỗi phiên IP hoạt động, hệ thống tính toán các đặc trưng lưu lượng bằng thuật toán trực tuyến Welford \cite{welford1962}. Công thức toán học của thuật toán Welford tính toán giá trị trung bình động (running mean) $\mu_k$ và tổng bình phương các độ lệch (sum of squared differences) $M_{2,k}$ trên một luồng liên tục các thuộc tính số của nhật ký (chẳng hạn như thời gian luồng, số lượng gói tin, hoặc kích thước byte) tại bước thứ $k$:
+Bộ lọc Tầng 1 chịu trách nhiệm thu nạp và xử lý theo thời thực luồng nhật ký tốc độ cao. Để quản lý trạng thái kết nối mà không gây ra nút thắt cổ chai về đọc/ghi đĩa (disk I/O), bộ lọc tích hợp một trình quản lý đường cơ sở phiên tạm thời (temporal session baseline manager) để ánh xạ các địa chỉ IP nguồn đang hoạt động. Đối với mỗi phiên IP hoạt động, hệ thống tính toán các đặc trưng lưu lượng bằng thuật toán trực tuyến Welford \cite{welford1962}. Công thức toán học của thuật toán Welford tính toán giá trị trung bình động (running mean) $\mu_k$ và tổng bình phương các độ lệch (sum of squared differences) $M_{2,k}$ trên một luồng liên tục các thuộc tính số của nhật ký (chẳng hạn như thời gian luồng, số lượng gói tin, hoặc kích thước byte) tại bước thứ $k$:
 
 \begin{equation}
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}
@@ -42,6 +53,8 @@ Từ các số liệu thống kê lũy kế này, phương sai cuộn (rolling v
 
 Nếu điểm Z-Score vượt quá một ngưỡng tới hạn (được xác định trong cấu hình, ví dụ: $\alpha > 3.5\sigma$), gói tin sẽ được gắn nhãn hành động `ESCALATE` (leo thang) và chuyển tiếp lên Tầng 2. Để duy trì chuỗi sự kiện theo thời gian của các chiến dịch tấn công âm thầm và chậm rãi (low-and-slow), hệ thống tiếp tục cập nhật đường cơ sở của các phiên. Song song với các kiểm tra thống kê dựa trên thuật toán Welford, Tầng 1 vận hành một bộ máy luật tĩnh (\texttt{RuleEngine}) thực hiện so khớp mẫu chữ ký nhanh bằng biểu thức chính quy (regex) để ngăn chặn tức thì các mẫu câu lệnh đã biết (như cú pháp tấn công SQL Injection) và áp dụng các hành động tĩnh `DROP` (loại bỏ) hoặc `WARN` (cảnh báo) mà không cần đi qua Tầng 2.
 
+Về mặt phần mềm, Tầng 1 được xây dựng bằng Python thông qua hai lớp chính: \texttt{RunningStats} và \texttt{SessionBaseline}. Lớp \texttt{RunningStats} lưu trữ động số lượng, giá trị trung bình và tổng bình phương độ lệch trên RAM, thực hiện các phép toán cập nhật với độ phức tạp thời gian tối ưu O(1). Để ngăn chặn tràn bộ nhớ khi lưu trữ trạng thái của vô số IP nguồn khác nhau, lớp \texttt{SessionBaseline} quản lý phiên thông qua cấu trúc bảng băm kết hợp với một luồng dọn rác (garbage collection daemon) định kỳ giải phóng các phiên không hoạt động dựa trên cấu hình TTL (Time-To-Live). Quy trình so khớp mẫu tĩnh được tăng tốc bằng các đối tượng biểu thức chính quy được biên dịch trước (pre-compiled regex) từ thư viện \texttt{re} của Python.
+
 \section{Tầng 2: Tác tử AI Nhận thức LangGraph}
 
 Các luồng bất thường được leo thang sẽ được tiếp nhận bởi công cụ nhận thức Tầng 2, được mô hình hóa dưới dạng Đồ thị có hướng không chu trình (Directed Acyclic Graph) hoạt động như một Máy trạng thái hữu hạn (Finite State Machine - FSM) có trạng thái bằng cách sử dụng LangGraph \cite{langgraph2024}. Dữ liệu phiên và ngữ cảnh suy luận được lưu giữ bên trong một đối tượng trạng thái trung tâm, \texttt{SentinelState}. Quy trình làm việc của tác tử bao gồm ba nút chính: nút phân tích (analyze), nút truy xuất (retrieve), và nút giải quyết (resolve). Tại nút phân tích, tác tử đánh giá ngữ cảnh nhật ký được leo thang bằng cách sử dụng LLM lượng hóa cục bộ để phân loại rủi ro ban đầu. Nếu tác tử phát hiện sự thiếu hụt kiến thức chuyên môn (như một CVE chưa biết hoặc một chữ ký không quen thuộc), nó sẽ kích hoạt quá trình chuyển hướng điều kiện đến nút truy xuất. Tại nút truy xuất, hệ thống thực hiện truy vấn cơ sở tri thức lai kết hợp vector và từ khóa. Các trạng thái định tuyến và chuyển dịch được trình bày chi tiết trong Bảng~\ref{tab:agent_fsm_transitions}.
@@ -50,7 +63,7 @@ Các luồng bất thường được leo thang sẽ được tiếp nhận bở
     \centering
     \caption{Ma trận chuyển trạng thái của FSM Tác tử Nhận thức Tầng 2.}
     \label{tab:agent_fsm_transitions}
-    \begin{tabular}{llll}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}}
         \toprule
         \textbf{Trạng thái hiện tại} & \textbf{Đầu vào / Điều kiện} & \textbf{Trạng thái tiếp theo} & \textbf{Hành động đầu ra} \\
         \midrule
@@ -66,6 +79,8 @@ Các luồng bất thường được leo thang sẽ được tiếp nhận bở
 
 Sau khi quá trình truy xuất hoàn tất, luồng xử lý sẽ quay vòng lại nút phân tích để tái đánh giá các bản ghi nhật ký cùng với các thông tin ngữ cảnh được bổ sung. Chu kỳ lặp này giúp ngăn chặn hiện tượng ảo giác (hallucination) bằng cách ràng buộc suy luận của LLM dựa trên các tài liệu đã được xác thực. Khi độ tin cậy đạt đến ngưỡng quy định, tác tử chuyển sang nút giải quyết để tạo một cấu trúc dữ liệu JSON chi tiết chứa phân loại mối đe dọa, độ tin cậy và các quy tắc ngăn chặn được đề xuất. Nếu độ tin cậy dưới ngưỡng, tác tử sẽ định tuyến cảnh báo đến hàng đợi phê duyệt của con người (Human-in-the-Loop - HITL).
 
+Hiện thực hóa kỹ thuật của đồ thị trạng thái sử dụng trình biên dịch của LangGraph. Trạng thái của tác tử được định nghĩa như một lớp tự điển có kiểu dữ liệu cấu trúc (typed dictionary), trong đó các trường lưu trữ khóa như chỉ số IOC và lịch sử quyết định được thiết lập ở chế độ chỉ cho phép ghi thêm (append-only) nhằm chống lại sự trôi dạt ngữ nghĩa (semantic drift) trong quá trình suy luận. Việc kết nối LLM được quản lý bởi lớp \texttt{OpenAILLMClient} giao tiếp với máy chủ llama.cpp chạy Gemma-2-9B-IT cục bộ, cấu hình với các tham số khắt khe như \texttt{temperature=0.0} và giới hạn cửa sổ ngữ cảnh để triệt tiêu tính bất định và ngăn chặn quá tải bộ nhớ VRAM.
+
 \section{Cơ chế Sinh Tăng cường Truy xuất Kép (Dual-RAG) và Bộ nhớ Ngữ nghĩa}
 
 Cơ chế Dual-RAG định hình các quyết định của tác tử bằng cách truy xuất ngữ cảnh từ hai cơ sở dữ liệu chuyên ngành thống nhất: cơ sở tri thức MITRE ATT\&CK dùng để ánh xạ các hành vi, chiến thuật và kỹ thuật đe dọa (TTPs), và kho lưu trữ kịch bản NIST SP 800-61r2 cung cấp các quy trình xử lý sự cố tiêu chuẩn \cite{nist80061}. Thay vì chỉ dựa vào khớp từ khóa đơn thuần hoặc các vector ngữ nghĩa dày đặc một cách độc lập \cite{rag2020}, quá trình truy xuất sử dụng một chiến lược tìm kiếm lai (hybrid search). Bảng so sánh giữa các thành phần tìm kiếm dày đặc (dense) và thưa thớt (sparse) được chi tiết hóa trong Bảng~\ref{tab:search_comparison}.
@@ -74,7 +89,7 @@ Cơ chế Dual-RAG định hình các quyết định của tác tử bằng cá
     \centering
     \caption{So sánh các mô hình truy xuất trong chiến lược tìm kiếm lai.}
     \label{tab:search_comparison}
-    \begin{tabular}{p{0.25\textwidth}p{0.32\textwidth}p{0.33\textwidth}}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}}
         \toprule
         \textbf{Khía cạnh} & \textbf{Tìm kiếm Vector Dày đặc (FAISS)} & \textbf{Tìm kiếm Từ khóa Thưa thớt (BM25)} \\
         \midrule
@@ -95,7 +110,7 @@ Cơ chế Dual-RAG định hình các quyết định của tác tử bằng cá
     R(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}
 \end{equation}
 
-trong đó $r_m(d)$ là thứ hạng của tài liệu $d$ trong lượt tìm kiếm $m$, và $k$ là một hằng số tỷ lệ (thường chọn $k=60$). Để vượt qua nút thắt độ trễ của LLM, một mô-đun Bộ đệm Ngữ nghĩa (Semantic Cache) được triển khai phía trước tác tử. Bộ đệm này tính toán độ tương đồng Cosine giữa vector đặc trưng (embedding) của truy vấn mới và các thực thể truy vấn lịch sử. Nếu độ tương đồng vượt quá $\theta \ge 0.95$, hệ thống sẽ trả về ngay kết quả đã lưu trong bộ đệm, rút ngắn thời gian xử lý từ vài giây xuống còn mili giây.
+trong đó $r_m(d)$ là thứ hạng của tài liệu $d$ trong lượt tìm kiếm $m$, và $k$ là một hằng số tỷ lệ (thường chọn $k=60$). Để vượt qua nút thắt độ trễ của LLM, một mô-đun Bộ đệm Ngữ nghĩa (Semantic Cache) được triển khai phía trước tác tử. Bộ đệm này tính toán độ tương đồng Cosine giữa vector đặc trưng (embedding) của truy vấn mới và các thực thể truy vấn lịch sử. Nếu độ tương đồng vượt quá $\theta \ge 0.95$, hệ thống sẽ trả về ngay kết quả đã lưu trong bộ đệm, rút ngắn thời gian xử lý từ vài giây xuống còn mili giây. Bộ đệm này hoạt động dựa trên cơ chế LRU với cơ sở dữ liệu SQLite phụ trợ, giúp dữ liệu cache được bảo toàn ngay cả khi khởi động lại hệ thống.
 
 \section{Bộ nhớ Đe dọa và Liên kết Chiến dịch APT}
 
@@ -105,7 +120,7 @@ Các tác nhân đe dọa tinh vi thường chia nhỏ chuỗi tấn công của
     \centering
     \caption{Thông số kỹ thuật lược đồ cơ sở dữ liệu Bộ nhớ Đe dọa.}
     \label{tab:threat_memory_schema}
-    \begin{tabular}{p{0.25\textwidth}p{0.3\textwidth}p{0.35\textwidth}}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.40\textwidth}}
         \toprule
         \textbf{Tên bảng} & \textbf{Trường khóa chính / thuộc tính} & \textbf{Mục đích chức năng} \\
         \midrule
@@ -124,13 +139,13 @@ Các tác nhân đe dọa tinh vi thường chia nhỏ chuỗi tấn công của
     S_{new} = S_{old} \times (1 - \lambda)^{t}
 \end{equation}
 
-trong đó $\lambda$ là tỷ lệ suy giảm và $t$ là thời gian không hoạt động đã trôi qua. Thuật toán liên kết APT sẽ quét bảng \texttt{threat\_events}. Nếu phát hiện một IP nguồn kích hoạt các dị thường trong nhiều ngày khác nhau hoặc trên nhiều giai đoạn khác nhau của ma trận MITRE ATT\&CK, hệ thống sẽ tự động nâng mức phân loại mối đe dọa lên nghiêm trọng cao, kích hoạt các biện pháp chặn phòng thủ.
+trong đó $\lambda$ là tỷ lệ suy giảm và $t$ là thời gian không hoạt động đã trôi qua. Thuật toán liên kết APT sẽ quét bảng \texttt{threat\_events}. Nếu phát hiện một IP nguồn kích hoạt các dị thường trong nhiều ngày khác nhau hoặc trên nhiều giai đoạn khác nhau của ma trận MITRE ATT\&CK, hệ thống sẽ tự động nâng mức phân loại mối đe dọa lên nghiêm trọng cao, kích hoạt các biện pháp chặn phòng thủ. Tại mức cơ sở dữ liệu, các SQL triggers được thiết kế để tự động tính toán khoảng cách thời gian và điểm tích lũy của IP để tránh xử lý dư thừa trên mã nguồn tác tử Python.
 
 \section{Tầng Rào chắn Bảo mật AI (Guardrails)}
 
-Do các LLM dễ bị tấn công chiếm quyền điều khiển chỉ thị (instruction hijacking / prompt injection), hệ thống SENTINEL triển khai một tầng Rào chắn Bảo mật AI (AI Security Guardrails) nhiều lớp nhằm cách ly công cụ suy luận khỏi các dữ liệu đầu vào không đáng tin cậy \cite{promptinjection2023}. Cơ chế phòng thủ cốt lõi dựa trên kỹ thuật Đóng gói Dữ liệu Phân tách (Delimited Data Encapsulation). Đối với mỗi phiên làm việc, hệ thống tự động tạo ra một mã token thập lục phân ngẫu nhiên bảo mật bằng mật mã (ví dụ: \texttt{<|DATA\_8F3E|>}). Phần dữ liệu nhật ký thô chưa được kiểm chứng sẽ được bao bọc bên trong các thẻ phân tách này trong khuôn mẫu prompt, chỉ thị cho LLM rằng bất kỳ mã lệnh nào xuất hiện bên trong ranh giới này đều phải được xử lý nghiêm ngặt dưới dạng dữ liệu tĩnh thụ động thay vì các chỉ thị thực thi.
+Do các LLM dễ bị tấn công chiếm quyền điều khiển chỉ thị (instruction hijacking / prompt injection), hệ thống SENTINEL triển khai một tầng Rào chắn Bảo mật AI (AI Security Guardrails) nhiều lớp nhằm cách ly công cụ suy luận khỏi các dữ liệu đầu vào không đáng tin cậy \cite{promptinjection2023}. Cơ chế phòng thủ cốt lõi dựa trên kỹ thuật Đóng gói Dữ liệu Phân tách (Delimited Data Encapsulation). Đối với mỗi phiên làm việc, hệ thống tự động tạo ra một mã token thập lục phân ngẫu nhiên bảo mật bằng mật mã (ví dụ: \texttt{<|DATA\_8F3E|>}) bằng thư viện \texttt{os.urandom()}. Phần dữ liệu nhật ký thô chưa được kiểm chứng sẽ được bao bọc bên trong các thẻ phân tách này trong khuôn mẫu prompt, chỉ thị cho LLM rằng bất kỳ mã lệnh nào xuất hiện bên trong ranh giới này đều phải được xử lý nghiêm ngặt dưới dạng dữ liệu tĩnh thụ động thay vì các chỉ thị thực thi.
 
-Để chống lại các cuộc tấn công Từ chối dịch vụ Token (Token DoS) và tràn ngữ cảnh, hệ thống tích hợp một trình Khai thác Mẫu Nhật ký (Log Template Miner) dựa trên thuật toán Drain3. Trình khai thác này nhóm các bản ghi nhật ký tương đồng thành các khuôn mẫu chung, loại bỏ các tham số ngẫu nhiên (chẳng hạn như mốc thời gian động hoặc ID luồng). Bộ Quản lý Ngân sách Token (Token Budget Manager) sau đó phân bổ tối đa 60\% dung lượng ngữ cảnh cho các khuôn mẫu đã nén và 40\% còn lại cho các điểm dị biệt có entropy cao. Cuối cùng, một Bộ lọc Làm sạch Đầu ra (Output Sanitization Filter) áp dụng cơ chế xác thực lược đồ JSON nghiêm ngặt, kiểm chứng câu trả lời của LLM chỉ chứa các trường được phép, đồng thời loại bỏ các thẻ hình ảnh markdown, kịch bản SVG, và các vector vượt rào mã hóa thập lục phân \cite{watchtower2026}.
+Để chống lại các cuộc tấn công Từ chối dịch vụ Token (Token DoS) và tràn ngữ cảnh, hệ thống tích hợp một trình Khai thác Mẫu Nhật ký (Log Template Miner) dựa trên thuật toán Drain3. Trình khai thác này nhóm các bản ghi nhật ký tương đồng thành các khuôn mẫu chung, loại bỏ các tham số ngẫu nhiên (chẳng hạn như mốc thời gian động hoặc ID luồng). Bộ Quản lý Ngân sách Token (Token Budget Manager) sau đó phân bổ tối đa 60\% dung lượng ngữ cảnh cho các khuôn mẫu đã nén và 40\% còn lại cho các điểm dị biệt có entropy cao. Cuối cùng, một Bộ lọc Làm sạch Đầu ra (Output Sanitization Filter) áp dụng cơ chế xác thực lược đồ JSON nghiêm ngặt, kiểm chứng câu trả lời của LLM chỉ chứa các trường được phép, đồng thời loại bỏ các thẻ hình ảnh markdown, kịch bản SVG, và các vector vượt rào mã hóa thập lục phân \cite{watchtower2026}. Lớp này được xây dựng dạng module độc lập \texttt{output\_sanitizer} để lọc dữ liệu trước khi nạp vào SQLite hoặc giao diện dashboard.
 
 \section{Toàn vẹn Dữ liệu và Bảo vệ bằng Chuỗi HMAC}
 
@@ -142,4 +157,20 @@ Do các LLM dễ bị tấn công chiếm quyền điều khiển chỉ thị (i
 
 trong đó $D_i$ là dữ liệu tải tin của bản ghi hiện tại, $H_{i-1}$ là mã băm của bản ghi liền trước, và $K$ là khóa bí mật HMAC được lưu trữ an toàn. Nếu kẻ tấn công cố tình thay đổi nhãn nhật ký hoặc xóa một bản ghi, chuỗi băm sẽ bị đứt gãy và các quy trình kiểm tra xác thực chạy trên bảng điều khiển sẽ lập tức gắn cờ phát hiện hành vi giả mạo. Ngoài ra, hệ thống cũng bảo vệ cơ sở dữ liệu vector RAG trước các cuộc tấn công đầu độc ngữ nghĩa (semantic poisoning). Các tệp tin cơ sở dữ liệu vector được giám sát chặt chẽ bởi một trình quản lý mã checksum chuyên dụng thực hiện tính toán và so sánh giá trị băm SHA-256 của các tệp tin trước khi nạp chúng vào bộ nhớ, đảm bảo không có tài liệu độc hại nào bị tiêm vào bộ nhớ truy xuất của tác tử.
 
-Tóm lại, Chương 3 đã thiết lập cấu trúc thiết kế và các khung toán học cốt lõi của kiến trúc SENTINEL, cân bằng giữa khả năng lọc mạng ở tốc độ đường truyền (Tầng 1) và suy luận có trạng thái, bảo mật của tác tử AI (Tầng 2) được củng cố bởi tính toàn vẹn mật mã vững chắc. Chương 4 sẽ mô tả quá trình hiện thực hóa kiến trúc này thành mã nguồn thực tế.
+Các chức năng này được đóng gói trong các lớp \texttt{HMACHashing} và \texttt{ActionValidator}. Lớp \texttt{ActionValidator} chịu trách nhiệm kiểm tra dải IP an toàn (RFC1918) và phát hiện các siêu ký tự shell độc hại nhằm loại bỏ nguy cơ chèn lệnh hệ thống trong quá trình gọi kịch bản cấu hình tường lửa.
+
+\section{Giao diện Streamlit Bảng điều khiển Giám sát SOC (Streamlit UI)}
+
+Giao diện Bảng điều khiển Giám sát SOC được phát triển trên Streamlit, tuân thủ mô hình phản hồi (reactive model) liên lạc liên tục với backend và cơ sở dữ liệu SQLite. Streamlit UI tích hợp ba phân hệ chính:
+- **Phân hệ luồng và hàng đợi:** Hiển thị trực quan thông lượng log đi qua Tầng 1 và các kết quả phân tích phân loại của Tầng 2.
+- **Phân hệ phân tích bộ nhớ đe dọa:** Vẽ sơ đồ chuỗi lan truyền cảnh báo APT của các địa chỉ IP theo dòng thời gian.
+- **Phân hệ kiểm tra toàn vẹn log:** Liên tục xác thực chuỗi băm HMAC của cơ sở dữ liệu logs và đưa ra các đèn tín hiệu cảnh báo (Xanh: Toàn vẹn; Đỏ: Đã bị can thiệp/sửa đổi).
+Ngoài ra, giao diện hỗ trợ cơ chế phê duyệt HITL, cho phép phân tích viên kiểm tra các đề xuất của tác tử và nhấn nút đồng ý/hủy bỏ cập nhật cấu hình tường lửa thực tế.
+
+\section{Kiến trúc ảo hóa Docker và Triển khai hạ tầng}
+
+Hệ thống được đóng gói thông qua Docker với cấu hình \texttt{Dockerfile} đa tầng (multi-stage build) để tối ưu dung lượng ảnh sản phẩm. Trình biên dịch llama.cpp trong container được kích hoạt CUDA để tận dụng GPU của hệ thống vật lý giúp đẩy nhanh tốc độ suy luận của LLM. Tệp điều phối \texttt{docker-compose.yml} thiết lập mạng nội bộ liên kết container tác tử và container Streamlit, chia sẻ chung các phân vùng ổ đĩa (volume mounts) chứa cơ sở dữ liệu SQLite (\texttt{threat\_memory.db} và \texttt{guardrails\_audit.db}) để đảm bảo tính lưu trữ bền vững độc lập với vòng đời của các container.
+
+\section{Tóm tắt chương}
+
+Chương 3 đã xây dựng toàn diện thiết kế kiến trúc và quy trình triển khai kỹ thuật của hệ thống SENTINEL. Bằng cách gộp bộ lọc mạng tốc độ đường truyền phi trạng thái (Tầng 1) với tác tử suy luận nhận thức có trạng thái (Tầng 2), đồng thời bổ sung các rào chắn AI cùng cơ chế chữ ký HMAC, hệ thống đạt được hiệu năng cao và độ bảo mật tuyệt đối trước các tấn công đối kháng. Quy trình tự động hóa được kiểm soát an toàn bởi con người qua hàng đợi HITL trên Streamlit UI và được đóng gói hoàn chỉnh trong Docker. Chương 4 tiếp theo sẽ mô tả chi tiết các thiết lập thực nghiệm, nghiên cứu loại trừ (ablation study) và các báo cáo kiểm định thống kê đánh giá hiệu năng thực tế của hệ thống.
