@@ -19,13 +19,21 @@ Mặc dù các Mô hình Ngôn ngữ Lớn (LLM) có thể tự động hóa quy
 
 \section{Mục tiêu Nghiên cứu}
 
-Mục tiêu tổng quát của nghiên cứu này là thiết kế, triển khai và đánh giá định lượng kiến trúc nhận thức hai tầng SENTINEL, kết hợp giữa bộ lọc bất thường thống kê trễ thấp và quy trình suy luận AI Tác tử có trạng thái được bảo vệ an toàn.
-
-Để thực hiện mục tiêu trên, nghiên cứu tập trung giải quyết ba mục tiêu cụ thể. Mục tiêu thứ nhất là triển khai thuật toán thống kê trực tuyến Welford với độ phức tạp $O(1)$ để tính toán phương sai cuộn và Z-Score nhằm lọc lưu lượng mạng vô hại ở tốc độ đường truyền. Mục tiêu thứ hai là thiết kế tác tử tự trị có trạng thái bằng LangGraph và LLM lượng tử hóa cục bộ, tích hợp các rào chắn bảo mật đầu vào-đầu ra nhằm phân tích an toàn các cảnh báo bất thường và ngăn ngừa các vector tấn công đối kháng nhắm vào hệ thống khi tích hợp LLM. Cuối cùng, mục tiêu thứ ba là xây dựng hệ thống truy xuất kiến thức kép (Dual-RAG) tích hợp MITRE ATT\&CK và NIST SP 800-61r2 nhằm làm nền tảng tri thức cho quyết định của tác tử và giảm thiểu ảo giác.
+Mục tiêu tổng quát của nghiên cứu này là thiết kế, triển khai và đánh giá định lượng kiến trúc nhận thức hai tầng SENTINEL, kết hợp giữa bộ lọc bất thường thống kê trễ thấp và quy trình suy luận AI Tác tử có trạng thái được bảo vệ an toàn. Để đạt được mục tiêu chung này, nghiên cứu tập trung giải quyết ba mục tiêu cụ thể:
+\begin{itemize}
+    \item \textbf{Cơ chế lọc tốc độ đường truyền:} Triển khai thuật toán thống kê trực tuyến Welford với độ phức tạp tính toán $O(1)$ và bộ nhớ $O(1)$ để tính toán phương sai cuộn và điểm Z-Score, giúp lọc bỏ lưu lượng mạng vô hại ở tốc độ đường truyền và giảm thiểu nạn bội thực cảnh báo ở tầng thu nạp.
+    \item \textbf{Tác tử nhận thức có trạng thái:} Thiết kế một tác tử tự trị có trạng thái bằng LangGraph và LLM lượng tử hóa cục bộ, tích hợp các rào chắn bảo mật đầu vào-đầu ra nhằm phân tích an toàn các cảnh báo bất thường và ngăn ngừa các vector tấn công đối kháng nhắm vào hệ thống tích hợp LLM.
+    \item \textbf{Truy xuất nền tảng kép (Dual-RAG):} Xây dựng hệ thống truy xuất tri thức kép tích hợp các kỹ thuật MITRE ATT\&CK và các kịch bản NIST SP 800-61r2 để làm nền tảng cho quyết định của tác tử và giảm thiểu ảo giác thông tin.
+\end{itemize}
 
 \section{Câu hỏi Nghiên cứu}
 
-Để kiểm chứng khoa học cho kiến trúc đề xuất, nghiên cứu này tập trung giải quyết ba câu hỏi nghiên cứu cốt lõi. Thứ nhất, RQ1 đặt câu hỏi làm thế nào để thiết kế toán học một cơ chế lọc lưu lượng mạng thời gian thực dựa trên baseline thống kê trực tuyến hoạt động ở tốc độ đường truyền nhằm loại bỏ cảnh báo nhiễu nhưng vẫn bảo toàn chuỗi sự kiện của APT. Thứ hai, RQ2 tìm kiếm phương pháp kiến trúc nào có thể tích hợp LLM cục bộ vào quy trình phản hồi sự cố tự động kết hợp đóng gói dữ liệu an toàn để loại bỏ độ trễ và ngăn ngừa các vector tấn công đối kháng nhắm vào hệ thống khi tích hợp LLM. Thứ ba, RQ3 đánh giá hiệu quả thực nghiệm của việc tăng cường bộ nhớ tác tử bằng hệ thống truy xuất tri thức kép sử dụng thuật toán Reciprocal Rank Fusion trong việc tối ưu hóa độ chính xác và giảm thiểu ảo giác của LLM.
+Để dẫn đường cho việc kiểm chứng thực nghiệm và đánh giá hiệu năng hệ thống, nghiên cứu này tập trung giải quyết ba câu hỏi nghiên cứu cốt lõi:
+\begin{itemize}
+    \item \textbf{Câu hỏi Nghiên cứu 1 (RQ1):} Làm thế nào để thiết kế toán học một cơ chế lọc lưu lượng mạng thời gian thực dựa trên baseline thống kê trực tuyến hoạt động ở tốc độ đường truyền nhằm giảm thiểu cảnh báo nhiễu nhưng vẫn bảo toàn chuỗi sự kiện của APT?
+    \item \textbf{Câu hỏi Nghiên cứu 2 (RQ2):} Phương pháp kiến trúc nào có thể tích hợp LLM cục bộ vào quy trình phản hồi sự cố tự động kết hợp đóng gói dữ liệu an toàn để giảm thiểu độ trễ và ngăn ngừa các vector tấn công đối kháng nhắm vào hệ thống khi tích hợp LLM?
+    \item \textbf{Câu hỏi Nghiên cứu 3 (RQ3):} Hiệu quả thực nghiệm của việc tăng cường bộ nhớ tác tử bằng hệ thống truy xuất tri thức kép sử dụng thuật toán Reciprocal Rank Fusion (RRF) trong việc tối ưu hóa độ chính xác và giảm thiểu ảo giác của LLM là gì?
+\end{itemize}
 
 \section{Đối tượng và Phạm vi Nghiên cứu}
 
@@ -42,7 +50,26 @@ Phương pháp nghiên cứu được thực hiện qua ba bước triển khai 
 Cuối cùng, các dữ liệu thực nghiệm thu thập được phân loại rõ ràng thành các biến định lượng và các đánh giá định tính được định lượng hóa. Dữ liệu định lượng bao gồm các biến số đo lường mạng như thời gian luồng, cổng dịch vụ, dung lượng byte, số gói tin và các chỉ số hiệu năng hệ thống như độ trễ, precision, recall và F1-score. Ngược lại, dữ liệu định tính gồm các nội dung lập luận và giải thích bằng ngôn ngữ tự nhiên của LLM sẽ được định lượng hóa thành thang điểm từ 0.0 đến 1.0 dựa trên các chỉ số của khung đánh giá RAGAS như Faithfulness, Answer Relevancy, Context Precision và Recall.
 
 \section{Các Công trình Liên quan (Related Works)}
-Các phương pháp phát hiện xâm nhập truyền thống sử dụng học máy (Random Forests, SVM) hoặc học sâu (LSTM, CNN). Tuy nhiên, chúng là những "hộp đen" thiếu tính giải thích. Mặc dù các nghiên cứu gần đây đã tích hợp LLM làm trợ lý hoặc tác tử điều phối SOC (Splunk triage overlays \cite{splunkllm2026}, LanG governance \cite{lang2026}, CyberRAG reporting \cite{cyberrag2025}), nhưng thường chuyển tiếp log thô trực tiếp tới LLM, gây ra nút thắt cổ chai về độ trễ. Quan trọng hơn, các hệ thống đa tác tử hiện tại thiếu khả năng bảo mật nhận thức để tự bảo vệ trước tấn công log-substrate prompt injection \cite{watchtower2026}. SENTINEL giải quyết khoảng trống này bằng cách kết hợp lọc thống kê Welford trễ thấp với cơ chế đóng gói dữ liệu phân tách để bảo vệ lõi suy luận của tác tử.
+Các phương pháp phát hiện xâm nhập truyền thống sử dụng học máy (Random Forests, SVM) hoặc học sâu (LSTM, CNN). Tuy nhiên, chúng là những "hộp đen" thiếu tính giải thích. Mặc dù các nghiên cứu gần đây đã tích hợp LLM làm trợ lý hoặc tác tử điều phối SOC (Splunk triage overlays \cite{splunkllm2026}, LanG governance \cite{lang2026}, CyberRAG reporting \cite{cyberrag2025}), nhưng thường chuyển tiếp log thô trực tiếp tới LLM, gây ra nút thắt cổ chai về độ trễ. Quan trọng hơn, các hệ thống đa tác tử hiện tại thiếu khả năng bảo mật nhận thức để tự bảo vệ trước tấn công log-substrate prompt injection \cite{watchtower2026}. SENTINEL giải quyết khoảng trống này bằng cách kết hợp lọc thống kê Welford trễ thấp với cơ chế đóng gói dữ liệu phân tách để bảo vệ lõi suy luận của tác tử. Một so sánh toàn diện của các mô hình này đối với kiến trúc SENTINEL trên các khía cạnh vận hành cốt lõi được trình bày trong Bảng~\ref{tab:architecture_comparison_intro}.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{So sánh các mô hình tự động hóa SOC và phát hiện mối đe dọa. (Nguồn: Tác giả)}
+    \label{tab:architecture_comparison_intro}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|}
+        \hline
+        \textbf{Khía cạnh / Mô hình} & \textbf{SIEM truyền thống (Luật tĩnh)} & \textbf{ML/DL-based IDS} & \textbf{Phân loại LLM thông thường} & \textbf{SENTINEL (Đề xuất)} \\
+        \hline
+        \textbf{Băng thông / Tốc độ} & Cực cao ($O(1)$) & Cao ($1$--$10$\,ms) & Rất thấp ($4$--$10$\,s) & Cao (tăng tốc độ lai) \\
+        \hline
+        \textbf{Tính giải thích} & Cao (luật tĩnh) & Thấp (hộp đen) & Cao (văn bản) & Rất cao (kịch bản) \\
+        \hline
+        \textbf{Bảo mật đối kháng} & Cao (không dùng LLM) & Trung bình (tránh né) & Rất thấp (tiêm prompt) & Cao (có rào chắn) \\
+        \hline
+        \textbf{Liên kết APT} & Kém (không trạng thái) & Trung bình (LSTMs) & Kém (giới hạn ngữ cảnh) & Cao (Bộ nhớ Đe dọa) \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \section{Đóng góp của Luận văn}
 Các đóng góp chính của luận văn này bao gồm ba khía cạnh chính. Về mặt kiến trúc, nghiên cứu đề xuất và chứng minh tính hiệu quả của mô hình lai hai tầng, giải quyết mâu thuẫn giữa hiệu năng xử lý tốc độ đường truyền và khả năng suy luận ngữ cảnh sâu. Về mặt bảo mật AI, luận văn cung cấp bằng chứng thực nghiệm về hiệu quả của đóng gói dữ liệu phân tách (Delimited Data Encapsulation) và chuỗi HMAC trong việc chống tiêm prompt và đầu độc dữ liệu. Về mặt điều phối tự động, nghiên cứu thay thế kịch bản tự động hóa tĩnh (RBA) bằng mô hình tác tử tự trị linh hoạt dựa trên đồ thị trạng thái LangGraph.

@@ -284,6 +284,138 @@ tier1:
     score: 100
     source: langgraph_agent
     status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:26:05.464008+00:00'
+    field: Source IP
+    pattern: 10.99.0.1
+    reason: Phát hiện IP nguồn 10.99.0.1 sử dụng cổng 80 để thực hiện truy vấn HTTP
+      với payload có chứa câu lệnh 'ignore instructions'. Câu lệnh này là dấu hiệu
+      rõ ràng của tấn công Command and Control (C2) sử dụng cổng không chuẩn. Hệ thống
+      thực hiện chặn IP để ngăn chặn hoạt động C2.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:26:14.726601+00:00'
+    field: Source IP
+    pattern: 10.99.0.2
+    reason: Phát hiện IP nguồn thực hiện nhiều lượt đăng nhập POST đến cổng 80 với
+      User-Agent lạ, khớp với kỹ thuật brute-force credential stuffing. Hệ thống thực
+      hiện chặn IP để ngăn chặn khả năng tấn công credential stuffing.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:26:24.249829+00:00'
+    field: Source IP
+    pattern: 10.99.0.4
+    reason: Phát hiện IP nguồn 10.99.0.4 sử dụng cổng 80 để thực hiện truy cập với
+      chuỗi User-Agent chứa mã độc hại, khớp với kỹ thuật T1571. Hệ thống thực hiện
+      chặn IP để ngăn chặn hoạt động C2.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:26:33.683251+00:00'
+    field: Source IP
+    pattern: 10.99.0.5
+    reason: Phát hiện IP nguồn thực hiện truy cập API với chuỗi User-Agent chứa mã
+      exec(malicious_4), khớp với kỹ thuật sử dụng web shell để cài đặt backdoor và
+      thực thi lệnh. Hệ thống thực hiện chặn IP để ngăn chặn truy cập bất hợp pháp.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:26:43.719827+00:00'
+    field: Source IP
+    pattern: 10.99.0.6
+    reason: 'Phát hiện IP nguồn thực hiện truy cập vào cổng 80 với yêu cầu GET chứa
+      chuỗi ''exec(malicious_5)'' - một dấu hiệu rõ ràng của việc tấn công bằng payload
+      độc hại. Hành vi này khớp với kỹ thuật T1571: Non-Standard Port (Command And
+      Control). Hệ thống thực hiện chặn IP để bảo vệ an toàn.'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:26:53.510286+00:00'
+    field: Source IP
+    pattern: 10.99.0.7
+    reason: Phát hiện IP nguồn thực hiện truy cập API với chuỗi User-Agent chứa mã
+      exec(malicious_6), khớp với kỹ thuật sử dụng web shell để thực thi mã độc. Hệ
+      thống thực hiện chặn IP để ngăn chặn truy cập và bảo vệ hệ thống khỏi bị tấn
+      công.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:27:03.291470+00:00'
+    field: Source IP
+    pattern: 10.99.0.8
+    reason: Phát hiện IP nguồn thực hiện truy cập vào cổng 80 với User-Agent chứa
+      chuỗi 'exec(malicious_7)', khớp với kỹ thuật T1571.  Hành vi này có thể là một
+      nỗ lực tấn công Command and Control. Hệ thống thực hiện chặn IP để bảo vệ an
+      toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:27:12.713849+00:00'
+    field: Source IP
+    pattern: 10.99.0.9
+    reason: Phát hiện IP nguồn thực hiện truy cập API với chuỗi User-Agent chứa mã
+      độc hại, khớp với kỹ thuật sử dụng web shell T1505.003. Hệ thống thực hiện chặn
+      IP để ngăn chặn truy cập độc hại.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:27:22.705729+00:00'
+    field: Source IP
+    pattern: 10.99.0.10
+    reason: Phát hiện IP nguồn thực hiện truy cập API với chuỗi User-Agent chứa mã
+      exec(malicious_9) - một dấu hiệu rõ ràng của việc sử dụng web shell để thực
+      thi mã độc. Hệ thống thực hiện chặn IP để ngăn chặn truy cập và bảo vệ khỏi
+      khả năng tấn công tấn công và cài đặt backdoor.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:27:32.131036+00:00'
+    field: Source IP
+    pattern: 10.99.0.11
+    reason: Phát hiện IP nguồn thực hiện truy cập API với chuỗi User-Agent chứa mã
+      độc hại, khớp với kỹ thuật sử dụng web shell T1505.003. Hệ thống thực hiện chặn
+      IP để ngăn chặn truy cập độc hại.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:27:41.689878+00:00'
+    field: Source IP
+    pattern: 10.99.0.12
+    reason: Phát hiện IP nguồn 10.99.0.12 thực hiện truy cập vào cổng 80 với payload
+      chứa mã độc hại, khớp với kỹ thuật T1571. Hệ thống thực hiện chặn IP để ngăn
+      chặn hoạt động tấn công.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:27:50.706075+00:00'
+    field: Source IP
+    pattern: 10.99.0.13
+    reason: Phát hiện IP nguồn gửi yêu cầu HTTP tới cổng 80 với User-Agent chứa mã
+      độc hại, khớp với kỹ thuật T1571. Hệ thống thực hiện chặn IP để ngăn chặn hoạt
+      động C2.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:28:00.579713+00:00'
+    field: Source IP
+    pattern: 10.99.0.14
+    reason: Phát hiện IP nguồn thực hiện truy cập vào cổng 80 với User-Agent chứa
+      chuỗi 'exec(malicious_13)', khớp với kỹ thuật T1571.  Hành vi này có thể là
+      một nỗ lực tấn công Command and Control. Hệ thống thực hiện chặn IP để bảo vệ
+      an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-15T14:28:10.212950+00:00'
+    field: Source IP
+    pattern: 10.99.0.15
+    reason: Phát hiện IP nguồn 10.99.0.15 sử dụng cổng 80 để thực hiện truy cập với
+      chuỗi User-Agent chứa mã độc hại, khớp với kỹ thuật T1571. Hệ thống thực hiện
+      chặn IP để ngăn chặn hoạt động C2.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
   max_fwd_packets: 1000
   risk_threshold: 15
   sensitive_ports:

@@ -10,18 +10,23 @@ Chương này trình bày chi tiết thiết kế kỹ thuật, mô hình hóa t
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.72\textheight,keepaspectratio]{images/soc_ai_concept.png}
-    \caption{Sơ đồ kiến trúc tổng thể của hệ thống SENTINEL, minh họa luồng dữ liệu hai tầng và các thành phần cấu trúc.}
+    \caption{Sơ đồ kiến trúc tổng thể của hệ thống SENTINEL, minh họa luồng dữ liệu hai tầng và các thành phần cấu trúc. (Nguồn: Tác giả)}
     \label{fig:soc_ai_concept}
 \end{figure}
 
-Tầng thứ nhất, được ký hiệu là Tầng 1, hoạt động như một tầng vận chuyển và lọc dữ liệu phi trạng thái (stateless) với vận tốc cao, được bố trí trực tiếp tại ranh giới mạng. Dữ liệu đo lường từ tường lửa, các cảm biến mạng và tác tử trên máy chủ (host agent) được nạp vào dưới dạng dòng gói tin bắt được (packet capture) hoặc nhật ký luồng (flow logs). Tầng 1 vận hành ở tốc độ đường truyền, tính toán các độ lệch thống kê theo thời gian thực trên dữ liệu đo lường đầu vào để ngay lập tức loại bỏ hoặc ghi nhật ký các gói tin lành tính, đồng thời chuyển tiếp các nhật ký bất thường lên Tầng 2. Ngược lại, Tầng 2 được thiết kế như một tầng nhận thức có trạng thái (stateful) với khả năng suy luận chuyên sâu. Được điều phối bởi một tác tử AI tự trị thông qua LangGraph \cite{langgraph2024}, Tầng 2 tiếp nhận các cảnh báo được leo thang, truy xuất tri thức an ninh mạng chuyên biệt, xâu chuỗi ngữ cảnh lịch sử, và đưa ra các quyết định phản hồi có cấu trúc (ví dụ: đề xuất cập nhật cấu hình tường lửa). Thiết kế lai này giải quyết triệt để nút thắt độ trễ của LLM bằng cách giảm tải phần lớn lưu lượng lành tính ngay tại Tầng 1---tỷ lệ được định lượng thực nghiệm ở Chương~4---chỉ dành riêng tài nguyên suy luận LLM chuyên sâu cho các cuộc điều tra mối đe dọa phức tạp.
+Kiến trúc đề xuất phân chia trách nhiệm trên hai tầng chính:
+\begin{itemize}
+    \item \textbf{Tầng 1 (Lọc dữ liệu phi trạng thái ở tốc độ đường truyền):} Được bố trí trực tiếp tại ranh giới mạng, tầng này nạp dữ liệu đo lường tốc độ cao (nhật ký luồng, siêu dữ liệu gói tin) và tính toán độ lệch thống kê thời gian thực (bằng thuật toán Welford) hoặc áp dụng chữ ký regex để loại bỏ hoặc ghi nhật ký các sự kiện lành tính ngay lập tức ở tốc độ đường truyền.
+    \item \textbf{Tầng 2 (Suy luận nhận thức có trạng thái):} Được điều phối bởi một tác tử LangGraph tự trị \cite{langgraph2024}, tầng này thực thi suy luận nhận thức chuyên sâu, truy xuất ngữ cảnh nền tảng từ công cụ Dual-RAG, đối sánh dữ liệu trên Bộ nhớ Đe dọa SQLite, và đưa ra các đề xuất ngăn chặn có cấu trúc (ví dụ: quy tắc chặn tường lửa động).
+\end{itemize}
+Thiết kế lai này giải quyết triệt để nút thắt độ trễ của LLM bằng cách giảm tải phần lớn lưu lượng lành tính ngay tại Tầng 1---tỷ lệ được định lượng thực nghiệm ở Chương~4---chỉ dành riêng tài nguyên suy luận LLM chuyên sâu cho các cuộc điều tra mối đe dọa phức tạp.
 
 Quy trình hoạt động và luồng xử lý dữ liệu chi tiết theo thời gian thực của hệ thống được minh họa thông qua sơ đồ luồng chạy trong Hình~\ref{fig:sentinel_flow}.
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{images/sentinel_flow.png}
-    \caption{Sơ đồ luồng xử lý và luồng dữ liệu chi tiết theo thời gian thực của hệ thống SENTINEL.}
+    \caption{Sơ đồ luồng xử lý và luồng dữ liệu chi tiết theo thời gian thực của hệ thống SENTINEL. (Nguồn: Tác giả)}
     \label{fig:sentinel_flow}
 \end{figure}
 
@@ -43,9 +48,9 @@ Về mặt cấu trúc phần mềm, Tầng 1 được định nghĩa thông qua
 
 Các luồng bất thường được leo thang sẽ được tiếp nhận bởi công cụ nhận thức Tầng 2, được mô hình hóa dưới dạng Đồ thị có hướng không chu trình (Directed Acyclic Graph - DAG) do LangGraph \cite{langgraph2024} biên dịch và hoạt động như một Máy trạng thái hữu hạn (Finite State Machine - FSM). Dữ liệu phiên và ngữ cảnh suy luận được lưu giữ bên trong một đối tượng trạng thái trung tâm, \texttt{SentinelState}. Đồ thị đã biên dịch nối tiếp một nút rào chắn (nén và đóng gói phân tách), một nút ngữ cảnh RAG, và một nút phân loại LLM theo trình tự, kết thúc tại một trong hai nút hành động (nút thực thi hành động hoặc nút chuyển con người phê duyệt). Nút ngữ cảnh RAG \emph{luôn} truy xuất ngữ cảnh nền từ cơ sở tri thức lai vector--từ khóa trước khi phân loại, chứ không phải chỉ được kích hoạt qua một nhánh điều kiện khi thiếu tri thức. Nút phân loại LLM sau đó đánh giá cụm nhật ký leo thang bằng mô hình ngôn ngữ lớn lượng tử hóa cục bộ Gemma 2 \cite{gemma_2_2024} và đưa ra một phán quyết có cấu trúc duy nhất. Đồ thị định tuyến tất định dựa trên hành động đã được kiểm định này---phán quyết mức cao chuyển tới nút thực thi, phán quyết mơ hồ hoặc độ tin cậy thấp chuyển sang hàng đợi phê duyệt của con người, còn phán quyết lành tính thì kết thúc chu kỳ---mà không quay vòng lặp lại. Các trạng thái định tuyến và chuyển dịch được trình bày chi tiết trong Bảng~\ref{tab:agent_fsm_transitions}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
-    \caption{Ma trận chuyển trạng thái của FSM Tác tử Nhận thức Tầng 2.}
+    \caption{Ma trận chuyển trạng thái của FSM Tác tử Nhận thức Tầng 2. (Nguồn: Tác giả)}
     \label{tab:agent_fsm_transitions}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.23\textwidth}|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.19\textwidth}|>{\raggedright\arraybackslash}p{0.15\textwidth}|}
         \hline
@@ -74,9 +79,9 @@ Hiện thực hóa kỹ thuật của đồ thị trạng thái sử dụng trì
 
 Cơ chế Dual-RAG định hình các quyết định của tác tử bằng cách truy xuất ngữ cảnh từ hai cơ sở dữ liệu chuyên ngành thống nhất: cơ sở tri thức MITRE ATT\&CK \cite{strom2018mitre} dùng để ánh xạ các hành vi, chiến thuật và kỹ thuật đe dọa (TTPs), và kho lưu trữ kịch bản NIST SP 800-61r2 cung cấp các quy trình xử lý sự cố tiêu chuẩn \cite{nist80061}. Thay vì chỉ dựa vào khớp từ khóa đơn thuần hoặc các vector ngữ nghĩa dày đặc một cách độc lập \cite{rag2020}, quá trình truy xuất sử dụng một chiến lược tìm kiếm lai (hybrid search). Bảng so sánh giữa các thành phần tìm kiếm dày đặc (dense) và thưa thớt (sparse) được chi tiết hóa trong Bảng~\ref{tab:search_comparison}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
-    \caption{So sánh các mô hình truy xuất trong chiến lược tìm kiếm lai.}
+    \caption{So sánh các mô hình truy xuất trong chiến lược tìm kiếm lai. (Nguồn: Tác giả)}
     \label{tab:search_comparison}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.22\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
         \hline
@@ -105,9 +110,9 @@ trong đó $r_m(d)$ là thứ hạng của tài liệu $d$ trong lượt tìm ki
 
 Các tác nhân đe dọa tinh vi thường chia nhỏ chuỗi tấn công của chúng thành các sự kiện có mức độ nghiêm trọng thấp và phân tán trên các khoảng thời gian dài nhằm vượt qua các bộ lọc gói tin phi trạng thái. Để vạch trần các chiến dịch tấn công âm thầm và chậm rãi này \cite{apt_stealth2021}, kiến trúc SENTINEL tích hợp một mô-đun Bộ nhớ Đe dọa (Threat Memory) bền vững, được triển khai dưới dạng cơ sở dữ liệu SQLite cục bộ. Mô-đun này được xây dựng trên các lược đồ (schema) chuyên dụng để theo dõi các cảnh báo lịch sử, điểm uy tín của các thực thể, và chuỗi tấn công theo thời gian. Chi tiết về các lược đồ cơ sở dữ liệu được trình bày trong Bảng~\ref{tab:threat_memory_schema}.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
-    \caption{Thông số kỹ thuật lược đồ cơ sở dữ liệu Bộ nhớ Đe dọa.}
+    \caption{Thông số kỹ thuật lược đồ cơ sở dữ liệu Bộ nhớ Đe dọa. (Nguồn: Tác giả)}
     \label{tab:threat_memory_schema}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.33\textwidth}|>{\raggedright\arraybackslash}p{0.28\textwidth}|}
         \hline
@@ -148,7 +153,7 @@ Do các LLM dễ bị tấn công chiếm quyền điều khiển chỉ thị (i
 
 trong đó $D_i$ là dữ liệu tải tin của bản ghi hiện tại, $H_{i-1}$ là mã băm của bản ghi liền trước, và $K$ là khóa bí mật HMAC được lưu trữ an toàn. Nếu kẻ tấn công cố tình thay đổi nhãn nhật ký hoặc xóa một bản ghi, chuỗi băm sẽ bị đứt gãy và các quy trình kiểm tra xác thực chạy trên bảng điều khiển sẽ lập tức gắn cờ phát hiện hành vi giả mạo. Ngoài ra, hệ thống cũng bảo vệ cơ sở dữ liệu vector RAG trước các cuộc tấn công đầu độc ngữ nghĩa (semantic poisoning). Các tệp tin cơ sở dữ liệu vector được giám sát chặt chẽ bởi một trình quản lý mã checksum chuyên dụng thực hiện tính toán và so sánh giá trị băm SHA-256 của các tệp tin trước khi nạp chúng vào bộ nhớ, đảm bảo không có tài liệu độc hại nào bị tiêm vào bộ nhớ truy xuất của tác tử.
 
-Việc liên kết chuỗi toàn vẹn được hiện thực trong quy trình ghi nhật ký kiểm toán, còn lớp \texttt{ActionValidator} thực thi danh sách cho phép (allowlist) các hành động an ninh hợp lệ, phát hiện và từ chối mọi siêu ký tự shell trong các trường của tải tin đầu vào nhằm loại bỏ nguy cơ thực thi mã từ xa (RCE) trong quá trình điều phối kịch bản cấu hình tường lửa.
+Việc liên kết chuỗi toàn vẹn được hiện thực trong quy trình ghi nhật ký kiểm toán, còn lớp \texttt{ActionValidator} thực thi danh sách cho phép (allowlist) các hành động an ninh hợp lệ, phát hiện và từ chối mọi siêu ký tự shell trong các trường của tải tin đầu vào nhằm ngăn chặn nguy cơ thực thi mã từ xa (RCE) trong quá trình điều phối kịch bản cấu hình tường lửa.
 
 \section{Giao diện Streamlit Bảng điều khiển Giám sát SOC (Streamlit UI)}
 

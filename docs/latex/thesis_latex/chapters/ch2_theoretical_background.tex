@@ -9,10 +9,10 @@ Modern Security Operations Centers (SOCs) act as the primary defense layer for e
 
 However, the rapid transition to cloud-native infrastructures has triggered a vast expansion of network log data. This telemetry growth has led directly to the alert fatigue crisis. Tier-1 security analysts are routinely overwhelmed by thousands of daily alerts, of which false positives constitute the vast majority. Attentional resource depletion due to continuous security alert floods degrades analyst cognitive performance, systematically increasing the probability of critical threat oversight \cite{alertfatigue2022}.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{images/soc_human_bottleneck.png}
-    \caption{The human bottleneck in traditional SOC systems, where massive alert volumes overwhelm analyst capacity.}
+    \caption{The human bottleneck in traditional SOC systems, where massive alert volumes overwhelm analyst capacity. (Source: Author)}
     \label{fig:soc_bottleneck}
 \end{figure}
 
@@ -28,14 +28,18 @@ Furthermore, running multi-billion parameter models locally presents substantial
 
 \section{Agentic AI Architecture and State-Graph Models}
 
-To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) to autonomous Agentic AI systems. While RBA uses static rules for linear alert handling, Agentic AI exhibits self-reflection, planning, and adaptive context routing.
+To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) to autonomous Agentic AI systems. The core operational differences between these two paradigms include:
+\begin{itemize}
+    \item \textbf{Runbook Automation (RBA):} Relies on static, pre-defined rules and deterministic scripts for linear alert handling, which is highly efficient but structurally blind to zero-day conditions or polymorphic alert formats.
+    \item \textbf{Agentic AI Systems:} Exhibit cognitive autonomy with capacities for self-reflection, multi-step planning, and adaptive context routing, allowing them to dynamically adjust analysis based on intermediate security findings.
+\end{itemize}
 
 These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs), where nodes represent distinct computational or cognitive actions—such as CTI retrieval, vulnerability scanning, and response generation—and conditional edges enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{images/agentic_fsm_workflow.png}
-    \caption{State-Graph (FSM) based workflow of an Agentic AI system during security incident analysis.}
+    \caption{State-Graph (FSM) based workflow of an Agentic AI system during security incident analysis. (Source: Author)}
     \label{fig:fsm_workflow}
 \end{figure}
 
@@ -55,18 +59,27 @@ Deploying LLMs as core reasoning engines in security pipelines introduces novel 
 
 The agents are exposed to critical cognitive manipulation risks via log-substrate prompt injections \cite{watchtower2026}, where adversaries exploit log ingestion pipelines to deliver adversarial instructions. Attackers embed command payloads in telemetry fields (such as User-Agent headers). When the LLM processes these logs, it may execute the embedded commands as high-level instructions, bypassing security controls.
 
-\begin{figure}[H]
+Recent work formalizes these log-substrate attacks into a four-class taxonomy \cite{watchtower2026}:
+\begin{itemize}
+    \item \textbf{Direct Override (S1):} The adversarial payload openly instructs the model to ignore prior security directives and override system instructions.
+    \item \textbf{Persona Hijack (S2):} The payload coerces the model into adopting an unrestricted or unauthorized persona to bypass safety alignment rules.
+    \item \textbf{Context Manipulation (S3):} The payload fabricates authorization metadata or false provenance (e.g., claiming an alert was pre-approved or whitelisted) within the log stream.
+    \item \textbf{Obfuscated Payloads (S4):} The instructions are concealed using Base64, hexadecimal, URL encoding, or homoglyph substitutions to evade simple regex pattern filters.
+\end{itemize}
+Because the log fields carrying these payloads are attacker-controlled yet structurally indistinguishable from legitimate evidence, a single-pass LLM analyst cannot reliably separate data from instructions. This taxonomy directly motivates the layered, defense-in-depth guardrail design adopted in Chapter~\ref{ch:system_design_implementation}.
+
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.9\textwidth]{images/log_substrate_prompt_injection.png}
-    \caption{The mechanism of a ''Log-Substrate Prompt Injection'' attack: The attacker embeds malicious commands into network traffic, exploiting log ingestion to manipulate the LLM's reasoning.}
+    \caption{The mechanism of a ''Log-Substrate Prompt Injection'' attack: The attacker embeds malicious commands into network traffic, exploiting log ingestion to manipulate the LLM's reasoning. (Source: Author)}
     \label{fig:prompt_injection}
 \end{figure}
 
 Furthermore, attackers use advanced techniques such as encoding bypasses (Base64/hex) and delimiter smuggling to evade filters \cite{promptinjection2023}. The consequences of these exploits range from incorrect threat classifications to unauthorized data exfiltration.
 
-\begin{table}[H]
+\begin{table}[!htbp]
     \centering
-    \caption{Summary of LLM Cognitive Vulnerabilities and SENTINEL's Mitigation Strategies.}
+    \caption{Summary of LLM Cognitive Vulnerabilities and SENTINEL's Mitigation Strategies. (Source: Author)}
     \label{tab:vulnerabilities_mitigations}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.20\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
         \hline
@@ -111,6 +124,41 @@ By maintaining these parameters with a constant memory footprint, the system cal
 
 To validate zero-day threat detection capabilities, the system uses a real-derived zero-day modeling paradigm. By isolating benign flows from ground truth and elevating a single statistic to its extreme mathematical boundary, the system forces a significant deviation in Welford's rolling calculations. This generates a high Z-score that mimics a completely unknown statistical outlier, allowing the signature-less threat to be caught and escalated to Tier-2.
 
+\section{Related Work: Agentic AI for Security Operations}
+
+The convergence of Large Language Models and security automation has produced a rapidly growing body of agentic-AI frameworks for the SOC. CyberRAG \cite{cyberrag2025} orchestrates a pool of fine-tuned classifiers through an agentic retrieval-and-reason loop to label and explain web attacks (SQLi, XSS, SSTI), prioritizing classification accuracy and interpretability. LanG \cite{lang2026} proposes a governance-aware platform built on LangGraph that unifies incident correlation, LLM-driven rule generation, and a three-phase attack reconstructor under an explicit AI governance policy engine with human-in-the-loop checkpoints. The Splunk-integrated framework of Sahay et al. \cite{splunkllm2026} couples a reconstruction autoencoder and deep reinforcement learning for initial triage with an LLM for contextual threat hunting inside an enterprise SIEM. On the adversarial side, Pandey and Bhujang \cite{watchtower2026} do not propose a defensive system but instead formalize the log-substrate prompt-injection threat (the S1--S4 taxonomy above) and empirically demonstrate its effectiveness against LLM-augmented security operations.
+
+Despite their individual strengths, these systems share a structural blind spot: they route raw or lightly filtered telemetry directly into LLM inference, inheriting both the latency bottleneck of multi-billion-parameter attention and, critically, exposure to the very log-substrate injection that Pandey and Bhujang formalize. None couples a wire-speed statistical pre-filter with cognitive-security guardrails, local data sovereignty, and tamper-evident auditing in a single pipeline. Table~\ref{tab:related_work} positions SENTINEL against these works across the capabilities most relevant to a deployable, security-hardened SOC engine.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \caption{Comparative analysis of SENTINEL against recent agentic-AI security frameworks. ($\checkmark$ = supported; $\sim$ = partial; $\times$ = absent; -- = not applicable). (Source: Author)}
+    \label{tab:related_work}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.30\textwidth}|c|c|c|c|c|}
+        \hline
+        \textbf{Capability} & \textbf{SENTINEL} & \textbf{CyberRAG} & \textbf{LanG} & \textbf{Splunk-LLM} & \textbf{Watchtower} \\
+         & (ours) & \cite{cyberrag2025} & \cite{lang2026} & \cite{splunkllm2026} & \cite{watchtower2026} \\
+        \hline
+        Primary focus & 2-tier defense & Attack classification & Unified governance & Threat hunting & Attack study \\
+        \hline
+        Wire-speed $O(1)$ statistical pre-filter & $\checkmark$ & $\times$ & $\times$ & $\sim$ & -- \\
+        \hline
+        Cognitive-security guardrails (anti log-substrate injection) & $\checkmark$ & $\times$ & $\sim$ & $\times$ & -- \\
+        \hline
+        Local / air-gapped inference & $\checkmark$ & $\sim$ & $\sim$ & $\times$ & -- \\
+        \hline
+        Multi-stage APT / kill-chain correlation & $\checkmark$ & $\times$ & $\checkmark$ & $\sim$ & -- \\
+        \hline
+        Hybrid dense+sparse RAG (RRF) & $\checkmark$ & $\sim$ & $\times$ & $\times$ & -- \\
+        \hline
+        Tamper-evident audit (HMAC chaining) & $\checkmark$ & $\times$ & $\sim$ & $\times$ & -- \\
+        \hline
+    \end{tabular}
+\end{table}
+
+As summarized in Table~\ref{tab:related_work}, SENTINEL is distinguished not by any single component but by their integration: a deterministic Tier-1 filter absorbs the high-velocity benign majority at wire-speed, while a cognitively isolated Tier-2 agent performs grounded reasoning behind cryptographic guardrails. This combination directly addresses the latency--security trade-off that the surveyed frameworks leave open.
+
 \section{Chapter Summary}
 
-This chapter established the theoretical foundations of the SENTINEL framework. It examined the cognitive bottlenecks of traditional SOC operations, the mathematical principles of local LLM quantization, and the orchestration of stateful agents using LangGraph. Additionally, it detailed hybrid search optimization via Reciprocal Rank Fusion, the mechanisms of log-substrate prompt injections, and the application of Welford's algorithm for low-latency zero-day anomaly detection. Building on these baselines, Chapter 3 details the technical design of the proposed architecture.
+This chapter established the theoretical foundations of the SENTINEL framework. It examined the cognitive bottlenecks of traditional SOC operations, the mathematical principles of local LLM quantization, and the orchestration of stateful agents using LangGraph. Additionally, it detailed hybrid search optimization via Reciprocal Rank Fusion, the mechanisms of log-substrate prompt injections and their S1--S4 taxonomy, and the application of Welford's algorithm for low-latency zero-day anomaly detection. A comparative analysis against recent agentic-AI security frameworks (CyberRAG, LanG, Splunk-LLM, and the Watchtower threat study) further positioned SENTINEL as the only approach that unifies wire-speed statistical pre-filtering, cognitive-security guardrails, local data sovereignty, and tamper-evident auditing. Building on these baselines, Chapter~\ref{ch:system_design_implementation} details the technical design of the proposed architecture.

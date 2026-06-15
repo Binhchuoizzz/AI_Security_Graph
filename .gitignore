@@ -57,6 +57,17 @@ data/trivy-results.json
 
 
 # LaTeX thesis compile files
+docs/latex/thesis_latex*/**/*.aux
+docs/latex/thesis_latex*/**/*.log
+docs/latex/thesis_latex*/**/*.out
+docs/latex/thesis_latex*/**/*.toc
+docs/latex/thesis_latex*/**/*.fls
+docs/latex/thesis_latex*/**/*.fdb_latexmk
+docs/latex/thesis_latex*/**/*.synctex*
+docs/latex/thesis_latex*/**/*.lof
+docs/latex/thesis_latex*/**/*.lot
+docs/latex/thesis_latex*/**/*.bbl
+docs/latex/thesis_latex*/**/*.blg
 docs/latex/thesis_latex*/*.aux
 docs/latex/thesis_latex*/*.log
 docs/latex/thesis_latex*/*.out
@@ -66,5 +77,7 @@ docs/latex/thesis_latex*/*.fdb_latexmk
 docs/latex/thesis_latex*/*.synctex*
 docs/latex/thesis_latex*/*.lof
 docs/latex/thesis_latex*/*.lot
+docs/latex/thesis_latex*/*.bbl
+docs/latex/thesis_latex*/*.blg
 
 config/pipeline_stats.json
