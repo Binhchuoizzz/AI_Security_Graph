@@ -30,11 +30,7 @@ Furthermore, running multi-billion parameter models locally presents substantial
 
 To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) to autonomous Agentic AI systems. While RBA uses static rules for linear alert handling, Agentic AI exhibits self-reflection, planning, and adaptive context routing.
 
-These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs), where:
-\begin{itemize}
-    \item \textbf{Nodes:} Represent distinct computational or cognitive actions, such as CTI retrieval, vulnerability scanning, and response generation.
-    \item \textbf{Conditional Edges:} Enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
-\end{itemize}
+These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs), where nodes represent distinct computational or cognitive actions—such as CTI retrieval, vulnerability scanning, and response generation—and conditional edges enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
 
 \begin{figure}[H]
     \centering
@@ -49,11 +45,7 @@ Stateful multi-actor orchestration paradigms \cite{langgraph2024} allow cogs to 
 
 The primary limitation of LLMs is factual hallucination, which poses a severe risk of misconfigurations or false positives in automated SOC environments. Grounding LLM reasoning in verified external knowledge corpora through retrieval-augmented configurations \cite{rag2020} mitigates the risks of factual hallucination by restricting model inferences to verified contexts.
 
-To ensure precise document retrieval, modern RAG configurations use a hybrid search strategy that combines two paradigms:
-\begin{enumerate}
-    \item \textbf{Dense Vector Search:} Uses embedding models (such as \texttt{all-MiniLM-L6-v2}) and vector libraries (FAISS) to compute cosine similarity \cite{faiss2019}, capturing the semantic meaning of queries even when keywords differ.
-    \item \textbf{Sparse Keyword Search:} Uses the BM25 algorithm \cite{bm25_2009} to match technical identifiers (such as CVE codes or IP addresses) based on term frequency-inverse document frequency weighting.
-\end{enumerate}
+To ensure precise document retrieval, modern RAG configurations use a hybrid search strategy that combines two paradigms: dense vector search, which uses embedding models (such as \texttt{all-MiniLM-L6-v2}) and vector libraries (FAISS) to compute cosine similarity \cite{faiss2019} to capture the semantic meaning of queries even when keywords differ; and sparse keyword search, which uses the BM25 algorithm \cite{bm25_2009} to match technical identifiers (such as CVE codes or IP addresses) based on term frequency-inverse document frequency weighting.
 
 Standardizing rank consolidation via reciprocal rank scoring heuristics \cite{rrf2009} produces a unified, high-precision retrieval list by balancing dense semantics and sparse keyword weights.
 

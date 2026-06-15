@@ -30,11 +30,7 @@ Bên cạnh đó, việc thực thi các mô hình có quy mô hàng tỷ tham s
 
 Nhằm khắc phục những giới hạn của các công cụ phân tích tĩnh, hướng tiếp cận tự động hóa an ninh đang dịch chuyển từ các kịch bản vận hành cứng nhắc (Runbook Automation - RBA) sang hệ thống AI Tác tử tự trị. Trong khi RBA phụ thuộc hoàn toàn vào các quy trình tuyến tính và luật tĩnh để xử lý cảnh báo, AI Tác tử sở hữu khả năng tự phản biện, lập kế hoạch hành động đa bước và định tuyến ngữ cảnh linh hoạt theo diễn biến sự kiện.
 
-Các hệ tác tử tự trị này được thiết lập toán học dưới dạng các Đồ thị có hướng lưu trạng thái hoạt động như một Máy Trạng thái Hữu hạn (FSM), bao gồm hai thành phần cốt lõi:
-\begin{itemize}
-    \item \textbf{Các Nút (Nodes):} Đại diện cho các bước tính toán hoặc hành động nhận thức cụ thể trong hệ thống, chẳng hạn như truy vấn cơ sở tri thức CTI, thực hiện rà quét lỗ hổng hoặc sinh phương án phản phó.
-    \item \textbf{Các Cạnh điều kiện (Conditional Edges):} Định nghĩa luồng di chuyển trạng thái động dựa trên kết quả suy luận của LLM tại các nút xử lý trung gian.
-\end{itemize}
+Các hệ tác tử tự trị này được thiết lập toán học dưới dạng các Đồ thị có hướng lưu trạng thái hoạt động như một Máy Trạng thái Hữu hạn (FSM), trong đó các nút đại diện cho các bước tính toán hoặc hành động nhận thức cụ thể trong hệ thống—chẳng hạn như truy vấn cơ sở tri thức CTI, thực hiện rà quét lỗ hổng hoặc sinh phương án phản phó—và các cạnh điều kiện định nghĩa luồng di chuyển trạng thái động dựa trên kết quả suy luận của LLM tại các nút xử lý trung gian.
 
 \begin{figure}[H]
     \centering
@@ -49,11 +45,7 @@ Phương pháp điều phối đa tác tử có lưu giữ trạng thái \cite{l
 
 Hạn chế cốt lõi của các mô hình LLM là hiện tượng ảo giác thông tin, điều này gây ra các rủi ro nghiêm trọng về cấu hình sai hoặc chặn nhầm lưu lượng hợp lệ trong môi trường tự động hóa SOC. Kỹ thuật Sinh Tăng cường Truy xuất (RAG) \cite{rag2020} giúp loại bỏ rủi ro này bằng cách ràng buộc suy luận của mô hình vào các nguồn dữ liệu tri thức đáng tin cậy bên ngoài được xác thực trước khi sinh văn bản.
 
-Để tối ưu hóa độ chính xác của quá trình truy xuất thông tin, các hệ thống RAG hiện đại áp dụng chiến lược tìm kiếm lai (hybrid search) kết hợp hai phương pháp bổ trợ cho nhau:
-\begin{enumerate}
-    \item \textbf{Tìm kiếm Vector Dày đặc (Dense Vector Search):} Chuyển đổi dữ liệu phi cấu trúc thành các biểu diễn không gian đa chiều thông qua mô hình nhúng (như \texttt{all-MiniLM-L6-v2}) và sử dụng thư viện FAISS để tính toán độ tương đồng Cosine \cite{faiss2019}, giúp nắm bắt ý nghĩa ngữ nghĩa của truy vấn ngay cả khi không trùng khớp về mặt từ vựng.
-    \item \textbf{Tìm kiếm Từ khóa Thưa thớt (Sparse Keyword Search):} Dựa trên thuật toán BM25 \cite{bm25_2009} để tính toán tần suất xuất hiện của các định danh kỹ thuật đặc thù (như mã số CVE, tên file hoặc địa chỉ IP) so với toàn bộ cơ sở tri thức.
-\end{enumerate}
+Để tối ưu hóa độ chính xác của quá trình truy xuất thông tin, các hệ thống RAG hiện đại áp dụng chiến lược tìm kiếm lai (hybrid search) kết hợp hai phương pháp bổ trợ cho nhau: tìm kiếm vector dày đặc, vốn chuyển đổi dữ liệu phi cấu trúc thành các biểu diễn không gian đa chiều thông qua mô hình nhúng (như \texttt{all-MiniLM-L6-v2}) và sử dụng thư viện FAISS để tính toán độ tương đồng Cosine \cite{faiss2019} nhằm nắm bắt ngữ nghĩa của truy vấn; và tìm kiếm từ khóa thưa thớt, dựa trên thuật toán BM25 \cite{bm25_2009} để tính toán tần suất xuất hiện của các định danh kỹ thuật đặc thù (như mã số CVE, tên file hoặc địa chỉ IP) so với toàn bộ cơ sở tri thức.
 
 Quy trình chuẩn hóa thứ hạng sử dụng phương pháp Reciprocal Rank Fusion (RRF) \cite{rrf2009} giúp tích hợp hai danh sách kết quả tìm kiếm trên thành một danh sách duy nhất có độ chính xác cao nhờ sự cân bằng giữa tính tương đồng ngữ nghĩa rộng và độ chính xác của từ khóa kỹ thuật cụ thể.
 
