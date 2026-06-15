@@ -1,13 +1,13 @@
 \chapter{Theoretical Background}
 \label{ch:theoretical_background}
 
-This chapter establishes the in-depth theoretical foundations in computer science and cybersecurity that serve as the mathematical and architectural basis for the SENTINEL system. The content is systematically developed, beginning with an analysis of the structural limitations of modern Security Operations Centers (SOCs), followed by statistical anomaly detection algorithms, and delving into the core technologies of Generative AI. Specifically, this chapter explores the operating principles of Large Language Models (LLMs), Model Quantization techniques, Agentic AI architectures based on state-graphs, Retrieval-Augmented Generation (RAG) systems, and finally, a detailed analysis of adversarial AI security vulnerabilities.
+This chapter establishes the theoretical foundations in computer science and cybersecurity that form the mathematical and architectural basis for the SENTINEL framework. The analysis is structured systematically, beginning with the cognitive bottlenecks in modern Security Operations Centers (SOCs), followed by online statistical filters, and concluding with Generative AI technologies. Specifically, this chapter covers Large Language Models (LLMs), Model Quantization, state-graph-based Agentic AI, Retrieval-Augmented Generation (RAG), and adversarial AI security vulnerabilities.
 
 \section{Overview of Security Operations Centers (SOCs) and the Cognitive Bottleneck}
 
-Modern Security Operations Centers (SOCs) form the core proactive defense layer of enterprise networks. Architecturally, a SOC operates as a centralized ecosystem, integrating a myriad of security appliances such as Security Information and Event Management (SIEM) platforms, Intrusion Detection and Prevention Systems (IDS/IPS), Next-Generation Firewalls (NGFW), and Endpoint Detection and Response (EDR) solutions. The standard Incident Response (IR) lifecycle requires these systems to ingest massive volumes of telemetry data, analyze them for anomalies based on static signatures or predefined heuristics, and generate alerts for Tier-1 analysts to investigate.
+Modern Security Operations Centers (SOCs) act as the primary defense layer for enterprise infrastructures, integrating diverse telemetry sources such as firewalls (NGFW), host monitors (EDR), and network analyzers (IDS/IPS). Incident response workflows rely on consolidating these telemetry sources into centralized Security Information and Event Management (SIEM) platforms to identify threats and escalate incidents to analysts for remediation.
 
-However, the shift towards cloud-native computing models and Zero-Trust architectures has led to an unprecedented data explosion. This colossal volume of network traffic directly contributes to the ''Alert Fatigue'' challenge. In operational reality, Tier-1 analysts are frequently overwhelmed by tens of thousands of alerts daily, among which False Positives typically constitute the vast majority. From a cognitive science perspective, this continuous information overload depletes human attentional resources, leading to a severe degradation in analytical acuity, thereby exponentially increasing the probability of missing genuine and destructive threats \cite{alertfatigue2022}.
+However, the rapid transition to cloud-native infrastructures has triggered a vast expansion of network log data. This telemetry growth has led directly to the alert fatigue crisis. Tier-1 security analysts are routinely overwhelmed by thousands of daily alerts, of which false positives constitute the vast majority. Attentional resource depletion due to continuous security alert floods degrades analyst cognitive performance, systematically increasing the probability of critical threat oversight \cite{alertfatigue2022}.
 
 \begin{figure}[H]
     \centering
@@ -16,24 +16,24 @@ However, the shift towards cloud-native computing models and Zero-Trust architec
     \label{fig:soc_bottleneck}
 \end{figure}
 
-Compounding this issue is the proliferation of Advanced Persistent Threats (APTs). APT campaigns are characterized by ''low-and-slow'' attack methodologies, where threat actors fragment their infiltration behavior into multiple insignificant event sequences, operating below the detection thresholds of traditional security systems. Deterministic rule-based systems, due to their over-reliance on instantaneous static thresholds, completely lack the capacity to maintain long-term state to contextualize and correlate these discrete indicators of compromise \cite{apt_stealth2021}.
+Compounding this problem is the emergence of Advanced Persistent Threats (APTs) employing stealthy, prolonged intrusion tactics. Traditional rule-based frameworks cannot construct long-term session context or correlate fragmented attack events, leaving them vulnerable to stealthy, prolonged infiltration methodologies \cite{apt_stealth2021}. Due to their stateless design, standard SIEMs cannot track the subtle steps of APT actors across long temporal horizons.
 
 \section{Large Language Models (LLMs) and the Mathematics of Quantization}
 
-At the forefront of the Generative AI revolution are Large Language Models (LLMs), built primarily upon the Transformer neural network architecture. The foundational breakthrough of the Transformer is the Self-Attention mechanism, allowing the model to compute correlation weights among all tokens in an input sequence simultaneously, regardless of their positional distance. This capability eliminates the long-term forgetting problem of traditional RNN/LSTM networks, endowing LLMs with profound contextual natural language processing capabilities, making them ideal tools for interpreting unstructured security logs.
+The emergence of Large Language Models (LLMs) based on the Transformer architecture has offered promising automation capabilities. The Transformer’s self-attention mechanism enables the simultaneous evaluation of contextual dependencies across an entire sequence, providing powerful log analysis capabilities.
 
-However, integrating LLMs into a SOC environment faces a critical barrier regarding Data Sovereignty. Enterprise security data contains highly sensitive infrastructure information. Transmitting this data to external cloud LLM APIs directly violates security compliance standards and Zero-Trust principles. Consequently, deploying Local LLMs within fully air-gapped environments is a prerequisite.
+However, executing LLMs within a SOC is constrained by data sovereignty requirements. Transmitting sensitive infrastructure telemetry to external cloud endpoints violates compliance policies and zero-trust guidelines, mandating the use of local LLMs in air-gapped environments.
 
-The subsequent barrier is the immense hardware requirement. For a model like \textit{Gemma-2-9B-IT} (with 9 billion parameters) to run locally using 16-bit floating-point (FP16), it requires approximately 18GB of VRAM solely for weight storage. To be feasible on consumer-grade hardware, Model Quantization techniques must be applied. Quantization is a mathematical process aimed at reducing the resolution of neural network parameters from a continuous space (e.g., FP16) to a discrete space with lower bit-width (e.g., 4-bit integer, INT4). By utilizing the GGUF format and the Q4\_K\_M quantization standard via the \texttt{llama.cpp} framework, the required memory footprint is reduced by over 70\%, while utilizing memory bandwidth more efficiently, ensuring high inference speeds with negligible degradation in cognitive capacity compared to the original model.
+Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. Quantization mathematically projects continuous weight parameters (such as FP16) onto discrete, lower-bit representations (such as INT4). Utilizing GGUF formats and the Q4\_K\_M quantization standard via the \texttt{llama.cpp} framework reduces memory requirements by over 70\%, maximizing inference speed with minimal degradation in model reasoning.
 
 \section{Agentic AI Architecture and State-Graph Models}
 
-The evolution of AI in cybersecurity is shifting aggressively from Static Runbook Automation (RBA) to dynamic Agentic AI models. RBA is inherently a rigid script-based system (if-this-then-that), capable only of linear responses to predefined indicators. Conversely, Agentic AI is equipped with the autonomous capacity to perceive, perform multi-step planning, critique, and self-adjust behavior based on the evolving real-time context of a security incident.
+To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) to autonomous Agentic AI systems. While RBA uses static rules for linear alert handling, Agentic AI exhibits self-reflection, planning, and adaptive context routing.
 
-Mathematically and architecturally, these sophisticated autonomous agents do not operate as monolithic blocks but are modeled as Finite State Machines (FSM) in the form of Directed Graphs. Within this structure:
+These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs), where:
 \begin{itemize}
-    \item \textbf{Nodes:} Represent independent computational or cognitive tasks (e.g., retrieving CTI, payload analysis, proposing mitigations).
-    \item \textbf{Conditional Edges:} Define dynamic routing logic, utilizing the LLM's analytical capabilities to decide which subsequent node to activate based on the current node's output.
+    \item \textbf{Nodes:} Represent distinct computational or cognitive actions, such as CTI retrieval, vulnerability scanning, and response generation.
+    \item \textbf{Conditional Edges:} Enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
 \end{itemize}
 
 \begin{figure}[H]
@@ -43,25 +43,25 @@ Mathematically and architecturally, these sophisticated autonomous agents do not
     \label{fig:fsm_workflow}
 \end{figure}
 
-The utilization of the LangGraph framework \cite{langgraph2024} enables the construction of stateful cognitive loops. It preserves the agent's ''working memory'' throughout the analysis session, allowing the AI to self-reflect on previous conclusions, request additional context if the data is insufficient (Analysis Incomplete), and only render a final verdict when hypotheses are fully verified.
+Stateful multi-actor orchestration paradigms \cite{langgraph2024} allow cogs to retain contextual working memory across multiple processing loops, enabling iterative decision refinement. This ensures that the agent can review previous triage decisions and collect additional evidence before issuing a final response.
 
 \section{Retrieval-Augmented Generation (RAG) and Hybrid Search Optimization}
 
-The most severe limitation of LLMs is the phenomenon of ''Hallucination'' — the tendency to generate information that is technically incorrect yet linguistically highly convincing. In security, a hallucinated decision could lead to disastrous misconfigurations, such as mistakenly blocking critical services (Denial of Service). The Retrieval-Augmented Generation (RAG) architecture \cite{rag2020} fundamentally resolves this risk by forcing the LLM to ground its inferences on specialized knowledge blocks retrieved from internal databases prior to generating a response.
+The primary limitation of LLMs is factual hallucination, which poses a severe risk of misconfigurations or false positives in automated SOC environments. Grounding LLM reasoning in verified external knowledge corpora through retrieval-augmented configurations \cite{rag2020} mitigates the risks of factual hallucination by restricting model inferences to verified contexts.
 
-To ensure absolute precision in retrieving security knowledge (such as MITRE ATT\&CK or NIST SP 800-61r2), modern RAG architectures employ a Hybrid Search mechanism, simultaneously combining two paradigms:
+To ensure precise document retrieval, modern RAG configurations use a hybrid search strategy that combines two paradigms:
 \begin{enumerate}
-    \item \textbf{Dense Vector Search:} Utilizes embedding models (like \texttt{all-MiniLM-L6-v2}) to map text data into high-dimensional numerical vectors. The FAISS library then computes the Cosine Similarity distance between the query vector and data vectors to find text segments with \textit{semantic} similarity, even if they lack exact keywords.
-    \item \textbf{Sparse Keyword Search:} Based on the BM25 (Best Matching 25) algorithm, utilizing TF-IDF (Term Frequency-Inverse Document Frequency) weighting for exact matching of specific technical strings, such as CVE identifiers, malware filenames, or IP addresses.
+    \item \textbf{Dense Vector Search:} Uses embedding models (such as \texttt{all-MiniLM-L6-v2}) and vector libraries (FAISS) to compute cosine similarity, capturing the semantic meaning of queries even when keywords differ.
+    \item \textbf{Sparse Keyword Search:} Uses the BM25 algorithm to match technical identifiers (such as CVE codes or IP addresses) based on term frequency-inverse document frequency weighting.
 \end{enumerate}
 
-Finally, the Reciprocal Rank Fusion (RRF) algorithm \cite{rrf2009} is applied to merge the two result sets. By computing the inverse rank score for each document from both result lists, RRF ensures that the documents provided to the LLM are those with the highest accuracy in both deep technical specificity and overall context.
+Standardizing rank consolidation via reciprocal rank scoring heuristics \cite{rrf2009} produces a unified, high-precision retrieval list by balancing dense semantics and sparse keyword weights.
 
 \section{LLM Cognitive Vulnerabilities and Prompt Injection Vectors}
 
-Deploying LLMs as the core engine in a SOC opens an entirely new spectrum of cybersecurity risks, collectively termed Adversarial AI Manipulations. The fundamental difference is that LLMs do not compile source code but process natural language. Consequently, the boundary between ''Data'' and ''Instruction'' is blurred.
+Deploying LLMs as core reasoning engines in security pipelines introduces novel vulnerabilities, primarily adversarial AI manipulations. Because LLMs process natural language inputs without a structural compile-time separation between code and data, they are vulnerable to instruction hijacking.
 
-One of the most existential threats is \textbf{Log-Substrate Prompt Injection} \cite{watchtower2026}. In this scenario, an attacker is aware that the organization utilizes an LLM-based log analysis system. Instead of directly attacking the web application, they intentionally embed malicious commands into standard data fields (such as HTTP User-Agent strings or DNS query payloads). When the SIEM ingests these payloads and pushes them directly into the LLM's Context Window for analysis, the LLM may interpret this malicious payload as a high-level administrative directive, leading to the circumvention of system security rules.
+The cogs are exposed to critical cognitive manipulation risks via log-substrate prompt injections \cite{watchtower2026}, where adversaries exploit log ingestion pipelines to deliver adversarial instructions. Attackers embed command payloads in telemetry fields (such as User-Agent headers). When the LLM processes these logs, it may execute the embedded commands as high-level instructions, bypassing security controls.
 
 \begin{figure}[H]
     \centering
@@ -70,13 +70,13 @@ One of the most existential threats is \textbf{Log-Substrate Prompt Injection} \
     \label{fig:prompt_injection}
 \end{figure}
 
-More advanced techniques like \textbf{Encoding Bypasses} utilize Base64 or Hexadecimal encoding to evade traditional keyword filters. Equally dangerous is \textbf{Delimiter Smuggling}, where attackers insert special characters to break the application's data encapsulation structure, causing the LLM to lose context. The consequences of these attacks range from the system autonomously mislabeling threats (Misdirection Verdict) to conceal malware, to Data Exfiltration via Markdown rendering techniques.
+Furthermore, attackers use advanced techniques such as encoding bypasses (Base64/hex) and delimiter smuggling to evade filters. The consequences of these exploits range from incorrect threat classifications to unauthorized data exfiltration.
 
 \section{Welford's Online Statistical Algorithm}
 
-While Agentic AI provides unparalleled forensic analysis capabilities, the immense computational complexity of LLMs ($O(N^2)$ where N is the input sequence length for the Attention mechanism) creates a paradox: they cannot process massive volumes of raw network data streams at wire-speed. To resolve this problem, a high-throughput preprocessing data filtration mechanism operating with an optimal space and time complexity of $O(1)$ is mandatory.
+While Agentic AI provides robust threat reasoning, the quadratic computational complexity of LLM attention mechanisms prevents them from analyzing massive raw log streams at wire-speed. A low-overhead preprocessing filter with $O(1)$ time and space complexity is required.
 
-Welford's Online Algorithm \cite{welford1962} provides a precise and numerically stable mathematical formulation for computing variance over streaming data. Instead of storing the entire historical dataset to compute the sum of squares (which poses risks of catastrophic cancellation and high complexity), Welford's algorithm updates the Mean ($\mu_k$) and the Sum of Squared Differences ($M_{2,k}$) for each new data point $x_k$ using recurrence relations:
+Computing rolling network baselines over continuous data streams requires numerically stable online statistical methods, such as Welford's algorithm \cite{welford1962}, to track running means and variances without accumulating floating-point errors:
 
 \begin{equation}
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}
@@ -90,9 +90,10 @@ Welford's Online Algorithm \cite{welford1962} provides a precise and numerically
     \sigma_k^2 = \frac{M_{2,k}}{k}
 \end{equation}
 
-By continuously maintaining rolling variance and mean with a constant $O(1)$ memory footprint, the system instantaneously computes a normalized Z-Score for each packet. This technique almost entirely eliminates benign background network traffic, thoroughly resolving the LLM latency bottleneck, while perfectly preserving lightweight anomalous event sequences, maintaining the context for low-and-slow APT infiltrations.
+By maintaining these parameters with a constant memory footprint, the system calculates a normalized Z-Score for each log packet. This enables the rapid elimination of benign network traffic, bypassing the LLM latency bottleneck while preserving the contextual event chains of low-and-slow attacks.
 
-To mathematically validate zero-day threat detection capabilities without introducing synthetic data bias, the architecture leverages a real-derived zero-day modeling paradigm. By isolating genuine benign network flows from the ground truth and systematically elevating a single statistical feature (such as flow duration or cumulative byte count) to its extreme mathematical boundary, the system forces a significant deviation in Welford's rolling calculations. This generates an anomalous Z-score, mimicking a completely unknown statistical outlier. Consequently, the signature-less zero-day threat is caught by the Tier-1 filter and escalated to the Tier-2 cognitive agent, bypassing the limitations of static signature engines.
+To validate zero-day threat detection capabilities, the system uses a real-derived zero-day modeling paradigm. By isolating benign flows from ground truth and elevating a single statistic to its extreme mathematical boundary, the system forces a significant deviation in Welford's rolling calculations. This generates a high Z-score that mimics a completely unknown statistical outlier, allowing the signature-less threat to be caught and escalated to Tier-2.
 
 \section{Chapter Summary}
-This chapter has established a comprehensive theoretical foundation for the SENTINEL system by analyzing the core paradigms in modern network security and generative AI. It dissected the cognitive bottlenecks of traditional SOC platforms, analyzed the mathematical underpinnings of local LLM quantization, and established the directed state-graph model using LangGraph. The chapter then detailed the hybrid search optimization (FAISS vector and BM25 keyword search) merged via Reciprocal Rank Fusion, highlighted the vulnerability parameters of log-substrate prompt injections, and mathematically formulated Welford's online algorithm for real-derived zero-day threat detection. Building upon these theoretical baselines, Chapter 3 will detail the proposed technical design of the SENTINEL dual-tier cognitive architecture.
+
+This chapter established the theoretical foundations of the SENTINEL framework. It examined the cognitive bottlenecks of traditional SOC operations, the mathematical principles of local LLM quantization, and the orchestration of stateful agents using LangGraph. Additionally, it detailed hybrid search optimization via Reciprocal Rank Fusion, the mechanisms of log-substrate prompt injections, and the application of Welford's algorithm for low-latency zero-day anomaly detection. Building on these baselines, Chapter 3 details the technical design of the proposed architecture.
