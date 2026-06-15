@@ -14,11 +14,10 @@ evaluation:
   ground_truth_path: experiments/ground_truth.json
   method: both
 guardrails:
-  trusted_internal_subnets:
-    - 127.0.0.0/8
-    - 10.0.0.0/8
-    - 172.16.0.0/12
-    - 192.168.0.0/16
+  critical_infrastructure_subnets:
+  - 127.0.0.0/8
+  - 10.0.0.99/32
+  - 192.168.1.254/32
   drain3:
     depth: 4
     max_children: 100
@@ -67,6 +66,11 @@ guardrails:
     strip_html_tags: true
     strip_markdown_images: true
   token_budget: 4000
+  trusted_internal_subnets:
+  - 127.0.0.0/8
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 192.168.0.0/16
 llm:
   base_url: http://localhost:5000/v1
   estimated_vram_gb: 7
@@ -107,7 +111,179 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
-  dynamic_rules: []
+  dynamic_rules:
+  - created_at: '2026-06-12T13:44:44.100323+00:00'
+    field: Source IP
+    pattern: 10.200.15.168
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH liên tiếp đến cổng 22 trên
+      nhiều máy chủ khác nhau. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral
+      Movement) và có thể là dấu hiệu tấn công để di chuyển sang các máy chủ khác
+      trong mạng. Hệ thống thực hiện chặn IP để ngăn chặn khả năng tấn công lan rộng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:44:53.287844+00:00'
+    field: Source IP
+    pattern: 10.200.7.215
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:45:28.738297+00:00'
+    field: Source IP
+    pattern: 10.200.7.115
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:45:47.395702+00:00'
+    field: Source IP
+    pattern: 10.200.16.223
+    reason: Phát hiện IP nguồn 10.200.16.223 sử dụng cổng 80 để kết nối với nhiều
+      dịch vụ web khác nhau, khớp với kỹ thuật T1571. Hệ thống thực hiện chặn IP để
+      bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:46:39.398074+00:00'
+    field: Source IP
+    pattern: 10.200.18.172
+    reason: Phát hiện IP nguồn 10.200.18.172 kết nối đến nhiều cổng khác nhau, bao
+      gồm cả cổng HTTPS (443) và các cổng khác như 80, 445, 3389, 53, 1033, 6669,
+      9900, 8083.  Các kết nối này sử dụng nhiều cổng không chuẩn, khớp với kỹ thuật
+      T1571. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:47:09.234901+00:00'
+    field: Source IP
+    pattern: 10.200.20.157
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong thời
+      gian ngắn. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral Movement)
+      và có thể là dấu hiệu tấn công lateral movement. Hệ thống thực hiện chặn IP
+      để ngăn chặn khả năng tấn công.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:47:18.614330+00:00'
+    field: Source IP
+    pattern: 10.200.5.55
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH liên tiếp đến cổng 22 trên
+      nhiều máy chủ khác nhau. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral
+      Movement) và có thể là dấu hiệu tấn công để di chuyển sang các máy chủ khác
+      trong mạng. Hệ thống thực hiện chặn IP để ngăn chặn khả năng tấn công lan rộng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:47:27.146706+00:00'
+    field: Source IP
+    pattern: 10.200.12.83
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH liên tiếp đến cổng 22,
+      khớp với kỹ thuật di chuyển bên trong mạng T1021.004. Hệ thống thực hiện chặn
+      IP để ngăn chặn khả năng tấn công di chuyển bên trong mạng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:47:36.664364+00:00'
+    field: Source IP
+    pattern: 10.200.1.64
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong thời
+      gian ngắn. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral Movement)
+      và có thể là dấu hiệu tấn công để di chuyển sang các máy chủ khác trong mạng.
+      Hệ thống thực hiện chặn IP để ngăn chặn khả năng tấn công lan rộng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:47:45.845104+00:00'
+    field: Source IP
+    pattern: 10.200.13.101
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong thời
+      gian ngắn. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral Movement)
+      và có thể là dấu hiệu tấn công lateral movement. Hệ thống thực hiện chặn IP
+      để ngăn chặn khả năng tấn công.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:47:54.663677+00:00'
+    field: Source IP
+    pattern: 10.200.4.155
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong thời
+      gian ngắn, khớp với kỹ thuật di chuyển bên trong mạng T1021.004. Hệ thống thực
+      hiện chặn IP để ngăn chặn khả năng tấn công di chuyển bên trong mạng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:48:03.842769+00:00'
+    field: Source IP
+    pattern: 10.200.9.17
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong thời
+      gian ngắn. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral Movement)
+      và có thể là dấu hiệu tấn công lateral movement. Hệ thống thực hiện chặn IP
+      để ngăn chặn khả năng tấn công lan rộng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:48:13.476638+00:00'
+    field: Source IP
+    pattern: 10.200.18.107
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong một khoảng
+      thời gian ngắn. Hành vi này khớp với kỹ thuật T1021.004 - SSH (Lateral Movement)
+      và có thể là dấu hiệu tấn công để di chuyển sang các máy chủ khác trong mạng.
+      Hệ thống thực hiện chặn IP để ngăn chặn khả năng tấn công.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:48:22.210386+00:00'
+    field: Source IP
+    pattern: 10.200.7.180
+    reason: Phát hiện IP nguồn thực hiện nhiều kết nối SSH đến cổng 22 trong thời
+      gian ngắn, khớp với kỹ thuật di chuyển bên trong mạng T1021.004. Hệ thống thực
+      hiện chặn IP để ngăn chặn khả năng tấn công di chuyển bên trong mạng.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:48:48.719454+00:00'
+    field: Source IP
+    pattern: 10.200.7.167
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:48:56.096611+00:00'
+    field: Source IP
+    pattern: 10.200.3.25
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:49:03.715236+00:00'
+    field: Source IP
+    pattern: 10.200.3.243
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:49:28.529483+00:00'
+    field: Source IP
+    pattern: 10.200.16.213
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-06-12T13:49:51.169617+00:00'
+    field: Source IP
+    pattern: 10.200.19.140
+    reason: Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp
+      với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
   max_fwd_packets: 1000
   risk_threshold: 15
   sensitive_ports:
