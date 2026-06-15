@@ -146,10 +146,10 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 *   **Tác dụng:** Set PYTHONPATH, gọi `build_all_indexes()`.
 *   **Mối quan hệ:** Gọi `src/rag/embedder.py`.
 
-### 26. `scripts/build_knowledge_base.py` (+ data: `expand_/supplement_knowledge_base.py`)
+### 26. `scripts/build_knowledge_base.py` (TỰ-CHỨA, single file)
 *   **Mục đích:** **Entry point DUY NHẤT** xây dựng/mở rộng tri thức RAG trong MỘT lần.
-*   **Tác dụng:** Gộp 2 batch trước đây chạy lẻ → append idempotent **67 kỹ thuật MITRE (0 trùng id) + 7 playbook NIST** (phủ đủ 14 tactic) vào `mitre_attack.json`/`nist_800_61r2.json`, RỒI tự rebuild FAISS/BM25 index + checksum (cờ `--no-index` để bỏ qua). `expand_knowledge_base.py` + `supplement_knowledge_base.py` giờ là **module DỮ LIỆU thuần** (chỉ export technique/playbook lists, không còn entry point riêng).
-*   **Mối quan hệ:** Gộp data → gọi `embedder.build_all_indexes()` + `update_checksums_file()`.
+*   **Tác dụng:** Inline trực tiếp data → append idempotent **67 kỹ thuật MITRE (0 trùng id) + 7 playbook NIST** (phủ đủ 14 tactic) vào `mitre_attack.json`/`nist_800_61r2.json`, RỒI tự rebuild FAISS/BM25 index + checksum (cờ `--no-index` để bỏ qua). Hai file `expand_knowledge_base.py` + `supplement_knowledge_base.py` cũ **đã xóa** — toàn bộ `ALL_MITRE`/`ALL_NIST` nay nằm gọn trong file này (1 source of truth thật sự).
+*   **Mối quan hệ:** Đọc data inline → gọi `embedder.build_all_indexes()` + `update_checksums_file()`.
 
 ### 27. `src/rag/security.py`
 *   **Mục đích:** Lá chắn toàn vẹn tri thức RAG (chống RAG Poisoning vật lý).
