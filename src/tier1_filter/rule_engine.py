@@ -13,20 +13,22 @@ TRIẾT LÝ THIẾT KẾ:
   → dynamic_rules được load tại khởi tạo và reload khi có notify
 """
 
-import yaml  # type: ignore
-import os
-import time
 import math
+import os
 import re
+import time
 from collections import defaultdict
-from typing import TypedDict, Optional, Set, Dict
+from typing import TypedDict
+
+import yaml  # type: ignore
+
 
 class IPProfile(TypedDict):
     request_count: int
-    unique_ports: Set[int]
+    unique_ports: set[int]
     total_fwd_packets: float
-    first_seen: Optional[float]
-    last_seen: Optional[float]
+    first_seen: float | None
+    last_seen: float | None
 
 
 class RunningStats:
@@ -34,6 +36,7 @@ class RunningStats:
     Duy trì Trung bình và Phương sai chạy trực tuyến dùng thuật toán Welford.
     Độ phức tạp: O(1) thời gian, O(1) không gian. Tránh memory leak/OOM trên data lớn.
     """
+
     def __init__(self):
         self.n = 0
         self.old_m = 0.0
@@ -62,9 +65,7 @@ class RunningStats:
         return math.sqrt(self.variance()) if self.n > 1 else 0.0
 
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
-)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 
 # Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
 _KEY_ALIASES = {
@@ -93,12 +94,12 @@ _RAW_TO_CANONICAL = {
     "Init Bwd Win Byts": ["Init Bwd Win Byts", "init_bwd_win_byts"],
     "Bwd Pkt Len Min": ["Bwd Pkt Len Min", "bwd_pkt_len_min"],
     "PSH Flag Cnt": ["PSH Flag Cnt", "psh_flag_cnt"],
-    "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"]
+    "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"],
 }
 
 
 def load_config():
-    with open(CONFIG_PATH, "r") as f:
+    with open(CONFIG_PATH) as f:
         return yaml.safe_load(f)
 
 
@@ -120,7 +121,7 @@ class SessionBaseline:
         max_profiles: int = 10000,
         eviction_interval: int = 100,
     ):
-        self.profiles: Dict[str, IPProfile] = defaultdict(
+        self.profiles: dict[str, IPProfile] = defaultdict(
             lambda: {
                 "request_count": 0,
                 "unique_ports": set(),
@@ -166,8 +167,7 @@ class SessionBaseline:
             # Nếu vẫn vượt ngưỡng sau khi dọn dẹp stale profiles, tiến hành xoá 10% profiles cũ nhất (FIFO/LRU-style)
             if len(self.profiles) >= self.max_profiles:
                 sorted_ips = sorted(
-                    self.profiles.keys(),
-                    key=lambda ip: self.profiles[ip]["last_seen"] or 0
+                    self.profiles.keys(), key=lambda ip: self.profiles[ip]["last_seen"] or 0
                 )
                 num_to_evict = max(1, int(self.max_profiles * 0.1))
                 for ip_to_evict in sorted_ips[:num_to_evict]:
@@ -277,7 +277,7 @@ class RuleEngine:
         self.risk_threshold = tier1_config.get("risk_threshold", 30)
         self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
-        
+
         all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
         self.whitelist_ips = tier1_config.get("whitelist_ips", [])
@@ -305,7 +305,7 @@ class RuleEngine:
         self.jailbreak_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in jailbreak_pats]
 
         # Unsupervised Anomaly Detection (Zero-Day statistical profiling trên các core features có corr cao)
-        self.global_stats: Dict[str, RunningStats] = {
+        self.global_stats: dict[str, RunningStats] = {
             "Flow Duration": RunningStats(),
             "Total Fwd Packets": RunningStats(),
             "Total Length of Fwd Packets": RunningStats(),
@@ -316,13 +316,13 @@ class RuleEngine:
             "Init Bwd Win Byts": RunningStats(),
             "Bwd Pkt Len Min": RunningStats(),
             "PSH Flag Cnt": RunningStats(),
-            "Flow Pkts/s": RunningStats()
+            "Flow Pkts/s": RunningStats(),
         }
         # Cần 100 mẫu sạch để khởi tạo baseline tin cậy trước khi tính Z-score
         self.warmup_count = 100
         self.total_processed_logs = 0
 
-    def _check_waf_signatures(self, log_entry: dict) -> Optional[str]:
+    def _check_waf_signatures(self, log_entry: dict) -> str | None:
         """
         Bộ lọc Signature WAF siêu nhẹ để phát hiện nhanh các dấu hiệu SQLi, XSS, Path Traversal
         ngay tại Tier-1 nhằm bảo vệ Tier-2 khỏi bị nghẽn (Resource Starvation).
@@ -339,9 +339,18 @@ class RuleEngine:
             ),
             "Command Injection": re.compile(
                 r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\))"
-            )
+            ),
         }
-        target_fields = ["payload", "uri", "user_agent", "User-Agent", "headers", "message", "command", "process"]
+        target_fields = [
+            "payload",
+            "uri",
+            "user_agent",
+            "User-Agent",
+            "headers",
+            "message",
+            "command",
+            "process",
+        ]
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
             if val and isinstance(val, str):
@@ -350,11 +359,20 @@ class RuleEngine:
                         return f"WAF: Phát hiện {attack_type} trong '{field}'"
         return None
 
-    def _check_injection_signatures(self, log_entry: dict) -> Optional[str]:
+    def _check_injection_signatures(self, log_entry: dict) -> str | None:
         """
         Kiểm tra các mẫu Prompt Injection và Jailbreak từ config hệ thống ngay tại Tier-1.
         """
-        target_fields = ["payload", "uri", "user_agent", "User-Agent", "headers", "message", "command", "process"]
+        target_fields = [
+            "payload",
+            "uri",
+            "user_agent",
+            "User-Agent",
+            "headers",
+            "message",
+            "command",
+            "process",
+        ]
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
             if val and isinstance(val, str):
@@ -418,7 +436,7 @@ class RuleEngine:
 
         # --- Tầng 0.5: Kiểm tra Unsupervised Statistical Anomaly ---
         self.total_processed_logs += 1
-        
+
         # Ánh xạ các trường mạng thô sang các nhóm tính năng
         current_values = {}
         for key, aliases in _RAW_TO_CANONICAL.items():
@@ -432,18 +450,18 @@ class RuleEngine:
                         pass
             if val is not None:
                 current_values[key] = val
-                
+
         # Chỉ kích hoạt cảnh báo sau giai đoạn warmup cho từng key cụ thể (dựa trên số lượng mẫu benign của key đó)
         max_z_score = 0.0
         z_anomaly_reasons = []
         z_anomaly_score = 0
-        
+
         for key, val in current_values.items():
             stats = self.global_stats[key]
             if stats.n >= self.warmup_count:
                 mean_val = stats.mean()
                 std_val = stats.std_dev()
-                
+
                 # Bỏ qua nếu dữ liệu không biến động (std quá bé)
                 if std_val > 0.01:
                     z_score = abs(val - mean_val) / std_val
@@ -455,7 +473,7 @@ class RuleEngine:
                         z_anomaly_reasons.append(
                             f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} lệch {z_score:.2f} lần độ lệch chuẩn (Z-Score > 3.5)"
                         )
-                        
+
         if z_anomaly_reasons:
             score += z_anomaly_score
             reasons.extend(z_anomaly_reasons)
@@ -487,9 +505,7 @@ class RuleEngine:
                 field_value = str(log_entry.get(rule_field, ""))
                 if rule_pattern in field_value:
                     score += rule_score
-                    reasons.append(
-                        f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'"
-                    )
+                    reasons.append(f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'")
 
         # --- Tầng 3: Session Baseline ---
         source_ip = log_entry.get("Source IP", "unknown")
@@ -514,7 +530,7 @@ class RuleEngine:
                 dest_port_val = int(dest_port)
             except (ValueError, TypeError):
                 pass
-            
+
             fwd_pkts_val = 0.0
             try:
                 fwd_pkts_val = float(fwd_packets)
@@ -523,7 +539,9 @@ class RuleEngine:
 
             # Phát hiện tấn công web rõ ràng (SQLi/XSS/Command Inj) -> Chặn luôn để bảo vệ LLM
             has_waf_match = any("WAF:" in r for r in reasons)
-            has_injection_match = any("Prompt Injection Pattern:" in r or "Jailbreak Pattern:" in r for r in reasons)
+            has_injection_match = any(
+                "Prompt Injection Pattern:" in r or "Jailbreak Pattern:" in r for r in reasons
+            )
 
             if has_waf_match:
                 log_entry["tier1_action"] = "BLOCK_IP"
@@ -560,12 +578,12 @@ class RuleEngine:
         """
         config = load_config()
         tier1_config = config.get("tier1", {})
-        
+
         self.risk_threshold = tier1_config.get("risk_threshold", self.risk_threshold)
         self.sensitive_ports = tier1_config.get("sensitive_ports", self.sensitive_ports)
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", self.max_fwd_packets)
         self.whitelist_ips = tier1_config.get("whitelist_ips", self.whitelist_ips)
-        
+
         all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
 
@@ -579,8 +597,18 @@ class RuleEngine:
 
         # Hot-reload SessionBaseline parameters without wiping profiles cache
         baseline_config = tier1_config.get("session_baseline", {})
-        self.session_baseline.deviation_threshold = baseline_config.get("deviation_threshold", self.session_baseline.deviation_threshold)
-        self.session_baseline.window_seconds = baseline_config.get("window_seconds", self.session_baseline.window_seconds)
-        self.session_baseline.ttl_seconds = baseline_config.get("ttl_seconds", self.session_baseline.ttl_seconds)
-        self.session_baseline.max_profiles = baseline_config.get("max_profiles", self.session_baseline.max_profiles)
-        self.session_baseline.eviction_interval = baseline_config.get("eviction_interval", self.session_baseline.eviction_interval)
+        self.session_baseline.deviation_threshold = baseline_config.get(
+            "deviation_threshold", self.session_baseline.deviation_threshold
+        )
+        self.session_baseline.window_seconds = baseline_config.get(
+            "window_seconds", self.session_baseline.window_seconds
+        )
+        self.session_baseline.ttl_seconds = baseline_config.get(
+            "ttl_seconds", self.session_baseline.ttl_seconds
+        )
+        self.session_baseline.max_profiles = baseline_config.get(
+            "max_profiles", self.session_baseline.max_profiles
+        )
+        self.session_baseline.eviction_interval = baseline_config.get(
+            "eviction_interval", self.session_baseline.eviction_interval
+        )

@@ -2,16 +2,15 @@
 Guardrails: State Monitor
 """
 
-import yaml  # type: ignore
+import json
 import os
 import sqlite3
-import json
 import threading
 from datetime import datetime, timezone
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
-)
+import yaml  # type: ignore
+
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 
 # Khóa luồng (thread lock) bảo vệ ghi DB đồng thời
 _db_lock = threading.Lock()
@@ -20,22 +19,16 @@ _db_lock = threading.Lock()
 def load_config():
     try:
         if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r") as f:
+            with open(CONFIG_PATH) as f:
                 cfg = yaml.safe_load(f)
                 if cfg:
                     return cfg
     except Exception:
         pass
     return {
-        "llm": {
-            "max_context_tokens": 8192
-        },
-        "guardrails": {
-            "token_budget": 4000
-        },
-        "logging": {
-            "audit_db_path": "logs/guardrails_audit.db"
-        }
+        "llm": {"max_context_tokens": 8192},
+        "guardrails": {"token_budget": 4000},
+        "logging": {"audit_db_path": "logs/guardrails_audit.db"},
     }
 
 
@@ -47,12 +40,8 @@ class ContextOverflowGuard:
 
     def __init__(self):
         config = load_config()
-        self.max_tokens = int(config.get("llm", {}).get(
-            "max_context_tokens", 8192
-        ))
-        self.log_budget = int(config.get("guardrails", {}).get(
-            "token_budget", 4000
-        ))
+        self.max_tokens = int(config.get("llm", {}).get("max_context_tokens", 8192))
+        self.log_budget = int(config.get("guardrails", {}).get("token_budget", 4000))
 
     def check(self, prompt_tokens: int, log_tokens: int) -> dict:
         total = prompt_tokens + log_tokens
@@ -84,10 +73,7 @@ class LoopDetector:
                 "node": node_name,
                 "visits": count,
                 "action": "FORCE_STOP",
-                "reason": (
-                    f"Infinite loop detected: Node '{node_name}' "
-                    f"visited {count} times"
-                ),
+                "reason": (f"Infinite loop detected: Node '{node_name}' visited {count} times"),
             }
         return {"node": node_name, "visits": count, "action": "CONTINUE"}
 
@@ -106,9 +92,9 @@ class AuditLogger:
 
     def __init__(self):
         config = load_config()
-        self.db_path = str(config.get("logging", {}).get(
-            "audit_db_path", "logs/guardrails_audit.db"
-        ))
+        self.db_path = str(
+            config.get("logging", {}).get("audit_db_path", "logs/guardrails_audit.db")
+        )
         self._init_db()
 
     def _init_db(self):

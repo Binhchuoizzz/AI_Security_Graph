@@ -1,5 +1,6 @@
 import json
 import os
+
 import matplotlib.pyplot as plt
 
 ROBUSTNESS_RESULTS_PATH = os.path.join(
@@ -10,12 +11,10 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "results", "plots")
 
 def plot_robustness():
     if not os.path.exists(ROBUSTNESS_RESULTS_PATH):
-        print(
-            f"[!] Chua chay test robustness. Khong tim thay {ROBUSTNESS_RESULTS_PATH}"
-        )
+        print(f"[!] Chua chay test robustness. Khong tim thay {ROBUSTNESS_RESULTS_PATH}")
         return
 
-    with open(ROBUSTNESS_RESULTS_PATH, "r") as f:
+    with open(ROBUSTNESS_RESULTS_PATH) as f:
         data = json.load(f)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)

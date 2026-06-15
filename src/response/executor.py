@@ -8,19 +8,17 @@ TĂNG CƯỜNG BẢO MẬT (Attack Vector #07 — Sandbox Escape / Phòng thủ 
   - Làm sạch đầu ra (Output Sanitizer): Loại bỏ markdown/HTML trước khi ghi DB
 """
 
-import sqlite3
+import hashlib
+import hmac
+import logging
 import os
 import re
-import logging
-import hmac
-import hashlib
+import sqlite3
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "audit_trail.db"
-)
+DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "audit_trail.db")
 
 
 # =========================================================================
@@ -33,16 +31,14 @@ class ActionValidator:
     Từ chối các hành động khác -> ngăn LLM bị thao túng để thực thi lệnh tùy ý.
     """
 
-    ALLOWED_ACTIONS = frozenset({
-        "BLOCK_IP", "QUARANTINE", "ALERT", "LOG", "AWAIT_HITL"
-    })
+    ALLOWED_ACTIONS = frozenset({"BLOCK_IP", "QUARANTINE", "ALERT", "LOG", "AWAIT_HITL"})
 
     # Các mẫu nguy hiểm trong trường target/reason (command injection)
     DANGEROUS_PATTERNS = re.compile(
-        r'[;|&`$]|'           # Ký tự đặc biệt của shell (metacharacters)
-        r'\b(?:rm|sudo|chmod|chown|wget|curl|nc|bash|sh|python|exec)\b|'
-        r'\.\./',             # Tấn công duyệt thư mục (path traversal)
-        re.IGNORECASE
+        r"[;|&`$]|"  # Ký tự đặc biệt của shell (metacharacters)
+        r"\b(?:rm|sudo|chmod|chown|wget|curl|nc|bash|sh|python|exec)\b|"
+        r"\.\./",  # Tấn công duyệt thư mục (path traversal)
+        re.IGNORECASE,
     )
 
     @classmethod
@@ -62,17 +58,15 @@ class ActionValidator:
                 f"Possible command injection attempt!"
             )
             # Loại bỏ các ký tự nguy hiểm, giữ lại các ký tự an toàn
-            return re.sub(r'[^a-zA-Z0-9._:\-/@ ]', '', target)
+            return re.sub(r"[^a-zA-Z0-9._:\-/@ ]", "", target)
         return target
 
     @classmethod
     def sanitize_reason(cls, reason: str) -> str:
         """Làm sạch trường reason trước khi ghi cơ sở dữ liệu."""
         if cls.DANGEROUS_PATTERNS.search(reason):
-            logger.warning(
-                "[ACTION VALIDATOR] Dangerous pattern in reason field. Sanitizing."
-            )
-            return re.sub(r'[;|&`$]', '', reason)
+            logger.warning("[ACTION VALIDATOR] Dangerous pattern in reason field. Sanitizing.")
+            return re.sub(r"[;|&`$]", "", reason)
         return reason
 
 
@@ -95,7 +89,7 @@ def _init_db():
                 reason TEXT
             )
         """)
-        
+
         # Tạo bảng login_attempts
         c.execute("""
             CREATE TABLE IF NOT EXISTS login_attempts (
@@ -110,7 +104,7 @@ def _init_db():
         columns = [col[1] for col in c.fetchall()]
         if "integrity_hash" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN integrity_hash TEXT")
-            
+
         conn.commit()
 
 
@@ -135,14 +129,18 @@ def _log_to_db(action: str, target: str, reason: str):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            
+
             # 1. Lấy integrity_hash của dòng log cuối cùng để liên kết (chaining)
             c.execute("SELECT integrity_hash FROM audit_trail ORDER BY id DESC LIMIT 1")
             last_row = c.fetchone()
-            prev_hash = last_row[0] if last_row and last_row[0] else "genesis_block_hash_sentinel_soc"
+            prev_hash = (
+                last_row[0] if last_row and last_row[0] else "genesis_block_hash_sentinel_soc"
+            )
 
             # 2. Tính toán mã băm HMAC
-            secret_key = os.getenv("SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026").encode()
+            secret_key = os.getenv(
+                "SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026"
+            ).encode()
             message = f"{prev_hash}|{timestamp}|{action}|{safe_target}|{safe_reason}".encode()
             current_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
 
@@ -182,10 +180,7 @@ def get_audit_trail(limit=50):
                 (limit,),
             )
             rows = c.fetchall()
-        return [
-            {"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]}
-            for r in rows
-        ]
+        return [{"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]} for r in rows]
     except Exception:
         return []
 
@@ -199,10 +194,7 @@ def get_audit_trail_for_ip(ip: str, limit=100):
                 (ip, limit),
             )
             rows = c.fetchall()
-        return [
-            {"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]}
-            for r in rows
-        ]
+        return [{"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]} for r in rows]
     except Exception:
         return []
 
@@ -215,25 +207,32 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute("SELECT id, timestamp, action, target, reason, integrity_hash FROM audit_trail ORDER BY id ASC")
+            c.execute(
+                "SELECT id, timestamp, action, target, reason, integrity_hash FROM audit_trail ORDER BY id ASC"
+            )
             rows = c.fetchall()
-            
+
         if not rows:
             return True, "Cơ sở dữ liệu trống. Hệ thống nhật ký trống nhưng toàn vẹn."
 
-        secret_key = os.getenv("SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026").encode()
+        secret_key = os.getenv(
+            "SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026"
+        ).encode()
         prev_hash = "genesis_block_hash_sentinel_soc"
 
         for row in rows:
             row_id, timestamp, action, target, reason, integrity_hash = row
-            
+
             # Tính toán lại hash mong đợi
             message = f"{prev_hash}|{timestamp}|{action}|{target}|{reason}".encode()
             expected_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
-            
+
             if not integrity_hash or not hmac.compare_digest(integrity_hash, expected_hash):
-                return False, f"⚠️ PHÁT HIỆN GIẢ MẠO! Dòng log ID {row_id} ({timestamp} - {action}) đã bị sửa đổi, xóa hoặc chèn sai thứ tự."
-                
+                return (
+                    False,
+                    f"⚠️ PHÁT HIỆN GIẢ MẠO! Dòng log ID {row_id} ({timestamp} - {action}) đã bị sửa đổi, xóa hoặc chèn sai thứ tự.",
+                )
+
             prev_hash = integrity_hash
 
         return True, "✅ Hệ thống nhật ký toàn vẹn (0 phát hiện sửa đổi hay giả mạo)."
@@ -245,15 +244,21 @@ def get_login_attempts(username: str) -> tuple[int, float]:
     """Trả về (attempts, lockout_until) cho một username. Tự động đặt lại (reset) nếu thời gian khóa đã hết."""
     try:
         import time
+
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute("SELECT attempts, lockout_until FROM login_attempts WHERE username = ?", (username,))
+            c.execute(
+                "SELECT attempts, lockout_until FROM login_attempts WHERE username = ?", (username,)
+            )
             row = c.fetchone()
             if row:
                 attempts, lockout_until = row[0], row[1]
                 if lockout_until > 0.0 and time.time() >= lockout_until:
                     # Thời gian khóa đã hết hạn, tự động đặt lại số lần thử
-                    c.execute("UPDATE login_attempts SET attempts = 0, lockout_until = 0.0 WHERE username = ?", (username,))
+                    c.execute(
+                        "UPDATE login_attempts SET attempts = 0, lockout_until = 0.0 WHERE username = ?",
+                        (username,),
+                    )
                     conn.commit()
                     return 0, 0.0
                 return attempts, lockout_until
@@ -267,11 +272,14 @@ def increment_login_attempts(username: str) -> int:
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO login_attempts (username, attempts, lockout_until) 
                 VALUES (?, 1, 0.0)
                 ON CONFLICT(username) DO UPDATE SET attempts = attempts + 1
-            """, (username,))
+            """,
+                (username,),
+            )
             conn.commit()
         attempts, _ = get_login_attempts(username)
         return attempts
@@ -285,11 +293,14 @@ def reset_login_attempts(username: str):
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO login_attempts (username, attempts, lockout_until) 
                 VALUES (?, 0, 0.0)
                 ON CONFLICT(username) DO UPDATE SET attempts = 0, lockout_until = 0.0
-            """, (username,))
+            """,
+                (username,),
+            )
             conn.commit()
     except Exception as e:
         logger.error(f"Lỗi reset login attempts: {e}")
@@ -299,15 +310,18 @@ def lock_user(username: str, duration_seconds: int):
     """Khóa tài khoản trong một khoảng thời gian."""
     try:
         import time
+
         lockout_time = time.time() + duration_seconds
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO login_attempts (username, attempts, lockout_until) 
                 VALUES (?, 5, ?)
                 ON CONFLICT(username) DO UPDATE SET lockout_until = ?, attempts = 5
-            """, (username, lockout_time, lockout_time))
+            """,
+                (username, lockout_time, lockout_time),
+            )
             conn.commit()
     except Exception as e:
         logger.error(f"Lỗi khóa người dùng: {e}")
-

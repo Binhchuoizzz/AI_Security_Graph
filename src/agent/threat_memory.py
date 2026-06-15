@@ -24,18 +24,16 @@ MỤC ĐÍCH:
   - Tích hợp: Inject vào LLM prompt qua node_llm_triage
 """
 
-import sqlite3
-import os
 import logging
+import os
+import sqlite3
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional
+
 from src.guardrails.output_sanitizer import output_sanitizer
 
 logger = logging.getLogger(__name__)
 
-MEMORY_DB_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "threat_memory.db"
-)
+MEMORY_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "threat_memory.db")
 
 
 class ThreatMemoryStore:
@@ -117,13 +115,16 @@ class ThreatMemoryStore:
             c.execute("SELECT COUNT(*) FROM known_entities")
             if c.fetchone()[0] == 0:
                 now_str = datetime.now().isoformat()
-                c.execute("""
+                c.execute(
+                    """
                     INSERT INTO known_entities (entity_type, entity_value, description, added_by, added_at, is_active)
                     VALUES 
                     ('Jump_Host', '192.168.1.254', 'Máy chủ nhảy quản trị nội bộ', 'system', ?, 1),
                     ('Security_Scanner', '10.0.0.99', 'Máy quét bảo mật Nessus định kỳ', 'system', ?, 1),
                     ('Active_Directory', '192.168.1.10', 'Máy chủ AD Domain Controller', 'system', ?, 1)
-                """, (now_str, now_str, now_str))
+                """,
+                    (now_str, now_str, now_str),
+                )
 
             conn.commit()
         logger.info(f"[THREAT MEMORY] Initialized at {self.db_path}")
@@ -153,7 +154,10 @@ class ThreatMemoryStore:
             c = conn.cursor()
 
             # Thêm mới hoặc cập nhật danh tiếng IP (Upsert)
-            c.execute("SELECT ip, total_incidents, reputation_score FROM ip_reputation WHERE ip = ?", (ip,))
+            c.execute(
+                "SELECT ip, total_incidents, reputation_score FROM ip_reputation WHERE ip = ?",
+                (ip,),
+            )
             row = c.fetchone()
 
             if row:
@@ -161,27 +165,38 @@ class ThreatMemoryStore:
                 new_score = min(row[2] + score_delta, 100.0)  # Giới hạn tối đa là 100
                 block_delta = 1 if action == "BLOCK_IP" else 0
                 alert_delta = 1 if action == "ALERT" else 0
-                c.execute("""
+                c.execute(
+                    """
                     UPDATE ip_reputation 
                     SET total_incidents = ?, reputation_score = ?, last_seen = ?,
                         total_blocks = total_blocks + ?, total_alerts = total_alerts + ?,
                         last_mitre_technique = ?
                     WHERE ip = ?
-                """, (new_incidents, new_score, now, block_delta, alert_delta,
-                      mitre_technique, ip))
+                """,
+                    (new_incidents, new_score, now, block_delta, alert_delta, mitre_technique, ip),
+                )
             else:
-                c.execute("""
+                c.execute(
+                    """
                     INSERT INTO ip_reputation 
                     (ip, total_incidents, total_blocks, total_alerts, first_seen, last_seen, 
                      reputation_score, last_mitre_technique)
                     VALUES (?, 1, ?, ?, ?, ?, ?, ?)
-                """, (ip, 1 if action == "BLOCK_IP" else 0,
-                      1 if action == "ALERT" else 0,
-                      now, now, score_delta, mitre_technique))
+                """,
+                    (
+                        ip,
+                        1 if action == "BLOCK_IP" else 0,
+                        1 if action == "ALERT" else 0,
+                        now,
+                        now,
+                        score_delta,
+                        mitre_technique,
+                    ),
+                )
 
             conn.commit()
 
-    def get_ip_reputation(self, ip: str) -> Optional[Dict]:
+    def get_ip_reputation(self, ip: str) -> dict | None:
         """Lấy thông tin reputation của IP."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -192,17 +207,20 @@ class ThreatMemoryStore:
                 return dict(row)
         return None
 
-    def get_high_risk_ips(self, min_score: float = 50.0, limit: int = 20) -> List[Dict]:
+    def get_high_risk_ips(self, min_score: float = 50.0, limit: int = 20) -> list[dict]:
         """Lấy danh sách IPs có reputation score cao (nguy hiểm)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 SELECT * FROM ip_reputation 
                 WHERE reputation_score >= ? 
                 ORDER BY reputation_score DESC 
                 LIMIT ?
-            """, (min_score, limit))
+            """,
+                (min_score, limit),
+            )
             return [dict(row) for row in c.fetchall()]
 
     def decay_reputation(self, decay_rate: float = 0.95, inactive_days: int = 7):
@@ -213,11 +231,14 @@ class ThreatMemoryStore:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 UPDATE ip_reputation 
                 SET reputation_score = reputation_score * ?
                 WHERE last_seen < ? AND reputation_score > 1.0
-            """, (decay_rate, cutoff))
+            """,
+                (decay_rate, cutoff),
+            )
             affected = c.rowcount
             conn.commit()
         if affected > 0:
@@ -227,11 +248,12 @@ class ThreatMemoryStore:
     # ORGANIZATIONAL CONTEXT (Known Entities)
     # =========================================================================
 
-    def add_known_entity(self, entity_type: str, entity_value: str,
-                         description: str = "", added_by: str = "system"):
+    def add_known_entity(
+        self, entity_type: str, entity_value: str, description: str = "", added_by: str = "system"
+    ):
         """
         Thêm thực thể hợp pháp (internal tool, pentest IP, scanner).
-        
+
         entity_type: 'scanner', 'pentest_ip', 'admin_tool', 'scheduled_scan'
         entity_value: IP, tên máy chủ (hostname), hoặc tên công cụ (tool name)
         """
@@ -243,11 +265,14 @@ class ThreatMemoryStore:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 c = conn.cursor()
-                c.execute("""
+                c.execute(
+                    """
                     INSERT OR REPLACE INTO known_entities 
                     (entity_type, entity_value, description, added_by, added_at, is_active)
                     VALUES (?, ?, ?, ?, ?, 1)
-                """, (entity_type, entity_value, description, added_by, now))
+                """,
+                    (entity_type, entity_value, description, added_by, now),
+                )
                 conn.commit()
             logger.info(f"[THREAT MEMORY] Added known entity: {entity_type}={entity_value}")
         except Exception as e:
@@ -258,12 +283,11 @@ class ThreatMemoryStore:
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
             c.execute(
-                "UPDATE known_entities SET is_active = 0 WHERE entity_value = ?",
-                (entity_value,)
+                "UPDATE known_entities SET is_active = 0 WHERE entity_value = ?", (entity_value,)
             )
             conn.commit()
 
-    def is_known_entity(self, value: str) -> Optional[Dict]:
+    def is_known_entity(self, value: str) -> dict | None:
         """
         Kiểm tra xem IP/tool có phải entity hợp pháp nội bộ không.
         Trả về dict nếu match, None nếu không.
@@ -271,16 +295,19 @@ class ThreatMemoryStore:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 SELECT * FROM known_entities 
                 WHERE entity_value = ? AND is_active = 1
-            """, (value,))
+            """,
+                (value,),
+            )
             row = c.fetchone()
             if row:
                 return dict(row)
         return None
 
-    def get_all_known_entities(self) -> List[Dict]:
+    def get_all_known_entities(self) -> list[dict]:
         """Lấy toàn bộ known entities đang active."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -292,9 +319,15 @@ class ThreatMemoryStore:
     # THEO DÕI CHUỖI APT (Tích hợp DAPT2020)
     # =========================================================================
 
-    def record_apt_event(self, src_ip: str, dst_ip: str = "",
-                         apt_phase: Optional[str] = None, apt_day: Optional[int] = None,
-                         label: str = "", timestamp: str = ""):
+    def record_apt_event(
+        self,
+        src_ip: str,
+        dst_ip: str = "",
+        apt_phase: str | None = None,
+        apt_day: int | None = None,
+        label: str = "",
+        timestamp: str = "",
+    ):
         """Ghi nhận một sự kiện đe dọa đơn lẻ để theo dõi chuỗi APT."""
         src_ip = output_sanitizer.sanitize(src_ip)
         dst_ip = output_sanitizer.sanitize(dst_ip)
@@ -305,11 +338,14 @@ class ThreatMemoryStore:
         now = datetime.now(timezone.utc).isoformat()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO threat_events
                 (src_ip, dst_ip, apt_phase, apt_day, label, timestamp, recorded_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (src_ip, dst_ip, apt_phase, apt_day, label, timestamp, now))
+            """,
+                (src_ip, dst_ip, apt_phase, apt_day, label, timestamp, now),
+            )
             conn.commit()
 
     def check_apt_chain(self, src_ip: str) -> dict:
@@ -324,7 +360,7 @@ class ThreatMemoryStore:
                 """SELECT COUNT(DISTINCT apt_day), MAX(apt_day), GROUP_CONCAT(DISTINCT apt_phase)
                    FROM threat_events
                    WHERE src_ip = ? AND apt_phase IS NOT NULL""",
-                (src_ip,)
+                (src_ip,),
             )
             row = cursor.fetchone()
 
@@ -352,7 +388,7 @@ class ThreatMemoryStore:
             return 0
 
         count = 0
-        with open(chains_path, "r", encoding="utf-8") as f:
+        with open(chains_path, encoding="utf-8") as f:
             for line in f:
                 chain = json.loads(line)
                 for event in chain.get("events", []):
@@ -373,8 +409,9 @@ class ThreatMemoryStore:
     # APT CORRELATION
     # =========================================================================
 
-    def check_apt_pattern(self, ip: str, threshold_incidents: int = 5,
-                          threshold_days: int = 7) -> Optional[Dict]:
+    def check_apt_pattern(
+        self, ip: str, threshold_incidents: int = 5, threshold_days: int = 7
+    ) -> dict | None:
         """
         Kiểm tra xem IP có pattern APT không.
         APT = IP bị escalate >= threshold_incidents lần trong threshold_days ngày.
@@ -385,22 +422,30 @@ class ThreatMemoryStore:
         if not reputation:
             return None
 
-        if (reputation["total_incidents"] >= threshold_incidents and
-                reputation["first_seen"] <= cutoff):
+        if (
+            reputation["total_incidents"] >= threshold_incidents
+            and reputation["first_seen"] <= cutoff
+        ):
             return {
                 "ip": ip,
                 "is_apt_candidate": True,
                 "total_incidents": reputation["total_incidents"],
-                "days_active": (datetime.now(timezone.utc) - datetime.fromisoformat(
-                    reputation["first_seen"])).days,
+                "days_active": (
+                    datetime.now(timezone.utc) - datetime.fromisoformat(reputation["first_seen"])
+                ).days,
                 "reputation_score": reputation["reputation_score"],
                 "last_mitre": reputation.get("last_mitre_technique", ""),
             }
         return None
 
-    def record_apt_indicator(self, indicator_type: str, indicator_value: str,
-                             confidence: float, related_ips: str = "",
-                             mitre_chain: str = ""):
+    def record_apt_indicator(
+        self,
+        indicator_type: str,
+        indicator_value: str,
+        confidence: float,
+        related_ips: str = "",
+        mitre_chain: str = "",
+    ):
         """Ghi nhận APT indicator cho correlation dài hạn."""
         indicator_type = output_sanitizer.sanitize(indicator_type)
         indicator_value = output_sanitizer.sanitize(indicator_value)
@@ -410,27 +455,43 @@ class ThreatMemoryStore:
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
             # Kiểm tra xem đã tồn tại chưa
-            c.execute("""
+            c.execute(
+                """
                 SELECT id, occurrence_count FROM apt_indicators 
                 WHERE indicator_type = ? AND indicator_value = ?
-            """, (indicator_type, indicator_value))
+            """,
+                (indicator_type, indicator_value),
+            )
             row = c.fetchone()
 
             if row:
-                c.execute("""
+                c.execute(
+                    """
                     UPDATE apt_indicators 
                     SET occurrence_count = ?, last_detected = ?, confidence = ?,
                         related_ips = ?, mitre_chain = ?
                     WHERE id = ?
-                """, (row[1] + 1, now, confidence, related_ips, mitre_chain, row[0]))
+                """,
+                    (row[1] + 1, now, confidence, related_ips, mitre_chain, row[0]),
+                )
             else:
-                c.execute("""
+                c.execute(
+                    """
                     INSERT INTO apt_indicators 
                     (indicator_type, indicator_value, confidence, first_detected, 
                      last_detected, related_ips, mitre_chain)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (indicator_type, indicator_value, confidence,
-                      now, now, related_ips, mitre_chain))
+                """,
+                    (
+                        indicator_type,
+                        indicator_value,
+                        confidence,
+                        now,
+                        now,
+                        related_ips,
+                        mitre_chain,
+                    ),
+                )
             conn.commit()
 
     # =========================================================================
@@ -490,10 +551,10 @@ class ThreatMemoryStore:
         context = "\n".join(parts)
         # Tỉ lệ ký tự/token ước lượng
         if len(context) > max_tokens * 4:  # rough char-to-token ratio
-            context = context[:max_tokens * 4] + "\n  ... [TRUNCATED]"
+            context = context[: max_tokens * 4] + "\n  ... [TRUNCATED]"
         return context
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Lấy thống kê tổng quan cho Dashboard."""
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
@@ -512,15 +573,18 @@ class ThreatMemoryStore:
             "apt_indicators": apt,
         }
 
-    def get_all_threat_events(self, limit: int = 50) -> List[Dict]:
+    def get_all_threat_events(self, limit: int = 50) -> list[dict]:
         """Lấy toàn bộ threat events cho UI."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
-            c.execute("SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events ORDER BY id DESC LIMIT ?", (limit,))
+            c.execute(
+                "SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events ORDER BY id DESC LIMIT ?",
+                (limit,),
+            )
             return [dict(row) for row in c.fetchall()]
 
-    def get_threat_events_for_ip(self, ip: str, limit: int = 50) -> List[Dict]:
+    def get_threat_events_for_ip(self, ip: str, limit: int = 50) -> list[dict]:
         """Lấy threat events liên quan đến IP cụ thể (IP nguồn hoặc IP đích)."""
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row

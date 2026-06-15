@@ -1,0 +1,41 @@
+[project]
+name = "ai-security-graph"
+version = "2.0.0"
+description = "SENTINEL: A Cognitive Two-Tier Architecture for Automated Threat Detection and Response using Agentic AI"
+authors = [
+    { name = "Nguyễn Đức Bình" }
+]
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "I",    # isort (import sorting)
+    "UP",   # pyupgrade (modern syntax upgrades)
+    "S",    # bandit (security checks)
+    "B",    # flake8-bugbear (common bugs)
+    "LOG",  # flake8-logging
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+    "S101", # allow assert statements (essential for test suites)
+    "S311", # pseudo-random generators (used for non-cryptographic simulation)
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["src", "tests", "experiments"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --tb=short"
+testpaths = [
+    "tests"
+]

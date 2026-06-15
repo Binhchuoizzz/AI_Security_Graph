@@ -17,10 +17,10 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.guardrails.prompt_filter import (
+    DelimitedDataEncapsulator,
+    EncodingNeutralizer,
     GuardrailsPipeline,
     PromptInjectionDetector,
-    EncodingNeutralizer,
-    DelimitedDataEncapsulator,
 )
 
 # =============================================================================
@@ -32,13 +32,18 @@ ADVERSARIAL_DIR = os.path.join(os.path.dirname(__file__), "adversarial")
 def load_adversarial_samples():
     """Tải toàn bộ mẫu adversarial từ 5 nhóm tấn công."""
     all_samples = []
-    categories = ["encoding_bypass", "structural_attacks", "semantic_confusion",
-                  "jailbreak", "rag_poisoning"]
+    categories = [
+        "encoding_bypass",
+        "structural_attacks",
+        "semantic_confusion",
+        "jailbreak",
+        "rag_poisoning",
+    ]
 
     for cat in categories:
         sample_path = os.path.join(ADVERSARIAL_DIR, cat, "samples.json")
         if os.path.exists(sample_path):
-            with open(sample_path, "r") as f:
+            with open(sample_path) as f:
                 samples = json.load(f)
                 all_samples.extend(samples)
                 print(f"  [+] Loaded {len(samples)} samples from {cat}/")
@@ -60,7 +65,7 @@ def evaluate_guardrails_defense(samples: list) -> dict:
     detector = PromptInjectionDetector()
     neutralizer = EncodingNeutralizer()
 
-    from typing import TypedDict, Any
+    from typing import Any, TypedDict
 
     class CategoryStats(TypedDict):
         total: int
@@ -109,9 +114,7 @@ def evaluate_guardrails_defense(samples: list) -> dict:
 
         # === Lớp 2: Hóa giải mã hóa ===
         neutralized = neutralizer.neutralize(log_entry)
-        encoding_changed = str(neutralized.get(payload_field)) != str(
-            log_entry.get(payload_field)
-        )
+        encoding_changed = str(neutralized.get(payload_field)) != str(log_entry.get(payload_field))
         if encoding_changed:
             stats["neutralized_encoding"] += 1
 
@@ -184,7 +187,7 @@ def print_report(results: dict):
         # Chi tiết các mẫu lọt bộ lọc (bypassed)
         bypassed_details = [d for d in stats["details"] if not d["overall_blocked"]]
         if bypassed_details:
-            print(f"\n   Bypassed samples:")
+            print("\n   Bypassed samples:")
             for d in bypassed_details:
                 print(f"    - {d['id']} ({d['attack_type']})")
 
@@ -194,18 +197,14 @@ def print_report(results: dict):
     overall_accuracy = (correct_all / total_all * 100) if total_all > 0 else 0
 
     print(f"\n{'=' * 70}")
-    print(f"  OVERALL SUMMARY")
+    print("  OVERALL SUMMARY")
     print(f"{'=' * 70}")
     print(f"  Total Adversarial Samples:  {total_all}")
-    print(
-        f"  Resistance (Block) Rate:    {blocked_all}/{total_all} ({overall_block:.1f}%)"
-    )
+    print(f"  Resistance (Block) Rate:    {blocked_all}/{total_all} ({overall_block:.1f}%)")
     print(
         f"  Defeat (Bypass) Rate:       {total_all - blocked_all}/{total_all} ({overall_bypass:.1f}%)"
     )
-    print(
-        f"  Overall Prediction Acc:     {correct_all}/{total_all} ({overall_accuracy:.1f}%)"
-    )
+    print(f"  Overall Prediction Acc:     {correct_all}/{total_all} ({overall_accuracy:.1f}%)")
     print(f"{'=' * 70}\n")
 
     return {
@@ -224,9 +223,7 @@ def print_report(results: dict):
                 "block_rate_pct": (
                     (s["fully_blocked"] / s["total"] * 100) if s["total"] > 0 else 0
                 ),
-                "bypass_rate_pct": (
-                    (s["bypassed"] / s["total"] * 100) if s["total"] > 0 else 0
-                ),
+                "bypass_rate_pct": ((s["bypassed"] / s["total"] * 100) if s["total"] > 0 else 0),
             }
             for cat, s in results.items()
         },

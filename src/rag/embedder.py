@@ -23,21 +23,20 @@ MÔ HÌNH EMBEDDING:
 """
 
 import json
-import os
 import logging
-import numpy as np  # type: ignore
+import os
 import pickle
 import sys
+
+import numpy as np  # type: ignore
 
 # Đảm bảo import được src.rag.security
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
-from src.rag.security import log_tokenizer
 from src.guardrails import RAGSanitizer
+from src.rag.security import log_tokenizer
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Khai báo đường dẫn
@@ -58,7 +57,7 @@ def load_mitre_chunks() -> list[dict]:
     Format chunk: "T1110 - Brute Force (Credential Access): ..."
     Giữ detection_indicators và response_actions để Agent có context hành động.
     """
-    with open(MITRE_JSON, "r", encoding="utf-8") as f:
+    with open(MITRE_JSON, encoding="utf-8") as f:
         data = json.load(f)
 
     chunks = []
@@ -70,15 +69,11 @@ def load_mitre_chunks() -> list[dict]:
             f"Description: {tech.get('description', '')}",
         ]
         if tech.get("detection_indicators"):
-            text_parts.append(
-                f"Detection Indicators: {', '.join(tech['detection_indicators'])}"
-            )
+            text_parts.append(f"Detection Indicators: {', '.join(tech['detection_indicators'])}")
         if tech.get("log_patterns"):
             text_parts.append(f"Log Patterns: {', '.join(tech['log_patterns'])}")
         if tech.get("response_actions"):
-            text_parts.append(
-                f"Response Actions: {', '.join(tech['response_actions'])}"
-            )
+            text_parts.append(f"Response Actions: {', '.join(tech['response_actions'])}")
 
         chunk_text = "\n".join(text_parts)
         sanitized_text = RAGSanitizer.sanitize_ingest(chunk_text)
@@ -105,7 +100,7 @@ def load_nist_chunks_json() -> list[dict]:
     Chỉ tạo ra 6 chunks từ curated JSON — không đủ granularity cho RAG.
     Giữ lại cho backward compatibility.
     """
-    with open(NIST_JSON, "r", encoding="utf-8") as f:
+    with open(NIST_JSON, encoding="utf-8") as f:
         data = json.load(f)
 
     chunks = []
@@ -165,31 +160,30 @@ def load_nist_chunks() -> list[dict]:
         return load_nist_chunks_json()
 
     import re
+
     from langchain_text_splitters import RecursiveCharacterTextSplitter  # type: ignore
 
-    with open(NIST_TXT_PATH, "r", encoding="utf-8", errors="ignore") as fh:
+    with open(NIST_TXT_PATH, encoding="utf-8", errors="ignore") as fh:
         text = fh.read()
     original_len = len(text)
 
     # Làm sạch các ký tự rác từ PDF
-    text = re.sub(r"\n{3,}", "\n\n", text)           # Thu gọn các dòng trống thừa
-    text = re.sub(r"NIST SP 800-61.*?\n", "", text)   # Loại bỏ các tiêu đề lặp lại
-    text = re.sub(r"Page \d+\n", "", text)             # Loại bỏ số trang
-    text = re.sub(r"\f", "", text)                     # Loại bỏ ký tự phân trang (form feed)
+    text = re.sub(r"\n{3,}", "\n\n", text)  # Thu gọn các dòng trống thừa
+    text = re.sub(r"NIST SP 800-61.*?\n", "", text)  # Loại bỏ các tiêu đề lặp lại
+    text = re.sub(r"Page \d+\n", "", text)  # Loại bỏ số trang
+    text = re.sub(r"\f", "", text)  # Loại bỏ ký tự phân trang (form feed)
     text = re.sub(r"^\d+\s*\n", "", text, flags=re.MULTILINE)  # Loại bỏ số trang độc lập
 
-    logger.info(
-        f"NIST text loaded: {original_len} chars → {len(text)} chars after cleanup"
-    )
+    logger.info(f"NIST text loaded: {original_len} chars → {len(text)} chars after cleanup")
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,        # ~256 tokens for all-MiniLM-L6-v2
-        chunk_overlap=190,      # ~32 tokens overlap
+        chunk_size=1500,  # ~256 tokens for all-MiniLM-L6-v2
+        chunk_overlap=190,  # ~32 tokens overlap
         separators=[
-            "\n\n",             # paragraph break (highest priority)
-            "\n",               # line break
-            ". ",               # sentence break
-            " ",                # word break (fallback)
+            "\n\n",  # paragraph break (highest priority)
+            "\n",  # line break
+            ". ",  # sentence break
+            " ",  # word break (fallback)
         ],
         length_function=len,
     )
@@ -200,49 +194,120 @@ def load_nist_chunks() -> list[dict]:
     # Mỗi giai đoạn có các từ đồng nghĩa/liên quan từ tài liệu NIST
     ir_phase_keywords = {
         "Preparation": [
-            "preparation", "preparing", "prepared", "readiness",
-            "incident response plan", "irp", "policy", "training",
-            "exercise", "toolkit", "jump bag", "contact list",
-            "war room", "communication plan", "resource",
+            "preparation",
+            "preparing",
+            "prepared",
+            "readiness",
+            "incident response plan",
+            "irp",
+            "policy",
+            "training",
+            "exercise",
+            "toolkit",
+            "jump bag",
+            "contact list",
+            "war room",
+            "communication plan",
+            "resource",
         ],
         "Detection": [
-            "detection", "detect", "detecting", "identified",
-            "indicator", "precursor", "sign", "symptom",
-            "monitoring", "alerting", "ids", "intrusion detection",
-            "anomaly", "signature", "log analysis", "correlation",
-            "siem", "sensor", "network monitoring",
+            "detection",
+            "detect",
+            "detecting",
+            "identified",
+            "indicator",
+            "precursor",
+            "sign",
+            "symptom",
+            "monitoring",
+            "alerting",
+            "ids",
+            "intrusion detection",
+            "anomaly",
+            "signature",
+            "log analysis",
+            "correlation",
+            "siem",
+            "sensor",
+            "network monitoring",
         ],
         "Analysis": [
-            "analysis", "analyze", "analyzing", "triage",
-            "investigate", "investigation", "priorit", "severity",
-            "categoriz", "classify", "validation", "verify",
-            "false positive", "incident category", "functional impact",
-            "information impact", "recoverability",
+            "analysis",
+            "analyze",
+            "analyzing",
+            "triage",
+            "investigate",
+            "investigation",
+            "priorit",
+            "severity",
+            "categoriz",
+            "classify",
+            "validation",
+            "verify",
+            "false positive",
+            "incident category",
+            "functional impact",
+            "information impact",
+            "recoverability",
         ],
         "Containment": [
-            "containment", "contain", "containing", "isolat",
-            "quarantin", "sandbox", "segmentation", "block",
-            "disconnect", "short-term containment", "long-term containment",
-            "network isolation", "disable account",
+            "containment",
+            "contain",
+            "containing",
+            "isolat",
+            "quarantin",
+            "sandbox",
+            "segmentation",
+            "block",
+            "disconnect",
+            "short-term containment",
+            "long-term containment",
+            "network isolation",
+            "disable account",
         ],
         "Eradication": [
-            "eradication", "eradicat", "eliminat", "remov",
-            "clean", "disinfect", "patch", "remediat",
-            "vulnerability", "root cause", "malware removal",
-            "reimag", "rebuild",
+            "eradication",
+            "eradicat",
+            "eliminat",
+            "remov",
+            "clean",
+            "disinfect",
+            "patch",
+            "remediat",
+            "vulnerability",
+            "root cause",
+            "malware removal",
+            "reimag",
+            "rebuild",
         ],
         "Recovery": [
-            "recovery", "recover", "restoring", "restored",
-            "rebuild", "reconstitut", "backup", "business continuity",
-            "return to normal", "service restoration",
-            "validation testing", "monitoring after",
+            "recovery",
+            "recover",
+            "restoring",
+            "restored",
+            "rebuild",
+            "reconstitut",
+            "backup",
+            "business continuity",
+            "return to normal",
+            "service restoration",
+            "validation testing",
+            "monitoring after",
         ],
         "Post-Incident": [
-            "post-incident", "lessons learned", "after action",
-            "retrospective", "improvement", "metrics",
-            "incident cost", "follow-up", "report",
-            "what happened", "what could be improved",
-            "retention", "evidence retention",
+            "post-incident",
+            "lessons learned",
+            "after action",
+            "retrospective",
+            "improvement",
+            "metrics",
+            "incident cost",
+            "follow-up",
+            "report",
+            "what happened",
+            "what could be improved",
+            "retention",
+            "evidence retention",
         ],
     }
 
@@ -308,9 +373,9 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
       - Tệp siêu dữ liệu JSON: {index_name}_metadata.json
     """
     try:
-        from sentence_transformers import SentenceTransformer  # type: ignore
         import faiss  # type: ignore
         from rank_bm25 import BM25Okapi  # type: ignore
+        from sentence_transformers import SentenceTransformer  # type: ignore
     except ImportError as e:
         logger.error(
             f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu rank_bm25"
@@ -324,9 +389,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
     # 1. Build Dense Index (FAISS - Tìm kiếm vector ngữ nghĩa)
     texts = [chunk["text"] for chunk in chunks]
-    logger.info(
-        f"Building Dense Embeddings ({len(texts)} chunks) for [{index_name}]..."
-    )
+    logger.info(f"Building Dense Embeddings ({len(texts)} chunks) for [{index_name}]...")
 
     embeddings = model.encode(texts, show_progress_bar=True, normalize_embeddings=True)
     embeddings = np.array(embeddings, dtype="float32")
@@ -355,9 +418,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
     # Lưu siêu dữ liệu metadata (ánh xạ vị trí → thông tin chunk)
     metadata = []
     for i, chunk in enumerate(chunks):
-        metadata.append(
-            {"index_position": i, "text": chunk["text"], **chunk["metadata"]}
-        )
+        metadata.append({"index_position": i, "text": chunk["text"], **chunk["metadata"]})
 
     metadata_path = os.path.join(INDEX_DIR, f"{index_name}_metadata.json")
     with open(metadata_path, "w", encoding="utf-8") as f:
@@ -370,18 +431,24 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 def update_checksums_file():
     """Tự động tính toán lại SHA-256 cho toàn bộ tệp KB và index, ghi đè checksums.sha256."""
     import hashlib
-    
+
     files_to_hash = [
         ("mitre_attack.json", MITRE_JSON),
         ("nist_800_61r2.json", NIST_JSON),
         ("faiss_index/mitre_attack.index", os.path.join(INDEX_DIR, "mitre_attack.index")),
         ("faiss_index/mitre_attack_bm25.pkl", os.path.join(INDEX_DIR, "mitre_attack_bm25.pkl")),
-        ("faiss_index/mitre_attack_metadata.json", os.path.join(INDEX_DIR, "mitre_attack_metadata.json")),
+        (
+            "faiss_index/mitre_attack_metadata.json",
+            os.path.join(INDEX_DIR, "mitre_attack_metadata.json"),
+        ),
         ("faiss_index/nist_800_61r2.index", os.path.join(INDEX_DIR, "nist_800_61r2.index")),
         ("faiss_index/nist_800_61r2_bm25.pkl", os.path.join(INDEX_DIR, "nist_800_61r2_bm25.pkl")),
-        ("faiss_index/nist_800_61r2_metadata.json", os.path.join(INDEX_DIR, "nist_800_61r2_metadata.json")),
+        (
+            "faiss_index/nist_800_61r2_metadata.json",
+            os.path.join(INDEX_DIR, "nist_800_61r2_metadata.json"),
+        ),
     ]
-    
+
     checksum_lines = []
     for rel_name, abs_path in files_to_hash:
         if os.path.exists(abs_path):
@@ -393,7 +460,7 @@ def update_checksums_file():
                         break
                     sha256.update(chunk)
             checksum_lines.append(f"{sha256.hexdigest()}  {rel_name}")
-            
+
     checksums_path = os.path.join(KB_DIR, "checksums.sha256")
     with open(checksums_path, "w", encoding="utf-8") as f:
         f.write("\n".join(checksum_lines) + "\n")
@@ -403,6 +470,7 @@ def update_checksums_file():
 def build_all_indexes():
     """Build cả 2 FAISS indexes: MITRE ATT&CK + NIST SP 800-61r2."""
     from src.rag.security import verify_document_integrity
+
     integrity_result = verify_document_integrity(exclude_generated=True)
     if not integrity_result["verified"]:
         logger.critical(f"KB integrity check FAILED: {integrity_result['details']}")

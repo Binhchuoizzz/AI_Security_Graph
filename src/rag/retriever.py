@@ -15,21 +15,19 @@ CÁCH DÙNG:
 """
 
 import json
-import os
 import logging
-import numpy as np  # type: ignore
+import os
 import pickle
 import sys
-from typing import Optional
+
+import numpy as np  # type: ignore
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(BASE_DIR)
-from src.rag.security import log_tokenizer
 from src.guardrails import RAGSanitizer
+from src.rag.security import log_tokenizer
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
 # Khai báo đường dẫn
@@ -44,21 +42,24 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 class DualRetriever:
     def __init__(
         self,
-        enabled_sources: Optional[list[str]] = None,
+        enabled_sources: list[str] | None = None,
         top_k: int = DEFAULT_TOP_K,
         use_cache: bool = True,
     ):
         # 1. Xác thực tính toàn vẹn của Knowledge Base trước khi load (Chống RAG Poisoning)
         from src.rag.security import verify_document_integrity
+
         integrity_result = verify_document_integrity()
         if not integrity_result["verified"]:
             logger.critical(f"KB integrity check FAILED: {integrity_result['details']}")
             raise RuntimeError("Knowledge Base integrity violation detected")
 
         try:
-            from sentence_transformers import SentenceTransformer  # type: ignore
             import faiss  # type: ignore
-            from rank_bm25 import BM25Okapi  # type: ignore  # noqa: F401  (kiểm tra dep tồn tại, fail-fast)
+            from rank_bm25 import (
+                BM25Okapi,  # type: ignore  # noqa: F401  (kiểm tra dep tồn tại, fail-fast)
+            )
+            from sentence_transformers import SentenceTransformer  # type: ignore
         except ImportError as e:
             logger.error(f"Missing dependency: {e}")
             raise
@@ -99,9 +100,7 @@ class DualRetriever:
         metadata_path = os.path.join(INDEX_DIR, f"{index_name}_metadata.json")
 
         if not os.path.exists(faiss_path) or not os.path.exists(bm25_path):
-            logger.warning(
-                f"Indexes not found for {source_key}. Run: python -m src.rag.embedder"
-            )
+            logger.warning(f"Indexes not found for {source_key}. Run: python -m src.rag.embedder")
             return
 
         self.faiss_indexes[source_key] = self.faiss.read_index(faiss_path)
@@ -109,16 +108,12 @@ class DualRetriever:
         # Ở đây BM25 index được tạo nội bộ và lưu ở phân vùng chỉ đọc, rủi ro thấp.
         with open(bm25_path, "rb") as f:
             self.bm25_indexes[source_key] = pickle.load(f)  # nosec B301
-        with open(metadata_path, "r", encoding="utf-8") as f:
+        with open(metadata_path, encoding="utf-8") as f:
             self.metadata[source_key] = json.load(f)
 
-        logger.info(
-            f"Loaded {source_key} indexes: {self.faiss_indexes[source_key].ntotal} vectors"
-        )
+        logger.info(f"Loaded {source_key} indexes: {self.faiss_indexes[source_key].ntotal} vectors")
 
-    def _dense_search(
-        self, query_embedding: np.ndarray, source_key: str, fetch_k: int
-    ) -> dict:
+    def _dense_search(self, query_embedding: np.ndarray, source_key: str, fetch_k: int) -> dict:
         """Tìm kiếm ngữ nghĩa với FAISS."""
         index = self.faiss_indexes[source_key]
         scores, indices = index.search(query_embedding, fetch_k)
@@ -130,9 +125,7 @@ class DualRetriever:
             results[idx] = {"score": float(score), "rank": rank + 1}
         return results
 
-    def _sparse_search(
-        self, tokenized_query: list[str], source_key: str, fetch_k: int
-    ) -> dict:
+    def _sparse_search(self, tokenized_query: list[str], source_key: str, fetch_k: int) -> dict:
         """Tìm kiếm khớp từ khóa chính xác bằng BM25."""
         bm25 = self.bm25_indexes[source_key]
         scores = bm25.get_scores(tokenized_query)
@@ -158,9 +151,9 @@ class DualRetriever:
         fetch_k = min(self.top_k * 3, total_docs)
 
         # 1. Tìm kiếm Vector Ngữ nghĩa (Dense Search)
-        query_embedding = self.model.encode(
-            [query_text], normalize_embeddings=True
-        ).astype("float32")
+        query_embedding = self.model.encode([query_text], normalize_embeddings=True).astype(
+            "float32"
+        )
         dense_results = self._dense_search(query_embedding, source_key, fetch_k)
 
         # 2. Tìm kiếm Từ khóa Chính xác (Sparse Search)
@@ -187,9 +180,7 @@ class DualRetriever:
             rrf_scores[idx] = rrf_score
 
         # Sắp xếp kết quả theo điểm RRF giảm dần
-        sorted_indices = sorted(
-            rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True
-        )
+        sorted_indices = sorted(rrf_scores.keys(), key=lambda x: rrf_scores[x], reverse=True)
 
         candidates = []
         for idx in sorted_indices:
@@ -202,6 +193,7 @@ class DualRetriever:
 
             # Gắn nhãn provenance xác thực nguồn gốc tài liệu
             from src.rag.security import add_provenance
+
             provenance_file = "mitre_attack.json" if source_key == "mitre" else "nist_800_61r2.json"
             provenance_text = add_provenance(safe_text, provenance_file, idx)
 
@@ -228,8 +220,7 @@ class DualRetriever:
                 result["cache_hit"] = True
                 # Tạo dựng lại combined_prompt từ các context đã được làm sạch
                 result["combined_prompt"] = self._build_combined_prompt(
-                    result.get("mitre_context", ""),
-                    result.get("nist_context", "")
+                    result.get("mitre_context", ""), result.get("nist_context", "")
                 )
                 return result
 
@@ -299,9 +290,9 @@ if __name__ == "__main__":
     ]
 
     for query in test_queries:
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"QUERY: {query}")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         result = retriever.retrieve(query)
 
         print(f"\n--- MITRE Results ({len(result['mitre_results'])}) ---")

@@ -2,10 +2,10 @@
 Guardrails: Data Validator
 """
 
-import logging
 import ipaddress
-from typing import Optional, List
-from src.guardrails.constants import normalize_log_keys, KEY_ALIASES
+import logging
+
+from src.guardrails.constants import KEY_ALIASES, normalize_log_keys
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class DataValidator:
     Kiểm tra tính toàn vẹn dữ liệu trước khi đưa vào pipeline LangGraph.
     """
 
-    def __init__(self, required_fields: Optional[list] = None):
+    def __init__(self, required_fields: list | None = None):
         fields = required_fields or REQUIRED_FIELDS
         # Normalize the required fields list using canonical mapping
         self.required_fields = []
@@ -71,13 +71,21 @@ class DataValidator:
                     errors.append(f"Invalid IP address format in '{ip_field}': {ip_str}")
 
         # 6. Xác thực dải Port cụ thể (Port range validation [0, 65535])
-        if "Destination Port" in clean_log and clean_log["Destination Port"] != "" and isinstance(clean_log["Destination Port"], int):
+        if (
+            "Destination Port" in clean_log
+            and clean_log["Destination Port"] != ""
+            and isinstance(clean_log["Destination Port"], int)
+        ):
             port = clean_log["Destination Port"]
             if not (0 <= port <= 65535):
                 errors.append(f"Destination Port {port} is out of bounds [0, 65535]")
 
         # 7. Xác thực dải Protocol cụ thể (Protocol validation [0, 255])
-        if "Protocol" in clean_log and clean_log["Protocol"] != "" and isinstance(clean_log["Protocol"], int):
+        if (
+            "Protocol" in clean_log
+            and clean_log["Protocol"] != ""
+            and isinstance(clean_log["Protocol"], int)
+        ):
             proto = clean_log["Protocol"]
             if not (0 <= proto <= 255):
                 errors.append(f"Protocol {proto} is out of bounds [0, 255]")
@@ -87,7 +95,9 @@ class DataValidator:
 
         return clean_log
 
-    def validate_batch(self, batch: List[dict], filter_invalid: bool = False, raise_on_error: bool = False) -> List[dict]:
+    def validate_batch(
+        self, batch: list[dict], filter_invalid: bool = False, raise_on_error: bool = False
+    ) -> list[dict]:
         """
         Xác thực lô dữ liệu log (batch).
         """
@@ -99,10 +109,10 @@ class DataValidator:
                 if raise_on_error:
                     raise ValueError(msg)
                 logger.warning(msg)
-                
+
                 if filter_invalid:
                     continue
-            
+
             validated_batch.append(validated_log)
-            
+
         return validated_batch

@@ -10,25 +10,24 @@ Vai trò trong bộ BA PUBLISHER (không trùng nhau):
   - experiments/stream_unified_online.py: phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
     metadata APT (demo end-to-end APT emergent — khuyến nghị cho demo luồng gộp).
 """
-import redis  # type: ignore
-import json
-import time
-import os
+
 import hashlib
+import json
+import os
 import random
+import time
+
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
-from dotenv import load_dotenv  # type: ignore
-
+import redis  # type: ignore
 import yaml  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
-)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 try:
-    with open(CONFIG_PATH, "r") as f:
+    with open(CONFIG_PATH) as f:
         _config = yaml.safe_load(f)
 except Exception:
     _config = {}
@@ -102,7 +101,7 @@ def stream_logs_to_redis(csv_path: str):
     Mô phỏng đường ống kỹ thuật dữ liệu (Streaming Ingestion):
     Đọc log tấn công từ tệp CSV và đẩy liên tục vào Redis Stream (dùng xadd).
     Sử dụng mô hình nhóm tiêu thụ (xreadgroup ở phía subscriber) để đảm bảo phân phối log ít nhất một lần.
-    
+
     Bao gồm kiểm soát nghẽn (backpressure) và giới hạn băng thông ở mức batch để tránh crash do Redis OOM.
     """
     print(f"[*] Connecting to Redis: {REDIS_URL}")
@@ -119,10 +118,8 @@ def stream_logs_to_redis(csv_path: str):
         print("    Please place a sample CSV file in this directory.")
         return
 
-    print(
-        f"[*] Ingesting logs from {csv_path} in batches with {BATCH_DELAY_SECONDS}s delay..."
-    )
-    
+    print(f"[*] Ingesting logs from {csv_path} in batches with {BATCH_DELAY_SECONDS}s delay...")
+
     total_published = 0
     try:
         # chunksize=500 là tối ưu để cân bằng giữa hiệu suất và chi phí bộ nhớ
@@ -142,9 +139,7 @@ def stream_logs_to_redis(csv_path: str):
                 log_entry = row.to_dict()
 
                 # Làm sạch các giá trị không hợp lệ (NaN -> 0, Inf -> 0.0, -1 -> 0)
-                clean_entry = {
-                    k: _clean_val(v) for k, v in log_entry.items()
-                }
+                clean_entry = {k: _clean_val(v) for k, v in log_entry.items()}
 
                 # Chuẩn hóa các trường khóa về định dạng tiêu chuẩn (tiêu đề CIC-IDS2018)
                 normalized_entry = {}
@@ -160,11 +155,18 @@ def stream_logs_to_redis(csv_path: str):
                 normalized_entry["dataset_source"] = os.path.basename(csv_path)
 
                 # Đẩy vào Redis Stream (giới hạn maxlen bằng approximate=True để tăng hiệu năng)
-                r.xadd(QUEUE_NAME, {"log": json.dumps(normalized_entry)}, maxlen=MAX_QUEUE_SIZE, approximate=True)
+                r.xadd(
+                    QUEUE_NAME,
+                    {"log": json.dumps(normalized_entry)},
+                    maxlen=MAX_QUEUE_SIZE,
+                    approximate=True,
+                )
                 total_published += 1
 
-            print(f"[>] Published chunk {chunk_idx + 1} (Total logs sent: {total_published}) -> Stream: {QUEUE_NAME}")
-            
+            print(
+                f"[>] Published chunk {chunk_idx + 1} (Total logs sent: {total_published}) -> Stream: {QUEUE_NAME}"
+            )
+
             # Giới hạn tốc độ nạp trên mỗi chunk (không phải từng dòng) để tránh nghẽn
             time.sleep(BATCH_DELAY_SECONDS)
 

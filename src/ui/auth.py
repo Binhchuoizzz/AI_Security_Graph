@@ -12,14 +12,21 @@ THIẾT KẾ BẢO MẬT:
   - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ.
 """
 
-import streamlit as st  # type: ignore
 import hashlib
+import hmac
 import logging
 import os
-import time
 import re
-import hmac
-from src.response.executor import get_login_attempts, increment_login_attempts, reset_login_attempts, lock_user
+import time
+
+import streamlit as st  # type: ignore
+
+from src.response.executor import (
+    get_login_attempts,
+    increment_login_attempts,
+    lock_user,
+    reset_login_attempts,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,14 +36,11 @@ _DEFAULT_DEMO_SALT = "sentinel_security_2026_default_salt"
 SALT = os.getenv("SENTINEL_AUTH_SALT", _DEFAULT_DEMO_SALT).encode()
 ITERATIONS = 100000
 
+
 def hash_password(password: str) -> str:
     """Băm mật khẩu dùng PBKDF2 để chống tấn công Brute-force/Bẻ khóa bằng GPU."""
-    return hashlib.pbkdf2_hmac(
-        'sha256',
-        password.encode(),
-        SALT,
-        ITERATIONS
-    ).hex()
+    return hashlib.pbkdf2_hmac("sha256", password.encode(), SALT, ITERATIONS).hex()
+
 
 # HASH DEMO TÍNH SẴN (PBKDF2-HMAC-SHA256, salt demo mặc định, 100k vòng).
 # KHÔNG còn plaintext password trong source. Mật khẩu rõ của bộ demo được tài liệu
@@ -57,9 +61,11 @@ USERS = {
 
 # Fail-loud: nếu đang chạy bằng HASH/SALT demo (chưa cấu hình env) -> cảnh báo để
 # người triển khai biết KHÔNG được dùng cấu hình này cho môi trường thật.
-if (SALT == _DEFAULT_DEMO_SALT.encode()
-        or USERS["analyst"]["password_hash"] == _DEFAULT_ANALYST_HASH
-        or USERS["manager"]["password_hash"] == _DEFAULT_MANAGER_HASH):
+if (
+    SALT == _DEFAULT_DEMO_SALT.encode()
+    or USERS["analyst"]["password_hash"] == _DEFAULT_ANALYST_HASH
+    or USERS["manager"]["password_hash"] == _DEFAULT_MANAGER_HASH
+):
     logger.warning(
         "[AUTH] Đang dùng thông tin đăng nhập DEMO mặc định. Production PHẢI đặt "
         "SENTINEL_AUTH_SALT + SENTINEL_ANALYST_HASH + SENTINEL_MANAGER_HASH."
@@ -73,13 +79,13 @@ LOCKOUT_SECONDS = 60
 def login_screen():
     """Hiển thị màn hình đăng nhập chuyên nghiệp (không lộ thông tin đăng nhập)."""
     st.title("🛡️ SENTINEL - Trung tâm Giám sát An ninh SOC")
-    st.caption("Chỉ dành cho nhân viên SOC được ủy quyền. Mọi hoạt động truy cập đều được ghi nhật ký và giám sát.")
+    st.caption(
+        "Chỉ dành cho nhân viên SOC được ủy quyền. Mọi hoạt động truy cập đều được ghi nhật ký và giám sát."
+    )
 
     with st.form("login_form"):
         username = st.text_input("Tên đăng nhập", placeholder="Nhập tài khoản SOC của bạn")
-        password = st.text_input(
-            "Mật khẩu", type="password", placeholder="Nhập mật khẩu của bạn"
-        )
+        password = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu của bạn")
         submit = st.form_submit_button("Đăng nhập")
 
         if submit:
@@ -127,7 +133,6 @@ def login_screen():
                     st.error(
                         f"Thông tin đăng nhập không chính xác. Còn lại {remaining_attempts} lần thử."
                     )
-
 
 
 def _constant_time_compare(a: str, b: str) -> bool:

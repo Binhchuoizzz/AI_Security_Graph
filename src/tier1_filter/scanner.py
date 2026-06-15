@@ -3,7 +3,7 @@ DevSecOps SCA Scanner Utility
 
 Module này thực hiện quét lỗ hổng tĩnh (Software Composition Analysis - SCA)
 trên mã nguồn và các dependencies phụ thuộc của chính hệ thống (ví dụ: requirements.txt)
-bằng công cụ Trivy. 
+bằng công cụ Trivy.
 
 LƯU Ý: Đây KHÔNG PHẢI là module sinh log quét mạng giả lập hay tương tác
 trực tiếp với runtime pipeline của SENTINEL. Mục đích của module này là:
@@ -12,47 +12,57 @@ trực tiếp với runtime pipeline của SENTINEL. Mục đích của module n
   3. Cung cấp tri thức bảo mật tĩnh để nạp vào Knowledge Graph (Neo4j).
 """
 
-import subprocess
 import json
-import os
 import logging
+import os
+import subprocess
 
 logger = logging.getLogger(__name__)
 
+
 class VulnerabilityScanner:
     """Lớp bọc (wrapper) cho bộ quét lỗ hổng Trivy."""
-    
+
     def __init__(self, target_dir="/app", output_file="data/trivy-results.json"):
         self.target_dir = target_dir
         self.output_file = output_file
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
-        
+
     def run_scan(self):
         """Chạy quét Trivy trên thư mục đích."""
         logger.info(f"Running Trivy scan on {self.target_dir}...")
-        
+
         try:
             # Kiểm tra xem trivy đã được cài đặt chưa
-            subprocess.run(["trivy", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            subprocess.run(
+                ["trivy", "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
+            )
         except (subprocess.CalledProcessError, FileNotFoundError):
             logger.warning("Trivy is not installed or not in PATH. Skipping actual scan.")
             self._generate_mock_results()
             return self.output_file
-            
+
         try:
             # Chạy quét thực tế
             cmd = [
-                "trivy", "fs", self.target_dir, 
-                "--format", "json", 
-                "--output", self.output_file,
-                "--scanners", "vuln",
-                "--skip-dirs", "data",
-                "--skip-dirs", "knowledge_base"
+                "trivy",
+                "fs",
+                self.target_dir,
+                "--format",
+                "json",
+                "--output",
+                self.output_file,
+                "--scanners",
+                "vuln",
+                "--skip-dirs",
+                "data",
+                "--skip-dirs",
+                "knowledge_base",
             ]
             subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             logger.info(f"Trivy scan completed. Results saved to {self.output_file}")
             return self.output_file
-            
+
         except subprocess.CalledProcessError as e:
             logger.error(f"Trivy scan failed: {e.stderr.decode('utf-8')}")
             # Chuyển sang kết quả giả lập nếu có lỗi để giữ pipeline hoạt động
@@ -72,9 +82,9 @@ class VulnerabilityScanner:
                             "InstalledVersion": "1.0.0",
                             "Severity": "HIGH",
                             "Description": "Mock vulnerability for testing.",
-                            "FixedVersion": "1.0.1"
+                            "FixedVersion": "1.0.1",
                         }
-                    ]
+                    ],
                 }
             ]
         }

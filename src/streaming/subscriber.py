@@ -14,29 +14,27 @@ dần vào Threat Memory; khi tích lũy đủ đa-ngày, `check_apt_chain` BẬ
 chuỗi APT lên Agent. Traffic thường không có metadata APT nên đường production không đổi.
 """
 
+import json
 import os
 import sys
-import json
 import time
 from typing import Any, cast
-import redis  # type: ignore
-from dotenv import load_dotenv  # type: ignore
 
+import redis  # type: ignore
 import yaml  # type: ignore
+from dotenv import load_dotenv  # type: ignore
 
 load_dotenv()
 
 # Khắc phục lỗi ModuleNotFound khi chạy trực tiếp file trong python
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from src.tier1_filter.rule_engine import RuleEngine
 from src.agent.threat_memory import ThreatMemoryStore
+from src.tier1_filter.rule_engine import RuleEngine
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
-)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 try:
-    with open(CONFIG_PATH, "r") as f:
+    with open(CONFIG_PATH) as f:
         _config = yaml.safe_load(f)
 except Exception:
     _config = {}
@@ -52,12 +50,24 @@ ESCALATED_QUEUE = _config.get("redis", {}).get("escalated_queue", "queue_hitl")
 # leakage) làm mất giá trị demo online. GIỮ `gt_id` (định danh mờ, phục vụ đối
 # chiếu hậu kiểm) và các trường tier1_*/apt_emergent/apt_phases (enrichment do
 # HỆ THỐNG tự suy ra — tương đương SIEM context thật, không phải đáp án).
-_DATASET_LABEL_KEYS = frozenset({
-    "gt_cicids_label", "gt_expected_action", "gt_expected_severity", "gt_expected_mitre",
-    "gt_label", "expected_threat",
-    "apt_phase", "apt_day", "apt_label", "apt_timestamp", "apt_is_attack",
-    "zd_id", "zd_name", "zd_mitre",
-})
+_DATASET_LABEL_KEYS = frozenset(
+    {
+        "gt_cicids_label",
+        "gt_expected_action",
+        "gt_expected_severity",
+        "gt_expected_mitre",
+        "gt_label",
+        "expected_threat",
+        "apt_phase",
+        "apt_day",
+        "apt_label",
+        "apt_timestamp",
+        "apt_is_attack",
+        "zd_id",
+        "zd_name",
+        "zd_mitre",
+    }
+)
 
 
 def _strip_dataset_labels(log: dict) -> dict:
@@ -106,7 +116,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     # mang metadata DAPT, ví dụ stream_unified_online.py). Traffic thường không có
     # apt_phase nên đường production không bị ảnh hưởng.
     memory = ThreatMemoryStore()
-    apt_fired: set[str] = set()   # IP đã bật cảnh báo APT (tránh leo thang lặp)
+    apt_fired: set[str] = set()  # IP đã bật cảnh báo APT (tránh leo thang lặp)
 
     # Bộ đệm gom sự cố (Incident-Level Aggregation Buffers)
     batch_buffer = []
@@ -118,7 +128,9 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     # Counter THẬT cho Dashboard (chống "ước lượng ×35"): ghi ra file chia sẻ qua volume
     # config/ — container Dashboard đọc TIN CẬY (Redis chỉ reach được từ host). Tích lũy
     # qua nhiều lần chạy: nạp lại file cũ khi khởi động.
-    _stats_path = os.path.join(os.path.dirname(__file__), "..", "..", "config", "pipeline_stats.json")
+    _stats_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "config", "pipeline_stats.json"
+    )
     try:
         with open(_stats_path) as _sf:
             _s = json.load(_sf)
@@ -131,8 +143,10 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         try:
             _tmp = _stats_path + ".tmp"
             with open(_tmp, "w") as _f:
-                json.dump({"raw_logs_total": raw_logs_total,
-                           "tier1_dropped_total": tier1_dropped_total}, _f)
+                json.dump(
+                    {"raw_logs_total": raw_logs_total, "tier1_dropped_total": tier1_dropped_total},
+                    _f,
+                )
             os.replace(_tmp, _stats_path)
         except Exception:
             pass
@@ -142,7 +156,10 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             # XREADGROUP lắng nghe trên nhiều stream cùng lúc.
             # Trả về: [[stream_name, [(msg_id, {field: value}), ...]], ...]
             # Tối ưu hóa throughput bằng cách lấy `count=batch_size` thay vì 1
-            response = cast(Any, r.xreadgroup(GROUP_NAME, CONSUMER_NAME, streams_dict, count=batch_size, block=1000))
+            response = cast(
+                Any,
+                r.xreadgroup(GROUP_NAME, CONSUMER_NAME, streams_dict, count=batch_size, block=1000),
+            )
             if response:
                 for stream_name, messages in response:
                     for msg_id, data in messages:
@@ -179,17 +196,25 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                                     timestamp=raw_log.get("apt_timestamp", ""),
                                 )
                                 after = memory.check_apt_chain(apt_ip)
-                                if (not before["is_apt"]) and after["is_apt"] and apt_ip not in apt_fired:
+                                if (
+                                    (not before["is_apt"])
+                                    and after["is_apt"]
+                                    and apt_ip not in apt_fired
+                                ):
                                     apt_fired.add(apt_ip)
                                     evaluated_log["apt_emergent"] = True
                                     evaluated_log["apt_phases"] = after.get("phases_seen", "")
                                     evaluated_log["tier1_reasons"] = (
                                         evaluated_log.get("tier1_reasons") or []
-                                    ) + [f"APT chain emergent: {after.get('chain_length')} ngày "
-                                         f"(phases={after.get('phases_seen')})"]
-                                    print(f"[APT] EMERGENT chain {apt_ip} @ ngày "
-                                          f"{after.get('max_day_seen')} -> ESCALATE lên Agent")
-                                    action = "ESCALATE"   # đẩy APT qua full pipeline (LLM)
+                                    ) + [
+                                        f"APT chain emergent: {after.get('chain_length')} ngày "
+                                        f"(phases={after.get('phases_seen')})"
+                                    ]
+                                    print(
+                                        f"[APT] EMERGENT chain {apt_ip} @ ngày "
+                                        f"{after.get('max_day_seen')} -> ESCALATE lên Agent"
+                                    )
+                                    action = "ESCALATE"  # đẩy APT qua full pipeline (LLM)
 
                         # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
                         if action == "ESCALATE":
@@ -207,7 +232,9 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
 
                         elif action == "BLOCK_IP":
                             # Đẩy IP vào blacklist của Redis với TTL 1 giờ
-                            src_ip = evaluated_log.get("Source IP") or evaluated_log.get("src_ip", "")
+                            src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                "src_ip", ""
+                            )
                             if src_ip:
                                 print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
                                 r.setex(f"blacklist:{src_ip}", 3600, "1")
@@ -227,19 +254,18 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             # Kiểm tra xem có cần trigger batch không
             current_time = time.time()
             if batch_buffer and (
-                len(batch_buffer) >= batch_size
-                or (current_time - last_batch_time) > timeout_sec
+                len(batch_buffer) >= batch_size or (current_time - last_batch_time) > timeout_sec
             ):
                 if on_batch_ready:
-                    print(
-                        f"[*] Triggering Agent Workflow for batch of {len(batch_buffer)} logs..."
-                    )
+                    print(f"[*] Triggering Agent Workflow for batch of {len(batch_buffer)} logs...")
                     on_batch_ready(batch_buffer)
                 else:
                     # Chế độ độc lập (standalone mode) — ghi log ra màn hình (console)
                     for log in batch_buffer:
-                        print(f"[ESCALATE] gt_id={log.get('gt_id')} "
-                               f"ip={log.get('Source IP')} score={log.get('tier1_score')}")
+                        print(
+                            f"[ESCALATE] gt_id={log.get('gt_id')} "
+                            f"ip={log.get('Source IP')} score={log.get('tier1_score')}"
+                        )
                 batch_buffer = []
                 last_batch_time = current_time
             elif not batch_buffer:

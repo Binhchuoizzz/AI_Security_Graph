@@ -2,10 +2,16 @@
 Guardrails: RAG Poisoning Sanitizer (Structural Sanitization & Instruction Neutralization)
 """
 
-import re
 import logging
+import re
 import unicodedata
-from src.guardrails.prompt_filter import load_config, HTMLTagStripper, strip_html_tags_fallback, strip_dangerous_tags_recursive
+
+from src.guardrails.prompt_filter import (
+    HTMLTagStripper,
+    load_config,
+    strip_dangerous_tags_recursive,
+    strip_html_tags_fallback,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,21 +27,15 @@ class RAGSanitizer:
 
     def __init__(self):
         config = load_config()
-        self.injection_patterns = config.get(
-            "guardrails", {}
-        ).get("injection_patterns", [])
-        self.jailbreak_patterns = config.get(
-            "guardrails", {}
-        ).get("jailbreak_patterns", [])
+        self.injection_patterns = config.get("guardrails", {}).get("injection_patterns", [])
+        self.jailbreak_patterns = config.get("guardrails", {}).get("jailbreak_patterns", [])
 
         # Tạo regex để bắt các pattern không phân biệt hoa thường
         self.injection_res = [
-            re.compile(re.escape(p), re.IGNORECASE)
-            for p in self.injection_patterns
+            re.compile(re.escape(p), re.IGNORECASE) for p in self.injection_patterns
         ]
         self.jailbreak_res = [
-            re.compile(re.escape(p), re.IGNORECASE)
-            for p in self.jailbreak_patterns
+            re.compile(re.escape(p), re.IGNORECASE) for p in self.jailbreak_patterns
         ]
 
     @staticmethod
@@ -68,17 +68,9 @@ class RAGSanitizer:
             clean = strip_html_tags_fallback(clean)
 
         # 4. Làm sạch Markdown images và links
+        clean = re.sub(r"!\[[^\]]*\]\s*\([^\)]+\)", "[IMG_STRIPPED]", clean, flags=re.IGNORECASE)
         clean = re.sub(
-            r"!\[[^\]]*\]\s*\([^\)]+\)",
-            "[IMG_STRIPPED]",
-            clean,
-            flags=re.IGNORECASE
-        )
-        clean = re.sub(
-            r"\[[^\]]*\]\s*\(https?://[^\)]+\)",
-            "[LINK_STRIPPED]",
-            clean,
-            flags=re.IGNORECASE
+            r"\[[^\]]*\]\s*\(https?://[^\)]+\)", "[LINK_STRIPPED]", clean, flags=re.IGNORECASE
         )
 
         # 5. Truncate (chặn buffer overflow / context window exhaustion)
@@ -102,25 +94,19 @@ class RAGSanitizer:
 
         # 2. Phát hiện và trung hòa Prompt Injection patterns
         for pattern_re in self.injection_res:
-            new_clean = pattern_re.sub(
-                "[POISONOUS_INSTRUCTION_NEUTRALIZED]", clean
-            )
+            new_clean = pattern_re.sub("[POISONOUS_INSTRUCTION_NEUTRALIZED]", clean)
             if new_clean != clean:
                 logger.warning(
-                    f"[RAG SANITIZER] Injection pattern neutralized: "
-                    f"{pattern_re.pattern}"
+                    f"[RAG SANITIZER] Injection pattern neutralized: {pattern_re.pattern}"
                 )
             clean = new_clean
 
         # 3. Phát hiện và trung hòa Jailbreak patterns
         for pattern_re in self.jailbreak_res:
-            new_clean = pattern_re.sub(
-                "[POISONOUS_JAILBREAK_NEUTRALIZED]", clean
-            )
+            new_clean = pattern_re.sub("[POISONOUS_JAILBREAK_NEUTRALIZED]", clean)
             if new_clean != clean:
                 logger.warning(
-                    f"[RAG SANITIZER] Jailbreak pattern neutralized: "
-                    f"{pattern_re.pattern}"
+                    f"[RAG SANITIZER] Jailbreak pattern neutralized: {pattern_re.pattern}"
                 )
             clean = new_clean
 
@@ -137,40 +123,25 @@ class RAGSanitizer:
         sanitized = dict(entry)
 
         # 1. Làm sạch các kết quả thô trong lists
-        if (
-            "mitre_results" in sanitized
-            and isinstance(sanitized["mitre_results"], list)
-        ):
+        if "mitre_results" in sanitized and isinstance(sanitized["mitre_results"], list):
             sanitized["mitre_results"] = [
                 {**r, "text": self.sanitize_retrieve(r.get("text", ""))}
-                if isinstance(r, dict) else r
+                if isinstance(r, dict)
+                else r
                 for r in sanitized["mitre_results"]
             ]
-        if (
-            "nist_results" in sanitized
-            and isinstance(sanitized["nist_results"], list)
-        ):
+        if "nist_results" in sanitized and isinstance(sanitized["nist_results"], list):
             sanitized["nist_results"] = [
                 {**r, "text": self.sanitize_retrieve(r.get("text", ""))}
-                if isinstance(r, dict) else r
+                if isinstance(r, dict)
+                else r
                 for r in sanitized["nist_results"]
             ]
 
         # 2. Làm sạch context văn bản
-        if (
-            "mitre_context" in sanitized
-            and isinstance(sanitized["mitre_context"], str)
-        ):
-            sanitized["mitre_context"] = self.sanitize_retrieve(
-                sanitized["mitre_context"]
-            )
-        if (
-            "nist_context" in sanitized
-            and isinstance(sanitized["nist_context"], str)
-        ):
-            sanitized["nist_context"] = self.sanitize_retrieve(
-                sanitized["nist_context"]
-            )
+        if "mitre_context" in sanitized and isinstance(sanitized["mitre_context"], str):
+            sanitized["mitre_context"] = self.sanitize_retrieve(sanitized["mitre_context"])
+        if "nist_context" in sanitized and isinstance(sanitized["nist_context"], str):
+            sanitized["nist_context"] = self.sanitize_retrieve(sanitized["nist_context"])
 
         return sanitized
-

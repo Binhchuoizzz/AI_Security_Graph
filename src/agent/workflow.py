@@ -5,20 +5,20 @@ Lắp ráp các Node thành một quy trình (Workflow) khép kín.
 """
 
 try:
-    from langgraph.graph import StateGraph, END  # type: ignore
+    from langgraph.graph import END, StateGraph  # type: ignore
     from langgraph.graph.state import CompiledStateGraph  # type: ignore
 except ImportError:
     raise ImportError("Missing dependency: pip install langgraph")
 
-from src.agent.state import SentinelState
 from src.agent.nodes import (
-    node_guardrails,
-    node_rag_context,
-    node_llm_triage,
     node_action_executor,
+    node_guardrails,
     node_human_in_the_loop,
+    node_llm_triage,
+    node_rag_context,
     route_triage_decision,
 )
+from src.agent.state import SentinelState
 
 
 def create_agent_workflow() -> CompiledStateGraph:

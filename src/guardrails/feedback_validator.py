@@ -2,12 +2,12 @@
 Guardrails: Configurable Feedback Loop Validator (Zero-Trust Rules & IP Checks)
 """
 
-import re
-import logging
 import ipaddress
-from typing import Tuple, List
-from src.guardrails.prompt_filter import load_config
+import logging
+import re
+
 from src.guardrails.constants import KEY_ALIASES
+from src.guardrails.prompt_filter import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -22,14 +22,12 @@ class FeedbackValidator:
         config = load_config()
         subnets = config.get("guardrails", {}).get(
             "trusted_internal_subnets",
-            ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+            ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
         )
         self.trusted_subnets = subnets
-        self.allowed_fields = [
-            "Source IP", "Destination Port", "Protocol", "URI", "User-Agent"
-        ]
+        self.allowed_fields = ["Source IP", "Destination Port", "Protocol", "URI", "User-Agent"]
 
-    def validate_rule(self, field: str, pattern: str, score: int) -> Tuple[bool, List[str]]:
+    def validate_rule(self, field: str, pattern: str, score: int) -> tuple[bool, list[str]]:
         """
         Xác thực cấu trúc và logic an toàn của một rule mới.
         Trả về (is_valid, list_of_errors).
@@ -62,8 +60,7 @@ class FeedbackValidator:
             # Chặn hành vi chặn IP hạ tầng quan trọng (Self-DoS prevention)
             if pattern_str in ["127.0.0.1", "::1", "10.0.0.99", "localhost"]:
                 errors.append(
-                    f"Forbidden to create rules affecting critical "
-                    f"infrastructure IP: {pattern_str}"
+                    f"Forbidden to create rules affecting critical infrastructure IP: {pattern_str}"
                 )
             else:
                 try:
@@ -74,8 +71,7 @@ class FeedbackValidator:
                         # Tránh dải quá rộng (bảo vệ zero-trust)
                         if net.prefixlen < 8:
                             errors.append(
-                                f"CIDR prefix /{net.prefixlen} is too broad "
-                                f"(must be >= /8)"
+                                f"CIDR prefix /{net.prefixlen} is too broad (must be >= /8)"
                             )
                     else:
                         ip = ipaddress.ip_address(pattern_str)
@@ -84,10 +80,7 @@ class FeedbackValidator:
                             network = ipaddress.ip_network(subnet_str, strict=False)
                             # Không cho chặn toàn bộ subnet nội bộ
                             if ip == network.network_address:
-                                errors.append(
-                                    f"Forbidden to match network address: "
-                                    f"{pattern_str}"
-                                )
+                                errors.append(f"Forbidden to match network address: {pattern_str}")
                 except ValueError:
                     # Nếu là regex hoặc signature khác, cho phép qua
                     pass
@@ -101,13 +94,11 @@ class FeedbackValidator:
 
         # 5. Kiểm tra Score
         if not (0 <= score <= 100):
-            errors.append(
-                f"Rule score {score} must be clamped between 0 and 100"
-            )
+            errors.append(f"Rule score {score} must be clamped between 0 and 100")
 
         return len(errors) == 0, errors
 
-    def validate_whitelist_ip(self, ip_str: str) -> Tuple[bool, List[str]]:
+    def validate_whitelist_ip(self, ip_str: str) -> tuple[bool, list[str]]:
         """
         Xác thực IP whitelist mới: Chỉ cho phép whitelist
         các dải nội bộ/tin cậy.
@@ -127,17 +118,11 @@ class FeedbackValidator:
                 is_within = False
                 for subnet_str in self.trusted_subnets:
                     network = ipaddress.ip_network(subnet_str, strict=False)
-                    if (
-                        net.network_address in network
-                        and net.broadcast_address in network
-                    ):
+                    if net.network_address in network and net.broadcast_address in network:
                         is_within = True
                         break
                 if not is_within:
-                    errors.append(
-                        f"IP range {ip_str} is outside the trusted "
-                        f"internal subnets"
-                    )
+                    errors.append(f"IP range {ip_str} is outside the trusted internal subnets")
             else:
                 ip = ipaddress.ip_address(ip_str)
                 is_within = False
@@ -147,14 +132,11 @@ class FeedbackValidator:
                         is_within = True
                         break
                 if not is_within:
-                    errors.append(
-                        f"IP {ip_str} is outside the trusted "
-                        f"internal subnets"
-                    )
+                    errors.append(f"IP {ip_str} is outside the trusted internal subnets")
         except ValueError:
             errors.append(f"Invalid IP address or CIDR format: {ip_str}")
 
         return len(errors) == 0, errors
 
-    def get_allowed_fields(self) -> List[str]:
+    def get_allowed_fields(self) -> list[str]:
         return self.allowed_fields

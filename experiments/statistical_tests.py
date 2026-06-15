@@ -1,8 +1,9 @@
 import json
 import os
+
 import numpy as np
 from scipy import stats
-from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 ABLATION_RESULTS_PATH = os.path.join(os.path.dirname(__file__), "results", "ablation_results.json")
 
@@ -49,7 +50,7 @@ def run_tests():
         print(f"[!] Chua chay ablation_study. Khong tim thay {ABLATION_RESULTS_PATH}")
         return
 
-    with open(ABLATION_RESULTS_PATH, "r") as f:
+    with open(ABLATION_RESULTS_PATH) as f:
         data = json.load(f)
 
     y_true = data["Config_A"]["y_true"]
@@ -78,12 +79,10 @@ def run_tests():
     # 2. Kiểm định McNemar cho Accuracy/F1
     p_val_mcnemar = mcnemar_test(y_true, y_pred_A, y_pred_F)
     print("\n--- MCNEMAR'S TEST (Classification Difference) ---")
-    print(f"H0: Hieu nang 2 mo hinh la tuong duong nhau.")
+    print("H0: Hieu nang 2 mo hinh la tuong duong nhau.")
     print(f"P-value: {p_val_mcnemar:.5f}")
     if p_val_mcnemar < 0.05:
-        print(
-            ">> Ket luan: Su khac biet ve hieu nang la CO Y NGHIA THONG KE (p < 0.05)."
-        )
+        print(">> Ket luan: Su khac biet ve hieu nang la CO Y NGHIA THONG KE (p < 0.05).")
     else:
         print(">> Ket luan: Khong du bang chung bac bo H0.")
 
@@ -95,11 +94,9 @@ def run_tests():
     print(f"Config A (Rule-only): Mean = {mean_lat_A:.4f}s")
     print(f"Config F (Full Sent): Mean = {mean_lat_F:.4f}s")
 
-    stat, p_val_mw = stats.mannwhitneyu(
-        latencies_A, latencies_F, alternative="two-sided"
-    )
+    stat, p_val_mw = stats.mannwhitneyu(latencies_A, latencies_F, alternative="two-sided")
     print("\n--- MANN-WHITNEY U TEST (Latency Difference) ---")
-    print(f"H0: Do tre phan phoi tuong dong giua 2 Config.")
+    print("H0: Do tre phan phoi tuong dong giua 2 Config.")
     print(f"P-value: {p_val_mw:.5f}")
     if p_val_mw < 0.05:
         print(">> Ket luan: Su khac biet ve do tre la CO Y NGHIA THONG KE (p < 0.05).")

@@ -2,9 +2,9 @@
 Bộ làm sạch đầu ra (Output Sanitizer): Phòng thủ rò rỉ dữ liệu (Vector tấn công #04)
 """
 
-import re
-import logging
 import base64
+import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -18,29 +18,26 @@ class OutputSanitizer:
     # Patterns nguy hiểm trong output
     DANGEROUS_PATTERNS = [
         # Markdown image (exfil vector chính - hỗ trợ khoảng trắng tùy chọn)
-        (r'!\[[^\]]*\]\s*\([^\)]+\)', '[IMG_STRIPPED]'),
+        (r"!\[[^\]]*\]\s*\([^\)]+\)", "[IMG_STRIPPED]"),
         # Markdown links to external domains (hỗ trợ khoảng trắng tùy chọn)
-        (r'\[[^\]]*\]\s*\(https?://[^\)]+\)', '[LINK_STRIPPED]'),
+        (r"\[[^\]]*\]\s*\(https?://[^\)]+\)", "[LINK_STRIPPED]"),
         # HTML img tags
-        (r'<img[^>]*>', '[IMG_STRIPPED]'),
+        (r"<img[^>]*>", "[IMG_STRIPPED]"),
         # Thẻ HTML anchor
-        (r'<a\s[^>]*>.*?</a>', '[LINK_STRIPPED]'),
+        (r"<a\s[^>]*>.*?</a>", "[LINK_STRIPPED]"),
         # Thẻ HTML iframe (nội dung nhúng)
-        (r'<iframe[^>]*>.*?</iframe>', '[IFRAME_STRIPPED]'),
+        (r"<iframe[^>]*>.*?</iframe>", "[IFRAME_STRIPPED]"),
         # Thẻ HTML script
-        (r'<script[^>]*>.*?</script>', '[SCRIPT_STRIPPED]'),
+        (r"<script[^>]*>.*?</script>", "[SCRIPT_STRIPPED]"),
         # Thẻ HTML object/embed (rò rỉ dựa trên plugin)
-        (r'<object[^>]*>.*?</object>', '[OBJECT_STRIPPED]'),
-        (r'<embed[^>]*/?>', '[EMBED_STRIPPED]'),
+        (r"<object[^>]*>.*?</object>", "[OBJECT_STRIPPED]"),
+        (r"<embed[^>]*/?>", "[EMBED_STRIPPED]"),
         # Định dạng Data URI (có thể mã hóa mã HTML/JS tùy ý)
-        (
-            r'data:[a-zA-Z]+/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]+',
-            '[DATA_URI_STRIPPED]'
-        ),
+        (r"data:[a-zA-Z]+/[a-zA-Z+]+;base64,[A-Za-z0-9+/=]+", "[DATA_URI_STRIPPED]"),
         # Định dạng SVG có khả năng thực thi JavaScript
-        (r'<svg[^>]*>.*?</svg>', '[SVG_STRIPPED]'),
+        (r"<svg[^>]*>.*?</svg>", "[SVG_STRIPPED]"),
         # Thẻ style (rò rỉ dựa trên CSS qua url())
-        (r'<style[^>]*>.*?</style>', '[STYLE_STRIPPED]'),
+        (r"<style[^>]*>.*?</style>", "[STYLE_STRIPPED]"),
     ]
 
     def __init__(self):
@@ -53,7 +50,7 @@ class OutputSanitizer:
     def _sanitize_base64(self, text: str) -> str:
         # Tìm kiếm khối Base64 hợp lệ, độ dài tối thiểu 8
         # để giảm chi phí false positive
-        pattern = re.compile(r'\b[A-Za-z0-9+/]{8,}={0,2}\b')
+        pattern = re.compile(r"\b[A-Za-z0-9+/]{8,}={0,2}\b")
         clean = text
 
         def repl(match):
@@ -61,17 +58,12 @@ class OutputSanitizer:
             try:
                 pad = len(val) % 4
                 if pad:
-                    val += '=' * (4 - pad)
-                decoded = base64.b64decode(
-                    val.encode(), validate=True
-                ).decode('utf-8', errors='ignore')
-                triggers = [
-                    "<script", "<img", "javascript:",
-                    "onload=", "onerror=", "iframe"
-                ]
-                if len(decoded) > 3 and any(
-                    char in decoded.lower() for char in triggers
-                ):
+                    val += "=" * (4 - pad)
+                decoded = base64.b64decode(val.encode(), validate=True).decode(
+                    "utf-8", errors="ignore"
+                )
+                triggers = ["<script", "<img", "javascript:", "onload=", "onerror=", "iframe"]
+                if len(decoded) > 3 and any(char in decoded.lower() for char in triggers):
                     self._strip_count += 1
                     return "[BASE64_OBFUSCATED_STRIPPED]"
             except Exception:
@@ -81,22 +73,15 @@ class OutputSanitizer:
         return pattern.sub(repl, clean)
 
     def _sanitize_hex(self, text: str) -> str:
-        pattern = re.compile(r'\b(0x)?([a-fA-F0-9]{8,})\b')
+        pattern = re.compile(r"\b(0x)?([a-fA-F0-9]{8,})\b")
         clean = text
 
         def repl(match):
             hex_digits = match.group(2)
             try:
-                decoded = bytes.fromhex(hex_digits).decode(
-                    'utf-8', errors='ignore'
-                )
-                triggers = [
-                    "<script", "<img", "javascript:",
-                    "onload=", "onerror=", "iframe"
-                ]
-                if len(decoded) > 3 and any(
-                    char in decoded.lower() for char in triggers
-                ):
+                decoded = bytes.fromhex(hex_digits).decode("utf-8", errors="ignore")
+                triggers = ["<script", "<img", "javascript:", "onload=", "onerror=", "iframe"]
+                if len(decoded) > 3 and any(char in decoded.lower() for char in triggers):
                     self._strip_count += 1
                     return "[HEX_OBFUSCATED_STRIPPED]"
             except Exception:

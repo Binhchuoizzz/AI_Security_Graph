@@ -23,8 +23,8 @@ def structural_sanitize(text: str, max_length: int = 1500) -> str:
     và độ phủ bảo mật cao nhất (loại bỏ HTML/JS tags, Markdown images/links).
     """
     from src.guardrails.rag_sanitizer import RAGSanitizer
-    return RAGSanitizer.sanitize_ingest(text, max_length)
 
+    return RAGSanitizer.sanitize_ingest(text, max_length)
 
 
 def log_tokenizer(text: str) -> list[str]:
@@ -45,27 +45,25 @@ def log_tokenizer(text: str) -> list[str]:
 # =========================================================================
 
 import hashlib
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
 CHECKSUM_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "knowledge_base", "checksums.sha256"
 )
-KB_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "knowledge_base"
-)
+KB_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "knowledge_base")
 
 
 def verify_document_integrity(exclude_generated: bool = False) -> dict:
     """
     Kiểm tra SHA-256 hash của Knowledge Base files trước khi load.
     So sánh với checksums.sha256 đã được pre-computed.
-    
+
     Trả về:
       {"verified": True/False, "details": [...]}
-    
+
     Nếu hash không khớp → KB có thể đã bị tamper (RAG Poisoning).
     """
     results = {"verified": True, "details": []}
@@ -78,7 +76,7 @@ def verify_document_integrity(exclude_generated: bool = False) -> dict:
 
     # Phân tích tệp checksum
     expected_hashes = {}
-    with open(CHECKSUM_PATH, "r") as f:
+    with open(CHECKSUM_PATH) as f:
         for line in f:
             line = line.strip()
             if line and "  " in line:
@@ -128,4 +126,3 @@ def add_provenance(chunk: str, source_file: str, chunk_index: int) -> str:
     """
     provenance = f"[SOURCE: {source_file} | CHUNK: {chunk_index} | VERIFIED: SENTINEL_KB]"
     return f"{provenance}\n{chunk}"
-

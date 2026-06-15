@@ -2,20 +2,20 @@
 Guardrails: Phòng thủ Prompt Injection (Đóng gói dữ liệu phân vùng - Delimited Data Encapsulation)
 """
 
-import re
-import yaml  # type: ignore
-import os
 import base64
 import codecs
 import html
+import os
+import re
 import secrets
 import unicodedata
 import urllib.parse
-from typing import Optional
 from html.parser import HTMLParser
 
-from src.guardrails.template_miner import LogTemplateMiner, EntropyScorer, TokenBudgetManager
+import yaml  # type: ignore
+
 from src.guardrails.constants import normalize_log_keys
+from src.guardrails.template_miner import EntropyScorer, LogTemplateMiner, TokenBudgetManager
 
 
 class HTMLTagStripper(HTMLParser):
@@ -29,20 +29,20 @@ class HTMLTagStripper(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         tag_lower = tag.lower()
-        if tag_lower == 'script':
+        if tag_lower == "script":
             self.in_script = True
             self.result.append("[SCRIPT_STRIPPED]")
-        elif tag_lower == 'iframe':
+        elif tag_lower == "iframe":
             self.in_iframe = True
             self.result.append("[IFRAME_STRIPPED]")
-        elif tag_lower == 'img':
+        elif tag_lower == "img":
             self.result.append("[IMG_STRIPPED]")
 
     def handle_endtag(self, tag):
         tag_lower = tag.lower()
-        if tag_lower == 'script':
+        if tag_lower == "script":
             self.in_script = False
-        elif tag_lower == 'iframe':
+        elif tag_lower == "iframe":
             self.in_iframe = False
 
     def handle_data(self, data):
@@ -57,9 +57,9 @@ def strip_html_tags_fallback(text: str) -> str:
     result = []
     in_tag = False
     for char in text:
-        if char == '<':
+        if char == "<":
             in_tag = True
-        elif char == '>':
+        elif char == ">":
             in_tag = False
         elif not in_tag:
             result.append(char)
@@ -75,7 +75,7 @@ def strip_dangerous_tags_recursive(text: str) -> str:
             break
         end = lower.find("</script>", start)
         if end != -1:
-            text = text[:start] + "[SCRIPT_STRIPPED]" + text[end + 9:]
+            text = text[:start] + "[SCRIPT_STRIPPED]" + text[end + 9 :]
         else:
             text = text[:start] + "[SCRIPT_STRIPPED]"
             break
@@ -88,7 +88,7 @@ def strip_dangerous_tags_recursive(text: str) -> str:
             break
         end = lower.find("</iframe>", start)
         if end != -1:
-            text = text[:start] + "[IFRAME_STRIPPED]" + text[end + 9:]
+            text = text[:start] + "[IFRAME_STRIPPED]" + text[end + 9 :]
         else:
             text = text[:start] + "[IFRAME_STRIPPED]"
             break
@@ -101,7 +101,7 @@ def strip_dangerous_tags_recursive(text: str) -> str:
             break
         end = lower.find(">", start)
         if end != -1:
-            text = text[:start] + "[IMG_STRIPPED]" + text[end + 1:]
+            text = text[:start] + "[IMG_STRIPPED]" + text[end + 1 :]
         else:
             text = text[:start] + "[IMG_STRIPPED]"
             break
@@ -109,15 +109,13 @@ def strip_dangerous_tags_recursive(text: str) -> str:
     return text
 
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
-)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 
 
 def load_config():
     try:
         if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r") as f:
+            with open(CONFIG_PATH) as f:
                 cfg = yaml.safe_load(f)
                 if cfg:
                     return cfg
@@ -126,21 +124,42 @@ def load_config():
     return {
         "guardrails": {
             "injection_patterns": [
-                "ignore previous instructions", "you are now", "system prompt",
-                "disregard", "<script>", "DROP TABLE", "UNION SELECT", "; exec",
-                "forget everything", "act as", "new instructions",
-                "override your instructions", "bypass safety", "pretend you are",
-                "roleplay as", "respond without restrictions", "<<<DATA_END_", ">>>>"
+                "ignore previous instructions",
+                "you are now",
+                "system prompt",
+                "disregard",
+                "<script>",
+                "DROP TABLE",
+                "UNION SELECT",
+                "; exec",
+                "forget everything",
+                "act as",
+                "new instructions",
+                "override your instructions",
+                "bypass safety",
+                "pretend you are",
+                "roleplay as",
+                "respond without restrictions",
+                "<<<DATA_END_",
+                ">>>>",
             ],
             "jailbreak_patterns": [
-                "DAN mode", "Do Anything Now", "Developer Mode", "jailbroken",
-                "ignore all previous", "you have no restrictions",
-                "act without limitations", "bypass your guidelines",
-                "entering unrestricted mode", "from now on you will",
-                "simulate a persona", "hypothetically speaking",
-                "for educational purposes only", "pretend there are no rules",
-                "you are no longer bound"
-            ]
+                "DAN mode",
+                "Do Anything Now",
+                "Developer Mode",
+                "jailbroken",
+                "ignore all previous",
+                "you have no restrictions",
+                "act without limitations",
+                "bypass your guidelines",
+                "entering unrestricted mode",
+                "from now on you will",
+                "simulate a persona",
+                "hypothetically speaking",
+                "for educational purposes only",
+                "pretend there are no rules",
+                "you are no longer bound",
+            ],
         }
     }
 
@@ -153,7 +172,7 @@ class PromptInjectionDetector:
     Tầng 1: Phát hiện chuỗi Prompt Injection đã biết (Known Patterns).
     """
 
-    def __init__(self, patterns: Optional[list] = None):
+    def __init__(self, patterns: list | None = None):
         config = load_config()
         self.patterns = patterns or config.get("guardrails", {}).get("injection_patterns", [])
         self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]
@@ -195,16 +214,16 @@ class JailbreakDetector:
     Phát hiện các kỹ thuật Jailbreak hiện đại nhắm vào LLM.
     """
 
-    def __init__(self, patterns: Optional[list] = None):
+    def __init__(self, patterns: list | None = None):
         config = load_config()
         self.patterns = patterns or config.get("guardrails", {}).get("jailbreak_patterns", [])
         self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]
-        
+
         self.role_play_re = re.compile(
-            r'(?:you\s+are\s+now|act\s+as\s+(?:if|a)|pretend\s+(?:to\s+be|you)|'
-            r'roleplay|simulate\s+(?:a|being)|imagine\s+you\s+are|'
-            r'from\s+now\s+on\s+you\s+(?:will|are|must))',
-            re.IGNORECASE
+            r"(?:you\s+are\s+now|act\s+as\s+(?:if|a)|pretend\s+(?:to\s+be|you)|"
+            r"roleplay|simulate\s+(?:a|being)|imagine\s+you\s+are|"
+            r"from\s+now\s+on\s+you\s+(?:will|are|must))",
+            re.IGNORECASE,
         )
 
     def scan(self, log_entry: dict) -> dict:
@@ -221,7 +240,7 @@ class JailbreakDetector:
             if key.startswith("_"):
                 continue
             str_value = str(value)
-            
+
             for i, pattern in enumerate(self.compiled):
                 if pattern.search(str_value):
                     jailbreak_detected = True
@@ -234,10 +253,10 @@ class JailbreakDetector:
         result = dict(normalized_log)
         result["_jailbreak_detected"] = jailbreak_detected
         result["_jailbreak_patterns"] = jailbreak_patterns
-        
+
         if jailbreak_detected:
             result["_isolation_level"] = "CRITICAL"
-        
+
         return result
 
 
@@ -246,32 +265,100 @@ class JailbreakDetector:
 # =========================================================================
 
 # Cyrillic / Greek look-alike characters -> ASCII Latin (homoglyph folding).
-_CONFUSABLE_MAP = str.maketrans({
-    # Cyrillic lowercase
-    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "у": "y", "х": "x",
-    "ѕ": "s", "і": "i", "ј": "j", "ԛ": "q", "ԝ": "w", "ё": "e", "к": "k",
-    "м": "m", "н": "h", "т": "t", "в": "b",
-    # Cyrillic uppercase
-    "А": "A", "Е": "E", "О": "O", "Р": "P", "С": "C", "У": "Y", "Х": "X",
-    "І": "I", "Ј": "J", "К": "K", "М": "M", "Н": "H", "Т": "T", "В": "B",
-    # Greek
-    "ο": "o", "α": "a", "ρ": "p", "ε": "e", "τ": "t", "υ": "u", "ι": "i",
-    "κ": "k", "ν": "v", "Ο": "O", "Α": "A", "Ρ": "P", "Ε": "E", "Τ": "T",
-    "Ι": "I", "Κ": "K", "Ν": "N",
-})
+_CONFUSABLE_MAP = str.maketrans(
+    {
+        # Cyrillic lowercase
+        "а": "a",
+        "е": "e",
+        "о": "o",
+        "р": "p",
+        "с": "c",
+        "у": "y",
+        "х": "x",
+        "ѕ": "s",
+        "і": "i",
+        "ј": "j",
+        "ԛ": "q",
+        "ԝ": "w",
+        "ё": "e",
+        "к": "k",
+        "м": "m",
+        "н": "h",
+        "т": "t",
+        "в": "b",
+        # Cyrillic uppercase
+        "А": "A",
+        "Е": "E",
+        "О": "O",
+        "Р": "P",
+        "С": "C",
+        "У": "Y",
+        "Х": "X",
+        "І": "I",
+        "Ј": "J",
+        "К": "K",
+        "М": "M",
+        "Н": "H",
+        "Т": "T",
+        "В": "B",
+        # Greek
+        "ο": "o",
+        "α": "a",
+        "ρ": "p",
+        "ε": "e",
+        "τ": "t",
+        "υ": "u",
+        "ι": "i",
+        "κ": "k",
+        "ν": "v",
+        "Ο": "O",
+        "Α": "A",
+        "Ρ": "P",
+        "Ε": "E",
+        "Τ": "T",
+        "Ι": "I",
+        "Κ": "K",
+        "Ν": "N",
+    }
+)
 
 # Common leetspeak substitutions -> ASCII letters.
-_LEET_MAP = str.maketrans({
-    "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t",
-    "$": "s", "@": "a", "!": "i", "|": "l",
-})
+_LEET_MAP = str.maketrans(
+    {
+        "0": "o",
+        "1": "i",
+        "3": "e",
+        "4": "a",
+        "5": "s",
+        "7": "t",
+        "$": "s",
+        "@": "a",
+        "!": "i",
+        "|": "l",
+    }
+)
 
 # Substrings that mark a decoded payload as an injection/jailbreak attempt.
 _DECODE_TRIGGERS = (
-    "ignore", "disregard", "previous", "instruction", "system prompt",
-    "system", "prompt", "override", "bypass", "jailbreak", "reveal",
-    "developer mode", "you are now", "act as", "sudo", "exfiltrat",
-    "password", "drop table", "<script",
+    "ignore",
+    "disregard",
+    "previous",
+    "instruction",
+    "system prompt",
+    "system",
+    "prompt",
+    "override",
+    "bypass",
+    "jailbreak",
+    "reveal",
+    "developer mode",
+    "you are now",
+    "act as",
+    "sudo",
+    "exfiltrat",
+    "password",
+    "drop table",
+    "<script",
 )
 
 
@@ -338,7 +425,7 @@ class EncodingNeutralizer:
         return codecs.encode(text, "rot_13")
 
     @staticmethod
-    def decode_if_base32(text: str) -> Optional[str]:
+    def decode_if_base32(text: str) -> str | None:
         try:
             clean = text.strip().upper()
             if re.fullmatch(r"[A-Z2-7]+=*", clean) and len(clean) >= 16:
@@ -445,13 +532,36 @@ class DelimitedDataEncapsulator:
 
     def encapsulate_fields(self, log_entry: dict) -> str:
         ALLOWED_FIELDS = {
-            "source ip", "src_ip", "source_ip",
-            "destination ip", "dst_ip", "destination_ip", 
-            "destination port", "dst_port", "destination_port",
-            "protocol", "total fwd packets", "total backward packets", "flow duration",
-            "label", "log_source", "timestamp",
-            "payload", "message", "uri", "URI", "user_agent", "user-agent", "User-Agent", "method", "headers", "command", "process",
-            "tier1_action", "tier1_score", "tier1_reasons"
+            "source ip",
+            "src_ip",
+            "source_ip",
+            "destination ip",
+            "dst_ip",
+            "destination_ip",
+            "destination port",
+            "dst_port",
+            "destination_port",
+            "protocol",
+            "total fwd packets",
+            "total backward packets",
+            "flow duration",
+            "label",
+            "log_source",
+            "timestamp",
+            "payload",
+            "message",
+            "uri",
+            "URI",
+            "user_agent",
+            "user-agent",
+            "User-Agent",
+            "method",
+            "headers",
+            "command",
+            "process",
+            "tier1_action",
+            "tier1_score",
+            "tier1_reasons",
         }
 
         lines = []
@@ -465,9 +575,6 @@ class DelimitedDataEncapsulator:
             lines.append(f"[FIELD:{key}] {safe_value}")
         content = "\n".join(lines)
         return self.encapsulate(content, normalized_log.get("_isolation_level", "NORMAL"))
-
-
-
 
 
 # =========================================================================
@@ -513,7 +620,7 @@ class GuardrailsPipeline:
         normalized_logs = [normalize_log_keys(log) for log in logs]
         results = [self.process(log) for log in normalized_logs]
         injection_count = sum(1 for r in results if r["injection_detected"])
-        
+
         sanitized_logs = [r["sanitized_log"] for r in results]
 
         # 1. Nén volume logs bằng LogTemplateMiner
@@ -526,7 +633,15 @@ class GuardrailsPipeline:
         scorer = EntropyScorer()
         high_priority_logs = []
         for log in sanitized_logs:
-            key_fields = ["Source IP", "Destination Port", "Protocol", "Total Fwd Packets", "Flow Duration", "payload", "uri"]
+            key_fields = [
+                "Source IP",
+                "Destination Port",
+                "Protocol",
+                "Total Fwd Packets",
+                "Flow Duration",
+                "payload",
+                "uri",
+            ]
             parts = [f"{f}={log.get(f)}" for f in key_fields if log.get(f) is not None]
             log_str = " ".join(parts) if parts else str(log)
             if scorer.is_high_entropy(log_str):

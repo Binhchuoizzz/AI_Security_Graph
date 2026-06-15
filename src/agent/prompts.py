@@ -66,31 +66,32 @@ def load_few_shot_feedback_context() -> str:
     REJECTED rules -> Mẫu cảnh báo sai (False Positive) bị con người từ chối.
     """
     import os
+
     import yaml  # type: ignore
-    
+
     config_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
     )
     if not os.path.exists(config_path):
         return ""
-        
+
     try:
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             config = yaml.safe_load(f)
-            
+
         rules = config.get("tier1", {}).get("dynamic_rules", [])
         if not rules:
             return ""
-            
+
         approved_examples = []
         rejected_examples = []
-        
+
         for rule in rules:
             status = rule.get("status", "ACTIVE")
             field = rule.get("field")
             pattern = rule.get("pattern")
             reason = rule.get("reason", "Không có lý do chi tiết")
-            
+
             if status == "ACTIVE":
                 approved_examples.append(
                     f"- Nếu log chứa {field} = '{pattern}': Đây là MỐI ĐE DỌA đã được phê duyệt chặn. "
@@ -101,17 +102,19 @@ def load_few_shot_feedback_context() -> str:
                     f"- Nếu log chứa {field} = '{pattern}': Đây là CẢNH BÁO SAI (False Positive) đã bị bác bỏ bởi Analyst. "
                     f"Hành động đề xuất: LOG hoặc whitelist. KHÔNG chặn IP. Lý do: {reason}."
                 )
-                
+
         context_parts = []
         if approved_examples:
             context_parts.append("Các mẫu TẤN CÔNG XÁC THỰC đã được con người phê duyệt:")
-            context_parts.extend(approved_examples[:5]) # Giới hạn tối đa 5 ví dụ
+            context_parts.extend(approved_examples[:5])  # Giới hạn tối đa 5 ví dụ
         if rejected_examples:
             context_parts.append("\nCác mẫu CẢNH BÁO SAI (False Positive) đã bị con người bác bỏ:")
-            context_parts.extend(rejected_examples[:5]) # Giới hạn tối đa 5 ví dụ
-            
+            context_parts.extend(rejected_examples[:5])  # Giới hạn tối đa 5 ví dụ
+
         if context_parts:
-            return "\n=== ACTIVE LEARNING: HUMAN FEEDBACK & HISTORICAL DECISIONS ===\n" + "\n".join(context_parts)
+            return "\n=== ACTIVE LEARNING: HUMAN FEEDBACK & HISTORICAL DECISIONS ===\n" + "\n".join(
+                context_parts
+            )
     except Exception:
         pass
     return ""

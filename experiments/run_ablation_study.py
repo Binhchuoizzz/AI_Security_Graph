@@ -12,22 +12,23 @@ import json
 import os
 import sys
 import time
+
 import mlflow
 import numpy as np
-from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.tier1_filter.rule_engine import RuleEngine
-from src.agent.workflow import agent_app
-from src.agent.state import SentinelState
 from src.agent.nodes import retriever
+from src.agent.state import SentinelState
+from src.agent.workflow import agent_app
+from src.tier1_filter.rule_engine import RuleEngine
 
 GROUND_TRUTH_PATH = os.path.join(os.path.dirname(__file__), "ground_truth.json")
 
 
 def load_ground_truth():
-    with open(GROUND_TRUTH_PATH, "r") as f:
+    with open(GROUND_TRUTH_PATH) as f:
         return json.load(f)
 
 
@@ -41,16 +42,15 @@ def run_ablation(limit=None):
             if lbl not in by_label:
                 by_label[lbl] = []
             by_label[lbl].append(sample)
-        
+
         num_classes = len(by_label)
         samples_per_class = max(1, (limit + num_classes - 1) // num_classes)
-        
+
         selected_samples = []
         for lbl, samples in by_label.items():
             selected_samples.extend(samples[:samples_per_class])
-        
-        dataset = selected_samples[:limit]
 
+        dataset = selected_samples[:limit]
 
     # Lớp Dương tính (Tấn công): expected_action != "LOG"
     # Lớp Âm tính (Lưu lượng sạch): expected_action == "LOG"
@@ -65,8 +65,6 @@ def run_ablation(limit=None):
             "actions": [],
         },
     }
-
-
 
     # Kết nối hệ thống MLflow
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
@@ -84,26 +82,24 @@ def run_ablation(limit=None):
         print("[*] Warming up Rule Engine baseline statistics...")
         for i in range(110):
             val = 15 + (i % 5) - 2
-            rule_engine.evaluate({
-                "Source IP": f"192.168.1.{10+i}",
-                "Destination Port": 80,
-                "Total Fwd Packets": val,
-                "Flow Bytes/s": val * 100,
-                "Flow Duration": 1000 + (i % 10) * 10
-            })
+            rule_engine.evaluate(
+                {
+                    "Source IP": f"192.168.1.{10 + i}",
+                    "Destination Port": 80,
+                    "Total Fwd Packets": val,
+                    "Flow Bytes/s": val * 100,
+                    "Flow Duration": 1000 + (i % 10) * 10,
+                }
+            )
         print("[+] Warmup complete. Rule Engine baseline established.")
 
         for idx, sample in enumerate(dataset):
-            is_attack = (
-                1
-                if sample["expected_action"] in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]
-                else 0
-            )
+            is_attack = 1 if sample["expected_action"] in ["BLOCK_IP", "ALERT", "AWAIT_HITL"] else 0
             logs = sample.get("logs", [])
 
             # Reset session baseline cho IP profile độc lập của từng mẫu, giữ lại global RunningStats
             rule_engine.session_baseline.reset_window()
-            
+
             # --- Config A: Chỉ sử dụng luật cứng ---
             start_time_a = time.time()
             pred_a = 0
@@ -150,13 +146,12 @@ def run_ablation(limit=None):
                 )
                 # Reset LoopDetector trước mỗi lần chạy đồ thị
                 from src.guardrails import loop_detector
+
                 loop_detector.reset()
                 try:
                     final_state = agent_app.invoke(initial_state)
                     decisions = final_state.get("decisions", [])
-                    reasoning_output["narrative_summary"] = final_state.get(
-                        "narrative_summary", ""
-                    )
+                    reasoning_output["narrative_summary"] = final_state.get("narrative_summary", "")
                     reasoning_output["decisions"] = decisions
                     if decisions:
                         latest = decisions[-1]
@@ -186,7 +181,7 @@ def run_ablation(limit=None):
             results["Config_F"]["reasoning_outputs"].append(reasoning_output)
 
             print(
-                f"[{idx+1}/{len(dataset)}] {sample['id']} | True: {is_attack} | Pred A: {pred_a} ({latency_a:.3f}s) | Pred F: {pred_f} ({latency_f:.3f}s)"
+                f"[{idx + 1}/{len(dataset)}] {sample['id']} | True: {is_attack} | Pred A: {pred_a} ({latency_a:.3f}s) | Pred F: {pred_f} ({latency_f:.3f}s)"
             )
 
         # Lưu kết quả ra file JSON
@@ -246,7 +241,11 @@ def run_ablation(limit=None):
         hitl_ratio = (hitl_count / total_f) * 100 if total_f > 0 else 0.0
 
         # Lấy Cache Hit Rate từ Retriever
-        cache_stats = retriever.cache.get_stats() if hasattr(retriever, "cache") and retriever.cache else {"hit_rate": 0.0}
+        cache_stats = (
+            retriever.cache.get_stats()
+            if hasattr(retriever, "cache") and retriever.cache
+            else {"hit_rate": 0.0}
+        )
         cache_hit_rate = cache_stats.get("hit_rate", 0.0)
 
         # Ghi nhận các chỉ số lên MLflow
@@ -264,18 +263,28 @@ def run_ablation(limit=None):
         mlflow.log_metric("HITL_Escalation_Rate_pct", hitl_ratio)
         mlflow.log_metric("RAG_Cache_Hit_Rate_pct", cache_hit_rate)
 
-        print(f"\n[+] Config A: F1={f1_a:.4f} | Prec={prec_a:.4f} | Rec={rec_a:.4f} | FPR={fpr_a:.4f} | MTTD_Proxy={np.mean(results['Config_A']['latencies']):.3f}s")
-        print(f"[+] Config F: F1={f1_f:.4f} | Prec={prec_f:.4f} | Rec={rec_f:.4f} | FPR={fpr_f:.4f} | MTTR_Proxy={np.mean(results['Config_F']['latencies']):.3f}s")
-        print(f"[+] Operational: RAG Cache Hit Rate = {cache_hit_rate:.1f}% | HITL Ratio = {hitl_ratio:.1f}%")
-        print("[!] DISCLAIMER: Processing Latency is used as a proxy for MTTD/MTTR under offline dataset constraints.")
+        print(
+            f"\n[+] Config A: F1={f1_a:.4f} | Prec={prec_a:.4f} | Rec={rec_a:.4f} | FPR={fpr_a:.4f} | MTTD_Proxy={np.mean(results['Config_A']['latencies']):.3f}s"
+        )
+        print(
+            f"[+] Config F: F1={f1_f:.4f} | Prec={prec_f:.4f} | Rec={rec_f:.4f} | FPR={fpr_f:.4f} | MTTR_Proxy={np.mean(results['Config_F']['latencies']):.3f}s"
+        )
+        print(
+            f"[+] Operational: RAG Cache Hit Rate = {cache_hit_rate:.1f}% | HITL Ratio = {hitl_ratio:.1f}%"
+        )
+        print(
+            "[!] DISCLAIMER: Processing Latency is used as a proxy for MTTD/MTTR under offline dataset constraints."
+        )
         print("                Real-world ingestion and human review times are not included.")
         print("[+] Da ghi metrics len MLflow.")
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("--limit", type=int, default=None, help="Gioi han so luong mau de chay nhanh")
+    parser.add_argument(
+        "--limit", type=int, default=None, help="Gioi han so luong mau de chay nhanh"
+    )
     args = parser.parse_args()
     run_ablation(limit=args.limit)
-

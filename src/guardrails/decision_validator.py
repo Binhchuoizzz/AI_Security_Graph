@@ -2,8 +2,9 @@
 Guardrails: LLM Decision Validator (Action Enum, Anti-DoS Shield, Confidence Gate, Reasoning Sanitization)
 """
 
-import logging
 import ipaddress
+import logging
+
 from src.guardrails.output_sanitizer import output_sanitizer
 from src.guardrails.prompt_filter import load_config
 
@@ -24,9 +25,9 @@ class DecisionValidator:
         # 172.16/12, 192.168/16 là "không được chặn" thì hệ thống KHÔNG THỂ cô lập kẻ tấn
         # công nội bộ (lateral movement / insider / host bị chiếm), và luồng HITL sinh-luật
         # (chỉ kích hoạt khi BLOCK_IP) sẽ không bao giờ chạy. Dải này phải HẸP và tường minh.
-        self.critical_infra_subnets = config.get("guardrails", {}).get("critical_infrastructure_subnets", [
-            "127.0.0.0/8", "10.0.0.99/32", "192.168.1.254/32"
-        ])
+        self.critical_infra_subnets = config.get("guardrails", {}).get(
+            "critical_infrastructure_subnets", ["127.0.0.0/8", "10.0.0.99/32", "192.168.1.254/32"]
+        )
         self.allowed_actions = ["BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "DROP"]
 
     def validate_decision(self, decision: dict) -> dict:
@@ -38,7 +39,9 @@ class DecisionValidator:
         # 1. Ép buộc Action Enum hợp lệ
         action = validated.get("action", "AWAIT_HITL")
         if action not in self.allowed_actions:
-            logger.warning(f"[DecisionValidator] Invalid action '{action}' overridden to AWAIT_HITL")
+            logger.warning(
+                f"[DecisionValidator] Invalid action '{action}' overridden to AWAIT_HITL"
+            )
             validated["action"] = "AWAIT_HITL"
             action = "AWAIT_HITL"
 
@@ -124,8 +127,7 @@ class DecisionValidator:
 
             if is_critical or target in ["127.0.0.1", "::1", "10.0.0.99", "localhost"]:
                 logger.warning(
-                    f"[DecisionValidator] BLOCK_IP on critical asset '{target}' "
-                    f"downgraded to ALERT"
+                    f"[DecisionValidator] BLOCK_IP on critical asset '{target}' downgraded to ALERT"
                 )
                 validated["action"] = "ALERT"
                 action = "ALERT"
@@ -135,7 +137,9 @@ class DecisionValidator:
         if "reasoning" in validated:
             validated["reasoning"] = output_sanitizer.sanitize(str(validated["reasoning"]))
         if "mitre_technique" in validated:
-            validated["mitre_technique"] = output_sanitizer.sanitize(str(validated["mitre_technique"]))
+            validated["mitre_technique"] = output_sanitizer.sanitize(
+                str(validated["mitre_technique"])
+            )
         if "nist_control" in validated:
             validated["nist_control"] = output_sanitizer.sanitize(str(validated["nist_control"]))
 

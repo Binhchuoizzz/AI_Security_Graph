@@ -146,15 +146,17 @@ def publish():
         return
 
     seq, warmup, main, apt_truth, n_chains = build_sequence()
-    print(f"[*] Phát {len(seq)} sự kiện (warmup {len(warmup)} + main {len(main)}) "
-          f"| DAPT {n_chains} chuỗi, {len(apt_truth)} IP-APT thật")
+    print(
+        f"[*] Phát {len(seq)} sự kiện (warmup {len(warmup)} + main {len(main)}) "
+        f"| DAPT {n_chains} chuỗi, {len(apt_truth)} IP-APT thật"
+    )
     print(f"[*] batch={BATCH_SIZE}, delay={BATCH_DELAY}s/batch -> 3 queue (waf/firewall)")
 
     published = 0
     src_counter = Counter()
     try:
         for i in range(0, len(seq), BATCH_SIZE):
-            batch = seq[i: i + BATCH_SIZE]
+            batch = seq[i : i + BATCH_SIZE]
 
             # Backpressure: chờ nếu queue đầy (consumer offline/chậm)
             for q in ("queue_waf", "queue_firewall"):
@@ -163,7 +165,9 @@ def publish():
                     time.sleep(0.1)
                     waited += 1
                     if waited % 100 == 0:
-                        print(f"[!] Backpressure {q}={r.xlen(q)} > {MAX_QUEUE_SIZE}. Consumer chậm?")
+                        print(
+                            f"[!] Backpressure {q}={r.xlen(q)} > {MAX_QUEUE_SIZE}. Consumer chậm?"
+                        )
 
             for ev in batch:
                 log = enrich(ev)
@@ -172,13 +176,17 @@ def publish():
                 published += 1
                 src_counter[ev["source"]] += 1
 
-            print(f"[>] Batch {i // BATCH_SIZE + 1}: {min(i + BATCH_SIZE, len(seq))}/{len(seq)} "
-                  f"phát (cicids={src_counter['cicids']} dapt={src_counter['dapt']} "
-                  f"zeroday={src_counter['zeroday']})")
+            print(
+                f"[>] Batch {i // BATCH_SIZE + 1}: {min(i + BATCH_SIZE, len(seq))}/{len(seq)} "
+                f"phát (cicids={src_counter['cicids']} dapt={src_counter['dapt']} "
+                f"zeroday={src_counter['zeroday']})"
+            )
             time.sleep(BATCH_DELAY)
 
-        print(f"[+] Hoàn tất! Đã phát {published} sự kiện lên Redis. "
-              f"Theo dõi APT/quyết định ở subscriber (main.py) + Dashboard.")
+        print(
+            f"[+] Hoàn tất! Đã phát {published} sự kiện lên Redis. "
+            f"Theo dõi APT/quyết định ở subscriber (main.py) + Dashboard."
+        )
     except KeyboardInterrupt:
         print("\n[*] Dừng bởi người dùng.")
     except Exception as e:  # noqa: BLE001
@@ -187,8 +195,11 @@ def publish():
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Unified streaming ONLINE publisher")
-    ap.add_argument("--dry-run", action="store_true",
-                    help="Chỉ kiểm tra logic (phân bố queue/metadata), KHÔNG đẩy Redis")
+    ap.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Chỉ kiểm tra logic (phân bố queue/metadata), KHÔNG đẩy Redis",
+    )
     args = ap.parse_args()
     if args.dry_run:
         dry_run()

@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import time
+
 import numpy as np
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,12 +31,8 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # API tương thích với OpenAI (Oobabooga / llama.cpp)
 LLM_API_BASE = os.getenv("LLM_API_BASE", "http://127.0.0.1:5000/v1")
 
-ABLATION_RESULTS_PATH = os.path.join(
-    os.path.dirname(__file__), "results", "ablation_results.json"
-)
-OUTPUT_PATH = os.path.join(
-    os.path.dirname(__file__), "results", "reasoning_eval_results.json"
-)
+ABLATION_RESULTS_PATH = os.path.join(os.path.dirname(__file__), "results", "ablation_results.json")
+OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "results", "reasoning_eval_results.json")
 
 JUDGE_SYSTEM_PROMPT = """You are an expert cybersecurity analyst acting as an independent judge.
 You will evaluate the reasoning quality of a Security AI Agent's analysis.
@@ -90,6 +87,7 @@ Respond ONLY in this JSON format:
 def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
     """Gọi API LLM Judge (đã nạp Llama 3) để đánh giá chất lượng suy luận."""
     import requests
+
     content = ""
 
     try:
@@ -163,7 +161,7 @@ def run_judge_evaluation():
         print("    Run 'python experiments/run_ablation_study.py' with Gemma 9B first.")
         sys.exit(1)
 
-    with open(ABLATION_RESULTS_PATH, "r") as f:
+    with open(ABLATION_RESULTS_PATH) as f:
         ablation_data = json.load(f)
 
     reasoning_outputs = ablation_data.get("Config_F", {}).get("reasoning_outputs", [])
@@ -179,9 +177,9 @@ def run_judge_evaluation():
     print(f"[*] Total samples: {len(reasoning_outputs)}")
     print(f"    Escalated to LLM (will judge): {len(escalated)}")
     print(f"    Not escalated (Tier 1 only): {len(not_escalated)}")
-    print(f"\n[*] Starting LLM-as-Judge evaluation...")
+    print("\n[*] Starting LLM-as-Judge evaluation...")
     print(f"    Judge Model: Llama 3 (loaded on LLM server at {LLM_API_BASE})")
-    print(f"    Agent Model: Gemma 9B (outputs from ablation study)")
+    print("    Agent Model: Gemma 9B (outputs from ablation study)")
     print()
 
     eval_results = {
@@ -204,7 +202,7 @@ def run_judge_evaluation():
     all_audit_completeness = []
 
     for idx, sample in enumerate(escalated):
-        print(f"[{idx+1}/{len(escalated)}] Judging {sample['sample_id']}...", end=" ")
+        print(f"[{idx + 1}/{len(escalated)}] Judging {sample['sample_id']}...", end=" ")
 
         decisions_text = format_decisions(sample.get("decisions", []))
         narrative = sample.get("narrative_summary", "(empty)")
@@ -224,7 +222,11 @@ def run_judge_evaluation():
         # Tính toán tỷ lệ hoàn thành vết kiểm toán (Audit Trail Completeness Rate)
         latest_decision = sample.get("decisions", [{}])[-1] if sample.get("decisions") else {}
         required_fields = ["action", "confidence", "reasoning", "target", "mitre_technique"]
-        present_fields = sum(1 for f in required_fields if latest_decision.get(f) not in [None, "", "UNKNOWN_TARGET", "N/A"])
+        present_fields = sum(
+            1
+            for f in required_fields
+            if latest_decision.get(f) not in [None, "", "UNKNOWN_TARGET", "N/A"]
+        )
         audit_completeness = (present_fields / len(required_fields)) * 100
 
         result_entry = {
@@ -232,7 +234,7 @@ def run_judge_evaluation():
             "scores": scores,
             "audit_completeness_pct": audit_completeness,
             "judge_latency_s": round(elapsed, 2),
-            "schema_version": "v2_5D"
+            "schema_version": "v2_5D",
         }
         eval_results["scores"].append(result_entry)
 
@@ -287,8 +289,12 @@ def run_judge_evaluation():
             "overall_mean": round(
                 float(
                     np.mean(
-                        [np.mean(all_precision), np.mean(all_relevancy),
-                         np.mean(all_faithfulness), np.mean(all_recall)]
+                        [
+                            np.mean(all_precision),
+                            np.mean(all_relevancy),
+                            np.mean(all_faithfulness),
+                            np.mean(all_recall),
+                        ]
                     )
                 ),
                 2,
@@ -299,28 +305,36 @@ def run_judge_evaluation():
     with open(OUTPUT_PATH, "w") as f:
         json.dump(eval_results, f, indent=2, ensure_ascii=False)
 
-    print(f"\n{'='*60}")
-    print(f"REASONING QUALITY EVALUATION — RESULTS")
-    print(f"{'='*60}")
+    print(f"\n{'=' * 60}")
+    print("REASONING QUALITY EVALUATION — RESULTS")
+    print(f"{'=' * 60}")
     if eval_results["aggregate"]:
         agg = eval_results["aggregate"]
-        print(f"  Context Precision (MITRE): {agg['context_precision']['mean']}/5 (±{agg['context_precision']['std']})")
-        print(f"  Answer Relevancy (Action): {agg['answer_relevancy']['mean']}/5 (±{agg['answer_relevancy']['std']})")
-        print(f"  Faithfulness (No Halluc):  {agg['faithfulness']['mean']}/5 (±{agg['faithfulness']['std']})")
-        print(f"  Context Recall (RAG Use):  {agg['context_recall']['mean']}/5 (±{agg['context_recall']['std']})")
-        print(f"  Audit Completeness Rate:   {agg['audit_completeness']['mean']}% (±{agg['audit_completeness']['std']}%)")
-        print(f"  ---")
+        print(
+            f"  Context Precision (MITRE): {agg['context_precision']['mean']}/5 (±{agg['context_precision']['std']})"
+        )
+        print(
+            f"  Answer Relevancy (Action): {agg['answer_relevancy']['mean']}/5 (±{agg['answer_relevancy']['std']})"
+        )
+        print(
+            f"  Faithfulness (No Halluc):  {agg['faithfulness']['mean']}/5 (±{agg['faithfulness']['std']})"
+        )
+        print(
+            f"  Context Recall (RAG Use):  {agg['context_recall']['mean']}/5 (±{agg['context_recall']['std']})"
+        )
+        print(
+            f"  Audit Completeness Rate:   {agg['audit_completeness']['mean']}% (±{agg['audit_completeness']['std']}%)"
+        )
+        print("  ---")
         print(f"  Overall LLM Mean Score:    {agg['overall_mean']}/5")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"[+] Results saved to: {OUTPUT_PATH}")
 
     # Ghi nhận dữ liệu lên MLflow
     try:
         import mlflow
 
-        mlflow.set_tracking_uri(
-            os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
-        )
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
         mlflow.set_experiment("Sentinel_Reasoning_Quality")
         with mlflow.start_run(run_name="LLM_Judge_Evaluation"):
             mlflow.log_param("judge_model", "Llama 3 8B Instruct")

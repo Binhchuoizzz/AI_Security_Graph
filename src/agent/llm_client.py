@@ -8,12 +8,12 @@ CHỨC NĂNG:
   Agent không bị crash khi model đang bận tính toán.
 """
 
-import os
-import time
-import logging
 import json
+import logging
+import os
 import re
-from typing import List, Dict, Any, Optional
+import time
+from typing import Any
 
 try:
     import openai  # type: ignore
@@ -24,11 +24,9 @@ import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
-)
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 try:
-    with open(CONFIG_PATH, "r") as f:
+    with open(CONFIG_PATH) as f:
         _config = yaml.safe_load(f)
 except Exception:
     _config = {}
@@ -37,9 +35,7 @@ YAML_BASE_URL = _config.get("llm", {}).get("base_url", "http://127.0.0.1:5000/v1
 
 # Endpoint tương thích với OpenAI (llama.cpp server)
 API_BASE_URL = os.getenv("LLM_API_BASE", YAML_BASE_URL)
-API_KEY = os.getenv(
-    "LLM_API_KEY", "sk-placeholder-local-only"
-)  # Giá trị giữ chỗ cho Local LLM
+API_KEY = os.getenv("LLM_API_KEY", "sk-placeholder-local-only")  # Giá trị giữ chỗ cho Local LLM
 
 # Tham số cấu hình cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
@@ -54,9 +50,7 @@ DEFAULT_MODEL = os.getenv(
 
 
 class LLMClient:
-    def __init__(
-        self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 300
-    ):
+    def __init__(self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 300):
         """
         Khởi tạo OpenAI Client trỏ về Local LLM server.
         """
@@ -65,10 +59,10 @@ class LLMClient:
 
     def invoke(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-        response_format: Optional[Dict[str, Any]] = None,
+        response_format: dict[str, Any] | None = None,
     ) -> str:
         """
         Gọi LLM với cơ chế thử lại (Retry).
@@ -86,12 +80,14 @@ class LLMClient:
         backoff = 2  # Bắt đầu với 2 giây chờ
 
         if os.getenv("MOCK_LLM") == "1":
-            return json.dumps({
-                "reasoning": "Mock reasoning from MOCK_LLM=1. Detected anomaly matching MITRE TTPs and NIST containment phases.",
-                "action": "BLOCK_IP",
-                "confidence": 0.99,
-                "extracted_iocs": [{"type": "ip", "value": "192.168.1.100"}]
-            })
+            return json.dumps(
+                {
+                    "reasoning": "Mock reasoning from MOCK_LLM=1. Detected anomaly matching MITRE TTPs and NIST containment phases.",
+                    "action": "BLOCK_IP",
+                    "confidence": 0.99,
+                    "extracted_iocs": [{"type": "ip", "value": "192.168.1.100"}],
+                }
+            )
 
         for retries in range(self.max_retries + 1):
             try:
@@ -113,27 +109,21 @@ class LLMClient:
                 return response.choices[0].message.content
 
             except openai.APITimeoutError as e:
-                logger.warning(
-                    f"LLM Timeout (attempt {retries+1}/{self.max_retries}): {e}"
-                )
+                logger.warning(f"LLM Timeout (attempt {retries + 1}/{self.max_retries}): {e}")
                 if retries == self.max_retries:
                     raise
             except openai.APIConnectionError as e:
-                logger.error(
-                    f"LLM Connection Error: {e}. Is LLM server running on port 5000?"
-                )
+                logger.error(f"LLM Connection Error: {e}. Is LLM server running on port 5000?")
                 if retries == self.max_retries:
                     raise
             except openai.RateLimitError:
                 logger.warning(
-                    f"LLM Rate Limit (attempt {retries+1}/{self.max_retries}): Model is busy."
+                    f"LLM Rate Limit (attempt {retries + 1}/{self.max_retries}): Model is busy."
                 )
                 if retries == self.max_retries:
                     raise
             except openai.APIStatusError as e:
-                logger.error(
-                    f"LLM API Status Error (e.g. 500 Internal Server Error): {e}"
-                )
+                logger.error(f"LLM API Status Error (e.g. 500 Internal Server Error): {e}")
                 # Trả về chuỗi rỗng để kích hoạt lớp Hard Fallback (AWAIT_HITL)
                 return ""
             except Exception as e:
@@ -160,9 +150,7 @@ class LLMClient:
         try:
             return json.loads(clean)
         except json.JSONDecodeError:
-            logger.warning(
-                f"JSON Decode failed, attempting regex fallback. Raw: {raw[:100]}..."
-            )
+            logger.warning(f"JSON Decode failed, attempting regex fallback. Raw: {raw[:100]}...")
             # Dự phòng: trích xuất khối JSON bằng biểu thức chính quy (regex)
             match = re.search(r"\{.*\}", clean, re.DOTALL)
             if match:

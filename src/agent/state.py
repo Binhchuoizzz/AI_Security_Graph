@@ -18,8 +18,8 @@ CHỐNG SEMANTIC DRIFT:
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
 from datetime import datetime, timezone
+from typing import Any
 
 
 @dataclass
@@ -96,7 +96,7 @@ class SentinelState:
     """
 
     # === IOC REGISTRY (KHÔNG được tóm tắt — chỉ append) ===
-    extracted_iocs: List[Dict[str, Any]] = field(default_factory=list)
+    extracted_iocs: list[dict[str, Any]] = field(default_factory=list)
     """
     Mảng JSON cứng lưu tất cả IOCs đã phát hiện.
     Mỗi phần tử là dict từ IOCEntry.to_dict().
@@ -105,14 +105,14 @@ class SentinelState:
     """
 
     # === DECISION HISTORY (audit trail) ===
-    decisions: List[Dict[str, Any]] = field(default_factory=list)
+    decisions: list[dict[str, Any]] = field(default_factory=list)
     """
     Lịch sử quyết định. Mỗi phần tử là dict từ AgentDecision.to_dict().
     Không xóa, không sửa, chỉ append.
     """
 
     # === CURRENT BATCH DATA (reset mỗi cycle) ===
-    current_batch_logs: List[Dict[str, Any]] = field(default_factory=list)
+    current_batch_logs: list[dict[str, Any]] = field(default_factory=list)
     """Log entries của batch hiện tại (đã qua Guardrails)."""
 
     current_batch_encapsulated: str = ""
@@ -139,7 +139,7 @@ class SentinelState:
     """Timestamp ISO format của lần cập nhật state gần nhất."""
 
     # === FEEDBACK LOOP ===
-    pending_rules: List[Dict[str, Any]] = field(default_factory=list)
+    pending_rules: list[dict[str, Any]] = field(default_factory=list)
     """
     Rules mới sinh bởi Agent chờ đẩy về Tier 1.
     Sau khi feedback_listener xử lý, list này được clear.
@@ -152,7 +152,6 @@ class SentinelState:
     Chứa IP reputation, organizational context, APT indicators.
     Inject vào prompt để Agent biết lịch sử IP trước khi phân tích.
     """
-
 
     # === HELPER METHODS ===
 
@@ -270,4 +269,3 @@ class SentinelState:
         self.threat_memory_context = ""
         self.cycle_count += 1
         self.last_updated = datetime.now(timezone.utc).isoformat()
-

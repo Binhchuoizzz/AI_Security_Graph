@@ -16,12 +16,13 @@ KẾT QUẢ ĐẦU RA:
   experiments/results/latency_benchmark.json
 """
 
-import sys
-import os
-import time
 import json
-import numpy as np
+import os
+import sys
+import time
 from pathlib import Path
+
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -29,6 +30,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 def check_llm_server():
     """Kiểm tra máy chủ llama.cpp có đang chạy hay không. Thử kết nối với các port 5000 và 8080."""
     import urllib.request
+
     for port in [5000, 8080]:
         try:
             req = urllib.request.Request(f"http://localhost:{port}/v1/models")
@@ -50,11 +52,16 @@ def load_test_events(n=100):
         samples = json.load(f)
 
     benign = [s for s in samples if s.get("input", {}).get("cicids_label") == "Benign"]
-    malicious = [s for s in samples if s.get("input", {}).get("cicids_label") != "Benign"
-                 and s.get("input", {}).get("cicids_label") != "Adversarial"]
+    malicious = [
+        s
+        for s in samples
+        if s.get("input", {}).get("cicids_label") != "Benign"
+        and s.get("input", {}).get("cicids_label") != "Adversarial"
+    ]
 
     # Lấy tối đa n/2 mẫu từ mỗi nhóm
     import random
+
     random.seed(42)
     benign_sample = random.sample(benign, min(n // 2, len(benign)))
     malicious_sample = random.sample(malicious, min(n // 2, len(malicious)))
@@ -68,11 +75,11 @@ def load_test_events(n=100):
 
 def measure_two_tier(events: list) -> list:
     """Chạy pipeline 2 Lớp và trả về độ trễ của từng sự kiện (tính bằng ms)."""
-    from src.tier1_filter.rule_engine import RuleEngine
-    from src.guardrails.template_miner import LogTemplateMiner
-    from src.guardrails.prompt_filter import GuardrailsPipeline
-    from src.rag.retriever import DualRetriever
     from src.agent.llm_client import LLMClient
+    from src.guardrails.prompt_filter import GuardrailsPipeline
+    from src.guardrails.template_miner import LogTemplateMiner
+    from src.rag.retriever import DualRetriever
+    from src.tier1_filter.rule_engine import RuleEngine
 
     engine = RuleEngine()
     miner = LogTemplateMiner()
@@ -98,11 +105,18 @@ def measure_two_tier(events: list) -> list:
         safe_log = guard_result.get("batch_encapsulated", str(event))
 
         # RAG
-        context = retriever.retrieve(safe_log[:500])        # Giới hạn độ dài truy vấn
+        context = retriever.retrieve(safe_log[:500])  # Giới hạn độ dài truy vấn
 
         # LLM
         try:
-            _ = llm.invoke([{"role": "user", "content": str(context.get("combined_prompt", "")) + "\n" + safe_log[:1000]}])
+            _ = llm.invoke(
+                [
+                    {
+                        "role": "user",
+                        "content": str(context.get("combined_prompt", "")) + "\n" + safe_log[:1000],
+                    }
+                ]
+            )
         except Exception:
             # Cuộc gọi LLM thất bại, vẫn tính thời gian xử lý
             pass
@@ -140,7 +154,9 @@ def run(n_events: int = 100):
     if not check_llm_server():
         print("[SKIP] llama.cpp server not running on port 5000 or 8080.")
         print("       Start with one of:")
-        print("         llama-server -m ~/text-generation-webui/user_data/models/gemma-2-9b-it-Q6_K.gguf -ngl 35 --port 5000")
+        print(
+            "         llama-server -m ~/text-generation-webui/user_data/models/gemma-2-9b-it-Q6_K.gguf -ngl 35 --port 5000"
+        )
         print("         or set LLM_API_BASE=http://127.0.0.1:8080/v1")
         print("       Then re-run this script.")
 
@@ -185,7 +201,7 @@ Two-Tier (SENTINEL):
 
 Latency Reduction: {reduction_pct:.1f}%
 Target:            ≥ 60%
-Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
+Status:            {"✅ PASS" if reduction_pct >= 60 else "❌ FAIL"}
 ═══════════════════════════════════════
     """)
 
@@ -210,8 +226,8 @@ Status:            {'✅ PASS' if reduction_pct >= 60 else '❌ FAIL'}
     # Kiểm định thống kê Mann-Whitney U
     try:
         from scipy.stats import mannwhitneyu
-        stat, p_value = mannwhitneyu(two_tier_latencies, baseline_latencies,
-                                      alternative="less")
+
+        stat, p_value = mannwhitneyu(two_tier_latencies, baseline_latencies, alternative="less")
         print(f"Mann-Whitney U Test: stat={stat:.2f}, p={p_value:.6f}")
         print(f"Statistical significance: {'✅ p < 0.05' if p_value < 0.05 else '❌ p >= 0.05'}")
     except ImportError:

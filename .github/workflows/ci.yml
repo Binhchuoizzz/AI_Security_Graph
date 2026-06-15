@@ -16,8 +16,22 @@ permissions:
   issues: write
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run Ruff check
+      uses: astral-sh/ruff-action@v3
+      with:
+        args: "check --output-format=github"
+    - name: Run Ruff format check
+      uses: astral-sh/ruff-action@v3
+      with:
+        args: "format --check"
+
   test:
     runs-on: ubuntu-latest
+    needs: lint
     
     services:
       redis:

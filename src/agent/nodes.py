@@ -2,26 +2,27 @@
 LangGraph Nodes for SENTINEL Agent
 """
 
-import os
 import logging
+import os
 import time
-import mlflow  # type: ignore
-from typing import Dict, Any
+from typing import Any
 
-from src.agent.state import SentinelState
+import mlflow  # type: ignore
+
 from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
+from src.agent.state import SentinelState
 from src.agent.threat_memory import threat_memory
-from src.rag.retriever import DualRetriever
 from src.guardrails import (
-    GuardrailsPipeline,
-    DelimitedDataEncapsulator,
-    output_sanitizer,
-    loop_detector,
-    context_overflow_guard,
-    audit_logger,
     DecisionValidator,
+    DelimitedDataEncapsulator,
+    GuardrailsPipeline,
+    audit_logger,
+    context_overflow_guard,
+    loop_detector,
+    output_sanitizer,
 )
+from src.rag.retriever import DualRetriever
 from src.response.executor import block_ip, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
 
@@ -35,12 +36,12 @@ guardrails_pipeline = GuardrailsPipeline()
 decision_validator = DecisionValidator()
 
 
-def node_guardrails(state: SentinelState) -> Dict[str, Any]:
+def node_guardrails(state: SentinelState) -> dict[str, Any]:
     """
     Guardrails Node: Nén log và làm sạch trước khi đưa vào RAG/LLM.
     """
     logger.info("--- NODE: GUARDRAILS (MINING & FILTERING) ---")
-    
+
     # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_guardrails")
     if visit_res["action"] == "FORCE_STOP":
@@ -73,12 +74,12 @@ def node_guardrails(state: SentinelState) -> Dict[str, Any]:
     }
 
 
-def node_rag_context(state: SentinelState) -> Dict[str, Any]:
+def node_rag_context(state: SentinelState) -> dict[str, Any]:
     """
     RAG Context Node: Trích xuất thông tin từ batch log để query RAG.
     """
     logger.info("--- NODE: RAG CONTEXT ---")
-    
+
     # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_rag_context")
     if visit_res["action"] == "FORCE_STOP":
@@ -123,12 +124,12 @@ def node_rag_context(state: SentinelState) -> Dict[str, Any]:
     }
 
 
-def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
+def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     """
     LLM Triage Node: Phân tích toàn bộ cụm log (Incident-Level) và đưa ra 1 quyết định duy nhất.
     """
     logger.info("--- NODE: LLM TRIAGE ---")
-    
+
     # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_llm_triage")
     if visit_res["action"] == "FORCE_STOP":
@@ -151,7 +152,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
             ip_context = threat_memory.get_context_for_prompt(src_ip)
             if ip_context:
                 threat_context_parts.append(ip_context)
-    
+
     threat_memory_context = "\n".join(threat_context_parts)
 
     # Đóng gói Raw Logs (kết hợp với Guardrails Encapsulation)
@@ -162,15 +163,15 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         raw_logs_str = emergency_enc.encapsulate(raw_content)
 
     # Xây dựng Prompt (inject Guardrails system_instruction vào LLM)
-    rag_combined = f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nNIST SP 800-61r2:\n{state.rag_nist_context}"
+    rag_combined = (
+        f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nNIST SP 800-61r2:\n{state.rag_nist_context}"
+    )
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_combined)
 
     guardrails_instruction = getattr(state, "_guardrails_system_instruction", "")
     logger.info(f"Guardrails instruction length: {len(guardrails_instruction)}")
     if guardrails_instruction:
-        messages[0]["content"] = (
-            guardrails_instruction + "\n\n" + messages[0]["content"]
-        )
+        messages[0]["content"] = guardrails_instruction + "\n\n" + messages[0]["content"]
 
     if state.narrative_summary:
         messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
@@ -205,9 +206,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
 
     # Ghi nhận vào MLflow (Tracking)
     try:
-        mlflow.set_tracking_uri(
-            os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
-        )
+        mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
         mlflow.set_experiment("Sentinel_Reasoning_Latency")
         with mlflow.start_run(run_name=f"Triage_Cycle_{state.cycle_count}", nested=True):
             mlflow.log_metric("reasoning_latency_sec", latency_sec)
@@ -253,7 +252,8 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         "source_ip": target,
         "tier1_score": t1_score,
         "tier1_action": t1_action,
-        "guardrail_injected": validated_decision.get("_injection_detected", False) or decision_json.get("_injection_detected", False),
+        "guardrail_injected": validated_decision.get("_injection_detected", False)
+        or decision_json.get("_injection_detected", False),
         "agent_decision": action,
         "agent_reasoning": reasoning,
         "mitre_technique": validated_decision.get("mitre_technique", ""),
@@ -263,17 +263,15 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
         "metadata": {
             "total_logs_in_batch": len(state.current_batch_logs),
             "cycle_count": state.cycle_count,
-            "raw_decision": decision_json
-        }
+            "raw_decision": decision_json,
+        },
     }
     audit_logger.log_event(audit_event)
 
     # Record incident vào Long-Term Threat Memory
     if target != "UNKNOWN_TARGET" and action in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
         threat_memory.record_incident(
-            ip=target,
-            action=action,
-            mitre_technique=validated_decision.get("mitre_technique", "")
+            ip=target, action=action, mitre_technique=validated_decision.get("mitre_technique", "")
         )
         apt_check = threat_memory.check_apt_pattern(target)
         # Chuỗi APT đa-ngày EMERGENT (threat_events — tích lũy từ luồng gộp online)
@@ -288,7 +286,7 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
                 indicator_value=target,
                 confidence=confidence,
                 related_ips=target,
-                mitre_chain=validated_decision.get("mitre_technique", "")
+                mitre_chain=validated_decision.get("mitre_technique", ""),
             )
         elif apt_chain.get("is_apt"):
             logger.warning(
@@ -312,12 +310,12 @@ def node_llm_triage(state: SentinelState) -> Dict[str, Any]:
     }
 
 
-def node_action_executor(state: SentinelState) -> Dict[str, Any]:
+def node_action_executor(state: SentinelState) -> dict[str, Any]:
     """
     Action Executor Node: Xử lý các action BLOCK_IP hoặc ALERT.
     """
     logger.info("--- NODE: ACTION EXECUTOR ---")
-    
+
     # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_action_executor")
     if visit_res["action"] == "FORCE_STOP":
@@ -325,7 +323,7 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
 
     latest_decision = state.decisions[-1] if state.decisions else {}
     action = latest_decision.get("action", "UNKNOWN")
-    
+
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
@@ -339,7 +337,7 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
         )
 
         rule_pattern = latest_decision.get("target", "UNKNOWN_IP")
-        
+
         # Gọi feedback listener (chạy qua FeedbackValidator ngầm định)
         FeedbackListener().receive_new_rule(
             "Source IP",
@@ -357,31 +355,30 @@ def node_action_executor(state: SentinelState) -> Dict[str, Any]:
     return {}
 
 
-def node_human_in_the_loop(state: SentinelState) -> Dict[str, Any]:
+def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     """
     HITL Node: Treo lại các cảnh báo phức tạp hoặc Parse Failures.
     """
     logger.info("--- NODE: HUMAN IN THE LOOP (AWAIT_HITL) ---")
-    
+
     # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_human_in_the_loop")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
 
     latest_decision = state.decisions[-1] if state.decisions else {}
-    
+
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
     formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {raw_reasoning}"
-    
-    logger.warning(
-        f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}"
-    )
-    
+
+    logger.warning(f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}")
+
     from src.response.executor import _log_to_db
+
     _log_to_db("AWAIT_HITL", latest_decision.get("target", "UNKNOWN_TARGET"), formatted_reasoning)
-    
+
     return {}
 
 
