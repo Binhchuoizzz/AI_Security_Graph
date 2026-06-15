@@ -14,7 +14,7 @@ To protect enterprise environments without incurring prohibitive computational l
     \label{fig:soc_ai_concept}
 \end{figure}
 
-The first tier, designated as Tier-1, acts as a stateless, high-velocity transport and filtration layer situated directly at the network boundary. Telemetry data from firewalls, network sensors, and host agents is ingested as packet capture streams or flow logs. Tier-1 operates at wire-speed, calculating real-time statistical deviations on incoming telemetry to instantly drop or log benign packets while forwarding anomalous logs to Tier-2. Conversely, Tier-2 is designated as a stateful, high-reasoning cognitive layer. Driven by an autonomous AI agent orchestrated via LangGraph \cite{langgraph2024}, Tier-2 receives escalated alerts, retrieves domain-specific cybersecurity knowledge, chains historical context, and outputs structured response decisions (such as recommending firewall updates). This hybrid layout resolves the LLM latency bottleneck by offloading up to 95\% of benign traffic at Tier-1, reserving deep LLM inference solely for complex threat investigations.
+The first tier, designated as Tier-1, acts as a stateless, high-velocity transport and filtration layer situated directly at the network boundary. Telemetry data from firewalls, network sensors, and host agents is ingested as packet capture streams or flow logs. Tier-1 operates at wire-speed, calculating real-time statistical deviations on incoming telemetry to instantly drop or log benign packets while forwarding anomalous logs to Tier-2. Conversely, Tier-2 is designated as a stateful, high-reasoning cognitive layer. Driven by an autonomous AI agent orchestrated via LangGraph \cite{langgraph2024}, Tier-2 receives escalated alerts, retrieves domain-specific cybersecurity knowledge, chains historical context, and outputs structured response decisions (such as recommending firewall updates). This hybrid layout resolves the LLM latency bottleneck by offloading the vast majority of benign traffic at Tier-1---quantified empirically in Chapter~4---reserving deep LLM inference solely for complex threat investigations.
 
 The detailed step-by-step runtime flow of the data processing and decision-making logic throughout the system is represented in the system execution flow diagram shown in Figure~\ref{fig:sentinel_flow}.
 
@@ -25,66 +25,50 @@ The detailed step-by-step runtime flow of the data processing and decision-makin
     \label{fig:sentinel_flow}
 \end{figure}
 
-As shown in the runtime flow, the process starts immediately when a network flow log is captured. Tier-1 intercepts it and applies rule matching via the Rule Engine. If a static signature matches, a direct DROP or WARN is executed. Otherwise, the numeric statistics are calculated and Z-Score is computed. Benign logs are written directly to the database, while anomalous logs with Z-Score exceeding the threshold are escalated. Tier-2 processes escalated logs by first applying delimiters, running the Drain log parser algorithm \cite{he2017drain} for event template extraction, and performing a Semantic Cache look-up. On cache hit, the executor processes it instantly; on cache miss, the LangGraph agent is activated. The agent queries Threat Memory and invokes the LLM triage node, routing dynamically to Dual-RAG if domain knowledge is required. Once resolved, the output is validated, sanitized, and written to the database with HMAC chain security, executing firewall blocks or alerting analysts via the Streamlit HITL dashboard.
+As shown in the runtime flow, the process starts immediately when a network flow log is captured. Tier-1 intercepts it and applies signature matching via the Rule Engine; a WAF or injection signature match yields a direct \texttt{BLOCK\_IP} or \texttt{ESCALATE} verdict, while whitelisted traffic is dropped. Otherwise, the numeric statistics are updated and a Z-Score is computed. Benign logs are dropped or written to the local decision log, whereas logs whose risk score exceeds the threshold are escalated. Tier-2 then processes the escalated batch by first compressing and nonce-encapsulating it---running the Drain log parser \cite{he2017drain} for event template extraction---before \emph{unconditionally} retrieving grounding context from the Dual-RAG knowledge base (accelerated by a Semantic Cache for recurring templates) together with long-term Threat Memory. The LangGraph agent subsequently invokes the LLM triage node to emit a single structured verdict. Once resolved, the output is validated, sanitized, and written to the database with HMAC chain security, executing firewall blocks or routing the alert to the Streamlit HITL dashboard.
 
 \section{Tier-1: Stateless Wire-Speed Filter (RuleEngine \& Welford)}
 
-The Tier-1 filtration engine is responsible for ingestion and real-time processing of high-velocity log streams. To manage connection state without incurring disk I/O bottlenecks, the engine incorporates a temporal session baseline manager that maps active source IP addresses. For each active IP session, the system computes statistical traffic features using Welford's online algorithm \cite{welford1962}. The mathematical formulation of Welford's algorithm calculates the running mean $\mu_k$ and the sum of squared differences $M_{2,k}$ over a continuous stream of numerical log attributes (such as flow duration, packet counts, or byte size) at step $k$:
-
-\begin{equation}
-    \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}
-\end{equation}
-
-\begin{equation}
-    M_{2,k} = M_{2,k-1} + (x_k - \mu_{k-1})(x_k - \mu_k)
-\end{equation}
-
-From these running statistics, the rolling variance $\sigma_k^2$ is calculated as:
-
-\begin{equation}
-    \sigma_k^2 = \frac{M_{2,k}}{k}
-\end{equation}
-
-For each incoming log payload, the system computes the Z-Score $Z$ of the characteristic traffic attributes:
+The Tier-1 filtration engine is responsible for ingestion and real-time processing of high-velocity log streams. To manage connection state without incurring disk I/O bottlenecks, the engine incorporates a temporal session baseline manager that maps active source IP addresses. For each active IP session, the system computes statistical traffic features using Welford's online algorithm \cite{welford1962}. The running mean $\mu_k$ and sum-of-squared-differences $M_{2,k}$ recurrences introduced in Section~\ref{sec:welford} (Equations~\ref{eq:welford_mean}--\ref{eq:welford_var}) yield a numerically stable rolling variance $\sigma_k^2$ over a continuous stream of numerical log attributes (such as flow duration, packet counts, or byte size). For each incoming log payload, the system then computes the Z-Score $Z$ of these characteristic traffic attributes:
 
 \begin{equation}
     Z = \frac{x_k - \mu_k}{\sigma_k}
 \end{equation}
 
-If the Z-Score exceeds a critical threshold (defined by config, e.g., $\alpha > 3.5\sigma$), the packet is labeled with an `ESCALATE` action and forwarded to Tier-2. To preserve the temporal event chains of low-and-slow campaigns, the system continues updating session baselines. Alongside Welford-based statistical checks, Tier-1 runs a static \texttt{RuleEngine} that performs fast regex signature matching to instantly intercept known command patterns (such as SQL injection syntax) and enforce static `DROP` or `WARN` actions, bypassing Tier-2.
+If the Z-Score exceeds a critical threshold (defined by config, e.g., $\alpha > 3.5\sigma$), the packet is labeled with an `ESCALATE` action and forwarded to Tier-2. To preserve the temporal event chains of low-and-slow campaigns, the system continues updating session baselines. Alongside Welford-based statistical checks, Tier-1 runs a static \texttt{RuleEngine} that performs fast regex signature matching to instantly intercept known command patterns (such as SQL injection syntax) and enforce static \texttt{DROP} or \texttt{BLOCK\_IP} actions, bypassing Tier-2.
 
 In the software implementation, Tier-1 is written in Python utilizing two primary classes: \texttt{RunningStats} and \texttt{SessionBaseline}. The \texttt{RunningStats} class maintains the running counts, mean, and sum of squares in memory, executing the mathematical updates in O(1) time complexity. To prevent memory exhaustion from tracking an unbounded number of unique IP sessions, the \texttt{SessionBaseline} class structures mapping via a hash table with a garbage-collection daemon that periodically purges inactive sessions based on a configurable Time-To-Live (TTL) parameter. The static signature matches are handled efficiently by compile-time pre-compiled regex objects in Python's \texttt{re} library.
 
 \section{Tier-2: LangGraph Stateful Cognitive AI Agent}
 
-Escalated anomalous flows are received by the Tier-2 cognitive engine, which is modeled as a stateful Directed Acyclic Graph functioning as a Finite State Machine (FSM) using LangGraph \cite{langgraph2024}. The session data and reasoning context are carried within a central state object, \texttt{SentinelState}. The agent's workflow contains three primary nodes: an analyze node, a retrieve node, and a resolve node. In the analyze node, the agent evaluates the escalated log context using a locally deployed quantized Gemma 2 language model \cite{gemma_2_2024} to perform initial risk categorization. If the agent identifies a deficit in domain-specific knowledge (such as an unknown CVE or unfamiliar signature), it triggers a conditional routing transition to the retrieve node. In the retrieve node, the system queries the hybrid vector-keyword knowledge base. The routing states and transitions are outlined in Table~\ref{tab:agent_fsm_transitions}.
+Escalated anomalous flows are received by the Tier-2 cognitive engine, modeled as a stateful Directed Acyclic Graph (DAG) compiled by LangGraph \cite{langgraph2024} and functioning as a Finite State Machine (FSM). The session data and reasoning context are carried within a central state object, \texttt{SentinelState}. The compiled graph chains a guardrails node (compression and delimited encapsulation), a RAG-context node, and an LLM-triage node in sequence, terminating in one of two action nodes (an action executor or a human-in-the-loop handler). The RAG-context node \emph{unconditionally} retrieves grounding context from the hybrid vector-keyword knowledge base before triage, rather than being reached through a knowledge-deficit branch. The LLM-triage node then evaluates the escalated batch using a locally deployed quantized Gemma 2 language model \cite{gemma_2_2024} and emits a single structured verdict. The graph routes deterministically on this validated action---high-severity verdicts proceed to the action executor, ambiguous or low-confidence verdicts are diverted to the human-in-the-loop queue, and benign verdicts terminate the cycle---without looping back. The routing states and transitions are outlined in Table~\ref{tab:agent_fsm_transitions}.
 
 \begin{table}[H]
     \centering
     \caption{State Transition Matrix of the Tier-2 Cognitive Agent FSM.}
     \label{tab:agent_fsm_transitions}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.15\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.15\textwidth}|>{\raggedright\arraybackslash}p{0.22\textwidth}|}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.23\textwidth}|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.19\textwidth}|>{\raggedright\arraybackslash}p{0.15\textwidth}|}
         \hline
         \textbf{Current State} & \textbf{Input / Condition} & \textbf{Next State} & \textbf{Output Action} \\
         \hline
-        \texttt{INIT} & Alert Ingested & \texttt{ANALYZE} & Load Session Context \\
+        \texttt{GUARDRAILS} & Escalated batch ingested & \texttt{RAG\_CONTEXT} & Compress \& nonce-encapsulate logs \\
         \hline
-        \texttt{ANALYZE} & High Confidence / Known Threat & \texttt{RESOLVE} & Threat Category \\
+        \texttt{RAG\_CONTEXT} & Grounding context retrieved & \texttt{LLM\_TRIAGE} & Append MITRE\slash NIST context \\
         \hline
-        \texttt{ANALYZE} & Low Confidence / Missing Info & \texttt{RETRIEVE} & Search Queries \\
+        \texttt{LLM\_TRIAGE} & action $\in$ \{\texttt{BLOCK\_IP}, \texttt{ALERT}\} & \texttt{ACTION\_EXEC} & Enforce block / raise alert \\
         \hline
-        \texttt{RETRIEVE} & Knowledge Retrieved & \texttt{ANALYZE} & Append Context to State \\
+        \texttt{LLM\_TRIAGE} & action = \texttt{AWAIT\_HITL} (or \texttt{BLOCK\_IP} with confidence $<0.5$) & \texttt{HITL} & Queue for SOC analyst \\
         \hline
-        \texttt{RESOLVE} & Confidence $\ge 0.7$ & \texttt{EXECUTE} & Recommended Response \\
+        \texttt{LLM\_TRIAGE} & action $\in$ \{\texttt{LOG}, \texttt{DROP}\} & \texttt{END} & Close cycle \\
         \hline
-        \texttt{RESOLVE} & Confidence $< 0.7$ & \texttt{HITL} & Escalate to SOC Analyst \\
+        \texttt{ACTION\_EXEC} / \texttt{HITL} & Action completed & \texttt{END} & Write HMAC audit record \\
         \hline
     \end{tabular}
 \end{table}
 
-Once retrieval completes, the flow loops back to the analyze node, which re-evaluates the logs with the added contextual details. This iterative cycle prevents hallucinations by grounding LLM reasoning in verified documents. Once confidence reaches the threshold, the agent transitions to the resolve node to generate a structured JSON payload detailing threat class, confidence, and recommended block rules. If confidence is low, the agent routes the alert to the Human-in-the-Loop (HITL) queue.
+Grounding the triage node in the retrieved MITRE/NIST documents constrains the LLM to verified context, mitigating hallucination. The triage node emits a structured JSON payload detailing the threat class, a confidence score, and recommended block rules. High-confidence malicious verdicts are dispatched to the action executor, whereas low-confidence or explicitly ambiguous verdicts are routed to the Human-in-the-Loop (HITL) queue for analyst review. A deterministic \texttt{DecisionValidator} additionally demotes any \texttt{BLOCK\_IP} verdict whose confidence falls below 0.5 to \texttt{AWAIT\_HITL}, and overrides the LLM to \texttt{AWAIT\_HITL} whenever it contradicts a Tier-1 attack signal (the tier-consensus guard against semantic social-engineering).
 
-The technical implementation of the state graph utilizes LangGraph's compiler. The state is represented as a structured Python typed dictionary containing append-only fields like \texttt{extracted\_iocs} and \texttt{decisions} to prevent semantic drift during the iterative LLM triage loop. The LLM connection is managed via the \texttt{OpenAILLMClient} class connecting to a local quantized llama.cpp service running the Gemma 2 model \cite{gemma_2_2024}, configured with strict parameters including \texttt{temperature=0.0} and a fixed context size token window to ensure high determinism and prevent resource depletion.
+The technical implementation of the state graph utilizes LangGraph's compiler. The state is represented as a structured Python typed dictionary containing append-only fields like \texttt{extracted\_iocs} and \texttt{decisions} to prevent semantic drift across the triage pipeline. The LLM connection is managed via the \texttt{LLMClient} class connecting to a local quantized llama.cpp service running the Gemma 2 model \cite{gemma_2_2024}, configured with strict parameters including \texttt{temperature=0.1} and a fixed context-size token window to ensure near-deterministic reasoning and prevent resource depletion.
 
 \section{Dual-RAG Mechanism and Semantic Memory}
 
@@ -115,7 +99,7 @@ The scores from the dense (FAISS) and sparse (BM25) pipelines are consolidated u
     R(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}
 \end{equation}
 
-where $r_m(d)$ is the rank of document $d$ in search run $m$, and $k$ is a constant scaling parameter (typically $k=60$). To bypass the LLM latency bottleneck, a Semantic Cache module sits before the agent. The cache computes the embedding cosine similarity between the incoming query and historical query entries. If similarity exceeds $\theta \ge 0.95$, the system serves the cached response, reducing processing time from seconds to milliseconds. The semantic cache is implemented as an LRU (Least Recently Used) cache backed by a local SQLite DB, enabling persistence across system restarts.
+where $r_m(d)$ is the rank of document $d$ in search run $m$, and $k$ is a constant scaling parameter (typically $k=60$). To avoid redundant embedding and search overhead, a Semantic Cache module sits before the retrieval pipeline. The cache derives a deterministic key by computing the SHA-256 digest of the mined log template, so escalated logs that share the same attack template reuse a previously computed retrieval result instead of re-embedding and re-searching, reducing per-query processing time from hundreds of milliseconds to microseconds. The cache is implemented as an in-memory Least Recently Used (LRU) structure (a Python \texttt{OrderedDict}) bounded to 500 entries, with an 1800-second Time-To-Live (TTL) that evicts stale templates.
 
 \section{Threat Memory and APT Campaign Correlation}
 
@@ -125,15 +109,17 @@ Stealthy threat actors frequently split their attack chains into low-severity ev
     \centering
     \caption{Threat Memory Database Schema Specifications.}
     \label{tab:threat_memory_schema}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.33\textwidth}|>{\raggedright\arraybackslash}p{0.28\textwidth}|}
         \hline
         \textbf{Table Name} & \textbf{Primary Fields} & \textbf{Functional Purpose} \\
         \hline
-        \texttt{ip\_reputation} & \texttt{ip\_address} (PK), \texttt{score}, \texttt{last\_seen}, \texttt{status} & Tracks the reputation score (0-100) and lifecycle of source IPs. \\
+        \texttt{ip\_reputation} & \texttt{ip} (PK), \texttt{reputation\_score}, \texttt{total\_incidents}, \texttt{total\_blocks}, \texttt{first\_seen}, \texttt{last\_seen}, \texttt{last\_mitre\_technique} & Tracks the long-term reputation score (0--100) and incident history of source IPs, subject to time decay. \\
         \hline
-        \texttt{known\_entities} & \texttt{entity\_name} (PK), \texttt{ip\_address}, \texttt{role} & Pre-seeds verified internal services (e.g., AD, DNS) to minimize false alerts. \\
+        \texttt{known\_entities} & \texttt{id} (PK), \texttt{entity\_type}, \texttt{entity\_value} (unique), \texttt{description}, \texttt{is\_active} & Pre-seeds verified internal tools/services (e.g., AD, scanners) to suppress false positives. \\
         \hline
-        \texttt{threat\_events} & \texttt{event\_id} (PK), \texttt{ip\_address}, \texttt{timestamp}, \texttt{alert\_type}, \texttt{severity} & Records the historical sequence of escalated alerts for correlation. \\
+        \texttt{threat\_events} & \texttt{id} (PK), \texttt{src\_ip}, \texttt{dst\_ip}, \texttt{apt\_phase}, \texttt{apt\_day}, \texttt{label}, \texttt{timestamp} & Records individual escalated events for emergent multi-day APT chain correlation. \\
+        \hline
+        \texttt{apt\_indicators} & \texttt{id} (PK), \texttt{indicator\_type}, \texttt{indicator\_value}, \texttt{confidence}, \texttt{occurrence\_count}, \texttt{mitre\_chain} & Stores confirmed APT correlation indicators for long-term campaign monitoring. \\
         \hline
     \end{tabular}
 \end{table}
@@ -144,11 +130,11 @@ The reputation score of an IP address escalates based on the severity of the ale
     S_{new} = S_{old} \times (1 - \lambda)^{t}
 \end{equation}
 
-where $\lambda$ is the decay rate and $t$ is the inactive time elapsed. An APT correlation algorithm scans the \texttt{threat\_events} table. If a single source IP triggers anomalies across multiple distinct days or across multiple distinct phases of the MITRE ATT\&CK matrix, the system automatically elevates the threat classification to high-severity, triggering defensive blocks. In the database implementation, SQL triggers and query wrappers calculate these temporal intervals and reputation increments automatically, avoiding memory overhead on the python agent.
+where $\lambda$ is the decay rate and $t$ is the inactive time elapsed. An APT correlation routine scans the \texttt{threat\_events} table. If a single source IP triggers anomalies across at least two distinct days (optionally spanning multiple kill-chain phases), the system automatically elevates the threat classification to high-severity, treating it as an emergent multi-day campaign rather than an isolated event. In the implementation, these temporal intervals and reputation increments are computed by Python-side upsert and aggregation queries over the SQLite store, avoiding the need to hold long-term state in the agent's working memory.
 
 \section{AI Security Guardrails and Encapsulation Layer}
 
-Because LLMs are vulnerable to instruction hijacking, the SENTINEL system implements a multi-layered AI Security Guardrails layer to isolate the reasoning engine from untrusted inputs \cite{promptinjection2023}. The core defense mechanism relies on Delimited Data Encapsulation. For each session, the system generates a cryptographically secure, randomized hexadecimal token (e.g., \texttt{<|DATA\_8F3E|>}) using Python's \texttt{os.urandom()}. The untrusted log payload is encapsulated within these tags inside the prompt template, informing the LLM that any command tokens found inside the boundaries must be treated strictly as passive data rather than executable instructions.
+Because LLMs are vulnerable to instruction hijacking, the SENTINEL system implements a multi-layered AI Security Guardrails layer to isolate the reasoning engine from untrusted inputs \cite{promptinjection2023}. The core defense mechanism relies on Delimited Data Encapsulation. For each session, the system generates a cryptographically secure, randomized hexadecimal token (e.g., \texttt{<|DATA\_8F3E|>}) using Python's \texttt{secrets.token\_hex()} routine (built on \texttt{os.urandom}). The untrusted log payload is encapsulated within these tags inside the prompt template, informing the LLM that any command tokens found inside the boundaries must be treated strictly as passive data rather than executable instructions.
 
 To defend against Token Denial-of-Service (DoS) and context overflow attacks, the system incorporates a Log Template Miner based on the Drain log parsing algorithm \cite{he2017drain}. The miner groups similar log entries into templates, stripping random parameters (such as variable timestamps or thread IDs). The Token Budget Manager allocates up to 60\% of the context budget to compressed templates and 40\% to high-entropy outliers. Finally, an Output Sanitization Filter enforces strict JSON schema conformance, verifying that the LLM response contains only allowed fields and stripping markdown image tags, SVG scripts, and hex-encoded bypass vectors \cite{watchtower2026}. The sanitization is implemented using the \texttt{output\_sanitizer} module which intercepts LLM outputs before they are processed by the database or dashboard.
 
@@ -162,7 +148,7 @@ To secure the security log database against tampering by malicious insiders or a
 
 where $D_i$ is the payload data of the current log, $H_{i-1}$ is the hash of the previous log record, and $K$ is the secret HMAC key stored securely. If an attacker attempts to alter a log label or delete an entry, the hash chain breaks, and the validation checks run by the dashboard immediately flag the tampering. Additionally, the system protects the RAG vector database against semantic poisoning attacks. The vector database files are monitored by a checksum manager that calculates and compares SHA-256 hashes of the files before loading them into memory, ensuring that no malicious documents have been injected into the agent's retrieval memory.
 
-The implementation is encapsulated within the \texttt{HMACHashing} and \texttt{ActionValidator} classes. The \texttt{ActionValidator} class enforces an allowlist of valid security actions, detecting and rejecting any shell metacharacters inside the fields of incoming payloads to eliminate remote code execution (RCE) attempts during firewall script orchestration.
+The integrity chaining is implemented in the audit-logging routine, while an \texttt{ActionValidator} class enforces an allowlist of valid security actions, detecting and rejecting any shell metacharacters inside the fields of incoming payloads to eliminate remote code execution (RCE) attempts during firewall script orchestration.
 
 \section{SOC Administration Dashboard Implementation (Streamlit UI)}
 
@@ -174,4 +160,4 @@ System deployment is virtualized using Docker, specified in a multi-stage \textt
 
 \section{Chapter Summary}
 
-This chapter has established the comprehensive system design and technical implementation details of the SENTINEL security architecture. By merging wire-speed stateless filtration (Tier-1) with stateful cognitive agentic reasoning (Tier-2) and wrapping the entire system in robust cryptographic and AI-specific guardrails, the framework effectively balances high throughput with secure deep reasoning. The Streamlit administration dashboard bridges this automated system with human oversight via the HITL queue, and the multi-stage Docker setup ensures isolated, reproducible deployments. Chapter 4 will delineate the empirical evaluation, presenting performance logs, ablation studies, and biostatistical test results verifying the capabilities of this merged architecture.
+This chapter has established the comprehensive system design and technical implementation details of the SENTINEL security architecture. By merging wire-speed stateless filtration (Tier-1) with stateful cognitive agentic reasoning (Tier-2) and wrapping the entire system in robust cryptographic and AI-specific guardrails, the framework effectively balances high throughput with secure deep reasoning. The Streamlit administration dashboard bridges this automated system with human oversight via the HITL queue, and the multi-stage Docker setup ensures isolated, reproducible deployments. Chapter 4 will delineate the empirical evaluation, presenting performance logs, ablation studies, and statistical test results verifying the capabilities of this merged architecture.

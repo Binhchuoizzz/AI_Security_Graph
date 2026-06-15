@@ -24,7 +24,7 @@ The emergence of Large Language Models (LLMs) based on the Transformer architect
 
 However, executing LLMs within a SOC is constrained by data sovereignty requirements. Transmitting sensitive infrastructure telemetry to external cloud endpoints violates compliance policies and zero-trust guidelines, mandating the use of local LLMs in air-gapped environments.
 
-Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. Quantization mathematically projects continuous weight parameters (such as FP16) onto discrete, lower-bit representations (such as INT4) \cite{quantization2021}. Utilizing GGUF formats and the Q4\_K\_M quantization standard via the \texttt{llama.cpp} framework reduces memory requirements by over 70\%, maximizing inference speed with minimal degradation in model reasoning.
+Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. Quantization mathematically projects continuous weight parameters (such as FP16) onto discrete, lower-bit representations (such as INT4) \cite{quantization2021}. Utilizing GGUF formats and the Q6\_K quantization standard via the \texttt{llama.cpp} framework reduces the memory footprint to approximately 7--8\,GB of VRAM---a reduction of over 50\%---maximizing inference speed with minimal degradation in model reasoning.
 
 \section{Agentic AI Architecture and State-Graph Models}
 
@@ -39,7 +39,7 @@ These autonomous agents are modeled mathematically as stateful Directed Graphs f
     \label{fig:fsm_workflow}
 \end{figure}
 
-Stateful multi-actor orchestration paradigms \cite{langgraph2024} allow cogs to retain contextual working memory across multiple processing loops, enabling iterative decision refinement. This ensures that the agent can review previous triage decisions and collect additional evidence before issuing a final response.
+Stateful multi-actor orchestration paradigms \cite{langgraph2024} allow agents to retain contextual working memory across multiple processing loops, enabling iterative decision refinement. This ensures that the agent can review previous triage decisions and collect additional evidence before issuing a final response.
 
 \section{Retrieval-Augmented Generation (RAG) and Hybrid Search Optimization}
 
@@ -53,7 +53,7 @@ Standardizing rank consolidation via reciprocal rank scoring heuristics \cite{rr
 
 Deploying LLMs as core reasoning engines in security pipelines introduces novel vulnerabilities, primarily adversarial AI manipulations. Because LLMs process natural language inputs without a structural compile-time separation between code and data, they are vulnerable to instruction hijacking \cite{promptinjection2023}.
 
-The cogs are exposed to critical cognitive manipulation risks via log-substrate prompt injections \cite{watchtower2026}, where adversaries exploit log ingestion pipelines to deliver adversarial instructions. Attackers embed command payloads in telemetry fields (such as User-Agent headers). When the LLM processes these logs, it may execute the embedded commands as high-level instructions, bypassing security controls.
+The agents are exposed to critical cognitive manipulation risks via log-substrate prompt injections \cite{watchtower2026}, where adversaries exploit log ingestion pipelines to deliver adversarial instructions. Attackers embed command payloads in telemetry fields (such as User-Agent headers). When the LLM processes these logs, it may execute the embedded commands as high-level instructions, bypassing security controls.
 
 \begin{figure}[H]
     \centering
@@ -86,21 +86,25 @@ Furthermore, attackers use advanced techniques such as encoding bypasses (Base64
 \end{table}
 
 \section{Welford's Online Statistical Algorithm}
+\label{sec:welford}
 
 While Agentic AI provides robust threat reasoning, the quadratic computational complexity of LLM attention mechanisms prevents them from analyzing massive raw log streams at wire-speed. A low-overhead preprocessing filter with $O(1)$ time and space complexity is required.
 
 Computing rolling network baselines over continuous data streams requires numerically stable online statistical methods, such as Welford's algorithm \cite{welford1962}, to track running means and variances without accumulating floating-point errors:
 
 \begin{equation}
+    \label{eq:welford_mean}
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}
 \end{equation}
 
 \begin{equation}
+    \label{eq:welford_m2}
     M_{2,k} = M_{2,k-1} + (x_k - \mu_{k-1})(x_k - \mu_k)
 \end{equation}
 
 \begin{equation}
-    \sigma_k^2 = \frac{M_{2,k}}{k}
+    \label{eq:welford_var}
+    \sigma_k^2 = \frac{M_{2,k}}{k-1}
 \end{equation}
 
 By maintaining these parameters with a constant memory footprint, the system calculates a normalized Z-Score for each log packet. This enables the rapid elimination of benign network traffic, bypassing the LLM latency bottleneck while preserving the contextual event chains of low-and-slow attacks.

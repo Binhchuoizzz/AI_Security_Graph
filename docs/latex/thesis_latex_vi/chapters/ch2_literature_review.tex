@@ -24,7 +24,7 @@ Sự đột phá của các Mô hình Ngôn ngữ Lớn (LLM) dựa trên kiến
 
 Mặc dù vậy, việc ứng dụng LLM trong môi trường SOC bị ràng buộc chặt chẽ bởi các nguyên tắc về chủ quyền dữ liệu. Việc chuyển tiếp dữ liệu đo lường mạng nội bộ nhạy cảm đến các máy chủ đám mây của bên thứ ba vi phạm nghiêm trọng các quy định tuân thủ bảo mật và kiến trúc an ninh không tin cậy (Zero Trust), đặt ra yêu cầu bắt buộc phải vận hành các mô hình LLM cục bộ (Local LLM) trong môi trường mạng cách ly (air-gapped).
 
-Bên cạnh đó, việc thực thi các mô hình có quy mô hàng tỷ tham số tại chỗ đòi hỏi tài nguyên phần cứng cực kỳ lớn. Ví dụ, vận hành mô hình \textit{Gemma-2-9B-IT} với kích thước 9 tỷ tham số ở định dạng số thực dấu phẩy động 16-bit (FP16) cần tối thiểu khoảng 18GB dung lượng bộ nhớ đồ họa (VRAM). Để hiện thực hóa khả năng suy luận trên các phần cứng thương mại phổ thông, kỹ thuật lượng tử hóa mô hình (Model Quantization) được áp dụng. Về mặt toán học, lượng tử hóa thực hiện phép chiếu các tham số trọng số liên tục (như FP16) sang không gian biểu diễn rời rạc có số bit thấp hơn (như số nguyên 4-bit INT4) \cite{quantization2021}. Việc ứng dụng định dạng tập tin GGUF kết hợp tiêu chuẩn lượng tử hóa Q4\_K\_M thông qua thư viện \texttt{llama.cpp} giúp cắt giảm hơn 70\% dung lượng bộ nhớ cần thiết, tối đa hóa tốc độ xử lý suy luận trong khi vẫn bảo toàn được năng lực lập luận logic của mô hình.
+Bên cạnh đó, việc thực thi các mô hình có quy mô hàng tỷ tham số tại chỗ đòi hỏi tài nguyên phần cứng cực kỳ lớn. Ví dụ, vận hành mô hình \textit{Gemma-2-9B-IT} với kích thước 9 tỷ tham số ở định dạng số thực dấu phẩy động 16-bit (FP16) cần tối thiểu khoảng 18GB dung lượng bộ nhớ đồ họa (VRAM). Để hiện thực hóa khả năng suy luận trên các phần cứng thương mại phổ thông, kỹ thuật lượng tử hóa mô hình (Model Quantization) được áp dụng. Về mặt toán học, lượng tử hóa thực hiện phép chiếu các tham số trọng số liên tục (như FP16) sang không gian biểu diễn rời rạc có số bit thấp hơn (như số nguyên 4-bit INT4) \cite{quantization2021}. Việc ứng dụng định dạng tập tin GGUF kết hợp tiêu chuẩn lượng tử hóa Q6\_K thông qua thư viện \texttt{llama.cpp} giúp giảm dung lượng bộ nhớ xuống còn khoảng 7--8\,GB VRAM (mức cắt giảm trên 50\%), tối đa hóa tốc độ xử lý suy luận trong khi vẫn bảo toàn được năng lực lập luận logic của mô hình.
 
 \section{Kiến trúc AI Tác tử (Agentic AI) và Mô hình Đồ thị Trạng thái}
 
@@ -86,21 +86,25 @@ Bên cạnh đó, các tác nhân đe dọa còn sử dụng các kỹ thuật t
 \end{table}
 
 \section{Thuật toán Thống kê Trực tuyến Welford}
+\label{sec:welford}
 
 Mặc dù kiến trúc AI Tác tử cung cấp năng lực lập luận ngữ cảnh sâu sắc, độ phức tạp tính toán bậc hai của cơ chế attention trong LLM khiến chúng không thể đảm đương việc phân tích luồng nhật ký mạng thô khổng lồ ở tốc độ đường truyền. Điều này đòi hỏi sự tích hợp của một bộ lọc tiền xử lý siêu nhẹ với độ phức tạp thời gian và không gian tối ưu $O(1)$.
 
 Việc thiết lập các đường cơ sở (baseline) hành vi mạng trên các luồng dữ liệu liên tục đòi hỏi các phương pháp thống kê trực tuyến có độ ổn định số học cao, chẳng hạn như thuật toán Welford \cite{welford1962}. Thuật toán này cho phép cập nhật liên tục giá trị trung bình và phương sai mà không gặp phải các sai số tích lũy dấu phẩy động:
 
 \begin{equation}
+    \label{eq:welford_mean}
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}
 \end{equation}
 
 \begin{equation}
+    \label{eq:welford_m2}
     M_{2,k} = M_{2,k-1} + (x_k - \mu_{k-1})(x_k - \mu_k)
 \end{equation}
 
 \begin{equation}
-    \sigma_k^2 = \frac{M_{2,k}}{k}
+    \label{eq:welford_var}
+    \sigma_k^2 = \frac{M_{2,k}}{k-1}
 \end{equation}
 
 Nhờ việc duy trì các tham số này với tài nguyên bộ nhớ cố định, hệ thống dễ dàng xác định điểm Z-Score chuẩn hóa cho từng luồng dữ liệu. Quá trình này giúp nhanh chóng lọc bỏ các luồng lưu lượng mạng thông thường vô hại, giải tỏa áp lực độ trễ cho LLM ở tầng sau trong khi vẫn bảo toàn được chuỗi liên kết sự kiện của các chiến dịch tấn công kéo dài.
