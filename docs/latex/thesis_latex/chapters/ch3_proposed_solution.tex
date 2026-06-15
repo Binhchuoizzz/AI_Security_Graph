@@ -170,7 +170,7 @@ The Streamlit-based SOC Administration Dashboard follows a reactive model where 
 
 \section{Containerization and Infrastructure Deployment}
 
-System deployment is virtualized using Docker, specified in a multi-stage \texttt{Dockerfile} designed to minimize the final production image size. The build process compiles llama.cpp with CUDA support to enable GPU-accelerated local inference within the container. Infrastructure services are managed via \texttt{docker-compose.yml}, which links the agent reasoning container with the Streamlit dashboard container, sharing log and database directories using persistent volume mounts. This ensures that the SQLite databases (\texttt{threat\_memory.db} and \texttt{guardrails\_audit.db}) remain decoupled from transient container lifetimes.
+System deployment is virtualized using Docker, specified in a multi-stage \texttt{Dockerfile} designed to minimize the final production image size. The build process compiles llama.cpp with CUDA support to enable GPU-accelerated local inference within the container. Infrastructure services are managed via \texttt{docker-compose.yml}, which links the agent reasoning container with the Streamlit dashboard container, sharing log and database directories using persistent volume mounts. This ensures that the \texttt{threat\_memory.db} and \texttt{guardrails\_audit.db} SQLite databases remain decoupled from transient container lifetimes.
 
 \section{Chapter Summary}
 
