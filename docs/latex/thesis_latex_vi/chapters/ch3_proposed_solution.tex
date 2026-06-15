@@ -1,52 +1,28 @@
-\chapter{The Proposed SENTINEL Architecture}
+\chapter{Kiến trúc SENTINEL Đề xuất}
 \label{ch:proposed_solution}
 
 % Chapter introduction
-This chapter meticulously delineates the design of the SENTINEL system (Cognitive Two-Tier Architecture). Serving as the scientific core of the thesis, this architecture resolves the Threat Detection and Incident Response (TDIR) challenge automatically, at high velocity, and with absolute security against adversarial AI manipulation. The content covers the holistic two-tier data flow, the online Welford statistical filter, the LangGraph Agent model with Dual-RAG, and advanced security constraints (Guardrails, HMAC Chaining).
+Chương này trình bày chi tiết thiết kế kỹ thuật của hệ thống SENTINEL (Kiến trúc nhận thức hai tầng). Đóng vai trò là hạt nhân khoa học của luận văn, kiến trúc này tự động hóa quy trình Phát hiện Đe dọa và Phản hồi Sự cố (TDIR) ở tốc độ cao và đảm bảo an toàn tuyệt đối trước các thao túng AI đối kháng. Nội dung chương bao gồm luồng dữ liệu hai tầng tổng quát, bộ lọc thống kê trực tuyến Welford, mô hình tác tử LangGraph kết hợp Dual-RAG và các rào chắn bảo mật nâng cao (Rào chắn AI, Chuỗi HMAC).
 
-\section{Overview of the Two-Tier Cognitive Architecture}
-\begin{itemize}
-    \item \textbf{Holistic System Block Diagram:} Illustrating the data flow starting from log generation, traversing Tier-1 (Transport/Filter Layer), escalating to Tier-2 (Cognitive/AI Agent Layer), and culminating in the Database/Dashboard.
-    \item \textbf{Design Philosophy:} Separation of concerns—Tier-1 is strictly responsible for wire-speed noise filtration, while Tier-2 provides deep contextual analysis to resolve the blindness of static systems toward Zero-day threats.
-\end{itemize}
+\section{Tổng quan về Kiến trúc Nhận thức Hai tầng}
+Kiến trúc đề xuất được minh họa trực quan thông qua sơ đồ khối hệ thống tổng quát ánh xạ luồng dữ liệu đầu cuối. Luồng dữ liệu đo lường bắt đầu từ khâu sinh log, đi qua Tầng 1 (Tầng Vận chuyển và Lọc), leo thang lên Tầng 2 (Tầng Nhận thức và Tác tử AI) trong trường hợp phát hiện bất thường, và kết thúc bằng việc ghi nhận vào cơ sở dữ liệu cùng bảng điều khiển giám sát. Triết lý thiết kế cốt lõi dựa trên nguyên tắc phân tách trách nhiệm nghiêm ngặt, trong đó Tầng 1 chịu trách nhiệm duy nhất cho việc lọc nhiễu ở tốc độ đường truyền, còn Tầng 2 được chỉ định để phân tích ngữ cảnh sâu nhằm khắc phục sự mù lòa của các hệ thống luật tĩnh truyền thống trước các mối đe dọa Zero-day.
 
-\section{Tier-1: Real-Time Traffic Filtration Engine (RuleEngine \& Welford)}
-\begin{itemize}
-    \item \textbf{Session and Baseline Management:} Mechanisms for storing and updating network connection states temporally.
-    \item \textbf{Online Welford's Algorithm Mechanism:} Mathematical specification for computing Z-Scores per log stream. When a Z-Score exceeds threshold $\alpha$, the system generates an ESCALATE label for Tier-2 instead of dropping the packet.
-    \item \textbf{Static Rule Engine Integration:} Incorporation of fundamental signature-based rules (DROP, WARN) to instantly eliminate rudimentary, known attack patterns.
-\end{itemize}
+\section{Tầng 1: Bộ lọc Lưu lượng Mạng Thời gian thực (RuleEngine và Welford)}
+Công cụ Tầng 1 tích hợp các cơ chế quản lý phiên và đường cơ sở hành vi mạng để lưu trữ và cập nhật liên tục trạng thái kết nối theo thời gian thực. Thuật toán thống kê trực tuyến Welford thực hiện tính toán phương sai cuộn và giá trị trung bình để xác định điểm Z-Score cho từng luồng log. Khi điểm Z-Score vượt qua ngưỡng thiết lập $\alpha$, hệ thống sẽ gắn nhãn luồng dữ liệu là dị biệt và chuyển tiếp lên Tầng 2 để xử lý nhận thức thay vì loại bỏ trực tiếp gói tin. Thêm vào đó, công cụ này tích hợp một bộ luật tĩnh để loại bỏ ngay lập tức các mẫu tấn công cơ bản đã biết bằng các luật như DROP và WARN, giúp tiết kiệm tối đa tài nguyên tính toán cho hệ thống.
 
-\section{Tier-2: LangGraph Cognitive AI Agent}
-\begin{itemize}
-    \item \textbf{StateGraph Design:} The architectural structure of the \texttt{SentinelState} object carrying session information. Definition of core Nodes: Analyze, Retrieve, Resolve.
-    \item \textbf{Conditional Edges Routing:} The internal reasoning loop of the AI Agent. Upon identifying a knowledge deficit, the agent autonomously transitions to the \texttt{retrieve\_knowledge} state before returning to evaluation.
-\end{itemize}
+\section{Tầng 2: Tác tử AI Nhận thức LangGraph}
+Bộ suy luận nhận thức ở Tầng 2 được thiết kế dựa trên thư viện LangGraph, trong đó tác tử tự trị được mô hình hóa dưới dạng Đồ thị Trạng thái có hướng lưu giữ thông tin. Trung tâm của đồ thị là đối tượng \texttt{SentinelState} chứa các tham số phiên và ngữ cảnh phân tích xuyên suốt giữa các bước xử lý. Quy trình hoạt động định nghĩa ba nút thực thi chính bao gồm nút phân tích (analyze node) để đánh giá log ban đầu, nút truy xuất (retrieve node) để truy vấn kiến thức bên ngoài, và nút giải quyết (resolve node) để đề xuất hành động phản phó. Ngoài ra, tác tử tích hợp cơ chế định tuyến động qua các cạnh điều kiện, cho phép tự động chuyển dịch sang trạng thái truy xuất tri thức khi phát hiện thiếu hụt thông tin trước khi quay lại bước ra quyết định cuối cùng.
 
-\section{Dual-RAG Mechanism and Semantic Memory}
-\begin{itemize}
-    \item \textbf{Dual-RAG Architecture:} Unification of two specialized knowledge bases: MITRE ATT\&CK (TTP identification) and NIST SP 800-61r2 (Incident Response Handbook) \cite{nist80061}.
-    \item \textbf{Hybrid Search Algorithm:} The fusion of Dense (FAISS) and Sparse (BM25) scoring mechanisms utilizing RRF.
-    \item \textbf{Semantic Cache:} A semantic hashing mechanism to bypass LLM inference if a highly similar log stream was successfully analyzed earlier in the temporal window, drastically reducing latency.
-\end{itemize}
+\section{Cơ chế Sinh Tăng cường Truy xuất Kép (Dual-RAG) và Bộ nhớ Ngữ nghĩa}
+Để làm nền tảng tri thức cho các quyết định ứng phó của tác tử, kiến trúc triển khai cơ chế truy xuất kiến thức kép Dual-RAG. Hệ thống này hợp nhất hai cơ sở tri thức chuyên ngành riêng biệt bao gồm khung kỹ chiến thuật MITRE ATT\&CK để nhận diện hành vi tấn công và bộ kịch bản NIST SP 800-61r2 để định hướng quy trình phản hồi sự cố tiêu chuẩn \cite{nist80061}. Quá trình truy xuất được tối ưu hóa thông qua thuật toán tìm kiếm lai kết hợp độ tương đồng Cosine vector dày đặc từ FAISS và tìm kiếm từ khóa thưa thớt từ BM25, xếp hạng kết quả bằng Reciprocal Rank Fusion. Nhằm giảm thiểu độ trễ suy luận, một bộ đệm ngữ nghĩa sẽ chặn trước các truy vấn đầu vào, tái sử dụng ngay kết quả phân tích nếu phát hiện truy vấn tương tự đã được xử lý thành công trong cửa sổ thời gian gần nhất.
 
-\section{Threat Memory and APT Campaign Correlation}
-\begin{itemize}
-    \item \textbf{Graph Data / IP Correlation Storage (SQLite/Neo4j):} Logic for tracking the Reputation Score of IP addresses over prolonged timelines.
-    \item \textbf{APT Correlation Mechanism:} An algorithm to chain temporally scattered, low-severity anomalies into a cohesive high-severity escalation verdict, exposing low-and-slow campaigns.
-\end{itemize}
+\section{Bộ nhớ Đe dọa và Liên kết Chiến dịch APT}
+Khả năng liên kết và phát hiện các chiến dịch tấn công dài hạn được duy trì thông qua mô hình Bộ nhớ Đe dọa lưu trữ trên SQLite để theo dõi điểm uy tín của các địa chỉ IP theo thời gian. Hệ thống liên tục tính toán điểm uy tín của các thực thể bên ngoài dựa trên lịch sử tương tác. Thuật toán liên kết APT tiến hành quét các bản ghi này để xâu chuỗi các cảnh báo bất thường mức độ thấp nhưng rải rác theo thời gian từ cùng một nguồn thành một chiến dịch đe dọa mức độ nghiêm trọng cao, cho phép phát hiện sớm các chiến dịch thâm nhập chậm rãi vốn thường vượt qua các bộ lọc phiên đơn lẻ.
 
-\section{AI Security Guardrails Layer}
-\begin{itemize}
-    \item \textbf{Delimited Data Encapsulation:} An algorithm generating a cryptographically random token per session (e.g., \texttt{<|PAYLOAD\_A7F9|>}) to encapsulate foreign data, ensuring the LLM does not execute hidden adversarial instructions.
-    \item \textbf{Token Budget Manager \& LogTemplateMiner:} Utilizing Drain3 to strip random textual variations and cluster logs, thereby preventing LLM Token Denial-of-Service (DoS) attacks.
-    \item \textbf{Output Sanitization Filter:} Strict standardization and JSON schema enforcement of the LLM's output.
-\end{itemize}
+\section{Tầng Rào chắn Bảo mật AI (Guardrails)}
+Để bảo vệ tầng nhận thức trước các đầu vào đối kháng độc hại, hệ thống thiết lập tầng Rào chắn Bảo mật AI chuyên dụng. Cơ chế phòng thủ cốt lõi dựa trên phương pháp Đóng gói Dữ liệu Phân tách, tự động sinh mã token thập lục phân ngẫu nhiên cho mỗi phiên để bao bọc phần dữ liệu log thô, ngăn chặn LLM thực thi nhầm các chỉ thị ẩn chứa trong dữ liệu log. Nhằm chống lại việc lạm dụng tài nguyên và tấn công từ chối dịch vụ token (Token DoS), hệ thống tích hợp bộ quản lý ngân sách token kết hợp bộ khai thác mẫu log Drain3 để nén và gộp các bản ghi trùng lặp. Cuối cùng, bộ lọc làm sạch đầu ra sẽ chuẩn hóa cấu trúc JSON và loại bỏ các đoạn mã độc hại khỏi câu trả lời của LLM trước khi chuyển giao cho các cấu phần khác.
 
-\section{Data Integrity and HMAC Protection}
-\begin{itemize}
-    \item \textbf{HMAC Log Chaining:} A cryptographic hashing algorithm linking consecutive logs, ensuring that any tampering by malicious insiders breaks the chain and is immediately flagged.
-    \item \textbf{RAG SHA-256 Checksum Validation:} Guaranteeing the vector database is not compromised by injected falsified documents (Data Poisoning).
-\end{itemize}
+\section{Toàn vẹn Dữ liệu và Bảo vệ bằng Chuỗi HMAC}
+Tính toàn vẹn của dữ liệu trong luồng phát hiện được đảm bảo nghiêm ngặt bằng các biện pháp mật mã học. Hệ thống triển khai cơ chế chuỗi liên kết log HMAC, liên kết các bản ghi cơ sở dữ liệu liên tiếp thông qua mã băm SHA-256 chứa chữ ký HMAC của bản ghi trước đó, đảm bảo bất kỳ hành vi thay đổi, xóa bỏ hoặc tráo đổi log nào của kẻ tấn công nội bộ đều làm đứt gãy chuỗi và bị cảnh báo ngay lập tức. Bên cạnh đó, để chống lại các cuộc tấn công đầu độc dữ liệu RAG, cơ chế xác thực checksum SHA-256 liên tục giám sát các tệp tin của cơ sở dữ liệu vector, kiểm chứng tính xác thực của tài liệu trước khi nạp vào bộ nhớ truy xuất của tác tử.
 
-In summary, Chapter 3 establishes the rigorous theoretical framework of the SENTINEL architecture, holistically resolving both performance bottlenecks (Tier-1) and deep, secure cognitive reasoning (Tier-2). Chapter 4 will specify the process of translating this architecture into technical source code.
+Tóm lại, Chương 3 đã thiết lập khung lý thuyết chặt chẽ cho kiến trúc SENTINEL, giải quyết toàn diện cả nút thắt hiệu năng (Tầng 1) và cơ chế suy luận nhận thức sâu bảo mật (Tầng 2). Chương 4 sẽ chi tiết hóa quá trình chuyển dịch kiến trúc này thành mã nguồn kỹ thuật cụ thể.

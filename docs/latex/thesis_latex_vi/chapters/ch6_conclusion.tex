@@ -1,40 +1,22 @@
-\chapter{Conclusion and Future Work}
+\chapter{Kết luận và Hướng phát triển}
 \label{ch:conclusion}
 
 % Chapter introduction
-This concluding chapter synthesizes the comprehensive research journey of the thesis, ``A Two-Tier Cognitive Architecture for Automated Threat Detection and Response Using Agentic AI'' (SENTINEL). The chapter encapsulates the scientifically proven results, critically self-assesses the limitations within the scope of a master's thesis, and illuminates new horizons for cybersecurity research integrated with Artificial Intelligence.
+Chương kết luận này tổng hợp lại toàn bộ hành trình nghiên cứu của luận văn với đề tài ''Kiến trúc nhận thức hai tầng tự động hóa phát hiện đe dọa và phản hồi sự cố sử dụng AI tác tử'' (SENTINEL). Chương này đúc rút các kết quả nghiên cứu đã được thực nghiệm chứng minh, tự đánh giá các giới hạn trong khuôn khổ một luận văn thạc sĩ và mở ra những chân trời mới cho nghiên cứu an ninh mạng tích hợp trí tuệ nhân tạo.
 
-\section{Synthesis of Achieved Research Results}
-\begin{itemize}
-    \item \textbf{Resolving Research Questions:} Reaffirming the successful mitigation of latency bottlenecks and Alert Fatigue via the tiered architecture of the Tier-1 Welford filter and the Tier-2 LangGraph Agent.
-    \item \textbf{AI System Security (AI Security):} Demonstrating the empirical viability of Delimited Data Encapsulation and HMAC Chaining structures in thwarting adversarial manipulation risks (Prompt Injection, Delimiter Smuggling, Data Tampering) targeting internal enterprise cognitive systems.
-    \item \textbf{Overcoming Zero-Day and APT Challenges:} The exceptional synergy between historical alert tracking (Threat Memory) and the hybrid knowledge repository (Dual-RAG MITRE + NIST) provides profound contextual awareness, enabling the system to expose highly sophisticated campaigns.
-    \item \textbf{Validation Rigor:} These achievements transcend theoretical propositions, having been robustly validated by 5D metrics and standard statistical tests (McNemar, Mann-Whitney U) on empirical datasets.
-\end{itemize}
+\section{Tổng hợp Kết quả Nghiên cứu Đạt được}
+Tổng hợp kết quả nghiên cứu đạt được khẳng định sự giải quyết thành công các câu hỏi nghiên cứu cốt lõi. Cụ thể, kiến trúc phân tầng kết hợp giữa bộ lọc Welford Tầng 1 và Tác tử LangGraph Tầng 2 đã loại bỏ hiệu quả nút thắt cổ chai về độ trễ và nạn bội thực cảnh báo vốn gây tê liệt các quy trình SOC truyền thống. Về khía cạnh an ninh hệ thống AI, các đánh giá thực nghiệm đã chứng minh tính khả thi của phương pháp Đóng gói Dữ liệu Phân tách và liên kết chuỗi log HMAC trong việc ngăn ngừa các nguy cơ thao túng đối kháng—bao gồm tiêm prompt, buôn lậu dấu phân tách và thay đổi dữ liệu—nhắm vào các hệ suy luận nội bộ của doanh nghiệp. Hơn nữa, hệ thống đã vượt qua các thách thức về Zero-day và chiến dịch APT nhờ sự phối hợp chặt chẽ giữa tính năng theo vết uy tín trong Bộ nhớ Đe dọa và cơ sở tri thức kép Dual-RAG. Cơ chế này cung cấp cho tác tử nhận thức ngữ cảnh sâu sắc để vạch trần các chiến dịch thâm nhập đa giai đoạn tinh vi. Cuối cùng, tính khoa học chặt chẽ của các phát hiện này được đảm bảo vững chắc qua các đánh giá 5D thực nghiệm và các kiểm định thống kê chuẩn mực như McNemar và Mann-Whitney U.
 
-\section{Scientific and Practical Contributions}
-\begin{itemize}
-    \item \textbf{Scientific Value:} Providing a highly modular architectural framework for integrating Mathematical Statistics with Large Language Models in cybersecurity. This substantially fortifies the theoretical repository concerning LLM security and Guardrails.
-    \item \textbf{Practical Value:} The finalized SENTINEL product serves as a core engine or an independent auxiliary tool for Small and Medium Businesses (SMBs) lacking the budget to sustain large-scale Tier-1 SOC teams, while strictly maintaining Zero Trust privacy through offline operations.
-\end{itemize}
+\section{Đóng góp Khoa học và Thực tiễn}
+Luận văn đem lại cả đóng góp khoa học và thực tiễn thiết thực cho lĩnh vực an ninh mạng. Về mặt giá trị khoa học, nghiên cứu cung cấp một khung kiến trúc module hóa cao để tích hợp toán học thống kê với các mô hình ngôn ngữ lớn trong an ninh mạng, làm giàu thêm kho tàng lý thuyết liên quan đến bảo mật nhận thức LLM, rào chắn bảo mật và cô lập ngữ cảnh. Về mặt thực tiễn, sản phẩm SENTINEL hoàn thiện đóng vai trò là một công cụ hỗ trợ độc lập hoặc hạt nhân xử lý cho các doanh nghiệp vừa và nhỏ (SMBs) thiếu ngân sách duy trì đội ngũ phân tích SOC Tier-1 quy mô lớn. Nhờ vận hành hoàn toàn ngoại tuyến (offline), hệ thống bảo toàn tuyệt đối chủ quyền dữ liệu và tuân thủ chặt chẽ nguyên lý an ninh Zero Trust.
 
-\section{Existing Limitations}
-Despite the system's demonstrated superiority, the research acknowledges distinct boundaries:
-\begin{itemize}
-    \item \textbf{Input Log Formats:} The system is currently deeply tested on Network Flow logs and HTTP payloads. Real-world applicability necessitates the ingestion of highly diverse unstructured formats (Windows Event Logs, Linux Syslogs, CloudTrail), requiring significantly more complex parsing mechanisms.
-    \item \textbf{Hardware Constraints:} Although inference speed is accelerated via Semantic Caching, processing entirely novel alerts still requires substantial LLM reasoning time. This mandates high capital expenditure for specialized GPU hardware if operating at hundreds of Gigabits/second network scales.
-    \item \textbf{Physical Mitigation Design:} The research deliberately constrained the system to recommend actions (e.g., Recommend Firewall Rules) rather than executing physical interventions on routers to prevent Self-Denial of Service (Self-DoS). However, this restricts true Real-Time Blocking capabilities.
-\end{itemize}
+\section{Các Giới hạn Hiện tại}
+Mặc dù hệ thống đã chứng minh tính ưu việt rõ rệt, nghiên cứu vẫn thẳng thắn thừa nhận các giới hạn kỹ thuật phân định phạm vi hoạt động. Về định dạng dữ liệu đầu vào, hệ thống hiện mới chỉ kiểm thử sâu trên các log luồng mạng (Network Flow) và tải trọng HTTP, trong khi môi trường doanh nghiệp thực tế đòi hỏi khả năng xử lý các định dạng log phi cấu trúc đa dạng hơn như Windows Event Logs, Linux Syslogs và CloudTrail, đòi hỏi các bộ tiền xử lý ngữ nghĩa phức tạp hơn. Về mặt phần cứng, dù độ trễ đã được cải thiện đáng kể nhờ bộ đệm ngữ nghĩa, việc xử lý các cảnh báo hoàn toàn mới vẫn yêu cầu chu kỳ suy luận lớn từ LLM, đặt ra yêu cầu chi phí đầu tư hạ tầng GPU chuyên dụng tương đối lớn nếu vận hành ở quy mô băng thông mạng hàng trăm Gigabit/giây. Cuối cùng, về mặt phản hồi vật lý, nghiên cứu chủ động giới hạn hành động của tác tử ở mức đề xuất (chẳng hạn như khuyến nghị quy tắc tường lửa) thay vì tự động cấu hình chặn vật lý trên thiết bị định tuyến. Dù giúp ngăn ngừa rủi ro tự từ chối dịch vụ (Self-DoS), thiết lập này làm hạn chế khả năng chặn thời gian thực hoàn toàn tự động của hệ thống.
 
-\section{Future Development Directions}
-Stemming from these limitations, future expansion trajectories for the system include:
-\begin{itemize}
-    \item \textbf{Federated Learning:} Expanding SENTINEL into a decentralized architecture. Instead of sharing privacy-violating network logs, SOC endpoints share only learned model parameters regarding novel malware variants.
-    \item \textbf{Multi-Agent System (MAS):} Decomposing the monolithic LangGraph Agent into specialized sub-agents: Malware Analyst Agent, Network Analyst Agent, and Threat Intel Agent. These agents would debate prior to issuing a final verdict, further elevating accuracy.
-    \item \textbf{Automated Red Teaming:} Constructing an internal Red Team agent to continuously generate sophisticated adversarial payloads targeting Sentinel, thereby self-evaluating and autonomously upgrading the system's defensive posture.
-\end{itemize}
+\section{Hướng Phát triển Tương lai}
+Từ các giới hạn trên, một số hướng phát triển tương lai được định hình để tiếp nối nghiên cứu này. Thứ nhất, việc tích hợp học liên hợp (Federated Learning) có thể mở rộng SENTINEL thành một kiến trúc phi tập trung, cho phép các đầu cuối SOC chia sẻ các tham số mô hình đã học về biến thể mã độc mới mà không cần truyền tải các log thô nhạy cảm vi phạm quyền riêng tư. Thứ hai, mô hình tác tử LangGraph đơn khối có thể phân tách thành hệ thống đa tác tử (Multi-Agent System - MAS) gồm các tác tử chuyên biệt như phân tích mã độc, phân tích mạng và tình báo mối đe dọa để cùng tranh luận trước khi đưa ra phán quyết cuối cùng nhằm tối ưu hóa độ chính xác. Thứ ba, năng lực bảo mật của hệ thống có thể được củng cố bằng cách xây dựng một tác tử thử nghiệm xâm nhập tự động (Red Team Agent) để liên tục tạo ra các tải trọng đối kháng tinh vi tấn công Sentinel, qua đó tự đánh giá và tự động nâng cấp khả năng phòng thủ của hệ thống.
 
 \vspace{1cm}
 \begin{flushright}
-    \textit{Closing a modest endeavor, yet opening profound aspirations in the pursuit of securing the digital realm through the power of Agentic AI.}
+    \textit{Khép lại một nỗ lực khiêm tốn, nhưng mở ra những khát vọng sâu sắc trong hành trình bảo vệ không gian số bằng sức mạnh của AI Tác tử.}
 \end{flushright}

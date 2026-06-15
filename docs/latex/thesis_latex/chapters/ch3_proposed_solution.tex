@@ -5,48 +5,24 @@
 This chapter meticulously delineates the design of the SENTINEL system (Cognitive Two-Tier Architecture). Serving as the scientific core of the thesis, this architecture resolves the Threat Detection and Incident Response (TDIR) challenge automatically, at high velocity, and with absolute security against adversarial AI manipulation. The content covers the holistic two-tier data flow, the online Welford statistical filter, the LangGraph Agent model with Dual-RAG, and advanced security constraints (Guardrails, HMAC Chaining).
 
 \section{Overview of the Two-Tier Cognitive Architecture}
-\begin{itemize}
-    \item \textbf{Holistic System Block Diagram:} Illustrating the data flow starting from log generation, traversing Tier-1 (Transport/Filter Layer), escalating to Tier-2 (Cognitive/AI Agent Layer), and culminating in the Database/Dashboard.
-    \item \textbf{Design Philosophy:} Separation of concerns—Tier-1 is strictly responsible for wire-speed noise filtration, while Tier-2 provides deep contextual analysis to resolve the blindness of static systems toward Zero-day threats.
-\end{itemize}
+This proposed design is illustrated by a holistic system block diagram mapping the end-to-end data flow. Telemetry starts from log generation, traverses Tier-1 (the Transport and Filter Layer), scales to Tier-2 (the Cognitive and AI Agent Layer) in case of escalation, and culminates in database logging and dashboard presentation. The foundational design philosophy relies on the strict separation of concerns, where Tier-1 is solely responsible for wire-speed noise filtration, and Tier-2 is designated for deep contextual analysis to resolve the inherent blindness of static signature-based systems toward Zero-day threats.
 
 \section{Tier-1: Real-Time Traffic Filtration Engine (RuleEngine \& Welford)}
-\begin{itemize}
-    \item \textbf{Session and Baseline Management:} Mechanisms for storing and updating network connection states temporally.
-    \item \textbf{Online Welford's Algorithm Mechanism:} Mathematical specification for computing Z-Scores per log stream. When a Z-Score exceeds threshold $\alpha$, the system generates an ESCALATE label for Tier-2 instead of dropping the packet.
-    \item \textbf{Static Rule Engine Integration:} Incorporation of fundamental signature-based rules (DROP, WARN) to instantly eliminate rudimentary, known attack patterns.
-\end{itemize}
+The Tier-1 engine incorporates session and baseline management mechanisms to store and temporally update network connection states. An online formulation of Welford's algorithm mathematically computes the rolling mean and variance to yield a Z-score for each log stream. When a Z-score exceeds a predetermined threshold $\alpha$, the system labels the flow as an outlier and escalates it to Tier-2 for cognitive analysis rather than dropping the packet. Furthermore, the engine integrates a static signature matching layer to instantly eliminate rudimentary, known attack patterns using basic rules like DROP and WARN, ensuring computational resources are saved.
 
 \section{Tier-2: LangGraph Cognitive AI Agent}
-\begin{itemize}
-    \item \textbf{StateGraph Design:} The architectural structure of the \texttt{SentinelState} object carrying session information. Definition of core Nodes: Analyze, Retrieve, Resolve.
-    \item \textbf{Conditional Edges Routing:} The internal reasoning loop of the AI Agent. Upon identifying a knowledge deficit, the agent autonomously transitions to the \texttt{retrieve\_knowledge} state before returning to evaluation.
-\end{itemize}
+The cognitive engine in Tier-2 is designed using LangGraph, where an autonomous agent is represented as a stateful Directed Acyclic Graph. The core of this graph is the \texttt{SentinelState} object, which carries session parameters and analytical context between states. The workflow defines three primary execution nodes: an analyze node for initial log evaluation, a retrieve node for external knowledge queries, and a resolve node for generating response actions. Additionally, the agent incorporates dynamic routing via conditional edges, allowing it to transition autonomously to the retrieval state when a knowledge deficit is identified, before looping back to final decision-making.
 
 \section{Dual-RAG Mechanism and Semantic Memory}
-\begin{itemize}
-    \item \textbf{Dual-RAG Architecture:} Unification of two specialized knowledge bases: MITRE ATT\&CK (TTP identification) and NIST SP 800-61r2 (Incident Response Handbook) \cite{nist80061}.
-    \item \textbf{Hybrid Search Algorithm:} The fusion of Dense (FAISS) and Sparse (BM25) scoring mechanisms utilizing RRF.
-    \item \textbf{Semantic Cache:} A semantic hashing mechanism to bypass LLM inference if a highly similar log stream was successfully analyzed earlier in the temporal window, drastically reducing latency.
-\end{itemize}
+To ground the agent's decisions in domain-specific expertise, the architecture implements a Dual-RAG mechanism. This system unifies two distinct knowledge bases: the MITRE ATT\&CK framework for threat tactic and technique identification, and the NIST SP 800-61r2 playbook repository for structured incident response guidelines \cite{nist80061}. Retrieval from these bases is optimized using a hybrid search algorithm that fuses dense vector cosine similarity via FAISS and sparse keyword matching via BM25, ranking results using Reciprocal Rank Fusion. To minimize computational latency, a semantic cache intercepts incoming queries. If a semantically similar query was previously processed within a defined temporal window, the system reuses the cached analysis, bypassing the LLM inference step entirely.
 
 \section{Threat Memory and APT Campaign Correlation}
-\begin{itemize}
-    \item \textbf{Graph Data / IP Correlation Storage (SQLite/Neo4j):} Logic for tracking the Reputation Score of IP addresses over prolonged timelines.
-    \item \textbf{APT Correlation Mechanism:} An algorithm to chain temporally scattered, low-severity anomalies into a cohesive high-severity escalation verdict, exposing low-and-slow campaigns.
-\end{itemize}
+Long-term campaign correlation is maintained through a persistent Threat Memory module, implemented using SQLite to track the security posture of IP addresses over prolonged timelines. The system maintains reputation scores for external entities based on historical interactions. An APT correlation algorithm scans these records to chain temporally scattered, low-severity anomalies from a single source into a cohesive high-severity threat escalation. This allows the agent to detect low-and-slow infiltration campaigns that would otherwise bypass isolated session-based detection filters.
 
 \section{AI Security Guardrails Layer}
-\begin{itemize}
-    \item \textbf{Delimited Data Encapsulation:} An algorithm generating a cryptographically random token per session (e.g., \texttt{<|PAYLOAD\_A7F9|>}) to encapsulate foreign data, ensuring the LLM does not execute hidden adversarial instructions.
-    \item \textbf{Token Budget Manager \& LogTemplateMiner:} Utilizing Drain3 to strip random textual variations and cluster logs, thereby preventing LLM Token Denial-of-Service (DoS) attacks.
-    \item \textbf{Output Sanitization Filter:} Strict standardization and JSON schema enforcement of the LLM's output.
-\end{itemize}
+To defend the cognitive layer against adversarial inputs, the system implements a dedicated AI Security Guardrails layer. The core defense relies on Delimited Data Encapsulation, which generates a cryptographically random hexadecimal token for each session to wrap untrusted log payloads, isolating data from control instructions and preventing prompt injection attacks. To prevent resource abuse and Token Denial-of-Service (DoS) attacks, the system utilizes a Token Budget Manager combined with a Drain3-based Log Template Miner to cluster and compress redundant logs. Finally, an Output Sanitization Filter enforces strict JSON schema conformance and strips potentially dangerous payloads from the LLM's response before it is propagated further.
 
 \section{Data Integrity and HMAC Protection}
-\begin{itemize}
-    \item \textbf{HMAC Log Chaining:} A cryptographic hashing algorithm linking consecutive logs, ensuring that any tampering by malicious insiders breaks the chain and is immediately flagged.
-    \item \textbf{RAG SHA-256 Checksum Validation:} Guaranteeing the vector database is not compromised by injected falsified documents (Data Poisoning).
-\end{itemize}
+Data integrity within the detection pipeline is guaranteed using cryptographic controls. The system implements HMAC log chaining, which links consecutive database logs using a SHA-256 hash containing the HMAC of the preceding entry, ensuring that any tampering, deletion, or reordering of logs by malicious insiders breaks the chain and is immediately flagged during audits. Additionally, to protect the semantic knowledge base from data poisoning attacks, a SHA-256 checksum validation mechanism monitors the files of the vector database, verifying document authenticity before they are loaded into the agent's retrieval memory.
 
 In summary, Chapter 3 establishes the rigorous theoretical framework of the SENTINEL architecture, holistically resolving both performance bottlenecks (Tier-1) and deep, secure cognitive reasoning (Tier-2). Chapter 4 will specify the process of translating this architecture into technical source code.
