@@ -5,7 +5,7 @@ Guardrails: RAG Poisoning Sanitizer (Structural Sanitization & Instruction Neutr
 import re
 import logging
 import unicodedata
-from src.guardrails.prompt_filter import load_config
+from src.guardrails.prompt_filter import load_config, HTMLTagStripper, strip_html_tags_fallback, strip_dangerous_tags_recursive
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +59,13 @@ class RAGSanitizer:
         clean = re.sub(control_chars, "", clean)
 
         # 3. Làm sạch HTML/JS tags
-        clean = re.sub(
-            r"<script[^>]*>.*?</script>",
-            "[SCRIPT_STRIPPED]",
-            clean,
-            flags=re.IGNORECASE | re.DOTALL
-        )
-        clean = re.sub(r"<[^>]+>", "", clean)
+        clean = strip_dangerous_tags_recursive(clean)
+        try:
+            stripper = HTMLTagStripper()
+            stripper.feed(clean)
+            clean = stripper.get_data()
+        except Exception:
+            clean = strip_html_tags_fallback(clean)
 
         # 4. Làm sạch Markdown images và links
         clean = re.sub(

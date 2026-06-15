@@ -332,7 +332,7 @@ class RuleEngine:
                 r"(?i)(union\s+select|select\s+.*?\s+from|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+)"
             ),
             "Cross-Site Scripting (XSS)": re.compile(
-                r"(?i)(<script.*?>|javascript:|onload\s*=|onerror\s*=|<img\s+.*?onerror|<svg.*?onload)"
+                r"(?i)(<script\b|javascript:|onload\s*=|onerror\s*=|<img\b|<svg\b)"
             ),
             "Path Traversal / LFI": re.compile(
                 r"(?i)(\.\./\.\./|\.\.\\\.\.\\|/etc/passwd|/windows/win\.ini|boot\.ini)"

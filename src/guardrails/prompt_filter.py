@@ -12,9 +12,102 @@ import secrets
 import unicodedata
 import urllib.parse
 from typing import Optional
+from html.parser import HTMLParser
 
 from src.guardrails.template_miner import LogTemplateMiner, EntropyScorer, TokenBudgetManager
 from src.guardrails.constants import normalize_log_keys
+
+
+class HTMLTagStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.convert_charrefs = True
+        self.result = []
+        self.in_script = False
+        self.in_iframe = False
+
+    def handle_starttag(self, tag, attrs):
+        tag_lower = tag.lower()
+        if tag_lower == 'script':
+            self.in_script = True
+            self.result.append("[SCRIPT_STRIPPED]")
+        elif tag_lower == 'iframe':
+            self.in_iframe = True
+            self.result.append("[IFRAME_STRIPPED]")
+        elif tag_lower == 'img':
+            self.result.append("[IMG_STRIPPED]")
+
+    def handle_endtag(self, tag):
+        tag_lower = tag.lower()
+        if tag_lower == 'script':
+            self.in_script = False
+        elif tag_lower == 'iframe':
+            self.in_iframe = False
+
+    def handle_data(self, data):
+        if not self.in_script and not self.in_iframe:
+            self.result.append(data)
+
+    def get_data(self) -> str:
+        return "".join(self.result)
+
+
+def strip_html_tags_fallback(text: str) -> str:
+    result = []
+    in_tag = False
+    for char in text:
+        if char == '<':
+            in_tag = True
+        elif char == '>':
+            in_tag = False
+        elif not in_tag:
+            result.append(char)
+    return "".join(result)
+
+
+def strip_dangerous_tags_recursive(text: str) -> str:
+    # 1. Strip script tags recursively
+    while True:
+        lower = text.lower()
+        start = lower.find("<script")
+        if start == -1:
+            break
+        end = lower.find("</script>", start)
+        if end != -1:
+            text = text[:start] + "[SCRIPT_STRIPPED]" + text[end + 9:]
+        else:
+            text = text[:start] + "[SCRIPT_STRIPPED]"
+            break
+
+    # 2. Strip iframe tags recursively
+    while True:
+        lower = text.lower()
+        start = lower.find("<iframe")
+        if start == -1:
+            break
+        end = lower.find("</iframe>", start)
+        if end != -1:
+            text = text[:start] + "[IFRAME_STRIPPED]" + text[end + 9:]
+        else:
+            text = text[:start] + "[IFRAME_STRIPPED]"
+            break
+
+    # 3. Strip img tags (self-closing or standard)
+    while True:
+        lower = text.lower()
+        start = lower.find("<img")
+        if start == -1:
+            break
+        end = lower.find(">", start)
+        if end != -1:
+            text = text[:start] + "[IMG_STRIPPED]" + text[end + 1:]
+        else:
+            text = text[:start] + "[IMG_STRIPPED]"
+            break
+
+    return text
+
 
 CONFIG_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
@@ -211,23 +304,14 @@ class EncodingNeutralizer:
 
     @staticmethod
     def neutralize_html_entities(text: str) -> str:
-        # Giải mã HTML entities trước (&#60;script&#62; -> <script>) rồi mới strip tag
+        # Giải mã HTML entities trước (&#60;script&#62; -> <script>)
         text = html.unescape(text)
-        # Loại bỏ và strip thẻ script/html độc hại thay vì chỉ encode
-        clean = re.sub(
-            r"<script[^>]*>.*?</script>",
-            "[SCRIPT_STRIPPED]",
-            text,
-            flags=re.IGNORECASE | re.DOTALL
-        )
-        clean = re.sub(r"<img[^>]*>", "[IMG_STRIPPED]", clean, flags=re.IGNORECASE)
-        clean = re.sub(
-            r"<iframe[^>]*>.*?</iframe>",
-            "[IFRAME_STRIPPED]",
-            clean,
-            flags=re.IGNORECASE | re.DOTALL
-        )
-        clean = re.sub(r"<[^>]+>", "", clean)
+        try:
+            stripper = HTMLTagStripper()
+            stripper.feed(text)
+            clean = stripper.get_data()
+        except Exception:
+            clean = strip_html_tags_fallback(text)
         return clean
 
     @staticmethod
