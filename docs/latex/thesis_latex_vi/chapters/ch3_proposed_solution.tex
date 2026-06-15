@@ -9,7 +9,7 @@ Chương này trình bày chi tiết thiết kế kỹ thuật, mô hình hóa t
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.7\textwidth,height=0.35\textheight,keepaspectratio]{images/soc_ai_concept.png}
+    \includegraphics[width=0.95\textwidth,height=0.72\textheight,keepaspectratio]{images/soc_ai_concept.png}
     \caption{Sơ đồ kiến trúc tổng thể của hệ thống SENTINEL, minh họa luồng dữ liệu hai tầng và các thành phần cấu trúc.}
     \label{fig:soc_ai_concept}
 \end{figure}
@@ -20,7 +20,7 @@ Quy trình hoạt động và luồng xử lý dữ liệu chi tiết theo thờ
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\textwidth,height=0.45\textheight,keepaspectratio]{images/sentinel_flow.png}
+    \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{images/sentinel_flow.png}
     \caption{Sơ đồ luồng xử lý và luồng dữ liệu chi tiết theo thời gian thực của hệ thống SENTINEL.}
     \label{fig:sentinel_flow}
 \end{figure}
@@ -63,17 +63,22 @@ Các luồng bất thường được leo thang sẽ được tiếp nhận bở
     \centering
     \caption{Ma trận chuyển trạng thái của FSM Tác tử Nhận thức Tầng 2.}
     \label{tab:agent_fsm_transitions}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.15\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.15\textwidth}|>{\raggedright\arraybackslash}p{0.22\textwidth}|}
+        \hline
         \textbf{Trạng thái hiện tại} & \textbf{Đầu vào / Điều kiện} & \textbf{Trạng thái tiếp theo} & \textbf{Hành động đầu ra} \\
-        \midrule
+        \hline
         \texttt{INIT} & Nhập cảnh báo & \texttt{ANALYZE} & Tải ngữ cảnh phiên \\
+        \hline
         \texttt{ANALYZE} & Độ tin cậy cao / Đe dọa đã biết & \texttt{RESOLVE} & Phân loại mối đe dọa \\
+        \hline
         \texttt{ANALYZE} & Độ tin cậy thấp / Thiếu thông tin & \texttt{RETRIEVE} & Câu truy vấn tìm kiếm \\
+        \hline
         \texttt{RETRIEVE} & Tri thức đã được truy xuất & \texttt{ANALYZE} & Bổ sung ngữ cảnh vào Trạng thái \\
+        \hline
         \texttt{RESOLVE} & Độ tin cậy $\ge 0.7$ & \texttt{EXECUTE} & Đề xuất phản hồi tương ứng \\
+        \hline
         \texttt{RESOLVE} & Độ tin cậy $< 0.7$ & \texttt{HITL} & Leo thang tới Chuyên viên SOC \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 
@@ -89,18 +94,18 @@ Cơ chế Dual-RAG định hình các quyết định của tác tử bằng cá
     \centering
     \caption{So sánh các mô hình truy xuất trong chiến lược tìm kiếm lai.}
     \label{tab:search_comparison}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.22\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
+        \hline
         \textbf{Khía cạnh} & \textbf{Tìm kiếm Vector Dày đặc (FAISS)} & \textbf{Tìm kiếm Từ khóa Thưa thớt (BM25)} \\
-        \midrule
+        \hline
         \textbf{Mô hình nền tảng} & all-MiniLM-L6-v2 Embeddings & Trọng số từ khóa BM25 \\
-        \midrule
+        \hline
         \textbf{Logic so khớp} & Độ tương đồng Cosine ngữ nghĩa \cite{faiss2019} & Tần suất từ - Tần suất nghịch đảo tài liệu (TF-IDF) \cite{bm25_2009} \\
-        \midrule
+        \hline
         \textbf{Ưu điểm} & Bắt được các từ đồng nghĩa, khái niệm và ngữ nghĩa trừu tượng & So khớp chính xác các định danh kỹ thuật (CVEs, IPs, số cổng) \\
-        \midrule
+        \hline
         \textbf{Hạn chế} & Yếu khi khớp chính xác các từ khóa băm kỹ thuật & Bị mù trước các từ đồng nghĩa ngữ nghĩa và ngữ cảnh khái niệm \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 
@@ -120,16 +125,16 @@ Các tác nhân đe dọa tinh vi thường chia nhỏ chuỗi tấn công của
     \centering
     \caption{Thông số kỹ thuật lược đồ cơ sở dữ liệu Bộ nhớ Đe dọa.}
     \label{tab:threat_memory_schema}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.40\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|}
+        \hline
         \textbf{Tên bảng} & \textbf{Trường khóa chính / thuộc tính} & \textbf{Mục đích chức năng} \\
-        \midrule
+        \hline
         \texttt{ip\_reputation} & \texttt{ip\_address} (PK), \texttt{score}, \texttt{last\_seen}, \texttt{status} & Theo dõi điểm uy tín (0-100) và vòng đời hoạt động của các IP nguồn. \\
-        \midrule
+        \hline
         \texttt{known\_entities} & \texttt{entity\_name} (PK), \texttt{ip\_address}, \texttt{role} & Khởi tạo trước các dịch vụ nội bộ đã được xác minh (như AD, DNS) để giảm thiểu cảnh báo giả. \\
-        \midrule
+        \hline
         \texttt{threat\_events} & \texttt{event\_id} (PK), \texttt{ip\_address}, \texttt{timestamp}, \texttt{alert\_type}, \texttt{severity} & Lưu trữ chuỗi các cảnh báo đã được leo thang theo trình tự thời gian phục vụ mục đích liên kết. \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 

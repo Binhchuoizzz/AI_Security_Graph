@@ -68,20 +68,20 @@ Bên cạnh đó, các tác nhân đe dọa còn sử dụng các kỹ thuật t
     \centering
     \caption{Tóm tắt các Lỗ hổng Nhận thức của LLM và Biện pháp Giảm thiểu trong SENTINEL.}
     \label{tab:vulnerabilities_mitigations}
-    \begin{tabular}{p{0.22\textwidth}p{0.38\textwidth}p{0.34\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.20\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
+        \hline
         \textbf{Vector Tấn công} & \textbf{Cơ chế Đe dọa} & \textbf{Biện pháp Giảm thiểu trong SENTINEL} \\
-        \midrule
+        \hline
         Tiêm Prompt Trực tiếp & Kẻ tấn công nhúng lệnh độc hại để kiểm soát luồng hoạt động & Bộ lọc mẫu prompt dựa trên biểu thức chính quy \\
-        \midrule
+        \hline
         Tiêm Prompt từ Log & Nhúng chỉ dẫn độc hại vào nhật ký hệ thống (User-Agent) & Đóng gói dữ liệu phân tách với token ngẫu nhiên động \\
-        \midrule
+        \hline
         Vượt qua Mã hóa & Ngụy trang chỉ dẫn (Base64/Hex/URL) nhằm lướt qua bộ lọc tĩnh & Giải mã đa tầng và chuẩn hóa chuỗi đầu vào \\
-        \midrule
+        \hline
         Buôn lậu Dấu phân tách & Chèn ký tự đặc biệt nhằm phá vỡ cấu trúc khoanh vùng dữ liệu & Làm sạch dấu phân tách và quản lý ngân sách token chặt chẽ \\
-        \midrule
+        \hline
         Đầu độc Ngữ nghĩa & Nhúng dữ liệu giả mạo vào cơ sở dữ liệu vector & Xác thực checksum SHA-256 tri thức và gắn nhãn nguồn gốc \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 

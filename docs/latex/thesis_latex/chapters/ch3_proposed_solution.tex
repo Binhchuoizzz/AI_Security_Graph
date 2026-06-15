@@ -9,7 +9,7 @@ To protect enterprise environments without incurring prohibitive computational l
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.7\textwidth,height=0.35\textheight,keepaspectratio]{images/soc_ai_concept.png}
+    \includegraphics[width=0.95\textwidth,height=0.72\textheight,keepaspectratio]{images/soc_ai_concept.png}
     \caption{The holistic architecture of the SENTINEL system, illustrating the two-tier data flow and structural components.}
     \label{fig:soc_ai_concept}
 \end{figure}
@@ -20,7 +20,7 @@ The detailed step-by-step runtime flow of the data processing and decision-makin
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\textwidth,height=0.45\textheight,keepaspectratio]{images/sentinel_flow.png}
+    \includegraphics[width=0.95\textwidth,height=0.82\textheight,keepaspectratio]{images/sentinel_flow.png}
     \caption{Detailed runtime execution flow and data processing logic within the SENTINEL pipeline.}
     \label{fig:sentinel_flow}
 \end{figure}
@@ -63,17 +63,22 @@ Escalated anomalous flows are received by the Tier-2 cognitive engine, which is 
     \centering
     \caption{State Transition Matrix of the Tier-2 Cognitive Agent FSM.}
     \label{tab:agent_fsm_transitions}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.26\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.15\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.15\textwidth}|>{\raggedright\arraybackslash}p{0.22\textwidth}|}
+        \hline
         \textbf{Current State} & \textbf{Input / Condition} & \textbf{Next State} & \textbf{Output Action} \\
-        \midrule
+        \hline
         \texttt{INIT} & Alert Ingested & \texttt{ANALYZE} & Load Session Context \\
+        \hline
         \texttt{ANALYZE} & High Confidence / Known Threat & \texttt{RESOLVE} & Threat Category \\
+        \hline
         \texttt{ANALYZE} & Low Confidence / Missing Info & \texttt{RETRIEVE} & Search Queries \\
+        \hline
         \texttt{RETRIEVE} & Knowledge Retrieved & \texttt{ANALYZE} & Append Context to State \\
+        \hline
         \texttt{RESOLVE} & Confidence $\ge 0.7$ & \texttt{EXECUTE} & Recommended Response \\
+        \hline
         \texttt{RESOLVE} & Confidence $< 0.7$ & \texttt{HITL} & Escalate to SOC Analyst \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 
@@ -89,18 +94,18 @@ The Dual-RAG mechanism grounds the agent's decisions by retrieving contexts from
     \centering
     \caption{Comparison of Retrieval Paradigms in the Hybrid Search Strategy.}
     \label{tab:search_comparison}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.25\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.22\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
+        \hline
         \textbf{Dimension} & \textbf{Dense Vector Search (FAISS)} & \textbf{Sparse Keyword Search (BM25)} \\
-        \midrule
+        \hline
         \textbf{Underlying Model} & all-MiniLM-L6-v2 Embeddings & BM25 BM-weighting \\
-        \midrule
+        \hline
         \textbf{Matching Logic} & Cosine Semantic Similarity \cite{faiss2019} & Term Frequency-Inverse Document Frequency \cite{bm25_2009} \\
-        \midrule
+        \hline
         \textbf{Strengths} & Captures synonyms, concepts, and abstract semantics & Matches exact technical IDs (CVEs, IPs, port numbers) \\
-        \midrule
+        \hline
         \textbf{Limitations} & Weak at exact keyword matching of technical hashes & Blind to semantic synonyms and conceptual context \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 
@@ -120,16 +125,16 @@ Stealthy threat actors frequently split their attack chains into low-severity ev
     \centering
     \caption{Threat Memory Database Schema Specifications.}
     \label{tab:threat_memory_schema}
-    \begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.33\textwidth}>{\raggedright\arraybackslash}p{0.40\textwidth}}
-        \toprule
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|}
+        \hline
         \textbf{Table Name} & \textbf{Primary Fields} & \textbf{Functional Purpose} \\
-        \midrule
+        \hline
         \texttt{ip\_reputation} & \texttt{ip\_address} (PK), \texttt{score}, \texttt{last\_seen}, \texttt{status} & Tracks the reputation score (0-100) and lifecycle of source IPs. \\
-        \midrule
+        \hline
         \texttt{known\_entities} & \texttt{entity\_name} (PK), \texttt{ip\_address}, \texttt{role} & Pre-seeds verified internal services (e.g., AD, DNS) to minimize false alerts. \\
-        \midrule
+        \hline
         \texttt{threat\_events} & \texttt{event\_id} (PK), \texttt{ip\_address}, \texttt{timestamp}, \texttt{alert\_type}, \texttt{severity} & Records the historical sequence of escalated alerts for correlation. \\
-        \bottomrule
+        \hline
     \end{tabular}
 \end{table}
 
