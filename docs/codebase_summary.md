@@ -146,10 +146,10 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 *   **Tác dụng:** Set PYTHONPATH, gọi `build_all_indexes()`.
 *   **Mối quan hệ:** Gọi `src/rag/embedder.py`.
 
-### 26. `scripts/expand_knowledge_base.py` & `scripts/supplement_knowledge_base.py`
-*   **Mục đích:** Mở rộng tri thức RAG (thêm MITRE techniques + NIST playbooks còn thiếu).
-*   **Tác dụng:** Idempotent append vào `mitre_attack.json`/`nist_800_61r2.json` (phủ đủ 14 tactic + playbook ransomware/credential/webshell/recon/lateral/botnet/zero-day); sau khi chạy BẮT BUỘC rebuild index.
-*   **Mối quan hệ:** Bổ sung nguồn cho `embedder.py`.
+### 26. `scripts/build_knowledge_base.py` (+ data: `expand_/supplement_knowledge_base.py`)
+*   **Mục đích:** **Entry point DUY NHẤT** xây dựng/mở rộng tri thức RAG trong MỘT lần.
+*   **Tác dụng:** Gộp 2 batch trước đây chạy lẻ → append idempotent **67 kỹ thuật MITRE (0 trùng id) + 7 playbook NIST** (phủ đủ 14 tactic) vào `mitre_attack.json`/`nist_800_61r2.json`, RỒI tự rebuild FAISS/BM25 index + checksum (cờ `--no-index` để bỏ qua). `expand_knowledge_base.py` + `supplement_knowledge_base.py` giờ là **module DỮ LIỆU thuần** (chỉ export technique/playbook lists, không còn entry point riêng).
+*   **Mối quan hệ:** Gộp data → gọi `embedder.build_all_indexes()` + `update_checksums_file()`.
 
 ### 27. `src/rag/security.py`
 *   **Mục đích:** Lá chắn toàn vẹn tri thức RAG (chống RAG Poisoning vật lý).

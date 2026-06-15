@@ -5,12 +5,6 @@ Bổ sung một tập lớn kỹ thuật MITRE ATT&CK phủ đủ 14 tactic + pl
 Idempotent. Sau khi chạy: BẮT BUỘC rebuild index:
     .venv/bin/python -c "from src.rag.embedder import update_checksums_file, build_all_indexes; update_checksums_file(); build_all_indexes()"
 """
-import json
-import os
-
-KB_DIR = os.path.join(os.path.dirname(__file__), "..", "knowledge_base")
-MITRE_PATH = os.path.join(KB_DIR, "mitre_attack.json")
-NIST_PATH = os.path.join(KB_DIR, "nist_800_61r2.json")
 
 
 def _tech(tid, name, tactic, desc, det, logp, resp):
@@ -323,44 +317,6 @@ EXPANDED_NIST = [
 ]
 
 
-def _load(p):
-    with open(p, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save(p, d):
-    with open(p, "w", encoding="utf-8") as f:
-        json.dump(d, f, ensure_ascii=False, indent=1)
-
-
-def run():
-    mitre = _load(MITRE_PATH)
-    ex_ids = {e.get("id") for e in mitre}
-    added_m = 0
-    for t in EXPANDED_MITRE:
-        if t["id"] not in ex_ids:
-            mitre.append(t)
-            ex_ids.add(t["id"])
-            added_m += 1
-    _save(MITRE_PATH, mitre)
-
-    nist = _load(NIST_PATH)
-    controls = nist.get("controls", [])
-    ex_c = {c.get("control") for c in controls}
-    added_n = 0
-    for c in EXPANDED_NIST:
-        if c["control"] not in ex_c:
-            controls.append(c)
-            ex_c.add(c["control"])
-            added_n += 1
-    nist["controls"] = controls
-    nist["_total_controls"] = len(controls)
-    _save(NIST_PATH, nist)
-
-    print(f"[MITRE] +{added_m} techniques (total {len(mitre)})")
-    print(f"[NIST]  +{added_n} playbooks (total {len(controls)})")
-
-
-if __name__ == "__main__":
-    run()
-    print("\n[!] Rebuild: .venv/bin/python -c \"from src.rag.embedder import update_checksums_file, build_all_indexes; update_checksums_file(); build_all_indexes()\"")
+# NOTE: file này giờ là MODULE DỮ LIỆU thuần (chỉ export EXPANDED_MITRE / EXPANDED_NIST).
+# Entry point xây dựng tri thức DUY NHẤT là `scripts/build_knowledge_base.py` (gộp cả
+# nguồn này + supplement_knowledge_base + rebuild index trong 1 lần).

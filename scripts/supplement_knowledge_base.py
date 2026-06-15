@@ -6,13 +6,6 @@ Idempotent: chạy lại nhiều lần không tạo trùng lặp.
 Sau khi chạy script này, BẮT BUỘC rebuild index:
     .venv/bin/python src/rag/embedder.py
 """
-import json
-import os
-
-KB_DIR = os.path.join(os.path.dirname(__file__), "..", "knowledge_base")
-MITRE_PATH = os.path.join(KB_DIR, "mitre_attack.json")
-NIST_PATH = os.path.join(KB_DIR, "nist_800_61r2.json")
-
 
 # =========================================================================
 # MITRE ATT&CK — các kỹ thuật còn thiếu (khớp schema hiện có)
@@ -233,48 +226,5 @@ NEW_NIST = [
 ]
 
 
-def _load(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _save(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=1)
-
-
-def supplement_mitre():
-    data = _load(MITRE_PATH)
-    existing = {e.get("id") for e in data}
-    added = 0
-    for t in NEW_MITRE:
-        if t["id"] not in existing:
-            data.append(t)
-            existing.add(t["id"])
-            added += 1
-    _save(MITRE_PATH, data)
-    print(f"[MITRE] +{added} techniques added (total now {len(data)})")
-    return added
-
-
-def supplement_nist():
-    data = _load(NIST_PATH)
-    controls = data.get("controls", [])
-    existing = {c.get("control") for c in controls}
-    added = 0
-    for c in NEW_NIST:
-        if c["control"] not in existing:
-            controls.append(c)
-            existing.add(c["control"])
-            added += 1
-    data["controls"] = controls
-    data["_total_controls"] = len(controls)
-    _save(NIST_PATH, data)
-    print(f"[NIST] +{added} playbooks added (total now {len(controls)})")
-    return added
-
-
-if __name__ == "__main__":
-    supplement_mitre()
-    supplement_nist()
-    print("\n[!] BẮT BUỘC rebuild index: .venv/bin/python src/rag/embedder.py")
+# NOTE: file này giờ là MODULE DỮ LIỆU thuần (chỉ export NEW_MITRE / NEW_NIST).
+# Entry point xây dựng tri thức DUY NHẤT là `scripts/build_knowledge_base.py`.
