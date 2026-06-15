@@ -20,11 +20,11 @@ Compounding this problem is the emergence of Advanced Persistent Threats (APTs) 
 
 \section{Large Language Models (LLMs) and the Mathematics of Quantization}
 
-The emergence of Large Language Models (LLMs) based on the Transformer architecture has offered promising automation capabilities. The Transformer’s self-attention mechanism enables the simultaneous evaluation of contextual dependencies across an entire sequence, providing powerful log analysis capabilities.
+The emergence of Large Language Models (LLMs) based on the Transformer architecture has offered promising automation capabilities. The Transformer’s self-attention mechanism enables the simultaneous evaluation of contextual dependencies across an entire sequence, providing powerful log analysis capabilities \cite{vaswani2017}.
 
 However, executing LLMs within a SOC is constrained by data sovereignty requirements. Transmitting sensitive infrastructure telemetry to external cloud endpoints violates compliance policies and zero-trust guidelines, mandating the use of local LLMs in air-gapped environments.
 
-Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. Quantization mathematically projects continuous weight parameters (such as FP16) onto discrete, lower-bit representations (such as INT4). Utilizing GGUF formats and the Q4\_K\_M quantization standard via the \texttt{llama.cpp} framework reduces memory requirements by over 70\%, maximizing inference speed with minimal degradation in model reasoning.
+Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. Quantization mathematically projects continuous weight parameters (such as FP16) onto discrete, lower-bit representations (such as INT4) \cite{quantization2021}. Utilizing GGUF formats and the Q4\_K\_M quantization standard via the \texttt{llama.cpp} framework reduces memory requirements by over 70\%, maximizing inference speed with minimal degradation in model reasoning.
 
 \section{Agentic AI Architecture and State-Graph Models}
 
@@ -51,15 +51,15 @@ The primary limitation of LLMs is factual hallucination, which poses a severe ri
 
 To ensure precise document retrieval, modern RAG configurations use a hybrid search strategy that combines two paradigms:
 \begin{enumerate}
-    \item \textbf{Dense Vector Search:} Uses embedding models (such as \texttt{all-MiniLM-L6-v2}) and vector libraries (FAISS) to compute cosine similarity, capturing the semantic meaning of queries even when keywords differ.
-    \item \textbf{Sparse Keyword Search:} Uses the BM25 algorithm to match technical identifiers (such as CVE codes or IP addresses) based on term frequency-inverse document frequency weighting.
+    \item \textbf{Dense Vector Search:} Uses embedding models (such as \texttt{all-MiniLM-L6-v2}) and vector libraries (FAISS) to compute cosine similarity \cite{faiss2019}, capturing the semantic meaning of queries even when keywords differ.
+    \item \textbf{Sparse Keyword Search:} Uses the BM25 algorithm \cite{bm25_2009} to match technical identifiers (such as CVE codes or IP addresses) based on term frequency-inverse document frequency weighting.
 \end{enumerate}
 
 Standardizing rank consolidation via reciprocal rank scoring heuristics \cite{rrf2009} produces a unified, high-precision retrieval list by balancing dense semantics and sparse keyword weights.
 
 \section{LLM Cognitive Vulnerabilities and Prompt Injection Vectors}
 
-Deploying LLMs as core reasoning engines in security pipelines introduces novel vulnerabilities, primarily adversarial AI manipulations. Because LLMs process natural language inputs without a structural compile-time separation between code and data, they are vulnerable to instruction hijacking.
+Deploying LLMs as core reasoning engines in security pipelines introduces novel vulnerabilities, primarily adversarial AI manipulations. Because LLMs process natural language inputs without a structural compile-time separation between code and data, they are vulnerable to instruction hijacking \cite{promptinjection2023}.
 
 The cogs are exposed to critical cognitive manipulation risks via log-substrate prompt injections \cite{watchtower2026}, where adversaries exploit log ingestion pipelines to deliver adversarial instructions. Attackers embed command payloads in telemetry fields (such as User-Agent headers). When the LLM processes these logs, it may execute the embedded commands as high-level instructions, bypassing security controls.
 
@@ -70,7 +70,7 @@ The cogs are exposed to critical cognitive manipulation risks via log-substrate 
     \label{fig:prompt_injection}
 \end{figure}
 
-Furthermore, attackers use advanced techniques such as encoding bypasses (Base64/hex) and delimiter smuggling to evade filters. The consequences of these exploits range from incorrect threat classifications to unauthorized data exfiltration.
+Furthermore, attackers use advanced techniques such as encoding bypasses (Base64/hex) and delimiter smuggling to evade filters \cite{promptinjection2023}. The consequences of these exploits range from incorrect threat classifications to unauthorized data exfiltration.
 
 \begin{table}[H]
     \centering
