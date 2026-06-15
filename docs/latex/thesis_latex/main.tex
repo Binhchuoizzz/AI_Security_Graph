@@ -28,6 +28,27 @@
 \usepackage{listings}
 \usepackage{xcolor}
 
+% --- Continuously number figures and tables across chapters ---
+\usepackage{chngcntr}
+\counterwithout{figure}{chapter}
+\counterwithout{table}{chapter}
+
+% --- Custom caption label separator (period instead of colon) ---
+\usepackage[labelsep=period]{caption}
+
+% --- Custom List of Figures/Tables layout using tocloft ---
+\usepackage{tocloft}
+\renewcommand{\cftfigpresnum}{Figure~}
+\renewcommand{\cftfigaftersnum}{.}
+\renewcommand{\cfttabpresnum}{Table~}
+\renewcommand{\cfttabaftersnum}{.}
+\setlength{\cftfignumwidth}{2.3cm}
+\setlength{\cfttabnumwidth}{2.0cm}
+
+% Redefine list names to match screenshot (singular)
+\renewcommand{\listtablename}{List of Table}
+\renewcommand{\listfigurename}{List of Figure}
+
 % --- Paragraph Formatting (Block Style: No indent, 6pt space above) ---
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{6pt}

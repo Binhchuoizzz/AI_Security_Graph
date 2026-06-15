@@ -28,6 +28,26 @@
 \usepackage{listings}
 \usepackage{xcolor}
 
+% --- Continuously number figures and tables across chapters ---
+\usepackage{chngcntr}
+\counterwithout{figure}{chapter}
+\counterwithout{table}{chapter}
+
+% --- Custom caption label separator (period instead of colon) ---
+\usepackage[labelsep=period]{caption}
+
+% --- Custom List of Figures/Tables layout using tocloft ---
+\usepackage{tocloft}
+\renewcommand{\cftfigpresnum}{Hình~}
+\renewcommand{\cftfigaftersnum}{.}
+\renewcommand{\cfttabpresnum}{Bảng~}
+\renewcommand{\cfttabaftersnum}{.}
+\setlength{\cftfignumwidth}{2.3cm}
+\setlength{\cfttabnumwidth}{2.0cm}
+
+\renewcommand{\listtablename}{Danh sách Bảng}
+\renewcommand{\listfigurename}{Danh sách Hình}
+
 \setlength{\headheight}{14.5pt}
 
 % --- Paragraph Formatting (Block Style: No indent, 6pt space above) ---
