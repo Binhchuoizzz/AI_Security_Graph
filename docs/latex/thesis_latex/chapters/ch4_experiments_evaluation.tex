@@ -5,7 +5,7 @@
 This chapter presents the empirical evidence of the thesis, validating the research hypotheses through rigorous quantitative metrics. The SENTINEL system is evaluated against a 5-Dimensional framework (5D Metrics: Accuracy, Performance, Security, Explainability, and Integrity). The content emphasizes the layered Ablation Study design and the application of non-parametric statistical models (McNemar's Test, Mann-Whitney U Test) to prove that the architectural enhancements are statistically significant and mathematically sound.
 
 \section{Experimental Environment and Datasets}
-To execute the empirical evaluations, a dedicated local hardware testbed was configured. The hardware setup consists of an Intel Core i7 CPU (specifically the i7-14700KF model), 32GB of DDR5 RAM, and an NVIDIA RTX 4060 Ti 16GB GPU, which was utilized to execute the local quantized \textit{Gemma-2-9B-IT} Q6\_K model. The evaluations rely on two major datasets: the CSE-CIC-IDS2018 dataset, which encompasses diverse network attack typologies—including Brute Force, DoS, and Web Attacks—serving as the baseline for evaluating classification accuracy; and the DAPT2020 dataset, which is employed for testing the system's capacity to correlate multi-stage Advanced Persistent Threat (APT) campaigns over prolonged timelines. To replicate the properties of a live SIEM environment, a Unified Data Stream simulator was scripted to merge and replay the network logs chronologically according to virtual timestamps, feeding them to the detection queues in real time.
+To execute the empirical evaluations, a dedicated local hardware testbed was configured. The hardware setup consists of an Intel Core i7 CPU (specifically the i7-14700KF model), 32GB of DDR5 RAM, and an NVIDIA RTX 4060 Ti 16GB GPU, which was utilized to execute the local quantized \textit{Gemma-2-9B-IT} Q6\_K model. The evaluations rely on two major datasets: the CSE-CIC-IDS2018 dataset~\cite{ids2018}, which encompasses diverse network attack typologies—including Brute Force, DoS, and Web Attacks—serving as the baseline for evaluating classification accuracy; and the DAPT2020 dataset~\cite{dapt2020}, which is employed for testing the system's capacity to correlate multi-stage Advanced Persistent Threat (APT) campaigns over prolonged timelines. To replicate the properties of a live SIEM environment, a Unified Data Stream simulator was scripted to merge and replay the network logs chronologically according to virtual timestamps, feeding them to the detection queues in real time.
 
 A detailed overview of the CSE-CIC-IDS2018 attack labels, their mapped MITRE ATT\&CK techniques, the default mitigation actions configured in the SENTINEL pipeline, and the source raw data files is summarized in Table~\ref{tab:dataset_distribution}.
 
@@ -39,15 +39,7 @@ A detailed overview of the CSE-CIC-IDS2018 attack labels, their mapped MITRE ATT
 \end{table}
 
 \section{5D Evaluation Metrics and Ablation Study Design}
-The analytical performance of the system is benchmarked across a five-dimensional evaluation framework. These 5D metrics include Accuracy, measured by Precision, Recall, and F1-Score; Performance, measuring latency and throughput; Security, defined by the adversarial robustness rate; Explainability, evaluated via audit completeness; and Integrity, verified by HMAC validation. To isolate the quantitative impact of each proposed component, an ablation study was designed across six specific configurations:
-\begin{itemize}
-    \item \textbf{Configuration A (Traditional Baseline):} Relying exclusively on a traditional, rule-based signature engine at the ingestion layer without any LLM routing.
-    \item \textbf{Configuration B (Pure LLM Baseline):} Utilizing pure local LLM inference for every network log without Welford pre-filtering, RAG context, or security guardrails.
-    \item \textbf{Configuration C (Welford Filtered):} Introducing Welford's Tier-1 statistical filter before routing anomalies to the LLM, reducing the ingestion volume.
-    \item \textbf{Configuration D (Single-RAG Grounded):} Adding a single dense vector search database (FAISS with MiniLM embeddings) to the filtered LLM triage.
-    \item \textbf{Configuration E (Hybrid-RAG Grounded):} Expanding the RAG component to a hybrid configuration combining dense vector search (FAISS) and sparse keyword search (BM25).
-    \item \textbf{Configuration F (Holistic SENTINEL):} Combining the Tier-1 Welford filter, the stateful Tier-2 LangGraph agent, hybrid Dual-RAG (FAISS + BM25) consolidated via RRF, and defensive guardrails.
-\end{itemize}
+The analytical performance of the system is benchmarked across a five-dimensional evaluation framework. These 5D metrics include Accuracy, measured by Precision, Recall, and F1-Score; Performance, measuring latency and throughput; Security, defined by the adversarial robustness rate; Explainability, evaluated via audit completeness; and Integrity, verified by HMAC validation. To isolate the quantitative impact of each proposed component, an ablation study was designed across six specific configurations. Configuration~A (the traditional baseline) relies exclusively on a rule-based signature engine at the ingestion layer, without any LLM routing. Configuration~B (the pure-LLM baseline) submits every network log to local LLM inference, without Welford pre-filtering, RAG context, or security guardrails. Configuration~C (Welford-filtered) inserts Welford's Tier-1 statistical filter ahead of the LLM so as to reduce the ingestion volume. Configuration~D (single-RAG grounded) adds a single dense vector-search database (FAISS with MiniLM embeddings) to the filtered LLM triage. Configuration~E (hybrid-RAG grounded) expands this retrieval component into a hybrid of dense vector search (FAISS) and sparse keyword search (BM25). Finally, Configuration~F (the holistic SENTINEL) combines the Tier-1 Welford filter, the stateful Tier-2 LangGraph agent, hybrid Dual-RAG (FAISS + BM25) consolidated via RRF, and the defensive guardrails.
 Within the scope of this thesis, the two architectural endpoints are evaluated empirically---Configuration~A (deterministic Tier-1 only, no LLM) and Configuration~F (the full two-tier system)---because together they bound the marginal contribution of the cognitive Tier-2; the intermediate configurations B--E are retained as a roadmap for finer-grained component isolation in future work.
 
 \section{Classification Accuracy on the Unified Stream}
@@ -135,7 +127,7 @@ Seven signature-less zero-day outliers were injected into the stream by elevatin
 Every zero-day outlier was missed by the signature-based static engine (which issued a DROP) yet caught by the online Welford filter, which flagged each as a statistical anomaly ($Z > 3.5$) and escalated it to Tier-2 for human-in-the-loop adjudication.
 
 \section{Ablation Study: Two-Tier Latency Trade-off and Statistical Tests}
-The ablation study isolates the contribution of the cognitive Tier-2 by contrasting Configuration~A (deterministic Tier-1 only) with Configuration~F (the full two-tier system) on a stratified 300-sample subset of the labeled ground truth. Two non-parametric tests were applied: McNemar's test on the paired binary verdicts, and the Mann-Whitney~U test on the per-event latency distributions. The results are summarized in Table~\ref{tab:ablation}.
+The ablation study isolates the contribution of the cognitive Tier-2 by contrasting Configuration~A (deterministic Tier-1 only) with Configuration~F (the full two-tier system) on a stratified 300-sample subset of the labeled ground truth. Two non-parametric tests were applied: McNemar's test~\cite{mcnemar1947} on the paired binary verdicts, and the Mann-Whitney~U test~\cite{mannwhitney1947} on the per-event latency distributions. The results are summarized in Table~\ref{tab:ablation}.
 
 \begin{table}[!htbp]
     \centering
@@ -165,7 +157,7 @@ The ablation study isolates the contribution of the cognitive Tier-2 by contrast
 Two findings emerge. First, on this labeled subset the two configurations produce \emph{identical} binary verdicts for every sample; McNemar's test is therefore degenerate (no discordant pairs, $p = 1.0$), indicating that the cognitive tier does not alter Tier-1's coarse attack/benign decision. The architectural value of Tier-2 is thus orthogonal to binary detection---it lies in the contextual reasoning, MITRE/NIST grounding, zero-day escalation, and adversarial robustness quantified elsewhere in this chapter---rather than in raw classification gain. (The stratified subset is attack-dominated, so the absolute F1 of 0.967 here is not directly comparable to the balanced Unified-Stream result of Table~\ref{tab:classification}; this ablation isolates the latency and verdict-equivalence comparison.) Second, the configurations differ sharply in latency: Tier-1 resolves a decision in roughly 0.6~ms, whereas escalated events incur a mean of about 5.7~s of LLM reasoning, and the Mann-Whitney~U test confirms that this separation is highly significant ($p = 2.8\times10^{-17}$). Crucially, only 62.7\% of the sampled events escalated to the LLM while 37.3\% were resolved at Tier-1 wire-speed; for that Tier-1-resolved traffic the latency reduction versus full LLM inference exceeds 99.9\%. This quantitatively validates the central design hypothesis: a deterministic wire-speed filter must absorb the bulk of traffic so that expensive cognitive reasoning is reserved for the genuinely ambiguous minority.
 
 \section{Adversarial Robustness Evaluation (Security)}
-To probe the security posture of the cognitive layer, an adversarial suite of \textbf{120 payloads} spanning five OWASP-aligned categories was compiled: encoding bypasses, structural (delimiter) attacks, semantic confusion, jailbreaks, and RAG poisoning. Each payload attempts to hijack the agent's reasoning (e.g., instructing the model to ignore security policies and report a malicious IP as benign). Table~\ref{tab:robustness} reports the block rate of the \textit{static guardrail layer} (encoding neutralization, delimiter sanitization, and pattern filters) measured in isolation.
+To probe the security posture of the cognitive layer, an adversarial suite of \textbf{120 payloads} spanning five OWASP-aligned categories~\cite{owasp_llm2025} was compiled: encoding bypasses, structural (delimiter) attacks, semantic confusion, jailbreaks, and RAG poisoning. Each payload attempts to hijack the agent's reasoning (e.g., instructing the model to ignore security policies and report a malicious IP as benign). Table~\ref{tab:robustness} reports the block rate of the \textit{static guardrail layer} (encoding neutralization, delimiter sanitization, and pattern filters) measured in isolation.
 
 \begin{table}[!htbp]
     \centering
@@ -177,7 +169,7 @@ To probe the security posture of the cognitive layer, an adversarial suite of \t
         \hline
         Encoding bypass (Base64/Hex/URL) & 45 & 45 & 100.0\% \\
         \hline
-        Structural / delimiter attacks & 20 & 8 & 40.0\% \\
+        Structural / delimiter attacks & 20 & 7 & 35.0\% \\
         \hline
         Semantic confusion & 20 & 0 & 0.0\% \\
         \hline
@@ -185,12 +177,12 @@ To probe the security posture of the cognitive layer, an adversarial suite of \t
         \hline
         RAG poisoning & 15 & 6 & 40.0\% \\
         \hline
-        \textbf{Overall} & \textbf{120} & \textbf{61} & \textbf{50.8\%} \\
+        \textbf{Overall} & \textbf{120} & \textbf{60} & \textbf{50.0\%} \\
         \hline
     \end{tabular}
 \end{table}
 
-The static layer is highly effective against syntactic obfuscation---blocking 100\% of encoding-bypass payloads---but, as expected, weaker against purely semantic manipulation, where pattern matching alone catches none of the semantic-confusion payloads and only 10\% of jailbreaks, yielding an overall static block rate of 50.8\%. These residual semantic attacks are precisely the class addressed by the deterministic Tier-1/Tier-2 consensus guard described in Chapter~\ref{ch:system_design_implementation}: when a semantically manipulated payload coerces the LLM into downgrading a Tier-1-flagged attack, the \texttt{DecisionValidator} overrides the verdict to \texttt{AWAIT\_HITL}, neutralizing the manipulation before it can take effect. It is therefore the integrity of this layered defense-in-depth design, rather than any single regular expression, that bounds the system's adversarial exposure. The breakdown of the block rates across attack categories is visualized in Figure~\ref{fig:robustness_block_rate}, while the overall prediction accuracy of the defended agent system under adversarial testing is depicted in Figure~\ref{fig:robustness_accuracy_pie}.
+The static layer is highly effective against syntactic obfuscation---blocking 100\% of encoding-bypass payloads---but, as expected, weaker against purely semantic manipulation, where pattern matching alone catches none of the semantic-confusion payloads and only 10\% of jailbreaks, yielding an overall static block rate of 50.0\%. These residual semantic attacks are precisely the class addressed by the deterministic Tier-1/Tier-2 consensus guard described in Chapter~\ref{ch:system_design_implementation}: when a semantically manipulated payload coerces the LLM into downgrading a Tier-1-flagged attack, the \texttt{DecisionValidator} overrides the verdict to \texttt{AWAIT\_HITL}, neutralizing the manipulation before it can take effect. It is therefore the integrity of this layered defense-in-depth design, rather than any single regular expression, that bounds the system's adversarial exposure. The breakdown of the block rates across attack categories is visualized in Figure~\ref{fig:robustness_block_rate}, while the overall prediction accuracy of the defended agent system under adversarial testing is depicted in Figure~\ref{fig:robustness_accuracy_pie}.
 
 \begin{figure}[!htbp]
     \centering
@@ -212,7 +204,7 @@ The static layer is highly effective against syntactic obfuscation---blocking 10
 \section{Integrity and Reasoning Quality (LLM-as-a-Judge)}
 The final validation phase assessed audit-trail integrity and the quality of the agent's grounded reasoning. To verify integrity, a tampering scenario was simulated in which a stored log label was maliciously altered; the HMAC log-chaining verifier immediately detected the hash-chain break and flagged it on the dashboard. A complementary audit-completeness check confirmed that 100\% of the agent's verdicts conformed to the mandatory structured (JSON) schema.
 
-To assess reasoning quality without self-enhancement bias, a cross-family LLM-as-Judge protocol \cite{zheng2023judge} was adopted: a Meta Llama-3-8B-Instruct judge scored the 188 LLM-escalated reasoning outputs generated by the Gemma-2-9B agent (from the ablation run) across four RAGAS-style dimensions on a 1--5 scale. Using a judge from a different model family eliminates the self-enhancement bias that arises when a model evaluates its own outputs. Table~\ref{tab:ragas} reports the means and standard deviations.
+To assess reasoning quality without self-enhancement bias, a cross-family LLM-as-Judge protocol \cite{zheng2023judge} was adopted: a Meta Llama-3-8B-Instruct judge scored the 188 LLM-escalated reasoning outputs generated by the Gemma-2-9B agent (from the ablation run) across four RAGAS-style dimensions~\cite{ragas2023} on a 1--5 scale. Using a judge from a different model family eliminates the self-enhancement bias that arises when a model evaluates its own outputs. Table~\ref{tab:ragas} reports the means and standard deviations.
 
 \begin{table}[!htbp]
     \centering
@@ -239,4 +231,28 @@ To assess reasoning quality without self-enhancement bias, a cross-family LLM-as
 
 The judge rated Faithfulness at 4.00/5 with zero variance, indicating that the agent's conclusions are consistently supported by the retrieved MITRE/NIST evidence rather than fabricated, and Answer Relevancy at 4.63/5, confirming that the recommended action matches the detected threat. Context Precision (3.00/5) is the weakest dimension, reflecting that the hybrid retriever occasionally surfaces broadly related rather than pin-point techniques---a clear direction for future re-ranking improvements. Taken together, the overall mean of 3.91/5 and the 100\% audit completeness support the claim that Dual-RAG grounding materially constrains hallucination, while honestly bounding the remaining headroom in retrieval precision.
 
-In summary, Chapter 4 verifies the technical prowess of SENTINEL through hard quantitative data and rigorous statistical tests. Chapter 5 will distill the significance of these findings and outline future trajectories.
+\section{Summary of 5D Evaluation Results}
+Table~\ref{tab:5d_summary} consolidates the principal findings across the five evaluation dimensions, mapping each dimension back to the concrete metric that operationalizes it.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Consolidated results across the five evaluation dimensions. (Source: Author)}
+    \label{tab:5d_summary}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.17\textwidth}|>{\raggedright\arraybackslash}p{0.43\textwidth}|>{\raggedright\arraybackslash}p{0.27\textwidth}|}
+        \hline
+        \textbf{Dimension} & \textbf{Operational Metric} & \textbf{Result} \\
+        \hline
+        Accuracy & Tier-1 F1 (Unified Stream); APT recall; zero-day caught & $0.594$; $1.00$; $7/7$ \\
+        \hline
+        Performance & Tier-1 vs.\ Tier-2 mean latency; LLM escalation rate & $0.6$\,ms vs.\ $5.7$\,s; $62.7\%$ \\
+        \hline
+        Security & Static guardrail block rate (overall; encoding-bypass) & $50.0\%$; $100\%$ \\
+        \hline
+        Explainability & Cross-family LLM-as-Judge (overall; Faithfulness) & $3.91/5$; $4.00/5$ \\
+        \hline
+        Integrity & Audit completeness; HMAC tamper detection & $100\%$; detected \\
+        \hline
+    \end{tabular}
+\end{table}
+
+In summary, Chapter 4 verifies the technical capabilities of SENTINEL through hard quantitative data and rigorous statistical tests. Chapter 5 distills the significance of these findings and outlines future trajectories.

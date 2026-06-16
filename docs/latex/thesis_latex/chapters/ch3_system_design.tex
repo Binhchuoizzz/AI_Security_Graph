@@ -14,11 +14,7 @@ To protect enterprise environments without incurring prohibitive computational l
     \label{fig:soc_ai_concept}
 \end{figure}
 
-The proposed architecture divides responsibilities across two main tiers:
-\begin{itemize}
-    \item \textbf{Tier-1 (Stateless Wire-Speed Filtration):} Situated directly at the network boundary, this tier ingests high-velocity telemetry (flow logs, packet metadata) and calculates real-time statistical deviations (using Welford's algorithm) or applies regex signatures to drop or log benign events instantly at wire-speed.
-    \item \textbf{Tier-2 (Stateful Cognitive Reasoning):} Driven by an autonomous LangGraph agent \cite{langgraph2024}, this tier executes deep cognitive reasoning, retrieves grounding contexts from the Dual-RAG engine, correlates logs over SQLite-based Threat Memory, and issues structured mitigation recommendations (e.g., dynamic firewall blocks).
-\end{itemize}
+The proposed architecture divides responsibilities across two main tiers. Tier-1, the stateless wire-speed filtration layer, is situated directly at the network boundary, where it ingests high-velocity telemetry such as flow logs and packet metadata and either computes real-time statistical deviations through Welford's algorithm or applies regex signatures, dropping or logging benign events instantly at wire-speed. Tier-2, the stateful cognitive-reasoning layer, is driven by an autonomous LangGraph agent \cite{langgraph2024}: it performs deep cognitive reasoning, retrieves grounding contexts from the Dual-RAG engine, correlates logs against the SQLite-based Threat Memory, and issues structured mitigation recommendations such as dynamic firewall blocks.
 This hybrid layout resolves the LLM latency bottleneck by offloading the vast majority of benign traffic at Tier-1---quantified empirically in Chapter~4---reserving deep LLM inference solely for complex threat investigations.
 
 The detailed step-by-step runtime flow of the data processing and decision-making logic throughout the system is represented in the system execution flow diagram shown in Figure~\ref{fig:sentinel_flow}.
@@ -73,7 +69,7 @@ Escalated anomalous flows are received by the Tier-2 cognitive engine, modeled a
 
 Grounding the triage node in the retrieved MITRE/NIST documents constrains the LLM to verified context, mitigating hallucination. The triage node emits a structured JSON payload detailing the threat class, a confidence score, and recommended block rules. High-confidence malicious verdicts are dispatched to the action executor, whereas low-confidence or explicitly ambiguous verdicts are routed to the Human-in-the-Loop (HITL) queue for analyst review. A deterministic \texttt{DecisionValidator} additionally demotes any \texttt{BLOCK\_IP} verdict whose confidence falls below 0.5 to \texttt{AWAIT\_HITL}, and overrides the LLM to \texttt{AWAIT\_HITL} whenever it contradicts a Tier-1 attack signal (the tier-consensus guard against semantic social-engineering).
 
-The technical implementation of the state graph utilizes LangGraph's compiler. The state is represented as a structured Python typed dictionary containing append-only fields like \texttt{extracted\_iocs} and \texttt{decisions} to prevent semantic drift across the triage pipeline. The LLM connection is managed via the \texttt{LLMClient} class connecting to a local quantized llama.cpp service running the Gemma 2 model \cite{gemma_2_2024}, configured with strict parameters including \texttt{temperature=0.1} and a fixed context-size token window to ensure near-deterministic reasoning and prevent resource depletion.
+The technical implementation of the state graph utilizes LangGraph's compiler. The state is represented as a structured Python typed dictionary containing append-only fields like \texttt{extracted\_iocs} and \texttt{decisions} to prevent semantic drift across the triage pipeline. The LLM connection is managed via the \texttt{LLMClient} class connecting to a local quantized llama.cpp service running the Gemma 2 model \cite{gemma_2_2024}, configured with strict parameters including \texttt{temperature=0.1} and a fixed 8{,}192-token context window to ensure near-deterministic reasoning and prevent resource depletion.
 
 \section{Dual-RAG Mechanism and Semantic Memory}
 
@@ -87,7 +83,7 @@ The Dual-RAG mechanism grounds the agent's decisions by retrieving contexts from
         \hline
         \textbf{Dimension} & \textbf{Dense Vector Search (FAISS)} & \textbf{Sparse Keyword Search (BM25)} \\
         \hline
-        \textbf{Underlying Model} & all-MiniLM-L6-v2 Embeddings \cite{reimers2019sentence} & BM25 BM-weighting \\
+        \textbf{Underlying Model} & all-MiniLM-L6-v2, 384-dim embeddings \cite{reimers2019sentence} & BM25 term weighting \\
         \hline
         \textbf{Matching Logic} & Cosine Semantic Similarity \cite{faiss2019} & Term Frequency-Inverse Document Frequency \cite{bm25_2009} \\
         \hline
@@ -104,7 +100,7 @@ The scores from the dense (FAISS) and sparse (BM25) pipelines are consolidated u
     R(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}
 \end{equation}
 
-where $r_m(d)$ is the rank of document $d$ in search run $m$, and $k$ is a constant scaling parameter (typically $k=60$). To avoid redundant embedding and search overhead, a Semantic Cache module sits before the retrieval pipeline. The cache derives a deterministic key by computing the SHA-256 digest of the mined log template, so escalated logs that share the same attack template reuse a previously computed retrieval result instead of re-embedding and re-searching, reducing per-query processing time from hundreds of milliseconds to microseconds. The cache is implemented as an in-memory Least Recently Used (LRU) structure (a Python \texttt{OrderedDict}) bounded to 500 entries, with an 1800-second Time-To-Live (TTL) that evicts stale templates.
+where $r_m(d)$ is the rank of document $d$ in search run $m$, and $k$ is a constant scaling parameter (typically $k=60$). The three top-ranked passages from this fused list are forwarded to the triage node as grounding context. To avoid redundant embedding and search overhead, a Semantic Cache module sits before the retrieval pipeline. The cache derives a deterministic key by computing the SHA-256 digest of the mined log template, so escalated logs that share the same attack template reuse a previously computed retrieval result instead of re-embedding and re-searching, reducing per-query processing time from hundreds of milliseconds to microseconds. The cache is implemented as an in-memory Least Recently Used (LRU) structure (a Python \texttt{OrderedDict}) bounded to 500 entries, with an 1800-second Time-To-Live (TTL) that evicts stale templates.
 
 \section{Threat Memory and APT Campaign Correlation}
 
@@ -141,11 +137,11 @@ where $\lambda$ is the decay rate and $t$ is the inactive time elapsed. An APT c
 
 Because LLMs are vulnerable to instruction hijacking, the SENTINEL system implements a multi-layered AI Security Guardrails layer to isolate the reasoning engine from untrusted inputs \cite{promptinjection2023}. The core defense mechanism relies on Delimited Data Encapsulation. For each session, the system generates a cryptographically secure, randomized hexadecimal token (e.g., \texttt{<|DATA\_8F3E|>}) using Python's \texttt{secrets.token\_hex()} routine (built on \texttt{os.urandom}). The untrusted log payload is encapsulated within these tags inside the prompt template, informing the LLM that any command tokens found inside the boundaries must be treated strictly as passive data rather than executable instructions.
 
-To defend against Token Denial-of-Service (DoS) and context overflow attacks, the system incorporates a Log Template Miner based on the Drain log parsing algorithm \cite{he2017drain}. The miner groups similar log entries into templates, stripping random parameters (such as variable timestamps or thread IDs). The Token Budget Manager allocates up to 60\% of the context budget to compressed templates and 40\% to high-entropy outliers. Finally, an Output Sanitization Filter enforces strict JSON schema conformance, verifying that the LLM response contains only allowed fields and stripping markdown image tags, SVG scripts, and hex-encoded bypass vectors \cite{watchtower2026}. The sanitization is implemented using the \texttt{output\_sanitizer} module which intercepts LLM outputs before they are processed by the database or dashboard.
+To defend against Token Denial-of-Service (DoS) and context overflow attacks, the system incorporates a Log Template Miner based on the Drain log parsing algorithm \cite{he2017drain}. The miner groups similar log entries into templates, stripping random parameters (such as variable timestamps or thread IDs). Operating within a 4{,}000-token budget, the Token Budget Manager allocates up to 60\% of this budget to compressed templates and 40\% to high-entropy outliers. Finally, an Output Sanitization Filter enforces strict JSON schema conformance, verifying that the LLM response contains only allowed fields and stripping markdown image tags, SVG scripts, and hex-encoded bypass vectors \cite{watchtower2026}. The sanitization is implemented using the \texttt{output\_sanitizer} module which intercepts LLM outputs before they are processed by the database or dashboard.
 
 \section{Data Integrity and HMAC Protection}
 
-To secure the security log database against tampering by malicious insiders or attackers who gain access to the file system, the system implements HMAC log chaining. Each security log entry is cryptographically linked to the preceding record, forming a private blockchain-like audit trail. For log entry $i$, the record hash $H_i$ is computed as:
+To secure the security log database against tampering by malicious insiders or attackers who gain access to the file system, the system implements HMAC log chaining~\cite{hmac1997}. Each security log entry is cryptographically linked to the preceding record, forming a private blockchain-like audit trail. For log entry $i$, the record hash $H_i$ is computed as:
 
 \begin{equation}
     H_i = \text{HMAC-SHA256}(D_i \parallel H_{i-1}, K)

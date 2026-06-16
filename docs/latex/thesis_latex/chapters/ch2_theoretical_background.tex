@@ -20,19 +20,32 @@ Compounding this problem is the emergence of Advanced Persistent Threats (APTs) 
 
 \section{Large Language Models (LLMs) and the Mathematics of Quantization}
 
-The emergence of Large Language Models (LLMs) based on the Transformer architecture has offered promising automation capabilities. The Transformer’s self-attention mechanism enables the simultaneous evaluation of contextual dependencies across an entire sequence, providing powerful log analysis capabilities \cite{vaswani2017}.
+The emergence of Large Language Models (LLMs) based on the Transformer architecture has offered promising automation capabilities. Their effectiveness stems from the self-attention mechanism, which weighs every token in a sequence against all others in parallel \cite{vaswani2017}; this property lets the model capture the long-range dependencies needed to correlate events scattered across an extended log stream.
 
-However, executing LLMs within a SOC is constrained by data sovereignty requirements. Transmitting sensitive infrastructure telemetry to external cloud endpoints violates compliance policies and zero-trust guidelines, mandating the use of local LLMs in air-gapped environments.
+However, executing LLMs within a SOC is constrained by data sovereignty requirements. Transmitting sensitive infrastructure telemetry to external cloud endpoints violates compliance policies and zero-trust guidelines~\cite{nist80207}, mandating the use of local LLMs in air-gapped environments.
 
-Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. Quantization mathematically projects continuous weight parameters (such as FP16) onto discrete, lower-bit representations (such as INT4) \cite{quantization2021}. Utilizing GGUF formats and the Q6\_K quantization standard via the \texttt{llama.cpp} framework reduces the memory footprint to approximately 7--8\,GB of VRAM---a reduction of over 50\%---maximizing inference speed with minimal degradation in model reasoning.
+Furthermore, running multi-billion parameter models locally presents substantial memory requirements. For instance, executing a 9-billion parameter model like \textit{Gemma-2-9B-IT} in 16-bit floating-point (FP16) requires roughly 18GB of VRAM. To enable local inference on consumer-grade hardware, model quantization is applied. In essence, quantization re-maps a model's continuous, high-precision weights (for instance, 16-bit floating point) onto a coarser grid of lower-bit integers (for instance, 4-bit), trading a controlled loss of numerical precision for a substantial saving in memory \cite{quantization2021}. Utilizing GGUF formats and the Q6\_K quantization standard via the \texttt{llama.cpp} framework reduces the memory footprint to approximately 7--8\,GB of VRAM---a reduction of over 50\%---maximizing inference speed with minimal degradation in model reasoning. Table~\ref{tab:quantization} contrasts the relevant quantization levels for the 9-billion-parameter model and motivates the selection of Q6\_K as a balance between memory footprint and reasoning fidelity.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Quantization levels for the Gemma-2-9B model (approximate values). (Source: Author)}
+    \label{tab:quantization}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\centering\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.20\textwidth}|}
+        \hline
+        \textbf{Format} & \textbf{Bits / weight} & \textbf{VRAM} & \textbf{Quality impact} \\
+        \hline
+        FP16 (baseline) & 16 & $\approx$18\,GB & None (reference) \\
+        \hline
+        \textbf{Q6\_K (this work)} & $\approx$6.6 & $\approx$7--8\,GB & Near-lossless \\
+        \hline
+        Q4\_K\_M & $\approx$4.5 & $\approx$5--6\,GB & Minor degradation \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \section{Agentic AI Architecture and State-Graph Models}
 
-To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) to autonomous Agentic AI systems. The core operational differences between these two paradigms include:
-\begin{itemize}
-    \item \textbf{Runbook Automation (RBA):} Relies on static, pre-defined rules and deterministic scripts for linear alert handling, which is highly efficient but structurally blind to zero-day conditions or polymorphic alert formats.
-    \item \textbf{Agentic AI Systems:} Exhibit cognitive autonomy with capacities for self-reflection, multi-step planning, and adaptive context routing, allowing them to dynamically adjust analysis based on intermediate security findings.
-\end{itemize}
+To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) towards autonomous Agentic AI systems, two paradigms that differ fundamentally in their operational logic. Runbook Automation relies on static, pre-defined rules and deterministic scripts for linear alert handling; this approach is highly efficient yet structurally blind to zero-day conditions and polymorphic alert formats. Agentic AI systems, by contrast, exhibit cognitive autonomy---encompassing self-reflection, multi-step planning, and adaptive context routing---which enables them to adjust their analysis dynamically in response to intermediate security findings.
 
 These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs), where nodes represent distinct computational or cognitive actions—such as CTI retrieval, vulnerability scanning, and response generation—and conditional edges enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
 
@@ -47,7 +60,7 @@ Stateful multi-actor orchestration paradigms \cite{langgraph2024} allow agents t
 
 \section{Retrieval-Augmented Generation (RAG) and Hybrid Search Optimization}
 
-The primary limitation of LLMs is factual hallucination, which poses a severe risk of misconfigurations or false positives in automated SOC environments. Grounding LLM reasoning in verified external knowledge corpora through retrieval-augmented configurations \cite{rag2020} mitigates the risks of factual hallucination by restricting model inferences to verified contexts.
+The primary limitation of LLMs is factual hallucination, which poses a severe risk of misconfigurations or false positives in automated SOC environments. Retrieval-Augmented Generation counters this by attaching an external, authoritative knowledge corpus to the model at inference time \cite{rag2020}: rather than answering from parametric memory alone, the model conditions each response on freshly retrieved passages, which narrows the space in which unsupported claims can emerge.
 
 To ensure precise document retrieval, modern RAG configurations use a hybrid search strategy that combines two paradigms: dense vector search, which uses embedding models (such as \texttt{all-MiniLM-L6-v2}) and vector libraries (FAISS) to compute cosine similarity \cite{faiss2019} to capture the semantic meaning of queries even when keywords differ; and sparse keyword search, which uses the BM25 algorithm \cite{bm25_2009} to match technical identifiers (such as CVE codes or IP addresses) based on term frequency-inverse document frequency weighting.
 
@@ -59,14 +72,7 @@ Deploying LLMs as core reasoning engines in security pipelines introduces novel 
 
 The agents are exposed to critical cognitive manipulation risks via log-substrate prompt injections \cite{watchtower2026}, where adversaries exploit log ingestion pipelines to deliver adversarial instructions. Attackers embed command payloads in telemetry fields (such as User-Agent headers). When the LLM processes these logs, it may execute the embedded commands as high-level instructions, bypassing security controls.
 
-Recent work formalizes these log-substrate attacks into a four-class taxonomy \cite{watchtower2026}:
-\begin{itemize}
-    \item \textbf{Direct Override (S1):} The adversarial payload openly instructs the model to ignore prior security directives and override system instructions.
-    \item \textbf{Persona Hijack (S2):} The payload coerces the model into adopting an unrestricted or unauthorized persona to bypass safety alignment rules.
-    \item \textbf{Context Manipulation (S3):} The payload fabricates authorization metadata or false provenance (e.g., claiming an alert was pre-approved or whitelisted) within the log stream.
-    \item \textbf{Obfuscated Payloads (S4):} The instructions are concealed using Base64, hexadecimal, URL encoding, or homoglyph substitutions to evade simple regex pattern filters.
-\end{itemize}
-Because the log fields carrying these payloads are attacker-controlled yet structurally indistinguishable from legitimate evidence, a single-pass LLM analyst cannot reliably separate data from instructions. This taxonomy directly motivates the layered, defense-in-depth guardrail design adopted in Chapter~\ref{ch:system_design_implementation}.
+Recent work formalizes these log-substrate attacks into a four-class taxonomy \cite{watchtower2026}. A \textit{Direct Override} (S1) payload openly instructs the model to ignore prior security directives and supersede its system instructions. A \textit{Persona Hijack} (S2) payload coerces the model into adopting an unrestricted or unauthorized persona in order to bypass its safety-alignment rules. A \textit{Context Manipulation} (S3) payload fabricates authorization metadata or false provenance within the log stream---for example, claiming that an alert was pre-approved or whitelisted. Finally, an \textit{Obfuscated Payload} (S4) conceals its instructions through Base64, hexadecimal, or URL encoding, or through homoglyph substitution, so as to evade simple regex pattern filters. Because the log fields carrying these payloads are attacker-controlled yet structurally indistinguishable from legitimate evidence, a single-pass LLM analyst cannot reliably separate data from instructions. This taxonomy directly motivates the layered, defense-in-depth guardrail design adopted in Chapter~\ref{ch:system_design_implementation}.
 
 \begin{figure}[!htbp]
     \centering
@@ -133,14 +139,16 @@ Despite their individual strengths, these systems share a structural blind spot:
 \begin{table}[!htbp]
     \centering
     \footnotesize
+    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.25}
     \caption{Comparative analysis of SENTINEL against recent agentic-AI security frameworks. ($\checkmark$ = supported; $\sim$ = partial; $\times$ = absent; -- = not applicable). (Source: Author)}
     \label{tab:related_work}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.30\textwidth}|c|c|c|c|c|}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|*{5}{>{\centering\arraybackslash}p{0.10\textwidth}|}}
         \hline
-        \textbf{Capability} & \textbf{SENTINEL} & \textbf{CyberRAG} & \textbf{LanG} & \textbf{Splunk-LLM} & \textbf{Watchtower} \\
+        \textbf{Capability} & \textbf{SENTINEL} & \textbf{Cyber\-RAG} & \textbf{LanG} & \textbf{Splunk\-LLM} & \textbf{Watch\-tower} \\
          & (ours) & \cite{cyberrag2025} & \cite{lang2026} & \cite{splunkllm2026} & \cite{watchtower2026} \\
         \hline
-        Primary focus & 2-tier defense & Attack classification & Unified governance & Threat hunting & Attack study \\
+        Primary focus & 2-tier defense & Attack classif. & Unified govern. & Threat hunting & Attack study \\
         \hline
         Wire-speed $O(1)$ statistical pre-filter & $\checkmark$ & $\times$ & $\times$ & $\sim$ & -- \\
         \hline

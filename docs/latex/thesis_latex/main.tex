@@ -89,6 +89,7 @@
 }
 
 % =============================================================================
+\renewcommand{\arraystretch}{1.3} % uniform vertical spacing for all tables
 \begin{document}
 \selectlanguage{english}
 
@@ -157,9 +158,9 @@
 \vspace{0.5cm}
 
 \begin{singlespace}
-In the contemporary cybersecurity landscape, Security Operations Centers (SOCs) are consistently overwhelmed by the sheer volume of network alerts, leading to severe alert fatigue and the potential oversight of critical Advanced Persistent Threats (APTs). To address the inherent limitations of traditional, static rule-based systems and the latency bottlenecks of processing raw logs directly through Large Language Models (LLMs), this thesis introduces SENTINEL: A Two-Tier Cognitive Architecture for Automated Threat Detection and Response. The proposed framework operates by deploying Welford's online statistical algorithm at the Transport Tier (Tier-1) to filter benign traffic at wire speed with minimal computational overhead. Subsequently, the Cognitive Agent Tier (Tier-2) leverages a LangGraph-driven AI Agent equipped with a Dual Retrieval-Augmented Generation (Dual-RAG) mechanism—integrating MITRE ATT\&CK and NIST guidelines—to perform deep, contextual threat reasoning and mitigation. 
+In the contemporary cybersecurity landscape, Security Operations Centers (SOCs) are consistently overwhelmed by the sheer volume of network alerts, leading to severe alert fatigue and the potential oversight of critical Advanced Persistent Threats (APTs). To address the inherent limitations of traditional, static rule-based systems and the latency bottlenecks of processing raw logs directly through Large Language Models (LLMs), this thesis introduces SENTINEL, a two-tier cognitive architecture for automated threat detection and response. The framework deploys Welford's online statistical algorithm at a stateless Transport Tier (Tier-1) to filter benign traffic at wire speed in $O(1)$ time and memory, while a LangGraph-driven Cognitive Agent Tier (Tier-2)—equipped with a Dual Retrieval-Augmented Generation (Dual-RAG) mechanism over MITRE ATT\&CK techniques and NIST SP 800-61r2 playbooks—performs grounded contextual reasoning behind cryptographic guardrails.
 
-Evaluated on the CSE-CIC-IDS2018 and DAPT2020 datasets, SENTINEL demonstrates substantial improvements in both detection accuracy and processing efficiency. Furthermore, the system incorporates robust AI security guardrails, including Delimited Data Encapsulation and HMAC log chaining, achieving highly effective mitigation against known adversarial AI manipulation attacks and ensuring forensic data integrity. The findings underscore the efficacy of combining deterministic statistical filters with explainable Agentic AI, offering a highly scalable and secure automation solution for modern network defense.
+Evaluated on the CSE-CIC-IDS2018 and DAPT2020 datasets, SENTINEL escalates only the genuinely ambiguous minority of traffic to the LLM: the deterministic tier resolves a decision in roughly $0.6$\,ms versus a $4$--$6$\,s LLM inference, a separation confirmed as statistically significant by a Mann-Whitney~U test ($p = 2.8\times10^{-17}$). The online Welford filter caught all seven injected signature-less zero-day outliers that the static engine missed, and emergent multi-day correlation in the persistent Threat Memory recovered all three DAPT2020 APT campaigns (recall $= 1.0$). A cross-family LLM-as-Judge evaluation rated the agent's grounded reasoning at $3.91/5$ overall, with a Faithfulness of $4.00/5$, while a defense-in-depth guardrail design---Delimited Data Encapsulation, output sanitization, and HMAC log chaining---blocked all encoding-based injection payloads and routed residual semantic manipulations to human review while preserving forensic integrity. These findings demonstrate that pairing a deterministic wire-speed filter with an explainable, cryptographically isolated Agentic AI tier yields a scalable and security-hardened automation solution for modern network defense.
 
 
 \end{singlespace}
@@ -198,9 +199,7 @@ Finally and most importantly, I dedicate a special acknowledgment to my loving f
 \midrule
 AI & Artificial Intelligence \\
 APT & Advanced Persistent Threat \\
-API & Application Programming Interface \\
 C2 & Command and Control \\
-CIDR & Classless Inter-Domain Routing \\
 CNN & Convolutional Neural Network \\
 CPU & Central Processing Unit \\
 CSV & Comma-Separated Values \\
@@ -208,18 +207,15 @@ CTI & Cyber Threat Intelligence \\
 CVE & Common Vulnerabilities and Exposures \\
 DAG & Directed Acyclic Graph \\
 DAPT & Dynamic/Delayed Advanced Persistent Threat \\
-DDoS & Distributed Denial of Service \\
 DL & Deep Learning \\
 DoS & Denial of Service \\
 EDR & Endpoint Detection and Response \\
 FAISS & Facebook AI Similarity Search \\
 FSM & Finite State Machine \\
-GenAI & Generative Artificial Intelligence \\
 GGUF & GPT-Generated Unified Format \\
 GPU & Graphics Processing Unit \\
 HITL & Human-in-the-Loop \\
 HMAC & Hash-based Message Authentication Code \\
-HTML & HyperText Markup Language \\
 IDS & Intrusion Detection System \\
 IOC & Indicator of Compromise \\
 IP & Internet Protocol \\
@@ -240,21 +236,18 @@ RAM & Random Access Memory \\
 RBA & Runbook Automation \\
 RCE & Remote Code Execution \\
 RRF & Reciprocal Rank Fusion \\
-SCA & Software Composition Analysis \\
 SHA & Secure Hash Algorithm \\
 SIEM & Security Information and Event Management \\
 SOC & Security Operations Center \\
 SQLi & SQL Injection \\
 SSTI & Server-Side Template Injection \\
 SVM & Support Vector Machine \\
-TDIR & Threat Detection and Incident Response \\
 TTP & Tactics, Techniques, and Procedures \\
 TTL & Time to Live \\
 URL & Uniform Resource Locator \\
 VRAM & Video Random Access Memory \\
 WAF & Web Application Firewall \\
 XSS & Cross-Site Scripting \\
-YAML & YAML Ain't Markup Language \\
 \bottomrule
 \end{longtable}
 \newpage
@@ -355,6 +348,27 @@ N. Reimers and I. Gurevych, ``Sentence-BERT: Sentence Embeddings using Siamese B
 
 \bibitem{zheng2023judge}
 L. Zheng \textit{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 36, 2023.
+
+\bibitem{dapt2020}
+S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kang, ``DAPT 2020 -- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \textit{Deployable Machine Learning for Security Defense (MLHat 2020)}, Communications in Computer and Information Science, vol. 1271, Springer, 2020, pp. 138--163.
+
+\bibitem{ragas2023}
+S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \textit{arXiv preprint arXiv:2309.15217}, 2023.
+
+\bibitem{mcnemar1947}
+Q. McNemar, ``Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages,'' \textit{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
+
+\bibitem{mannwhitney1947}
+H. B. Mann and D. R. Whitney, ``On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other,'' \textit{Annals of Mathematical Statistics}, vol. 18, no. 1, pp. 50--60, 1947.
+
+\bibitem{hmac1997}
+H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.
+
+\bibitem{owasp_llm2025}
+OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
+
+\bibitem{nist80207}
+S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,'' NIST Special Publication 800-207, National Institute of Standards and Technology, 2020.
 
 \end{thebibliography}
 

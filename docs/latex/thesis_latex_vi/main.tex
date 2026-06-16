@@ -90,6 +90,7 @@
 }
 
 % =============================================================================
+\renewcommand{\arraystretch}{1.3} % uniform vertical spacing for all tables
 \begin{document}
 \selectlanguage{vietnamese}
 
@@ -158,9 +159,9 @@
 \vspace{0.5cm}
 
 \begin{singlespace}
-Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh mạng (SOC) luôn bị quá tải bởi số lượng cảnh báo khổng lồ, dẫn đến hội chứng "bội thực cảnh báo" và nguy cơ bỏ sót các Cuộc tấn công có chủ đích (APT) nghiêm trọng. Để giải quyết những hạn chế cố hữu của các hệ thống dựa trên luật tĩnh truyền thống và nút thắt về độ trễ khi xử lý trực tiếp log mạng qua Mô hình Ngôn ngữ Lớn (LLM), luận văn này giới thiệu SENTINEL: Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động. Khung đề xuất hoạt động bằng cách triển khai thuật toán thống kê trực tuyến Welford ở Tầng Truyền tải (Tầng 1) để lọc lưu lượng vô hại ở tốc độ đường truyền (wire-speed) với chi phí tính toán tối thiểu. Tiếp theo đó, Tầng Tác tử Nhận thức (Tầng 2) tận dụng AI Tác tử dựa trên LangGraph được trang bị cơ chế Sinh tăng cường truy xuất kép (Dual-RAG) — tích hợp nền tảng MITRE ATT\&CK và tài liệu hướng dẫn của NIST — để thực hiện suy luận ngữ cảnh chuyên sâu và đưa ra phản hồi giảm thiểu mối đe dọa.
+Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh mạng (SOC) luôn bị quá tải bởi số lượng cảnh báo khổng lồ, dẫn đến hội chứng "bội thực cảnh báo" và nguy cơ bỏ sót các Cuộc tấn công có chủ đích (APT) nghiêm trọng. Để giải quyết những hạn chế cố hữu của các hệ thống dựa trên luật tĩnh truyền thống và nút thắt về độ trễ khi xử lý trực tiếp log mạng qua Mô hình Ngôn ngữ Lớn (LLM), luận văn này giới thiệu SENTINEL, một kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động. Khung đề xuất triển khai thuật toán thống kê trực tuyến Welford ở Tầng Truyền tải phi trạng thái (Tầng 1) để lọc lưu lượng vô hại ở tốc độ đường truyền với độ phức tạp thời gian và bộ nhớ $O(1)$, trong khi Tầng Tác tử Nhận thức (Tầng 2) dựa trên LangGraph --- được trang bị cơ chế Sinh tăng cường truy xuất kép (Dual-RAG) trên các kỹ thuật MITRE ATT\&CK và kịch bản NIST SP 800-61r2 --- thực hiện suy luận ngữ cảnh có nền tảng phía sau các rào chắn mật mã.
 
-Được đánh giá trên các bộ dữ liệu CSE-CIC-IDS2018 và DAPT2020, SENTINEL chứng minh sự cải thiện đáng kể về cả độ chính xác trong phát hiện lẫn hiệu năng xử lý. Hơn nữa, hệ thống còn tích hợp các cơ chế bảo mật AI mạnh mẽ, bao gồm Đóng gói Dữ liệu phân tách (Delimited Data Encapsulation) và chuỗi log HMAC, đạt hiệu quả giảm thiểu cao đối với các cuộc tấn công thao túng AI đối kháng đã biết và đảm bảo tính toàn vẹn của dữ liệu pháp y. Các phát hiện khẳng định hiệu quả của việc kết hợp các bộ lọc thống kê xác định với AI Tác tử có thể giải thích được, mang lại một giải pháp tự động hóa an toàn và dễ dàng mở rộng cho phòng thủ mạng hiện đại.
+Được đánh giá trên các bộ dữ liệu CSE-CIC-IDS2018 và DAPT2020, SENTINEL chỉ leo thang phần thiểu số lưu lượng thực sự mơ hồ lên LLM: tầng tất định ra quyết định trong khoảng $0.6$\,ms so với $4$--$6$\,s cho mỗi lượt suy luận LLM, một sự tách biệt được kiểm định Mann-Whitney~U xác nhận là có ý nghĩa thống kê ($p = 2.8\times10^{-17}$). Bộ lọc Welford trực tuyến bắt được toàn bộ bảy điểm dị biệt zero-day không chữ ký mà bộ máy tĩnh bỏ sót, và cơ chế liên kết đa-ngày nổi lên trong Bộ nhớ Đe dọa bền vững đã phục hồi cả ba chiến dịch APT của DAPT2020 (recall $= 1.0$). Một đánh giá LLM-Trọng tài khác họ chấm chất lượng suy luận có nền tảng của tác tử đạt $3.91/5$ tổng thể, với Faithfulness $4.00/5$, trong khi thiết kế rào chắn phòng thủ nhiều lớp --- Đóng gói Dữ liệu phân tách, làm sạch đầu ra, và chuỗi log HMAC --- chặn toàn bộ tải trọng tiêm dựa trên mã hóa và định tuyến các thao túng ngữ nghĩa còn lại tới khâu duyệt của con người trong khi vẫn bảo toàn tính toàn vẹn pháp y. Các phát hiện này cho thấy việc kết hợp một bộ lọc tất định tốc độ đường truyền với một tầng AI Tác tử có thể giải thích và được cô lập bằng mật mã mang lại một giải pháp tự động hóa an toàn, dễ mở rộng cho phòng thủ mạng hiện đại.
 
 
 \end{singlespace}
@@ -199,9 +200,7 @@ Cuối cùng và quan trọng nhất, tôi xin dành lời tri ân đặc biệt
 \midrule
 AI & Artificial Intelligence (Trí tuệ nhân tạo) \\
 APT & Advanced Persistent Threat (Mối đe dọa thường trực nâng cao) \\
-API & Application Programming Interface (Giao diện lập trình ứng dụng) \\
 C2 & Command and Control (Chỉ huy và điều khiển) \\
-CIDR & Classless Inter-Domain Routing (Định tuyến liên miền không phân lớp) \\
 CNN & Convolutional Neural Network (Mạng nơ-ron tích chập) \\
 CPU & Central Processing Unit (Bộ vi xử lý trung tâm) \\
 CSV & Comma-Separated Values (Định dạng dữ liệu phân tách bằng dấu phẩy) \\
@@ -209,18 +208,15 @@ CTI & Cyber Threat Intelligence (Tình báo mối đe dọa mạng) \\
 CVE & Common Vulnerabilities and Exposures (Danh sách lỗ hổng bảo mật phổ biến) \\
 DAG & Directed Acyclic Graph (Đồ thị có hướng không chu trình) \\
 DAPT & Dynamic/Delayed Advanced Persistent Threat (Tấn công APT động/trễ) \\
-DDoS & Distributed Denial of Service (Từ chối dịch vụ phân tán) \\
 DL & Deep Learning (Học sâu) \\
 DoS & Denial of Service (Từ chối dịch vụ) \\
 EDR & Endpoint Detection and Response (Phát hiện và phản hồi điểm cuối) \\
 FAISS & Facebook AI Similarity Search (Tìm kiếm tương đồng AI của Facebook) \\
 FSM & Finite State Machine (Máy trạng thái hữu hạn) \\
-GenAI & Generative Artificial Intelligence (Trí tuệ nhân tạo tạo sinh) \\
 GGUF & GPT-Generated Unified Format (Định dạng hợp nhất do GPT tạo ra) \\
 GPU & Graphics Processing Unit (Bộ xử lý đồ họa) \\
 HITL & Human-in-the-Loop (Con người trong vòng lặp) \\
 HMAC & Hash-based Message Authentication Code (Mã xác thực thông báo dựa trên hàm băm) \\
-HTML & HyperText Markup Language (Ngôn ngữ đánh dấu siêu văn bản) \\
 IDS & Intrusion Detection System (Hệ thống phát hiện xâm nhập) \\
 IOC & Indicator of Compromise (Chỉ thị xâm nhập) \\
 IP & Internet Protocol (Giao thức mạng Internet) \\
@@ -241,21 +237,18 @@ RAM & Random Access Memory (Bộ nhớ truy cập ngẫu nhiên) \\
 RBA & Runbook Automation (Tự động hóa kịch bản chạy) \\
 RCE & Remote Code Execution (Thực thi mã từ xa) \\
 RRF & Reciprocal Rank Fusion (Tổng hợp xếp hạng nghịch đảo) \\
-SCA & Software Composition Analysis (Phân tích thành phần phần mềm) \\
 SHA & Secure Hash Algorithm (Thuật toán băm an toàn) \\
 SIEM & Security Information and Event Management (Quản lý thông tin và sự kiện an ninh) \\
 SOC & Security Operations Center (Trung tâm điều hành an ninh mạng) \\
 SQLi & SQL Injection (Tấn công tiêm lệnh SQL) \\
 SSTI & Server-Side Template Injection (Tấn công tiêm khuôn mẫu máy chủ) \\
 SVM & Support Vector Machine (Máy vector hỗ trợ) \\
-TDIR & Threat Detection and Incident Response (Phát hiện đe dọa và phản hồi sự cố) \\
 TTP & Tactics, Techniques, and Procedures (Chiến thuật, kỹ thuật và quy trình) \\
 TTL & Time to Live (Thời gian tồn tại) \\
 URL & Uniform Resource Locator (Đường dẫn tài nguyên thống nhất) \\
 VRAM & Video Random Access Memory (Bộ nhớ truy cập ngẫu nhiên video) \\
 WAF & Web Application Firewall (Tường lửa ứng dụng web) \\
 XSS & Cross-Site Scripting (Tấn công kịch bản chéo trang) \\
-YAML & YAML Ain't Markup Language (Định dạng dữ liệu cấu hình YAML) \\
 \bottomrule
 \end{longtable}
 \newpage
@@ -356,6 +349,27 @@ N. Reimers and I. Gurevych, ``Sentence-BERT: Sentence Embeddings using Siamese B
 
 \bibitem{zheng2023judge}
 L. Zheng \textit{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 36, 2023.
+
+\bibitem{dapt2020}
+S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kang, ``DAPT 2020 -- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \textit{Deployable Machine Learning for Security Defense (MLHat 2020)}, Communications in Computer and Information Science, vol. 1271, Springer, 2020, pp. 138--163.
+
+\bibitem{ragas2023}
+S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \textit{arXiv preprint arXiv:2309.15217}, 2023.
+
+\bibitem{mcnemar1947}
+Q. McNemar, ``Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages,'' \textit{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
+
+\bibitem{mannwhitney1947}
+H. B. Mann and D. R. Whitney, ``On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other,'' \textit{Annals of Mathematical Statistics}, vol. 18, no. 1, pp. 50--60, 1947.
+
+\bibitem{hmac1997}
+H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.
+
+\bibitem{owasp_llm2025}
+OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
+
+\bibitem{nist80207}
+S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,'' NIST Special Publication 800-207, National Institute of Standards and Technology, 2020.
 
 \end{thebibliography}
 
