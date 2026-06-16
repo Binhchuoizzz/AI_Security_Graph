@@ -211,7 +211,7 @@ The proposed solution is based on a cognitive Two-Tier Architecture designed wit
     \node[box, left=1.5cm of quarantine] (block) {[ BLOCK ]};
     \node[box, right=1.5cm of quarantine] (alert) {[ ALERT ]};
 
-    \node[box, text width=5.5cm, below=1cm of quarantine] (hitl) {HITL DASHBOARD \\ Streamlit \textbullet\ SQLite memory \\ Llama-3.1-8B judge \\ Rule approval queue};
+    \node[box, text width=5.5cm, below=1cm of quarantine] (hitl) {HITL DASHBOARD \\ Streamlit \textbullet\ SQLite memory \\ Llama-3-8B judge \\ Rule approval queue};
 
     % Edges
     \draw[->] (dataset) -- node[right] {Redis stream} (tier1);
@@ -245,7 +245,7 @@ The proposed solution is based on a cognitive Two-Tier Architecture designed wit
     \label{fig:architecture}
 \end{figure}
 
-At the first stage, the Tier 1 Rule Engine acts as a heuristic filter. It maintains Session-Aware Behavioral Baselines using in-memory data structures (Redis) to track request rates and known malicious IPs. To proactively detect zero-day or signature-less anomalies, Tier 1 integrates an online Unsupervised Outlier Detector using Welford's algorithm to calculate the Running Mean and Standard Deviation ($O(1)$ time and memory complexity) of core network flow statistics (e.g., Flow Duration, Fwd/Bwd Packets, Fwd/Bwd Length). When a flow's Z-score exceeds the threshold ($|Z| > 3.5$), it is flagged as an Outlier Anomaly and escalated directly to Tier 2 for agentic investigation. This layer is designed to filter the majority of benign or purely volumetric noise at wire speed, achieving a 99.8\% average latency reduction and ensuring the downstream LLM is not overwhelmed by high-volume traffic.
+At the first stage, the Tier 1 Rule Engine acts as a heuristic filter. It maintains Session-Aware Behavioral Baselines using in-memory data structures (Redis) to track request rates and known malicious IPs. To proactively detect zero-day or signature-less anomalies, Tier 1 integrates an online Unsupervised Outlier Detector using Welford's algorithm to calculate the Running Mean and Standard Deviation ($O(1)$ time and memory complexity) of core network flow statistics (e.g., Flow Duration, Fwd/Bwd Packets, Fwd/Bwd Length). When a flow's Z-score exceeds the threshold ($|Z| > 3.5$), it is flagged as an Outlier Anomaly and escalated directly to Tier 2 for agentic investigation. This layer is designed to filter the majority of benign or purely volumetric noise at wire speed---filtering roughly 99.8\% of benign events and reducing average processing latency by over 99.9\% for Tier-1-resolved traffic---ensuring the downstream LLM is not overwhelmed by high-volume traffic.
 
 Logs that exhibit anomalous behavior or trigger ambiguous thresholds are passed to the Guardrail Layer. Here, a two-step neutralization occurs:
 1. \textbf{Template Mining (Drain3):} Extracts the static log template to compress the token volume without altering the dynamic payload variables.
@@ -264,13 +264,13 @@ Each index employs a \textbf{Hybrid Search} strategy combining dense semantic se
 
 Finally, to ensure system safety against Adversarial Rule Injection, the LLM cannot directly modify the Tier 1 firewall. Instead, its recommended rules are placed into a Quarantine state (Human-in-the-Loop Feedback Loop). A SOC manager reviews these rules via a Dashboard before they are hot-reloaded into the Tier 1 engine.
 
-\textbf{Short-Term and Long-Term SQLite Threat Memory:} The Tier 2 Agent relies on a persistent SQLite Threat Memory Store to correlate alerts across multi-day windows. When a new log is escalated, the system queries the IP's historical threat profile. If activities span multiple phases of the MITRE ATT\&CK matrix over time (e.g., Reconnaissance followed by Initial Compromise), the memory module dynamically escalates the threat severity level to critical, allowing for robust detection of slow-rate APT chains (as demonstrated by correlating 197 multi-day chains from the DAPT2020 dataset).
+\textbf{Short-Term and Long-Term SQLite Threat Memory:} The Tier 2 Agent relies on a persistent SQLite Threat Memory Store to correlate alerts across multi-day windows. When a new log is escalated, the system queries the IP's historical threat profile. If activities span multiple phases of the MITRE ATT\&CK matrix over time (e.g., Reconnaissance followed by Initial Compromise), the memory module dynamically escalates the threat severity level to critical, allowing for robust detection of slow-rate APT chains across the multi-day DAPT2020 campaigns (achieving full recall on the embedded APT actors in the evaluation stream).
 
-\textbf{Human-in-the-Loop Web Dashboard (SOC UI):} A dedicated Streamlit interface is implemented with role-based access control (RBAC), featuring L1 Analyst and L3 Manager views. It displays real-time alert queues, active blocked firewall rules, and a quarantine management section. The dashboard displays a Live False Positive Rate (FPR) KPI card calculated dynamically based on manual rule rejections to measure operational performance. Additionally, a localized Docker Model Switcher orchestration module is integrated into the UI to allow administrators to hot-reload localized LLM environments (swapping backends such as Gemma-2-9B-IT and Llama-3-8B-Instruct). The dashboard also features an Interactive IP/Threat Investigation module where analysts can click directly on any IP address in the threat list to instantly retrieve its threat reputation score, AI-generated reasoning, first/last seen milestones, and a chronological event timeline.
+\textbf{Human-in-the-Loop Web Dashboard (SOC UI):} A Streamlit interface with role-based access control (L1 Analyst and L3 Manager views) presents real-time alert queues, active firewall rules, a quarantine-management section, and a live False-Positive-Rate KPI derived from manual rule rejections. Analysts can click any IP to inspect its reputation score, AI-generated reasoning, and chronological event timeline, while administrators can hot-swap local LLM backends (e.g., Gemma-2-9B-IT and Llama-3-8B-Instruct) directly from the UI.
 
 \textbf{Cryptographic Audit Trail with HMAC Validation:} To guarantee the integrity of security alerts and responses, the system implements a cryptographic audit trail stored in SQLite. Each log entry is cryptographically chained to the previous entry using a Keyed-Hash Message Authentication Code (HMAC-SHA256) \cite{hmac1997}. This prevents tampering or unauthorized deletion of event trails by adversaries who might compromise parts of the SOC dashboard, providing forensic-grade non-repudiation and integrity verification.
 
-\textbf{MLflow Experiment Tracking:} To support rigorous scientific evaluations, MLflow is integrated to log ablation metrics (F1-Score, Precision, Recall, false positive rates, processing latencies, RAG cache hit rate, and HITL escalation rate) across multiple system configurations, enabling reproducible comparative analysis.
+\textbf{Reproducibility:} MLflow logs all ablation metrics (classification scores, latencies, cache-hit and HITL escalation rates) across system configurations to ensure reproducible comparative analysis.
 
 \subsection{Technologies and Tools}
 The system is built on modern Python frameworks. The data streaming and short-term session tracking rely on Redis. The LLM reasoning engine utilizes a local quantized model (Gemma-2-9B-IT) in GGUF Q6\_K format, served via llama.cpp, ensuring absolute data privacy and full offline operation.
@@ -315,7 +315,7 @@ Following this, the Guardrail Layer will be implemented, integrating the Drain3 
 
 The next critical step is the construction of the Tier 2 Agent using LangGraph and the Dual-RAG knowledge base. Two separate FAISS indexes will be populated: one with parsed MITRE ATT\&CK techniques and one with NIST SP 800-61r2 incident response procedures. The agent's prompts will be carefully engineered to strictly separate system instructions from the encapsulated payload data.
 
-Finally, the Streamlit Dashboard and the SQLite Long-Term Threat Memory will be integrated. This phase will finalize the closed-loop process by enabling the Human-in-the-Loop feature, allowing administrators to approve dynamic rules generated by the LLM and feed them back to Tier 1. Additionally, the dashboard incorporates an Interactive Threat Investigation module, enabling analysts to click directly on any IP address in the Threat Actor list or the APT tracker to instantly query and display its comprehensive threat profile and chronological alert history from the SQLite database.
+Finally, the Streamlit Dashboard and the SQLite Long-Term Threat Memory will be integrated. This phase will finalize the closed-loop process by enabling the Human-in-the-Loop feature, allowing administrators to approve dynamic rules generated by the LLM and feed them back to Tier 1.
 
 \subsection{Evaluation Plan}
 To validate the effectiveness of the system, the study employs a comprehensive 5-Dimensional (5D) Evaluation Framework.
@@ -325,8 +325,8 @@ The evaluation metrics will include:
 \begin{itemize}
     \item \textbf{1. Classification:} F1-Score, Precision, Recall, and False Positive Rate (FPR), evaluated using McNemar's Test ($p<0.05$) \cite{mcnemar1947} for statistical significance.
     \item \textbf{2. Operational:} Processing Latency (serving as a proxy for Mean Time To Detect/Respond), HITL Escalation Rate, and RAG Semantic Cache Hit Rate, evaluated using the Mann-Whitney U Test ($p<0.05$) \cite{mannwhitney1947}.
-    \item \textbf{3. Robustness:} The Guardrail Defeat Rate will be tested against 45 curated adversarial samples covering Structural Attacks (Delimiter Smuggling) and Semantic Confusion.
-    \item \textbf{4. Context Quality:} To evaluate the LLM's reasoning and mitigate Self-Enhancement Bias, a cross-family LLM-as-a-Judge methodology will be employed: while Gemma-2-9B-IT serves as the primary reasoning model, \textbf{Llama-3.1-8B-Instruct} (a different model family) will serve as the judge, assessing Context Precision, Answer Relevancy, Faithfulness, and Context Recall using the RAGAS framework \cite{ragas2023}. Judge scores will be cross-validated with automated RAGAS metrics for statistical consistency.
+    \item \textbf{3. Robustness:} The static guardrail block rate is measured against 120 curated adversarial payloads spanning five OWASP-aligned categories~\cite{owasp2025} (encoding bypass, structural/delimiter attacks, semantic confusion, jailbreak, and RAG poisoning).
+    \item \textbf{4. Context Quality:} To evaluate the LLM's reasoning and mitigate Self-Enhancement Bias, a cross-family LLM-as-a-Judge methodology will be employed: while Gemma-2-9B-IT serves as the primary reasoning model, \textbf{Llama-3-8B-Instruct} (a different model family) will serve as the judge, assessing Context Precision, Answer Relevancy, Faithfulness, and Context Recall using the RAGAS framework \cite{ragas2023}. Judge scores will be cross-validated with automated RAGAS metrics for statistical consistency.
     \item \textbf{5. Explainability:} Audit Trail Completeness Rate will be measured deterministically via programmatic field presence checks.
 \end{itemize}
 
@@ -431,7 +431,7 @@ The expected contributions of this research include proposing a novel hybrid arc
     H. Guo, S. Yuan, and X. Wu, ``LogBERT: Log Anomaly Detection via BERT,'' in \emph{2021 International Joint Conference on Neural Networks (IJCNN)}, IEEE, 2021.
 
     \bibitem{habibzadeh2025}
-    M. Habibzadeh \emph{et al.}, ``Large Language Models for Security Operations Centers: A Comprehensive Survey,'' \emph{arXiv preprint}, 2025.
+    A. Habibzadeh, F. Feyzi, and R. E. Atani, ``Large Language Models for Security Operations Centers: A Comprehensive Survey,'' \emph{arXiv preprint arXiv:2509.10858}, 2025.
 
     \bibitem{he2017}
     P. He, J. Zhu, Z. Zheng, and M. R. Lyu, ``Drain: An Online Log Parsing Approach with Fixed Depth Tree,'' in \emph{2017 IEEE International Conference on Web Services (ICWS)}, 2017.

@@ -220,7 +220,7 @@ Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tần
     \node[box, left=1.5cm of quarantine] (block) {[ CHẶN IP (BLOCK) ]};
     \node[box, right=1.5cm of quarantine] (alert) {[ CẢNH BÁO (ALERT) ]};
 
-    \node[box, text width=6.5cm, below=1cm of quarantine] (hitl) {HITL DASHBOARD STREAMLIT \\ Bộ nhớ SQLite \textbullet\ Llama-3.1-8B Judge \\ Hàng đợi phê duyệt luật chặn};
+    \node[box, text width=6.5cm, below=1cm of quarantine] (hitl) {HITL DASHBOARD STREAMLIT \\ Bộ nhớ SQLite \textbullet\ Llama-3-8B Judge \\ Hàng đợi phê duyệt luật chặn};
 
     % Edges
     \draw[->] (dataset) -- node[right] {Redis stream} (tier1);
@@ -254,7 +254,7 @@ Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tần
     \label{fig:architecture}
 \end{figure}
 
-Tại tầng đầu tiên (Tier 1), Động cơ Quy tắc đóng vai trò như một màng lọc heuristic tốc độ cao. Nó duy trì các đường cơ sở (baselines) hành vi nhận thức theo phiên bằng cách sử dụng cấu trúc dữ liệu trên bộ nhớ (như Redis) để theo dõi tần suất yêu cầu và các IP độc hại đã biết. Để chủ động phát hiện các bất thường không có chữ ký hoặc zero-day, Tier 1 tích hợp Bộ phát hiện bất thường phi giám sát trực tuyến sử dụng thuật toán Welford để tính toán Trung bình trượt (Running Mean) và Độ lệch chuẩn (Standard Deviation) với độ phức tạp thời gian và bộ nhớ tối ưu $O(1)$ của các thống kê luồng mạng cốt lõi (như Thời lượng luồng, Số gói tin đi/về, Độ dài luồng đi/về). Khi điểm Z-score của một luồng vượt quá ngưỡng ($|Z| > 3.5$), luồng đó được đánh dấu là Bất thường Ngoài hàng (Outlier Anomaly) và leo thang trực tiếp lên Tier 2 để tác tử điều tra. Tầng này được thiết kế để lọc phần lớn nhiễu lành tính hoặc nhiễu thể tích tại tốc độ đường truyền (wire speed), giúp giảm trung bình $99.9\%$ độ trễ xử lý và đảm bảo mô hình LLM ở tầng dưới không bị quá tải bởi lưu lượng khổng lồ.
+Tại tầng đầu tiên (Tier 1), Động cơ Quy tắc đóng vai trò như một màng lọc heuristic tốc độ cao. Nó duy trì các đường cơ sở (baselines) hành vi nhận thức theo phiên bằng cách sử dụng cấu trúc dữ liệu trên bộ nhớ (như Redis) để theo dõi tần suất yêu cầu và các IP độc hại đã biết. Để chủ động phát hiện các bất thường không có chữ ký hoặc zero-day, Tier 1 tích hợp Bộ phát hiện bất thường phi giám sát trực tuyến sử dụng thuật toán Welford để tính toán Trung bình trượt (Running Mean) và Độ lệch chuẩn (Standard Deviation) với độ phức tạp thời gian và bộ nhớ tối ưu $O(1)$ của các thống kê luồng mạng cốt lõi (như Thời lượng luồng, Số gói tin đi/về, Độ dài luồng đi/về). Khi điểm Z-score của một luồng vượt quá ngưỡng ($|Z| > 3.5$), luồng đó được đánh dấu là Bất thường Ngoài hàng (Outlier Anomaly) và leo thang trực tiếp lên Tier 2 để tác tử điều tra. Tầng này được thiết kế để lọc phần lớn nhiễu lành tính hoặc nhiễu thể tích tại tốc độ đường truyền (wire speed) --- lọc khoảng $99.8\%$ sự kiện lành tính và giảm trung bình hơn $99.9\%$ độ trễ xử lý cho lưu lượng do Tier-1 xử lý --- đảm bảo mô hình LLM ở tầng dưới không bị quá tải bởi lưu lượng khổng lồ.
 
 Đối với những log có biểu hiện bất thường hoặc vượt qua ngưỡng mập mờ, chúng sẽ được chuyển đến Tầng Guardrail. Tại đây, quá trình vô hiệu hóa diễn ra theo hai bước tách biệt:
 1. \textbf{Template Mining (Drain3):} Trích xuất cấu trúc tĩnh của log để nén số lượng token mà không làm thay đổi các biến payload động.
@@ -271,13 +271,13 @@ Mỗi chỉ mục sử dụng chiến lược \textbf{Tìm kiếm Lai (Hybrid Se
 
 Cuối cùng, nhằm bảo vệ hệ thống trước đòn Adversarial Rule Injection, LLM không được phép trực tiếp thay đổi tường lửa ở Tier 1. Thay vào đó, các quy tắc do nó đề xuất sẽ bị đưa vào trạng thái Cách ly (Quarantine). Một quản trị viên SOC sẽ tiến hành rà soát các quy tắc này thông qua Dashboard (yếu tố Human-in-the-Loop) trước khi chúng được nạp nóng (hot-reload) vào hệ thống phòng thủ.
 
-\textbf{Bộ nhớ SQLite Threat Memory Ngắn hạn và Dài hạn:} Tác tử Tier 2 dựa vào kho lưu trữ Threat Memory bằng SQLite bền vững để tương quan các cảnh báo an ninh mạng diễn ra trong nhiều ngày. Khi một log mới được leo thang lên, hệ thống sẽ truy vấn hồ sơ hoạt động lịch sử của IP đó. Nếu phát hiện các hành vi xảy ra thuộc nhiều giai đoạn khác nhau trong ma trận MITRE ATT\&CK theo thời gian (ví dụ: Thăm dò mạng ở ngày 1, Xâm nhập ban đầu ở ngày 2), mô-đun bộ nhớ sẽ tự động nâng mức cảnh báo của IP đó lên nguy cấp (HIGH/CRITICAL), cho phép phát hiện hiệu quả chuỗi APT tốc độ chậm (như đã chứng minh qua việc liên kết 197 chuỗi tấn công đa ngày từ bộ dữ liệu DAPT2020).
+\textbf{Bộ nhớ SQLite Threat Memory Ngắn hạn và Dài hạn:} Tác tử Tier 2 dựa vào kho lưu trữ Threat Memory bằng SQLite bền vững để tương quan các cảnh báo an ninh mạng diễn ra trong nhiều ngày. Khi một log mới được leo thang lên, hệ thống sẽ truy vấn hồ sơ hoạt động lịch sử của IP đó. Nếu phát hiện các hành vi xảy ra thuộc nhiều giai đoạn khác nhau trong ma trận MITRE ATT\&CK theo thời gian (ví dụ: Thăm dò mạng ở ngày 1, Xâm nhập ban đầu ở ngày 2), mô-đun bộ nhớ sẽ tự động nâng mức cảnh báo của IP đó lên nguy cấp (HIGH/CRITICAL), cho phép phát hiện hiệu quả chuỗi APT tốc độ chậm trên các chiến dịch đa ngày của DAPT2020 (đạt recall đầy đủ trên các tác nhân APT nhúng trong luồng đánh giá).
 
-\textbf{Bảng điều khiển Web Dashboard hỗ trợ HITL (SOC UI):} Một giao diện quản trị chuyên nghiệp bằng Streamlit được xây dựng kèm phân quyền tài khoản (L1 Analyst và L3 Manager). Dashboard hiển thị thời gian thực hàng đợi cảnh báo, danh sách rule tường lửa đang chặn và mục quản trị cách ly. Streamlit Dashboard cũng hỗ trợ tính năng Điều tra Đối tượng Tương tác (Interactive Threat Investigation) cho phép chuyên gia SOC click chọn trực tiếp địa chỉ IP bất kỳ trên bảng để truy xuất ngay điểm uy tín rủi ro, lập luận của AI, thời điểm First/Last Seen và dòng thời gian (timeline) sự kiện lịch sử từ SQLite.
+\textbf{Bảng điều khiển Web hỗ trợ HITL (SOC UI):} Một giao diện Streamlit kèm phân quyền (L1 Analyst và L3 Manager) hiển thị thời gian thực hàng đợi cảnh báo, các rule tường lửa đang chặn, mục quản trị cách ly, và chỉ số FPR trực tiếp tính từ các lần từ chối rule thủ công. Chuyên gia có thể nhấp vào bất kỳ IP nào để xem điểm uy tín, lập luận của AI và dòng thời gian sự kiện, trong khi quản trị viên có thể hoán đổi nóng backend LLM cục bộ (ví dụ Gemma-2-9B-IT và Llama-3-8B-Instruct) ngay trên giao diện.
 
 \textbf{Nhật ký kiểm toán an toàn bằng xác thực HMAC:} Để bảo vệ tính toàn vẹn của các cảnh báo an ninh và quyết định phản hồi, hệ thống tích hợp một chuỗi nhật ký kiểm toán (audit trail) lưu trữ trong SQLite. Mỗi bản ghi nhật ký được liên kết mật mã với bản ghi trước đó bằng mã xác thực thông điệp băm khóa (HMAC-SHA256) \cite{hmac1997}. Cơ chế này ngăn chặn việc sửa đổi hoặc xóa dấu vết logs từ phía tin tặc ngay cả khi Dashboard bị xâm nhập, đảm bảo khả năng chống chối bỏ và tính toàn vẹn phục vụ điều tra số (forensics).
 
-\textbf{Theo dõi Thử nghiệm bằng MLflow:} Nhằm phục vụ nghiên cứu thực nghiệm nghiêm túc, MLflow được tích hợp để tự động ghi nhật ký các chỉ số đánh giá của Ablation Study (F1-Score, Precision, Recall, FPR, độ trễ MTTR/MTTD, tỷ lệ trúng cache ngữ cảnh, tỷ lệ leo thang HITL) xuyên suốt các cấu hình khác nhau, hỗ trợ phân tích so sánh trực quan và tái lập thí nghiệm.
+\textbf{Khả năng tái lập:} MLflow ghi nhật ký toàn bộ chỉ số ablation (điểm phân loại, độ trễ, tỷ lệ trúng cache và leo thang HITL) xuyên suốt các cấu hình, đảm bảo phân tích so sánh có thể tái lập.
 
 \subsection{Công nghệ và Công cụ}
 Hệ thống được xây dựng trên các framework Python hiện đại. Quá trình xử lý luồng và theo dõi phiên ngắn hạn dựa vào Redis. Động cơ suy luận LLM sử dụng mô hình cục bộ đã được lượng tử hóa (Gemma-2-9B-IT) ở định dạng GGUF Q6\_K, được phục vụ thông qua llama.cpp, đảm bảo quyền riêng tư dữ liệu tuyệt đối và khả năng vận hành hoàn toàn ngoại tuyến.
@@ -322,7 +322,7 @@ Tiếp theo, lớp Guardrail được triển khai, tích hợp thuật toán Dr
 
 Bước quan trọng kế tiếp là xây dựng Tác tử Tier 2 bằng LangGraph và cơ sở tri thức Dual-RAG. Hai chỉ mục FAISS riêng biệt được tạo lập: một chứa các kỹ thuật MITRE ATT\&CK và một chứa quy trình ứng phó sự cố NIST SP 800-61r2.
 
-Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamlit và Bộ nhớ Dài hạn bằng SQLite. Bước này hoàn thiện chu trình khép kín của hệ thống bằng cách kích hoạt tính năng Human-in-the-Loop, cho phép quản trị viên phê duyệt các bộ quy tắc tự động do LLM sinh ra và đẩy ngược chúng trở lại Tier 1. Ngoài ra, giao diện tích hợp mô-đun Điều tra Đối tượng Tương tác (Interactive Threat Investigation) cho phép nhấp chọn trực tiếp địa chỉ IP trên các bảng giám sát để hiển thị hồ sơ rủi ro chi tiết (reputation score, incidents, blocks, alerts) và lịch sử cảnh báo theo thời gian thực từ SQLite.
+Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamlit và Bộ nhớ Dài hạn bằng SQLite. Bước này hoàn thiện chu trình khép kín của hệ thống bằng cách kích hoạt tính năng Human-in-the-Loop, cho phép quản trị viên phê duyệt các bộ quy tắc tự động do LLM sinh ra và đẩy ngược chúng trở lại Tier 1.
 
 \subsection{Kế hoạch Đánh giá}
 Nhằm kiểm chứng tính hiệu quả của hệ thống, nghiên cứu áp dụng chiến lược đánh giá toàn diện dựa trên Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework).
@@ -332,8 +332,8 @@ Các tiêu chí đánh giá bao gồm:
 \begin{itemize}
     \item \textbf{1. Phân loại (Classification):} Điểm F1-Score, Precision, Recall và Tỷ lệ Dương tính giả (FPR), được phân tích ý nghĩa thống kê bằng kiểm định McNemar ($p<0.05$) \cite{mcnemar1947}.
     \item \textbf{2. Vận hành (Operational):} Độ trễ Xử lý (đại diện cho Thời gian Phát hiện/Phản hồi Trung bình), Tỷ lệ Leo thang HITL (Escalation Rate), và Tỷ lệ Cache Hit Ngữ nghĩa RAG, được kiểm định thông qua phép thử Mann-Whitney U ($p<0.05$) \cite{mannwhitney1947}.
-    \item \textbf{3. Kháng lỗi (Robustness):} Tỷ lệ Đánh bại Guardrail sẽ được kiểm thử bằng 45 mẫu adversarial đặc chế, bao trùm tấn công cấu trúc (Delimiter Smuggling) và nhầm lẫn ngữ nghĩa (Semantic Confusion).
-    \item \textbf{4. Chất lượng Ngữ cảnh (Context Quality):} Để đánh giá suy luận của LLM và giảm thiểu Thiên kiến Tự đề cao, phương pháp LLM-as-a-Judge chéo họ được áp dụng: trong khi Gemma-2-9B-IT đóng vai trò mô hình suy luận chính, \textbf{Llama-3.1-8B-Instruct} (thuộc họ mô hình khác) sẽ làm giám khảo, chấm điểm Độ chính xác Ngữ cảnh, Sự liên quan của Câu trả lời, Tính trung thực và Độ bao phủ Ngữ cảnh theo khung RAGAS \cite{ragas2023}. Điểm giám khảo sẽ được kiểm chứng chéo với các chỉ số RAGAS tự động để đảm bảo tính nhất quán thống kê.
+    \item \textbf{3. Kháng lỗi (Robustness):} Tỷ lệ chặn của rào chắn tĩnh được đo trên 120 tải trọng đối kháng đặc chế thuộc năm nhóm theo chuẩn OWASP~\cite{owasp2025} (ngụy trang mã hóa, tấn công cấu trúc/dấu phân tách, gây nhiễu ngữ nghĩa, bẻ khóa, và đầu độc RAG).
+    \item \textbf{4. Chất lượng Ngữ cảnh (Context Quality):} Để đánh giá suy luận của LLM và giảm thiểu Thiên kiến Tự đề cao, phương pháp LLM-as-a-Judge chéo họ được áp dụng: trong khi Gemma-2-9B-IT đóng vai trò mô hình suy luận chính, \textbf{Llama-3-8B-Instruct} (thuộc họ mô hình khác) sẽ làm giám khảo, chấm điểm Độ chính xác Ngữ cảnh, Sự liên quan của Câu trả lời, Tính trung thực và Độ bao phủ Ngữ cảnh theo khung RAGAS \cite{ragas2023}. Điểm giám khảo sẽ được kiểm chứng chéo với các chỉ số RAGAS tự động để đảm bảo tính nhất quán thống kê.
     \item \textbf{5. Tính Giải thích (Explainability):} Tỷ lệ Hoàn thiện Nhật ký Kiểm toán (Audit Trail Completeness Rate) được đo lường một cách xác định (deterministic) thông qua kiểm tra tự động sự tồn tại của các trường dữ liệu.
 \end{itemize}
 
@@ -423,7 +423,7 @@ Những đóng góp kỳ vọng của nghiên cứu bao gồm việc đề xuấ
     K. Greshake, S. Abdelnabi, S. Mishra, A. Endres, T. Holz, and M. Fritz, ``More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models,'' \emph{arXiv preprint arXiv:2302.12173}, 2023.
 
     \bibitem{habibzadeh2025}
-    M. Habibzadeh, et al., ``Large Language Models for Security Operations Centers: A Comprehensive Survey,'' \emph{arXiv preprint}, 2025.
+    A. Habibzadeh, F. Feyzi, and R. E. Atani, ``Large Language Models for Security Operations Centers: A Comprehensive Survey,'' \emph{arXiv preprint arXiv:2509.10858}, 2025.
 
     \bibitem{khraisat2019}
     A. Khraisat, I. Gondal, P. Vamplew, and J. Kamruzzaman, ``Survey of intrusion detection systems: techniques, datasets and challenges,'' \emph{Cybersecurity}, vol. 2, no. 1, p. 20, 2019.
