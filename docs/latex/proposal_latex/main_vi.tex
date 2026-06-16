@@ -131,10 +131,7 @@ Việc ứng dụng Mô hình Ngôn ngữ Lớn (LLM), đặc biệt là kiến 
 Nhận thấy những hạn chế trên, nghiên cứu này đặt mục tiêu phát triển một AI Security Agent tự trị dựa trên kiến trúc nhận thức hai tầng (cognitive two-tier architecture). Thay vì hoàn toàn phụ thuộc vào một LLM duy nhất để xử lý mọi log, luận văn đề xuất một kiến trúc hybrid lai: một động cơ quy tắc tốc độ cao kết hợp với một LLM Agent có khả năng suy luận sâu. Hướng tiếp cận này được kỳ vọng sẽ tối ưu hóa độ trễ suy luận bằng cách lọc nhiễu, giảm thiểu nguy cơ prompt injection qua cơ chế đóng gói có ranh giới, và nâng cao khả năng nhận thức ngữ cảnh thông qua Bộ nhớ Rủi ro Dài hạn (Long-Term Threat Memory) và kiến trúc Dual-RAG. Một bảng điều khiển (Dashboard) kết hợp yếu tố Human-in-the-Loop (HITL) cũng sẽ được xây dựng để chứng minh tính thực tiễn của tự động hóa SOC.
 
 \subsection{Câu hỏi Nghiên cứu}
-Dựa trên các mục tiêu đã đề ra, luận văn tập trung giải quyết ba câu hỏi nghiên cứu cốt lõi:
-1. Việc áp dụng Kiến trúc Hai tầng (Rule-based + LLM Agent) kết hợp với Cơ sở Hành vi theo Phiên (Session-Aware Behavioral Baselining) có tối ưu hóa Độ trễ Suy luận so với phương pháp Một tầng (chỉ dùng LLM) hay không?
-2. Liệu cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation), được tăng cường bởi lá chắn đồng thuận Tầng 1/Tầng 2 tất định và cơ chế Cách ly Human-in-the-Loop (HITL Quarantine), có thể ngăn chặn hiệu quả các đòn Prompt Injection mang tính cấu trúc (ví dụ: Delimiter Smuggling) cùng các phản ứng tự động không an toàn mà không làm suy giảm độ chính xác phân loại của LLM?
-3. Kiến trúc Dual-RAG (kết hợp khung chuẩn chiến thuật và kiểm soát phòng thủ) cải thiện Độ phù hợp Ngữ cảnh (Context Relevance) của quá trình phân tích rủi ro do LLM thực hiện như thế nào?
+Dựa trên các mục tiêu đã đề ra, luận văn giải quyết ba câu hỏi nghiên cứu cốt lõi. Câu hỏi thứ nhất (RQ1) đặt vấn đề liệu một Kiến trúc Hai tầng --- bộ máy dựa trên luật kết hợp với một tác tử LLM, được tăng cường bởi cơ sở hành vi theo phiên và phát hiện bất thường trực tuyến phi giám sát Welford --- có tối ưu hóa độ trễ suy luận so với phương pháp một tầng chỉ-dùng-LLM hay không. Câu hỏi thứ hai (RQ2) đặt vấn đề liệu cơ chế Đóng gói Dữ liệu có Phân cách (dùng dấu phân cách ngẫu nhiên động), được tăng cường bởi lá chắn đồng thuận Tầng 1/Tầng 2 tất định và cơ chế Cách ly Human-in-the-Loop, có thể ngăn chặn các đòn tiêm prompt mang tính cấu trúc như delimiter smuggling --- cùng các phản ứng tự động không an toàn --- mà không làm suy giảm độ chính xác phân loại của LLM hay không. Câu hỏi thứ ba (RQ3) đặt vấn đề một đường ống Dual-RAG kết hợp khung chiến thuật với các tiêu chuẩn ứng phó sự cố cải thiện độ phù hợp ngữ cảnh của phân tích rủi ro do LLM thực hiện như thế nào.
 
 \subsection{Đối tượng và Phương pháp Nghiên cứu}
 Đối tượng nghiên cứu chính bao gồm Kiến trúc Bảo mật Hai tầng, AI Tác tử (LLM ứng dụng trong tự động hóa SOC), các kỹ thuật tấn công Prompt Injection, và dữ liệu log phát hiện xâm nhập mạng.
@@ -195,7 +192,7 @@ Về mặt an toàn, cả danh sách OWASP Top 10 cho ứng dụng LLM \cite{owa
 \subsection{Giải pháp Đề xuất: Kiến trúc Nhận thức Hai tầng}
 Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tầng (Cognitive Two-Tier Architecture) được thiết kế với nguyên tắc Phân tách Mối quan tâm (Separation of Concerns) nghiêm ngặt. Cốt lõi của giải pháp là kết hợp tốc độ xử lý của các bộ quy tắc xác định (Tier 1) với năng lực suy luận sâu sắc của LLM Tác tử (Tier 2), được kết nối với nhau bởi các lớp rào chắn (guardrails) chống tấn công adversarial mạnh mẽ.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \resizebox{\textwidth}{!}{
     \begin{tikzpicture}[
@@ -210,7 +207,7 @@ Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tần
     \node[box, text width=7.5cm, below=1cm of dataset] (tier1) {TIER 1 -- ĐỘNG CƠ QUY TẮC \\ Đường cơ sở hành vi \textbullet\ Blacklist IP};
     \node[box, right=1.5cm of tier1] (drop) {[ BỎ QUA (DROP) ]};
 
-    \node[box, text width=7.5cm, below=1cm of tier1] (guardrail) {TẦNG RÀO CHẮN (GUARDRAIL) \\ 1. Gom nhóm template Drain3 -- nén token \\ 2. Đóng gói phân cách -- chống chèn mã độc};
+    \node[box, text width=7.5cm, below=1cm of tier1] (guardrail) {TẦNG RÀO CHẮN (GUARDRAIL) \\ 1. Gom nhóm template Drain -- nén token \\ 2. Đóng gói phân cách -- chống chèn mã độc};
 
     \node[box, text width=5.5cm, below=2cm of guardrail] (tier2) {TIER 2 -- TÁC TỬ LANGGRAPH \\ Gemma-2-9B-IT qua llama.cpp \\ Dual-RAG \textbullet\ Bộ nhớ Threat Memory SQLite};
     \node[box, text width=3.5cm, left=0.5cm of tier2] (mitre) {MITRE ATT\&CK \\ Chỉ mục FAISS 1 \\ Ánh xạ kỹ thuật};
@@ -256,15 +253,9 @@ Giải pháp đề xuất dựa trên một Kiến trúc Nhận thức Hai tần
 
 Tại tầng đầu tiên (Tier 1), Động cơ Quy tắc đóng vai trò như một màng lọc heuristic tốc độ cao. Nó duy trì các đường cơ sở (baselines) hành vi nhận thức theo phiên bằng cách sử dụng cấu trúc dữ liệu trên bộ nhớ (như Redis) để theo dõi tần suất yêu cầu và các IP độc hại đã biết. Để chủ động phát hiện các bất thường không có chữ ký hoặc zero-day, Tier 1 tích hợp Bộ phát hiện bất thường phi giám sát trực tuyến sử dụng thuật toán Welford để tính toán Trung bình trượt (Running Mean) và Độ lệch chuẩn (Standard Deviation) với độ phức tạp thời gian và bộ nhớ tối ưu $O(1)$ của các thống kê luồng mạng cốt lõi (như Thời lượng luồng, Số gói tin đi/về, Độ dài luồng đi/về). Khi điểm Z-score của một luồng vượt quá ngưỡng ($|Z| > 3.5$), luồng đó được đánh dấu là Bất thường Ngoài hàng (Outlier Anomaly) và leo thang trực tiếp lên Tier 2 để tác tử điều tra. Tầng này được thiết kế để lọc phần lớn nhiễu lành tính hoặc nhiễu thể tích tại tốc độ đường truyền (wire speed) --- lọc khoảng $99.8\%$ sự kiện lành tính và giảm trung bình hơn $99.9\%$ độ trễ xử lý cho lưu lượng do Tier-1 xử lý --- đảm bảo mô hình LLM ở tầng dưới không bị quá tải bởi lưu lượng khổng lồ.
 
-Đối với những log có biểu hiện bất thường hoặc vượt qua ngưỡng mập mờ, chúng sẽ được chuyển đến Tầng Guardrail. Tại đây, quá trình vô hiệu hóa diễn ra theo hai bước tách biệt:
-1. \textbf{Template Mining (Drain3):} Trích xuất cấu trúc tĩnh của log để nén số lượng token mà không làm thay đổi các biến payload động.
-2. \textbf{Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation):} Các trường payload động được bao bọc bên trong các dấu phân cách sinh ngẫu nhiên theo chuẩn mật mã học (ví dụ: \verb|<<RANDOM_HEX>>|). Điều này ngăn chặn triệt để đòn tấn công.
+Đối với những log có biểu hiện bất thường hoặc vượt qua ngưỡng mập mờ, chúng được chuyển đến Tầng Guardrail, nơi quá trình vô hiệu hóa diễn ra theo hai bước. Trước hết, việc gom nhóm khuôn mẫu bằng thuật toán Drain trích xuất cấu trúc tĩnh của log và nén số lượng token mà không làm thay đổi các biến payload động. Sau đó, cơ chế Đóng gói Dữ liệu có Phân cách bao bọc các trường payload động bên trong những dấu phân cách sinh ngẫu nhiên theo chuẩn mật mã (ví dụ: \verb|<<RANDOM_HEX>>|), ngăn kẻ tấn công dùng delimiter smuggling để thoát khỏi ngữ cảnh dữ liệu và thực thi một đòn tiêm prompt.
 
-Sau khi vượt qua guardrail, dữ liệu log sạch sẽ tiến vào Tier 2, được quản lý bởi một Agent phát triển trên nền LangGraph. Agent này ứng dụng cơ chế Dual-RAG với hai chỉ mục FAISS riêng biệt, được truy vấn tuần tự và hợp nhất ngữ cảnh trước khi suy luận LLM:
-\begin{itemize}
-    \item \textbf{Chỉ mục 1 --- MITRE ATT\&CK:} Ánh xạ các chỉ báo quan sát được vào các chiến thuật, kỹ thuật và thủ tục (TTP) cụ thể, trả lời câu hỏi \textit{``cuộc tấn công nào đang xảy ra?''}
-    \item \textbf{Chỉ mục 2 --- NIST SP 800-61r2 \cite{nist80061}:} Truy xuất giai đoạn ứng phó sự cố phù hợp (Chuẩn bị, Phát hiện, Ngăn chặn, Loại bỏ, Khôi phục, Bài học kinh nghiệm), trả lời câu hỏi \textit{``SOC cần làm gì tiếp theo?''}
-\end{itemize}
+Sau khi vượt qua guardrail, dữ liệu log sạch tiến vào Tier 2, được quản lý bởi một Agent trên nền LangGraph vận dụng cơ chế Dual-RAG trên hai chỉ mục FAISS riêng biệt, được truy vấn tuần tự và hợp nhất ngữ cảnh trước khi suy luận LLM. Chỉ mục thứ nhất, xây trên MITRE ATT\&CK, ánh xạ các chỉ báo quan sát được vào các chiến thuật, kỹ thuật và thủ tục (TTP) cụ thể, qua đó trả lời câu hỏi \textit{``cuộc tấn công nào đang xảy ra?''} Chỉ mục thứ hai, xây trên NIST SP 800-61r2 \cite{nist80061}, truy xuất giai đoạn ứng phó sự cố phù hợp --- Chuẩn bị, Phát hiện, Ngăn chặn, Loại bỏ, Khôi phục, hay Bài học kinh nghiệm --- qua đó trả lời câu hỏi \textit{``SOC cần làm gì tiếp theo?''}
 Thiết kế hai chỉ mục cố định này loại bỏ nhu cầu về cơ chế định tuyến (router), giảm thiểu điểm lỗi và đảm bảo độ trễ có thể dự đoán cho quá trình đánh giá. Sự phân tách này bắc cầu giữa \textit{nhận diện chiến thuật} (MITRE: chuyện gì đã xảy ra) và \textit{phản ứng vận hành} (NIST: cần làm gì).
 
 Mỗi chỉ mục sử dụng chiến lược \textbf{Tìm kiếm Lai (Hybrid Search)} kết hợp tìm kiếm ngữ nghĩa dày đặc (Dense Search qua FAISS với \verb|all-MiniLM-L6-v2|) với tìm kiếm từ khóa thưa (Sparse Search qua BM25Okapi), được hợp nhất thông qua \textbf{Reciprocal Rank Fusion (RRF, k=60)} \cite{rrf2009}. Cách tiếp cận tín hiệu kép này tối đa hóa cả khả năng hiểu ngữ nghĩa lẫn độ chính xác khớp từ khóa cho các định danh đặc thù an ninh mạng như CVE ID, địa chỉ IP và số cổng. Các đoạn văn bản được truy xuất sẽ trải qua quá trình \textbf{Làm sạch Cấu trúc (Structural Sanitization)}---chuẩn hóa Unicode, loại bỏ ký tự điều khiển và cắt giới hạn độ dài---nhằm phòng chống RAG Poisoning trước khi đưa vào prompt của LLM.
@@ -309,16 +300,11 @@ Luồng công việc của Agent được điều phối bởi LangGraph, cho ph
 \section{Kế hoạch Triển khai và Đánh giá}
 
 \subsection{Các Giai đoạn Phát triển Chính}
-Quá trình triển khai hệ thống tập trung trước tiên vào việc Thu nhận Dữ liệu (Data Ingestion) và Động cơ Quy tắc Tier 1 (Tier 1 Rule Engine). Hai bộ dữ liệu chuẩn được lựa chọn để đánh giá là:
-
-\begin{itemize}
-    \item \textbf{CSE-CIC-IDS2018 \cite{sharafaldin2018}:} Tiêu chuẩn thực tế cho nghiên cứu phát hiện xâm nhập mạng doanh nghiệp. Bộ dữ liệu cung cấp cả tệp PCAP thô và các đặc trưng luồng được trích xuất sẵn, giúp so sánh trực tiếp với các nghiên cứu trước đó.
-    \item \textbf{DAPT2020 \cite{dapt2020}:} Bộ dữ liệu được thiết kế riêng cho việc phát hiện tấn công APT đa giai đoạn. Bộ dữ liệu này bổ sung cho CSE-CIC-IDS2018 bằng cách cung cấp các chuỗi tấn công dài hạn nhằm thử nghiệm tính năng Tác tử Tier 2 và Bộ nhớ Rủi ro Dài hạn của SENTINEL.
-\end{itemize}
+Quá trình triển khai trước tiên tập trung vào việc thu nhận dữ liệu và Động cơ Quy tắc Tier 1, được đánh giá trên hai bộ dữ liệu chuẩn. CSE-CIC-IDS2018 \cite{sharafaldin2018} đóng vai trò tiêu chuẩn thực tế cho nghiên cứu phát hiện xâm nhập mạng doanh nghiệp; vì cung cấp cả tệp PCAP thô lẫn các đặc trưng luồng trích xuất sẵn và được sử dụng rộng rãi, nó cho phép so sánh trực tiếp với các nghiên cứu trước. DAPT2020 \cite{dapt2020}, một bộ dữ liệu thiết kế riêng cho phát hiện tấn công APT đa giai đoạn, bổ sung cho CSE-CIC-IDS2018 bằng các chuỗi tấn công dài hạn nhằm thử nghiệm tác tử Tier 2 và Bộ nhớ Đe dọa dài hạn của SENTINEL.
 
 Cơ chế theo dõi phiên (session-tracking) được xây dựng bằng cách sử dụng Redis TTL để thiết lập đường cơ sở hành vi bình thường.
 
-Tiếp theo, lớp Guardrail được triển khai, tích hợp thuật toán Drain3 cho gom nhóm log và phát triển mô-đun Đóng gói Dữ liệu có Phân cách bằng mật mã để trung hòa các payload độc hại.
+Tiếp theo, lớp Guardrail được triển khai, tích hợp thuật toán Drain cho gom nhóm log và phát triển mô-đun Đóng gói Dữ liệu có Phân cách bằng mật mã để trung hòa các payload độc hại.
 
 Bước quan trọng kế tiếp là xây dựng Tác tử Tier 2 bằng LangGraph và cơ sở tri thức Dual-RAG. Hai chỉ mục FAISS riêng biệt được tạo lập: một chứa các kỹ thuật MITRE ATT\&CK và một chứa quy trình ứng phó sự cố NIST SP 800-61r2.
 
@@ -328,21 +314,14 @@ Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamli
 Nhằm kiểm chứng tính hiệu quả của hệ thống, nghiên cứu áp dụng chiến lược đánh giá toàn diện dựa trên Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework).
 
 Để đánh giá mức cơ sở, một Thí nghiệm Loại bỏ (Ablation Study) sẽ được tiến hành. Quá trình này đối chiếu hệ hai tầng đầy đủ (Cấu hình~F) với một baseline chỉ-Tầng-1 tất định (Cấu hình~A) để cô lập đóng góp về độ trễ và phán quyết của tầng nhận thức; cấu hình chỉ-dùng-LLM được giữ lại như một hướng mở rộng nhằm cô lập từng cấu phần chi tiết hơn.
-Các tiêu chí đánh giá bao gồm:
-\begin{itemize}
-    \item \textbf{1. Phân loại (Classification):} Điểm F1-Score, Precision, Recall và Tỷ lệ Dương tính giả (FPR), được phân tích ý nghĩa thống kê bằng kiểm định McNemar ($p<0.05$) \cite{mcnemar1947}.
-    \item \textbf{2. Vận hành (Operational):} Độ trễ Xử lý (đại diện cho Thời gian Phát hiện/Phản hồi Trung bình), Tỷ lệ Leo thang HITL (Escalation Rate), và Tỷ lệ Cache Hit Ngữ nghĩa RAG, được kiểm định thông qua phép thử Mann-Whitney U ($p<0.05$) \cite{mannwhitney1947}.
-    \item \textbf{3. Kháng lỗi (Robustness):} Tỷ lệ chặn của rào chắn tĩnh được đo trên 120 tải trọng đối kháng đặc chế thuộc năm nhóm theo chuẩn OWASP~\cite{owasp2025} (ngụy trang mã hóa, tấn công cấu trúc/dấu phân tách, gây nhiễu ngữ nghĩa, bẻ khóa, và đầu độc RAG).
-    \item \textbf{4. Chất lượng Ngữ cảnh (Context Quality):} Để đánh giá suy luận của LLM và giảm thiểu Thiên kiến Tự đề cao, phương pháp LLM-as-a-Judge chéo họ được áp dụng: trong khi Gemma-2-9B-IT đóng vai trò mô hình suy luận chính, \textbf{Llama-3-8B-Instruct} (thuộc họ mô hình khác) sẽ làm giám khảo, chấm điểm Độ chính xác Ngữ cảnh, Sự liên quan của Câu trả lời, Tính trung thực và Độ bao phủ Ngữ cảnh theo khung RAGAS \cite{ragas2023}. Điểm giám khảo sẽ được kiểm chứng chéo với các chỉ số RAGAS tự động để đảm bảo tính nhất quán thống kê.
-    \item \textbf{5. Tính Giải thích (Explainability):} Tỷ lệ Hoàn thiện Nhật ký Kiểm toán (Audit Trail Completeness Rate) được đo lường một cách xác định (deterministic) thông qua kiểm tra tự động sự tồn tại của các trường dữ liệu.
-\end{itemize}
+Quá trình đánh giá trải trên năm chiều bổ trợ. Về \textbf{Phân loại}, hệ thống được đo bằng F1-Score, Precision, Recall và Tỷ lệ Dương tính giả (FPR), với ý nghĩa thống kê được kiểm chứng bằng kiểm định McNemar ($p<0.05$) \cite{mcnemar1947}. Về \textbf{Vận hành}, các chỉ số gồm độ trễ xử lý (đại diện cho thời gian phát hiện/phản hồi trung bình), tỷ lệ leo thang HITL và tỷ lệ trúng cache ngữ nghĩa RAG, với ý nghĩa thống kê kiểm chứng bằng phép thử Mann-Whitney~U ($p<0.05$) \cite{mannwhitney1947}. Về \textbf{Kháng lỗi}, tỷ lệ chặn của rào chắn tĩnh được đo trên 120 tải trọng đối kháng thuộc năm nhóm theo chuẩn OWASP \cite{owasp2025} (ngụy trang mã hóa, tấn công cấu trúc/dấu phân tách, gây nhiễu ngữ nghĩa, bẻ khóa, và đầu độc RAG). Về \textbf{Chất lượng Ngữ cảnh}, một quy trình LLM-as-a-Judge chéo họ giúp khử thiên kiến tự đề cao: trong khi Gemma-2-9B-IT là mô hình suy luận chính, một giám khảo khác họ là Llama-3-8B-Instruct chấm Độ chính xác Ngữ cảnh, Sự liên quan của Câu trả lời, Tính trung thực và Độ bao phủ Ngữ cảnh theo khung RAGAS \cite{ragas2023}, được kiểm chứng chéo với các chỉ số RAGAS tự động. Cuối cùng, về \textbf{Tính Giải thích}, tỷ lệ hoàn thiện nhật ký kiểm toán được đo một cách xác định qua kiểm tra tự động sự hiện diện của các trường dữ liệu.
 
 \subsection{Kế hoạch Thực hiện}
-Dự án được triển khai trong khuôn khổ 14 tuần tiêu chuẩn của Đồ án Tốt nghiệp (Capstone), cấu trúc như sau:
+Dự án được triển khai trong khuôn khổ 12 tuần tiêu chuẩn của Đồ án Tốt nghiệp (Capstone), cấu trúc như sau:
 
 \begin{table}[H]
     \centering
-    \caption{Kế hoạch Thực hiện 14 Tuần}
+    \caption{Kế hoạch Thực hiện 12 Tuần}
     \label{tab:timeline}
     \begin{tabular}{lp{10cm}}
         \toprule
@@ -350,12 +329,12 @@ Dự án được triển khai trong khuôn khổ 14 tuần tiêu chuẩn của 
         \midrule
         Tuần 1--2 & Tổng quan tài liệu, thu thập dữ liệu (CSE-CIC-IDS2018) và thiết lập môi trường. \\
         Tuần 3--4 & Xây dựng Động cơ Quy tắc Tier 1 và theo dõi phiên Redis. \\
-        Tuần 5--6 & Cài đặt Lớp Guardrail (Drain3 và Đóng gói có Phân cách). \\
+        Tuần 5--6 & Cài đặt Lớp Guardrail (Drain và Đóng gói có Phân cách). \\
         Tuần 7--8 & Tích hợp backend LLM cục bộ (llama.cpp) và luồng LangGraph. \\
-        Tuần 9--10 & Xây dựng chỉ mục Dual-RAG FAISS (MITRE ATT\&CK và NIST SP 800-61r2). \\
-        Tuần 11--12 & Phát triển Bảng điều khiển Streamlit HITL và CSDL Kiểm toán SQLite. \\
-        Tuần 13 & Tích hợp toàn hệ thống, chạy Thí nghiệm Loại bỏ và thu thập số liệu. \\
-        Tuần 14 & Viết báo cáo tổng kết, chuẩn bị bảo vệ và nộp dự án. \\
+        Tuần 9 & Xây dựng chỉ mục Dual-RAG FAISS (MITRE ATT\&CK và NIST SP 800-61r2). \\
+        Tuần 10 & Phát triển Bảng điều khiển Streamlit HITL và CSDL Kiểm toán SQLite. \\
+        Tuần 11 & Tích hợp toàn hệ thống, chạy Thí nghiệm Loại bỏ và thu thập số liệu. \\
+        Tuần 12 & Viết báo cáo tổng kết, chuẩn bị bảo vệ và nộp dự án. \\
         \bottomrule
     \end{tabular}
 \end{table}

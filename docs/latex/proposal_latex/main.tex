@@ -123,10 +123,7 @@ The application of Large Language Models (LLMs), particularly Agentic AI and Ret
 Motivated by these limitations, this study aims to develop an autonomous AI Security Agent utilizing a cognitive two-tier architecture. Instead of relying purely on a single LLM to process all logs, the thesis proposes a hybrid approach: a high-speed deterministic rule engine combined with a deep-reasoning LLM Agent. This approach is expected to drastically reduce reasoning latency by filtering noise, mitigate prompt injection via bounded encapsulation, and enhance context awareness using Long-Term Threat Memory and a Dual-RAG setup (incorporating MITRE ATT\&CK for tactical threat identification and NIST SP 800-61r2 for incident response guidance). A Human-in-the-Loop (HITL) Web Dashboard will also be developed to demonstrate practical SOC automation.
 
 \subsection{Research Questions}
-Based on the objectives, this thesis focuses on three core research questions:
-1. Does a Two-Tier Architecture (Rule-based + LLM Agent) combined with Session-Aware Behavioral Baselining and unsupervised online Welford anomaly detection optimize Reasoning Latency compared to a One-Tier (LLM-only) approach?
-2. Can a Delimited Data Encapsulation mechanism (using Dynamic Randomized Delimiters), reinforced by a deterministic Tier-1/Tier-2 consensus guard and a Human-in-the-Loop quarantine, prevent structural Prompt Injections (e.g., Delimiter Smuggling) and unsafe autonomous responses without degrading the LLM's classification accuracy?
-3. How does a Dual-RAG pipeline (combining tactical threat frameworks with incident response standards) improve the Context Relevance of the LLM's threat analysis?
+Based on the objectives, this thesis addresses three core research questions. The first (RQ1) asks whether a Two-Tier architecture---a rule-based engine coupled with an LLM agent and augmented by session-aware behavioural baselining and unsupervised online Welford anomaly detection---optimises reasoning latency relative to a one-tier, LLM-only approach. The second (RQ2) asks whether a Delimited Data Encapsulation mechanism using dynamic randomised delimiters, reinforced by a deterministic Tier-1/Tier-2 consensus guard and a Human-in-the-Loop quarantine, can prevent structural prompt injections such as delimiter smuggling---together with unsafe autonomous responses---without degrading the LLM's classification accuracy. The third (RQ3) asks how a Dual-RAG pipeline that combines a tactical threat framework with incident-response standards improves the contextual relevance of the LLM's threat analysis.
 
 \subsection{Research Object and Methodology}
 The primary objects of this research are the Two-Tier Security Architecture, Agentic AI (LLMs applied to SOC automation), Adversarial Prompt Injections, and network intrusion log data.
@@ -186,7 +183,7 @@ On the security side, both the OWASP Top 10 for LLM Applications \cite{owasp2025
 \subsection{Proposed Solution: Cognitive Two-Tier Architecture}
 The proposed solution is based on a cognitive Two-Tier Architecture designed with a strict Separation of Concerns. The core idea is to leverage the speed of deterministic rules (Tier 1) alongside the deep reasoning capabilities of an Agentic LLM (Tier 2), interconnected by robust adversarial guardrails.
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \resizebox{\textwidth}{!}{
     \begin{tikzpicture}[
@@ -201,7 +198,7 @@ The proposed solution is based on a cognitive Two-Tier Architecture designed wit
     \node[box, text width=7cm, below=1cm of dataset] (tier1) {TIER 1 -- RULE ENGINE \\ Behavioral baseline \textbullet\ IP blacklist};
     \node[box, right=1.5cm of tier1] (drop) {[ DROP ]};
 
-    \node[box, text width=7cm, below=1cm of tier1] (guardrail) {GUARDRAIL LAYER \\ 1. Drain3 template mining -- token compression \\ 2. Delimited Data Encapsulation -- anti-inject};
+    \node[box, text width=7cm, below=1cm of tier1] (guardrail) {GUARDRAIL LAYER \\ 1. Drain template mining -- token compression \\ 2. Delimited Data Encapsulation -- anti-inject};
 
     \node[box, text width=5cm, below=2cm of guardrail] (tier2) {TIER 2 -- LANGGRAPH AGENT \\ Gemma-2-9B-IT via llama.cpp \\ Dual-RAG \textbullet\ long-term threat memory};
     \node[box, text width=3.5cm, left=0.5cm of tier2] (mitre) {MITRE ATT\&CK \\ FAISS Index 1 \\ TTP mapping};
@@ -247,15 +244,9 @@ The proposed solution is based on a cognitive Two-Tier Architecture designed wit
 
 At the first stage, the Tier 1 Rule Engine acts as a heuristic filter. It maintains Session-Aware Behavioral Baselines using in-memory data structures (Redis) to track request rates and known malicious IPs. To proactively detect zero-day or signature-less anomalies, Tier 1 integrates an online Unsupervised Outlier Detector using Welford's algorithm to calculate the Running Mean and Standard Deviation ($O(1)$ time and memory complexity) of core network flow statistics (e.g., Flow Duration, Fwd/Bwd Packets, Fwd/Bwd Length). When a flow's Z-score exceeds the threshold ($|Z| > 3.5$), it is flagged as an Outlier Anomaly and escalated directly to Tier 2 for agentic investigation. This layer is designed to filter the majority of benign or purely volumetric noise at wire speed---filtering roughly 99.8\% of benign events and reducing average processing latency by over 99.9\% for Tier-1-resolved traffic---ensuring the downstream LLM is not overwhelmed by high-volume traffic.
 
-Logs that exhibit anomalous behavior or trigger ambiguous thresholds are passed to the Guardrail Layer. Here, a two-step neutralization occurs:
-1. \textbf{Template Mining (Drain3):} Extracts the static log template to compress the token volume without altering the dynamic payload variables.
-2. \textbf{Delimited Data Encapsulation:} Dynamic payload fields are wrapped within cryptographically generated randomized delimiters (e.g., \verb|<<RANDOM_HEX>>|). This prevents adversaries from using Delimiter Smuggling to escape the data context and execute Prompt Injections.
+Logs that exhibit anomalous behaviour or trigger ambiguous thresholds are passed to the Guardrail Layer, where a two-step neutralisation occurs. First, template mining with the Drain algorithm extracts the static log template and compresses the token volume without altering the dynamic payload variables. Second, Delimited Data Encapsulation wraps the dynamic payload fields within cryptographically generated randomised delimiters (for example, \verb|<<RANDOM_HEX>>|), preventing an adversary from using delimiter smuggling to escape the data context and execute a prompt injection.
 
-Following the guardrails, the sanitized log enters Tier 2, governed by a LangGraph-based Agent. The Agent utilizes a Dual-RAG mechanism with two dedicated FAISS indexes, queried sequentially and merged before LLM inference:
-\begin{itemize}
-    \item \textbf{Index 1 — MITRE ATT\&CK:} Maps observed indicators to specific tactics, techniques, and procedures (TTPs), answering \textit{``what attack is happening?''}
-    \item \textbf{Index 2 — NIST SP 800-61r2 \cite{nist80061}:} Retrieves the appropriate incident response phase (Preparation, Detection, Containment, Eradication, Recovery, Lessons Learned), answering \textit{``what should the SOC do next?''}
-\end{itemize}
+Following the guardrails, the sanitised log enters Tier 2, governed by a LangGraph-based agent that employs a Dual-RAG mechanism over two dedicated FAISS indexes, queried sequentially and merged before LLM inference. The first index, built on MITRE ATT\&CK, maps the observed indicators to specific tactics, techniques, and procedures (TTPs) and thus answers \textit{``what attack is happening?''} The second index, built on NIST SP 800-61r2 \cite{nist80061}, retrieves the appropriate incident-response phase---preparation, detection, containment, eradication, recovery, or lessons learned---and thus answers \textit{``what should the SOC do next?''}
 This fixed dual-index design eliminates the need for a routing mechanism, reducing failure points and ensuring predictable latency for evaluation. The separation bridges the gap between \textit{tactical identification} (MITRE: what happened) and \textit{operational response} (NIST: what to do about it).
 
 Each index employs a \textbf{Hybrid Search} strategy combining dense semantic search (FAISS with \verb|all-MiniLM-L6-v2|) with sparse keyword matching (BM25Okapi), fused via \textbf{Reciprocal Rank Fusion (RRF, k=60)} \cite{rrf2009}. This dual-signal approach maximizes both semantic understanding and exact-match recall for security-specific identifiers such as CVE IDs, IP addresses, and port numbers. Retrieved chunks undergo \textbf{Structural Sanitization}---Unicode normalization, control character removal, and length truncation---to defend against RAG Poisoning before injection into the LLM prompt.
@@ -300,16 +291,11 @@ To ensure full reproducibility of latency benchmarks, all experiments are conduc
 \section{Implementation and Evaluation Plan}
 
 \subsection{Main Development Stages}
-The implementation process will first focus on the Data Ingestion and Tier 1 Rule Engine. Two benchmark datasets are selected for evaluation:
-
-\begin{itemize}
-    \item \textbf{CSE-CIC-IDS2018 \cite{sharafaldin2018}:} The de facto standard for enterprise network intrusion detection research. As of 2025, no publicly available general-purpose enterprise NIDS dataset post-2018 exists. CIC's 2023--2026 releases (CICIoT2023, CIC-YNU-IoTMal 2026) target IoT environments and are not representative of enterprise SOC traffic. CSE-CIC-IDS2018 provides both raw PCAP and pre-extracted flow features, and its extensive adoption enables direct comparison with prior work.
-    \item \textbf{DAPT2020 \cite{dapt2020}:} A purpose-built dataset for multi-stage Advanced Persistent Threat detection. This complements CSE-CIC-IDS2018 by providing attack chains that exercise SENTINEL's Tier 2 agent and Long-Term Threat Memory capabilities.
-\end{itemize}
+The implementation process will first focus on data ingestion and the Tier-1 Rule Engine, evaluated on two benchmark datasets. CSE-CIC-IDS2018 \cite{sharafaldin2018} serves as the de facto standard for enterprise network intrusion-detection research; as of 2025 no publicly available general-purpose enterprise NIDS dataset post-2018 exists, since the CIC 2023--2026 releases (CICIoT2023, CIC-YNU-IoTMal 2026) target IoT environments that are not representative of enterprise SOC traffic. Because CSE-CIC-IDS2018 provides both raw PCAP and pre-extracted flow features and is widely adopted, it also enables direct comparison with prior work. DAPT2020 \cite{dapt2020}, a purpose-built dataset for multi-stage Advanced Persistent Threat detection, complements it by contributing the attack chains that exercise SENTINEL's Tier-2 agent and long-term Threat Memory.
 
 The session-tracking mechanism will be built using Redis TTLs to establish behavioral baselines.
 
-Following this, the Guardrail Layer will be implemented, integrating the Drain3 algorithm for template mining and developing the cryptographic Delimited Data Encapsulation module to neutralize adversarial payloads.
+Following this, the Guardrail Layer will be implemented, integrating the Drain algorithm for template mining and developing the cryptographic Delimited Data Encapsulation module to neutralize adversarial payloads.
 
 The next critical step is the construction of the Tier 2 Agent using LangGraph and the Dual-RAG knowledge base. Two separate FAISS indexes will be populated: one with parsed MITRE ATT\&CK techniques and one with NIST SP 800-61r2 incident response procedures. The agent's prompts will be carefully engineered to strictly separate system instructions from the encapsulated payload data.
 
@@ -319,17 +305,10 @@ Finally, the Streamlit Dashboard and the SQLite Long-Term Threat Memory will be 
 To validate the effectiveness of the system, the study employs a comprehensive 5-Dimensional (5D) Evaluation Framework.
 
 To evaluate the system's baseline accuracy, an Ablation Study will be conducted. This contrasts the full two-tier system (Configuration~F) against a deterministic Tier-1-only baseline (Configuration~A) to isolate the latency and verdict contribution of the cognitive tier; an LLM-only configuration is retained as a planned extension for finer-grained, per-component isolation.
-The evaluation metrics will include:
-\begin{itemize}
-    \item \textbf{1. Classification:} F1-Score, Precision, Recall, and False Positive Rate (FPR), evaluated using McNemar's Test ($p<0.05$) \cite{mcnemar1947} for statistical significance.
-    \item \textbf{2. Operational:} Processing Latency (serving as a proxy for Mean Time To Detect/Respond), HITL Escalation Rate, and RAG Semantic Cache Hit Rate, evaluated using the Mann-Whitney U Test ($p<0.05$) \cite{mannwhitney1947}.
-    \item \textbf{3. Robustness:} The static guardrail block rate is measured against 120 curated adversarial payloads spanning five OWASP-aligned categories~\cite{owasp2025} (encoding bypass, structural/delimiter attacks, semantic confusion, jailbreak, and RAG poisoning).
-    \item \textbf{4. Context Quality:} To evaluate the LLM's reasoning and mitigate Self-Enhancement Bias, a cross-family LLM-as-a-Judge methodology will be employed: while Gemma-2-9B-IT serves as the primary reasoning model, \textbf{Llama-3-8B-Instruct} (a different model family) will serve as the judge, assessing Context Precision, Answer Relevancy, Faithfulness, and Context Recall using the RAGAS framework \cite{ragas2023}. Judge scores will be cross-validated with automated RAGAS metrics for statistical consistency.
-    \item \textbf{5. Explainability:} Audit Trail Completeness Rate will be measured deterministically via programmatic field presence checks.
-\end{itemize}
+The evaluation spans five complementary dimensions. \textbf{Classification} is captured by F1-score, precision, recall, and false-positive rate, with statistical significance assessed by McNemar's test ($p<0.05$) \cite{mcnemar1947}. \textbf{Operational} performance is measured through processing latency (a proxy for mean time to detect and respond), the HITL escalation rate, and the RAG semantic-cache hit rate, with significance assessed by the Mann-Whitney~U test ($p<0.05$) \cite{mannwhitney1947}. \textbf{Robustness} is quantified as the static guardrail block rate against 120 curated adversarial payloads spanning five OWASP-aligned categories \cite{owasp2025} (encoding bypass, structural/delimiter attacks, semantic confusion, jailbreak, and RAG poisoning). \textbf{Context quality} is evaluated by a cross-family LLM-as-a-Judge protocol that mitigates self-enhancement bias: while Gemma-2-9B-IT is the primary reasoning model, a different-family judge---Llama-3-8B-Instruct---scores Context Precision, Answer Relevancy, Faithfulness, and Context Recall under the RAGAS framework \cite{ragas2023}, cross-validated against automated RAGAS metrics. Finally, \textbf{explainability} is measured deterministically as the audit-trail completeness rate through programmatic field-presence checks.
 
 \subsection{Project Timeline}
-The project spans a standard 14-week Capstone period, structured as follows:
+The project spans a standard 12-week Capstone period, structured as follows:
 
 \begin{figure}[H]
     \centering
@@ -346,17 +325,17 @@ The project spans a standard 14-week Capstone period, structured as follows:
         bar height=0.6,
         milestone label font=\bfseries\footnotesize,
         milestone/.style={fill=red, draw=red, shape=circle, inner sep=1.5pt}
-    ]{1}{14}
-    \gantttitle{14-Week Capstone Project Timeline}{14} \\
-    \gantttitlelist{1,...,14}{1} \\
+    ]{1}{12}
+    \gantttitle{12-Week Capstone Project Timeline}{12} \\
+    \gantttitlelist{1,...,12}{1} \\
     \ganttbar{Literature Review \& Dataset}{1}{2} \\
     \ganttbar{Tier 1: Rule Engine \& Redis}{3}{4} \\
-    \ganttbar{Guardrails (Drain3 \& Encapsulation)}{5}{6} \\
+    \ganttbar{Guardrails (Drain \& Encapsulation)}{5}{6} \\
     \ganttbar{Local LLM backend \& LangGraph}{7}{8} \\
-    \ganttbar{Dual-RAG (MITRE \& NIST)}{9}{10} \\
-    \ganttbar{HITL Dashboard \& Audit DB}{11}{12} \\
-    \ganttbar{Ablation Study \& Evaluation}{13}{13} \\
-    \ganttbar{Final Report \& Defense}{14}{14}
+    \ganttbar{Dual-RAG (MITRE \& NIST)}{9}{9} \\
+    \ganttbar{HITL Dashboard \& Audit DB}{10}{10} \\
+    \ganttbar{Ablation Study \& Evaluation}{11}{11} \\
+    \ganttbar{Final Report \& Defense}{12}{12}
     \end{ganttchart}
     }
     \caption{Project Timeline (Gantt Chart)}
