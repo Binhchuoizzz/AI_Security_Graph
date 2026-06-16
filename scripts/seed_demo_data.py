@@ -53,6 +53,9 @@ ATTACK_CLASSES = [
 # hợp khác nhau (artifact của bước trích xuất). Ta gộp lại dưới một attacker IP để
 # Tier-1 session baseline phát hiện đúng pattern (đặc trưng flow/port/nhãn giữ NGUYÊN).
 FLOWS_PER_INCIDENT = 15
+# Số incident demo tạo cho MỖI loại tấn công (tăng để dashboard có nhiều dữ liệu hơn).
+# Mỗi incident dùng một nhóm flow THẬT khác nhau (đan xen) -> attacker IP khác nhau.
+INCIDENTS_PER_CLASS = 3
 
 
 def run_real_pipeline_on_cicids():
@@ -75,44 +78,50 @@ def run_real_pipeline_on_cicids():
         if not samples:
             print(f"  [skip] no samples for {cls}")
             continue
-        # Gom FLOWS_PER_INCIDENT flow THẬT của cùng loại tấn công
-        flows = []
-        for s in samples:
-            flows.extend(s.get("logs", []))
-            if len(flows) >= FLOWS_PER_INCIDENT:
-                break
-        flows = flows[:FLOWS_PER_INCIDENT]
-        if not flows:
-            continue
-        # Gộp về MỘT attacker IP (đại diện nguồn tấn công thật)
-        attacker_ip = flows[0].get("src_ip", "unknown")
-        # RuleEngine mới cho mỗi incident để session baseline tích lũy đúng theo IP này
-        engine = RuleEngine()
-        evaluated = []
-        for log in flows:
-            e = dict(log)
-            e["src_ip"] = attacker_ip  # consolidate nguồn (đặc trưng flow giữ nguyên)
-            e["dataset_source"] = "CSE-CIC-IDS2018"
-            e["log_source"] = "queue_waf"
-            evaluated.append(engine.evaluate(e))  # Tier-1 thật, tích lũy baseline
+        # Tạo nhiều incident demo cho mỗi loại tấn công, mỗi cái từ một nhóm flow
+        # THẬT khác nhau (đan xen grp::INCIDENTS_PER_CLASS) -> attacker IP khác nhau.
+        for grp in range(INCIDENTS_PER_CLASS):
+            grp_samples = samples[grp::INCIDENTS_PER_CLASS]
+            if not grp_samples:
+                continue
+            # Gom FLOWS_PER_INCIDENT flow THẬT của cùng loại tấn công
+            flows = []
+            for s in grp_samples:
+                flows.extend(s.get("logs", []))
+                if len(flows) >= FLOWS_PER_INCIDENT:
+                    break
+            flows = flows[:FLOWS_PER_INCIDENT]
+            if not flows:
+                continue
+            # Gộp về MỘT attacker IP (đại diện nguồn tấn công thật)
+            attacker_ip = flows[0].get("src_ip", "unknown")
+            # RuleEngine mới cho mỗi incident để session baseline tích lũy đúng theo IP này
+            engine = RuleEngine()
+            evaluated = []
+            for log in flows:
+                e = dict(log)
+                e["src_ip"] = attacker_ip  # consolidate nguồn (đặc trưng flow giữ nguyên)
+                e["dataset_source"] = "CSE-CIC-IDS2018"
+                e["log_source"] = "queue_waf"
+                evaluated.append(engine.evaluate(e))  # Tier-1 thật, tích lũy baseline
 
-        expected = samples[0]
-        state = SentinelState(
-            current_batch_logs=evaluated,
-            current_batch_size=len(evaluated),
-            narrative_summary="",
-        )
-        loop_detector.reset()
-        try:
-            final = agent_app.invoke(state)
-            dec = (final.get("decisions") or [{}])[-1] if isinstance(final, dict) else {}
-            t1 = evaluated[-1]
-            print(
-                f"  [{cls:24s}] T1={t1.get('tier1_action')}({t1.get('tier1_score')}) -> LLM {dec.get('action', '?')} {dec.get('target', '?')} | {str(dec.get('mitre_technique', ''))[:34]} (exp {expected.get('expected_action')}/{expected.get('expected_mitre_technique')})"
+            expected = grp_samples[0]
+            state = SentinelState(
+                current_batch_logs=evaluated,
+                current_batch_size=len(evaluated),
+                narrative_summary="",
             )
-            done += 1
-        except Exception as e:
-            print(f"  [{cls:24s}] pipeline error: {e}")
+            loop_detector.reset()
+            try:
+                final = agent_app.invoke(state)
+                dec = (final.get("decisions") or [{}])[-1] if isinstance(final, dict) else {}
+                t1 = evaluated[-1]
+                print(
+                    f"  [{cls:24s} #{grp + 1}] T1={t1.get('tier1_action')}({t1.get('tier1_score')}) -> LLM {dec.get('action', '?')} {dec.get('target', '?')} | {str(dec.get('mitre_technique', ''))[:34]} (exp {expected.get('expected_action')}/{expected.get('expected_mitre_technique')})"
+                )
+                done += 1
+            except Exception as e:
+                print(f"  [{cls:24s} #{grp + 1}] pipeline error: {e}")
     print(f"[CICIDS] {done} real incidents analyzed by LLM across attack types")
 
 
