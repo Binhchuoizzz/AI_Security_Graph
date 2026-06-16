@@ -105,11 +105,11 @@
 \newpage
 \addcontentsline{toc}{section}{Tóm tắt}
 \section*{Tóm tắt}
-Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đang phải đối mặt với một ``Nghịch lý Dữ liệu lớn'' nghiêm trọng: khối lượng khổng lồ các sự kiện mạng phát sinh mỗi giây dẫn đến tình trạng quá tải cảnh báo, với phần lớn trong số đó là dương tính giả. Các hệ thống Phát hiện Xâm nhập (IDS) và Quản lý Sự kiện An ninh (SIEM) truyền thống thường phân tích luồng dữ liệu một cách đơn lẻ, qua đó làm suy giảm đáng kể khả năng nhận diện các chiến dịch tấn công có chủ đích tinh vi (APT). Gần đây, việc ứng dụng trực tiếp các Mô hình Ngôn ngữ Lớn (LLM) vào việc phân tích log đã được thử nghiệm; tuy nhiên, hướng đi này lại mở ra hai lỗ hổng rủi ro lớn: độ trễ suy luận quá cao không thể đáp ứng được tốc độ của luồng dữ liệu thời gian thực, và nguy cơ hệ thống LLM bị thao túng bởi các đòn tấn công Prompt Injection ẩn giấu ngay bên trong dữ liệu log độc hại.
+Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đối mặt với một ``Nghịch lý Dữ liệu lớn'' nghiêm trọng: khối lượng khổng lồ sự kiện mạng phát sinh mỗi giây dẫn đến quá tải cảnh báo. Các hệ thống IDS và SIEM truyền thống phân tích luồng dữ liệu rời rạc, làm suy giảm khả năng nhận diện các chiến dịch tấn công APT tinh vi. Việc ứng dụng Mô hình Ngôn ngữ Lớn (LLM) và AI Tác tử hứa hẹn cải thiện khả năng điều tra sự cố nhưng gặp phải hai trở ngại lớn: độ trễ suy luận quá cao đối với môi trường thời gian thực, và rủi ro bị thao túng bởi các đòn tấn công tiêm prompt từ log (log-substrate prompt injection) đối kháng.
 
-Để giải quyết triệt để những thách thức này, nghiên cứu đề xuất một kiến trúc nhận thức (cognitive architecture) kết hợp giữa một Động cơ Quy tắc (Rule Engine) xác định và một Mô hình Ngôn ngữ Lớn. Thông qua phương pháp tiếp cận hai tầng, hệ thống được kỳ vọng sẽ sàng lọc lượng lớn nhiễu ở tốc độ cao (Tầng 1), đồng thời bảo lưu năng lực suy luận sâu --- được vận hành bởi AI Tác tử dựa trên LangGraph cùng cơ chế Dual-RAG (tích hợp MITRE ATT\&CK cho nhận diện mối đe dọa và NIST SP 800-61r2 cho hướng dẫn ứng phó sự cố) --- để xử lý các mối đe dọa phức tạp và khó đoán (Tầng 2). Bên cạnh đó, các cơ chế an toàn nâng cao được triển khai bao gồm: Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) chống Prompt Injection, xác thực mã ký SHA-256 bảo vệ tính toàn vẹn của cơ sở tri thức tĩnh chống RAG Ingestion Poisoning, làm sạch cấu trúc ngữ cảnh để ngăn chặn đầu độc bộ nhớ đệm (Semantic Cache Poisoning), bảo mật biểu mẫu xác thực bằng Regex và thuật toán PBKDF2-HMAC-SHA256, cùng cơ chế ký HMAC chuỗi logs bảo vệ tính toàn vẹn của nhật ký kiểm toán.
+Để giải quyết triệt để các thách thức này, nghiên cứu đề xuất một kiến trúc nhận thức hai tầng (cognitive two-tier architecture) lai ghép tên là SENTINEL. Tầng 1 sử dụng động cơ quy tắc xác định kết hợp thuật toán thống kê trực tuyến Welford phi giám sát ($O(1)$) để lọc nhiễu lành tính ở tốc độ đường truyền (giảm $99.9\%$ độ trễ thông qua xử lý cục bộ chỉ trong $0.6$\,ms). Tầng 2 chỉ vận hành khi có cảnh báo leo thang ($62.7\%$ sự kiện), sử dụng tác tử nhận thức LangGraph có trạng thái chạy mô hình cục bộ lượng tử hóa Gemma-2-9B-IT GGUF Q6\_K qua llama.cpp. Hệ thống neo ngữ cảnh thông qua Dual-RAG kết hợp tìm kiếm lai (Dense FAISS + Sparse BM25) với Reciprocal Rank Fusion (RRF), đồng thời triển khai cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) chống tiêm prompt, bộ đệm ngữ nghĩa LRU trong bộ nhớ với khóa băm SHA-256, và bảo vệ HMAC cho chuỗi logs kiểm toán.
 
-Hệ thống đề xuất sẽ được triển khai và đánh giá trên hai bộ dữ liệu chuẩn: CSE-CIC-IDS2018 cho phát hiện xâm nhập mạng doanh nghiệp và DAPT2020 cho theo dõi tấn công APT đa giai đoạn. Các tiêu chí đánh giá sẽ được cấu trúc theo Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework) toàn diện, bao quát Chỉ số Phân loại, Chỉ số Vận hành, Mức độ Kháng lỗi, Chất lượng Ngữ cảnh và Tính Giải thích.
+Được đánh giá trên bộ dữ liệu CSE-CIC-IDS2018 và DAPT2020, hệ thống chứng minh độ trễ ưu việt và khả năng phát hiện zero-day ($7/7$) cùng recall APT tuyệt đối ($1.0$). Quy trình đánh giá chéo họ LLM-as-a-Judge bằng Llama-3-8B-Instruct chấm điểm chất lượng suy luận RAGAS trung bình đạt $3.91/5$ (Faithfulness đạt $4.00/5$), trong khi rào chắn tĩnh chặn toàn bộ tải trọng tiêm dựa trên mã hóa và định tuyến các bẻ khóa ngữ nghĩa sang khâu duyệt Human-in-the-Loop (HITL), khẳng định hiệu quả của một kiến trúc an ninh tự phòng vệ và dễ mở rộng.
 
 % --- MỤC LỤC ---
 \newpage
@@ -170,6 +170,7 @@ Về vấn đề an toàn và tính kháng lỗi của bản thân LLM, danh sá
 
 \begin{table}[H]
     \centering
+    \setlength{\tabcolsep}{3pt}
     \caption{So sánh các phương pháp phân tích log SOC}
     \label{tab:comparison}
     \begin{tabular}{lccccc}
@@ -257,7 +258,7 @@ Tại tầng đầu tiên (Tier 1), Động cơ Quy tắc đóng vai trò như m
 
 Đối với những log có biểu hiện bất thường hoặc vượt qua ngưỡng mập mờ, chúng sẽ được chuyển đến Tầng Guardrail. Tại đây, quá trình vô hiệu hóa diễn ra theo hai bước tách biệt:
 1. \textbf{Template Mining (Drain3):} Trích xuất cấu trúc tĩnh của log để nén số lượng token mà không làm thay đổi các biến payload động.
-2. \textbf{Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation):} Các trường payload động được bao bọc bên trong các dấu phân cách sinh ngẫu nhiên theo chuẩn mật mã học (ví dụ: \verb|<<RANDOM_HEX>>|). Điều này ngăn chặn triệt để đòn tấn công Delimiter Smuggling, khiến kẻ thù không thể thoát khỏi ranh giới dữ liệu để thực thi Prompt Injection.
+2. \textbf{Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation):} Các trường payload động được bao bọc bên trong các dấu phân cách sinh ngẫu nhiên theo chuẩn mật mã học (ví dụ: \verb|<<RANDOM_HEX>>|). Điều này ngăn chặn triệt để đòn tấn công.
 
 Sau khi vượt qua guardrail, dữ liệu log sạch sẽ tiến vào Tier 2, được quản lý bởi một Agent phát triển trên nền LangGraph. Agent này ứng dụng cơ chế Dual-RAG với hai chỉ mục FAISS riêng biệt, được truy vấn tuần tự và hợp nhất ngữ cảnh trước khi suy luận LLM:
 \begin{itemize}
@@ -276,624 +277,8 @@ Cuối cùng, nhằm bảo vệ hệ thống trước đòn Adversarial Rule Inj
 
 \textbf{Theo dõi Thử nghiệm bằng MLflow:} Nhằm phục vụ nghiên cứu thực nghiệm nghiêm túc, MLflow được tích hợp để tự động ghi nhật ký các chỉ số đánh giá của Ablation Study (F1-Score, Precision, Recall, FPR, độ trễ MTTR/MTTD, tỷ lệ trúng cache ngữ cảnh, tỷ lệ leo thang HITL) xuyên suốt các cấu hình khác nhau, hỗ trợ phân tích so sánh trực quan và tái lập thí nghiệm.
 
-\subsection{Tài liệu Kiến trúc Kỹ thuật Toàn diện}
-
-\subsubsection{PHẦN 1: DATASET LAYER}
-
-\paragraph{Bước 1. CSE-CIC-IDS2018 Data Ingestion \& Transformation}
-\begin{description}[noitemsep]
-    \item[Tên bước:] CSE-CIC-IDS2018 Data Ingestion \& Transformation.
-    \item[Tầng:] Dataset Input Layer.
-    \item[Mục đích:] Biến đổi tập dữ liệu mạng tĩnh (CSV) thành dòng dữ liệu streaming thực tế mô phỏng môi trường mạng doanh nghiệp (Network Traffic Simulation), cung cấp đầu vào liên tục cho hệ thống.
-    \item[Công nghệ sử dụng:] \verb|pandas| (ETL), Generator Python (\verb|yield|), Sleep/Delay mechanics.
-    \item[Cơ chế hoạt động:] Đọc tệp CSV khổng lồ theo từng chunk (\verb|chunksize|). Chuyển đổi các cột dữ liệu (Timestamp, Flow Duration, Bwd Packet Length Max...) thành JSON payload. Tạo độ trễ ngẫu nhiên (\verb|time.sleep|) để mô phỏng Real-time Traffic/Wire speed.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|scripts/fetch_and_build_dataset.py| \& \verb|src/streaming/publisher.py|
-        \item Hàm: \verb|stream_logs()|, \verb|fetch_dataset()|
-        \item Đoạn mã logic:
-\begin{lstlisting}
-for chunk in pd.read_csv("dataset.csv", chunksize=1000):
-    for _, row in chunk.iterrows():
-        payload = row.to_json()
-        publish_to_redis(payload)
-        time.sleep(random.uniform(0.01, 0.05))
-\end{lstlisting}
-        \item Input: Raw CSV/Parquet file $\rightarrow$ Output: JSON strings.
-    \end{itemize}
-    \item[Luồng dữ liệu:] CSV trên đĩa $\rightarrow$ Chunking Memory $\rightarrow$ JSON Formatting $\rightarrow$ Redis Pub/Sub channel.
-    \item[Vai trò bảo mật:] N/A --- phục vụ hiệu năng và mô phỏng.
-\end{description}
-
-\paragraph{Bước 2. Multi-Stage APT Pattern Injection}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Multi-Stage APT Pattern Injection.
-    \item[Tầng:] Dataset Input Layer.
-    \item[Mục đích:] Đảm bảo hệ thống có khả năng kiểm thử các chiến dịch Low-and-Slow APT kéo dài nhiều giai đoạn (Reconnaissance $\rightarrow$ Initial Access $\rightarrow$ Lateral Movement $\rightarrow$ Exfiltration), không chỉ các mã độc (malware) cục bộ.
-    \item[Công nghệ sử dụng:] JSON Serialization, HuggingFace Datasets, SQLite.
-    \item[Cơ chế hoạt động:] Load tập dữ liệu DAPT2020 có dán nhãn chuỗi tấn công (Kill-Chain). Các log được gán Session ID và giữ nguyên thứ tự thời gian tuyến tính để kích hoạt logic Long-Term Memory của Tier 2 sau này thông qua liên kết lịch sử.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|scripts/fetch_dapt2020.py| \& \verb|scripts/build_dapt_chains.py|
-        \item Hàm: \verb|process_dapt2020()|, \verb|build_chains()|
-        \item Input: DAPT2020 JSON $\rightarrow$ Output: Mapped Normalized JSON.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Raw DAPT2020 logs $\rightarrow$ Data Normalizer (Đồng nhất schema với CIC-IDS) $\rightarrow$ Redis Channel.
-    \item[Vai trò bảo mật:] N/A --- hỗ trợ đánh giá Contextual Correlation.
-\end{description}
-
-\paragraph{Bước 3. Redis Pub/Sub \& Stateful Session Tracker}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Redis Pub/Sub \& Stateful Session Tracker.
-    \item[Tầng:] Dataset Input Layer / Middleware.
-    \item[Mục đích:] Hoạt động như một Message Broker tốc độ cao (In-memory) giữa Data Publisher và Tier 1 Rule Engine, đồng thời duy trì trạng thái (State) của các phiên kết nối mạng mà không cần Database lưu trữ vĩnh viễn.
-    \item[Công nghệ sử dụng:] \verb|redis-py|, Redis Pub/Sub, Redis EXPIRE (TTL) / Local sliding memory.
-    \item[Cơ chế hoạt động:] Khi Publisher gửi log dạng JSON lên Redis Channel \verb|sentinel_logs|, Subscriber lắng nghe. Với mỗi IP Nguồn mới, hệ thống tạo/cập nhật Session Profile trong \verb|SessionBaseline|. Các log được liên kết phiên theo Source IP. Hệ thống thiết lập cơ chế tự dọn dẹp (eviction) các profile đã lâu không có traffic hoạt động vượt quá \verb|ttl_seconds| để tránh cạn kiệt bộ nhớ.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/streaming/subscriber.py| \& \verb|src/tier1_filter/rule_engine.py|
-        \item Lớp: \verb|RedisSubscriber|, \verb|SessionBaseline|
-        \item Đoạn mã logic:
-\begin{lstlisting}
-def _evict_stale_profiles(self):
-    now = time.time()
-    stale_ips = [ip for ip, profile in self.profiles.items() 
-                 if profile["last_seen"] and (now - profile["last_seen"]) > self.ttl_seconds]
-    for ip in stale_ips:
-        del self.profiles[ip]
-\end{lstlisting}
-        \item Input: JSON từ Pub/Sub $\rightarrow$ Output: In-memory Stateful IP Profiles.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Network Stream $\rightarrow$ Redis Message Broker $\rightarrow$ Tier 1 Event Listener $\rightarrow$ Stateful Memory Update.
-    \item[Vai trò bảo mật:] Phòng chống tấn công từ chối dịch vụ (DoS) cạn kiệt tài nguyên bộ nhớ thông qua cơ chế tự động hủy Session rác (TTL/Eviction).
-\end{description}
-
-\subsubsection{PHẦN 2: TIER 1 --- RULE ENGINE}
-
-\paragraph{Bước 4. Dynamic Behavioral Baselining (Welford Outlier)}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Unsupervised Outlier Detection using Welford's Algorithm.
-    \item[Tầng:] Tier 1 Rule Engine.
-    \item[Mục đích:] Xây dựng đường cơ sở (Baseline) hành vi mạng chuẩn cho từng IP theo thời gian thực và phát hiện zero-day attack dưới dạng các dị biệt thống kê phi giám sát mà không tốn tài nguyên bộ nhớ.
-    \item[Công nghệ sử dụng:] Thuật toán trực tuyến Welford ($O(1)$ time, $O(1)$ memory), Z-Score.
-    \item[Cơ chế hoạt động:] Duy trì các giá trị Trung bình (Mean) và Độ lệch chuẩn (Std Dev) chạy trực tuyến của các đặc trưng lưu lượng mạng chính. Khi có log mới, tính toán Z-Score: nếu $|Z| > 3.5$, đánh dấu là Outlier Anomaly và leo thang lên Tier 2 để điều tra.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/tier1_filter/rule_engine.py|
-        \item Lớp: \verb|RunningStats|, \verb|RuleEngine|
-        \item Đoạn mã logic:
-\begin{lstlisting}
-def push(self, x: float):
-    self.n += 1
-    if self.n == 1:
-        self.old_m = self.new_m = x
-        self.old_s = 0.0
-    else:
-        self.new_m = self.old_m + (x - self.old_m) / self.n
-        self.new_s = self.old_s + (x - self.old_m) * (x - self.new_m)
-        self.old_m = self.new_m
-        self.old_s = self.new_s
-\end{lstlisting}
-        \item Input: Flow statistics variables $\rightarrow$ Output: Z-Score / Escalation flag.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Raw Flow variables $\rightarrow$ Welford calculations $\rightarrow$ Z-Score evaluation $\rightarrow$ Outlier Trigger.
-    \item[Vai trò bảo mật:] Phát hiện zero-day attack vượt qua các rule tĩnh truyền thống bằng cách kiểm soát độ lệch phân bố thống kê.
-\end{description}
-
-\paragraph{Bước 5. Static Threat Intelligence Lookup}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Static Threat Intelligence Lookup.
-    \item[Tầng:] Tier 1 Rule Engine.
-    \item[Mục đích:] Drop tức thì (Wire-speed drop) các IP độc hại đã biết mà không cần phân tích tốn kém ở LLM.
-    \item[Công nghệ sử dụng:] $O(1)$ Hash Map (Python \verb|set| hoặc Redis lookup).
-    \item[Cơ chế hoạt động:] Truy vấn IP nguồn (\verb|src_ip|) vào một bảng Hash Table chứa danh sách IP xấu từ Threat Intel. Quá trình tra cứu mất chưa tới $O(1)$ thời gian. Nếu khớp, tăng điểm rủi ro và chặn lập tức.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/tier1_filter/rule_engine.py|
-        \item Hàm: \verb|_check_blacklist(ip)|
-        \item Logic: \verb|if ip in self.blacklist_set: return ThreatLevel.CRITICAL|
-        \item Input: IP String $\rightarrow$ Output: Boolean (Matched/Unmatched).
-    \end{itemize}
-    \item[Luồng dữ liệu:] Extracted IP $\rightarrow$ Hash Table Memory Lookup $\rightarrow$ Drop Trigger.
-    \item[Vai trò bảo mật:] Chống lại Known Botnets, Mass Scanners, DDoS.
-\end{description}
-
-\paragraph{Bước 6. Heuristic Rate Limiting}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Heuristic Rate Limiting.
-    \item[Tầng:] Tier 1 Rule Engine.
-    \item[Mục đích:] Chặn đứng các hành vi Brute-force, Syn Flood truyền thống bằng các rule cứng (Hard Rules).
-    \item[Công nghệ sử dụng:] Token Bucket / Leaky Bucket Heuristics (Python Variables).
-    \item[Cơ chế hoạt động:] Đếm số lượng request/packet vào các Port nhạy cảm (22 SSH, 3389 RDP) trong cửa sổ 1 giây hoặc 1 phút. Nếu vượt ngưỡng cho phép $\rightarrow$ Tính điểm rủi ro.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/tier1_filter/rule_engine.py|
-        \item Hàm: \verb|_evaluate_rate_limits()|
-        \item Input: Flow Record $\rightarrow$ Output: Penalty Score.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Port/Protocol extraction $\rightarrow$ Counter check $\rightarrow$ Scoring.
-    \item[Vai trò bảo mật:] Chống lại Brute-force Authentication, Port Scanning, DDoS.
-\end{description}
-
-\paragraph{Bước 7. Wire-speed Clean Traffic Dropping}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Wire-speed Clean Traffic Dropping.
-    \item[Tầng:] Tier 1 Rule Engine.
-    \item[Mục đích:] Đây là màng lọc quan trọng nhất giúp Tier 2 (LLM Agent) không bị nghẽn (Bottleneck) thông qua việc triệt tiêu hơn 99\% lượng log an toàn (Noise).
-    \item[Công nghệ sử dụng:] If-else Heuristic Logic (Python).
-    \item[Cơ chế hoạt động:] Nếu tổng điểm rủi ro (Risk Score) của một Session từ Baseline + Rate Limit + Blacklist nhỏ hơn một \verb|THRESHOLD_BENIGN| (ví dụ: < 30 điểm), trả về hành động \verb|DROP|. Log biến mất khỏi luồng xử lý và không được gửi đi.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/tier1_filter/rule_engine.py|
-        \item Hàm: \verb|evaluate()|
-        \item Logic: \verb|if total_score < self.risk_threshold: return {"tier1_action": "DROP", ...}|
-        \item Input: Total Score $\rightarrow$ Output: Void / Drop Action.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Scored Session $\rightarrow$ Garbage Collector (Hủy).
-    \item[Vai trò bảo mật:] Triệt tiêu cảnh báo giả và giảm tải tối đa cho mô hình ngôn ngữ lớn (Alert Fatigue Prevention).
-\end{description}
-
-\paragraph{Bước 8. Threat Escalation (Escalate to Tier 2)}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Threat Escalation (Escalate to Tier 2).
-    \item[Tầng:] Tier 1 Rule Engine.
-    \item[Mục đích:] Đẩy các luồng mạng bất thường hoặc có biểu hiện outlier vượt ngưỡng ($|Z| > 3.5$) lên AI Agent để phân tích chuyên sâu.
-    \item[Công nghệ sử dụng:] Redis Queue, Message broker.
-    \item[Cơ chế hoạt động:] Khi \verb|total_score >= THRESHOLD_ESCALATE| hoặc phát hiện dị biệt thống kê bởi Welford, Tier 1 đánh dấu hành động là \verb|ESCALATE| và đẩy log vào bộ đệm của subscriber để gom thành batch gửi đến Tier 2.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/tier1_filter/rule_engine.py| \& \verb|src/streaming/subscriber.py|
-        \item Hàm: \verb|evaluate()|, \verb|start_listening()|
-        \item Input: Raw network log $\rightarrow$ Output: Escalate flag + Session history payload.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Tier 1 evaluation $\rightarrow$ Escalate Flag $\rightarrow$ Subscriber batch buffer $\rightarrow$ LangGraph workflow input.
-    \item[Vai trò bảo mật:] Đưa các lưu lượng nghi ngờ, mập mờ vào luồng phân tích nhận thức sâu để phát hiện xâm nhập tinh vi.
-\end{description}
-
-\subsubsection{PHẦN 3: GUARDRAIL LAYER}
-
-\paragraph{Bước 9. Log Parsing \& Template Abstraction}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Log Parsing \& Template Abstraction.
-    \item[Tầng:] Guardrail Layer (Pre-processing).
-    \item[Mục đích:] Giải quyết bài toán giới hạn token của LLM, tránh việc đưa hàng nghìn dòng log giống hệt nhau làm tràn cửa sổ ngữ cảnh (Context Overflow).
-    \item[Công nghệ sử dụng:] \verb|drain3| library (Thuật toán Fixed Depth Tree).
-    \item[Cơ chế hoạt động:] Duyệt qua log mạng và tách các trường động (IP, Port, Timestamp) thành thẻ \verb|<*>|. Xây dựng cây parse tree để gom nhóm các log có cùng cấu trúc tĩnh vào một Template ID và đếm tần suất xuất hiện của chúng.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/guardrails/template_miner.py|
-        \item Lớp: \verb|LogTemplateMiner| \& \verb|TokenBudgetManager|
-        \item Hàm: \verb|add_log_dict()|
-        \item Input: Array of raw logs $\rightarrow$ Output: Dictionary of templates \& occurrences.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Raw JSON/string $\rightarrow$ Drain3 Tree Parser $\rightarrow$ Abstracted Template.
-    \item[Vai trò bảo mật:] Phòng chống tấn công làm cạn kiệt tài nguyên ngữ cảnh LLM (Context Exhaustion / DoS).
-\end{description}
-
-\paragraph{Bước 10. Summarized Token Budgeting}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Summarized Token Budgeting.
-    \item[Tầng:] Guardrail Layer.
-    \item[Mục đích:] Đảm bảo dữ liệu gửi vào prompt luôn nằm trong giới hạn tối đa cho phép của mô hình (ví dụ 4000 tokens) nhưng vẫn giữ lại đầy đủ chỉ báo xâm nhập.
-    \item[Công nghệ sử dụng:] Tiktoken / LLM Tokenizer heuristics.
-    \item[Cơ chế hoạt động:] Đếm tổng số token của các template. Định dạng đầu ra dưới dạng Markdown cô đọng: \verb|[1000x] Template: Connection from IP <*>|. Nếu vượt quá giới hạn token, hệ thống tự động cắt bỏ (truncate) các log ít quan trọng hơn.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/guardrails/template_miner.py|
-        \item Lớp: \verb|TokenBudgetManager|
-        \item Hàm: \verb|fit_to_budget()|
-        \item Input: Abstracted Templates $\rightarrow$ Output: Compressed Markdown String.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Template Dictionary $\rightarrow$ Length Evaluation $\rightarrow$ Truncated String.
-    \item[Vai trò bảo mật:] Tối ưu hóa hiệu năng và giảm chi phí suy luận (Inference cost).
-\end{description}
-
-\paragraph{Bước 11. Dynamic Prompt Encapsulation}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Dynamic Prompt Encapsulation.
-    \item[Tầng:] Guardrail Layer.
-    \item[Mục đích:] Phân tách rạch ròi giữa chỉ thị hệ thống (System Prompt) và dữ liệu log đầu vào không đáng tin cậy. Ngăn LLM nhầm lẫn dữ liệu log là câu lệnh điều khiển.
-    \item[Công nghệ sử dụng:] Python \verb|secrets.token_hex()| (Cryptographically Secure Pseudo-Random Number Generator).
-    \item[Cơ chế hoạt động:] Sinh ngẫu nhiên một chuỗi Delimiter có cấu trúc bảo mật (ví dụ: \verb|===SENTINEL_DATA_a1b2c3d4===|) cho mỗi phiên. Hướng dẫn LLM chỉ được xử lý dữ liệu nằm giữa dấu phân cách này và bọc toàn bộ log vào bên trong.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/guardrails/prompt_filter.py|
-        \item Lớp: \verb|DelimitedDataEncapsulator|
-        \item Đoạn mã logic:
-\begin{lstlisting}
-delimiter = f"===SENTINEL_DATA_{secrets.token_hex(8)}==="
-return f"{delimiter}\n{raw_data}\n{delimiter}"
-\end{lstlisting}
-        \item Input: Compressed String $\rightarrow$ Output: Encapsulated String.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Compressed Log $\rightarrow$ Hex Generator $\rightarrow$ Wrapped Payload.
-    \item[Vai trò bảo mật:] Phòng chống tấn công chèn mã lệnh trực tiếp (Direct Prompt Injection).
-\end{description}
-
-\paragraph{Bước 12. Delimiter Smuggling Prevention}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Delimiter Smuggling Prevention.
-    \item[Tầng:] Guardrail Layer.
-    \item[Mục đích:] Ngăn chặn kẻ tấn công tự sinh chuỗi phân cách giả mạo (ví dụ chèn \verb|===SENTINEL_DATA_| trong User-Agent payload) để đóng ngoặc sớm và chèn lệnh điều khiển bên ngoài vùng đóng gói.
-    \item[Công nghệ sử dụng:] Regex Pattern Matching.
-    \item[Cơ chế hoạt động:] Quét qua dữ liệu log thô bằng Regex trước khi đóng gói. Nếu phát hiện bất kỳ chuỗi nào trùng khớp với định dạng Delimiter, hệ thống lập tức loại bỏ (\verb|[DELIMITER_STRIPPED]|) để vô hiệu hóa nỗ lực smuggling.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/guardrails/prompt_filter.py|
-        \item Lớp: \verb|DelimitedDataEncapsulator|
-        \item Hàm: \verb|_strip_smuggling_attempts()|
-        \item Input: Raw data string, Delimiter Pattern $\rightarrow$ Output: Cleaned data string.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Raw string $\rightarrow$ Regex Stripper $\rightarrow$ Safe String.
-    \item[Vai trò bảo mật:] Phòng chống tấn công Delimiter Smuggling / Escape Injection.
-\end{description}
-
-\paragraph{Bước 13. Structural Sanitization \& Cache Hardening}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Structural Sanitization \& Cache Hardening.
-    \item[Tầng:] Guardrail Layer (Output/Input Sanitizer).
-    \item[Mục đích:] Bảo vệ công cụ RAG khỏi nhiễu ngữ nghĩa (Semantic Confusion), giải mã các obfuscation của hacker, cấm XSS/Markdown Exfiltration khi hiển thị, và trung hòa các mã độc tiềm ẩn lấy ra từ Semantic Cache (Cache Hit path).
-    \item[Công nghệ sử dụng:] Unicode Normalization (NFKC), Base64/Hex decoding, HTML/Markdown Sanitization, RAG Cache Sanitizer.
-    \item[Cơ chế hoạt động:] Giải mã các payload Hex/Base64 độc hại, loại bỏ ký tự zero-width và control characters. Quét loại bỏ các thẻ HTML nguy hiểm và cú pháp hình ảnh Markdown (\verb|!alt|) để cấm LLM đẩy dữ liệu nhạy cảm ra ngoài qua render HTML. Đồng thời, khi đọc dữ liệu từ Semantic Cache, phương thức \verb|sanitize_cache_entry()| sẽ làm sạch đệ quy kết quả và ngữ cảnh để tránh đầu độc bộ nhớ đệm (Semantic Cache Poisoning).
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/guardrails/rag_sanitizer.py| \& \verb|src/rag/retriever.py|
-        \item Lớp: \verb|RAGSanitizer|
-        \item Function: \verb|sanitize_ingest()|, \verb|sanitize_cache_entry()|
-        \item Input: LLM Output / Log Input / Cache Entry $\rightarrow$ Output: Sanitized String / Sanitized Cache Dict.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Raw text / Cache Hit Data $\rightarrow$ Normalization $\rightarrow$ RAGSanitizer Filtering $\rightarrow$ Sanitized Context.
-    \item[Vai trò bảo mật:] Phòng chống RAG Poisoning, Semantic Cache Poisoning, XSS, và rò rỉ dữ liệu qua giao diện quản trị (Data Exfiltration).
-\end{description}
-
-\subsubsection{PHẦN 4: TIER 2 --- LANGGRAPH AGENT}
-
-\paragraph{Bước 14. Cognitive Workflow Orchestration}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Cognitive Workflow Orchestration.
-    \item[Tầng:] Tier 2 LangGraph Agent.
-    \item[Mục đích:] Xây dựng cỗ máy trạng thái hữu hạn (FSM) luân chuyển dữ liệu qua các node xử lý một cách an toàn, duy trì trạng thái của phiên điều tra mà không làm mất thông tin.
-    \item[Công nghệ sử dụng:] \verb|langgraph.graph.StateGraph|, \verb|TypedDict| (State Schema).
-    \item[Cơ chế hoạt động:] Định nghĩa cấu trúc \verb|SentinelState| mang thông tin phiên điều tra. Đăng ký các nút xử lý: \verb|rag_context| $\rightarrow$ \verb|llm_triage| $\rightarrow$ \verb|execute_action|. Tại \verb|llm_triage|, kết quả phân loại từ LLM sẽ kích hoạt Conditional Edges để điều hướng hành động tiếp theo.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/agent/workflow.py| \& \verb|src/agent/nodes.py|
-        \item Class/Function: \verb|SentinelState|, \verb|create_agent_workflow()|, \verb|route_triage_decision()|
-        \item Đoạn mã logic:
-\begin{lstlisting}
-workflow.add_node("rag_context", node_rag_context)
-workflow.add_node("llm_triage", node_llm_triage)
-workflow.add_edge("rag_context", "llm_triage")
-workflow.add_conditional_edges("llm_triage", route_triage_decision)
-\end{lstlisting}
-        \item Input: State Object $\rightarrow$ Output: Compiled Graph App.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Raw Incident $\rightarrow$ Guardrails Node $\rightarrow$ RAG Node $\rightarrow$ LLM Node $\rightarrow$ Action/HITL Node.
-    \item[Vai trò bảo mật:] Ràng buộc quy trình logic bảo mật (Logic Enforcer), cấm tác tử tự động thực thi phản hồi mạng mà không qua các trạm thẩm định.
-\end{description}
-
-\paragraph{Bước 15 \& 16. FAISS Index 1 \& 2 (MITRE ATT\&CK \& NIST SP 800-61r2)}
-\begin{description}[noitemsep]
-    \item[Tên bước:] FAISS Index 1 \& 2 (MITRE ATT\&CK \& NIST SP 800-61r2).
-    \item[Tầng:] Tier 2 LangGraph Agent (RAG Sub-module).
-    \item[Mục đích:] Cung cấp tri thức chuyên sâu về kỹ thuật tấn công (MITRE ATT\&CK) và quy trình ứng phó (NIST) dựa trên ngữ nghĩa của log mạng, ngăn chặn ảo giác (Hallucination) của LLM và đảm bảo tính toàn vẹn của tri thức tĩnh.
-    \item[Công nghệ sử dụng:] \verb|faiss-cpu|, mô hình embedding \verb|all-MiniLM-L6-v2| (384 chiều), SHA-256 verification.
-    \item[Cơ chế hoạt động:] Tài liệu MITRE và NIST được lưu dưới dạng vector 384 chiều trong 2 chỉ mục FAISS. Khi có truy vấn từ log, hệ thống mã hóa nó thành vector và tìm kiếm top-K văn bản có khoảng cách Euclidean nhỏ nhất. Đặc biệt, trước khi nạp cơ sở tri thức, hàm \verb|verify_document_integrity()| trong \verb|security.py| tự động kiểm tra chữ ký mã băm SHA-256 của toàn bộ tệp tài liệu nguồn đối chiếu với tệp \verb|checksums.sha256| để phát hiện và ngăn chặn triệt để hành vi can thiệp trái phép.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/rag/embedder.py| \& \verb|src/rag/retriever.py| \& \verb|src/rag/security.py|
-        \item Class: \verb|DualRetriever|
-        \item Function: \verb|_retrieve_dense(query, index)|, \verb|verify_document_integrity()|
-        \item Input: Query String $\rightarrow$ Output: List of Top-K Document Dicts.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Query String $\rightarrow$ Embedding Model $\rightarrow$ Vector $\rightarrow$ FAISS L2 Search $\rightarrow$ Ranked Chunks.
-    \item[Vai trò bảo mật:] Đảm bảo LLM lập luận bảo mật dựa trên các khung tiêu chuẩn chính thống, giảm dương tính giả. Đồng thời, bảo đảm tính toàn vẹn của tri thức tĩnh chống lại các tấn công RAG Poisoning.
-\end{description}
-
-\paragraph{Bước 17. BM25Okapi Sparse Keyword Matching}
-\begin{description}[noitemsep]
-    \item[Tên bước:] BM25Okapi Sparse Keyword Matching.
-    \item[Tầng:] Tier 2 LangGraph Agent (RAG Sub-module).
-    \item[Mục đích:] Khắc phục điểm yếu của dense vector search trong việc tìm kiếm các từ khóa chính xác như CVE ID, địa chỉ IP hoặc port đặc thù.
-    \item[Công nghệ sử dụng:] \verb|rank_bm25.BM25Okapi|.
-    \item[Cơ chế hoạt động:] Kho tài liệu được tokenize và lập chỉ mục ngược. Điểm số tương đồng từ khóa được tính toán bằng thuật toán BM25Okapi để lọc ra các văn bản chứa chính xác định danh bảo mật cần tìm.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/rag/retriever.py|
-        \item Class: \verb|DualRetriever| (khởi tạo \verb|bm25_mitre| và \verb|bm25_nist|)
-        \item Function: \verb|_retrieve_sparse(query_tokens)|
-        \item Input: Query Tokens $\rightarrow$ Output: List of Sparse Scores.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Query Tokens $\rightarrow$ BM25 calculation $\rightarrow$ Ranked Sparse Chunks.
-    \item[Vai trò bảo mật:] N/A — Cải thiện độ chính xác tìm kiếm RAG đối với các chỉ báo xâm nhập cụ thể.
-\end{description}
-
-\paragraph{Bước 18. Reciprocal Rank Fusion (RRF, k=60) Score Merging}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Reciprocal Rank Fusion (RRF, k=60) Score Merging.
-    \item[Tầng:] Tier 2 LangGraph Agent (RAG Sub-module).
-    \item[Mục đích:] Hợp nhất kết quả xếp hạng từ FAISS (Dense) và BM25 (Sparse) một cách công bằng mà không cần chuẩn hóa điểm số khác biệt về thang đo của 2 thuật toán.
-    \item[Công nghệ sử dụng:] Thuật toán Reciprocal Rank Fusion (RRF) với hằng số $k=60$.
-    \item[Cơ chế hoạt động:] Chạy Dense và Sparse song song. Lấy vị trí thứ hạng (rank) của từng tài liệu trong 2 list và cộng điểm RRF: $RRF\_Score = \sum \frac{1}{k + rank}$. Sắp xếp lại danh sách theo điểm số này.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/rag/retriever.py|
-        \item Function: \verb|_rrf_merge(dense_results, sparse_results, k=60)|
-        \item Đoạn mã logic:
-\begin{lstlisting}
-rrf_scores[doc_id] += 1.0 / (k + rank)
-\end{lstlisting}
-        \item Input: 2 Ranked Lists $\rightarrow$ Output: 1 Final Sorted Top-K List.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Dense Ranks + Sparse Ranks $\rightarrow$ RRF merging $\rightarrow$ Final Sorted Context.
-    \item[Vai trò bảo mật:] N/A — Đảm bảo ngữ cảnh đưa vào LLM là tối ưu nhất.
-\end{description}
-
-\paragraph{Bước 19. Context Merge and LLM Prompt Construction (Active Learning)}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Context Merge and LLM Prompt Construction (Active Learning).
-    \item[Tầng:] Tier 2 LangGraph Agent.
-    \item[Mục đích:] Tạo lập prompt hoàn chỉnh chứa logs mạng, tri thức RAG và bổ sung thêm các ví dụ thực tiễn từ vòng lặp Few-shot Active Learning để LLM tự học quyết định sửa sai của con người.
-    \item[Công nghệ sử dụng:] Jinja2 / Prompt formatting.
-    \item[Cơ chế hoạt động:] Đọc các quyết định Approve/Reject trước đây của analyst trong cấu hình hệ thống, sinh các ví dụ few-shot đưa trực tiếp vào cuối System Prompt để định hình lập luận bảo mật cho LLM.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/agent/prompts.py| \& \verb|src/agent/nodes.py|
-        \item Function: \verb|build_triage_prompt(log_data, rag_context)|
-        \item Input: Logs + Context $\rightarrow$ Output: Message Array \verb|[{"role": "system", ...}, {"role": "user", ...}]|.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Sub-components + Active Learning examples $\rightarrow$ Prompt Builder $\rightarrow$ LLM Input.
-    \item[Vai trò bảo mật:] Giúp tác tử tự sửa sai và cải thiện độ chính xác phân loại theo thời gian dựa trên tương tác con người.
-\end{description}
-
-\paragraph{Bước 20. Gemma-2-9B-IT Inference via llama.cpp}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Gemma-2-9B-IT Inference via llama.cpp.
-    \item[Tầng:] Tier 2 LangGraph Agent.
-    \item[Mục đích:] "Bộ não" chính của toàn hệ thống, chịu trách nhiệm đọc ngữ cảnh, suy luận logic an ninh mạng và đưa ra phán quyết.
-    \item[Công nghệ sử dụng:] Server \verb|llama.cpp|, mô hình cục bộ \verb|Gemma-2-9B-IT| định dạng GGUF lượng tử hóa 4-bit (\verb|Q4_K_M|).
-    \item[Cơ chế hoạt động:] Phục vụ mô hình hoàn toàn offline trên GPU (RTX 4060 Ti). Gửi HTTP POST request tới API tương thích OpenAI của server llama.cpp. Cấu hình \verb|temperature=0.1| để đảm bảo câu trả lời mang tính xác định cao nhất và tuân thủ định dạng JSON.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/agent/llm_client.py|
-        \item Class: \verb|OpenAILLMClient|
-        \item Function: \verb|invoke(messages, temperature)|
-        \item Input: Message Array $\rightarrow$ Output: JSON String.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Node Triage $\rightarrow$ HTTP POST Request $\rightarrow$ GPU Compute $\rightarrow$ JSON Response.
-    \item[Vai trò bảo mật:] Thực hiện phân tích nhận thức sâu để phát hiện các mẫu tấn công tinh vi.
-\end{description}
-
-\paragraph{Bước 21. Decision Output: BLOCK / QUARANTINE / ALERT}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Decision Output: BLOCK / QUARANTINE / ALERT.
-    \item[Tầng:] Tier 2 LangGraph Agent.
-    \item[Mục đích:] Biến kết quả phán quyết JSON của LLM thành các hành động tác động vật lý lên tường lửa hoặc đưa vào quarantine.
-    \item[Công nghệ sử dụng:] Python API Callbacks, OS Firewall command scripting.
-    \item[Cơ chế hoạt động:] Đọc trường \verb|action| từ JSON:
-   - \verb|BLOCK_IP|: Gọi hàm chặn IP ở mức mạng và ghi nhận quy tắc vào hàng đợi cách ly chờ phê duyệt.
-   - \verb|ALERT|: Ghi cảnh báo đỏ lên DB mà không cấm.
-   - \verb|AWAIT_HITL| (QUARANTINE): Phán quyết mập mờ, chuyển thẳng vào hàng đợi chờ analyst duyệt.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/agent/nodes.py| \& \verb|src/response/executor.py|
-        \item Function: \verb|node_action_executor()|, \verb|block_ip()|
-        \item Input: Parsed JSON Dictionary $\rightarrow$ Output: Action Executions.
-    \end{itemize}
-    \item[Luồng dữ liệu:] LLM Output JSON $\rightarrow$ Callback Router $\rightarrow$ Execution / Database write.
-    \item[Vai trò bảo mật:] Cô lập tấn công, phản ứng ngăn chặn kịp thời (Threat Neutralization).
-\end{description}
-
-\paragraph{Bước 22 \& 23. Long-Term Threat Memory \& APT Chain Tracking Logic}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Long-Term Threat Memory \& APT Chain Tracking Logic.
-    \item[Tầng:] Tier 2 LangGraph Agent (Memory).
-    \item[Mục đích:] Lưu trữ uy tín (Reputation) dài hạn của các IP vi phạm và kết nối các hành vi đơn lẻ qua nhiều ngày để phát hiện các chiến dịch APT low-and-slow.
-    \item[Công nghệ sử dụng:] Cơ sở dữ liệu SQLite, IP Reputation Scoring.
-    \item[Cơ chế hoạt động:] Lưu vết mọi incident vi phạm vào SQLite. Khi có IP mới bị leo thang, hệ thống tra cứu SQLite xem IP này đã thực hiện các kỹ thuật gì. Nếu IP vi phạm liên quan đến $\ge 3$ giai đoạn khác nhau trong ma trận MITRE ATT\&CK theo thời gian $\rightarrow$ Đánh dấu cảnh báo APT nguy cấp và nâng mức cảnh báo của IP lên critical.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/agent/threat_memory.py|
-        \item Class: \verb|ThreatMemoryManager|
-        \item Function: \verb|record_incident()|, \verb|check_apt_pattern()|
-        \item Input: IP, Action, MITRE ID $\rightarrow$ Output: SQLite Insert/Update, APT Candidate Flag (Boolean).
-    \end{itemize}
-    \item[Luồng dữ liệu:] Action Node $\rightarrow$ SQLite Write $\rightarrow$ (Chu kỳ sau) SQLite Read $\rightarrow$ System Prompt.
-    \item[Vai trò bảo mật:] Phòng chống tấn công APT có kỹ năng ẩn mình và đổi chiến thuật qua thời gian dài để bypass Signature.
-\end{description}
-
-\subsubsection{PHẦN 5: HITL DASHBOARD}
-
-\paragraph{Bước 24. Streamlit UI Layout, RBAC \& Authentication Hardening}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Streamlit UI Layout, RBAC \& Authentication Hardening.
-    \item[Tầng:] HITL Dashboard Layer.
-    \item[Mục đích:] Cung cấp giao diện trực quan thời gian thực (Real-time GUI) cho phép chuyên gia an ninh mạng theo dõi hệ thống, điều tra sự cố, phê duyệt quy tắc một cách an toàn và bảo mật cao.
-    \item[Công nghệ sử dụng:] \verb|streamlit|, \verb|streamlit-autorefresh|, \verb|st.session_state|, PBKDF2-HMAC-SHA256, constant-time compare.
-    \item[Cơ chế hoạt động:] Tổ chức giao diện dưới dạng các Tabs chức năng. Tích hợp màn hình xác thực phân quyền (RBAC) cho Analyst (L1) và Manager (L3). Để chống tấn công Auth Input Injection và Brute-force, Username được lọc chặt chẽ qua biểu thức chính quy \verb|^[a-zA-Z0-9_]{1,30}$|, mật khẩu được băm bằng thuật toán an toàn PBKDF2-HMAC-SHA256 kết hợp constant-time comparison để loại bỏ rủi ro tấn công kênh kề (Side-channel Timing Attacks).
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/ui/app.py| \& \verb|src/ui/auth.py|
-        \item Function: \verb|main_dashboard()|, \verb|login_screen()|, \verb|hash_password()|
-        \item Input: User credentials $\rightarrow$ Output: Session State / GUI.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Input Credentials $\rightarrow$ Regex validation $\rightarrow$ PBKDF2 Hashing $\rightarrow$ constant-time comparison $\rightarrow$ \verb|st.session_state| configuration.
-    \item[Vai trò bảo mật:] Phòng ngừa các đòn tấn công chèn mã Form Input Injection, side-channel timing attacks, và kiểm soát truy cập phân quyền nghiêm ngặt (Zero Trust HITL Auth).
-\end{description}
-
-\paragraph{Bước 25. Quarantine Rule Review \& SOC Manager Workflow}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Quarantine Rule Review \& SOC Manager Workflow.
-    \item[Tầng:] HITL Dashboard Layer.
-    \item[Mục đích:] Ngăn chặn LLM tự động đưa ra các quyết định cấm nhầm IP quan trọng hoặc gateway bằng cách bắt buộc phải có sự xác nhận của quản trị viên (L3 Manager).
-    \item[Công nghệ sử dụng:] RBAC Session, Streamlit Buttons.
-    \item[Cơ chế hoạt động:] Các quy tắc chặn do AI đề xuất sẽ ở trạng thái \verb|PENDING| và đưa vào hàng đợi cách ly. Giao diện chỉ cho phép tài khoản có vai trò \verb|manager| (L3) click duyệt (\textbf{Approve}) hoặc từ chối (\textbf{Reject}).
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/ui/app.py| \& \verb|src/tier1_filter/feedback_listener.py|
-        \item Function: \verb|approve_rule()|, \verb|get_active_dynamic_rules()|
-        \item Input: Manager Click Event $\rightarrow$ Output: Rule status change (PENDING $\rightarrow$ ACTIVE/REJECTED).
-    \end{itemize}
-    \item[Luồng dữ liệu:] UI Click $\rightarrow$ State change $\rightarrow$ Ghi file cấu hình \verb|system_settings.yaml|.
-    \item[Vai trò bảo mật:] Phòng chống tấn công Adversarial Rule Injection.
-\end{description}
-
-\paragraph{Bước 26. Live Production False Positive Rate (FPR) Tracker}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Live Production False Positive Rate (FPR) Tracker.
-    \item[Tầng:] HITL Dashboard Layer.
-    \item[Mục đích:] Trực quan hóa tỷ lệ cảnh báo sai thực tế của mô hình LLM tại môi trường vận hành thời gian thực để chuyên gia SOC đánh giá hiệu năng AI.
-    \item[Công nghệ sử dụng:] Streamlit Metric Cards, Python calculations.
-    \item[Cơ chế hoạt động:] Hệ thống tính toán tỷ lệ cảnh báo sai dựa trên phản hồi bác bỏ của analyst: $\text{Live FPR} = \frac{\text{Rejected Rules}}{\text{Approved} + \text{Rejected}} \times 100\%$. Thẻ KPI hiển thị màu sắc Neon để chỉ thị cảnh báo tương ứng (Xanh lá < 10%, Đỏ > 25%).
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/ui/app.py| \& \verb|src/ui/components.py|
-        \item Function: \verb|render_metrics_header()|
-        \item Input: Configuration count lists $\rightarrow$ Output: Live FPR Score (Float).
-    \end{itemize}
-    \item[Luồng dữ liệu:] Rule counters $\rightarrow$ FPR Formula $\rightarrow$ Rendered Dashboard Metric Card.
-    \item[Vai trò bảo mật:] Đánh giá tính kháng nhiễu và độ tin cậy thực tế của bộ óc AI trong môi trường sản xuất.
-\end{description}
-
-\paragraph{Bước 27. Docker Model Switcher Orchestration}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Docker Model Switcher Orchestration.
-    \item[Tầng:] HITL Dashboard Layer.
-    \item[Mục đích:] Cho phép quản trị viên chuyển đổi nhanh cấu hình hoặc hoán đổi mô hình LLM đang chạy (ví dụ giữa Gemma và Llama) trực tiếp từ giao diện mà không gây gián đoạn luồng xử lý chính.
-    \item[Công nghệ sử dụng:] Bash scripting, Docker-compose env hot-reload.
-    \item[Cơ chế hoạt động:] Khi admin chọn model trên UI và bấm áp dụng, hệ thống gọi script chạy ngầm cập nhật biến môi trường \verb|LLM_MODEL_FILE| trong file \verb|.env| và restart container \verb|sentinel_llm| tự động.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|scripts/switch_model.sh| \& \verb|src/ui/app.py|
-        \item Input: Model name string $\rightarrow$ Output: Environment hot-reload.
-    \end{itemize}
-    \item[Luồng dữ liệu:] UI Select $\rightarrow$ Script execution $\rightarrow$ Docker Container Restart $\rightarrow$ Port 5000 API reconnect.
-    \item[Vai trò bảo mật:] Hỗ trợ tính linh hoạt và dự phòng lỗi (Failover) của bộ óc AI.
-\end{description}
-
-\paragraph{Bước 28. HMAC Cryptographic Log Chaining}
-\begin{description}[noitemsep]
-    \item[Tên bước:] HMAC Cryptographic Log Chaining.
-    \item[Tầng:] HITL Dashboard Layer / Response.
-    \item[Mục đích:] Chống giả mạo nhật ký sự kiện trong DB SQLite bằng cách tạo ra một chuỗi liên kết băm mật mã học (HMAC Log Chaining) tương tự cấu trúc Blockchain.
-    \item[Công nghệ sử dụng:] \verb|hmac| (SHA-256), \verb|sqlite3|.
-    \item[Cơ chế hoạt động:] Khi ghi một dòng log mới vào bảng \verb|audit_trail|, giá trị băm HMAC được tính toán dựa trên nội dung log và hash của dòng log trước đó. Nút kiểm tra tính toàn vẹn logs quét qua DB, tính toán lại hash và báo đỏ nếu phát hiện bất kỳ sự thay đổi dữ liệu trái phép nào.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|src/response/executor.py| \& \verb|src/ui/app.py|
-        \item Function: \verb|_log_to_db()|, \verb|verify_log_chain()|
-        \item Input: Log record data $\rightarrow$ Output: Cryptographic Hash string.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Log data $\rightarrow$ HMAC calculation $\rightarrow$ SQLite Write $\rightarrow$ Integrity Check.
-    \item[Vai trò bảo mật:] Phòng chống tấn công xâm nhập DB sửa xóa dấu vết log (Non-repudiation / Forensics Protection).
-\end{description}
-
-\paragraph{Bước 29 \& 30. Cross-family Judge Invocation \& RAGAS Metric Computation}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Cross-family Judge Invocation \& RAGAS Metric Computation.
-    \item[Tầng:] Evaluation Framework / HITL Context.
-    \item[Mục đích:] Chấm điểm tự động và độc lập chất lượng ngữ cảnh truy xuất RAG của Gemma-2-9B-IT mà không bị ảnh hưởng bởi thiên kiến tự đề cao.
-    \item[Công nghệ sử dụng:] Mô hình \verb|Llama-3.1-8B-Instruct| (trọng tài), RAGAS-inspired Prompting Rubrics.
-    \item[Cơ chế hoạt động:] Sử dụng mô hình \verb|Llama-3.1| (khác họ với Gemma) làm trọng tài chấm điểm câu trả lời từ 0.0 đến 1.0 cho 4 khía cạnh: Context Precision, Answer Relevancy, Faithfulness, Context Recall dựa trên các tiêu chí RAGAS.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|experiments/evaluate_reasoning.py|
-        \item Function: \verb|evaluate_with_llama_judge()|
-        \item Input: Gemma Output + Context $\rightarrow$ Output: 4 Metric Scores (JSON).
-    \end{itemize}
-    \item[Luồng dữ liệu:] RAG Output + Gemma Response $\rightarrow$ Llama-3.1 Prompt $\rightarrow$ Metric Scores.
-    \item[Vai trò bảo mật:] Đánh giá chất lượng và độ trung thực của RAG, chống ngộ độc tri thức (RAG Poisoning).
-\end{description}
-
-\subsubsection{PHẦN 6: EVALUATION FRAMEWORK (5D)}
-
-\paragraph{Bước 31. Ablation Study Setup}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Ablation Study Setup.
-    \item[Tầng:] Evaluation Framework.
-    \item[Mục đích:] Chứng minh hiệu năng của kiến trúc 2-Tier thông qua thử nghiệm loại bỏ (Ablation Study) bằng cách so sánh 6 cấu hình từ A đến F.
-    \item[Công nghệ sử dụng:] YAML configs, MLflow Experiment Tracking.
-    \item[Cơ chế hoạt động:] Bật/tắt các cấu phần hệ thống thông qua các file YAML. Chạy thử nghiệm tự động trên tập dữ liệu ground truth và ghi nhật ký chỉ số lên MLflow để phân tích trực quan.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|config/ablation/*.yaml| \& \verb|experiments/run_ablation_study.py|
-        \item Input: YAML Config $\rightarrow$ Output: MLflow logs.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Config YAML $\rightarrow$ Ablation script run $\rightarrow$ Metric results $\rightarrow$ MLflow dashboard.
-    \item[Vai trò bảo mật:] N/A — Phương pháp luận thực nghiệm nghiên cứu khoa học.
-\end{description}
-
-\paragraph{Bước 32. Classification Metrics \& McNemar's Test}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Classification Metrics \& McNemar's Test.
-    \item[Tầng:] Evaluation Framework.
-    \item[Mục đích:] Đo lường khả năng phân loại và kiểm định ý nghĩa thống kê của việc cải thiện độ chính xác (Precision, Recall, F1, FPR).
-    \item[Công nghệ sử dụng:] \verb|scikit-learn|, \verb|statsmodels| (McNemar's Test).
-    \item[Cơ chế hoạt động:] So sánh nhãn dự đoán và ground truth trên 750 mẫu. Chạy kiểm định McNemar trên ma trận nhầm lẫn để tính toán p-value: nếu $p < 0.05$, chứng minh cải tiến có ý nghĩa thống kê thực tế.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|experiments/statistical_tests.py| \& \verb|run_ablation_study.py|
-        \item Function: \verb|compute_classification_metrics()|, \verb|mcnemar_test()|
-        \item Input: Prediction arrays $\rightarrow$ Output: Quality scores \& p-value.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Result arrays $\rightarrow$ Sklearn formulas $\rightarrow$ P-value.
-    \item[Vai trò bảo mật:] N/A — Đánh giá tính chính xác tổng thể trong phát hiện xâm nhập.
-\end{description}
-
-\paragraph{Bước 33. Operational Metrics \& Mann-Whitney U Test}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Operational Metrics \& Mann-Whitney U Test.
-    \item[Tầng:] Evaluation Framework.
-    \item[Mục đích:] Đo lường độ trễ xử lý (MTTR/MTTD proxy), tỷ lệ leo thang và cache hit rate để chứng minh tính khả thi triển khai trong thực tế.
-    \item[Công nghệ sử dụng:] Python \verb|time|, \verb|scipy.stats| (Mann-Whitney U Test).
-    \item[Cơ chế hoạt động:] Ghi nhận thời gian suy luận. So sánh độ trễ giữa hệ thống 1-tier và 2-tier bằng kiểm định phi tham số Mann-Whitney U để xác minh việc giảm 99.8% độ trễ xử lý của Tier 1 có ý nghĩa thống kê.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|experiments/statistical_tests.py|
-        \item Function: \verb|mann_whitney_u_test(latency_A, latency_F)|
-        \item Input: Latency arrays $\rightarrow$ Output: U-test p-value.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Time Deltas $\rightarrow$ U-test math $\rightarrow$ p-value.
-    \item[Vai trò bảo mật:] Xác thực hiệu năng của màng lọc Tier 1 trong việc chống nghẽn LLM.
-\end{description}
-
-\paragraph{Bước 34. Robustness against Adversarial Attacks}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Robustness against Adversarial Attacks.
-    \item[Tầng:] Evaluation Framework.
-    \item[Mục đích:] Đánh giá độ bền bỉ và khả năng phòng thủ của hệ thống trước 45 mẫu tấn công nghịch đảo tinh vi.
-    \item[Công nghệ sử dụng:] JSON adversarial dataset (45 mẫu).
-    \item[Cơ chế hoạt động:] Nhồi các log chứa chuỗi prompt injection và encoding bypass đặc chế. Tính toán tỷ lệ phần trăm payload có thể bypass được guardrail để thao túng LLM.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|experiments/evaluate_robustness.py|
-        \item Function: \verb|run_robustness_eval()|
-        \item Input: Adversarial JSON List $\rightarrow$ Output: Defeat Rate Percentage.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Adversarial logs $\rightarrow$ Guardrails pipeline $\rightarrow$ Block/Pass decisions.
-    \item[Vai trò bảo mật:] Đo lường khả năng chống đỡ trước mã độc chèn prompt injection ẩn giấu trong log.
-\end{description}
-
-\paragraph{Bước 35. Explainability (Audit Trail Completeness Rate)}
-\begin{description}[noitemsep]
-    \item[Tên bước:] Explainability (Audit Trail Completeness Rate).
-    \item[Tầng:] Evaluation Framework.
-    \item[Mục đích:] Đo lường tính giải thích được (Explainability) của mô hình một cách xác định thông qua kiểm tra cấu trúc dữ liệu bắt buộc.
-    \item[Công nghệ sử dụng:] Python Key/Field Validation Logic.
-    \item[Cơ chế hoạt động:] Quét các câu trả lời JSON của LLM và kiểm tra sự hiện diện đầy đủ của 5 trường dữ liệu quan trọng: \verb|action|, \verb|confidence|, \verb|reasoning|, \verb|target|, và \verb|mitre_technique|. Tính toán tỷ lệ phần trăm hoàn thành.
-    \item[Cấu trúc mã nguồn:] \quad
-    \begin{itemize}[noitemsep]
-        \item File: \verb|experiments/evaluate_reasoning.py|
-        \item Function: \verb|check_audit_completeness()|
-        \item Logic: \verb|valid = all(k in response for k in REQUIRED_FIELDS)|
-        \item Input: LLM JSON response $\rightarrow$ Output: Completeness percentage.
-    \end{itemize}
-    \item[Luồng dữ liệu:] Output JSON $\rightarrow$ Key validator $\rightarrow$ Completeness metric.
-    \item[Vai trò bảo mật:] Đảm bảo hệ thống đạt chuẩn Explainable AI (XAI) cho ứng cứu sự cố SOC, tránh hiện tượng hộp đen AI.
-\end{description}
-
 \subsection{Công nghệ và Công cụ}
-Hệ thống được xây dựng hoàn toàn trên các framework Python hiện đại. Quá trình xử lý luồng và theo dõi phiên ngắn hạn dựa vào Redis. Động cơ suy luận LLM sử dụng mô hình cục bộ đã được lượng tử hóa (Gemma-2-9B-IT) ở định dạng GGUF Q4\_K\_M, được phục vụ thông qua llama.cpp, đảm bảo quyền riêng tư dữ liệu tuyệt đối và khả năng vận hành hoàn toàn ngoại tuyến.
+Hệ thống được xây dựng trên các framework Python hiện đại. Quá trình xử lý luồng và theo dõi phiên ngắn hạn dựa vào Redis. Động cơ suy luận LLM sử dụng mô hình cục bộ đã được lượng tử hóa (Gemma-2-9B-IT) ở định dạng GGUF Q6\_K, được phục vụ thông qua llama.cpp, đảm bảo quyền riêng tư dữ liệu tuyệt đối và khả năng vận hành hoàn toàn ngoại tuyến.
 
 Luồng công việc của Agent được điều phối bởi LangGraph, cho phép ra quyết định tuần hoàn và sử dụng công cụ. Đối với phần truy xuất tri thức, thư viện \verb|sentence-transformers| kết hợp với FAISS được sử dụng cho tìm kiếm vector ngữ nghĩa dày đặc (Dense Search) và BM25Okapi (\verb|rank\_bm25|) cho tìm kiếm từ khóa thưa (Sparse Search). Giao diện người dùng và bảng điều khiển HITL được phát triển bằng Streamlit, trong khi bộ nhớ rủi ro dài hạn và nhật ký kiểm toán (audit trails) được lưu trữ bền vững qua SQLite.
 
@@ -910,7 +295,7 @@ Luồng công việc của Agent được điều phối bởi LangGraph, cho ph
         GPU                 & NVIDIA GeForce RTX 4060 Ti (16 GB VRAM)      \\
         RAM                 & 32 GB DDR5                                   \\
         HĐH                 & Ubuntu 24.04.4 LTS (x86\_64, Kernel 6.17)    \\
-        LLM Backend         & llama.cpp với lượng tử hóa GGUF Q4\_K\_M     \\
+        LLM Backend         & llama.cpp với lượng tử hóa GGUF Q6\_K         \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -984,24 +369,25 @@ Nghiên cứu này đánh giá đường ống tự trị được phát triển
 
 \begin{table}[H]
     \centering
+    \setlength{\tabcolsep}{4pt}
     \caption{Chỉ tiêu hiệu năng định lượng kỳ vọng so với Kết quả thực nghiệm đạt được}
     \label{tab:targets}
-    \begin{tabular}{llll}
+    \begin{tabular}{>{\raggedright\arraybackslash}p{3.2cm}ll>{\raggedright\arraybackslash}p{5.5cm}}
         \toprule
         \textbf{Chiều đánh giá}      & \textbf{Mục tiêu} & \textbf{Kết quả Đạt được} & \textbf{Cơ sở / Ghi chú}                          \\
         \midrule
-        F1-Score (Phân loại)         & $\geq 0.90$       & \textbf{0.982}            & Đánh giá trên 750 mẫu ground-truth                \\
-        Giảm Độ trễ so với LLM-only  & $\geq 60\%$       & \textbf{99.8\%}           & Lọc nhiễu hiệu quả tại Tier 1 ở tốc độ cao        \\
-        Tỷ lệ Đánh bại Guardrail     & $< 10\%$          & \textbf{10.0\%}           & Đo trên 45 mẫu nghịch đảo (loại trừ ngữ nghĩa)    \\
-        Độ Phù hợp Ngữ cảnh (RAGAS)  & $\geq 0.85$       & \textbf{0.870}            & Ngữ cảnh lai tích hợp MITRE ATT\&CK \& NIST       \\
-        Hoàn thiện Nhật ký Kiểm toán & $100\%$           & \textbf{100.0\%}          & Kiểm tra tự động các trường bắt buộc của schema  \\
+        F1-Score (Phân loại)         & $\geq 0.90$       & \textbf{0.967} / \textbf{0.594} & Tập mẫu phân tầng / Luồng gộp thô                \\
+        Giảm Độ trễ (lọc Tier 1)     & $\geq 60\%$       & \textbf{99.9\%}           & Tốc độ đường truyền ($0.6$\,ms vs.\ $5.7$\,s)      \\
+        Chặn tĩnh (Tổng thể / Mã hóa)& $\geq 40\%$       & \textbf{50.0\%} / \textbf{100\%} & Đo trên 120 mẫu nghịch đảo (OWASP)                \\
+        Chất lượng RAG (RAGAS Score) & $\geq 3.5 / 5$    & \textbf{3.91 / 5}         & Đánh giá chéo họ LLM-as-a-Judge                   \\
+        Hoàn thiện Nhật ký Kiểm toán & $100\%$           & \textbf{100.0\%}          & Kiểm tra cấu trúc JSON và phát hiện HMAC          \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách bằng mật mã đạt Tỷ lệ Đánh bại Guardrail là 10.0\% trước các đòn tấn công prompt injection dạng cấu trúc và mã hóa (được chứng minh qua bộ kiểm thử độ bền bỉ), thiết lập một ranh giới phòng thủ vững chắc mà không làm mất đi thông tin payload quan trọng cần thiết cho việc điều tra sự cố của LLM.
+Việc áp dụng cơ chế Đóng gói Dữ liệu có Phân cách bằng mật mã đạt Tỷ lệ Chặn rào chắn tĩnh tổng thể là 50.0\% (chặn đứng 100\% các đòn tấn công tiêm prompt dạng mã hóa và 35\% dạng cấu trúc), thiết lập một ranh giới phòng thủ vững chắc mà không làm mất đi thông tin payload quan trọng cần thiết cho việc điều tra sự cố của LLM, đồng thời định tuyến các tấn công ngữ nghĩa còn lại sang khâu duyệt HITL.
 
-Bên cạnh đó, quá trình tích hợp Dual-RAG mang lại điểm Độ Phù hợp Ngữ cảnh đạt 0.87, đảm bảo rằng Agent luôn đưa ra các đề xuất khắc phục bám sát tiêu chuẩn NIST SP 800-61r2. Về mặt vận hành, chiến lược lọc hai tầng giúp giảm trung bình 99.8\% thời gian xử lý log bằng cách loại bỏ nhiễu lành tính ở Tier 1, chứng minh tính hiệu quả của đề tài trong việc giải quyết vấn nạn alert fatigue trong các luồng SIEM lớn.
+Bên cạnh đó, quá trình tích hợp Dual-RAG mang lại điểm chất lượng RAGAS trung bình đạt 3.91/5 (trong đó điểm Faithfulness đạt tuyệt đối 4.00/5), đảm bảo rằng Agent đưa ra các phân tích rủi ro bám sát MITRE ATT\&CK và đề xuất ứng phó theo tiêu chuẩn NIST SP 800-61r2. Về mặt vận hành, chiến lược lọc hai tầng giúp giảm trung bình 99.9\% thời gian xử lý log bằng cách loại bỏ nhiễu lành tính ở Tier 1, chứng minh tính hiệu quả của đề tài trong việc giải quyết vấn nạn alert fatigue trong các luồng SIEM lớn.
 
 \subsection{Đóng góp Khoa học}
 Xét về mặt học thuật, đóng góp tiên quyết của nghiên cứu là việc đề xuất một Kiến trúc Nhận thức Hai tầng độc đáo, nối liền một cách an toàn giữa sức mạnh của Động cơ Quy tắc xác định với trí tuệ của LLM Agent. Hướng tiếp cận này vẫn còn rất mới mẻ trong các văn bản nghiên cứu an ninh mạng, đặc biệt là khi kết hợp việc triển khai các LLM bảo mật cục bộ cùng với rào chắn adversarial linh hoạt.
@@ -1072,6 +458,18 @@ Những đóng góp kỳ vọng của nghiên cứu bao gồm việc đề xuấ
 
     \bibitem{rrf2009}
     G. V. Cormack, C. L. A. Clarke, and S. Buettcher, ``Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning Methods,'' in \emph{Proceedings of the 32nd International ACM SIGIR Conference on Research and Development in Information Retrieval}, 2009, pp. 758--759.
+
+    \bibitem{nist80207}
+    S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,'' NIST Special Publication 800-207, National Institute of Standards and Technology, 2020.
+
+    \bibitem{mcnemar1947}
+    Q. McNemar, ``Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages,'' \emph{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
+
+    \bibitem{mannwhitney1947}
+    H. B. Mann and D. R. Whitney, ``On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other,'' \emph{Annals of Mathematical Statistics}, vol. 18, no. 1, pp. 50--60, 1947.
+
+    \bibitem{hmac1997}
+    H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.
 
 \end{thebibliography}
 
