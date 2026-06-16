@@ -123,15 +123,14 @@ The application of Large Language Models (LLMs), particularly Agentic AI and Ret
 Motivated by these limitations, this study aims to develop an autonomous AI Security Agent utilizing a cognitive two-tier architecture. Instead of relying purely on a single LLM to process all logs, the thesis proposes a hybrid approach: a high-speed deterministic rule engine combined with a deep-reasoning LLM Agent. This approach is expected to drastically reduce reasoning latency by filtering noise, mitigate prompt injection via bounded encapsulation, and enhance context awareness using Long-Term Threat Memory and a Dual-RAG setup (incorporating MITRE ATT\&CK for tactical threat identification and NIST SP 800-61r2 for incident response guidance). A Human-in-the-Loop (HITL) Web Dashboard will also be developed to demonstrate practical SOC automation.
 
 \subsection{Research Questions}
-Based on the objectives, this thesis focuses on four core research questions:
+Based on the objectives, this thesis focuses on three core research questions:
 1. Does a Two-Tier Architecture (Rule-based + LLM Agent) combined with Session-Aware Behavioral Baselining and unsupervised online Welford anomaly detection optimize Reasoning Latency compared to a One-Tier (LLM-only) approach?
-2. Can a Delimited Data Encapsulation mechanism (using Dynamic Randomized Delimiters) effectively prevent structural Prompt Injections (e.g., Delimiter Smuggling) without degrading the LLM's classification accuracy?
+2. Can a Delimited Data Encapsulation mechanism (using Dynamic Randomized Delimiters), reinforced by a deterministic Tier-1/Tier-2 consensus guard and a Human-in-the-Loop quarantine, prevent structural Prompt Injections (e.g., Delimiter Smuggling) and unsafe autonomous responses without degrading the LLM's classification accuracy?
 3. How does a Dual-RAG pipeline (combining tactical threat frameworks with incident response standards) improve the Context Relevance of the LLM's threat analysis?
-4. Can an adaptive Feedback Loop with HITL Quarantine and Few-shot Active Learning prevent Adversarial Rule Injection and safely automate defensive responses?
 
 \subsection{Research Object and Methodology}
 The primary objects of this research are the Two-Tier Security Architecture, Agentic AI (LLMs applied to SOC automation), Adversarial Prompt Injections, and network intrusion log data.
-The study employs a Quantitative Experimental methodology, utilizing an Ablation Study to compare the Two-Tier system against a baseline LLM-only setup. Evaluation is conducted using a 5-Dimensional (5D) Framework covering Classification metrics, Operational latency, Adversarial Robustness, RAGAS-based Context Quality (via cross-family LLM-as-a-Judge), and Explainability.
+The study employs a Quantitative Experimental methodology, utilizing an Ablation Study that contrasts the full two-tier system (Configuration~F) against a deterministic single-tier baseline (Configuration~A, Tier-1 only) to isolate the latency and verdict contribution of the cognitive tier. Evaluation is conducted using a 5-Dimensional (5D) Framework covering Classification metrics, Operational latency, Adversarial Robustness, RAGAS-based Context Quality (via cross-family LLM-as-a-Judge), and Explainability.
 
 \subsection{Scope of the Study}
 The research is limited to Network Intrusion Detection and SOC log triage. The in-scope components include: Data Streaming Pipeline (Redis), Tier-1 Rule Engine, LangGraph Agent with Dual-RAG, Guardrails (Volume Compression and Injection Defense), and a Streamlit HITL Dashboard with SQLite-based Threat Memory. The study does not cover fine-tuning Foundation Models, physical hardware deployment (e.g., physical Kafka clusters), or Layer 3/4 volumetric DDoS mitigation.
@@ -259,8 +258,6 @@ Following the guardrails, the sanitized log enters Tier 2, governed by a LangGra
 \end{itemize}
 This fixed dual-index design eliminates the need for a routing mechanism, reducing failure points and ensuring predictable latency for evaluation. The separation bridges the gap between \textit{tactical identification} (MITRE: what happened) and \textit{operational response} (NIST: what to do about it).
 
-To optimize classification and reasoning accuracy without resource-intensive offline fine-tuning, Tier 2 incorporates a Few-shot Active Learning feedback loop. The agent dynamically retrieves historical analyst approval (Approve) and rejection (Reject) decisions stored in system settings and structures them as prompt-level few-shot context. This allows the LLM to learn continuously from analyst feedback, avoiding repeat misclassifications.
-
 Each index employs a \textbf{Hybrid Search} strategy combining dense semantic search (FAISS with \verb|all-MiniLM-L6-v2|) with sparse keyword matching (BM25Okapi), fused via \textbf{Reciprocal Rank Fusion (RRF, k=60)} \cite{rrf2009}. This dual-signal approach maximizes both semantic understanding and exact-match recall for security-specific identifiers such as CVE IDs, IP addresses, and port numbers. Retrieved chunks undergo \textbf{Structural Sanitization}---Unicode normalization, control character removal, and length truncation---to defend against RAG Poisoning before injection into the LLM prompt.
 
 Finally, to ensure system safety against Adversarial Rule Injection, the LLM cannot directly modify the Tier 1 firewall. Instead, its recommended rules are placed into a Quarantine state (Human-in-the-Loop Feedback Loop). A SOC manager reviews these rules via a Dashboard before they are hot-reloaded into the Tier 1 engine.
@@ -321,7 +318,7 @@ Finally, the Streamlit Dashboard and the SQLite Long-Term Threat Memory will be 
 \subsection{Evaluation Plan}
 To validate the effectiveness of the system, the study employs a comprehensive 5-Dimensional (5D) Evaluation Framework.
 
-To evaluate the system's baseline accuracy, an Ablation Study will be conducted. This will compare the full Two-Tier system against a baseline LLM-only setup to observe differences in performance.
+To evaluate the system's baseline accuracy, an Ablation Study will be conducted. This contrasts the full two-tier system (Configuration~F) against a deterministic Tier-1-only baseline (Configuration~A) to isolate the latency and verdict contribution of the cognitive tier; an LLM-only configuration is retained as a planned extension for finer-grained, per-component isolation.
 The evaluation metrics will include:
 \begin{itemize}
     \item \textbf{1. Classification:} F1-Score, Precision, Recall, and False Positive Rate (FPR), evaluated using McNemar's Test ($p<0.05$) \cite{mcnemar1947} for statistical significance.

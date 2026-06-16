@@ -131,15 +131,14 @@ Việc ứng dụng Mô hình Ngôn ngữ Lớn (LLM), đặc biệt là kiến 
 Nhận thấy những hạn chế trên, nghiên cứu này đặt mục tiêu phát triển một AI Security Agent tự trị dựa trên kiến trúc nhận thức hai tầng (cognitive two-tier architecture). Thay vì hoàn toàn phụ thuộc vào một LLM duy nhất để xử lý mọi log, luận văn đề xuất một kiến trúc hybrid lai: một động cơ quy tắc tốc độ cao kết hợp với một LLM Agent có khả năng suy luận sâu. Hướng tiếp cận này được kỳ vọng sẽ tối ưu hóa độ trễ suy luận bằng cách lọc nhiễu, giảm thiểu nguy cơ prompt injection qua cơ chế đóng gói có ranh giới, và nâng cao khả năng nhận thức ngữ cảnh thông qua Bộ nhớ Rủi ro Dài hạn (Long-Term Threat Memory) và kiến trúc Dual-RAG. Một bảng điều khiển (Dashboard) kết hợp yếu tố Human-in-the-Loop (HITL) cũng sẽ được xây dựng để chứng minh tính thực tiễn của tự động hóa SOC.
 
 \subsection{Câu hỏi Nghiên cứu}
-Dựa trên các mục tiêu đã đề ra, luận văn tập trung giải quyết bốn câu hỏi nghiên cứu cốt lõi:
+Dựa trên các mục tiêu đã đề ra, luận văn tập trung giải quyết ba câu hỏi nghiên cứu cốt lõi:
 1. Việc áp dụng Kiến trúc Hai tầng (Rule-based + LLM Agent) kết hợp với Cơ sở Hành vi theo Phiên (Session-Aware Behavioral Baselining) có tối ưu hóa Độ trễ Suy luận so với phương pháp Một tầng (chỉ dùng LLM) hay không?
-2. Liệu cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation) có thể ngăn chặn hiệu quả các đòn Prompt Injection mang tính cấu trúc (ví dụ: Delimiter Smuggling) mà không làm suy giảm độ chính xác phân loại của LLM?
+2. Liệu cơ chế Đóng gói Dữ liệu có Phân cách (Delimited Data Encapsulation), được tăng cường bởi lá chắn đồng thuận Tầng 1/Tầng 2 tất định và cơ chế Cách ly Human-in-the-Loop (HITL Quarantine), có thể ngăn chặn hiệu quả các đòn Prompt Injection mang tính cấu trúc (ví dụ: Delimiter Smuggling) cùng các phản ứng tự động không an toàn mà không làm suy giảm độ chính xác phân loại của LLM?
 3. Kiến trúc Dual-RAG (kết hợp khung chuẩn chiến thuật và kiểm soát phòng thủ) cải thiện Độ phù hợp Ngữ cảnh (Context Relevance) của quá trình phân tích rủi ro do LLM thực hiện như thế nào?
-4. Một vòng lặp phản hồi (Feedback Loop) mang tính thích ứng với cơ chế Cách ly HITL (HITL Quarantine) có thể ngăn chặn Adversarial Rule Injection và đảm bảo an toàn cho các phản ứng tự động ra sao?
 
 \subsection{Đối tượng và Phương pháp Nghiên cứu}
 Đối tượng nghiên cứu chính bao gồm Kiến trúc Bảo mật Hai tầng, AI Tác tử (LLM ứng dụng trong tự động hóa SOC), các kỹ thuật tấn công Prompt Injection, và dữ liệu log phát hiện xâm nhập mạng.
-Nghiên cứu sử dụng phương pháp Thực nghiệm Định lượng, áp dụng thiết kế Thí nghiệm Loại bỏ (Ablation Study) để so sánh hệ thống Hai tầng với hệ thống cơ sở chỉ dùng LLM. Quá trình đánh giá được thực hiện qua Khung 5 Chiều (5D) bao trùm các chỉ số Phân loại, Độ trễ vận hành, Tính kháng lỗi Adversarial, Chất lượng Ngữ cảnh qua RAGAS (sử dụng LLM-as-a-Judge chéo họ), và Tính Giải thích.
+Nghiên cứu sử dụng phương pháp Thực nghiệm Định lượng, áp dụng thiết kế Thí nghiệm Loại bỏ (Ablation Study) đối chiếu hệ hai tầng đầy đủ (Cấu hình~F) với một baseline đơn tầng tất định (Cấu hình~A, chỉ Tầng 1) để cô lập đóng góp về độ trễ và phán quyết của tầng nhận thức. Quá trình đánh giá được thực hiện qua Khung 5 Chiều (5D) bao trùm các chỉ số Phân loại, Độ trễ vận hành, Tính kháng lỗi Adversarial, Chất lượng Ngữ cảnh qua RAGAS (sử dụng LLM-as-a-Judge chéo họ), và Tính Giải thích.
 
 \subsection{Phạm vi Nghiên cứu}
 Nghiên cứu giới hạn trong phạm vi Phát hiện Xâm nhập Mạng (Network Intrusion Detection) và phân loại log tại SOC. Các thành phần trong phạm vi bao gồm: Pipeline luồng dữ liệu (Redis), Động cơ Quy tắc Tier-1, LangGraph Agent với Dual-RAG, Cơ chế Guardrails (Nén dữ liệu và Phòng thủ Injection), cùng Dashboard Streamlit hỗ trợ HITL với Bộ nhớ SQLite. Nghiên cứu không bao gồm việc tinh chỉnh (fine-tuning) các Mô hình Nền tảng (Foundation Models), triển khai hạ tầng phần cứng vật lý lớn, hay chống lại các đòn tấn công từ chối dịch vụ (DDoS) thể tích ở Layer 3/4.
@@ -328,7 +327,7 @@ Giai đoạn cuối cùng là việc tích hợp Bảng điều khiển Streamli
 \subsection{Kế hoạch Đánh giá}
 Nhằm kiểm chứng tính hiệu quả của hệ thống, nghiên cứu áp dụng chiến lược đánh giá toàn diện dựa trên Khung Đánh giá 5 Chiều (5-Dimensional Evaluation Framework).
 
-Để đánh giá mức cơ sở, một Thí nghiệm Loại bỏ (Ablation Study) sẽ được tiến hành. Quá trình này so sánh hệ thống Hai tầng hoàn chỉnh với một kiến trúc chỉ sử dụng LLM đơn thuần để quan sát sự khác biệt về hiệu năng.
+Để đánh giá mức cơ sở, một Thí nghiệm Loại bỏ (Ablation Study) sẽ được tiến hành. Quá trình này đối chiếu hệ hai tầng đầy đủ (Cấu hình~F) với một baseline chỉ-Tầng-1 tất định (Cấu hình~A) để cô lập đóng góp về độ trễ và phán quyết của tầng nhận thức; cấu hình chỉ-dùng-LLM được giữ lại như một hướng mở rộng nhằm cô lập từng cấu phần chi tiết hơn.
 Các tiêu chí đánh giá bao gồm:
 \begin{itemize}
     \item \textbf{1. Phân loại (Classification):} Điểm F1-Score, Precision, Recall và Tỷ lệ Dương tính giả (FPR), được phân tích ý nghĩa thống kê bằng kiểm định McNemar ($p<0.05$) \cite{mcnemar1947}.
