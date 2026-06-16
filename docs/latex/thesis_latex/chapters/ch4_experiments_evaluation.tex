@@ -40,7 +40,7 @@ A detailed overview of the CSE-CIC-IDS2018 attack labels, their mapped MITRE ATT
 
 \section{5D Evaluation Metrics and Ablation Study Design}
 The analytical performance of the system is benchmarked across a five-dimensional evaluation framework. These 5D metrics include Accuracy, measured by Precision, Recall, and F1-Score; Performance, measuring latency and throughput; Security, defined by the adversarial robustness rate; Explainability, evaluated via audit completeness; and Integrity, verified by HMAC validation. To isolate the quantitative impact of each proposed component, an ablation study was designed across six specific configurations. Configuration~A (the traditional baseline) relies exclusively on a rule-based signature engine at the ingestion layer, without any LLM routing. Configuration~B (the pure-LLM baseline) submits every network log to local LLM inference, without Welford pre-filtering, RAG context, or security guardrails. Configuration~C (Welford-filtered) inserts Welford's Tier-1 statistical filter ahead of the LLM so as to reduce the ingestion volume. Configuration~D (single-RAG grounded) adds a single dense vector-search database (FAISS with MiniLM embeddings) to the filtered LLM triage. Configuration~E (hybrid-RAG grounded) expands this retrieval component into a hybrid of dense vector search (FAISS) and sparse keyword search (BM25). Finally, Configuration~F (the holistic SENTINEL) combines the Tier-1 Welford filter, the stateful Tier-2 LangGraph agent, hybrid Dual-RAG (FAISS + BM25) consolidated via RRF, and the defensive guardrails.
-Within the scope of this thesis, the two architectural endpoints are evaluated empirically---Configuration~A (deterministic Tier-1 only, no LLM) and Configuration~F (the full two-tier system)---because together they bound the marginal contribution of the cognitive Tier-2; the intermediate configurations B--E are retained as a roadmap for finer-grained component isolation in future work.
+All six configurations were evaluated empirically on a stratified 300-sample subset of the labeled ground truth, so that the marginal contribution of each added component---the language model itself, the Welford pre-filter, dense retrieval, hybrid retrieval, and the guardrail stack---can be isolated from the difference between consecutive configurations.
 
 \section{Classification Accuracy on the Unified Stream}
 The primary accuracy evaluation was conducted on the Unified Stream---a single time-ordered merge of 150 benign warm-up flows and 4{,}526 main-stream events (CSE-CIC-IDS2018 attacks and benign traffic, DAPT2020 APT events, and seven real-derived zero-day outliers)---processed end-to-end with a freshly initialized Threat Memory. Table~\ref{tab:classification} reports the binary classification performance of the Tier-1 gate on this stream.
@@ -127,34 +127,38 @@ Seven signature-less zero-day outliers were injected into the stream by elevatin
 Every zero-day outlier was missed by the signature-based static engine (which issued a DROP) yet caught by the online Welford filter, which flagged each as a statistical anomaly ($Z > 3.5$) and escalated it to Tier-2 for human-in-the-loop adjudication.
 
 \section{Ablation Study: Two-Tier Latency Trade-off and Statistical Tests}
-The ablation study isolates the contribution of the cognitive Tier-2 by contrasting Configuration~A (deterministic Tier-1 only) with Configuration~F (the full two-tier system) on a stratified 300-sample subset of the labeled ground truth. Two non-parametric tests were applied: McNemar's test~\cite{mcnemar1947} on the paired binary verdicts, and the Mann-Whitney~U test~\cite{mannwhitney1947} on the per-event latency distributions. The results are summarized in Table~\ref{tab:ablation}.
+The ablation study isolates the contribution of each component by running all six configurations (A--F) on the same stratified 300-sample subset of the labeled ground truth. Two non-parametric tests anchor the comparison between the deterministic and full endpoints: McNemar's test~\cite{mcnemar1947} on the paired binary verdicts, and the Mann-Whitney~U test~\cite{mannwhitney1947} on the per-event latency distributions. The results are summarized in Table~\ref{tab:ablation}.
 
 \begin{table}[!htbp]
     \centering
-    \caption{Ablation: deterministic Tier-1 (Config A) vs. full two-tier SENTINEL (Config F) on 300 stratified samples. (Source: Author)}
+    \footnotesize
+    \setlength{\tabcolsep}{4pt}
+    \caption{Cumulative ablation across all six configurations (300 stratified samples). Every configuration yields \emph{identical} binary verdicts (zero discordant pairs vs.\ A); the components add latency, not classification gain. (Source: Author)}
     \label{tab:ablation}
-    \begin{tabular}{|l|c|c|}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.36\textwidth}|c|c|c|c|c|}
         \hline
-        \textbf{Metric} & \textbf{Config A (Tier-1)} & \textbf{Config F (Full)} \\
+        \textbf{Configuration} & \textbf{F1} & \textbf{Prec.} & \textbf{Rec.} & \textbf{Escal.} & \textbf{Lat./ev.} \\
         \hline
-        Precision & 0.937 & 0.937 \\
+        A --- Tier-1 only (no LLM) & 0.967 & 0.937 & 1.000 & --- & 0.6\,ms \\
         \hline
-        Recall & 1.000 & 1.000 \\
+        B --- Pure LLM (no gate/RAG/guard) & 0.967 & 0.937 & 1.000 & 100\% & 7.29\,s \\
         \hline
-        F1-score & 0.967 & 0.967 \\
+        C --- Welford gate $+$ LLM & 0.967 & 0.937 & 1.000 & 62.7\% & 3.95\,s \\
         \hline
-        Mean latency / event & 0.6 ms & 5{,}736 ms \\
+        D --- C $+$ dense RAG (FAISS) & 0.967 & 0.937 & 1.000 & 62.7\% & 5.62\,s \\
         \hline
-        Escalation to LLM & --- & 62.7\% \\
+        E --- D $+$ hybrid RAG (BM25$+$RRF) & 0.967 & 0.937 & 1.000 & 62.7\% & 6.07\,s \\
         \hline
-        McNemar (A vs F) & \multicolumn{2}{c|}{$p = 1.0$ (no discordant pairs)} \\
-        \hline
-        Mann-Whitney U (latency) & \multicolumn{2}{c|}{$U=27{,}053.5,\; p = 2.8\times10^{-17}$} \\
+        \textbf{F --- Full SENTINEL} & \textbf{0.967} & \textbf{0.937} & \textbf{1.000} & \textbf{62.7\%} & \textbf{5.74\,s} \\
         \hline
     \end{tabular}
 \end{table}
 
-Two findings emerge. First, on this labeled subset the two configurations produce \emph{identical} binary verdicts for every sample; McNemar's test is therefore degenerate (no discordant pairs, $p = 1.0$), indicating that the cognitive tier does not alter Tier-1's coarse attack/benign decision. The architectural value of Tier-2 is thus orthogonal to binary detection---it lies in the contextual reasoning, MITRE/NIST grounding, zero-day escalation, and adversarial robustness quantified elsewhere in this chapter---rather than in raw classification gain. (The stratified subset is attack-dominated, so the absolute F1 of 0.967 here is not directly comparable to the balanced Unified-Stream result of Table~\ref{tab:classification}; this ablation isolates the latency and verdict-equivalence comparison.) Second, the configurations differ sharply in latency: Tier-1 resolves a decision in roughly 0.6~ms, whereas escalated events incur a mean of about 5.7~s of LLM reasoning, and the Mann-Whitney~U test confirms that this separation is highly significant ($p = 2.8\times10^{-17}$). Crucially, only 62.7\% of the sampled events escalated to the LLM while 37.3\% were resolved at Tier-1 wire-speed; for that Tier-1-resolved traffic the latency reduction versus full LLM inference exceeds 99.9\%. This quantitatively validates the central design hypothesis: a deterministic wire-speed filter must absorb the bulk of traffic so that expensive cognitive reasoning is reserved for the genuinely ambiguous minority.
+Three findings emerge. First---and most striking---all six configurations produce \emph{identical} binary verdicts on every one of the 300 samples (zero discordant pairs against Configuration~A, with $\mathrm{F1}=0.967$, precision $=0.937$, and recall $=1.000$ throughout). Successively adding the language model (B), the Welford gate (C), dense retrieval (D), hybrid retrieval (E), and the full guardrail stack (F) leaves the coarse attack/benign decision unchanged, so McNemar's test is degenerate for every pair ($p = 1.0$, no discordant pairs). The architectural value of these components is therefore \emph{orthogonal} to binary detection: it lies in the contextual reasoning, MITRE/NIST grounding, zero-day escalation, and adversarial robustness quantified elsewhere in this chapter, rather than in raw classification gain. (The stratified subset is attack-dominated, so the absolute F1 of 0.967 is not directly comparable to the balanced Unified-Stream result of Table~\ref{tab:classification}; this ablation isolates the per-component latency and verdict-equivalence comparison.)
+
+Second, where the configurations differ sharply is in \emph{latency}, and the progression isolates the cost of each component. Submitting every event to the LLM (Configuration~B) incurs the highest mean latency, $7.29$~s; inserting the Welford gate (Configuration~C) cuts this to $3.95$~s by resolving $37.3\%$ of traffic at wire-speed---escalation falls from $100\%$ to $62.7\%$---so the pre-filter's contribution is throughput, not accuracy. Adding dense RAG (Configuration~D, $5.62$~s) and then hybrid BM25\,$+$\,RRF retrieval (Configuration~E, $6.07$~s) each introduce retrieval overhead without altering F1, confirming that the retriever's role is grounding quality (Table~\ref{tab:ragas}) rather than classification. The full system (Configuration~F) averages $5.74$~s per escalated event against $0.6$~ms at Tier-1, and the Mann-Whitney~U test confirms that this Tier-1/Tier-2 latency separation is highly significant ($U=27{,}053.5,\; p = 2.8\times10^{-17}$).
+
+Third, the ablation validates the central design hypothesis: because the expensive cognitive layer does not change the binary verdict on clear-cut traffic, a deterministic wire-speed filter must absorb the bulk of it so that costly reasoning---whose value is qualitative rather than classificatory on this subset---is reserved for the genuinely ambiguous minority. For the $37.3\%$ of traffic resolved at Tier-1, the latency reduction versus full LLM inference exceeds $99.9\%$.
 
 \section{Adversarial Robustness Evaluation (Security)}
 To probe the security posture of the cognitive layer, an adversarial suite of \textbf{120 payloads} spanning five OWASP-aligned categories~\cite{owasp_llm2025} was compiled: encoding bypasses, structural (delimiter) attacks, semantic confusion, jailbreaks, and RAG poisoning. Each payload attempts to hijack the agent's reasoning (e.g., instructing the model to ignore security policies and report a malicious IP as benign). Table~\ref{tab:robustness} reports the block rate of the \textit{static guardrail layer} (encoding neutralization, delimiter sanitization, and pattern filters) measured in isolation.

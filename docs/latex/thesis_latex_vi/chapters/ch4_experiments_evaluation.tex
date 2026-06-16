@@ -40,7 +40,7 @@ Tổng quan chi tiết về các nhãn tấn công trong CSE-CIC-IDS2018, ánh x
 
 \section{Chỉ số Đánh giá 5D và Thiết kế Nghiên cứu Loại trừ (Ablation Study)}
 Hiệu năng phân tích của hệ thống được đo lường thông qua khung đánh giá năm chiều. Các chỉ số 5D bao gồm Độ chính xác (đo bằng F1-Score, Precision, Recall), Hiệu suất (đo bằng độ trễ và băng thông xử lý), Bảo mật (độ hiệu quả ngăn chặn tấn công đối kháng), Tính giải thích (đánh giá mức độ chi tiết của báo cáo pháp y) và Tính toàn vẹn (xác thực tính toàn vẹn qua chuỗi HMAC). Nhằm tách biệt và làm rõ đóng góp định lượng của từng cấu phần đề xuất, nghiên cứu thiết lập sáu cấu hình thử nghiệm loại trừ. Cấu hình~A (baseline tường lửa luật tĩnh) chỉ sử dụng bộ lọc luật tĩnh truyền thống tại tầng thu nạp mà không áp dụng mô hình LLM. Cấu hình~B (baseline LLM thuần túy) gửi trực tiếp mọi log mạng tới LLM cục bộ mà không qua bộ lọc Welford Tầng 1, ngữ cảnh RAG hay rào chắn bảo mật. Cấu hình~C (LLM có lọc Welford) chèn bộ lọc thống kê Welford Tầng 1 trước khi gửi dữ liệu đến LLM nhằm giảm đáng kể khối lượng cần xử lý. Cấu hình~D (RAG vector đơn lẻ) bổ sung một cơ sở dữ liệu tìm kiếm vector dày đặc đơn lẻ (FAISS với MiniLM embeddings) vào quy trình phân loại LLM đã lọc. Cấu hình~E (RAG tìm kiếm lai) mở rộng cấu phần truy xuất này thành một tổ hợp lai giữa tìm kiếm vector dày đặc (FAISS) và tìm kiếm từ khóa thưa thớt (BM25). Cuối cùng, Cấu hình~F (SENTINEL toàn diện) kết hợp đồng bộ bộ lọc Welford Tầng 1, tác tử nhận thức LangGraph Tầng 2, hệ RAG kép (FAISS + BM25) tổng hợp qua RRF, và các rào chắn bảo mật.
-Trong phạm vi luận văn này, hai điểm đầu-cuối của kiến trúc được đánh giá thực nghiệm --- Cấu hình~A (chỉ Tầng 1 tất định, không LLM) và Cấu hình~F (hệ hai tầng đầy đủ) --- vì cùng nhau chúng chặn trên-dưới đóng góp biên của tầng nhận thức Tầng 2; các cấu hình trung gian B--E được giữ lại như một lộ trình cô lập cấu phần chi tiết hơn cho nghiên cứu tương lai.
+Cả sáu cấu hình đều được đánh giá thực nghiệm trên cùng một tập con phân tầng 300 mẫu của dữ liệu đã gán nhãn, nhờ đó đóng góp biên của từng cấu phần được thêm vào --- bản thân mô hình LLM, bộ tiền lọc Welford, truy xuất dày đặc, truy xuất lai, và lớp rào chắn --- có thể được cô lập qua hiệu số giữa các cấu hình liền kề.
 
 \section{Độ chính xác Phân loại trên Luồng Gộp Thống nhất}
 Đánh giá độ chính xác chính được thực hiện trên Luồng Gộp Thống nhất --- một luồng đơn sắp theo thời gian gồm 150 luồng benign khởi động và 4526 sự kiện luồng chính (tấn công và lưu lượng lành tính CSE-CIC-IDS2018, sự kiện APT DAPT2020, và bảy điểm dị biệt zero-day real-derived) --- được xử lý đầu-cuối với Bộ nhớ Đe dọa khởi tạo sạch. Bảng~\ref{tab:classification} trình bày hiệu năng phân loại nhị phân của cổng lọc Tầng 1 trên luồng này.
@@ -127,34 +127,38 @@ Bảy điểm dị biệt zero-day không-chữ-ký được tiêm vào luồng 
 Mọi điểm dị biệt zero-day đều bị bộ luật dựa-trên-chữ-ký bỏ sót (ra quyết định DROP) nhưng được bộ lọc Welford trực tuyến bắt được, gắn cờ mỗi điểm là dị biệt thống kê ($Z > 3.5$) và leo thang lên Tầng 2 để con người phân xử.
 
 \section{Nghiên cứu Loại trừ: Đánh đổi Độ trễ Hai tầng và Kiểm định Thống kê}
-Nghiên cứu loại trừ cô lập đóng góp của tầng nhận thức Tầng 2 bằng cách đối chiếu Cấu hình~A (chỉ Tầng 1 tất định) với Cấu hình~F (hệ hai tầng đầy đủ) trên một tập con phân tầng 300 mẫu của dữ liệu đã gán nhãn. Hai kiểm định phi tham số được áp dụng: kiểm định McNemar~\cite{mcnemar1947} trên các phán quyết nhị phân theo cặp, và kiểm định Mann-Whitney~U~\cite{mannwhitney1947} trên phân phối độ trễ mỗi sự kiện. Kết quả tóm tắt trong Bảng~\ref{tab:ablation}.
+Nghiên cứu loại trừ cô lập đóng góp của từng cấu phần bằng cách chạy cả sáu cấu hình (A--F) trên cùng một tập con phân tầng 300 mẫu của dữ liệu đã gán nhãn. Hai kiểm định phi tham số neo phép so sánh giữa hai đầu mút tất định và đầy đủ: kiểm định McNemar~\cite{mcnemar1947} trên các phán quyết nhị phân theo cặp, và kiểm định Mann-Whitney~U~\cite{mannwhitney1947} trên phân phối độ trễ mỗi sự kiện. Kết quả tóm tắt trong Bảng~\ref{tab:ablation}.
 
 \begin{table}[!htbp]
     \centering
-    \caption{Ablation: Tầng 1 tất định (Cấu hình A) so với SENTINEL hai tầng đầy đủ (Cấu hình F) trên 300 mẫu phân tầng. (Nguồn: Tác giả)}
+    \footnotesize
+    \setlength{\tabcolsep}{4pt}
+    \caption{Nghiên cứu loại trừ cộng dồn trên cả sáu cấu hình (300 mẫu phân tầng). Mọi cấu hình cho phán quyết nhị phân \emph{giống hệt nhau} (0 cặp bất đồng so với A); các cấu phần thêm độ trễ chứ không tăng phân loại. (Nguồn: Tác giả)}
     \label{tab:ablation}
-    \begin{tabular}{|l|c|c|}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.36\textwidth}|c|c|c|c|c|}
         \hline
-        \textbf{Chỉ số} & \textbf{Cấu hình A (Tầng 1)} & \textbf{Cấu hình F (Đầy đủ)} \\
+        \textbf{Cấu hình} & \textbf{F1} & \textbf{Prec.} & \textbf{Rec.} & \textbf{Leo th.} & \textbf{Trễ/sk} \\
         \hline
-        Precision & 0.937 & 0.937 \\
+        A --- Chỉ Tầng 1 (không LLM) & 0.967 & 0.937 & 1.000 & --- & 0.6\,ms \\
         \hline
-        Recall & 1.000 & 1.000 \\
+        B --- LLM thuần (không lọc/RAG/chắn) & 0.967 & 0.937 & 1.000 & 100\% & 7.29\,s \\
         \hline
-        F1-score & 0.967 & 0.967 \\
+        C --- Lọc Welford $+$ LLM & 0.967 & 0.937 & 1.000 & 62.7\% & 3.95\,s \\
         \hline
-        Độ trễ trung bình / sự kiện & 0.6 ms & 5{,}736 ms \\
+        D --- C $+$ RAG dày đặc (FAISS) & 0.967 & 0.937 & 1.000 & 62.7\% & 5.62\,s \\
         \hline
-        Tỷ lệ leo thang lên LLM & --- & 62.7\% \\
+        E --- D $+$ RAG lai (BM25$+$RRF) & 0.967 & 0.937 & 1.000 & 62.7\% & 6.07\,s \\
         \hline
-        McNemar (A vs F) & \multicolumn{2}{c|}{$p = 1.0$ (không có cặp bất đồng)} \\
-        \hline
-        Mann-Whitney U (độ trễ) & \multicolumn{2}{c|}{$U=27{,}053.5,\; p = 2.8\times10^{-17}$} \\
+        \textbf{F --- SENTINEL đầy đủ} & \textbf{0.967} & \textbf{0.937} & \textbf{1.000} & \textbf{62.7\%} & \textbf{5.74\,s} \\
         \hline
     \end{tabular}
 \end{table}
 
-Hai phát hiện nổi lên. Thứ nhất, trên tập con đã gán nhãn này, hai cấu hình cho phán quyết nhị phân \emph{giống hệt nhau} cho mọi mẫu; do đó kiểm định McNemar bị suy biến (không có cặp bất đồng, $p = 1.0$), cho thấy tầng nhận thức không làm thay đổi quyết định thô tấn công/lành tính của Tầng 1. Giá trị kiến trúc của Tầng 2 vì vậy trực giao với phân loại nhị phân --- nó nằm ở suy luận theo ngữ cảnh, nền tảng MITRE/NIST, leo thang zero-day, và kháng tấn công đối kháng được định lượng ở các phần khác của chương này --- chứ không phải ở việc tăng độ chính xác phân loại thô. (Tập con phân tầng thiên về tấn công, nên F1 tuyệt đối 0.967 ở đây không so sánh trực tiếp được với kết quả Luồng Gộp cân bằng ở Bảng~\ref{tab:classification}; ablation này chỉ cô lập so sánh độ trễ và sự tương đương phán quyết.) Thứ hai, hai cấu hình khác biệt mạnh về độ trễ: Tầng 1 ra quyết định trong khoảng 0.6~ms, trong khi các sự kiện leo thang chịu độ trễ trung bình khoảng 5.7~s cho suy luận LLM, và kiểm định Mann-Whitney~U khẳng định sự tách biệt này có ý nghĩa thống kê rất cao ($p = 2.8\times10^{-17}$). Quan trọng là chỉ 62.7\% số sự kiện được lấy mẫu leo thang lên LLM trong khi 37.3\% được giải quyết ngay ở tốc độ đường truyền của Tầng 1; với phần lưu lượng do Tầng 1 xử lý đó, mức giảm độ trễ so với suy luận LLM toàn phần vượt 99.9\%. Điều này định lượng hóa và xác nhận giả thuyết thiết kế cốt lõi: một bộ lọc tất định tốc độ đường truyền phải hấp thụ phần lớn lưu lượng để dành suy luận nhận thức tốn kém cho thiểu số thực sự mơ hồ.
+Ba phát hiện nổi lên. Thứ nhất --- và đáng chú ý nhất --- cả sáu cấu hình cho phán quyết nhị phân \emph{giống hệt nhau} trên từng mẫu trong 300 mẫu (không có cặp bất đồng nào so với Cấu hình~A, với $\mathrm{F1}=0.967$, precision $=0.937$, recall $=1.000$ xuyên suốt). Việc lần lượt thêm mô hình LLM (B), bộ lọc Welford (C), truy xuất dày đặc (D), truy xuất lai (E), và toàn bộ lớp rào chắn (F) không làm thay đổi quyết định thô tấn công/lành tính, nên kiểm định McNemar bị suy biến với mọi cặp ($p = 1.0$, không cặp bất đồng). Giá trị kiến trúc của các cấu phần này vì vậy \emph{trực giao} với phân loại nhị phân: nó nằm ở suy luận theo ngữ cảnh, nền tảng MITRE/NIST, leo thang zero-day, và kháng tấn công đối kháng được định lượng ở các phần khác của chương này, chứ không ở việc tăng độ chính xác phân loại thô. (Tập con phân tầng thiên về tấn công, nên F1 tuyệt đối 0.967 không so sánh trực tiếp được với kết quả Luồng Gộp cân bằng ở Bảng~\ref{tab:classification}; ablation này chỉ cô lập so sánh độ trễ theo từng cấu phần và sự tương đương phán quyết.)
+
+Thứ hai, nơi các cấu hình khác biệt mạnh là \emph{độ trễ}, và tiến trình tăng dần cô lập chi phí của từng cấu phần. Gửi mọi sự kiện vào LLM (Cấu hình~B) chịu độ trễ trung bình cao nhất, $7.29$~s; chèn bộ lọc Welford (Cấu hình~C) cắt xuống $3.95$~s nhờ giải quyết $37.3\%$ lưu lượng ở tốc độ đường truyền --- leo thang giảm từ $100\%$ xuống $62.7\%$ --- nên đóng góp của tiền lọc là về thông lượng, không phải độ chính xác. Thêm RAG dày đặc (Cấu hình~D, $5.62$~s) rồi RAG lai BM25\,$+$\,RRF (Cấu hình~E, $6.07$~s) mỗi bước thêm chi phí truy xuất mà không đổi F1, khẳng định vai trò của bộ truy xuất là chất lượng nền tảng (Bảng~\ref{tab:ragas}) chứ không phải phân loại. Hệ đầy đủ (Cấu hình~F) trung bình $5.74$~s mỗi sự kiện leo thang so với $0.6$~ms ở Tầng 1, và kiểm định Mann-Whitney~U khẳng định sự tách biệt độ trễ Tầng 1/Tầng 2 này có ý nghĩa thống kê rất cao ($U=27{,}053.5,\; p = 2.8\times10^{-17}$).
+
+Thứ ba, nghiên cứu loại trừ xác nhận giả thuyết thiết kế cốt lõi: vì tầng nhận thức tốn kém không làm đổi phán quyết nhị phân trên lưu lượng rõ ràng, một bộ lọc tất định tốc độ đường truyền phải hấp thụ phần lớn lưu lượng đó để dành suy luận tốn kém --- vốn có giá trị định tính chứ không phải phân loại trên tập con này --- cho thiểu số thực sự mơ hồ. Với $37.3\%$ lưu lượng được giải quyết ở Tầng 1, mức giảm độ trễ so với suy luận LLM toàn phần vượt $99.9\%$.
 
 \section{Đánh giá Năng lực Phòng thủ Đối kháng (Bảo mật)}
 Để đánh giá mức độ an toàn của tầng nhận thức, một bộ tấn công đối kháng gồm \textbf{120 tải trọng} thuộc năm nhóm theo chuẩn OWASP~\cite{owasp_llm2025} đã được biên soạn: ngụy trang mã hóa (encoding bypass), tấn công cấu trúc (delimiter), gây nhiễu ngữ nghĩa (semantic confusion), bẻ khóa (jailbreak), và đầu độc RAG. Mỗi tải trọng cố gắng chiếm quyền điều khiển suy luận của tác tử (ví dụ: ra lệnh cho LLM bỏ qua các chính sách bảo mật và gắn nhãn an toàn cho một IP độc hại). Bảng~\ref{tab:robustness} báo cáo tỷ lệ chặn của \textit{tầng rào chắn tĩnh} (trung hòa mã hóa, làm sạch dấu phân tách, lọc mẫu) khi đo riêng lẻ.
