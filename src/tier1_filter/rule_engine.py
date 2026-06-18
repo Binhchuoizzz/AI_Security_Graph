@@ -277,6 +277,9 @@ class RuleEngine:
         self.risk_threshold = tier1_config.get("risk_threshold", 30)
         self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
+        # Ngưỡng Z-score cho phát hiện dị biệt thống kê Welford (zero-day). Mặc định
+        # 3.5σ; cấu hình được để phục vụ phân tích độ nhạy (sensitivity analysis).
+        self.z_threshold = tier1_config.get("z_threshold", 3.5)
 
         all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
@@ -466,12 +469,12 @@ class RuleEngine:
                 if std_val > 0.01:
                     z_score = abs(val - mean_val) / std_val
                     max_z_score = max(max_z_score, z_score)
-                    if z_score > 3.5:
+                    if z_score > self.z_threshold:
                         # Điểm phạt tăng dần theo độ lệch, cap ở 40
                         penalty = min(int(z_score * 5), 40)
                         z_anomaly_score += penalty
                         z_anomaly_reasons.append(
-                            f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} lệch {z_score:.2f} lần độ lệch chuẩn (Z-Score > 3.5)"
+                            f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} lệch {z_score:.2f} lần độ lệch chuẩn (Z-Score > {self.z_threshold:.1f})"
                         )
 
         if z_anomaly_reasons:
