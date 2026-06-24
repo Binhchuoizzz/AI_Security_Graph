@@ -22,6 +22,8 @@ except ImportError:
 
 import yaml  # type: ignore
 
+from src.agent import token_monitor
+
 logger = logging.getLogger(__name__)
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
@@ -89,6 +91,9 @@ class LLMClient:
                 }
             )
 
+        # Cổng quan sát ngữ cảnh (TRƯỚC khi gọi): ước lượng token input, cảnh báo nếu sát trần.
+        token_monitor.preflight_check(messages, max_tokens)
+
         for retries in range(self.max_retries + 1):
             try:
                 # Gọi API
@@ -104,6 +109,9 @@ class LLMClient:
                     kwargs["response_format"] = response_format
 
                 response: Any = self.client.chat.completions.create(**kwargs)  # type: ignore
+
+                # Ghi token THẬT do server trả về (prompt/completion) để quan sát & tinh chỉnh.
+                token_monitor.record_usage(getattr(response, "usage", None))
 
                 # Trả về văn bản
                 return response.choices[0].message.content

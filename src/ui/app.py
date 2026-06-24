@@ -161,6 +161,24 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
         )
         st.success(f"🟢 Luật đang chặn (active): {len(active_rules)} · Whitelist nội bộ đã seed")
 
+        # Ngân sách ngữ cảnh LLM (observability) — biết prompt cách trần n_ctx bao xa.
+        from src.agent.token_monitor import get_stats as _get_token_stats
+
+        _tok = _get_token_stats()
+        if _tok and _tok.get("calls", 0) > 0:
+            _util = _tok.get("utilization_pct_max", 0.0)
+            _c = "🟢" if _util < 75 else "🟡" if _util < 90 else "🔴"
+            st.markdown(
+                f"{_c} **Ngân sách ngữ cảnh:** p95 **{_tok.get('utilization_pct_p95', 0)}%** · "
+                f"max **{_util}%** của {_tok.get('n_ctx', 8192)} token · "
+                f"prompt TB {_tok.get('prompt_tokens_mean', 0)} / max {_tok.get('prompt_tokens_max', 0)} · "
+                f"⚠️ {_tok.get('overflow_warnings', 0)} cảnh báo sát trần ({_tok.get('calls', 0)} call)"
+            )
+        else:
+            st.caption(
+                "ℹ️ Ngân sách ngữ cảnh: chưa có dữ liệu token — chạy pipeline/eval để thu thập."
+            )
+
     st.markdown("---")
     st.caption(
         "💡 Tab này gom toàn bộ thành phần để trình bày trước hội đồng. Các tab kế tiếp cung cấp "
