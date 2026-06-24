@@ -90,7 +90,9 @@ def test_graceful_degradation():
 
         loop_detector.reset()
         final = agent_app.invoke(
-            SentinelState(current_batch_logs=logs, current_batch_size=len(logs), narrative_summary="")
+            SentinelState(
+                current_batch_logs=logs, current_batch_size=len(logs), narrative_summary=""
+            )
         )
         decisions = final.get("decisions", [])
         action = decisions[-1].get("action") if decisions else None
@@ -132,8 +134,7 @@ def main():
         json.dump(out, f, indent=2, ensure_ascii=False)
     print(f"\n[+] Saved -> {OUT_JSON}")
     print(
-        f"\n  TỔNG: determinism action={det['action_identical']} · "
-        f"degradation safe={deg['safe']}"
+        f"\n  TỔNG: determinism action={det['action_identical']} · degradation safe={deg['safe']}"
     )
 
 

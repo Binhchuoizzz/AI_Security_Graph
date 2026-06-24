@@ -125,7 +125,7 @@ class LLMClient:
                 return response.choices[0].message.content
 
             except openai.APITimeoutError as e:
-                logger.warning(f"LLM Timeout (attempt {retries + 1}/{self.max_retries}): {e}")
+                logger.warning(f"LLM Timeout (attempt {retries + 1}/{self.max_retries + 1}): {e}")
                 if retries == self.max_retries:
                     raise
             except openai.APIConnectionError as e:
@@ -134,7 +134,7 @@ class LLMClient:
                     raise
             except openai.RateLimitError:
                 logger.warning(
-                    f"LLM Rate Limit (attempt {retries + 1}/{self.max_retries}): Model is busy."
+                    f"LLM Rate Limit (attempt {retries + 1}/{self.max_retries + 1}): Model is busy."
                 )
                 if retries == self.max_retries:
                     raise
@@ -147,8 +147,7 @@ class LLMClient:
                 raise  # Các lỗi khác (vd: code logic error) thì fail fast luôn
 
             # Cơ chế thử lại (Retry)
-            retries += 1
-            if retries <= self.max_retries:
+            if retries < self.max_retries:
                 logger.info(f"Retrying in {backoff} seconds...")
                 time.sleep(backoff)
                 backoff *= 2  # Exponential backoff (2, 4, 8s...)

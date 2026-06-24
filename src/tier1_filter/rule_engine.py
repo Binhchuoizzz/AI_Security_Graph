@@ -18,7 +18,7 @@ import os
 import re
 import time
 from collections import defaultdict
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import yaml  # type: ignore
 
@@ -98,9 +98,59 @@ _RAW_TO_CANONICAL = {
 }
 
 
-def load_config():
-    with open(CONFIG_PATH) as f:
-        return yaml.safe_load(f)
+def load_config() -> dict[str, Any]:
+    try:
+        if os.path.exists(CONFIG_PATH):
+            with open(CONFIG_PATH) as f:
+                cfg = yaml.safe_load(f)
+                if cfg and isinstance(cfg, dict):
+                    return cfg
+    except Exception as e:
+        print(
+            f"[!] Warning: Failed to load config from {CONFIG_PATH}: {e}. Using default configuration."
+        )
+    return {
+        "tier1": {
+            "risk_threshold": 30,
+            "sensitive_ports": [21, 22, 23, 3389],
+            "max_fwd_packets": 1000,
+            "z_threshold": 3.5,
+            "dynamic_rules": [],
+            "whitelist_ips": [],
+            "session_baseline": {
+                "deviation_threshold": 2.0,
+                "window_seconds": 300,
+                "ttl_seconds": 600,
+                "max_profiles": 10000,
+                "eviction_interval": 100,
+            },
+        },
+        "guardrails": {
+            "injection_patterns": [
+                "ignore previous instructions",
+                "you are now",
+                "system prompt",
+                "disregard",
+                "<script>",
+                "DROP TABLE",
+                "UNION SELECT",
+                "; exec",
+                "forget everything",
+                "act as",
+                "new instructions",
+                "override your instructions",
+                "bypass safety",
+                "pretend you are",
+            ],
+            "jailbreak_patterns": [
+                "DAN mode",
+                "Do Anything Now",
+                "Developer Mode",
+                "jailbroken",
+                "ignore all previous",
+            ],
+        },
+    }
 
 
 class SessionBaseline:

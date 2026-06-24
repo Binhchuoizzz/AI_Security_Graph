@@ -20,7 +20,11 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.agent.token_monitor import N_CTX  # noqa: E402
-from src.guardrails.template_miner import LogTemplateMiner, TokenBudgetManager, load_config  # noqa: E402
+from src.guardrails.template_miner import (  # noqa: E402
+    LogTemplateMiner,
+    TokenBudgetManager,
+    load_config,
+)
 
 GT_PATH = os.path.join(os.path.dirname(__file__), "ground_truth.json")
 OUT_JSON = os.path.join(os.path.dirname(__file__), "results", "context_stress_results.json")
@@ -86,7 +90,10 @@ def main():
     os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(
-            {"n_ctx": N_CTX, "token_budget": token_budget, "sweep": rows}, f, indent=2, ensure_ascii=False
+            {"n_ctx": N_CTX, "token_budget": token_budget, "sweep": rows},
+            f,
+            indent=2,
+            ensure_ascii=False,
         )
     print(f"\n[+] Saved -> {OUT_JSON}")
 
@@ -102,7 +109,13 @@ def main():
         plt.plot(ns, raw, "o-", color="#C62828", label="RAW (nối thẳng log)", linewidth=2)
         plt.plot(ns, comp, "s-", color="#2E7D32", label="COMPRESSED (Drain template)", linewidth=2)
         plt.axhline(N_CTX, color="#1565C0", linestyle="--", linewidth=1.5, label=f"n_ctx = {N_CTX}")
-        plt.axhline(token_budget, color="#EF6C00", linestyle=":", linewidth=1.5, label=f"token_budget = {token_budget}")
+        plt.axhline(
+            token_budget,
+            color="#EF6C00",
+            linestyle=":",
+            linewidth=1.5,
+            label=f"token_budget = {token_budget}",
+        )
         plt.xscale("log")
         plt.yscale("log")
         plt.xlabel("Số lượng log trong một batch (log scale)", fontsize=12)
