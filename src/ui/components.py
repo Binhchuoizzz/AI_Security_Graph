@@ -171,8 +171,15 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
                 help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).",
             )
 
-    # Hiển thị log gốc JSON phục vụ việc kiểm tra sâu của SOC Analysts
-    with st.expander("🔍 Xem Log gốc (Raw JSON)", expanded=False):
+    # Đây là BẢN GHI QUYẾT ĐỊNH (output audit record đã ký HMAC), KHÔNG phải input log thô.
+    # action/MITRE/lập luận ở đây là KẾT QUẢ tác tử sinh ra — không bao giờ là đầu vào của LLM.
+    with st.expander("🔍 Xem bản ghi Quyết định (Audit Record JSON)", expanded=False):
+        st.caption(
+            "ℹ️ Đây là **bản ghi quyết định** (output, đã ký HMAC) — `action`/`MITRE`/lập luận là "
+            "**kết quả** tác tử suy luận ra. Đầu vào của LLM chỉ gồm **đặc trưng luồng mạng thô** "
+            "(IP, cổng, số gói/byte, thời lượng luồng…), **KHÔNG** chứa nhãn/đáp án (xem "
+            "`tests/unit/test_subscriber.py` — kiểm thử chống lộ nhãn)."
+        )
         st.json(alert)
 
 

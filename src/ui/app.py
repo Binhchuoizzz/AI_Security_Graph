@@ -184,9 +184,11 @@ def main_dashboard():
         st.markdown("### 🔍 Bộ lọc Sự cố")
 
         # Lọc theo hành động
+        # Chỉ liệt kê các hành động THỰC SỰ có trong nhật ký sự cố (bỏ "LOG" vì đó là
+        # ghi chú benign/quản trị, không phải sự cố cần phân loại → tránh bộ lọc rỗng).
         action_filter = st.selectbox(
             "Phân loại Hành động",
-            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG"],
+            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL"],
             index=0,
             key="action_filter_sb",
         )
@@ -358,7 +360,7 @@ def main_dashboard():
     # xử lý log thô qua Tier-1. raw_logs_total = tổng log đã phân tích; tier1_dropped
     # = số bị Tier-1 lọc bỏ -> Noise Reduction = dropped/raw (đo trực tiếp, không bịa).
     raw_logs_count = 0
-    noise_reduction = None  # None -> header tự tính (fallback khi chưa có dữ liệu thật)
+    noise_reduction = None
     try:
         import json as _json
 
@@ -370,11 +372,16 @@ def main_dashboard():
         with open(_stats_p) as _sf:
             _ps = _json.load(_sf)
         raw_logs_count = int(_ps.get("raw_logs_total", 0))
-        _dropped = int(_ps.get("tier1_dropped_total", 0))
-        if raw_logs_count > 0:
-            noise_reduction = (_dropped / raw_logs_count) * 100
     except Exception:
         pass
+
+    # MỘT nguồn sự thật: Tỷ lệ giảm tải = (log thô − cảnh báo escalated) / log thô.
+    # Buộc raw, escalated và noise-reduction luôn NHẤT QUÁN với nhau (tránh việc 3 con
+    # số đến từ 3 counter khác nhau rồi mâu thuẫn, ví dụ 550 thô nhưng 434 escalated).
+    if raw_logs_count > len(all_alerts):
+        noise_reduction = ((raw_logs_count - len(all_alerts)) / raw_logs_count) * 100
+    else:
+        noise_reduction = None  # raw chưa hợp lệ -> header dùng fallback an toàn
 
     # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
     render_metrics_header(
@@ -458,7 +465,15 @@ def main_dashboard():
             )
 
         if not filtered_alerts:
-            st.success("Không có sự cố nào khớp với bộ lọc hoặc cơ sở dữ liệu trống.")
+            _af = st.session_state.get("action_filter_sb", "Tất cả")
+            st.markdown(
+                f"""<div class="soc-empty">
+                    <div class="soc-empty-title">🔎 Không có sự cố nào khớp bộ lọc hiện tại</div>
+                    <div class="soc-empty-sub">Bộ lọc hành động: <b>{_af}</b>. Hãy đổi sang
+                    <b>“Tất cả”</b> hoặc một phân loại khác, hoặc seed thêm dữ liệu demo.</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
         else:
             # Phân trang
             total_pages = max(1, math.ceil(total_filtered / page_size))
@@ -525,13 +540,13 @@ def main_dashboard():
                     if st.session_state.get("role") == "L3_Manager":
                         col1, col2 = st.columns([1, 1])
                         with col1:
-                            if st.button(" Phê duyệt", key=f"app_{rule.get('pattern')}"):
+                            if st.button("✅ Phê duyệt", key=f"app_{rule.get('pattern')}"):
                                 feedback_mgr.approve_rule(rule.get("pattern"), rule.get("field"))
                                 st.success(f"Đã duyệt luật {rule.get('pattern')}")
                                 time.sleep(0.5)
                                 st.rerun()
                         with col2:
-                            if st.button(" Từ chối", key=f"rej_{rule.get('pattern')}"):
+                            if st.button("❌ Từ chối", key=f"rej_{rule.get('pattern')}"):
                                 feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
                                 st.warning(f"Đã từ chối luật {rule.get('pattern')}")
                                 time.sleep(0.5)
@@ -554,7 +569,7 @@ def main_dashboard():
                     st.write(f"**Tạo lúc:** {rule.get('created_at')}")
 
                     if st.session_state.get("role") == "L3_Manager":
-                        if st.button(" Vô hiệu hóa / Hoàn tác", key=f"rev_{rule.get('pattern')}"):
+                        if st.button("🔄 Vô hiệu hóa / Hoàn tác", key=f"rev_{rule.get('pattern')}"):
                             feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
                             st.warning(f"Đã hoàn tác và vô hiệu hóa luật {rule.get('pattern')}")
                             time.sleep(0.5)
@@ -1274,11 +1289,33 @@ def main_dashboard():
             dot_lines.append("}")
             dot_code = "\n".join(dot_lines)
             st.graphviz_chart(dot_code, width="stretch")
-
         else:
-            st.info(
-                "Chưa có kết quả quét lỗ hổng. Vui lòng bấm '⚡ Chạy Quét Lỗ Hổng' ở trên để phân tích hệ thống."
+            # Trạng thái rỗng (chưa quét Trivy) — tránh tab trắng, luôn có nội dung trực quan.
+            st.markdown(
+                """<div class="soc-empty">
+                    <div class="soc-empty-title">🧬 Chưa có dữ liệu quét lỗ hổng</div>
+                    <div class="soc-empty-sub">Bấm <b>“⚡ Chạy Quét Lỗ Hổng (Trivy)”</b> ở trên để
+                    quét container và dựng Knowledge Graph trong Neo4j. Bên dưới là sơ đồ kiến trúc
+                    tri thức minh hoạ của hệ thống SENTINEL.</div>
+                </div>""",
+                unsafe_allow_html=True,
             )
+            st.markdown("##### 🧬 Sơ đồ Kiến trúc Tri thức SENTINEL (minh hoạ)")
+            arch_dot = (
+                'digraph G { rankdir=LR; bgcolor="transparent"; '
+                'node [style=filled, fontname="sans-serif", fontcolor="#ffffff", shape=box, color="#ffffff"]; '
+                'edge [color="#888888", fontcolor="#888888", fontsize=10, fontname="sans-serif"]; '
+                'SOC [label="SENTINEL_SOC", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"]; '
+                'T1 [label="Tier-1 Welford Filter", fillcolor="#14c2c2", color="#14c2c2"]; '
+                'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
+                'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
+                'LLM [label="Tier-2 Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '
+                'MEM [label="Threat Memory (APT)", fillcolor="#1d39c4", color="#1d39c4"]; '
+                'SOC -> T1 [label="ingest"]; T1 -> GR [label="escalate"]; '
+                'GR -> RAG [label="ground"]; RAG -> LLM [label="reason"]; '
+                'LLM -> MEM [label="correlate"]; }'
+            )
+            st.graphviz_chart(arch_dot, width="stretch")
 
 
 if __name__ == "__main__":

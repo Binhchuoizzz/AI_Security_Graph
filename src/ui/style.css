@@ -248,3 +248,110 @@ html, body, [class*="css"] {
 .blink {
     animation: blink-animation 1s infinite;
 }
+
+/* ============================================================
+   PROFESSIONAL UPGRADE — native Streamlit component theming
+   (CSS-only; targets stable Streamlit test-ids, no logic change)
+   ============================================================ */
+
+/* App background: subtle depth gradient instead of flat black */
+.stApp {
+    background:
+        radial-gradient(1200px 600px at 82% -12%, rgba(64,169,255,0.08), transparent 60%),
+        radial-gradient(900px 520px at -12% 112%, rgba(138,43,226,0.07), transparent 55%),
+        #0a0e17;
+}
+
+/* KPI row: turn plain st.metric into professional cards with accent bar */
+[data-testid="stMetric"] {
+    background: linear-gradient(160deg, rgba(28,35,54,0.85), rgba(18,23,38,0.9));
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 18px 16px 14px 16px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.28);
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    position: relative;
+    overflow: hidden;
+}
+[data-testid="stMetric"]::before {
+    content: "";
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: linear-gradient(90deg, #40A9FF, #8A5CFF);
+    opacity: 0.9;
+}
+[data-testid="stMetric"]:hover {
+    transform: translateY(-3px);
+    border-color: rgba(64,169,255,0.35);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+[data-testid="stMetricValue"] {
+    font-size: 2rem; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.74rem !important; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; color: #93A1B5 !important;
+}
+
+/* Tabs: clear active state with accent underline */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {
+    gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+[data-testid="stTabs"] [data-baseweb="tab"] {
+    border-radius: 8px 8px 0 0; padding: 8px 14px; color: #93A1B5;
+    transition: background .15s ease, color .15s ease;
+}
+[data-testid="stTabs"] [data-baseweb="tab"]:hover {
+    background: rgba(64,169,255,0.08); color: #DCE6F2;
+}
+[data-testid="stTabs"] [aria-selected="true"] {
+    color: #FFFFFF !important; background: rgba(64,169,255,0.12);
+    border-bottom: 2px solid #40A9FF;
+}
+
+/* Section headers: accent rule on H2 */
+h1 { letter-spacing: 0.3px; font-weight: 800; }
+h2 { letter-spacing: 0.2px; border-left: 4px solid #40A9FF; padding-left: 12px; }
+h3 { letter-spacing: 0.2px; }
+
+/* Sidebar polish */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, rgba(14,19,30,0.96), rgba(10,14,23,0.96));
+    border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Buttons: subtle gradient + hover lift */
+.stButton > button {
+    border-radius: 9px; border: 1px solid rgba(255,255,255,0.10); font-weight: 600;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+.stButton > button:hover {
+    transform: translateY(-1px); border-color: rgba(64,169,255,0.45);
+    box-shadow: 0 6px 18px rgba(64,169,255,0.18);
+}
+
+/* Inputs / selectbox rounded */
+[data-baseweb="select"] > div, .stTextInput input, .stNumberInput input {
+    border-radius: 8px !important;
+}
+
+/* Dataframes rounded */
+[data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(64,169,255,0.4); }
+
+/* Neutral empty-state panel */
+.soc-empty {
+    background: rgba(22, 28, 45, 0.5);
+    border: 1px dashed rgba(255,255,255,0.14);
+    border-radius: 12px;
+    padding: 28px 20px;
+    text-align: center;
+    color: #93A1B5;
+    margin-top: 8px;
+}
+.soc-empty-title { font-size: 1rem; font-weight: 700; color: #C7D2E0; margin-bottom: 4px; }
+.soc-empty-sub { font-size: 0.85rem; color: #8E9AA8; }
