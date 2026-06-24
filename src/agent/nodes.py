@@ -177,7 +177,17 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
 
     start_time = time.time()
-    raw_response = llm_client.invoke(messages=messages, temperature=0.1)
+    # Suy biến có kiểm soát (graceful degradation): nếu LLM cục bộ chết/không kết nối
+    # được (connection refused, timeout sau retry), KHÔNG để vỡ đồ thị — trả chuỗi rỗng
+    # để parse_llm_response cho AWAIT_HITL an toàn. Tier-1 (xác định) vẫn bảo vệ độc lập.
+    try:
+        raw_response = llm_client.invoke(messages=messages, temperature=0.1)
+    except Exception as e:
+        logger.error(
+            f"[LLM UNAVAILABLE] Tier-2 call thất bại ({e}). Suy biến an toàn -> AWAIT_HITL; "
+            f"Tier-1 vẫn bảo vệ độc lập."
+        )
+        raw_response = ""
     end_time = time.time()
     latency_sec = end_time - start_time
 

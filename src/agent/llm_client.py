@@ -42,6 +42,9 @@ API_KEY = os.getenv("LLM_API_KEY", "sk-placeholder-local-only")  # Giá trị gi
 # Tham số cấu hình cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận nhất quán (deterministic), ít ảo tưởng
+# Seed cố định -> với cùng prompt + temp thấp, llama.cpp cho output TẤT ĐỊNH (tái lập).
+# None = không cố định (bỏ qua). Đọc từ config llm.seed.
+DEFAULT_SEED = _config.get("llm", {}).get("seed", 42)
 # Tên model đọc từ env LLM_MODEL_FILE (đồng bộ với model thực tế llama.cpp đang nạp
 # và tự khớp khi hot-swap qua scripts/switch_model.sh). llama.cpp bỏ qua tên này khi
 # chỉ nạp 1 model, nhưng giữ đồng bộ để chính xác và tương thích đa-model.
@@ -65,6 +68,7 @@ class LLMClient:
         temperature: float = DEFAULT_TEMPERATURE,
         max_tokens: int = DEFAULT_MAX_TOKENS,
         response_format: dict[str, Any] | None = None,
+        seed: int | None = DEFAULT_SEED,
     ) -> str:
         """
         Gọi LLM với cơ chế thử lại (Retry).
@@ -103,6 +107,10 @@ class LLMClient:
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 }
+
+                # Seed cố định -> output tất định (tái lập) với cùng prompt + temp thấp.
+                if seed is not None:
+                    kwargs["seed"] = seed
 
                 # llama.cpp API hỗ trợ JSON mode cho một số model
                 if response_format:

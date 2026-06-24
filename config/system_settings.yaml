@@ -77,6 +77,7 @@ llm:
   max_context_tokens: 8192
   model_name: gemma-2-9b-it-Q6_K
   request_timeout_seconds: 120
+  seed: 42
   temperature: 0.1
 logging:
   audit_db_path: logs/guardrails_audit.db
