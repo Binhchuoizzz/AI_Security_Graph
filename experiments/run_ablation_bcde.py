@@ -94,7 +94,9 @@ def dense_only_context(query_text):
         fetch_k = min(retriever.top_k, len(meta))
         emb = retriever.model.encode([query_text], normalize_embeddings=True).astype("float32")
         dense = retriever._dense_search(emb, source_key, fetch_k)  # {idx:{score,rank}}
-        ranked = sorted(dense.keys(), key=lambda x: dense[x]["score"], reverse=True)[: retriever.top_k]
+        ranked = sorted(dense.keys(), key=lambda x: dense[x]["score"], reverse=True)[
+            : retriever.top_k
+        ]
         if not ranked:
             out[source_key] = f"[{source_name}] No relevant matches found."
             continue

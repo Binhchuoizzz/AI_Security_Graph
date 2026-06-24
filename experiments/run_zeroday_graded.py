@@ -45,9 +45,7 @@ PROBE_FEATURES = [
 
 
 def snapshot_stats(engine):
-    return {
-        k: (s.n, s.old_m, s.new_m, s.old_s, s.new_s) for k, s in engine.global_stats.items()
-    }
+    return {k: (s.n, s.old_m, s.new_m, s.old_s, s.new_s) for k, s in engine.global_stats.items()}
 
 
 def restore_stats(engine, snap):

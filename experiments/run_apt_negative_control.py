@@ -67,7 +67,9 @@ def main():
         ip = ev["ip"]
         day = _safe_int(ev.get("day"), 1)
         all_days[ip].add(day)
-        is_attack = (ev.get("phase") not in BENIGN_PHASES) and (ev.get("label") not in BENIGN_PHASES)
+        is_attack = (ev.get("phase") not in BENIGN_PHASES) and (
+            ev.get("label") not in BENIGN_PHASES
+        )
         if not is_attack:
             continue  # CỔNG GHI: chỉ sự kiện tấn công mới vào kho APT
         attack_days[ip].add(day)

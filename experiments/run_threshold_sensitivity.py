@@ -31,9 +31,7 @@ from experiments.evaluate_unified_stream import (  # noqa: E402
 )
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
-OUT_JSON = os.path.join(
-    os.path.dirname(__file__), "results", "threshold_sensitivity_results.json"
-)
+OUT_JSON = os.path.join(os.path.dirname(__file__), "results", "threshold_sensitivity_results.json")
 
 # Dải ngưỡng quét quanh điểm vận hành 3.5σ (3-sigma rule cổ điển ở giữa).
 THRESHOLDS = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]

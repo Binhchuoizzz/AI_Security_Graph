@@ -115,7 +115,9 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
             ]
             st.dataframe(pd.DataFrame(feed), width="stretch", height=300, hide_index=True)
         else:
-            st.info("Chưa có cảnh báo. Chạy luồng demo (unified_stream) hoặc seed dữ liệu để minh hoạ.")
+            st.info(
+                "Chưa có cảnh báo. Chạy luồng demo (unified_stream) hoặc seed dữ liệu để minh hoạ."
+            )
 
         st.markdown("### 🎯 Chiến dịch APT đa giai đoạn (Multi-day Kill-chain)")
         if apt_events:
