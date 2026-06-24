@@ -2,8 +2,9 @@ import json
 import os
 import re
 import time
-import redis
-import yaml
+
+import redis  # type: ignore
+import yaml  # type: ignore
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "system_settings.yaml")
 try:
@@ -23,6 +24,7 @@ SSH_FAILED_PATTERN = re.compile(
     r"Failed password for (?P<user>\S+) from (?P<ip>\S+) port (?P<port>\d+) ssh2"
 )
 
+
 def follow_file(filepath):
     """Realtime file tailer (tương đương tail -f)"""
     if not os.path.exists(filepath):
@@ -30,8 +32,8 @@ def follow_file(filepath):
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, "w") as f:
             f.write("")
-            
-    with open(filepath, "r") as f:
+
+    with open(filepath) as f:
         # Di chuyển con trỏ tới cuối file
         f.seek(0, os.SEEK_END)
         while True:
@@ -41,10 +43,14 @@ def follow_file(filepath):
                 continue
             yield line
 
+
 def push_to_redis(queue_name, log_entry):
     payload = {"log": json.dumps(log_entry)}
     r.xadd(queue_name, payload, maxlen=10000, approximate=True)
-    print(f"[+] Pushed to Redis [{queue_name}]: {log_entry['Source IP']} -> {log_entry.get('message') or log_entry.get('payload')}")
+    print(
+        f"[+] Pushed to Redis [{queue_name}]: {log_entry['Source IP']} -> {log_entry.get('message') or log_entry.get('payload')}"
+    )
+
 
 def monitor_ssh():
     print(f"[*] Monitoring SSH logs in {AUTH_LOG_PATH}...")
@@ -54,7 +60,7 @@ def monitor_ssh():
             ip = match.group("ip")
             user = match.group("user")
             port = int(match.group("port"))
-            
+
             # Map sang schema mà SENTINEL expects
             log_entry = {
                 "Source IP": ip,
@@ -68,9 +74,10 @@ def monitor_ssh():
                 "Total Bwd Packets": 0,
                 "service": "SSH",
                 "message": f"Failed password for user {user}",
-                "dataset_source": "live_pentest"
+                "dataset_source": "live_pentest",
             }
             push_to_redis("queue_firewall", log_entry)
+
 
 if __name__ == "__main__":
     try:
