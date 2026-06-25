@@ -347,6 +347,49 @@ To assess reasoning quality without self-enhancement bias, a cross-family LLM-as
 
 The judge rated Faithfulness at 4.00/5 with zero variance, indicating that the agent's conclusions are consistently supported by the retrieved MITRE/NIST evidence rather than fabricated, and Answer Relevancy at 4.63/5, confirming that the recommended action matches the detected threat. Context Precision (3.00/5) is the weakest dimension, reflecting that the hybrid retriever occasionally surfaces broadly related rather than pin-point techniques---a clear direction for future re-ranking improvements. Taken together, the overall mean of 3.91/5 and the 100\% audit completeness support the claim that Dual-RAG grounding materially constrains hallucination, while honestly bounding the remaining headroom in retrieval precision.
 
+\section{Operational Robustness: Determinism, Graceful Degradation, and Context Budget}
+Beyond detection accuracy, a locally hosted reasoning layer must be \emph{operationally} dependable: its verdicts must be reproducible, it must fail safe when the model is unavailable, and its context consumption must remain observable and bounded. This section reports three controlled experiments that address these concerns directly, since they are the points most frequently raised against running an LLM on-premise rather than via a managed cloud API.
+
+\subsection{Decision Determinism}
+Because the agent samples at a non-zero temperature ($0.1$), it is fair to ask whether its verdicts are reproducible. Fixing the inference seed (\texttt{llm.seed}\,$=42$) and issuing the \emph{same} escalated prompt five times yields an \textbf{identical action in all $5/5$ runs} (\texttt{BLOCK\_IP}); the raw JSON text collapsed to only two distinct variants---attributable to GPU batching non-determinism---but this never altered the parsed decision. The operational verdict, which is the only output that drives a response action, is therefore deterministic and auditable, satisfying the reproducibility requirement of a forensic SOC tool.
+
+\subsection{Graceful Degradation under Model Outage}
+To test fail-safe behavior, the local LLM endpoint was forced to raise a connection error mid-pipeline while a genuine attack sample was processed end-to-end. The agent graph did \textbf{not crash} (\texttt{crashed}\,$=$\,\texttt{false}); instead, the empty model response was caught and the verdict safely degraded to \texttt{AWAIT\_HITL}, routing the event to a human analyst rather than silently dropping it. Crucially, the deterministic Tier-1 layer continues to filter and block independently of Tier-2 availability, so a model outage downgrades the system to a slower human-in-the-loop mode rather than disabling protection altogether.
+
+\subsection{Context-Budget Observability and Stress Behavior}
+A recurring objection to a \emph{local} LLM is context overflow: if too many logs are forwarded at once, the prompt could exceed the model window ($n_{\text{ctx}} = 8192$ tokens) and silently truncate evidence. Two complementary mechanisms address this. First, a stress sweep forwarded an increasing number of logs ($N \in [1, 2000]$) and measured the resulting input tokens under two regimes: naive concatenation (RAW) versus the Drain template-mining compressor used by SENTINEL. Table~\ref{tab:context_stress} and Figure~\ref{fig:context_stress} report the result.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \caption{Input-token growth versus number of forwarded logs: naive concatenation (RAW) against Drain-compressed prompts. The model window is $n_{\text{ctx}} = 8192$ and the prompt budget is $4{,}000$ tokens. (Source: Author)}
+    \label{tab:context_stress}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \textbf{Logs $N$} & \textbf{RAW tokens} & \textbf{Compressed tokens} & \textbf{RAW exceeds $n_{\text{ctx}}$?} \\
+        \hline
+        1 & 100 & 47 & no \\
+        \hline
+        50 & 5{,}125 & 80 & no \\
+        \hline
+        100 & 10{,}251 & 80 & \textbf{yes} \\
+        \hline
+        500 & 50{,}651 & 79 & yes \\
+        \hline
+        2000 & 201{,}355 & 80 & yes \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/context_stress.png}
+    \caption{Context-budget stress curve. Naive concatenation grows linearly and breaches the $8{,}192$-token window beyond $N \approx 100$ logs, whereas Drain template compression saturates near $80$ tokens regardless of volume, keeping every batch within budget by construction. (Source: Author)}
+    \label{fig:context_stress}
+\end{figure}
+
+The RAW prompt grows linearly and breaches the $8{,}192$-token window at only $N \approx 100$ logs ($10{,}251$ tokens), reaching $201{,}355$ tokens at $N = 2000$---a $25\times$ overflow. In contrast, the Drain-compressed prompt \emph{saturates} at $\approx 80$ tokens regardless of volume (a compression ratio exceeding $2{,}500\times$ at $N = 2000$), remaining well within the $4{,}000$-token budget by design. Context overflow is therefore structurally prevented rather than merely hoped for. Second, the running pipeline is instrumented with a token monitor that records the \emph{real} prompt and completion tokens returned by the server and persists per-call statistics. Across a live escalation batch the monitor reported a mean prompt size of $4{,}818$ tokens (p95 $= 4{,}960$; max $= 4{,}960$), i.e.\ a peak context utilization of \textbf{60.5\%} with \textbf{zero} overflow warnings---empirical confirmation that, after Tier-1 filtering and Drain compression, real escalated batches consume well under the available window, and that any approach toward the budget would be observable and actionable rather than a silent failure.
+
 \section{Summary of 5D Evaluation Results}
 Table~\ref{tab:5d_summary} consolidates the principal findings across the five evaluation dimensions, mapping each dimension back to the concrete metric that operationalizes it.
 

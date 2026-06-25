@@ -347,6 +347,49 @@ Giai đoạn xác thực cuối cùng đánh giá tính toàn vẹn của lịch
 
 Trọng tài chấm Faithfulness 4.00/5 với phương sai bằng không, cho thấy kết luận của tác tử luôn được hỗ trợ bởi bằng chứng MITRE/NIST đã truy xuất chứ không phải bịa đặt, và Answer Relevancy 4.63/5, khẳng định hành động đề xuất khớp với mối đe dọa được phát hiện. Context Precision (3.00/5) là chiều yếu nhất, phản ánh việc bộ truy xuất lai đôi khi đưa ra các kỹ thuật liên quan rộng thay vì chính xác điểm---một hướng cải tiến tái xếp hạng (re-ranking) trong tương lai. Tổng hợp lại, trung bình tổng 3.91/5 cùng tỷ lệ đầy đủ kiểm toán 100\% củng cố luận điểm rằng việc neo nền tảng bằng Dual-RAG hạn chế ảo giác một cách thực chất, đồng thời nêu trung thực phần dư địa còn lại ở độ chính xác truy xuất.
 
+\section{Độ bền Vận hành: Tính Tất định, Suy biến An toàn và Ngân sách Ngữ cảnh}
+Ngoài độ chính xác phát hiện, một tầng suy luận chạy cục bộ còn phải đáng tin cậy về mặt \emph{vận hành}: phán quyết phải tái lập được, hệ phải suy biến an toàn khi mô hình không khả dụng, và mức tiêu thụ ngữ cảnh phải quan sát được và bị chặn trên. Phần này trình bày ba thực nghiệm có kiểm soát nhằm giải quyết trực tiếp các quan ngại đó, vì đây chính là những điểm thường bị nêu ra khi phản đối việc chạy LLM tại chỗ thay vì qua API đám mây được quản lý.
+
+\subsection{Tính Tất định của Quyết định}
+Vì tác tử lấy mẫu ở nhiệt độ khác không ($0.1$), một câu hỏi hợp lý là liệu phán quyết của nó có tái lập được hay không. Cố định hạt giống suy luận (\texttt{llm.seed}\,$=42$) và đưa \emph{cùng một} prompt đã leo thang năm lần cho ra \textbf{hành động giống hệt ở cả $5/5$ lượt} (\texttt{BLOCK\_IP}); văn bản JSON thô chỉ thu về hai biến thể---do tính bất định khi gộp lô (batching) trên GPU---nhưng điều này KHÔNG bao giờ làm thay đổi quyết định sau khi phân tích cú pháp. Phán quyết vận hành, vốn là đầu ra DUY NHẤT điều khiển hành động ứng phó, do đó có tính tất định và kiểm toán được, thỏa mãn yêu cầu tái lập của một công cụ SOC pháp chứng.
+
+\subsection{Suy biến An toàn khi Mô hình Gián đoạn}
+Để kiểm tra hành vi an toàn-khi-lỗi, điểm cuối LLM cục bộ bị ép ném lỗi kết nối giữa chừng trong khi một mẫu tấn công thật được xử lý đầu-cuối. Đồ thị tác tử \textbf{KHÔNG vỡ} (\texttt{crashed}\,$=$\,\texttt{false}); thay vào đó, phản hồi rỗng của mô hình bị bắt lại và phán quyết suy biến an toàn về \texttt{AWAIT\_HITL}, định tuyến sự kiện cho phân tích viên thay vì âm thầm bỏ qua. Quan trọng hơn, tầng Tier-1 tất định vẫn tiếp tục lọc và chặn độc lập với tình trạng khả dụng của Tier-2, nên việc mô hình gián đoạn chỉ hạ cấp hệ thống xuống chế độ có-người-trong-vòng-lặp chậm hơn, chứ không vô hiệu hóa khả năng bảo vệ.
+
+\subsection{Quan sát Ngân sách Ngữ cảnh và Hành vi Chịu tải}
+Một phản biện thường gặp với LLM \emph{cục bộ} là tràn ngữ cảnh: nếu chuyển tiếp quá nhiều log cùng lúc, prompt có thể vượt cửa sổ mô hình ($n_{\text{ctx}} = 8192$ token) và âm thầm cắt cụt chứng cứ. Hai cơ chế bổ trợ giải quyết điều này. Thứ nhất, một phép quét chịu tải chuyển tiếp số log tăng dần ($N \in [1, 2000]$) và đo số token đầu vào theo hai chế độ: nối thẳng (RAW) so với bộ nén khai phá mẫu Drain mà SENTINEL sử dụng. Bảng~\ref{tab:context_stress} và Hình~\ref{fig:context_stress} trình bày kết quả.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \caption{Mức tăng token đầu vào theo số log chuyển tiếp: nối thẳng (RAW) so với prompt nén bằng Drain. Cửa sổ mô hình là $n_{\text{ctx}} = 8192$ và ngân sách prompt là $4{,}000$ token. (Nguồn: Tác giả)}
+    \label{tab:context_stress}
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \textbf{Số log $N$} & \textbf{Token RAW} & \textbf{Token nén} & \textbf{RAW vượt $n_{\text{ctx}}$?} \\
+        \hline
+        1 & 100 & 47 & không \\
+        \hline
+        50 & 5{,}125 & 80 & không \\
+        \hline
+        100 & 10{,}251 & 80 & \textbf{có} \\
+        \hline
+        500 & 50{,}651 & 79 & có \\
+        \hline
+        2000 & 201{,}355 & 80 & có \\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/context_stress.png}
+    \caption{Đường cong chịu tải ngân sách ngữ cảnh. Nối thẳng tăng tuyến tính và vượt cửa sổ $8{,}192$ token khi $N \gtrsim 100$ log, trong khi nén mẫu Drain bão hòa quanh $80$ token bất kể khối lượng, giữ mọi lô trong ngân sách theo thiết kế. (Nguồn: Tác giả)}
+    \label{fig:context_stress}
+\end{figure}
+
+Prompt RAW tăng tuyến tính và vượt cửa sổ $8{,}192$ token chỉ tại $N \approx 100$ log ($10{,}251$ token), đạt $201{,}355$ token ở $N = 2000$---tức tràn $25$ lần. Ngược lại, prompt nén Drain \emph{bão hòa} ở $\approx 80$ token bất kể khối lượng (tỷ lệ nén vượt $2{,}500$ lần tại $N = 2000$), luôn nằm trong ngân sách $4{,}000$ token theo thiết kế. Tràn ngữ cảnh vì vậy được ngăn chặn về mặt cấu trúc chứ không chỉ là kỳ vọng. Thứ hai, pipeline đang chạy được trang bị một bộ theo dõi token ghi lại số token prompt và completion \emph{thật} do máy chủ trả về và lưu thống kê theo từng lần gọi. Trên một lô leo thang thực tế, bộ theo dõi báo kích thước prompt trung bình $4{,}818$ token (p95 $= 4{,}960$; cực đại $= 4{,}960$), tức mức sử dụng ngữ cảnh đỉnh \textbf{60,5\%} với \textbf{KHÔNG} cảnh báo tràn nào---bằng chứng thực nghiệm rằng sau khi lọc Tier-1 và nén Drain, các lô leo thang thật tiêu thụ thấp hơn nhiều so với cửa sổ khả dụng, và mọi sự tiến sát ngân sách đều quan sát được và xử lý được chứ không phải một lỗi âm thầm.
+
 \section{Tổng hợp Kết quả Đánh giá 5D}
 Bảng~\ref{tab:5d_summary} tổng hợp các phát hiện chính trên cả năm chiều đánh giá, ánh xạ mỗi chiều về đúng chỉ số định lượng hiện thực hóa nó.
 
