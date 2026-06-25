@@ -1,9 +1,39 @@
 # Tài liệu Tổng kết Cấu trúc Mã nguồn & Lộ trình Học tập (SENTINEL)
 
-Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thống SENTINEL, phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Lộ trình học tập 5 ngày**. Mỗi file phân tích rõ: **Mục đích → Tác dụng → Mối quan hệ** với các cấu phần khác. Đã đối chiếu sát với code ở HEAD (cập nhật 2026-06: luồng gộp online, zero-day real-derived, Anti-Self-DoS shield hẹp, raw-log counter thật, BLOCK_IP brute-force, FIREWALL MOCK).
+Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thống SENTINEL, phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Lộ trình học tập 5 ngày**. Mỗi file phân tích rõ: **Mục đích → Tác dụng → Mối quan hệ** với các cấu phần khác. Đã đối chiếu sát với code ở HEAD (cập nhật 2026-06: luồng gộp online, zero-day real-derived, Anti-Self-DoS shield hẹp, raw-log counter thật, BLOCK_IP brute-force, FIREWALL MOCK; **bổ sung mới nhất:** quan sát ngữ cảnh `token_monitor` + seed tất định + suy biến an toàn ở Agent, và 7 experiment rigor: ablation B–E/cân bằng, độ nhạy ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM).
 
 > **Bản đồ luồng:** Dataset → **Tier-1** (RuleEngine + Welford) → **Guardrails** → **Dual-RAG** → **LangGraph Agent (LLM)** → **Response/Audit** → **Dashboard HITL** → Feedback Loop về Tier-1.
 > **Trạng thái kiểm thử:** `pytest 194 passed`, `E2E 22/22 PASSED`.
+
+---
+
+## **LUỒNG XỬ LÝ ĐẦU-CUỐI (END-TO-END FLOW) — đọc trước để nắm "từng quá trình một"**
+
+Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ thống (online runtime), và đường đi **offline benchmark** — kèm file/hàm chính xác ở mỗi bước. Số trong ngoặc `(#n)` trỏ tới mục chi tiết bên dưới.
+
+### A. LUỒNG ONLINE THỜI GIAN THỰC (production/demo realtime)
+
+1. **Thu nhận (Ingestion):** một nguồn đẩy log JSON vào **Redis Stream** (`xadd`) trên queue `queue_firewall`/`queue_waf`/`queue_sysmon`. Có **4 nguồn**: `publisher.py` (#6, raw CSV load-test), `simulate_traffic.py` (#7, replay ground_truth), `stream_unified_online.py` (#53, luồng gộp online), `live_log_collector.py` (#8, **bắt log THẬT** từ `/var/log/auth.log` + decoy WAF).
+2. **Tiêu thụ (Subscriber):** `subscriber.py` (#9) đọc qua consumer group `sentinel_group` (`xreadgroup`), gọi `RuleEngine.evaluate(log)`.
+3. **Tier-1 quyết định** (`rule_engine.py` #10): trả `tier1_action` → định tuyến:
+   - `DROP`/`LOG` (benign) → đếm vào `pipeline_stats.json`, KHÔNG leo thang.
+   - `BLOCK_IP` → blacklist ngay.
+   - `AWAIT_HITL` → `queue_hitl`.
+   - `ALERT` → `queue_decisions`.
+   - `ESCALATE` → gom batch gọi Agent. *(APT emergent: `record_apt_event`+`check_apt_chain` có thể ÉP `ESCALATE`.)*
+4. **Agent (LangGraph)** — batch escalate → `agent_app.invoke(SentinelState)` (`workflow.py` #34). Đồ thị: `guardrails → rag_context → llm_triage →` (rẽ nhánh) `action_executor` / `human_in_the_loop` / `END`.
+5. **node_guardrails** (#35): `GuardrailsPipeline` nén Drain (#15) + đóng gói nonce (#16).
+6. **node_rag_context** (#35): `DualRetriever._hybrid_search` (FAISS+BM25+RRF, #30) + `threat_memory.get_context_for_prompt` (lịch sử APT, #39).
+7. **node_llm_triage** (#35): `build_triage_prompt` (#36) → `llm_client.invoke` (Gemma, seed=42, `token_monitor` preflight/record #38) → parse → `DecisionValidator.validate_decision` + `enforce_tier_consensus` (#21) → ghi `AuditLogger`. *(LLM chết → suy biến `AWAIT_HITL`.)*
+8. **Rẽ nhánh** (`route_triage_decision`): `execute_action` → **node_action_executor** (#35): `block_ip()` (FIREWALL MOCK #40) + `FeedbackListener.receive_new_rule()` PENDING (#11) + `threat_memory.record_incident` (#39) + audit HMAC. `await_hitl` → **node_human_in_the_loop** (#35) → hàng đợi analyst. `end_cycle` → kết thúc.
+9. **Audit** (`executor.py` #40): ghi `audit_trail.db` chuỗi HMAC-SHA256 (chống giả mạo).
+10. **Dashboard** (`app.py` #41): đọc `audit_trail.db`/`threat_memory.db`/`pipeline_stats.json`/`llm_token_stats.json`; analyst Duyệt luật → `approve_rule` persist `system_settings.yaml` → **RuleEngine hot-reload** → Tier-1 enforce IP đó ở lần sau ⇒ **VÒNG PHẢN HỒI khép kín** (#11).
+
+### B. LUỒNG OFFLINE BENCHMARK (đánh giá tất định, không cần Redis)
+
+`evaluate_unified_stream.build_stream()` (#52) gộp **CICIDS + DAPT2020 + zero-day real-derived** thành MỘT luồng sắp theo thời gian → chạy qua `RuleEngine` + Welford + `ThreatMemoryStore` **bộ nhớ SẠCH** → đo phân loại + APT emergent + zero-day. Các script rigor (#54–#57) và ablation (#46–#47) **tái dùng** `build_stream`/`map_cicids`/`_is_threat` để đo trên cùng dữ liệu thật.
+
+> **Tóm tắt 2 trục:** Online (A) = chứng minh end-to-end + demo; Offline (B) = benchmark tất định cho luận văn. Cả hai dùng CHUNG Tier-1/Guardrails/RAG/Memory — chỉ khác nguồn đẩy và việc có gọi LLM hay không.
 
 ---
 
@@ -36,39 +66,45 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 ### 6. `src/streaming/publisher.py`
 *   **Mục đích:** Stream CSV THÔ ở quy mô lớn (production load-test).
-*   **Tác dụng:** Đọc CSV **CHUNKED** (chunksize=500, file hàng triệu dòng không nạp hết RAM), chuẩn hóa cột + sinh IP xác định (`_inject_ips`), đẩy từng flow JSON vào **Redis Stream** `xadd` (maxlen chống OOM) với backpressure. *(1 trong **BA PUBLISHER**: file này = raw load-test; `simulate_traffic.py` = replay ground_truth; `stream_unified_online.py` = luồng gộp online.)*
-*   **Mối quan hệ:** Đẩy vào `queue_waf`; subscriber tiêu thụ qua consumer group.
+*   **Tác dụng:** Đọc CSV **CHUNKED** (chunksize=500, file hàng triệu dòng không nạp hết RAM), chuẩn hóa cột + sinh IP xác định (`_inject_ips`), đẩy từng flow JSON vào **Redis Stream** `xadd` (maxlen chống OOM) với backpressure. *(1 trong **4 NGUỒN ĐẦU VÀO**: file này = raw load-test; `simulate_traffic.py` (#7) = replay ground_truth; `stream_unified_online.py` (#53) = luồng gộp online; `live_log_collector.py` (#8) = **bắt log THẬT** live từ OS/decoy WAF.)*
+*   **Mối quan hệ:** Đẩy vào `queue_waf`; subscriber (#9) tiêu thụ qua consumer group.
 
 ### 7. `scripts/simulate_traffic.py`
 *   **Mục đích:** Replay `ground_truth.json` (4267 mẫu có nhãn) lên Redis cho demo/ablation.
 *   **Tác dụng:** Multi-source routing (`determine_queue`: port → queue_firewall/queue_waf), `map_to_cicids` ánh xạ network_layer → schema RuleEngine, kèm metadata ground-truth (`gt_id`...).
 *   **Mối quan hệ:** Đọc `ground_truth.json`, đẩy 3 queue; subscriber tiêu thụ.
 
-### 8. `src/streaming/subscriber.py`
+### 8. `scripts/live_log_collector.py`
+*   **Mục đích:** Bắt log THẬT từ máy chủ (live capture) đẩy vào Redis cho demo pentest trực tiếp (Kali) — nguồn đầu vào THẬT thứ tư (khác 3 publisher benchmark/demo).
+*   **Tác dụng:** `follow_file()` tail realtime `/var/log/auth.log`, `parse_ssh_line()` bắt SSH login fail (cả **password** lẫn **publickey**) → `push_to_redis('queue_firewall')`; chạy **decoy WAF HTTP server** (`DecoyWAFHandler`, cổng 8000) bắt request lạ → `push_to_redis('queue_waf')`. `xadd` maxlen=10000.
+*   **Mối quan hệ:** Đẩy vào `queue_firewall`/`queue_waf`; subscriber (#9) tiêu thụ như mọi publisher khác. Dùng trong `docs/guides/KALI_PENTEST_DEMO.md`.
+
+### 9. `src/streaming/subscriber.py`
 *   **Mục đích:** Lắng nghe & gom batch logs từ Redis cho Tier-1/Tier-2; ghi chuỗi APT emergent; đếm số liệu thật.
-*   **Tác dụng:** Consumer group `sentinel_group` trên các Redis Stream (`queue_firewall`/`queue_waf`) qua `xreadgroup`; mỗi log → `RuleEngine.evaluate` → định tuyến theo `tier1_action`: `ESCALATE` → batch gọi Agent; `BLOCK_IP` → blacklist; `AWAIT_HITL` → `queue_hitl`; `ALERT/LOG` → `queue_decisions`. **APT EMERGENT (online):** message mang metadata DAPT (`apt_phase`/`apt_day`/`apt_is_attack` từ `stream_unified_online.py`) → `record_apt_event` rồi `check_apt_chain`; bản án bật (đủ đa-ngày) → ép `ESCALATE`. **Số liệu THẬT:** đếm log thô qua Tier-1 + số bị DROP → ghi `config/pipeline_stats.json` (atomic, chia sẻ qua volume) cho Dashboard tính Noise Reduction thật (KHÔNG dùng Redis vì container Dashboard không reach được redis).
+*   **Tác dụng:** Consumer group `sentinel_group` trên các Redis Stream (`queue_firewall`/`queue_waf`/`queue_sysmon`) qua `xreadgroup`; mỗi log → `RuleEngine.evaluate` → định tuyến theo `tier1_action`: `ESCALATE` → batch gọi Agent; `BLOCK_IP` → blacklist; `AWAIT_HITL` → `queue_hitl`; `ALERT/LOG` → `queue_decisions`. **APT EMERGENT (online):** message mang metadata DAPT (`apt_phase`/`apt_day`/`apt_is_attack` từ `stream_unified_online.py`) → `record_apt_event` rồi `check_apt_chain`; bản án bật (đủ đa-ngày) → ép `ESCALATE`. **Số liệu THẬT:** đếm log thô qua Tier-1 + số bị DROP → ghi `config/pipeline_stats.json` (atomic, chia sẻ qua volume) cho Dashboard tính Noise Reduction thật (KHÔNG dùng Redis vì container Dashboard không reach được redis).
 *   **Mối quan hệ:** Gọi `rule_engine.py` (Tier-1), `agent/threat_memory.py` (APT), `agent/workflow.py` (Tier-2 khi escalate).
 
-### 9. `src/tier1_filter/rule_engine.py` *(Cực kỳ quan trọng)*
+### 10. `src/tier1_filter/rule_engine.py` *(Cực kỳ quan trọng)*
 *   **Mục đích:** Màng lọc heuristics tốc độ cao + phát hiện dị biệt thống kê phi giám sát trực tuyến.
 *   **Tác dụng:**
     *   `RunningStats`: thuật toán **Welford** cập nhật Mean/StdDev trực tuyến, $O(1)$ RAM/CPU.
     *   `SessionBaseline`: IP profiles, phát hiện **port scan** (>10 cổng non-HTTP), tần suất/dung lượng bất thường; eviction TTL chống OOM.
-    *   `evaluate()` theo tầng: Whitelist → **WAF signature** (SQLi/XSS/Path/Cmd-Inj) → **Injection/Jailbreak signature** → **Z-Score anomaly** (warmup 100 mẫu sạch, lệch >3.5σ → zero-day) → Static rules (cổng nhạy cảm, volumetric) → **Dynamic rules (status `ACTIVE`)** → Session baseline → action (DROP/LOG/ALERT/BLOCK_IP/AWAIT_HITL/ESCALATE).
+    *   `evaluate()` theo tầng: Whitelist → **WAF signature** (SQLi/XSS/Path/Cmd-Inj) → **Injection/Jailbreak signature** → **Z-Score anomaly** (warmup 100 mẫu sạch, lệch > `z_threshold`σ (tham số, mặc định 3.5) → zero-day) → Static rules (cổng nhạy cảm, volumetric) → **Dynamic rules (status `ACTIVE`)** → Session baseline → action (DROP/LOG/ALERT/BLOCK_IP/AWAIT_HITL/ESCALATE).
     *   **Chống Baseline Poisoning:** chỉ nạp flow benign (DROP/LOG) vào `global_stats`. **Hot-reload** config mỗi 5s.
+    *   `z_threshold` được tham số hóa (đọc `tier1.z_threshold`, mặc định 3.5) để `run_threshold_sensitivity.py` quét độ nhạy mà KHÔNG đổi hành vi production.
 *   **Mối quan hệ:** Nhận logs từ `subscriber.py`; đọc/hot-reload `system_settings.yaml`; trả quyết định Tier-1. Luật ACTIVE (do HITL duyệt) được enforce ở đây.
 
-### 10. `src/tier1_filter/feedback_listener.py`
+### 11. `src/tier1_filter/feedback_listener.py`
 *   **Mục đích:** Vòng phản hồi đồng bộ rule động UI/Agent ↔ Tier-1.
 *   **Tác dụng:** Nhận rule mới (`receive_new_rule` qua `FeedbackValidator`), persist `system_settings.yaml` bằng **atomic write** (`mkstemp`+`chmod 0644`+`os.replace`) + `FileLock`. Vòng đời `PENDING_APPROVAL → ACTIVE/REJECTED` (HITL); `approve_rule`/`reject_rule`/`get_pending_rules`/`get_active_dynamic_rules`; whitelist; clamp score `[0,100]`.
 *   **Mối quan hệ:** Gọi bởi `node_action_executor` (Agent khi BLOCK_IP) và Dashboard (nút Duyệt); RuleEngine hot-reload rule ACTIVE.
 
-### 11. `src/tier1_filter/scanner.py`
+### 12. `src/tier1_filter/scanner.py`
 *   **Mục đích:** Quét lỗ hổng phụ thuộc (SCA) bằng Trivy (DevSecOps tự-bảo-vệ).
 *   **Tác dụng:** `VulnerabilityScanner` chạy `trivy fs` (list-form, không shell), xuất `data/trivy-results.json` nạp vào Knowledge Graph. KHÔNG tương tác runtime pipeline.
 *   **Mối quan hệ:** Chạy độc lập (main.py mode scan/full); output cho `graph_builder.py`.
 
-### 12. `demos/demo_tier1.py`
+### 13. `demos/demo_tier1.py`
 *   **Mục đích:** Demo chạy riêng Tier-1.
 *   **Tác dụng:** CLI minh họa các action (DROP/BLOCK_IP/ALERT/ESCALATE/AWAIT_HITL) + Welford Z-Score zero-day; xử lý đúng rule động.
 *   **Mối quan hệ:** Gọi trực tiếp `rule_engine.py`.
@@ -77,57 +113,57 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 ## **NGÀY 2: TẦNG AN TOÀN & NÉN DỮ LIỆU (GUARDRAILS)**
 
-### 13. `src/guardrails/constants.py`
+### 14. `src/guardrails/constants.py`
 *   **Mục đích:** Tập trung ánh xạ tên trường log giữa các tầng.
 *   **Tác dụng:** `KEY_ALIASES` + `normalize_log_keys()` chuyển biến thể (`src_ip`/`dst_port`/`user_agent`...) → chuẩn (`Source IP`/`Destination Port`/`User-Agent`...).
 *   **Mối quan hệ:** Dùng bởi `data_validator`, `feedback_validator`, `template_miner`, `prompt_filter`.
 
-### 14. `src/guardrails/template_miner.py`
+### 15. `src/guardrails/template_miner.py`
 *   **Mục đích:** Nén volume logs + quản lý token đầu vào LLM.
 *   **Tác dụng:** `LogTemplateMiner` (drain3) gom logs cùng cấu trúc thành Template+count; `EntropyScorer` (Shannon entropy) ưu tiên log bất thường; `TokenBudgetManager` ước lượng token (`len//4`) cắt theo `token_budget` config.
-*   **Mối quan hệ:** Nhận logs escalate từ Tier-1, nén & chuyển `prompt_filter.py`.
+*   **Mối quan hệ:** Nhận logs escalate từ Tier-1, nén & chuyển `prompt_filter.py`. Cũng được `run_context_stress.py` dùng để chứng minh nén ngữ cảnh bão hòa.
 
-### 15. `src/guardrails/prompt_filter.py`
+### 16. `src/guardrails/prompt_filter.py`
 *   **Mục đích:** Phòng thủ Prompt Injection nhiều lớp trước khi log vào LLM.
 *   **Tác dụng:** `PromptInjectionDetector`/`JailbreakDetector` (regex + role-play, isolation `HIGH`/`CRITICAL`); `EncodingNeutralizer` (NFKC + giải base64/base32/ROT13/URL/hex + fold homoglyph/leetspeak + strip zero-width/HTML, có guard chống false-positive); `DelimitedDataEncapsulator` (**nonce `secrets.token_hex(8)`**, strip delimiter smuggling, chỉ giữ `ALLOWED_FIELDS`); `GuardrailsPipeline` orchestrate `process()`/`process_batch()`.
 *   **Mối quan hệ:** Nhận log đã nén; đóng gói an toàn trước prompt Agent.
 
-### 16. `src/guardrails/output_sanitizer.py`
+### 17. `src/guardrails/output_sanitizer.py`
 *   **Mục đích:** Làm sạch ĐẦU RA LLM (chống Data Exfiltration/XSS/Markdown).
 *   **Tác dụng:** Singleton `output_sanitizer`: strip zero-width/ANSI; thay pattern nguy hiểm (markdown image/link, `<script>/<img>/<iframe>/<svg>`, data URI) bằng placeholder; quét **base64/hex obfuscation sâu**.
 *   **Mối quan hệ:** Dùng bởi `decision_validator`, `threat_memory`, `nodes` (double-sanitize) trước khi hiển thị/ghi DB.
 
-### 17. `src/guardrails/data_validator.py`
+### 18. `src/guardrails/data_validator.py`
 *   **Mục đích:** Xác thực schema log đầu vào (chống Schema Abuse).
 *   **Tác dụng:** Chuẩn hóa key, ép kiểu an toàn, kiểm IP (`ipaddress`), port `[0,65535]`, protocol `[0,255]`; gắn `_is_valid`/`_validation_errors`; batch `filter_invalid`/`raise_on_error`.
 *   **Mối quan hệ:** Chốt định dạng đầu vào cho Guardrail Layer.
 
-### 18. `src/guardrails/state_monitor.py`
+### 19. `src/guardrails/state_monitor.py`
 *   **Mục đích:** Giám sát runtime: audit, chống vòng lặp vô hạn, kiểm soát context.
 *   **Tác dụng:** `AuditLogger` ghi SQLite an toàn (`threading.Lock`); `LoopDetector` (`FORCE_STOP` khi vượt, `reset()`); `ContextOverflowGuard` (ngân sách token). Singletons `loop_detector`/`audit_logger`/`context_overflow_guard`.
 *   **Mối quan hệ:** Ghi audit & giám sát các Node LangGraph.
 
-### 19. `src/guardrails/rag_sanitizer.py`
+### 20. `src/guardrails/rag_sanitizer.py`
 *   **Mục đích:** Chống RAG Poisoning & Semantic Cache Poisoning.
 *   **Tác dụng:** `sanitize_ingest` (NFKC, strip control/zero-width/HTML/markdown, truncate); `sanitize_retrieve` (strip delimiter, trung hòa injection); `sanitize_cache_entry` (làm sạch cache-hit path).
 *   **Mối quan hệ:** Tích hợp vào `rag/retriever.py` và `rag/security.py`.
 
-### 20. `src/guardrails/decision_validator.py`
+### 21. `src/guardrails/decision_validator.py`
 *   **Mục đích:** Thẩm định quyết định LLM (chống Hallucination/Self-DoS/Social-Engineering).
 *   **Tác dụng:** Ép Action Enum hợp lệ; **Confidence Gate** (BLOCK_IP cần ≥0.5); **Anti-Self-DoS Shield** hạ BLOCK_IP→ALERT **chỉ** khi target ∈ **`critical_infrastructure_subnets`** (HẸP: loopback + hạ tầng cụ thể, parse hex/octal/integer chống bypass) — **KHÔNG** dùng toàn RFC1918 (nếu rộng → không chặn được attacker nội bộ/lateral, vá 2026-06); sanitize reasoning/mitre/nist. **`enforce_tier_consensus`**: nếu Tier-1 coi là tấn công nhưng LLM hạ xuống LOG/DROP → KHÔNG tin LLM, ép `AWAIT_HITL`.
 *   **Mối quan hệ:** Gọi bởi `node_llm_triage` trước khi thực thi quyết định.
 
-### 21. `src/guardrails/feedback_validator.py`
+### 22. `src/guardrails/feedback_validator.py`
 *   **Mục đích:** Zero-Trust cho rule động & whitelist đẩy về Tier-1.
 *   **Tác dụng:** Chặn wildcard (`0.0.0.0/0`, `*`, `any`), CIDR ≥ `/8`, cấm chặn IP hạ tầng (`127.0.0.1`/`10.0.0.99`); validate regex URI/User-Agent; chỉ whitelist IP trong subnet tin cậy (`trusted_internal_subnets`).
 *   **Mối quan hệ:** Dùng bởi `FeedbackListener` kiểm duyệt rule.
 
-### 22. `scripts/build_adversarial_suite.py`
+### 23. `scripts/build_adversarial_suite.py`
 *   **Mục đích:** Sinh bộ adversarial mở rộng (120 mẫu / 5 nhóm) theo OWASP LLM Top 10.
 *   **Tác dụng:** Sinh `encoding_bypass`(45)/`structural_attacks`(20)/`semantic_confusion`(20)/`jailbreak`(20)/`rag_poisoning`(15) ra `experiments/adversarial/{cat}/samples.json`.
 *   **Mối quan hệ:** Đầu vào cho `evaluate_robustness.py` và `evaluate_adversarial_pipeline.py`.
 
-### 23. `demos/demo_guardrails.py`
+### 24. `demos/demo_guardrails.py`
 *   **Mục đích:** Demo tích hợp Guardrails.
 *   **Tác dụng:** Trực quan hóa các lớp: injection/jailbreak, nonce delimiter, encoding neutralize, RAG sanitize, decision/feedback validate, output sanitize.
 *   **Mối quan hệ:** Gọi trực tiếp `src/guardrails/`.
@@ -136,42 +172,42 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 ## **NGÀY 3: TẦNG TRUY XUẤT TRI THỨC KÉP (DUAL-RAG) & ĐỒ THỊ TRI THỨC**
 
-### 24. `src/rag/embedder.py`
+### 25. `src/rag/embedder.py`
 *   **Mục đích:** Xây Vector Index (FAISS & BM25) + cập nhật checksum.
 *   **Tác dụng:** Chunk MITRE/NIST (~256 token), `RAGSanitizer.sanitize_ingest()`, `SentenceTransformer('all-MiniLM-L6-v2')` → vector 384 chiều; ghi SHA-256 vào `checksums.sha256`. `verify_document_integrity(exclude_generated=True)` ở đầu build.
 *   **Mối quan hệ:** Đọc `knowledge_base/`, ghi `knowledge_base/faiss_index/`.
 
-### 25. `scripts/build_rag_indexes.py`
+### 26. `scripts/build_rag_indexes.py`
 *   **Mục đích:** CLI wrapper xây chỉ mục RAG.
 *   **Tác dụng:** Set PYTHONPATH, gọi `build_all_indexes()`.
 *   **Mối quan hệ:** Gọi `src/rag/embedder.py`.
 
-### 26. `scripts/build_knowledge_base.py` (TỰ-CHỨA, single file)
+### 27. `scripts/build_knowledge_base.py` (TỰ-CHỨA, single file)
 *   **Mục đích:** **Entry point DUY NHẤT** xây dựng/mở rộng tri thức RAG trong MỘT lần.
 *   **Tác dụng:** Inline trực tiếp data → append idempotent **67 kỹ thuật MITRE (0 trùng id) + 7 playbook NIST** (phủ đủ 14 tactic) vào `mitre_attack.json`/`nist_800_61r2.json`, RỒI tự rebuild FAISS/BM25 index + checksum (cờ `--no-index` để bỏ qua). Hai file `expand_knowledge_base.py` + `supplement_knowledge_base.py` cũ **đã xóa** — toàn bộ `ALL_MITRE`/`ALL_NIST` nay nằm gọn trong file này (1 source of truth thật sự).
 *   **Mối quan hệ:** Đọc data inline → gọi `embedder.build_all_indexes()` + `update_checksums_file()`.
 
-### 27. `src/rag/security.py`
+### 28. `src/rag/security.py`
 *   **Mục đích:** Lá chắn toàn vẹn tri thức RAG (chống RAG Poisoning vật lý).
 *   **Tác dụng:** `verify_document_integrity()` so SHA-256 file KB/index với `checksums.sha256`, sai khác → ngắt (fail-closed); `log_tokenizer()` giữ CVE/IP; `add_provenance()` gắn tag `[VERIFIED: SENTINEL_KB]`.
 *   **Mối quan hệ:** Gọi bởi `embedder.py` và `retriever.py` (chạy TRƯỚC `pickle.load` BM25 → chặn CWE-502).
 
-### 28. `src/rag/semantic_cache.py`
+### 29. `src/rag/semantic_cache.py`
 *   **Mục đích:** Giảm độ trễ truy xuất bằng bộ đệm ngữ nghĩa.
 *   **Tác dụng:** LRU Cache (`OrderedDict`) khóa SHA-256 query template; `max_size=500`, `ttl_seconds=1800`; thống kê hit/miss/eviction cho MLflow.
 *   **Mối quan hệ:** Tích hợp trong `retriever.py` (bỏ qua embed/search log trùng template).
 
-### 29. `src/rag/retriever.py` *(Cực kỳ quan trọng)*
+### 30. `src/rag/retriever.py` *(Cực kỳ quan trọng)*
 *   **Mục đích:** Truy xuất tri thức an toàn (Hybrid Search & Cache Defense).
 *   **Tác dụng:** Kiểm checksum ở init (raise nếu fail); tra `SemanticCache` (cache hit qua `sanitize_cache_entry`); `_hybrid_search()`: Dense (FAISS IndexFlatIP) + Sparse (BM25Okapi) hợp nhất bằng **RRF (k=60)**, lọc `MIN_SCORE_THRESHOLD=0.15`, `sanitize_retrieve` + provenance.
 *   **Mối quan hệ:** Gọi bởi `node_rag_context` (Agent); trả `combined_prompt`.
 
-### 30. `src/rag/graph_builder.py`
+### 31. `src/rag/graph_builder.py`
 *   **Mục đích:** Đồ thị tri thức lỗ hổng (Knowledge Graph, V2 tùy chọn).
 *   **Tác dụng:** Driver Neo4j (Bolt) đọc `data/trivy-results.json`, tạo node `Component`/`SubComponent`/`Vulnerability` + quan hệ `CONTAINS`/`HAS_VULNERABILITY`; mock JSON nếu Neo4j offline.
 *   **Mối quan hệ:** Nạp kết quả `scanner.py` vào Neo4j; hiển thị tab Graph trên Dashboard.
 
-### 31. `demos/demo_rag.py`
+### 32. `demos/demo_rag.py`
 *   **Mục đích:** Demo CLI RAG layer.
 *   **Tác dụng:** Tìm kiếm lai + trực quan hóa ngữ cảnh MITRE/NIST cho 1 truy vấn log mẫu.
 *   **Mối quan hệ:** Gọi trực tiếp `retriever.py`.
@@ -180,41 +216,47 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 ## **NGÀY 4: CỖ MÁY TRẠNG THÁI LANGGRAPH & PHẢN HỒI AN NINH**
 
-### 32. `src/agent/state.py`
+### 33. `src/agent/state.py`
 *   **Mục đích:** Schema bộ nhớ trạng thái của tác tử LangGraph.
-*   **Tác dụng:** `SentinelState` (`TypedDict`): `current_batch_logs`, `current_batch_encapsulated`, `rag_mitre_context`/`rag_nist_context`, `decisions`, `narrative_summary`, `cycle_count`, IOCs, `hitl_status`...
+*   **Tác dụng:** `SentinelState` (`TypedDict`): `current_batch_logs`, `current_batch_encapsulated`, `rag_mitre_context`/`rag_nist_context`, `decisions`, `narrative_summary`, `cycle_count`, IOCs, `hitl_status`... Kèm 2 dataclass: **`IOCEntry`** (ioc_type/value/severity/source_template — LLM chỉ APPEND, chống Semantic Drift) và **`AgentDecision`** (action/target/confidence/reasoning/mitre_technique/nist_control/hitl_status).
 *   **Mối quan hệ:** Import bởi toàn bộ `src/agent/`.
 
-### 33. `src/agent/workflow.py`
+### 34. `src/agent/workflow.py`
 *   **Mục đích:** Định nghĩa đồ thị nhận thức của tác tử.
-*   **Tác dụng:** Khởi tạo `StateGraph`, đăng ký node (guardrails → rag_context → llm_triage → action_executor), nối edge + conditional edge (Block/Alert/HITL/End). Compile `agent_app`.
+*   **Tác dụng:** Khởi tạo `StateGraph` với **5 node** (`guardrails`/`rag_context`/`llm_triage`/`action_executor`/`human_in_the_loop`); entry=`guardrails`; edge thẳng `guardrails → rag_context → llm_triage`; **conditional edge** `route_triage_decision` từ `llm_triage` → `execute_action`(→action_executor) / `await_hitl`(→human_in_the_loop) / `end_cycle`(→END, cho LOG/benign); `action_executor`→END, `human_in_the_loop`→END. Compile `agent_app` (singleton).
 *   **Mối quan hệ:** Import node từ `nodes.py`; `agent_app` được `subscriber`/`main.py`/eval gọi.
 
-### 34. `src/agent/nodes.py` *(Cực kỳ quan trọng)*
+### 35. `src/agent/nodes.py` *(Cực kỳ quan trọng)*
 *   **Mục đích:** Logic xử lý tại các "Trạm" của đồ thị.
 *   **Tác dụng:**
     *   `node_guardrails`: chạy `GuardrailsPipeline` (nén + đóng gói nonce).
     *   `node_rag_context`: query RAG từ metadata flow thật + inject lịch sử Threat Memory (`get_context_for_prompt`, gồm **chuỗi APT đa-ngày**).
-    *   `node_llm_triage`: build prompt + gọi LLM; `DecisionValidator.validate_decision` + **`enforce_tier_consensus`** (lá chắn social-engineering) + `AuditLogger`.
+    *   `node_llm_triage`: build prompt + gọi LLM; **suy biến an toàn** (bọc `try/except`: nếu LLM cục bộ chết → log lỗi, đặt response rỗng → đồ thị KHÔNG vỡ, đẩy về `AWAIT_HITL`; Tier-1 vẫn bảo vệ độc lập); `DecisionValidator.validate_decision` + **`enforce_tier_consensus`** (lá chắn social-engineering) + `AuditLogger`.
     *   `node_action_executor`: thực thi action; **`BLOCK_IP`** → `block_ip()` (audit, MOCK) **VÀ** `FeedbackListener.receive_new_rule()` (sinh luật PENDING cho HITL); ghi `threat_memory.record_incident`; nếu `check_apt_chain` BẬT → ghi indicator `multi_day_chain`. `LoopDetector` chống vô hạn.
+    *   `node_human_in_the_loop`: nhánh `AWAIT_HITL` — đẩy quyết định mập mờ/bị Consensus-Guard ép xuống vào hàng đợi chờ analyst duyệt (không tự thực thi), rồi kết thúc cycle.
 *   **Mối quan hệ:** Gọi `DualRetriever`, `llm_client`, `threat_memory`, `executor`, `feedback_listener`.
 
-### 35. `src/agent/prompts.py`
+### 36. `src/agent/prompts.py`
 *   **Mục đích:** Kho mẫu Prompt (System & User).
 *   **Tác dụng:** System prompt có **rule #7 chống social-engineering** (bỏ qua tuyên bố thẩm quyền/whitelist trong log) + **Decision Matrix** (BLOCK_IP cho brute-force/scan rõ ràng từ IP ngoài whitelist trên cổng nhạy cảm SSH/FTP/RDP/SMB; ALERT cho DoS/DDoS spoofed). Tiêm few-shot Active Learning (rule analyst đã Approve/Reject).
 *   **Mối quan hệ:** Gọi bởi `node_llm_triage`.
 
-### 36. `src/agent/llm_client.py`
+### 37. `src/agent/llm_client.py`
 *   **Mục đích:** API client tới LLM cục bộ (offline).
-*   **Tác dụng:** HTTP POST chuẩn OpenAI → `llama.cpp` server (Gemma-2-9B-IT), `temperature=0.1` ép JSON sạch; `parse_llm_response` (bóc JSON an toàn); `DEFAULT_MODEL` từ env (hỗ trợ hot-swap Llama-3 trọng tài).
-*   **Mối quan hệ:** Gọi bởi `node_llm_triage` và `evaluate_reasoning.py`.
+*   **Tác dụng:** HTTP POST chuẩn OpenAI → `llama.cpp` server (Gemma-2-9B-IT), `temperature=0.1` ép JSON sạch; `parse_llm_response` (bóc JSON an toàn); `DEFAULT_MODEL` từ env (hỗ trợ hot-swap Llama-3 trọng tài); **seed cố định** (config `llm.seed=42`) → cùng prompt + temp thấp cho output TẤT ĐỊNH (tái lập); retry + exponential backoff. Tích hợp **`token_monitor`**: `preflight_check` (cảnh báo TRƯỚC khi prompt sát trần ngữ cảnh) + `record_usage` (ghi token THẬT server trả về sau mỗi call). `MOCK_LLM=1` trả JSON cố định cho test offline.
+*   **Mối quan hệ:** Gọi bởi `node_llm_triage` và `evaluate_reasoning.py`; gọi `token_monitor` mỗi lần invoke.
 
-### 37. `src/agent/threat_memory.py`
+### 38. `src/agent/token_monitor.py` *(MỚI — Quan sát ngân sách ngữ cảnh)*
+*   **Mục đích:** Quan sát token/ngữ cảnh LLM để BIẾT prompt cách trần `n_ctx` bao xa mà tinh chỉnh — trả lời lo ngại "log quá dài/nhiều → tràn ngữ cảnh local LLM, làm sao theo dõi?".
+*   **Tác dụng:** `estimate_tokens(messages)` (chars/3.5, bảo thủ); `preflight_check(messages, max_output)` log **WARNING + đếm** khi prompt ước lượng vượt 90% ngân sách input (degrade CÓ quan sát, không âm thầm); `record_usage(usage)` ghi token THẬT (`response.usage` prompt/completion) → mean/p95/max/utilization% bền vững ở `config/llm_token_stats.json`; `get_stats()` cho Dashboard KPI "Context Utilization". Thread-safe; nuốt mọi lỗi ghi file (không bao giờ làm hỏng luồng LLM). `N_CTX=8192` đọc từ `llm.max_context_tokens` (server llama.cpp đặt 16384 → còn headroom).
+*   **Mối quan hệ:** Gọi bởi `llm_client.invoke` (preflight TRƯỚC + record SAU); số liệu đọc bởi Dashboard và `run_context_stress.py`.
+
+### 39. `src/agent/threat_memory.py`
 *   **Mục đích:** Uy tín IP dài hạn, chuỗi APT, chống Memory Poisoning.
 *   **Tác dụng:** SQLite (`config/threat_memory.db`): `record_incident`/`get_ip_reputation`; **`record_apt_event` + `check_apt_chain`** (đánh dấu APT khi IP xuất hiện ở **≥2 NGÀY khác nhau** — không phải "≥3 giai đoạn"); `get_context_for_prompt` (reputation + known-entity + **APT CHAIN đa-ngày** inject vào LLM); `ingest_dapt_chains` (bulk seed dashboard); known entities; `output_sanitizer` cho mọi trường trước khi ghi.
 *   **Mối quan hệ:** Gọi bởi `node_action_executor` (ghi) và `node_rag_context` (nạp lịch sử); `subscriber` ghi APT emergent.
 
-### 38. `src/response/executor.py`
+### 40. `src/response/executor.py`
 *   **Mục đích:** Audit trail không thể chối cãi + hành động ứng phó.
 *   **Tác dụng:** Ghi `config/audit_trail.db` với **HMAC SHA-256 móc-xích** (dòng trước→sau, `verify_audit_trail_integrity` phát hiện giả mạo); `block_ip()`/`quarantine_host()`/`raise_alert()` = **`[FIREWALL MOCK]`** (ghi audit, KHÔNG gọi iptables/OS — enforcement thật là luật ACTIVE ở Tier-1); login lockout (`get/increment/reset_login_attempts`, `lock_user`).
 *   **Mối quan hệ:** Gọi bởi `node_action_executor` và Dashboard (verify + auth).
@@ -223,82 +265,117 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 ## **NGÀY 5: GIAO DIỆN SOC & KHUNG ĐÁNH GIÁ THỰC NGHIỆM**
 
-### 39. `src/ui/app.py`
+### 41. `src/ui/app.py`
 *   **Mục đích:** Web Dashboard Streamlit (SOC HITL).
-*   **Tác dụng:** 5 tab (Nhật ký SIEM & Audit / Phê duyệt Luật HITL / Giám sát APT / Blocklist & Whitelist / Lỗ hổng & Graph). KPI header: "Cảnh báo Escalated", "Luật chờ duyệt/đang chặn", "Live FPR" và **"Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (SỐ THẬT** do subscriber ghi — bỏ ước lượng ×35). Nút Duyệt/Bác → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce. Nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json`.
-*   **Mối quan hệ:** Đọc `audit_trail.db`/`threat_memory.db`/`feedback_listener`/`pipeline_stats.json`.
+*   **Tác dụng:** 5 tab (Nhật ký SIEM & Audit / Phê duyệt Luật HITL / Giám sát APT / Blocklist & Whitelist / Lỗ hổng & Graph). KPI header: "Cảnh báo Escalated", "Luật chờ duyệt/đang chặn", "Live FPR" và **"Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (SỐ THẬT** do subscriber ghi — bỏ ước lượng ×35); KPI "Context Budget" đọc `config/llm_token_stats.json`. Nút Duyệt/Bác → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce. Nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json`.
+*   **Mối quan hệ:** Đọc `audit_trail.db`/`threat_memory.db`/`feedback_listener`/`pipeline_stats.json`/`llm_token_stats.json`.
 
-### 40. `src/ui/components.py`
+### 42. `src/ui/components.py`
 *   **Mục đích:** Component hiển thị tái dùng (Glassmorphism SOC).
-*   **Tác dụng:** `render_metrics_header(..., noise_reduction)` (KPI cards, dùng noise_reduction đo thật); `render_alert_card` (card cảnh báo + MITRE/confidence/reasoning + NIST playbook, anti-XSS); `render_threat_intel_tables` (IP nguy cơ + known entities); `render_apt_events_table` (chuỗi APT DAPT2020).
+*   **Tác dụng:** `render_metrics_header(..., noise_reduction)` (KPI cards, dùng noise_reduction đo thật); `render_alert_card` (card cảnh báo + MITRE/confidence/reasoning + NIST playbook, anti-XSS); `render_threat_intel_tables` (IP nguy cơ + known entities); `render_apt_events_table` (chuỗi APT DAPT2020). Nhãn "Xem bản ghi Quyết định (Audit Record JSON)" làm rõ đây là ĐẦU RA quyết định, KHÔNG phải input LLM.
 *   **Mối quan hệ:** Import & render bởi `app.py`.
 
-### 41. `src/ui/auth.py`
+### 43. `src/ui/auth.py`
 *   **Mục đích:** Xác thực RBAC + chống Input Injection.
 *   **Tác dụng:** **PBKDF2-HMAC-SHA256 (100k vòng), KHÔNG hardcode plaintext** — hash demo tính sẵn + cảnh báo fail-loud khi dùng HASH/SALT demo; `hmac.compare_digest` (constant-time chống timing); regex `^[a-zA-Z0-9_]{1,30}$` cho username; lockout brute-force (5 lần). 2 vai trò L1_Analyst / L3_Manager.
 *   **Mối quan hệ:** Bọc Dashboard; dùng `executor` cho lockout.
 
-### 42. `src/ui/style.css`
+### 44. `src/ui/style.css`
 *   **Mục đích:** Ngôn ngữ thiết kế thị giác SOC Dashboard.
-*   **Tác dụng:** CSS variables, Glassmorphism, Neon Glow, severity glow + pulse critical, KPI cards, console box (font Inter).
+*   **Tác dụng:** CSS variables, Glassmorphism, Neon Glow, severity glow + pulse critical, KPI cards (accent bar), tabs/headers/sidebar/buttons, gradient bg, scrollbar, panel `.soc-empty` (empty-state trung tính), console box (font Inter).
 *   **Mối quan hệ:** Load trong `app.py`.
 
-### 43. `experiments/run_ablation_study.py`
+### 45. `experiments/run_ablation_study.py`
 *   **Mục đích:** Ablation Study (đóng góp từng thành phần).
 *   **Tác dụng:** So sánh **Config A** (Tier-1 đầy đủ, không LLM) vs **Config F** (full SENTINEL) trên ground_truth; đo Precision/Recall/F1/FPR/latency; sinh `Config_F.reasoning_outputs` (cho trọng tài); đẩy MLflow. *(Config A ở đây = Tier-1 đầy đủ — KHÁC "static-only" trong unified stream.)*
 *   **Mối quan hệ:** Output `results/ablation_results.json` dùng cho `statistical_tests` + `evaluate_reasoning`.
 
-### 44. `experiments/statistical_tests.py` *(Quan trọng)*
+### 46. `experiments/run_ablation_bcde.py`
+*   **Mục đích:** Bù đủ Ablation **Configs B, C, D, E** (run_ablation_study.py chỉ chạy A & F) — chạy THẬT, không ước tính.
+*   **Tác dụng:** Trên CÙNG 300 mẫu phân tầng tất định: **B** Pure LLM (mọi mẫu→LLM, KHÔNG gate/RAG/guardrails), **C** Welford-gate + LLM (không RAG), **D** gate + dense-RAG (FAISS-only), **E** gate + hybrid-RAG (FAISS+BM25+RRF). Gate Welford tính 1 lần/mẫu, dùng chung C/D/E → escalation set giống hệt nên hiệu số D−C, E−D cô lập đúng đóng góp từng tầng RAG. Verdict = action thô LLM (không áp consensus-guard) để đo năng lực phân loại thuần.
+*   **Mối quan hệ:** Output `results/ablation_bcde_results.json`; ghép với A/F của `run_ablation_study.py`.
+
+### 47. `experiments/run_ablation_balanced.py`
+*   **Mục đích:** Ablation **CÂN BẰNG 150/150** — cả 6 cấu hình A–F trên cùng tập, để phép so cấu phần CÓ ý nghĩa (tập gốc 93% tấn công khiến mọi cấu hình suy biến về dự đoán toàn-dương, F1 ≈ base rate).
+*   **Tác dụng:** Dựng 150 benign (expected=LOG, **warmup Welford bằng benign THẬT held-out** `benign[150:300]`) + 150 tấn công (phân tầng đều 10/lớp × 15 lớp). Có benign thật → gate Welford/Tier-1 có cơ hội DROP benign (true negative) nên C/D/E/F không còn buộc trùng nhau; đo P/R/F1/FPR + latency từng cấu hình + McNemar (B-vs-gated).
+*   **Mối quan hệ:** Tái dùng hàm gate/RAG/LLM từ `run_ablation_bcde.py`; cần LLM server; output `results/ablation_balanced_results.json`.
+
+### 48. `experiments/statistical_tests.py` *(Quan trọng)*
 *   **Mục đích:** Kiểm định ý nghĩa thống kê.
 *   **Tác dụng:** **McNemar's Test** (khác biệt phân loại Config A vs F) + **Mann-Whitney U** (khác biệt độ trễ), đọc `ablation_results.json`.
 *   **Mối quan hệ:** Chạy sau Ablation.
 
-### 45. `experiments/evaluate_robustness.py`
+### 49. `experiments/evaluate_robustness.py`
 *   **Mục đích:** Đo kháng adversarial của Guardrails **TĨNH** (120 mẫu / 5 nhóm).
 *   **Tác dụng:** Bơm payload qua lớp tĩnh, tính **block rate / bypass rate** (đã sửa naming khỏi "defeat_rate" gây hiểu lầm); ghi `results/robustness_results.json`.
 *   **Mối quan hệ:** Đọc `experiments/adversarial/`; output cho `plot_results`.
 
-### 46. `experiments/evaluate_adversarial_pipeline.py`
+### 50. `experiments/evaluate_adversarial_pipeline.py`
 *   **Mục đích:** Đo kháng của **FULL pipeline (Tier-2 LLM)** với payload KHÓ.
 *   **Tác dụng:** Nhúng payload (semantic/jailbreak/rag-poison) vào flow tấn công thật, đẩy qua Tier-1→Guardrails→RAG→LLM; đếm RESISTED vs COMPROMISED (LLM bị ép ra LOG/DROP).
 *   **Mối quan hệ:** Chứng minh `enforce_tier_consensus` đóng lỗ hổng social-engineering.
 
-### 47. `experiments/evaluate_reasoning.py`
+### 51. `experiments/evaluate_reasoning.py`
 *   **Mục đích:** Đánh giá chất lượng suy luận (LLM-as-Judge cross-family).
 *   **Tác dụng:** Hot-swap sang **Llama-3 8B (Meta)** chấm reasoning của **Gemma-2 (Google)** từ `ablation_results.json` → Context Precision/Answer Relevancy/Faithfulness/Context Recall/Audit Completeness (chuẩn RAGAS); đẩy MLflow.
 *   **Mối quan hệ:** Cần `run_ablation_study` chạy trước (sinh reasoning_outputs); dùng `switch_model.sh`.
 
-### 48. `experiments/evaluate_unified_stream.py`
+### 52. `experiments/evaluate_unified_stream.py`
 *   **Mục đích:** Đánh giá luồng gộp THỐNG NHẤT (offline, tất định) — thay phương pháp 3 luồng circular cũ.
 *   **Tác dụng:** `build_stream()` gộp CICIDS + DAPT2020 + **zero-day REAL-DERIVED (7 mẫu, nền flow benign thật, đẩy 1 feature cực trị, rải ngày 2-5)** vào MỘT luồng sắp theo thời gian (golden-ratio interleave), stream qua Tier-1 + Welford + Threat Memory **bộ nhớ sạch** → đo: phân loại, **APT EMERGENT** (recall + độ trễ), zero-day (Welford bắt khi static bỏ sót).
-*   **Mối quan hệ:** Đọc `ground_truth.json` + `dapt2020_chains.jsonl`; output `results/unified_stream_results.json` + `reports/unified_stream_evaluation_report.md`.
+*   **Mối quan hệ:** Đọc `ground_truth.json` + `dapt2020_chains.jsonl`; output `results/unified_stream_results.json` + `reports/unified_stream_evaluation_report.md`. Hàm `build_stream`/`map_cicids`/`_is_threat` được tái dùng bởi các script rigor #54–#57.
 
-### 49. `experiments/stream_unified_online.py`
+### 53. `experiments/stream_unified_online.py`
 *   **Mục đích:** Publisher ONLINE phát cùng luồng gộp qua TOÀN BỘ hệ thống (demo realtime).
-*   **Tác dụng:** `build_sequence()` + `enrich()` (gắn metadata DAPT/zero-day) → đẩy Redis qua pipeline thật (Tier-1 → APT emergent ở subscriber → LLM Agent → Dashboard); có `--dry-run`. Chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC). *(Offline #48 = benchmark tất định; online #49 = chứng minh end-to-end.)*
-*   **Mối quan hệ:** Dùng chung `build_stream()` với #48; cần Redis + `main.py --mode server`.
+*   **Tác dụng:** `build_sequence()` + `enrich()` (gắn metadata DAPT/zero-day) → đẩy Redis qua pipeline thật (Tier-1 → APT emergent ở subscriber → LLM Agent → Dashboard); có `--dry-run`. Chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC). *(Offline #52 = benchmark tất định; online #53 = chứng minh end-to-end.)*
+*   **Mối quan hệ:** Dùng chung `build_stream()` với #52; cần Redis + `main.py --mode server`.
 
-### 50. `experiments/measure_latency_baseline.py`
+### 54. `experiments/run_threshold_sensitivity.py` *(MỚI — rigor)*
+*   **Mục đích:** Phân tích **độ nhạy ngưỡng Welford** (Z-score) — bác bỏ lo ngại "3.5σ chọn may rủi / cherry-pick / tinh chỉnh quá khớp".
+*   **Tác dụng:** Quét τ ∈ {2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0} trên ĐÚNG luồng gộp thật của `evaluate_unified_stream` (Tier-1 đầy đủ, KHÔNG LLM, tất định); đo trade-off: tỷ lệ escalation (tải/chi phí LLM), FP-rate benign, P/R/F1 Tier-1, zero-day bắt được /7. Ghi đè `RuleEngine.z_threshold` chỉ khi quét; production giữ 3.5.
+*   **Mối quan hệ:** Output `results/threshold_sensitivity_results.json`; vẽ bởi `plot_results.plot_threshold_sensitivity()`.
+
+### 55. `experiments/run_zeroday_graded.py` *(MỚI — rigor)*
+*   **Mục đích:** Đường cong phát hiện zero-day **PHÂN CẤP** — thay vì chỉ 7 mẫu cực trị (lệch ≫100σ, bắt 7/7 hiển nhiên), xác định RANH GIỚI phát hiện thật.
+*   **Tác dụng:** Quét độ lệch k ∈ {2,3,3.5,4,5,6,8,10,20,50,100}·σ trên nhiều flow benign thật × nhiều feature Welford; đo "noticed" (Welford gắn cờ Z>3.5σ) và "escalated" (điểm Tier-1 ≥ risk_threshold → leo thang Tầng 2). Baseline Welford **đóng băng** (snapshot+restore) trước mỗi probe để z=k chính xác. Tất định, Tier-1 only.
+*   **Mối quan hệ:** Output `results/zeroday_graded_results.json`; vẽ bởi `plot_results.plot_zeroday_graded()`.
+
+### 56. `experiments/run_apt_negative_control.py` *(MỚI — rigor)*
+*   **Mục đích:** **Đối chứng ÂM tính + khoảng tin cậy** cho phần APT (vốn chỉ báo recall=1.0 trên n nhỏ, thiếu đối chứng âm).
+*   **Tác dụng:** (a) báo **Wilson 95% CI** cho recall k/n (phù hợp n nhỏ, p ở biên); (b) đối chứng âm — đếm IP benign hiện diện ≥2 ngày phân biệt trong luồng rồi xác nhận **0 IP** nào kích hoạt `check_apt_chain` (specificity=1.0). Cơ chế phân biệt nằm ở CỔNG GHI: chỉ sự kiện gắn cờ tấn công mới ghi kho APT; cảnh báo bật khi đủ ≥2 NGÀY-TẤN-CÔNG phân biệt. Tier-1 + Memory, tất định, KHÔNG LLM.
+*   **Mối quan hệ:** Dùng `ThreatMemoryStore` + `build_stream`; output `results/apt_negative_control_results.json`.
+
+### 57. `experiments/run_context_stress.py` *(MỚI — rigor/observability)*
+*   **Mục đích:** **Đường cong stress ngữ cảnh** — chứng minh kiến trúc giữ token đầu vào trong ngân sách bất kể số log (trả lời "log quá nhiều có tràn ngữ cảnh local LLM không, tinh chỉnh thế nào").
+*   **Tác dụng:** Đẩy số log N ∈ {1..2000}, đo token vào LLM theo 2 cách: **RAW** (nối thẳng → tăng TUYẾN TÍNH, vượt n_ctx rất nhanh) vs **COMPRESSED** (Drain template mining → BÃO HÒA, chặn bằng thiết kế quanh token_budget=4000/n_ctx=8192). Tất định, KHÔNG LLM; vẽ `results/plots/context_stress.png`.
+*   **Mối quan hệ:** Dùng `template_miner` + `token_monitor.N_CTX`; output `results/context_stress_results.json`.
+
+### 58. `experiments/run_llm_robustness.py` *(MỚI — rigor)*
+*   **Mục đích:** **Độ bền LLM & quy trình** — (A) tái lập (determinism) và (B) suy biến an toàn (graceful degradation).
+*   **Tác dụng:** (A) cùng prompt + **seed=42** gọi N lần → kiểm action GIỐNG HỆT (báo cả raw có tất định không); (B) monkeypatch `llm_client.invoke` ném ConnectionError (giả lập LLM chết) → chạy `agent_app` đầy đủ trên 1 mẫu tấn công, xác nhận hệ KHÔNG vỡ mà suy biến về **AWAIT_HITL** (Tier-1 vẫn bảo vệ độc lập). Kèm thống kê semantic-cache (bonus).
+*   **Mối quan hệ:** Cần LLM server cho (A); output `results/llm_robustness_results.json`.
+
+### 59. `experiments/measure_latency_baseline.py`
 *   **Mục đích:** Đo độ trễ Two-Tier vs LLM-only.
 *   **Tác dụng:** Chạy N log qua 2 cấu hình, đo Mean/Median/P95, tính **Latency Reduction** (mục tiêu ≥60%) — Tier-1 lọc ~99% nên không phải gọi LLM cho mọi log.
 *   **Mối quan hệ:** Output `results/latency_benchmark.json`; bổ sung cho Mann-Whitney U.
 
-### 51. `experiments/plot_results.py`
+### 60. `experiments/plot_results.py`
 *   **Mục đích:** Trực quan hóa số liệu thực nghiệm.
-*   **Tác dụng:** Vẽ biểu đồ block-rate theo nhóm + pie accuracy từ `robustness_results.json` → `results/plots/*.png`.
+*   **Tác dụng:** Vẽ biểu đồ block-rate theo nhóm + pie accuracy từ `robustness_results.json`; **`plot_threshold_sensitivity()`** (đường cong độ nhạy ngưỡng) và **`plot_zeroday_graded()`** (đường cong phát hiện phân cấp) → `results/plots/*.png`.
 *   **Mối quan hệ:** Đọc result JSON cho luận văn.
 
-### 52. `experiments/e2e_test_runner.py` *(Quan trọng kiểm thử)*
+### 61. `experiments/e2e_test_runner.py` *(Quan trọng kiểm thử)*
 *   **Mục đích:** Bộ kiểm thử tích hợp E2E toàn hệ thống.
 *   **Tác dụng:** Chạy **22 kịch bản** (T01-T22): RuleEngine, Guardrails, Dual-RAG, Threat Memory, Agent, Latency (T19, cần LLM), **Unified Stream (T21)** + **Online Publisher (T22)**; `--offline` bỏ qua test cần LLM.
 *   **Mối quan hệ:** Chốt chặn toàn vẹn trước khi push/demo.
 
-### 53. `scripts/seed_demo_data.py`
+### 62. `scripts/seed_demo_data.py`
 *   **Mục đích:** Seed Dashboard từ data THẬT (không bịa).
-*   **Tác dụng:** Chạy pipeline thật (Tier-1 + Agent + LLM) trên mẫu CICIDS 14 lớp → quyết định thật vào audit/threat/pending-rules; `ingest_dapt_chains` 9 chuỗi APT; seed known entities. *(SEED dashboard, KHÔNG phải benchmark APT — benchmark ở #48.)*
+*   **Tác dụng:** Chạy pipeline thật (Tier-1 + Agent + LLM) trên mẫu CICIDS 14 lớp → quyết định thật vào audit/threat/pending-rules; `ingest_dapt_chains` 9 chuỗi APT; seed known entities. *(SEED dashboard, KHÔNG phải benchmark APT — benchmark ở #52.)*
 *   **Mối quan hệ:** Đọc `ground_truth.json` + `dapt2020_chains.jsonl`; ghi DBs production.
 
-### 54. `scripts/convert_report.py` & `scripts/switch_model.sh` & `scripts/cleanup.sh`
+### 63. `scripts/convert_report.py` & `scripts/switch_model.sh` & `scripts/cleanup.sh`
 *   **convert_report.py:** Markdown → DOCX (báo cáo tiến độ).
 *   **switch_model.sh:** Hot-swap LLM (`gemma`/`llama`), sửa `.env` + restart container `sentinel_llm`, chờ healthy.
 *   **cleanup.sh:** Dọn artifact tạm (mlruns, `results/*.json`, plots, eval DB), GIỮ benchmark (ground_truth, adversarial).
@@ -307,7 +384,7 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 ## **TÍCH HỢP HỆ THỐNG GỐC (ROOT)**
 
-### 55. `main.py`
+### 64. `main.py`
 *   **Mục đích:** Điểm khởi chạy tích hợp (entrypoint).
 *   **Tác dụng:** `argparse` mode `server`/`scan`/`full`. Mode server: khởi động **Subscriber loop** (`start_listening(on_batch_ready=handle_escalated_batch)`) — Tier-1 lọc, escalate → LangGraph Agent → LLM → audit. Mode scan/full: chạy Trivy + build Neo4j KG. Reset LoopDetector mỗi cycle. *(KHÔNG tự chạy Streamlit — Dashboard chạy qua Docker `streamlit run src/ui/app.py`.)*
 *   **Mối quan hệ:** Gọi `subscriber.start_listening`, `agent.agent_app`, `tier1_filter.scanner`, `rag.graph_builder`.
@@ -321,3 +398,5 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 *   **`tests/unit/`** — data_validator, decision_validator (+ Anti-Self-DoS shield + tier-consensus guard), feedback_validator, **feedback_listener** (HITL lifecycle), output_sanitizer, prompt_filter, rag_sanitizer, template_miner, entropy_scorer, threat_memory (+ APT-chain-context), **subscriber** (chống lộ nhãn dataset vào LLM + hợp đồng enrich↔strip), **semantic_cache**, **auth** (PBKDF2/RBAC), **executor** (HMAC chain, đã cô lập DB tạm), agent, rag.
 *   **`tests/integration/`** — `test_unified_stream.py` (3 nguồn trộn + APT emergent + **bất biến zero-day real-derived**), `test_streaming_pipeline.py` (routing đa-nguồn), `test_end_to_end.py`.
 *   **`tests/test_adversarial.py`** + **`tests/test_tier1_filter.py`** + **`tests/conftest.py`** (sys.path root).
+</content>
+</invoke>

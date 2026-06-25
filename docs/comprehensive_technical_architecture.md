@@ -1,4 +1,4 @@
-# Tài liệu Kiến trúc Kỹ thuật Toàn diện (36 Bước - SENTINEL V5)
+# Tài liệu Kiến trúc Kỹ thuật Toàn diện (43 Bước - SENTINEL V5)
 
 Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong toàn bộ luồng hoạt động của hệ thống SENTINEL (Cognitive Two-Tier Architecture), phân bổ xuyên suốt qua 6 phân hệ cốt lõi từ tầng Dataset đầu vào cho đến tầng Đánh giá (Evaluation).
 
@@ -310,15 +310,15 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 1. **STEP NAME:** Agentic Cognitive Inference.
 2. **LAYER:** Tier 2 LangGraph Agent.
 3. **MỤC ĐÍCH:** "Bộ não" chính của toàn hệ thống, chịu trách nhiệm đọc ngữ cảnh, suy luận logic an ninh mạng và đưa ra phán quyết.
-4. **CÔNG NGHỆ SỬ DỤNG:** Server `llama.cpp`, mô hình cục bộ `Gemma-2-9B-IT` định dạng GGUF lượng tử hóa 4-bit (`Q4_K_M`).
-5. **CƠ CHẾ HOẠT ĐỘNG:** Phục vụ mô hình hoàn toàn offline trên GPU (RTX 4060 Ti). Gửi HTTP POST request tới API tương thích OpenAI của server llama.cpp. Cấu hình `temperature=0.1` để đảm bảo câu trả lời mang tính xác định cao nhất và tuân thủ định dạng JSON.
+4. **CÔNG NGHỆ SỬ DỤNG:** Server `llama.cpp`, mô hình cục bộ `Gemma-2-9B-IT` định dạng GGUF lượng tử hóa (`Q6_K`, file `gemma-2-9b-it-Q6_K.gguf` theo `.env` LLM_MODEL_FILE).
+5. **CƠ CHẾ HOẠT ĐỘNG:** Phục vụ mô hình hoàn toàn offline trên GPU (RTX 4060 Ti). Gửi HTTP POST request tới API tương thích OpenAI của server llama.cpp. Cấu hình `temperature=0.1` **+ `seed=42`** (config `llm.seed`) để đảm bảo câu trả lời TẤT ĐỊNH (cùng prompt → cùng output, tái lập) và tuân thủ định dạng JSON. Có retry + exponential backoff. **Quan sát ngữ cảnh:** `token_monitor.preflight_check()` ước lượng token TRƯỚC khi gọi (cảnh báo WARNING khi prompt vượt 90% ngân sách input so với `n_ctx=8192`), và `token_monitor.record_usage()` ghi token THẬT (`response.usage`) sau mỗi call vào `config/llm_token_stats.json` (mean/p95/max/utilization%).
 6. **CẤU TRÚC MÃ NGUỒN:**
-   - File: `src/agent/llm_client.py`.
-   - Class: `OpenAILLMClient`.
-   - Function: `invoke(messages, temperature)`.
+   - File: `src/agent/llm_client.py` (+ `src/agent/token_monitor.py`).
+   - Class: `LLMClient` (singleton `llm_client`).
+   - Function: `invoke(messages, temperature, max_tokens, response_format, seed)`.
    - Input: Message Array → Output: JSON String.
-7. **LUỒNG DỮ LIỆU:** Node Triage → HTTP POST Request → GPU Compute → JSON Response.
-8. **VAI TRÒ BẢO MẬT:** Thực hiện phân tích nhận thức sâu để phát hiện các mẫu tấn công tinh vi.
+7. **LUỒNG DỮ LIỆU:** Node Triage → `preflight_check` → HTTP POST Request → GPU Compute → JSON Response → `record_usage`.
+8. **VAI TRÒ BẢO MẬT:** Thực hiện phân tích nhận thức sâu để phát hiện các mẫu tấn công tinh vi; seed cố định cho phép kiểm toán/tái lập phán quyết.
 
 ### **21. Decision Output: BLOCK_IP / AWAIT_HITL / ALERT**
 1. **STEP NAME:** Action Routing & Execution.
@@ -330,6 +330,7 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
    - `ALERT`: Ghi cảnh báo đỏ lên DB mà không cấm.
    - `AWAIT_HITL`: Phán quyết mập mờ (hoặc bị Tier-Consensus Guard ép xuống), chuyển thẳng vào hàng đợi chờ analyst duyệt.
    - `LOG` / `DROP`: Ghi nhật ký / loại bỏ traffic lành tính (5 action hợp lệ: `BLOCK_IP`, `ALERT`, `AWAIT_HITL`, `LOG`, `DROP` — không có "QUARANTINE" trong enum).
+   - **SUY BIẾN AN TOÀN (graceful degradation):** nếu LLM cục bộ chết/không phản hồi, `node_llm_triage` bọc `try/except` đặt response rỗng → parse trả về `AWAIT_HITL` (an toàn), đồ thị KHÔNG vỡ — Tier-1 vẫn lọc/chặn độc lập (đã chứng minh ở `experiments/run_llm_robustness.py`).
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/agent/nodes.py` & `src/response/executor.py`.
    - Function: `node_action_executor()`, `block_ip()` (`[FIREWALL MOCK]` — ghi audit), `FeedbackListener.receive_new_rule()`.
@@ -345,9 +346,9 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 5. **CƠ CHẾ HOẠT ĐỘNG:** Lưu vết mọi incident vi phạm vào SQLite. Khi có IP mới bị leo thang, hệ thống tra cứu SQLite xem IP này đã thực hiện các kỹ thuật gì. Nếu IP vi phạm xuất hiện ở >= 2 NGÀY khác nhau (đúng logic `check_apt_chain`) → Đánh dấu cảnh báo APT nguy cấp và nâng mức cảnh báo của IP lên critical.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/agent/threat_memory.py`.
-   - Class: `ThreatMemoryManager`.
-   - Function: `record_incident()`, `check_apt_pattern()`.
-   - Input: IP, Action, MITRE ID → Output: SQLite Insert/Update, APT Candidate Flag (Boolean).
+   - Class: `ThreatMemoryStore`.
+   - Function: `record_incident()`, `record_apt_event()`, `check_apt_chain()` (đánh dấu khi IP xuất hiện ≥2 NGÀY-TẤN-CÔNG phân biệt).
+   - Input: IP, Action, MITRE ID, apt_day → Output: SQLite Insert/Update, APT Chain Flag (dict).
 7. **LUỒNG DỮ LIỆU:** Action Node → SQLite Write → (Chu kỳ sau) SQLite Read → System Prompt.
 8. **VAI TRÒ BẢO MẬT:** Phòng chống tấn công APT có kỹ năng ẩn mình và đổi chiến thuật qua thời gian dài để bypass Signature.
 
@@ -517,4 +518,45 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
    - Output: `experiments/results/unified_stream_results.json` + `reports/unified_stream_evaluation_report.md`.
 7. **LUỒNG DỮ LIỆU:** 3 nguồn data THẬT → chuẩn hóa + gán khóa thời gian → sort 1 luồng → stream incremental → Tier-1 + Threat Memory → metrics (F1 gate, APT recall + lag, zero-day TPR).
 8. **VAI TRÒ BẢO MẬT:** Chứng minh năng lực phát hiện APT low-and-slow và zero-day signature-less một cách **trung thực** (memory sạch, không tra đáp án nạp sẵn).
+
+---
+
+# **PHẦN 6 (BỔ SUNG 2): RIGOR, ROBUSTNESS & OBSERVABILITY**
+
+> Các bước nâng cấp độ chặt chẽ (rebut hội đồng) + độ bền LLM + quan sát ngữ cảnh — tất cả chạy THẬT, tất định khi không cần LLM. Đối chiếu code ở HEAD.
+
+### **37. Welford Threshold Sensitivity (Độ nhạy ngưỡng)**
+1. **MỤC ĐÍCH:** Bác bỏ "3.5σ chọn may rủi / cherry-pick" — quét τ ∈ {2.0..5.0} và đo trade-off escalation / FP / P-R-F1 / zero-day.
+2. **CƠ CHẾ:** Tham số hóa `RuleEngine.z_threshold` (mặc định 3.5, production KHÔNG đổi); chạy trên ĐÚNG luồng gộp `evaluate_unified_stream` (Tier-1 đầy đủ, KHÔNG LLM, tất định).
+3. **MÃ NGUỒN:** `experiments/run_threshold_sensitivity.py` → `results/threshold_sensitivity_results.json`; vẽ `plot_results.plot_threshold_sensitivity()`.
+
+### **38. Graded Zero-Day Detection Boundary (Phân cấp)**
+1. **MỤC ĐÍCH:** Thay vì 7 mẫu cực trị (bắt 7/7 hiển nhiên), xác định RANH GIỚI phát hiện thật.
+2. **CƠ CHẾ:** Quét độ lệch k ∈ {2..100}·σ trên nhiều flow benign thật × nhiều feature; đo "noticed" (Welford Z>3.5σ) và "escalated" (điểm ≥ risk_threshold). Baseline Welford ĐÓNG BĂNG (snapshot+restore) trước mỗi probe → z=k chính xác.
+3. **MÃ NGUỒN:** `experiments/run_zeroday_graded.py` → `results/zeroday_graded_results.json`; vẽ `plot_results.plot_zeroday_graded()`.
+
+### **39. APT Negative Control + Wilson CI (Đối chứng âm)**
+1. **MỤC ĐÍCH:** (a) báo Wilson 95% CI cho recall k/n nhỏ; (b) chứng minh IP benign hiện diện ≥2 ngày KHÔNG kích hoạt cảnh báo APT (specificity).
+2. **CƠ CHẾ:** Cổng GHI — chỉ sự kiện gắn cờ tấn công mới vào kho APT; `check_apt_chain` bật khi đủ ≥2 NGÀY-TẤN-CÔNG phân biệt. Tier-1 + Memory, KHÔNG LLM.
+3. **MÃ NGUỒN:** `experiments/run_apt_negative_control.py` → `results/apt_negative_control_results.json`.
+
+### **40. Balanced Ablation 150/150 + Configs B–E**
+1. **MỤC ĐÍCH:** Phép so cấu phần CÓ ý nghĩa — tập gốc 93% tấn công khiến mọi cấu hình suy biến về dự đoán toàn-dương (F1 ≈ base rate).
+2. **CƠ CHẾ:** `run_ablation_bcde.py` bù Configs **B** (pure-LLM) / **C** (Welford-gate) / **D** (dense-RAG) / **E** (hybrid-RAG) trên 300 mẫu; `run_ablation_balanced.py` dựng tập 150 benign (warmup Welford bằng benign THẬT held-out) + 150 tấn công đều 15 lớp → A–F so được + McNemar.
+3. **MÃ NGUỒN:** `experiments/run_ablation_bcde.py`, `experiments/run_ablation_balanced.py` → `results/ablation_bcde_results.json`, `results/ablation_balanced_results.json`.
+
+### **41. Context Stress Curve + Token Observability**
+1. **MỤC ĐÍCH:** Trả lời "log quá dài/nhiều có tràn ngữ cảnh local LLM không, theo dõi/tinh chỉnh thế nào".
+2. **CƠ CHẾ:** Đẩy N log ∈ {1..2000}, đo token vào LLM theo RAW (nối thẳng → tuyến tính, vượt `n_ctx` nhanh) vs COMPRESSED (Drain template → BÃO HÒA quanh token_budget=4000/n_ctx=8192). Runtime: `token_monitor` preflight (cảnh báo trước) + record_usage (token thật) → `config/llm_token_stats.json` cho Dashboard KPI "Context Utilization".
+3. **MÃ NGUỒN:** `experiments/run_context_stress.py` (+ `src/agent/token_monitor.py`) → `results/context_stress_results.json` + `results/plots/context_stress.png`.
+
+### **42. LLM Robustness (Determinism + Graceful Degradation)**
+1. **MỤC ĐÍCH:** (A) tái lập — cùng prompt + `seed=42` → action GIỐNG HỆT; (B) suy biến an toàn — LLM chết → hệ KHÔNG vỡ, đẩy về `AWAIT_HITL`.
+2. **CƠ CHẾ:** (A) gọi N lần đo distinct actions; (B) monkeypatch `llm_client.invoke` ném ConnectionError → chạy `agent_app` đầy đủ, xác nhận `crashed=false`, action=`AWAIT_HITL`, Tier-1 vẫn bảo vệ.
+3. **MÃ NGUỒN:** `experiments/run_llm_robustness.py` → `results/llm_robustness_results.json`.
+
+### **43. Full-Pipeline Adversarial Resistance (Tier-2 LLM)**
+1. **MỤC ĐÍCH:** Đo kháng của TOÀN pipeline (không chỉ guardrails tĩnh) với payload semantic/jailbreak/rag-poison KHÓ.
+2. **CƠ CHẾ:** Nhúng payload vào flow tấn công thật → Tier-1 → Guardrails → RAG → LLM; đếm RESISTED vs COMPROMISED (LLM bị ép ra LOG/DROP) — chứng minh `enforce_tier_consensus` đóng lỗ hổng social-engineering.
+3. **MÃ NGUỒN:** `experiments/evaluate_adversarial_pipeline.py` → `results/adversarial_pipeline_results.json`.
 9. **CHẾ ĐỘ ONLINE (demo end-to-end):** `stream_unified_online.py` phát **CÙNG luồng gộp** (dùng chung `build_stream()`) lên **Redis Streams** với metadata theo nguồn (DAPT: `apt_phase`/`apt_day`/`apt_is_attack`; zero-day: `zd_id`/`zd_mitre`); `subscriber.py` ghi dần chuỗi APT vào Threat Memory (`record_apt_event` → `check_apt_chain`), khi bản án APT **nổi lên** thì ép `ESCALATE` qua toàn pipeline (Guardrails → RAG → LLM → Executor → Audit → Dashboard). Offline = số liệu benchmark tất định; Online = chứng minh realtime, chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC).

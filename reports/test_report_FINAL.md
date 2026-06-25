@@ -4,6 +4,8 @@
 **Suite Version:** 20 Tests (Phase 4)
 **Result:** ✅ 20/20 PASSED | 0 FAILED | 0 SKIPPED
 
+> ⚠️ **Ảnh chụp lịch sử (Phase 4, 2026-06-01).** Các con số bên dưới (20 test, 750 mẫu ground-truth, 197 chuỗi APT) đúng tại MỐC NÀY và được giữ nguyên làm bản ghi. **Trạng thái hiện hành** của bộ E2E đã mở rộng: **22 test (T01–T22), 4.267 mẫu ground-truth, 9 chuỗi APT đa-ngày, 22/22 PASSED** — xem báo cáo mới nhất [`reports/test_report_20260624.md`](test_report_20260624.md) và bản đồ mã nguồn [`docs/codebase_summary.md`](../docs/codebase_summary.md).
+
 ---
 
 ## Fix Summary

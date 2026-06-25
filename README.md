@@ -118,7 +118,7 @@ SENTINEL is systematically benchmarked across five analytical axes:
 | :--- | :--- | :--- | :--- |
 | **1. Classification** | F1-Score $\ge 0.90$ (Triage accuracy) | McNemar's Test ($p < 0.05$) | `experiments/run_ablation_study.py` |
 | **2. Operational** | Latency Reduction $\ge 60\%$ (Tier 1 filter rate)| Mann-Whitney U Test ($p < 0.05$) | `experiments/measure_latency_baseline.py` |
-| **3. Robustness** | Guardrail Bypass Rate $< 10\%$ | 120-sample Adversarial Suite (6 categories) | `evaluate_robustness.py` (static) + `evaluate_adversarial_pipeline.py` (full LLM) |
+| **3. Robustness** | Guardrail Bypass Rate $< 10\%$ | 120-sample Adversarial Suite (5 categories) | `evaluate_robustness.py` (static) + `evaluate_adversarial_pipeline.py` (full LLM) |
 | **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3 8B) | `experiments/evaluate_reasoning.py` |
 | **5. Explainability**| Completeness Index $= 100\%$ (Audit Trail) | Deterministic schema checks | `experiments/evaluate_reasoning.py` |
 
@@ -153,12 +153,19 @@ AI_Security_Graph/
 │   ├── adversarial/                  # 120-sample adversarial suite (5 generated categories)
 │   ├── ground_truth.json             # 4,267-sample labelled benchmark (14 classes + benign + adversarial)
 │   ├── adversarial_samples.json      # 50 adversarial vectors (25 structural + 25 semantic)
-│   ├── run_ablation_study.py         # Runs ablation tests across A-F configs
+│   ├── run_ablation_study.py         # Ablation configs A (Tier-1 only) & F (full SENTINEL)
+│   ├── run_ablation_bcde.py          # Ablation configs B/C/D/E (pure-LLM, Welford-gate, dense-RAG, hybrid-RAG)
+│   ├── run_ablation_balanced.py      # Balanced 150/150 ablation across A-F (meaningful component comparison)
 │   ├── evaluate_robustness.py        # Static Guardrails bypass benchmark
 │   ├── evaluate_adversarial_pipeline.py # Full-LLM-pipeline adversarial resistance test
 │   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation (Llama 3)
 │   ├── evaluate_unified_stream.py    # Unified stream eval: CICIDS + DAPT (emergent APT) + zero-day in one time-ordered stream
 │   ├── stream_unified_online.py      # ONLINE publisher: replays the SAME merged stream via Redis through the full pipeline (live demo)
+│   ├── run_threshold_sensitivity.py  # Welford Z-score threshold sweep (rebuts "3.5σ cherry-picked")
+│   ├── run_zeroday_graded.py         # Graded zero-day detection-boundary curve (k·σ sweep)
+│   ├── run_apt_negative_control.py   # APT negative control + Wilson 95% CI (specificity on benign multi-day IPs)
+│   ├── run_context_stress.py         # Context-budget curve: RAW vs Drain-compressed token growth vs n_ctx
+│   ├── run_llm_robustness.py         # LLM determinism (seed) + graceful degradation (LLM-down -> AWAIT_HITL)
 │   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
 │   ├── statistical_tests.py          # McNemar / Mann-Whitney U significance tests
 │   ├── e2e_test_runner.py            # Automated E2E integration test suite
@@ -178,7 +185,7 @@ AI_Security_Graph/
 │   ├── tier1_filter/                 # Rule engine, session monitor & feedback logic
 │   ├── guardrails/                   # Prompt-injection, jailbreak, & XSS sanitization
 │   ├── rag/                          # Embedders, FAISS database client, RAG caching
-│   ├── agent/                        # LangGraph workflow engine, agent states, LLM APIs
+│   ├── agent/                        # LangGraph workflow engine, agent states, LLM APIs, token-budget monitor
 │   ├── response/                     # Action executor, DB client, lockout, & HMAC log signer
 │   └── ui/                           # Glassmorphism Streamlit UI & authentication logic
 ├── docs/

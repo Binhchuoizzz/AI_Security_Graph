@@ -10,6 +10,8 @@ Dự án SENTINEL hiện đang trong quá trình chuẩn bị bảo vệ Luận 
 - ✅ Thiết kế kiến trúc **Short-term Memory** (Redis), **Long-term Threat Memory** (SQLite để lưu vết APT/DAPT2020) và **Vulnerability Graph** (Neo4j).
 - ✅ Thiết lập khung đánh giá **5D Evaluation Framework** (Classification, Operational, Robustness, Context Quality, Explainability) + đánh giá Zero-day riêng và tự động quản lý thí nghiệm qua **MLflow**.
 - ✅ Tích hợp tiện ích **Docker Model Switcher** (`switch_model.sh`) hỗ trợ hot-swap mô hình LLM trọng tài và tác tử.
+- ✅ **Độ bền & quan sát LLM (2026-06):** suy luận tất định (`seed=42`), **suy biến an toàn** khi LLM chết → `AWAIT_HITL` (đồ thị không vỡ), và **quan sát ngân sách ngữ cảnh** (`token_monitor` → `config/llm_token_stats.json`, KPI Context Utilization trên Dashboard).
+- ✅ **Nâng độ chặt chẽ thực nghiệm (rebut hội đồng):** độ nhạy ngưỡng Welford, zero-day phân cấp (đường cong k·σ), đối chứng âm APT + Wilson 95% CI, ablation B–E + cân bằng 150/150, stress ngữ cảnh — tất cả chạy thật, tất định khi không cần LLM.
 
 ## 2. Kế Hoạch Các Cột Mốc (Next Milestones)
 

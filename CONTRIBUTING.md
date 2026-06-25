@@ -18,9 +18,11 @@ Tuân thủ Conventional Commits để tự động hóa việc sinh Changelog:
 - `test:` Thêm hoặc sửa Unit Test.
 
 ## 3. Cách Thêm Một Detection Module Mới (Module Mở Rộng)
-Nếu bạn muốn đóng góp một Rule mới cho Tier 1 hoặc một Tool mới cho Agent Tier 2:
-1. **Với Tier 1 (Rules):** Tạo một file Python class kế thừa từ `BaseRule` trong thư mục `src/tier1_filter/rules/`. Hàm `evaluate(log)` phải trả về một trong các nhãn: `DROP`, `LOG`, `ESCALATE`.
-2. **Với Tier 2 (Agent Tools):** Định nghĩa một Tool sử dụng `@tool` decorator của LangChain và đăng ký nó vào mảng Tools trong file `src/agent/workflow.py`. Đảm bảo mô tả của Tool (Docstring) phải cực kỳ rõ ràng để LLM biết khi nào nên gọi nó.
+Nếu bạn muốn đóng góp một Rule mới cho Tier 1 hoặc một Node mới cho Agent Tier 2 (khớp kiến trúc thực tế ở HEAD):
+1. **Với Tier 1 (Rules):** SENTINEL KHÔNG dùng hệ plugin `BaseRule`. Có 2 cách thêm luật:
+   - **Khai báo (khuyến nghị):** thêm vào `static_rules`/`dynamic_rules` trong `config/system_settings.yaml` — `RuleEngine` **hot-reload** mỗi 5s, không cần sửa code. Luật động qua Dashboard còn được kiểm duyệt bởi `FeedbackValidator` (Zero-Trust) + HITL.
+   - **Bằng code:** mở rộng phương thức `evaluate()` trong `src/tier1_filter/rule_engine.py` (trả về một action hợp lệ: `DROP`/`LOG`/`ALERT`/`BLOCK_IP`/`AWAIT_HITL`/`ESCALATE`), kèm Unit Test trong `tests/`.
+2. **Với Tier 2 (Agent Node):** SENTINEL dùng **LangGraph `StateGraph`**, KHÔNG dùng `@tool` của LangChain. Viết một hàm node `node_<tên>(state: SentinelState)` trong `src/agent/nodes.py`, rồi đăng ký bằng `workflow.add_node(...)` + nối edge/conditional-edge trong `src/agent/workflow.py`. Mọi quyết định LLM phải đi qua `DecisionValidator` + `enforce_tier_consensus` trước khi thực thi.
 
 ## 4. Pull Request Checklist (Kiểm Tra Trước Khi Nộp PR)
 Trước khi nhấn nút Create Pull Request, hãy tự rà soát:

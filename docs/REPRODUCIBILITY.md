@@ -4,10 +4,10 @@ Tài liệu này cung cấp các hướng dẫn để các nhà nghiên cứu đ
 
 ## 1. Môi trường Thực thi
 
-- **Phần cứng:** Cần có tối thiểu NVIDIA RTX 4060 Ti 16GB VRAM để chạy cục bộ LLM `Gemma-2-9B-IT` (Q4_K_M) thông qua `llama.cpp`. Có thể sử dụng API ngoài nếu cấu hình endpoint OpenAI-compatible trong file `.env`.
+- **Phần cứng:** Cần có tối thiểu NVIDIA RTX 4060 Ti 16GB VRAM để chạy cục bộ LLM `Gemma-2-9B-IT` (Q6_K, file `gemma-2-9b-it-Q6_K.gguf`) thông qua `llama.cpp`. Có thể sử dụng API ngoài nếu cấu hình endpoint OpenAI-compatible trong file `.env`.
 - **Hệ điều hành:** Linux (Ubuntu 20.04/22.04 LTS).
 - **Python:** Phiên bản `3.10.x`.
-- **Hạt giống ngẫu nhiên (Seed):** Mọi hàm random trong FAISS, Numpy và Data Splitting đều được cố định bằng Seed `42`.
+- **Hạt giống ngẫu nhiên (Seed):** Mọi hàm random trong FAISS, Numpy và Data Splitting đều được cố định bằng Seed `42`. **Suy luận LLM cũng tất định:** `temperature=0.1` + `seed=42` (config `llm.seed`) → cùng prompt cho cùng phán quyết (kiểm chứng bằng `experiments/run_llm_robustness.py`). *(Lưu ý: GPU batching có thể khiến văn bản thô đôi khi khác vài ký tự nhưng `action` sau parse luôn ổn định.)*
 
 ## 2. Dataset & Tiền xử lý
 
@@ -59,9 +59,22 @@ python experiments/e2e_test_runner.py --offline
 
 - Tính toàn vẹn của Audit Trail DB. Tích hợp trong `evaluate_reasoning.py` and `e2e_test_runner.py`.
 
+## 3b. Thực nghiệm Rigor, Robustness & Observability (bổ sung)
+
+Các thực nghiệm tăng độ chặt chẽ (rebut hội đồng) + độ bền LLM + quan sát ngữ cảnh. Tất định khi không cần LLM; chỉ Ablation B–E/cân bằng và determinism cần LLM server.
+
+- **Độ nhạy ngưỡng Welford** (bác bỏ "3.5σ cherry-pick"): `python experiments/run_threshold_sensitivity.py` → `results/threshold_sensitivity_results.json`.
+- **Zero-day phân cấp** (đường cong ranh giới k·σ): `python experiments/run_zeroday_graded.py` → `results/zeroday_graded_results.json`.
+- **Đối chứng âm APT + Wilson 95% CI** (specificity trên IP benign đa-ngày): `python experiments/run_apt_negative_control.py` → `results/apt_negative_control_results.json`.
+- **Ablation B–E** (pure-LLM / Welford-gate / dense-RAG / hybrid-RAG, 300 mẫu): `python experiments/run_ablation_bcde.py` → `results/ablation_bcde_results.json`.
+- **Ablation cân bằng 150/150** (A–F so được, warmup benign thật): `python experiments/run_ablation_balanced.py` → `results/ablation_balanced_results.json`.
+- **Stress ngữ cảnh** (RAW vs Drain-compressed vs `n_ctx`): `python experiments/run_context_stress.py` → `results/context_stress_results.json` + `results/plots/context_stress.png`.
+- **Độ bền LLM** (determinism seed + suy biến an toàn → AWAIT_HITL): `python experiments/run_llm_robustness.py` → `results/llm_robustness_results.json`.
+- **Quan sát ngữ cảnh runtime:** `src/agent/token_monitor.py` ghi `config/llm_token_stats.json` (mean/p95/max/utilization% token) trong mọi lần chạy có gọi LLM; Dashboard hiển thị KPI "Context Utilization". Biểu đồ độ nhạy/zero-day vẽ bằng `python experiments/plot_results.py`.
+
 ## 4. Quản lý Thí nghiệm (MLflow Tracking)
 
 Hệ thống sử dụng **MLflow** để tự động log và phiên bản hóa mọi thông số:
 
 - Các kết quả được MLflow quản lý tại thư mục `mlruns/` (Local SQLite) và xem biểu đồ tại `http://localhost:5001`.
-- Log bao gồm Hyperparameters (Temperature=0.1) và Metrics của từng luồng thử nghiệm (F1, Latency, Block/Bypass Rate, reasoning quality scores).
+- Log bao gồm Hyperparameters (Temperature=0.1, Seed=42) và Metrics của từng luồng thử nghiệm (F1, Latency, Block/Bypass Rate, reasoning quality scores).
