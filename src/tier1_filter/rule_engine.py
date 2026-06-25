@@ -327,7 +327,9 @@ class RuleEngine:
         tier1_config = config.get("tier1", {})
 
         self.risk_threshold = tier1_config.get("risk_threshold", 15)
-        self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389, 445, 1433, 3306])
+        self.sensitive_ports = tier1_config.get(
+            "sensitive_ports", [21, 22, 23, 3389, 445, 1433, 3306]
+        )
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
         # Ngưỡng Z-score cho phát hiện dị biệt thống kê Welford (zero-day). Mặc định
         # 3.5σ; cấu hình được để phục vụ phân tích độ nhạy (sensitivity analysis).

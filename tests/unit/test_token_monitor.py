@@ -57,7 +57,9 @@ def test_estimate_tokens_empty():
 
 def test_preflight_small_prompt_no_warning():
     before = token_monitor._state["overflow_warnings"]
-    est = token_monitor.preflight_check([{"role": "user", "content": "ping"}], max_output_tokens=512)
+    est = token_monitor.preflight_check(
+        [{"role": "user", "content": "ping"}], max_output_tokens=512
+    )
     assert est >= 0
     assert token_monitor._state["overflow_warnings"] == before  # KHÔNG cảnh báo
 
