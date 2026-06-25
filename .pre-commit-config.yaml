@@ -1,0 +1,32 @@
+# Pre-commit hooks — tự động giữ code sạch TRƯỚC khi commit, khớp 100% với CI
+# (.github/workflows/ci.yml dùng astral-sh ruff: `ruff check` + `ruff format --check`).
+#
+# Cài 1 lần:   .venv/bin/pre-commit install
+# Chạy thủ công toàn repo:  .venv/bin/pre-commit run --all-files
+#
+# Sau khi cài, mỗi `git commit` sẽ tự: (1) ruff --fix sửa lint, (2) ruff-format
+# format lại. Nếu có thay đổi, commit bị chặn để bạn `git add` lại — KHÔNG bao
+# giờ còn fail "CI Pipeline / lint" trên GitHub nữa.
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Pin khớp ruff trong venv (0.15.17) để hook và CI cho kết quả y hệt.
+    rev: v0.15.17
+    hooks:
+      - id: ruff # linter (sửa được thì tự --fix)
+        args: [--fix]
+      - id: ruff-format # formatter (tương đương `ruff format`)
+
+  # Vệ sinh cơ bản: chặn file rác/lỗi vô tình lọt vào commit.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        # 6MB: đủ chỗ cho PDF luận văn (~4.3MB, không LFS) nhưng vẫn chặn vô tình
+        # add dataset/video lớn. File *.json/*.csv/*.db đã LFS nên được bỏ qua.
+        args: [--maxkb=6144]
+      - id: check-yaml
+      - id: detect-private-key # an ninh: chặn commit nhầm private key

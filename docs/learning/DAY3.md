@@ -41,7 +41,7 @@
 
 
 2. ONLINE RETRIEVAL PHASE (retriever.py):
-   Query (từ escalated logs) 
+   Query (từ escalated logs)
        │
        ▼
    [verify_document_integrity()] ──(so sánh SHA-256 vs checksums.sha256)──► SAI LỆCH? ──► [True] ──► Raise ERROR (Chặn RAG Poisoning)
@@ -88,7 +88,7 @@
 #### `load_mitre_chunks() -> list[dict]`
 - **Mục đích:** Đọc tệp MITRE ATT&CK JSON, chuẩn hóa và đóng gói mỗi technique thành một chunk văn bản an toàn để nhúng.
 - **Trả về:** Danh sách các dict, mỗi dict chứa: `"text"` (chuỗi chunk đã làm sạch) và `"metadata"` (nguồn, ID, tên, tactic).
-- **Luồng xử lý:** 
+- **Luồng xử lý:**
   1. Đọc tệp `mitre_attack.json`.
   2. Với mỗi technique, ghép các trường `id`, `name`, `tactic`, `description`, `detection_indicators`, `log_patterns` và `response_actions` thành một chuỗi duy nhất.
   3. Đi qua `RAGSanitizer.sanitize_ingest()` để trung hòa các mã độc hại/markdown lạ.
@@ -113,7 +113,7 @@
 
 #### `build_indexes(chunks: list[dict], index_name: str, model=None)`
 - **Mục đích:** Tạo và lưu trữ đồng thời chỉ mục Dense (FAISS IndexFlatIP) và Sparse (BM25Okapi) cho nguồn tri thức tương ứng.
-- **Tham số:** 
+- **Tham số:**
   - `chunks`: Danh sách chunks từ hàm load.
   - `index_name`: Tên định danh file lưu index (ví dụ: `"mitre_attack"`).
   - `model`: Đối tượng `SentenceTransformer` dùng chung (nếu có).

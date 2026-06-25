@@ -191,7 +191,8 @@ AI_Security_Graph/
 ├── docs/
 │   ├── guides/                       # RUN_PROJECT.md, ablation_design.md, E2E_TESTS_GUIDE.md
 │   ├── latex/                        # Thesis/proposal LaTeX sources + Template
-│   └── *.md                          # Architecture, DAY1/DAY2, threat model, reproducibility...
+│   ├── learning/                     # DAY1/DAY2/DAY3 5-day learning-path notes
+│   └── *.md                          # Architecture, codebase_summary, threat model, reproducibility...
 ├── tests/
 │   ├── unit/                         # Pytest unit tests
 │   └── integration/                  # End-to-end flow tests
