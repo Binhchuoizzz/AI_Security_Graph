@@ -163,90 +163,101 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             if response:
                 for stream_name, messages in response:
                     for msg_id, data in messages:
-                        raw_log = json.loads(data["log"])
+                        # Cô lập per-message: 1 log hỏng KHÔNG phá cả batch.
+                        try:
+                            raw_log = json.loads(data["log"])
 
-                        # Gắn nhãn Provenance (Nguồn gốc) để phục vụ SIEM Correlation
-                        raw_log["log_source"] = stream_name
+                            # Gắn nhãn Provenance (Nguồn gốc) để phục vụ SIEM Correlation
+                            raw_log["log_source"] = stream_name
 
-                        # Gọi ngay Tier 1 Rule Engine để cân nhắc
-                        evaluated_log = engine.evaluate(raw_log)
-                        action = evaluated_log.get("tier1_action", "DROP")
+                            # Gọi ngay Tier 1 Rule Engine để cân nhắc
+                            evaluated_log = engine.evaluate(raw_log)
+                            action = evaluated_log.get("tier1_action", "DROP")
 
-                        # ── Số liệu THẬT cho Dashboard: đếm log thô qua Tier-1 + số bị
-                        # lọc (DROP) -> Noise Reduction THẬT (ghi ra file cuối mỗi batch).
-                        raw_logs_total += 1
-                        if action in ("DROP", "WHITELIST_DROP"):
-                            tier1_dropped_total += 1
+                            # ── Số liệu THẬT cho Dashboard: đếm log thô qua Tier-1 + số bị
+                            # lọc (DROP) -> Noise Reduction THẬT (ghi ra file cuối mỗi batch).
+                            raw_logs_total += 1
+                            if action in ("DROP", "WHITELIST_DROP"):
+                                tier1_dropped_total += 1
 
-                        # ── APT EMERGENT: ghi chuỗi từ luồng + leo thang khi bản án bật ──
-                        # Chỉ chạy với event mang metadata DAPT (apt_phase + apt_is_attack).
-                        # Mỗi sự kiện APT lẻ tín hiệu THẤP (thường DROP/LOG ở Tier-1) nên
-                        # bản án "is_apt" phải NỔI LÊN DẦN từ Threat Memory đa-ngày, không
-                        # phải từ một flow đơn — đúng với cơ chế offline.
-                        if raw_log.get("apt_phase") and raw_log.get("apt_is_attack"):
-                            apt_ip = raw_log.get("Source IP") or raw_log.get("src_ip", "")
-                            if apt_ip:
-                                before = memory.check_apt_chain(apt_ip)
-                                memory.record_apt_event(
-                                    src_ip=apt_ip,
-                                    dst_ip=raw_log.get("Destination IP", ""),
-                                    apt_phase=raw_log.get("apt_phase"),
-                                    apt_day=raw_log.get("apt_day"),
-                                    label=raw_log.get("apt_label", ""),
-                                    timestamp=raw_log.get("apt_timestamp", ""),
-                                )
-                                after = memory.check_apt_chain(apt_ip)
-                                if (
-                                    (not before["is_apt"])
-                                    and after["is_apt"]
-                                    and apt_ip not in apt_fired
-                                ):
-                                    apt_fired.add(apt_ip)
-                                    evaluated_log["apt_emergent"] = True
-                                    evaluated_log["apt_phases"] = after.get("phases_seen", "")
-                                    evaluated_log["tier1_reasons"] = (
-                                        evaluated_log.get("tier1_reasons") or []
-                                    ) + [
-                                        f"APT chain emergent: {after.get('chain_length')} ngày "
-                                        f"(phases={after.get('phases_seen')})"
-                                    ]
-                                    print(
-                                        f"[APT] EMERGENT chain {apt_ip} @ ngày "
-                                        f"{after.get('max_day_seen')} -> ESCALATE lên Agent"
+                            # ── APT EMERGENT: ghi chuỗi từ luồng + leo thang khi bản án bật ──
+                            # Chỉ chạy với event mang metadata DAPT (apt_phase + apt_is_attack).
+                            # Mỗi sự kiện APT lẻ tín hiệu THẤP (thường DROP/LOG ở Tier-1) nên
+                            # bản án "is_apt" phải NỔI LÊN DẦN từ Threat Memory đa-ngày, không
+                            # phải từ một flow đơn — đúng với cơ chế offline.
+                            if raw_log.get("apt_phase") and raw_log.get("apt_is_attack"):
+                                apt_ip = raw_log.get("Source IP") or raw_log.get("src_ip", "")
+                                if apt_ip:
+                                    before = memory.check_apt_chain(apt_ip)
+                                    memory.record_apt_event(
+                                        src_ip=apt_ip,
+                                        dst_ip=raw_log.get("Destination IP", ""),
+                                        apt_phase=raw_log.get("apt_phase"),
+                                        apt_day=raw_log.get("apt_day"),
+                                        label=raw_log.get("apt_label", ""),
+                                        timestamp=raw_log.get("apt_timestamp", ""),
                                     )
-                                    action = "ESCALATE"  # đẩy APT qua full pipeline (LLM)
+                                    after = memory.check_apt_chain(apt_ip)
+                                    if (
+                                        (not before["is_apt"])
+                                        and after["is_apt"]
+                                        and apt_ip not in apt_fired
+                                    ):
+                                        apt_fired.add(apt_ip)
+                                        evaluated_log["apt_emergent"] = True
+                                        evaluated_log["apt_phases"] = after.get("phases_seen", "")
+                                        evaluated_log["tier1_reasons"] = (
+                                            evaluated_log.get("tier1_reasons") or []
+                                        ) + [
+                                            f"APT chain emergent: {after.get('chain_length')} ngày "
+                                            f"(phases={after.get('phases_seen')})"
+                                        ]
+                                        print(
+                                            f"[APT] EMERGENT chain {apt_ip} @ ngày "
+                                            f"{after.get('max_day_seen')} -> ESCALATE lên Agent"
+                                        )
+                                        action = "ESCALATE"  # đẩy APT qua full pipeline (LLM)
 
-                        # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
-                        if action == "ESCALATE":
-                            alert_msg = f"[!] ESCALATE TO AI | Source: {stream_name} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
-                            print(alert_msg)
-                            # Loại nhãn dataset trước khi lên LLM (chống label leakage);
-                            # bản FULL (kèm nhãn) vẫn nằm ở queue_decisions/queue_hitl
-                            # để đối chiếu hậu kiểm.
-                            batch_buffer.append(_strip_dataset_labels(evaluated_log))
+                            # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
+                            if action == "ESCALATE":
+                                alert_msg = f"[!] ESCALATE TO AI | Source: {stream_name} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
+                                print(alert_msg)
+                                # Loại nhãn dataset trước khi lên LLM (chống label leakage);
+                                # bản FULL (kèm nhãn) vẫn nằm ở queue_decisions/queue_hitl
+                                # để đối chiếu hậu kiểm.
+                                batch_buffer.append(_strip_dataset_labels(evaluated_log))
 
-                        elif action == "AWAIT_HITL":
-                            # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
-                            print(f"[*] routing AWAIT_HITL (Infiltration) -> {ESCALATED_QUEUE}")
-                            r.rpush(ESCALATED_QUEUE, json.dumps(evaluated_log))
+                            elif action == "AWAIT_HITL":
+                                # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
+                                print(f"[*] routing AWAIT_HITL (Infiltration) -> {ESCALATED_QUEUE}")
+                                r.rpush(ESCALATED_QUEUE, json.dumps(evaluated_log))
 
-                        elif action == "BLOCK_IP":
-                            # Đẩy IP vào blacklist của Redis với TTL 1 giờ
-                            src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
-                                "src_ip", ""
-                            )
-                            if src_ip:
-                                print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
-                                r.setex(f"blacklist:{src_ip}", 3600, "1")
-                            # Ghi nhận vào log quyết định để phục vụ ablation study
-                            r.rpush("queue_decisions", json.dumps(evaluated_log))
+                            elif action == "BLOCK_IP":
+                                # Đẩy IP vào blacklist của Redis với TTL 1 giờ
+                                src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                    "src_ip", ""
+                                )
+                                if src_ip:
+                                    print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
+                                    r.setex(f"blacklist:{src_ip}", 3600, "1")
+                                # Ghi nhận vào log quyết định để phục vụ ablation study
+                                r.rpush("queue_decisions", json.dumps(evaluated_log))
 
-                        elif action in ("ALERT", "LOG"):
-                            # Chỉ ghi nhận vào ablation log phục vụ thống kê nghiên cứu
-                            r.rpush("queue_decisions", json.dumps(evaluated_log))
+                            elif action in ("ALERT", "LOG"):
+                                # Chỉ ghi nhận vào ablation log phục vụ thống kê nghiên cứu
+                                r.rpush("queue_decisions", json.dumps(evaluated_log))
 
-                        # Xác nhận đã xử lý xong tin nhắn trong stream (XACK)
-                        r.xack(stream_name, GROUP_NAME, msg_id)
+                        except json.JSONDecodeError:
+                            print(f"[!] Malformed JSON in message {msg_id}. Bỏ qua (đã xack).")
+                        except Exception as e:
+                            print(f"[!] Lỗi xử lý message {msg_id}: {e}. Bỏ qua (đã xack).")
+                        finally:
+                            # LUÔN xack (kể cả message lỗi) -> poison message không kẹt
+                            # vĩnh viễn trong Pending Entries List của consumer group.
+                            try:
+                                r.xack(stream_name, GROUP_NAME, msg_id)
+                            except Exception:
+                                pass
 
                 # Ghi counter THẬT ra file (Dashboard container đọc qua volume config/)
                 _flush_stats()

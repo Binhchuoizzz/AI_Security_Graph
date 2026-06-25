@@ -111,8 +111,10 @@ def load_config() -> dict[str, Any]:
         )
     return {
         "tier1": {
-            "risk_threshold": 30,
-            "sensitive_ports": [21, 22, 23, 3389],
+            # Fallback PHẢI là bản sao trung thực của config production (fail-safe không
+            # được yếu hơn): khớp system_settings.yaml (risk_threshold=15, đủ 7 cổng nhạy cảm).
+            "risk_threshold": 15,
+            "sensitive_ports": [21, 22, 23, 3389, 445, 1433, 3306],
             "max_fwd_packets": 1000,
             "z_threshold": 3.5,
             "dynamic_rules": [],
@@ -324,8 +326,8 @@ class RuleEngine:
         config = load_config()
         tier1_config = config.get("tier1", {})
 
-        self.risk_threshold = tier1_config.get("risk_threshold", 30)
-        self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389])
+        self.risk_threshold = tier1_config.get("risk_threshold", 15)
+        self.sensitive_ports = tier1_config.get("sensitive_ports", [21, 22, 23, 3389, 445, 1433, 3306])
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
         # Ngưỡng Z-score cho phát hiện dị biệt thống kê Welford (zero-day). Mặc định
         # 3.5σ; cấu hình được để phục vụ phân tích độ nhạy (sensitivity analysis).
