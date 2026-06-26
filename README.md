@@ -82,6 +82,43 @@ SENTINEL operates on a strict **Separation of Concerns** model to minimize proce
 
 ---
 
+## 🎯 MITRE ATT&CK Mapping Layer (Tier-2 enrichment node)
+
+A dedicated LangGraph node — [`src/agent/attack_mapper.py`](src/agent/attack_mapper.py),
+wired as `attack_mapper` in [`src/agent/workflow.py`](src/agent/workflow.py) — turns the
+triage step's **free-text** `mitre_technique` (e.g. `"T1190 - ..."`) into a **structured,
+schema-validated** ATT&CK record.
+
+* **When it runs:** a conditional edge after `llm_triage` (`route_after_triage`). It only
+  fires when the triage **confidence > 0.7** *and* the verdict is a threat (`BLOCK_IP` /
+  `ALERT` / `AWAIT_HITL`) — benign `LOG` events are never mapped. The enriched decision is
+  then routed on to the HITL node / Action Executor.
+* **Reuses existing infrastructure — no parallel system:** the same
+  `knowledge_base/mitre_attack.json` (299 techniques), the same `DualRetriever`
+  (FAISS + BM25, **RRF k=60**), and the same `llm_client` (Gemma-2-9B-IT **Q6_K** via
+  llama.cpp at `127.0.0.1:5000`). No STIX re-download, no second KB, no Ollama endpoint.
+* **Two resolution paths:**
+  1. **Deterministic** — common web attacks (SQLi, XSS, Path Traversal, LFI, RFI, SSRF,
+     XXE, Command Injection, IDOR, Prompt Injection) resolve from a hand-verified curated
+     map. Every Tactic/Technique ID is a real ATT&CK/ATLAS entry. Reproducible, **no LLM
+     call**, low latency.
+  2. **Inference** — for an unseen `attack_type`, RRF returns the top-3 candidate techniques
+     from the KB and the local LLM selects the best match (with graceful fallback to the
+     top-RRF candidate if the LLM is unavailable).
+* **Output schema** (Pydantic `MitreMapping`, always valid): `attack_type`, `confidence`,
+  `framework`, `mitre_tactic` (+`_id`), `mitre_technique` (+`_id`), `mitre_subtechnique`
+  (+`_id`), `mitre_url`, `mapping_confidence`, `mapping_status` (`resolved` |
+  `low_confidence`), `recommended_response` (rule-based by tactic).
+* **Honesty notes:** Prompt Injection is not an ATT&CK Enterprise technique — it is mapped
+  to **MITRE ATLAS `AML.T0051`** with its tactic ID intentionally left blank (unverified, no
+  fabrication). IDOR has no dedicated ATT&CK technique, so it maps to `T1190` with a lower
+  `mapping_confidence`.
+* **Tests:** [`tests/unit/test_attack_mapper.py`](tests/unit/test_attack_mapper.py) — 29
+  CI-safe tests (no LLM/Redis needed) covering all 10 attack types, schema validity, URL
+  building, and the RRF/graceful-degradation paths.
+
+---
+
 ## 🛡️ Core Security Novelty & Defensive Controls
 
 SENTINEL implements defense-in-depth, protecting both the protected infrastructure and the AI system itself from adversarial threats:

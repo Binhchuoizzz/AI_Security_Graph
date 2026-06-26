@@ -9,6 +9,11 @@ from typing import Any
 
 import mlflow  # type: ignore
 
+from src.agent.attack_mapper import (
+    MAPPING_CONFIDENCE_GATE,
+    AttackMapperInput,
+    map_attack,
+)
 from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
 from src.agent.state import SentinelState
@@ -320,6 +325,81 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     }
 
 
+def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
+    """
+    ATT&CK Mapper Node: chạy SAU node_llm_triage cho các quyết định tin cậy cao.
+
+    Biến `mitre_technique` free-text của triage thành bản đồ MITRE ATT&CK CÓ CẤU
+    TRÚC (tactic/technique/sub-technique/URL/mapping_confidence/recommended_response),
+    bồi đắp vào quyết định mới nhất để node HITL / Action Executor dùng được.
+
+    TÁI DÙNG hạ tầng sẵn có: `retriever` (DualRetriever) + `llm_client`. KHÔNG gọi
+    LLM thêm trong đường XÁC ĐỊNH (web attack phổ biến) -> giữ độ trễ thấp.
+    """
+    logger.info("--- NODE: ATT&CK MAPPER ---")
+
+    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
+    visit_res = loop_detector.record_visit("node_attack_mapper")
+    if visit_res["action"] == "FORCE_STOP":
+        raise RuntimeError(visit_res["reason"])
+
+    if not state.decisions:
+        return {}
+
+    decision = dict(state.decisions[-1])  # copy để bồi đắp, giữ action/target/confidence
+
+    # Dựng đầu vào mapper từ triage + batch log thật.
+    first_log = state.current_batch_logs[0] if state.current_batch_logs else {}
+    payload = (str(first_log.get("message", "")) + " " + str(first_log.get("payload", ""))).strip()
+    # Tín hiệu loại tấn công: free-text mitre_technique + reasoning + tier1_reasons.
+    type_hint = " ".join(
+        [
+            str(decision.get("mitre_technique", "")),
+            str(decision.get("reasoning", "")),
+            " ".join(str(r) for r in (first_log.get("tier1_reasons") or [])[:3]),
+        ]
+    ).strip()
+
+    mapper_input = AttackMapperInput(
+        attack_type=type_hint,
+        confidence=float(decision.get("confidence", 0.0) or 0.0),
+        payload=payload,
+        features=first_log if isinstance(first_log, dict) else {},
+    )
+
+    try:
+        mapping = map_attack(mapper_input, retriever=retriever, llm=llm_client)
+    except Exception as e:
+        # Suy biến an toàn: mapping hỏng KHÔNG được phá đồ thị — giữ quyết định gốc.
+        logger.error(f"[ATT&CK MAPPER] Lỗi ánh xạ ({e}). Giữ nguyên quyết định triage.")
+        return {}
+
+    # Bồi đắp các trường có cấu trúc vào quyết định (free-text được thay bằng chuẩn hoá).
+    decision.update(
+        {
+            "mitre_technique": f"{mapping.mitre_technique_id} - {mapping.mitre_technique}".strip(
+                " -"
+            ),
+            "mitre_tactic": mapping.mitre_tactic,
+            "mitre_tactic_id": mapping.mitre_tactic_id,
+            "mitre_technique_id": mapping.mitre_technique_id,
+            "mitre_subtechnique": mapping.mitre_subtechnique or "",
+            "mitre_subtechnique_id": mapping.mitre_subtechnique_id or "",
+            "mitre_url": mapping.mitre_url,
+            "mapping_confidence": mapping.mapping_confidence,
+            "mapping_status": mapping.mapping_status,
+            "recommended_response": mapping.recommended_response,
+        }
+    )
+
+    logger.info(
+        f"[ATT&CK MAPPER] {mapping.mitre_technique_id} ({mapping.mitre_tactic}) "
+        f"status={mapping.mapping_status} conf={mapping.mapping_confidence:.2f}"
+    )
+
+    return {"decisions": [decision]}
+
+
 def node_action_executor(state: SentinelState) -> dict[str, Any]:
     """
     Action Executor Node: Xử lý các action BLOCK_IP hoặc ALERT.
@@ -410,3 +490,23 @@ def route_triage_decision(state: SentinelState) -> str:
         return "await_hitl"
     else:
         return "end_cycle"
+
+
+# Action cần làm giàu MITRE (bỏ qua LOG/benign — ánh xạ ATT&CK cho benign vô nghĩa).
+_MAPPABLE_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL"}
+
+
+def route_after_triage(state: SentinelState) -> str:
+    """
+    Cổng điều kiện SAU triage:
+      - Nếu confidence > 0.7 VÀ là quyết định mối-đe-doạ -> chạy attack_mapper ("map").
+      - Ngược lại -> giữ nguyên định tuyến theo action (hành vi cũ).
+    Sau attack_mapper, route_triage_decision sẽ định tuyến tiếp theo action.
+    """
+    latest_decision = state.decisions[-1] if state.decisions else {}
+    confidence = float(latest_decision.get("confidence", 0.0) or 0.0)
+    action = latest_decision.get("action", "LOG")
+
+    if confidence > MAPPING_CONFIDENCE_GATE and action in _MAPPABLE_ACTIONS:
+        return "map"
+    return route_triage_decision(state)

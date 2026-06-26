@@ -60,6 +60,19 @@ class AgentDecision:
     nist_control: str = ""  # Ví dụ: "Containment - Network isolation"
     hitl_status: str = "N/A"  # Các trạng thái: "PENDING", "APPROVED", "REJECTED", "N/A"
 
+    # === MITRE ATT&CK MAPPING (có cấu trúc) — do node_attack_mapper bồi đắp ===
+    # Free-text mitre_technique ở trên được tách thành các trường kiểm chứng được.
+    # Mặc định rỗng để các luồng cũ (chưa qua mapper) vẫn hợp lệ.
+    mitre_tactic: str = ""  # VD: "Initial Access"
+    mitre_tactic_id: str = ""  # VD: "TA0001"
+    mitre_technique_id: str = ""  # VD: "T1190"
+    mitre_subtechnique: str = ""  # VD: "JavaScript" (rỗng nếu không có)
+    mitre_subtechnique_id: str = ""  # VD: "T1059.007"
+    mitre_url: str = ""  # Link technique chính thức
+    mapping_confidence: float = 0.0  # Độ tin cậy của riêng phép ánh xạ [0,1]
+    mapping_status: str = ""  # "resolved" | "low_confidence" | "" (chưa map)
+    recommended_response: str = ""  # Phản hồi đề xuất (rule-based theo tactic)
+
     def to_dict(self) -> dict:
         return {
             "timestamp": self.timestamp,
@@ -70,6 +83,15 @@ class AgentDecision:
             "mitre_technique": self.mitre_technique,
             "nist_control": self.nist_control,
             "hitl_status": self.hitl_status,
+            "mitre_tactic": self.mitre_tactic,
+            "mitre_tactic_id": self.mitre_tactic_id,
+            "mitre_technique_id": self.mitre_technique_id,
+            "mitre_subtechnique": self.mitre_subtechnique,
+            "mitre_subtechnique_id": self.mitre_subtechnique_id,
+            "mitre_url": self.mitre_url,
+            "mapping_confidence": self.mapping_confidence,
+            "mapping_status": self.mapping_status,
+            "recommended_response": self.recommended_response,
         }
 
 
@@ -190,8 +212,28 @@ class SentinelState:
         mitre_technique: str = "",
         nist_control: str = "",
         hitl_status: str = "N/A",
+        **mitre_mapping: Any,
     ):
-        """Ghi nhận quyết định mới vào audit trail."""
+        """
+        Ghi nhận quyết định mới vào audit trail.
+
+        mitre_mapping (tùy chọn): các trường có cấu trúc do node_attack_mapper
+        bồi đắp (mitre_tactic, mitre_tactic_id, mitre_technique_id,
+        mitre_subtechnique, mitre_subtechnique_id, mitre_url, mapping_confidence,
+        mapping_status, recommended_response). Khoá lạ bị bỏ qua an toàn.
+        """
+        allowed = {
+            "mitre_tactic",
+            "mitre_tactic_id",
+            "mitre_technique_id",
+            "mitre_subtechnique",
+            "mitre_subtechnique_id",
+            "mitre_url",
+            "mapping_confidence",
+            "mapping_status",
+            "recommended_response",
+        }
+        extra = {k: v for k, v in mitre_mapping.items() if k in allowed}
         decision = AgentDecision(
             timestamp=datetime.now(timezone.utc).isoformat(),
             action=action,
@@ -201,6 +243,7 @@ class SentinelState:
             mitre_technique=mitre_technique,
             nist_control=nist_control,
             hitl_status=hitl_status,
+            **extra,
         )
         self.decisions.append(decision.to_dict())
 
