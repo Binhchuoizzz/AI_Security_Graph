@@ -152,3 +152,48 @@ def test_no_retriever_degrades_gracefully():
     assert mapping.mapping_status == "low_confidence"
     assert mapping.mitre_tactic == "Unknown"
     assert set(mapping.model_dump().keys()) == SCHEMA_KEYS
+
+
+# ---------- Triết lý A: NEO vào verdict triage (không để RRF ghi đè) ----------
+def test_anchor_on_triage_technique_in_kb():
+    """attack_type chứa Txxxx (triage đã gán) + KB phủ -> NEO, không cần retriever/LLM."""
+    mapping = map_attack(
+        AttackMapperInput(attack_type="T1071 - Application Layer Protocol", confidence=0.9)
+    )
+    assert mapping.mitre_technique_id == "T1071"  # giữ verdict triage, KHÔNG đổi qua RRF
+    assert mapping.mitre_tactic == "Command and Control"
+    assert mapping.mitre_tactic_id == "TA0011"
+    assert mapping.mapping_status == "resolved"
+    assert mapping.mitre_url == "https://attack.mitre.org/techniques/T1071/"
+
+
+def test_anchor_preserves_subtechnique_id():
+    """Triage gán sub-technique -> NEO giữ nguyên id + URL sub-technique."""
+    mapping = map_attack(AttackMapperInput(attack_type="T1110.001 something brute", confidence=0.8))
+    assert mapping.mitre_technique_id == "T1110.001"
+    assert mapping.mitre_subtechnique_id == "T1110.001"
+    assert mapping.mitre_url == "https://attack.mitre.org/techniques/T1110/001/"
+
+
+def test_anchor_on_valid_id_not_in_kb_keeps_id_blank_tactic():
+    """Txxxx hợp lệ nhưng KB không phủ -> vẫn NEO id (honest: tactic trống)."""
+    mapping = map_attack(AttackMapperInput(attack_type="T1110 - Brute Force", confidence=0.8))
+    assert mapping.mitre_technique_id == "T1110"  # KHÔNG để RRF chệch sang cổng/giao thức
+    assert mapping.mitre_tactic == "Unknown"
+    assert mapping.mitre_tactic_id == ""
+    assert mapping.mapping_status == "resolved"
+
+
+def test_no_anchor_when_no_technique_id_falls_to_rrf(monkeypatch):
+    """Không có Txxxx trong attack_type -> KHÔNG neo, đi tiếp RRF (fallback)."""
+    monkeypatch.setattr(
+        "src.agent.attack_mapper._load_kb_index",
+        lambda: {
+            "T1046": {"id": "T1046", "name": "Network Service Discovery", "tactic": "Discovery"}
+        },
+    )
+    fake = _FakeRetriever([{"id": "T1046", "name": "Network Service Discovery", "rrf_score": 0.03}])
+    mapping = map_attack(
+        AttackMapperInput(attack_type="weird scan no id", confidence=0.8), retriever=fake, llm=None
+    )
+    assert mapping.mitre_technique_id == "T1046"  # đến từ RRF, không phải anchor

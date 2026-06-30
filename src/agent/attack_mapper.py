@@ -332,13 +332,22 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 # ==============================================================================
 # HÀM HỖ TRỢ
 # ==============================================================================
+def _kw_hit(kw: str, haystack: str) -> bool:
+    """Khớp keyword. Keyword 'từ' (chỉ chữ/số/space) phải khớp NGUYÊN TỪ (word
+    boundary) để tránh dương-tính-giả như 'rce' lọt trong 'fo[rce]' (brute force).
+    Keyword chứa ký tự đặc biệt (../, <script, $(, javascript:) thì khớp substring."""
+    if all(c.isalnum() or c.isspace() for c in kw):
+        return re.search(r"\b" + re.escape(kw) + r"\b", haystack) is not None
+    return kw in haystack
+
+
 def normalize_attack_type(*texts: str) -> str:
     """Quét nhiều chuỗi (attack_type, payload, reasoning...) -> khoá chuẩn hoặc ""."""
     haystack = " ".join(t for t in texts if t).lower()
     if not haystack:
         return ""
     for key, kws in _ATTACK_KEYWORDS:
-        if any(kw in haystack for kw in kws):
+        if any(_kw_hit(kw, haystack) for kw in kws):
             return key
     return ""
 
@@ -529,6 +538,47 @@ def _from_rrf(inp: AttackMapperInput, retriever: Any, llm: Any) -> MitreMapping:
     )
 
 
+def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
+    """
+    NEO vào technique-id mà TRIAGE đã gán (nếu attack_type chứa Txxxx hợp lệ).
+
+    Triết lý A (đã chốt): mapper KHÔNG ghi đè verdict của triage — triage đã
+    grounded trên RAG MITRE; mapper chỉ CẤU TRÚC HOÁ (thêm tactic/url/response).
+    Trả None nếu không tìm thấy id -> đi tiếp đường RRF (fallback khi triage mơ hồ).
+    """
+    m = re.search(r"\bT\d{4}(?:\.\d{3})?\b", inp.attack_type or "")
+    if not m:
+        return None
+    tid = m.group(0)
+    kb = _load_kb_index()
+    rec = kb.get(tid) or kb.get(tid.split(".")[0])
+    if rec:
+        name = rec.get("name", "") or tid
+        tactic, tactic_id = normalize_tactic(rec.get("tactic", ""))
+        conf = 0.80  # triage grounded + KB xác nhận id
+    else:
+        # id hợp lệ nhưng KB không phủ -> vẫn NEO (đúng hơn là để RRF chệch sang
+        # kỹ thuật cổng/giao thức), nhưng tactic để TRỐNG (honest) + hạ confidence.
+        name = tid
+        tactic, tactic_id = ("Unknown", "")
+        conf = 0.60
+    sub_id = tid if "." in tid else None
+    return MitreMapping(
+        attack_type=inp.attack_type.strip()[:120] or tid,
+        confidence=inp.confidence,
+        mitre_tactic=tactic,
+        mitre_tactic_id=tactic_id,
+        mitre_technique=name,
+        mitre_technique_id=tid,
+        mitre_subtechnique=name if (sub_id and rec) else None,
+        mitre_subtechnique_id=sub_id,
+        mitre_url=build_mitre_url(tid),
+        mapping_confidence=conf,
+        mapping_status="resolved" if conf >= LOW_CONFIDENCE_THRESHOLD else "low_confidence",
+        recommended_response=_response_for("", tactic),
+    )
+
+
 # ==============================================================================
 # API CHÍNH
 # ==============================================================================
@@ -552,5 +602,9 @@ def map_attack(
     key = normalize_attack_type(inp.attack_type, inp.payload, str(inp.features))
     if key in WEB_ATTACK_MAP:
         return _from_curated(key, inp)
-    # 2) Đường suy luận: RRF + LLM (graceful) cho attack_type lạ.
+    # 2) NEO vào verdict của triage nếu attack_type chứa technique-id hợp lệ (triết lý A).
+    anchored = _from_triage_anchor(inp)
+    if anchored is not None:
+        return anchored
+    # 3) Đường suy luận: RRF + LLM (graceful) khi triage mơ hồ / attack_type lạ.
     return _from_rrf(inp, retriever, llm)
