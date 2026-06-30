@@ -208,6 +208,8 @@ Quản lý bộ nhớ đệm LRU (Least Recently Used) dựa trên cấu trúc `
 ## R5. `src/rag/retriever.py`
 **Vai trò:** Thực hiện tìm kiếm kết hợp Hybrid Search (Dense FAISS + Sparse BM25), dung hòa thứ hạng bằng thuật toán Reciprocal Rank Fusion (RRF), đồng thời tích hợp các chốt chặn làm sạch đầu ra và tối ưu cache.
 
+> 🔗 **Tái dùng ở Tầng-4 (Agent):** ngoài `node_rag_context`, `DualRetriever` (đặc biệt RRF k=60 trên nguồn `mitre`) còn được **node `attack_mapper`** (`src/agent/attack_mapper.py`, mục 35b ở `codebase_summary.md`) gọi lại để lấy top-3 kỹ thuật ứng viên khi ánh xạ MITRE — KHÔNG dựng store/endpoint song song. *(Tài liệu DAY1–DAY3 chỉ phủ Tier-1/Guardrails/RAG; lớp Agent + mapper xem `codebase_summary.md` #33–#40, 35b.)*
+
 ### Hằng số
 | Tên | Mô tả |
 |-----|-------|

@@ -185,7 +185,7 @@ Kịch bản kiểm thử sẽ duyệt qua các module:
 1.  **Tier 1 Filter**: Kiểm tra luật Stateless (cổng, giao thức), Stateful (Port scan, Session baseline).
 2.  **Guardrails**: Quét Prompt Injection, Jailbreak, Encapsulation, và HTML/URL Decoupling.
 3.  **RAG Module**: Kiểm tra Hybrid retriever (FAISS + BM25) thu hồi ngữ cảnh từ tài liệu NIST & MITRE.
-4.  **Agent (Tier 2)**: Kiểm tra cấu trúc đồ thị suy luận của LangGraph.
+4.  **Agent (Tier 2)**: Kiểm tra cấu trúc đồ thị suy luận **6 node** của LangGraph (guardrails → rag_context → llm_triage → **attack_mapper** → action_executor/human_in_the_loop), gồm node ánh xạ MITRE ATT&CK có cấu trúc.
 5.  **Audit & UI**: Kiểm tra luồng ghi log hoạt động (Audit Trail) và phân quyền RBAC.
 
 **Kết quả mong đợi trên Terminal:**
@@ -197,9 +197,11 @@ FINAL: 22/22 PASSED | 0 FAILED | 0 SKIPPED  (cả --offline lẫn online)
 
 > **Số liệu thực đo (2026-06-12):** `--offline` cho **22/22 PASSED** (gồm T21 Unified
 > Streaming Eval offline và T22 Unified ONLINE Publisher — metadata + queue routing).
-> Bộ pytest đầy đủ (`.venv/bin/pytest tests/`) cho **194 passed, 0 failed** (gồm các
-> test mới: chống lộ nhãn dataset vào LLM, bất biến zero-day real-derived, APT-chain
-> context, semantic_cache, feedback_listener, auth; test_executor đã cô lập DB tạm).
+> Bộ pytest (`tests/unit` + `tests/test_tier1_filter` + `tests/test_adversarial`) cho
+> **207 passed, 0 failed** (gồm 35 test mới `test_attack_mapper` — curated/anchor/RRF + token_monitor;
+> chống lộ nhãn dataset vào LLM, bất biến zero-day real-derived, APT-chain context,
+> semantic_cache, feedback_listener, auth; test_executor đã cô lập DB tạm). *(Test integration
+> `tests/integration/` cần Redis nên không tính trong con số này.)*
 
 ---
 
@@ -385,7 +387,7 @@ Minh họa cách hệ thống SENTINEL hoạt động tự động hoàn toàn d
 .venv/bin/python main.py --mode server --log-level INFO
 ```
 
-*   **Công việc xử lý:** Subscriber lắng nghe Redis queue `sentinel_logs`, nhận dữ liệu log thô, lọc qua Tier 1 Rule Engine. Nếu log bị gán nhãn `ESCALATE`, nó sẽ chạy qua Guardrails, gọi Dual-RAG để lấy thông tin MITRE/NIST, sau đó gọi LLM cục bộ (llama.cpp) để phân tích sự cố bảo mật và lưu kết quả vào SQLite DB.
+*   **Công việc xử lý:** Subscriber lắng nghe Redis queue `sentinel_logs`, nhận dữ liệu log thô, lọc qua Tier 1 Rule Engine. Nếu log bị gán nhãn `ESCALATE`, nó sẽ chạy qua Guardrails, gọi Dual-RAG để lấy thông tin MITRE/NIST, gọi LLM cục bộ (llama.cpp) để phân tích sự cố, **rồi node `attack_mapper` làm giàu thành bản ghi MITRE ATT&CK có cấu trúc** (tactic/technique/URL/recommended_response) trước khi lưu kết quả vào SQLite DB.
 
 **Mở Terminal thứ 2 (Chạy phía Publisher / Giả lập máy phát log):**
 
@@ -663,7 +665,7 @@ rm -f config/threat_memory.db
 
 *   *Cơ chế:* publisher phát luồng gộp kèm metadata DAPT (`apt_phase`/`apt_day`); `subscriber.py`
     ghi dần chuỗi APT vào Threat Memory — khi `check_apt_chain` BẬT (đủ đa-ngày) thì ép
-    `ESCALATE` chuỗi APT qua full pipeline (Guardrails → RAG → LLM → Executor → Audit → Dashboard).
+    `ESCALATE` chuỗi APT qua full pipeline (Guardrails → RAG → LLM → ATT&CK Mapper → Executor → Audit → Dashboard).
 *   *Phân vai:* **Offline (Bước 4) = số liệu benchmark tất định** cho luận văn; **Online (Bước 5)
     = chứng minh end-to-end realtime** — chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC),
     số liệu online không dùng làm benchmark vì phụ thuộc timing/LLM.

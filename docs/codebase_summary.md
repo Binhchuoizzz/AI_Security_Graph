@@ -1,9 +1,9 @@
 # Tài liệu Tổng kết Cấu trúc Mã nguồn & Lộ trình Học tập (SENTINEL)
 
-Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thống SENTINEL, phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Lộ trình học tập 5 ngày**. Mỗi file phân tích rõ: **Mục đích → Tác dụng → Mối quan hệ** với các cấu phần khác. Đã đối chiếu sát với code ở HEAD (cập nhật 2026-06: luồng gộp online, zero-day real-derived, Anti-Self-DoS shield hẹp, raw-log counter thật, BLOCK_IP brute-force, FIREWALL MOCK; **bổ sung mới nhất:** quan sát ngữ cảnh `token_monitor` + seed tất định + suy biến an toàn ở Agent, và 7 experiment rigor: ablation B–E/cân bằng, độ nhạy ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM).
+Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thống SENTINEL, phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Lộ trình học tập 5 ngày**. Mỗi file phân tích rõ: **Mục đích → Tác dụng → Mối quan hệ** với các cấu phần khác. Đã đối chiếu sát với code ở HEAD (cập nhật 2026-06: luồng gộp online, zero-day real-derived, Anti-Self-DoS shield hẹp, raw-log counter thật, BLOCK_IP brute-force, FIREWALL MOCK; **bổ sung mới nhất:** quan sát ngữ cảnh `token_monitor` + seed tất định + suy biến an toàn ở Agent, và 7 experiment rigor: ablation B–E/cân bằng, độ nhạy ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM; và **Lớp ánh xạ MITRE ATT&CK có cấu trúc** — node thứ 6 `attack_mapper` sau triage, cổng theo ACTION, eval `scripts/eval_attack_mapper.py`).
 
-> **Bản đồ luồng:** Dataset → **Tier-1** (RuleEngine + Welford) → **Guardrails** → **Dual-RAG** → **LangGraph Agent (LLM)** → **Response/Audit** → **Dashboard HITL** → Feedback Loop về Tier-1.
-> **Trạng thái kiểm thử:** `pytest 194 passed`, `E2E 22/22 PASSED`.
+> **Bản đồ luồng:** Dataset → **Tier-1** (RuleEngine + Welford) → **Guardrails** → **Dual-RAG** → **LangGraph Agent (LLM + ATT&CK Mapper)** → **Response/Audit** → **Dashboard HITL** → Feedback Loop về Tier-1.
+> **Trạng thái kiểm thử:** `pytest 207 passed` (unit+tier1+adversarial), `E2E 22/22 PASSED`.
 
 ---
 
@@ -219,13 +219,13 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ### 33. `src/agent/state.py`
 *   **Mục đích:** Schema bộ nhớ trạng thái của tác tử LangGraph.
-*   **Tác dụng:** `SentinelState` (`TypedDict`): `current_batch_logs`, `current_batch_encapsulated`, `rag_mitre_context`/`rag_nist_context`, `decisions`, `narrative_summary`, `cycle_count`, IOCs, `hitl_status`... Kèm 2 dataclass: **`IOCEntry`** (ioc_type/value/severity/source_template — LLM chỉ APPEND, chống Semantic Drift) và **`AgentDecision`** (action/target/confidence/reasoning/mitre_technique/nist_control/hitl_status).
+*   **Tác dụng:** `SentinelState` (**`@dataclass`**, không phải TypedDict): `current_batch_logs`, `current_batch_encapsulated`, `rag_mitre_context`/`rag_nist_context`, `decisions`, `narrative_summary`, `cycle_count`, IOCs, `hitl_status`... Kèm 2 dataclass: **`IOCEntry`** (ioc_type/value/severity/source_template — LLM chỉ APPEND, chống Semantic Drift) và **`AgentDecision`** (action/target/confidence/reasoning/mitre_technique/nist_control/hitl_status **+ các trường MITRE có cấu trúc do `node_attack_mapper` bồi đắp:** `mitre_tactic`/`mitre_tactic_id`/`mitre_technique_id`/`mitre_subtechnique(_id)`/`mitre_url`/`mapping_confidence`/`mapping_status`/`recommended_response`; `to_dict()` + `add_decision(**mitre_mapping)` mở rộng tương ứng).
 *   **Mối quan hệ:** Import bởi toàn bộ `src/agent/`.
 
 ### 34. `src/agent/workflow.py`
 *   **Mục đích:** Định nghĩa đồ thị nhận thức của tác tử.
-*   **Tác dụng:** Khởi tạo `StateGraph` với **5 node** (`guardrails`/`rag_context`/`llm_triage`/`action_executor`/`human_in_the_loop`); entry=`guardrails`; edge thẳng `guardrails → rag_context → llm_triage`; **conditional edge** `route_triage_decision` từ `llm_triage` → `execute_action`(→action_executor) / `await_hitl`(→human_in_the_loop) / `end_cycle`(→END, cho LOG/benign); `action_executor`→END, `human_in_the_loop`→END. Compile `agent_app` (singleton).
-*   **Mối quan hệ:** Import node từ `nodes.py`; `agent_app` được `subscriber`/`main.py`/eval gọi.
+*   **Tác dụng:** Khởi tạo `StateGraph` với **6 node** (`guardrails`/`rag_context`/`llm_triage`/`attack_mapper`/`action_executor`/`human_in_the_loop`); entry=`guardrails`; edge thẳng `guardrails → rag_context → llm_triage`; **conditional edge `route_after_triage`** từ `llm_triage`: nếu action ∈ {`BLOCK_IP`,`ALERT`,`AWAIT_HITL`} → `attack_mapper` (làm giàu MITRE), ngược lại (LOG/benign) định tuyến thẳng theo action; **conditional edge `route_triage_decision`** từ `attack_mapper` → `execute_action`(→action_executor) / `await_hitl`(→human_in_the_loop) / `end_cycle`(→END); `action_executor`→END, `human_in_the_loop`→END. Compile `agent_app` (singleton). *(Cổng theo ACTION, KHÔNG theo confidence — đo thực tế cho thấy triage gán ALERT@0.6-0.7 nên ngưỡng `>0.7` cũ lọc mất gần hết verdict.)*
+*   **Mối quan hệ:** Import node từ `nodes.py` (gồm `route_after_triage`); `agent_app` được `subscriber`/`main.py`/eval gọi.
 
 ### 35. `src/agent/nodes.py` *(Cực kỳ quan trọng)*
 *   **Mục đích:** Logic xử lý tại các "Trạm" của đồ thị.
@@ -233,9 +233,16 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
     *   `node_guardrails`: chạy `GuardrailsPipeline` (nén + đóng gói nonce).
     *   `node_rag_context`: query RAG từ metadata flow thật + inject lịch sử Threat Memory (`get_context_for_prompt`, gồm **chuỗi APT đa-ngày**).
     *   `node_llm_triage`: build prompt + gọi LLM; **suy biến an toàn** (bọc `try/except`: nếu LLM cục bộ chết → log lỗi, đặt response rỗng → đồ thị KHÔNG vỡ, đẩy về `AWAIT_HITL`; Tier-1 vẫn bảo vệ độc lập); `DecisionValidator.validate_decision` + **`enforce_tier_consensus`** (lá chắn social-engineering) + `AuditLogger`.
+    *   **`route_after_triage` (cổng theo ACTION)**: threat verdict (`BLOCK_IP`/`ALERT`/`AWAIT_HITL`) → `node_attack_mapper`; benign `LOG` → route thẳng theo action.
+    *   `node_attack_mapper`: NEO vào technique-id mà triage đã gán → cấu trúc hóa bản ghi MITRE qua `map_attack` (web-attack phổ biến tra `WEB_ATTACK_MAP` tất định, không LLM; còn lại RRF top-3 + LLM-select, graceful); bồi đắp `mitre_tactic`/`mitre_technique_id`/`mitre_url`/`mapping_confidence`/`mapping_status`/`recommended_response` vào quyết định. *(Logic chi tiết ở mục 35b.)*
     *   `node_action_executor`: thực thi action; **`BLOCK_IP`** → `block_ip()` (audit, MOCK) **VÀ** `FeedbackListener.receive_new_rule()` (sinh luật PENDING cho HITL); ghi `threat_memory.record_incident`; nếu `check_apt_chain` BẬT → ghi indicator `multi_day_chain`. `LoopDetector` chống vô hạn.
     *   `node_human_in_the_loop`: nhánh `AWAIT_HITL` — đẩy quyết định mập mờ/bị Consensus-Guard ép xuống vào hàng đợi chờ analyst duyệt (không tự thực thi), rồi kết thúc cycle.
 *   **Mối quan hệ:** Gọi `DualRetriever`, `llm_client`, `threat_memory`, `executor`, `feedback_listener`.
+
+### 35b. `src/agent/attack_mapper.py` *(MỚI — Lớp ánh xạ MITRE ATT&CK có cấu trúc)*
+*   **Mục đích:** Biến `mitre_technique` dạng văn bản tự do của triage thành bản ghi MITRE ATT&CK CÓ CẤU TRÚC, kiểm chứng được (Pydantic) — tactic/technique/sub-technique/URL/`mapping_confidence`/`recommended_response`.
+*   **Tác dụng:** Models Pydantic `AttackMapperInput`/`MitreMapping` (schema LUÔN hợp lệ). `map_attack()` 3 đường: (1) **curated** — web-attack phổ biến tra `WEB_ATTACK_MAP` (10 lớp: SQLi→T1190, XSS→T1059.007, cmd-inj→T1059, prompt-inj→ATLAS `AML.T0051`...) tất định, KHÔNG LLM; (2) **anchor** — neo vào technique-id hợp lệ triage đã sinh (`_from_triage_anchor`); (3) **RRF** — `_from_rrf` lấy top-3 từ KB (tái dùng `DualRetriever`, RRF k=60) + `_llm_select` (graceful, fallback top-RRF nếu LLM chết). Fallback "C + cờ": luôn ghi structured + `mapping_status` ∈ {`resolved`,`low_confidence`}. `recommended_response` rule-based theo tactic. `build_mitre_url`/`normalize_tactic` (chuẩn hóa nhãn KB phi-chuẩn "Stealth"→Defense Evasion); keyword match dùng **word-boundary** (tránh dương-tính-giả "rce"⊂"force"). TRUNG THỰC: prompt-injection gắn cờ ATLAS (không Enterprise), IDOR không có technique riêng → T1190 confidence thấp.
+*   **Mối quan hệ:** Gọi bởi `node_attack_mapper` (#35, tái dùng `retriever`+`llm_client` singleton); KB = `knowledge_base/mitre_attack.json` (299 kỹ thuật); đo bằng `scripts/eval_attack_mapper.py`; test `tests/unit/test_attack_mapper.py` (35 test, không cần LLM).
 
 ### 36. `src/agent/prompts.py`
 *   **Mục đích:** Kho mẫu Prompt (System & User).
@@ -371,6 +378,11 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 *   **Tác dụng:** Chạy **22 kịch bản** (T01-T22): RuleEngine, Guardrails, Dual-RAG, Threat Memory, Agent, Latency (T19, cần LLM), **Unified Stream (T21)** + **Online Publisher (T22)**; `--offline` bỏ qua test cần LLM.
 *   **Mối quan hệ:** Chốt chặn toàn vẹn trước khi push/demo.
 
+### 61b. `scripts/eval_attack_mapper.py` *(MỚI — đo chất lượng ATT&CK Mapper)*
+*   **Mục đích:** Đo độ chính xác ánh xạ MITRE của node `attack_mapper` (#35b) trên ground truth, sinh số THẬT cho ch4 luận văn.
+*   **Tác dụng:** 2 mode — **`rrf`** (offline, tất định, không LLM: dựng query flow như `node_rag_context` → top-RRF; cô lập đóng góp KB) và **`e2e`** (chạy FULL `agent_app`, cần LLM server; **TỰ CÔ LẬP** threat_memory/audit/config sang DB tạm + no-op các hàm ghi → KHÔNG đụng dữ liệu thật). Metrics: technique exact/parent-match, tactic-match, mapper-fired-rate, latency p50/p95, **trần KB-coverage** (báo trung thực giới hạn). Cờ `--ground-truth experiments/ground_truth_webattacks.json` (50 payload web thật, nhãn ATT&CK chuẩn) đo ở MIỀN thiết kế → e2e 64% (vs flow-GT 0% — bài toán flow-only ill-posed).
+*   **Mối quan hệ:** Gọi `map_attack`/`agent_app`; output `results/attack_mapper_eval_*.json` (đã commit làm bằng chứng); tổng hợp ở `docs/METRICS_SUMMARY.md`.
+
 ### 62. `scripts/seed_demo_data.py`
 *   **Mục đích:** Seed Dashboard từ data THẬT (không bịa).
 *   **Tác dụng:** Chạy pipeline thật (Tier-1 + Agent + LLM) trên mẫu CICIDS 14 lớp → quyết định thật vào audit/threat/pending-rules; `ingest_dapt_chains` 9 chuỗi APT; seed known entities. *(SEED dashboard, KHÔNG phải benchmark APT — benchmark ở #52.)*
@@ -379,7 +391,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 ### 63. `scripts/convert_report.py` & `scripts/switch_model.sh` & `scripts/cleanup.sh`
 *   **convert_report.py:** Markdown → DOCX (báo cáo tiến độ).
 *   **switch_model.sh:** Hot-swap LLM (`gemma`/`llama`), sửa `.env` + restart container `sentinel_llm`, chờ healthy.
-*   **cleanup.sh:** Dọn artifact tạm (mlruns, `results/*.json`, plots, eval DB), GIỮ benchmark (ground_truth, adversarial).
+*   **cleanup.sh:** Dọn artifact tạm AN TOÀN — chỉ xóa thứ tái tạo được/gitignored (mlruns, eval DB tạm, faiss index cache, logs, `__pycache__`/caches). **KHÔNG** xóa `results/*.json` hay `plots/*.png` (dữ liệu luận văn đã commit — đã sửa footgun).
 
 ---
 
@@ -394,9 +406,9 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ## **KIỂM THỬ (TESTS)**
 
-> Bộ test đảm bảo tính toàn vẹn — `pytest 194 passed`, `E2E 22/22`.
+> Bộ test đảm bảo tính toàn vẹn — `pytest 207 passed` (unit+tier1+adversarial), `E2E 22/22`.
 
-*   **`tests/unit/`** — data_validator, decision_validator (+ Anti-Self-DoS shield + tier-consensus guard), feedback_validator, **feedback_listener** (HITL lifecycle), output_sanitizer, prompt_filter, rag_sanitizer, template_miner, entropy_scorer, threat_memory (+ APT-chain-context), **subscriber** (chống lộ nhãn dataset vào LLM + hợp đồng enrich↔strip), **semantic_cache**, **auth** (PBKDF2/RBAC), **executor** (HMAC chain, đã cô lập DB tạm), agent, rag.
+*   **`tests/unit/`** — data_validator, decision_validator (+ Anti-Self-DoS shield + tier-consensus guard), feedback_validator, **feedback_listener** (HITL lifecycle), output_sanitizer, prompt_filter, rag_sanitizer, template_miner, entropy_scorer, threat_memory (+ APT-chain-context), **subscriber** (chống lộ nhãn dataset vào LLM + hợp đồng enrich↔strip), **semantic_cache**, **auth** (PBKDF2/RBAC), **executor** (HMAC chain, đã cô lập DB tạm), agent, rag, **attack_mapper** (35 test: curated 10 web-attack, anchor, RRF fallback, schema — không cần LLM), **token_monitor**.
 *   **`tests/integration/`** — `test_unified_stream.py` (3 nguồn trộn + APT emergent + **bất biến zero-day real-derived**), `test_streaming_pipeline.py` (routing đa-nguồn), `test_end_to_end.py`.
 *   **`tests/test_adversarial.py`** + **`tests/test_tier1_filter.py`** + **`tests/conftest.py`** (sys.path root).
 </content>
