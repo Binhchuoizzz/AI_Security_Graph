@@ -130,8 +130,8 @@ def subsample(gt: list, per_class: int | None, limit: int | None) -> list:
     return gt
 
 
-def predict_rrf(sample: dict, retriever) -> tuple[str, str, str, bool, float]:
-    """1 sample -> (pred_id, pred_tactic, mapping_status, curated_path, latency_s)."""
+def predict_rrf(sample: dict, retriever) -> tuple[str, str, str, bool, float, dict]:
+    """1 sample -> (pred_id, pred_tactic, mapping_status, curated_path, latency_s, extra)."""
     logs = sample.get("logs") or []
     log = logs[0] if logs else {}
     query = build_flow_query(log)
@@ -144,12 +144,19 @@ def predict_rrf(sample: dict, retriever) -> tuple[str, str, str, bool, float]:
     t0 = time.time()
     mapping = map_attack(inp, retriever=retriever, llm=None)  # llm=None -> tất định
     lat = time.time() - t0
-    return mapping.mitre_technique_id, mapping.mitre_tactic, mapping.mapping_status, curated, lat
+    return (
+        mapping.mitre_technique_id,
+        mapping.mitre_tactic,
+        mapping.mapping_status,
+        curated,
+        lat,
+        {},
+    )
 
 
 def predict_e2e(
     sample: dict, agent_app, SentinelState, loop_detector
-) -> tuple[str, str, str, bool, float]:
+) -> tuple[str, str, str, bool, float, dict]:
     """1 sample -> chạy full agent; đọc các trường MITRE có cấu trúc từ decision cuối."""
     logs = sample.get("logs") or []
     loop_detector.reset()  # BẮT BUỘC: tránh loop-guard cộng dồn qua các invoke
@@ -164,7 +171,13 @@ def predict_e2e(
     pred_tactic = dec.get("mitre_tactic", "")
     status = dec.get("mapping_status", "")  # "" nếu mapper bị gate bỏ qua (conf<=0.7/benign)
     curated = pred_id in CURATED_TECH_IDS and status == "resolved"
-    return pred_id, pred_tactic, status, curated, lat
+    # extra: phân rã NGUYÊN NHÂN — action/confidence của triage + technique free-text.
+    extra = {
+        "action": dec.get("action", ""),
+        "confidence": dec.get("confidence", 0.0),
+        "mitre_technique": dec.get("mitre_technique", ""),
+    }
+    return pred_id, pred_tactic, status, curated, lat, extra
 
 
 def isolate_for_e2e() -> str:
@@ -220,6 +233,9 @@ def main():
         help="Subsample N/expected-technique (khuyến nghị cho e2e).",
     )
     ap.add_argument("--out", default=None)
+    ap.add_argument(
+        "--debug", type=int, default=0, help="In chi tiết N mẫu đầu (exp/pred/status/action)."
+    )
     args = ap.parse_args()
 
     with open(args.ground_truth, encoding="utf-8") as f:
@@ -256,22 +272,32 @@ def main():
     n_tech = n_exact = n_parent = 0  # mẫu có technique kỳ vọng
     n_tac = n_tac_match = 0  # mẫu có tactic kỳ vọng suy được
     n_benign = n_resolved = n_curated = 0
+    n_fired = n_fired_tech = 0  # mapper THỰC SỰ chạy (qua cổng) / trong đó là mẫu có technique
     latencies: list[float] = []
-    per_type: dict = defaultdict(lambda: {"n": 0, "exact": 0, "parent": 0, "tactic": 0})
+    per_type: dict = defaultdict(lambda: {"n": 0, "exact": 0, "parent": 0, "tactic": 0, "fired": 0})
 
     t_start = time.time()
     for i, s in enumerate(gt, 1):
         exp_id = str(s.get("expected_mitre_technique", ""))
         try:
-            pred_id, pred_tactic, status, curated, lat = predictor(s)
+            pred_id, pred_tactic, status, curated, lat, extra = predictor(s)
         except Exception as e:
             print(f"   [ERR] {s.get('id')}: {e}")
             continue
         latencies.append(lat)
+        fired = bool(status)  # "" = mapper bị cổng (conf<=0.7/benign) bỏ qua; rrf luôn fired
+        if fired:
+            n_fired += 1
         if status == "resolved":
             n_resolved += 1
         if curated:
             n_curated += 1
+
+        if args.debug and i <= args.debug:
+            print(
+                f"   [dbg] exp={exp_id:11s} pred={pred_id or '-':11s} status={status or 'GATED':12s}"
+                f" act={extra.get('action', '')!s:10s} conf={extra.get('confidence', 0.0)}"
+            )
 
         if exp_id in BENIGN:
             n_benign += 1
@@ -279,6 +305,9 @@ def main():
             n_tech += 1
             pt = per_type[exp_id]
             pt["n"] += 1
+            if fired:
+                n_fired_tech += 1
+                pt["fired"] += 1
             if pred_id == exp_id:
                 n_exact += 1
                 pt["exact"] += 1
@@ -310,6 +339,11 @@ def main():
         "technique_parent_match_pct": pct(n_parent, n_tech),
         "tactic_match_pct": pct(n_tac_match, n_tac),
         "tactic_eval_n": n_tac,
+        # PHÂN RÃ NGUYÊN NHÂN: cổng confidence>0.7 lọc bao nhiêu, và khi mapper THỰC
+        # SỰ chạy thì exact-match bao nhiêu (tách 'mapper sai' khỏi 'triage gated').
+        "mapper_fired_rate_pct": pct(n_fired, len(gt)),
+        "exact_when_fired_pct": pct(n_exact, n_fired_tech),
+        "n_fired_with_technique": n_fired_tech,
         "mapping_resolved_rate_pct": pct(n_resolved, len(gt)),
         "curated_path_rate_pct": pct(n_curated, len(gt)),
         "latency_ms_p50": round(float(np.percentile(lat_arr, 50)) * 1000, 2),
@@ -346,6 +380,12 @@ def main():
     )
     print(
         f"  tactic match          : {result['tactic_match_pct']}%  (trên {n_tac} mẫu suy được tactic)"
+    )
+    print(
+        f"  mapper fired rate     : {result['mapper_fired_rate_pct']}%  (còn lại bị cổng conf>0.7 lọc)"
+    )
+    print(
+        f"  exact WHEN fired      : {result['exact_when_fired_pct']}%  (trên {n_fired_tech} mẫu mapper thực chạy)"
     )
     print(f"  mapping resolved rate : {result['mapping_resolved_rate_pct']}%")
     print(f"  curated path rate     : {result['curated_path_rate_pct']}%")

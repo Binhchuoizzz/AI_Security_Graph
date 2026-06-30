@@ -89,10 +89,12 @@ wired as `attack_mapper` in [`src/agent/workflow.py`](src/agent/workflow.py) —
 triage step's **free-text** `mitre_technique` (e.g. `"T1190 - ..."`) into a **structured,
 schema-validated** ATT&CK record.
 
-* **When it runs:** a conditional edge after `llm_triage` (`route_after_triage`). It only
-  fires when the triage **confidence > 0.7** *and* the verdict is a threat (`BLOCK_IP` /
-  `ALERT` / `AWAIT_HITL`) — benign `LOG` events are never mapped. The enriched decision is
-  then routed on to the HITL node / Action Executor.
+* **When it runs:** a conditional edge after `llm_triage` (`route_after_triage`). It fires
+  on every actionable threat verdict (`BLOCK_IP` / `ALERT` / `AWAIT_HITL`) — benign `LOG`
+  events are never mapped. (The gate is **action-based**: an earlier `confidence > 0.7`
+  threshold was dropped after measurement showed the triage assigns ~0.6–0.7 confidence to
+  flow-only anomalies, so a strict threshold filtered out almost every real verdict.) The
+  enriched decision is then routed on to the HITL node / Action Executor.
 * **Reuses existing infrastructure — no parallel system:** the same
   `knowledge_base/mitre_attack.json` (299 techniques), the same `DualRetriever`
   (FAISS + BM25, **RRF k=60**), and the same `llm_client` (Gemma-2-9B-IT **Q6_K** via

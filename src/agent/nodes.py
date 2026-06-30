@@ -10,7 +10,6 @@ from typing import Any
 import mlflow  # type: ignore
 
 from src.agent.attack_mapper import (
-    MAPPING_CONFIDENCE_GATE,
     AttackMapperInput,
     map_attack,
 )
@@ -498,15 +497,19 @@ _MAPPABLE_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL"}
 
 def route_after_triage(state: SentinelState) -> str:
     """
-    Cổng điều kiện SAU triage:
-      - Nếu confidence > 0.7 VÀ là quyết định mối-đe-doạ -> chạy attack_mapper ("map").
-      - Ngược lại -> giữ nguyên định tuyến theo action (hành vi cũ).
-    Sau attack_mapper, route_triage_decision sẽ định tuyến tiếp theo action.
+    Cổng điều kiện SAU triage — gate theo ACTION:
+      - Nếu là verdict đáng-hành-động (BLOCK_IP/ALERT/AWAIT_HITL) -> attack_mapper ("map").
+      - Ngược lại (LOG/benign) -> giữ nguyên định tuyến theo action.
+
+    GHI CHÚ THIẾT KẾ: trước đây cổng còn đòi confidence > 0.7, nhưng đo thực tế
+    cho thấy triage gán ALERT với confidence ~0.6-0.7 cho bất thường flow, nên
+    ngưỡng strict đó lọc mất gần như mọi verdict thật. ALERT vẫn là threat verdict
+    đáng làm giàu ATT&CK cho analyst -> gate theo ACTION (không theo confidence).
+    Sau attack_mapper, route_triage_decision định tuyến tiếp theo action.
     """
     latest_decision = state.decisions[-1] if state.decisions else {}
-    confidence = float(latest_decision.get("confidence", 0.0) or 0.0)
     action = latest_decision.get("action", "LOG")
 
-    if confidence > MAPPING_CONFIDENCE_GATE and action in _MAPPABLE_ACTIONS:
+    if action in _MAPPABLE_ACTIONS:
         return "map"
     return route_triage_decision(state)

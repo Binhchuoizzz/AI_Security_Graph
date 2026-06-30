@@ -44,9 +44,9 @@ logger = logging.getLogger(__name__)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KB_PATH = os.path.join(_BASE_DIR, "knowledge_base", "mitre_attack.json")
 
-# Cổng confidence của Tier-2 để KÍCH HOẠT mapping (khớp yêu cầu "confidence > 0.7").
-MAPPING_CONFIDENCE_GATE = 0.7
 # Dưới ngưỡng này => mapping_status = "low_confidence".
+# (Cổng KÍCH HOẠT mapper nằm ở nodes.route_after_triage và gate theo ACTION threat,
+#  không theo confidence — xem ghi chú thiết kế ở đó.)
 LOW_CONFIDENCE_THRESHOLD = 0.5
 
 FRAMEWORK_ATTACK = "MITRE ATT&CK Enterprise"
