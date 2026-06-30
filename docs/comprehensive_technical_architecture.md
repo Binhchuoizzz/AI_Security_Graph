@@ -53,7 +53,7 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
      ```python
      def _evict_stale_profiles(self):
          now = time.time()
-         stale_ips = [ip for ip, profile in self.profiles.items() 
+         stale_ips = [ip for ip, profile in self.profiles.items()
                       if profile["last_seen"] and (now - profile["last_seen"]) > self.ttl_seconds]
          for ip in stale_ips:
              del self.profiles[ip]
@@ -233,19 +233,24 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 2. **LAYER:** Tier 2 LangGraph Agent.
 3. **MỤC ĐÍCH:** Xây dựng cỗ máy trạng thái hữu hạn (FSM) luân chuyển dữ liệu qua các node xử lý một cách an toàn, duy trì trạng thái của phiên điều tra mà không làm mất thông tin.
 4. **CÔNG NGHỆ SỬ DỤNG:** `langgraph.graph.StateGraph`, `TypedDict` (State Schema).
-5. **CƠ CHẾ HOẠT ĐỘNG:** Định nghĩa cấu trúc `SentinelState` mang thông tin phiên điều tra. Đăng ký các nút xử lý: `rag_context` → `llm_triage` → `execute_action`. Tại `llm_triage`, kết quả phân loại từ LLM sẽ kích hoạt Conditional Edges để điều hướng hành động tiếp theo.
+5. **CƠ CHẾ HOẠT ĐỘNG:** Định nghĩa cấu trúc `SentinelState` mang thông tin phiên điều tra. Đăng ký **6 nút** xử lý: `guardrails` → `rag_context` → `llm_triage` → (`route_after_triage`) `attack_mapper` → `action_executor`/`human_in_the_loop`. Tại `llm_triage`, mọi threat verdict (`BLOCK_IP`/`ALERT`/`AWAIT_HITL`) đi qua `attack_mapper` để làm giàu MITRE ATT&CK có cấu trúc; benign `LOG` bỏ qua mapper và kết thúc.
 6. **CẤU TRÚC MÃ NGUỒN:**
-   - File: `src/agent/workflow.py` & `src/agent/nodes.py`.
-   - Class/Function: `SentinelState`, `create_agent_workflow()`, `route_triage_decision()`.
+   - File: `src/agent/workflow.py`, `src/agent/nodes.py` & `src/agent/attack_mapper.py`.
+   - Class/Function: `SentinelState`, `create_agent_workflow()`, `route_after_triage()`, `route_triage_decision()`, `map_attack()`.
    - Logic snippet:
      ```python
      workflow.add_node("rag_context", node_rag_context)
      workflow.add_node("llm_triage", node_llm_triage)
+     workflow.add_node("attack_mapper", node_attack_mapper)  # MITRE enrichment
      workflow.add_edge("rag_context", "llm_triage")
-     workflow.add_conditional_edges("llm_triage", route_triage_decision)
+     # Gate theo ACTION: threat verdict -> attack_mapper, benign -> route theo action
+     workflow.add_conditional_edges("llm_triage", route_after_triage,
+         {"map": "attack_mapper", "execute_action": "action_executor",
+          "await_hitl": "human_in_the_loop", "end_cycle": END})
+     workflow.add_conditional_edges("attack_mapper", route_triage_decision)
      ```
    - Input: State Object → Output: Compiled Graph App.
-7. **LUỒNG DỮ LIỆU:** Raw Incident → Guardrails Node → RAG Node → LLM Node → Action/HITL Node.
+7. **LUỒNG DỮ LIỆU:** Raw Incident → Guardrails Node → RAG Node → LLM Node → **ATT&CK Mapper Node** → Action/HITL Node.
 8. **VAI TRÒ BẢO MẬT:** Ràng buộc quy trình logic bảo mật (Logic Enforcer), cấm tác tử tự động thực thi phản hồi mạng mà không qua các trạm thẩm định.
 
 ### **15 & 16. FAISS Index 1 & 2 (MITRE ATT&CK & NIST SP 800-61r2)**

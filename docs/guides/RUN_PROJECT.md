@@ -10,6 +10,11 @@
 > **kết quả đo trực tiếp** ngày 2026-06-09. Báo cáo demo đầy đủ (pipeline realtime, LLM-as-Judge
 > cross-family, robustness, Neo4j KG, MLflow, đánh giá 5D): xem [reports/LIVE_DEMO_REPORT.md](reports/LIVE_DEMO_REPORT.md).
 
+> 🎯 **ATT&CK Mapping Layer (node thứ 6):** đo chất lượng ánh xạ MITRE bằng
+> `python scripts/eval_attack_mapper.py --mode rrf --tag baseline` (offline, tất định) hoặc
+> `--mode e2e --per-class 20` (pipeline triển khai, cần LLM server; tự CÔ LẬP DB/audit/config tạm,
+> không đụng dữ liệu thật). Bộ web-payload: thêm `--ground-truth experiments/ground_truth_webattacks.json`.
+
 ---
 
 ## 📋 Mục lục

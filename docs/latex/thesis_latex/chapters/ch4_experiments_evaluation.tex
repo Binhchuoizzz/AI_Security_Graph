@@ -390,6 +390,35 @@ A recurring objection to a \emph{local} LLM is context overflow: if too many log
 
 The RAW prompt grows linearly and breaches the $8{,}192$-token window at only $N \approx 100$ logs ($10{,}251$ tokens), reaching $201{,}355$ tokens at $N = 2000$---a $25\times$ overflow. In contrast, the Drain-compressed prompt \emph{saturates} at $\approx 80$ tokens regardless of volume (a compression ratio exceeding $2{,}500\times$ at $N = 2000$), remaining well within the $4{,}000$-token budget by design. Context overflow is therefore structurally prevented rather than merely hoped for. Second, the running pipeline is instrumented with a token monitor that records the \emph{real} prompt and completion tokens returned by the server and persists per-call statistics. Across a live escalation batch the monitor reported a mean prompt size of $4{,}818$ tokens (p95 $= 4{,}960$; max $= 4{,}960$), i.e.\ a peak context utilization of \textbf{60.5\%} with \textbf{zero} overflow warnings---empirical confirmation that, after Tier-1 filtering and Drain compression, real escalated batches consume well under the available window, and that any approach toward the budget would be observable and actionable rather than a silent failure.
 
+\section{Structured ATT\&CK Mapping Layer}
+The Tier-2 agent enriches each free-text technique emitted by triage into a structured, schema-validated MITRE ATT\&CK record through a dedicated mapping node. This layer is evaluated along two axes---logical correctness and end-to-end mapping accuracy---and, crucially, across two dataset regimes that expose the \emph{domain of validity} of automated ATT\&CK mapping.
+
+Logical correctness is established by a deterministic unit suite of $35$ tests: the curated path resolves all ten canonical web-application attack classes (SQLi, XSS, path traversal, LFI, RFI, SSRF, XXE, command injection, IDOR, and prompt injection) to their established ATT\&CK---or, for prompt injection, MITRE ATLAS (\texttt{AML.T0051})---techniques with $100\%$ agreement, reproducibly and without invoking the language model.
+
+End-to-end accuracy is reported in Table~\ref{tab:attack_mapper} under two regimes. On the flow-only CSE-CIC-IDS2018 ground truth, technique exact-match is \emph{near zero}: the action-gated mapper fires on every threat verdict, yet the LLM's technique inferred from raw NetFlow features systematically diverges from the dataset's mechanically assigned label (e.g., an RDP flow is reasonably inferred as \texttt{T1210} Exploitation of Remote Services, whereas the capture label is \texttt{T1110.001} Brute Force). This is an honest \emph{limitation of the task}, not of the mapper: ATT\&CK technique mapping from flow-only telemetry is ill-posed, since flow features are behaviorally ambiguous and the labels are category-derived. On a 50-payload web-attack benchmark---the layer's designed operating domain---the deployed pipeline reaches \textbf{$64.0\%$ technique exact-match} and $57.5\%$ tactic match, with a clean per-class structure: signature-bearing attacks map almost perfectly (prompt injection and command injection $100\%$; XSS and path traversal $80\%$), while the residual error concentrates on signature-less logical variants (RFI, IDOR, and internal-target SSRF), which legitimately lack a payload signature.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \caption{ATT\&CK mapping accuracy across evaluation regimes. The retrieval-only floor isolates the contribution of hybrid retrieval (no LLM); the deployed pipeline runs the full triage$\rightarrow$mapper graph. (Source: Author)}
+    \label{tab:attack_mapper}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.40\textwidth}|c|c|c|}
+        \hline
+        \textbf{Regime} & \textbf{$n$} & \textbf{Technique exact} & \textbf{Tactic} \\
+        \hline
+        Retrieval-only floor (flow GT, offline) & 3{,}967 & $0.0\%$ & $15.8\%$ \\
+        \hline
+        Deployed pipeline (flow GT) & 160 & $0.0\%$ & $3.6\%$ \\
+        \hline
+        Retrieval/curated (web payloads) & 50 & $62.0\%$ & $52.5\%$ \\
+        \hline
+        Deployed pipeline (web payloads) & 50 & $\mathbf{64.0\%}$ & $57.5\%$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Two findings follow. First, the retrieval-only floor on flow data ($0.0\%$ exact) confirms that hybrid retrieval alone cannot map raw telemetry to a \emph{behavioral} technique---it surfaces transport-layer techniques (Protocol Tunneling, Non-Standard Port) that match port/service tokens---which motivates the cognitive triage tier rather than a retrieval-only design. Second, where the input carries the semantic signal the technique describes (a web payload), the mapper is genuinely useful, attaching a correct, analyst-ready ATT\&CK record to roughly two-thirds of incidents and to nearly all signature-bearing attacks. The tactic-match column is computed only over techniques whose reference tactic is recoverable from the local knowledge base, and is reported as a secondary, coarser-grained indicator.
+
 \section{Summary of 5D Evaluation Results}
 Table~\ref{tab:5d_summary} consolidates the principal findings across the five evaluation dimensions, mapping each dimension back to the concrete metric that operationalizes it.
 

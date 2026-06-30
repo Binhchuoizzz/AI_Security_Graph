@@ -21,13 +21,14 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
    - `AWAIT_HITL` → `queue_hitl`.
    - `ALERT` → `queue_decisions`.
    - `ESCALATE` → gom batch gọi Agent. *(APT emergent: `record_apt_event`+`check_apt_chain` có thể ÉP `ESCALATE`.)*
-4. **Agent (LangGraph)** — batch escalate → `agent_app.invoke(SentinelState)` (`workflow.py` #34). Đồ thị: `guardrails → rag_context → llm_triage →` (rẽ nhánh) `action_executor` / `human_in_the_loop` / `END`.
+4. **Agent (LangGraph)** — batch escalate → `agent_app.invoke(SentinelState)` (`workflow.py` #34). Đồ thị **6 node**: `guardrails → rag_context → llm_triage →` (rẽ nhánh `route_after_triage`) `attack_mapper` (nếu là threat verdict) `→ action_executor` / `human_in_the_loop`; hoặc thẳng `END` (benign `LOG`).
 5. **node_guardrails** (#35): `GuardrailsPipeline` nén Drain (#15) + đóng gói nonce (#16).
 6. **node_rag_context** (#35): `DualRetriever._hybrid_search` (FAISS+BM25+RRF, #30) + `threat_memory.get_context_for_prompt` (lịch sử APT, #39).
 7. **node_llm_triage** (#35): `build_triage_prompt` (#36) → `llm_client.invoke` (Gemma, seed=42, `token_monitor` preflight/record #38) → parse → `DecisionValidator.validate_decision` + `enforce_tier_consensus` (#21) → ghi `AuditLogger`. *(LLM chết → suy biến `AWAIT_HITL`.)*
-8. **Rẽ nhánh** (`route_triage_decision`): `execute_action` → **node_action_executor** (#35): `block_ip()` (FIREWALL MOCK #40) + `FeedbackListener.receive_new_rule()` PENDING (#11) + `threat_memory.record_incident` (#39) + audit HMAC. `await_hitl` → **node_human_in_the_loop** (#35) → hàng đợi analyst. `end_cycle` → kết thúc.
-9. **Audit** (`executor.py` #40): ghi `audit_trail.db` chuỗi HMAC-SHA256 (chống giả mạo).
-10. **Dashboard** (`app.py` #41): đọc `audit_trail.db`/`threat_memory.db`/`pipeline_stats.json`/`llm_token_stats.json`; analyst Duyệt luật → `approve_rule` persist `system_settings.yaml` → **RuleEngine hot-reload** → Tier-1 enforce IP đó ở lần sau ⇒ **VÒNG PHẢN HỒI khép kín** (#11).
+8. **Cổng `route_after_triage`**: nếu action ∈ {`BLOCK_IP`,`ALERT`,`AWAIT_HITL`} → **node_attack_mapper** (`agent/attack_mapper.py`): NEO vào technique-id triage đã gán → cấu trúc hóa thành bản ghi MITRE (tactic/technique/sub-technique/URL/`mapping_confidence`/`recommended_response`); web-attack phổ biến tra `WEB_ATTACK_MAP` (tất định, không LLM), còn lại RRF + LLM-select (graceful). Benign `LOG` → bỏ qua mapper.
+9. **Rẽ nhánh** (`route_triage_decision`, sau mapper): `execute_action` → **node_action_executor** (#35): `block_ip()` (FIREWALL MOCK #40) + `FeedbackListener.receive_new_rule()` PENDING (#11) + `threat_memory.record_incident` (#39) + audit HMAC. `await_hitl` → **node_human_in_the_loop** (#35) → hàng đợi analyst. `end_cycle` → kết thúc.
+10. **Audit** (`executor.py` #40): ghi `audit_trail.db` chuỗi HMAC-SHA256 (chống giả mạo).
+11. **Dashboard** (`app.py` #41): đọc `audit_trail.db`/`threat_memory.db`/`pipeline_stats.json`/`llm_token_stats.json`; analyst Duyệt luật → `approve_rule` persist `system_settings.yaml` → **RuleEngine hot-reload** → Tier-1 enforce IP đó ở lần sau ⇒ **VÒNG PHẢN HỒI khép kín** (#11).
 
 ### B. LUỒNG OFFLINE BENCHMARK (đánh giá tất định, không cần Redis)
 

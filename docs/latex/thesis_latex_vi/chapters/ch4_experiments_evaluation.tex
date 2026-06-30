@@ -390,6 +390,35 @@ Một phản biện thường gặp với LLM \emph{cục bộ} là tràn ngữ 
 
 Prompt RAW tăng tuyến tính và vượt cửa sổ $8{,}192$ token chỉ tại $N \approx 100$ log ($10{,}251$ token), đạt $201{,}355$ token ở $N = 2000$---tức tràn $25$ lần. Ngược lại, prompt nén Drain \emph{bão hòa} ở $\approx 80$ token bất kể khối lượng (tỷ lệ nén vượt $2{,}500$ lần tại $N = 2000$), luôn nằm trong ngân sách $4{,}000$ token theo thiết kế. Tràn ngữ cảnh vì vậy được ngăn chặn về mặt cấu trúc chứ không chỉ là kỳ vọng. Thứ hai, pipeline đang chạy được trang bị một bộ theo dõi token ghi lại số token prompt và completion \emph{thật} do máy chủ trả về và lưu thống kê theo từng lần gọi. Trên một lô leo thang thực tế, bộ theo dõi báo kích thước prompt trung bình $4{,}818$ token (p95 $= 4{,}960$; cực đại $= 4{,}960$), tức mức sử dụng ngữ cảnh đỉnh \textbf{60,5\%} với \textbf{KHÔNG} cảnh báo tràn nào---bằng chứng thực nghiệm rằng sau khi lọc Tier-1 và nén Drain, các lô leo thang thật tiêu thụ thấp hơn nhiều so với cửa sổ khả dụng, và mọi sự tiến sát ngân sách đều quan sát được và xử lý được chứ không phải một lỗi âm thầm.
 
+\section{Tầng Ánh xạ MITRE ATT\&CK có Cấu trúc}
+Tác tử Tầng 2 làm giàu mỗi kỹ thuật dạng văn bản tự do do nút phân loại sinh ra thành một bản ghi MITRE ATT\&CK có cấu trúc, hợp lệ theo lược đồ, thông qua một nút ánh xạ chuyên biệt. Tầng này được đánh giá theo hai trục---tính đúng đắn logic và độ chính xác ánh xạ đầu-cuối---và, quan trọng hơn, trên hai chế độ dữ liệu làm lộ rõ \emph{miền hiệu lực} của việc ánh xạ ATT\&CK tự động.
+
+Tính đúng đắn logic được khẳng định bởi một bộ kiểm thử đơn vị tất định gồm $35$ test: đường tra cứu được người soạn kiểm chứng giải mã cả mười lớp tấn công ứng dụng web kinh điển (SQLi, XSS, path traversal, LFI, RFI, SSRF, XXE, command injection, IDOR và prompt injection) về đúng kỹ thuật ATT\&CK---hoặc, với prompt injection, MITRE ATLAS (\texttt{AML.T0051})---với mức đồng thuận $100\%$, tái lập được và không cần gọi mô hình ngôn ngữ.
+
+Độ chính xác đầu-cuối được trình bày trong Bảng~\ref{tab:attack_mapper} theo hai chế độ. Trên tập nhãn chuẩn chỉ-luồng (flow-only) CSE-CIC-IDS2018, tỷ lệ khớp kỹ thuật chính xác \emph{xấp xỉ không}: nút ánh xạ (kích hoạt theo action) chạy trên mọi phán quyết mối đe dọa, nhưng kỹ thuật mà LLM suy ra từ các đặc trưng NetFlow thô lệch một cách hệ thống so với nhãn được gán cơ học của tập dữ liệu (ví dụ, một luồng RDP được suy luận hợp lý là \texttt{T1210} Exploitation of Remote Services, trong khi nhãn ghi nhận là \texttt{T1110.001} Brute Force). Đây là một \emph{giới hạn của bài toán}, không phải của nút ánh xạ: việc ánh xạ kỹ thuật ATT\&CK từ telemetry chỉ-luồng là bài toán đặt-sai (ill-posed), vì đặc trưng luồng mơ hồ về mặt hành vi còn nhãn thì suy ra từ danh mục. Trên một bộ đánh giá web-payload gồm 50 mẫu---miền vận hành mà tầng này được thiết kế cho---pipeline triển khai đạt \textbf{$64{,}0\%$ khớp kỹ thuật chính xác} và $57{,}5\%$ khớp tactic, với cấu trúc theo lớp rõ ràng: các tấn công có chữ ký được ánh xạ gần như hoàn hảo (prompt injection và command injection $100\%$; XSS và path traversal $80\%$), trong khi sai số còn lại tập trung ở các biến thể logic không-chữ-ký (RFI, IDOR, và SSRF tới đích nội bộ), vốn về bản chất thiếu chữ ký trong payload.
+
+\begin{table}[!htbp]
+    \centering
+    \footnotesize
+    \caption{Độ chính xác ánh xạ ATT\&CK trên các chế độ đánh giá. Sàn chỉ-truy-xuất tách biệt đóng góp của truy xuất lai (không LLM); pipeline triển khai chạy toàn bộ đồ thị phân loại$\rightarrow$ánh xạ. (Nguồn: Tác giả)}
+    \label{tab:attack_mapper}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.40\textwidth}|c|c|c|}
+        \hline
+        \textbf{Chế độ} & \textbf{$n$} & \textbf{Khớp kỹ thuật} & \textbf{Tactic} \\
+        \hline
+        Sàn chỉ-truy-xuất (flow GT, offline) & 3{,}967 & $0{,}0\%$ & $15{,}8\%$ \\
+        \hline
+        Pipeline triển khai (flow GT) & 160 & $0{,}0\%$ & $3{,}6\%$ \\
+        \hline
+        Truy xuất/tra cứu (web payloads) & 50 & $62{,}0\%$ & $52{,}5\%$ \\
+        \hline
+        Pipeline triển khai (web payloads) & 50 & $\mathbf{64{,}0\%}$ & $57{,}5\%$ \\
+        \hline
+    \end{tabular}
+\end{table}
+
+Hai kết luận rút ra. Thứ nhất, sàn-chỉ-truy-xuất trên dữ liệu luồng ($0{,}0\%$ chính xác) khẳng định rằng truy xuất lai đơn độc không thể ánh xạ telemetry thô sang một kỹ thuật \emph{hành vi}---nó chỉ nổi lên các kỹ thuật tầng-truyền-tải (Protocol Tunneling, Non-Standard Port) khớp với token cổng/dịch vụ---điều này biện minh cho tầng phân loại nhận thức thay vì một thiết kế chỉ-truy-xuất. Thứ hai, ở nơi đầu vào mang tín hiệu ngữ nghĩa mà kỹ thuật mô tả (một web payload), nút ánh xạ thực sự hữu ích, gắn một bản ghi ATT\&CK đúng và sẵn-sàng-cho-chuyên-viên vào khoảng hai phần ba số sự cố và gần như toàn bộ tấn công có chữ ký. Cột khớp tactic chỉ được tính trên các kỹ thuật mà tactic tham chiếu khôi phục được từ cơ sở tri thức cục bộ, và được báo cáo như một chỉ báo thứ cấp, thô hơn.
+
 \section{Tổng hợp Kết quả Đánh giá 5D}
 Bảng~\ref{tab:5d_summary} tổng hợp các phát hiện chính trên cả năm chiều đánh giá, ánh xạ mỗi chiều về đúng chỉ số định lượng hiện thực hóa nó.
 
