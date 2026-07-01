@@ -232,7 +232,7 @@ Tài liệu này đặc tả chi tiết 36 bước xử lý kỹ thuật trong t
 1. **STEP NAME:** Cognitive Workflow Orchestration.
 2. **LAYER:** Tier 2 LangGraph Agent.
 3. **MỤC ĐÍCH:** Xây dựng cỗ máy trạng thái hữu hạn (FSM) luân chuyển dữ liệu qua các node xử lý một cách an toàn, duy trì trạng thái của phiên điều tra mà không làm mất thông tin.
-4. **CÔNG NGHỆ SỬ DỤNG:** `langgraph.graph.StateGraph`, `TypedDict` (State Schema).
+4. **CÔNG NGHỆ SỬ DỤNG:** `langgraph.graph.StateGraph`, `@dataclass` `SentinelState` (State Schema).
 5. **CƠ CHẾ HOẠT ĐỘNG:** Định nghĩa cấu trúc `SentinelState` mang thông tin phiên điều tra. Đăng ký **6 nút** xử lý: `guardrails` → `rag_context` → `llm_triage` → (`route_after_triage`) `attack_mapper` → `action_executor`/`human_in_the_loop`. Tại `llm_triage`, mọi threat verdict (`BLOCK_IP`/`ALERT`/`AWAIT_HITL`) đi qua `attack_mapper` để làm giàu MITRE ATT&CK có cấu trúc; benign `LOG` bỏ qua mapper và kết thúc.
 6. **CẤU TRÚC MÃ NGUỒN:**
    - File: `src/agent/workflow.py`, `src/agent/nodes.py` & `src/agent/attack_mapper.py`.

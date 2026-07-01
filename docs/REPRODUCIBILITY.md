@@ -70,6 +70,7 @@ Các thực nghiệm tăng độ chặt chẽ (rebut hội đồng) + độ bề
 - **Ablation cân bằng 150/150** (A–F so được, warmup benign thật): `python experiments/run_ablation_balanced.py` → `results/ablation_balanced_results.json`.
 - **Stress ngữ cảnh** (RAW vs Drain-compressed vs `n_ctx`): `python experiments/run_context_stress.py` → `results/context_stress_results.json` + `results/plots/context_stress.png`.
 - **Độ bền LLM** (determinism seed + suy biến an toàn → AWAIT_HITL): `python experiments/run_llm_robustness.py` → `results/llm_robustness_results.json`.
+- **Đánh giá ATT&CK Mapper** (node thứ 6 — độ chính xác ánh xạ MITRE): `python scripts/eval_attack_mapper.py --mode rrf --tag baseline` (offline, tất định) và `--mode e2e --ground-truth experiments/ground_truth_webattacks.json` (pipeline triển khai, **tự cô lập** DB/audit/config sang thư mục tạm — không đụng dữ liệu thật) → `results/attack_mapper_eval_*.json`. Web-payload e2e **64%** (miền thiết kế) vs flow-GT 0% (giới hạn ill-posed); tổng hợp ở `docs/METRICS_SUMMARY.md`.
 - **Quan sát ngữ cảnh runtime:** `src/agent/token_monitor.py` ghi `config/llm_token_stats.json` (mean/p95/max/utilization% token) trong mọi lần chạy có gọi LLM; Dashboard hiển thị KPI "Context Utilization". Biểu đồ độ nhạy/zero-day vẽ bằng `python experiments/plot_results.py`.
 
 ## 4. Quản lý Thí nghiệm (MLflow Tracking)
