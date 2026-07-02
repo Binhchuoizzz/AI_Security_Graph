@@ -4,6 +4,9 @@ Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thốn
 
 > **Bản đồ luồng:** Dataset → **Tier-1** (RuleEngine + Welford) → **Guardrails** → **Dual-RAG** → **LangGraph Agent (LLM + ATT&CK Mapper)** → **Response/Audit** → **Dashboard HITL** → Feedback Loop về Tier-1.
 > **Trạng thái kiểm thử:** `pytest 207 passed` (unit+tier1+adversarial), `E2E 22/22 PASSED`.
+>
+> **📚 Lộ trình học chi tiết theo từng hàm (5 ngày):** [DAY1](learning/DAY1.md) Tier-1 & Streaming · [DAY2](learning/DAY2.md) Guardrails · [DAY3](learning/DAY3.md) Dual-RAG & Knowledge Graph · [DAY4](learning/DAY4.md) LangGraph Agent + Response/Audit · [DAY5](learning/DAY5.md) SOC UI + Khung đánh giá 5D. Mỗi file có "💡 Sơ đồ 1 phút" để hình dung nhanh trước khi đọc sâu.
+> **🚀 Lộ trình mở rộng quy mô (Scalability Roadmap):** đã viết vào `docs/latex/thesis_latex{,_vi}/chapters/ch5_conclusion.tex` (mục *Horizontal Scalability Roadmap* / *Lộ trình Mở rộng Quy mô theo Chiều ngang*) — 5 trục: shard Tier-1 bằng **consistent hashing** theo Source IP, **Redis Cluster/Kafka** phân mảnh, **idempotency** cho at-least-once, **cụm worker LLM co giãn**, **KV store nhân bản** (quorum W+R>N) + LB + rate limiter. Đối chiếu trực tiếp với *System Design Interview* (Ch1/4/5/6/10/14).
 
 ---
 

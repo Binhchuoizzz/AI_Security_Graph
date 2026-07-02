@@ -6,6 +6,15 @@
 
 ---
 
+## 💡 Sơ đồ 1 phút (đọc để hình dung nhanh)
+
+> **Guardrails = lá chắn AI giữa Tier-1 và LLM**, phòng thủ 2 chiều (defense-in-depth).
+> **Đầu vào:** batch ESCALATE → chuẩn hoá key → validate schema → *phát hiện injection/jailbreak* (chỉ ĐÁNH DẤU, không xoá) → *trung hoà encoding* (base64/hex/homoglyph/zero-width) → *nén Drain + entropy + token budget* (giữ context trong tầm) → *bọc nonce delimiter* (chỉ giữ `ALLOWED_FIELDS`, chống buôn lậu dấu phân tách) → LLM.
+> **Đầu ra LLM:** *validate decision* (enum guard · confidence gate · Anti-Self-DoS · **Tier-Consensus** ép AWAIT_HITL khi LLM bị "nói chuyện" hạ cấp) → *sanitize XSS/markdown/base64*.
+> Ý tưởng cốt lõi: **coi log là DATA ONLY**, tầng deterministic (Tier-1) làm trọng tài kiểm tra tầng LLM.
+
+---
+
 ## Mục lục
 
 - [0. Bản đồ kiến trúc tổng thể](#0-bản-đồ-kiến-trúc-tổng-thể)
@@ -365,4 +374,4 @@ XUYÊN SUỐT:
 
 ---
 
-*Tài liệu sinh từ phân tích mã nguồn (Ngày 2) — đối chiếu lại số dòng nếu mã thay đổi.*
+*Tài liệu sinh từ phân tích mã nguồn (Ngày 2) — đối chiếu lại số dòng nếu mã thay đổi. Xem thêm: [DAY1](DAY1.md) (Tier-1) · [DAY3](DAY3.md) (Dual-RAG) · [DAY4](DAY4.md) (Agent + Audit) · [DAY5](DAY5.md) (UI + Đánh giá) · [codebase_summary](../codebase_summary.md).*

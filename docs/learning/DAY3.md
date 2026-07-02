@@ -6,6 +6,15 @@
 
 ---
 
+## 💡 Sơ đồ 1 phút (đọc để hình dung nhanh)
+
+> **Dual-RAG = bộ nhớ tri thức** cấp ngữ cảnh MITRE ATT&CK + NIST cho LLM (chống ảo giác).
+> **Offline (build):** chunk MITRE/NIST → `sanitize_ingest` → **FAISS (dense 384d)** + **BM25 (sparse)** → ghi **checksum SHA-256** (`checksums.sha256`).
+> **Online (retrieve):** `verify_document_integrity` (sai 1 bit → dừng, chống RAG Poisoning) → **Semantic Cache** (khoá SHA-256 template, hit <0.5ms) → nếu miss: embed → dense + sparse → **RRF (k=60)** hợp nhất → `sanitize_retrieve` + **provenance tag** `[VERIFIED: SENTINEL_KB]` → prompt.
+> **3 lá chắn poisoning:** integrity checksum (nguồn) · sanitize_retrieve (indirect injection) · sanitize_cache_entry (cache). Cùng KB này được **`attack_mapper`** (DAY4) tái dùng để ánh xạ MITRE.
+
+---
+
 ## Mục lục
 
 - [0. Bản đồ kiến trúc tổng thể của RAG Layer](#0-bản-đồ-kiến-trúc-tổng-thể-của-rag-layer)
@@ -324,3 +333,7 @@ Quản lý bộ nhớ đệm LRU (Least Recently Used) dựa trên cấu trúc `
 #### 3. Semantic Cache Poisoning (Đầu độc bộ đệm ngữ nghĩa)
 *   **Vector tấn công:** Kẻ tấn công gửi một truy vấn độc hại, nếu kết quả truy xuất RAG không được làm sạch trước khi lưu cache, hoặc cache trả ra trực tiếp các trường bị nhiễm độc, các truy vấn tương tự tiếp theo sẽ liên tục lấy ra kết quả bị nhiễm độc mà không đi qua tầng kiểm tra của Retriever.
 *   **Giải pháp của SENTINEL:** Khi lấy kết quả từ `SemanticCache`, hệ thống bắt buộc phải đẩy dữ liệu qua `RAGSanitizer.sanitize_cache_entry()` để làm sạch trước khi dựng lại prompt tổng hợp, đảm bảo an toàn tuyệt đối ngay cả khi dữ liệu cache bị can thiệp.
+
+---
+
+*Tài liệu sinh từ phân tích mã nguồn (Ngày 3) — đối chiếu lại số dòng nếu mã thay đổi. Xem thêm: [DAY1](DAY1.md) (Tier-1) · [DAY2](DAY2.md) (Guardrails) · [DAY4](DAY4.md) (LangGraph Agent + Response/Audit) · [DAY5](DAY5.md) (UI + Khung đánh giá 5D) · tổng quan [codebase_summary](../codebase_summary.md).*

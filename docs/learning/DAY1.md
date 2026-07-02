@@ -6,6 +6,13 @@
 
 ---
 
+## 💡 Sơ đồ 1 phút (đọc để hình dung nhanh)
+
+> **Tier-1 = màng lọc tốc độ cao.** Log JSON → **Redis Streams** → `subscriber` (consumer group, **at-least-once** qua `xack`) → **`RuleEngine.evaluate()`** chấm điểm nhiều tầng: *Whitelist → WAF signature → Injection/Jailbreak → Z-score (Welford) → Static rules → Dynamic rules → Session baseline* → **6 action** (`DROP/LOG/BLOCK_IP/ALERT/AWAIT_HITL/ESCALATE`).
+> Đa số log dừng ở **DROP/LOG** (lọc ~99%); chỉ **ESCALATE** mới gọi Tier-2 (đắt). **Welford O(1)** học baseline mỗi IP nhưng **chỉ học từ benign** (chống Baseline Poisoning). **Vòng phản hồi:** Agent (DAY4) ghi rule → `system_settings.yaml` → RuleEngine **hot-reload** → enforce ở lần sau.
+
+---
+
 ## Mục lục
 
 - [0. Bản đồ kiến trúc tổng thể](#0-bản-đồ-kiến-trúc-tổng-thể)
@@ -443,4 +450,4 @@ PIPELINE B — Batch / APT memory (DAPT2020):
 
 ---
 
-*Tài liệu sinh tự động từ phân tích mã nguồn — đối chiếu lại số dòng nếu mã thay đổi.*
+*Tài liệu sinh tự động từ phân tích mã nguồn — đối chiếu lại số dòng nếu mã thay đổi. Xem tiếp: [DAY2](DAY2.md) (Guardrails) · [DAY3](DAY3.md) (Dual-RAG) · [DAY4](DAY4.md) (LangGraph Agent + Response/Audit) · [DAY5](DAY5.md) (UI + Khung đánh giá 5D) · tổng quan [codebase_summary](../codebase_summary.md).*
