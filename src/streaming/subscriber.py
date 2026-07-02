@@ -95,7 +95,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         try:
             r.xgroup_create(q, GROUP_NAME, id="0", mkstream=True)
             print(f"[+] Consumer group '{GROUP_NAME}' created/verified for stream '{q}'")
-        except redis.exceptions.ResponseError as e:
+        except redis.exceptions.ResponseError as e:  # type: ignore[attr-defined]
             if "BUSYGROUP" in str(e):
                 pass
             else:

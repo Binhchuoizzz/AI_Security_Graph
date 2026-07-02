@@ -255,8 +255,9 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
             st.info("Chưa ghi nhận Threat Actor nào.")
         else:
             df_high_risk = pd.DataFrame(
-                high_risk_ips, columns=["Địa chỉ IP", "Điểm danh tiếng (Reputation)"]
-            )  # type: ignore
+                high_risk_ips,
+                columns=["Địa chỉ IP", "Điểm danh tiếng (Reputation)"],  # type: ignore
+            )
 
             def color_score(val):
                 color = "#ff4d4f" if val >= 70 else "#faad14" if val >= 40 else "#52c41a"

@@ -74,7 +74,7 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
         apt_events = threat_memory.get_all_threat_events() or []
     except Exception:
         apt_events = []
-    apt_ips = sorted({e.get("src_ip") for e in apt_events if e.get("src_ip")})
+    apt_ips = sorted({s for e in apt_events if (s := e.get("src_ip"))})
     try:
         high_risk = threat_memory.get_high_risk_ips(min_score=1.0) or []
     except Exception:
