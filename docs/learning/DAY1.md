@@ -239,7 +239,7 @@ PIPELINE B — Batch / APT memory (DAPT2020):
 | `std_dev()` | Độ lệch chuẩn `sqrt(variance)`. | [61-62](../src/tier1_filter/rule_engine.py#L61-L62) |
 
 ### Hằng số module
-- `CONFIG_PATH`, `_KEY_ALIASES` (JSON↔CSV key — tên chuẩn TRÙNG với `KEY_ALIASES` của Guardrails G1), `_RAW_TO_CANONICAL` (gom biến thể tên cột cho Z-score).
+- `CONFIG_PATH`, `_KEY_ALIASES` (JSON↔CSV key — tên chuẩn TRÙNG với `KEY_ALIASES` của Guardrails G1; nay gồm cả `user_agent`→`User-Agent`, `uri`→`URI` để **luật HÀNH VI** do Agent học ngược khớp được log lớp-ứng-dụng bất kể hoa/thường), `_RAW_TO_CANONICAL` (gom biến thể tên cột cho Z-score).
 - **Dòng:** [65-97](../src/tier1_filter/rule_engine.py#L65-L97)
 
 ### `load_config() -> dict`

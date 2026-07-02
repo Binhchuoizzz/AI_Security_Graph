@@ -80,6 +80,12 @@ _KEY_ALIASES = {
     "flow_duration_us": "Flow Duration",
     "flow_duration_ms": "Flow Duration",
     "protocol": "Protocol",
+    # Trường lớp-ứng-dụng (WAF/HTTP) — cần cho luật HÀNH VI do Agent học ngược
+    # (User-Agent/URI signature). Đồng bộ với KEY_ALIASES của Guardrails (G1) để
+    # luật động khớp bất kể log nguồn viết hoa/thường.
+    "user_agent": "User-Agent",
+    "user-agent": "User-Agent",
+    "uri": "URI",
 }
 
 # Ánh xạ các trường mạng thô sang các nhóm tính năng phục vụ Z-score tracking

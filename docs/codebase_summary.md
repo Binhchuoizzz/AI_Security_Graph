@@ -3,7 +3,7 @@
 Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thống SENTINEL, phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Lộ trình học tập 5 ngày**. Mỗi file phân tích rõ: **Mục đích → Tác dụng → Mối quan hệ** với các cấu phần khác. Đã đối chiếu sát với code ở HEAD (cập nhật 2026-06: luồng gộp online, zero-day real-derived, Anti-Self-DoS shield hẹp, raw-log counter thật, BLOCK_IP brute-force, FIREWALL MOCK; **bổ sung mới nhất:** quan sát ngữ cảnh `token_monitor` + seed tất định + suy biến an toàn ở Agent, và 7 experiment rigor: ablation B–E/cân bằng, độ nhạy ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM; và **Lớp ánh xạ MITRE ATT&CK có cấu trúc** — node thứ 6 `attack_mapper` sau triage, cổng theo ACTION, eval `scripts/eval_attack_mapper.py`).
 
 > **Bản đồ luồng:** Dataset → **Tier-1** (RuleEngine + Welford) → **Guardrails** → **Dual-RAG** → **LangGraph Agent (LLM + ATT&CK Mapper)** → **Response/Audit** → **Dashboard HITL** → Feedback Loop về Tier-1.
-> **Trạng thái kiểm thử:** `pytest 207 passed` (unit+tier1+adversarial), `E2E 22/22 PASSED`.
+> **Trạng thái kiểm thử:** `pytest 248 passed` (unit+tier1+adversarial), `E2E 22/22 PASSED`.
 >
 > **📚 Lộ trình học chi tiết theo từng hàm (5 ngày):** [DAY1](learning/DAY1.md) Tier-1 & Streaming · [DAY2](learning/DAY2.md) Guardrails · [DAY3](learning/DAY3.md) Dual-RAG & Knowledge Graph · [DAY4](learning/DAY4.md) LangGraph Agent + Response/Audit · [DAY5](learning/DAY5.md) SOC UI + Khung đánh giá 5D. Mỗi file có "💡 Sơ đồ 1 phút" để hình dung nhanh trước khi đọc sâu.
 > **🚀 Lộ trình mở rộng quy mô (Scalability Roadmap):** đã viết vào `docs/latex/thesis_latex{,_vi}/chapters/ch5_conclusion.tex` (mục *Horizontal Scalability Roadmap* / *Lộ trình Mở rộng Quy mô theo Chiều ngang*) — 5 trục: shard Tier-1 bằng **consistent hashing** theo Source IP, **Redis Cluster/Kafka** phân mảnh, **idempotency** cho at-least-once, **cụm worker LLM co giãn**, **KV store nhân bản** (quorum W+R>N) + LB + rate limiter. Đối chiếu trực tiếp với *System Design Interview* (Ch1/4/5/6/10/14).
@@ -96,11 +96,11 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
     *   `evaluate()` theo tầng: Whitelist → **WAF signature** (SQLi/XSS/Path/Cmd-Inj) → **Injection/Jailbreak signature** → **Z-Score anomaly** (warmup 100 mẫu sạch, lệch > `z_threshold`σ (tham số, mặc định 3.5) → zero-day) → Static rules (cổng nhạy cảm, volumetric) → **Dynamic rules (status `ACTIVE`)** → Session baseline → action (DROP/LOG/ALERT/BLOCK_IP/AWAIT_HITL/ESCALATE).
     *   **Chống Baseline Poisoning:** chỉ nạp flow benign (DROP/LOG) vào `global_stats`. **Hot-reload** config mỗi 5s.
     *   `z_threshold` được tham số hóa (đọc `tier1.z_threshold`, mặc định 3.5) để `run_threshold_sensitivity.py` quét độ nhạy mà KHÔNG đổi hành vi production.
-*   **Mối quan hệ:** Nhận logs từ `subscriber.py`; đọc/hot-reload `system_settings.yaml`; trả quyết định Tier-1. Luật ACTIVE (do HITL duyệt) được enforce ở đây.
+*   **Mối quan hệ:** Nhận logs từ `subscriber.py`; đọc/hot-reload `system_settings.yaml`; trả quyết định Tier-1. Luật ACTIVE (do HITL duyệt) được enforce ở đây bằng **substring match** `pattern in log[field]` — bao gồm cả luật HÀNH VI (`User-Agent`/`URI`), nên IP MỚI dùng cùng chữ ký kỹ thuật cũng bị CỜ. `_KEY_ALIASES` nay chuẩn hoá cả `user_agent`→`User-Agent`, `uri`→`URI` (đồng bộ Guardrails G1) để luật khớp bất kể log nguồn viết hoa/thường.
 
 ### 11. `src/tier1_filter/feedback_listener.py`
 *   **Mục đích:** Vòng phản hồi đồng bộ rule động UI/Agent ↔ Tier-1.
-*   **Tác dụng:** Nhận rule mới (`receive_new_rule` qua `FeedbackValidator`), persist `system_settings.yaml` bằng **atomic write** (`mkstemp`+`chmod 0644`+`os.replace`) + `FileLock`. Vòng đời `PENDING_APPROVAL → ACTIVE/REJECTED` (HITL); `approve_rule`/`reject_rule`/`get_pending_rules`/`get_active_dynamic_rules`; whitelist; clamp score `[0,100]`.
+*   **Tác dụng:** Nhận rule mới (`receive_new_rule` qua `FeedbackValidator`), persist `system_settings.yaml` bằng **atomic write** (`mkstemp`+`chmod 0644`+`os.replace`) + `FileLock`. Rule có thể theo **IP** (`Source IP`) HOẶC theo **HÀNH VI** (`URI`/`User-Agent` — chữ ký kỹ thuật do Agent học ngược). Vòng đời `PENDING_APPROVAL → ACTIVE/REJECTED` (HITL); `approve_rule`/`reject_rule`/`get_pending_rules`/`get_active_dynamic_rules`; whitelist; clamp score `[0,100]`.
 *   **Mối quan hệ:** Gọi bởi `node_action_executor` (Agent khi BLOCK_IP) và Dashboard (nút Duyệt); RuleEngine hot-reload rule ACTIVE.
 
 ### 12. `src/tier1_filter/scanner.py`
@@ -235,10 +235,10 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 *   **Tác dụng:**
     *   `node_guardrails`: chạy `GuardrailsPipeline` (nén + đóng gói nonce).
     *   `node_rag_context`: query RAG từ metadata flow thật + inject lịch sử Threat Memory (`get_context_for_prompt`, gồm **chuỗi APT đa-ngày**).
-    *   `node_llm_triage`: build prompt + gọi LLM; **suy biến an toàn** (bọc `try/except`: nếu LLM cục bộ chết → log lỗi, đặt response rỗng → đồ thị KHÔNG vỡ, đẩy về `AWAIT_HITL`; Tier-1 vẫn bảo vệ độc lập); `DecisionValidator.validate_decision` + **`enforce_tier_consensus`** (lá chắn social-engineering) + `AuditLogger`.
+    *   `node_llm_triage`: build prompt + gọi LLM; **suy biến an toàn** (bọc `try/except`: nếu LLM cục bộ chết → log lỗi, đặt response rỗng → đồ thị KHÔNG vỡ, đẩy về `AWAIT_HITL`; Tier-1 vẫn bảo vệ độc lập); `DecisionValidator.validate_decision` + **`enforce_tier_consensus`** (lá chắn social-engineering) + `AuditLogger`. Sau khi validate, **ghi `threat_memory.record_incident`** (reputation + MITRE) cho action ∈ {BLOCK_IP, ALERT, AWAIT_HITL} + `check_apt_pattern`/`check_apt_chain`. *(record_incident nằm ở ĐÂY — node_llm_triage — không phải ở action_executor.)*
     *   **`route_after_triage` (cổng theo ACTION)**: threat verdict (`BLOCK_IP`/`ALERT`/`AWAIT_HITL`) → `node_attack_mapper`; benign `LOG` → route thẳng theo action.
     *   `node_attack_mapper`: NEO vào technique-id mà triage đã gán → cấu trúc hóa bản ghi MITRE qua `map_attack` (web-attack phổ biến tra `WEB_ATTACK_MAP` tất định, không LLM; còn lại RRF top-3 + LLM-select, graceful); bồi đắp `mitre_tactic`/`mitre_technique_id`/`mitre_url`/`mapping_confidence`/`mapping_status`/`recommended_response` vào quyết định. *(Logic chi tiết ở mục 35b.)*
-    *   `node_action_executor`: thực thi action; **`BLOCK_IP`** → `block_ip()` (audit, MOCK) **VÀ** `FeedbackListener.receive_new_rule()` (sinh luật PENDING cho HITL); ghi `threat_memory.record_incident`; nếu `check_apt_chain` BẬT → ghi indicator `multi_day_chain`. `LoopDetector` chống vô hạn.
+    *   `node_action_executor`: thực thi action; **`BLOCK_IP`** → `block_ip()` (audit HMAC, MOCK) **VÀ** sinh **HAI** luật PENDING cho HITL qua `FeedbackListener.receive_new_rule()`: **(1) luật theo IP** (`Source IP`, score 100 — "nhớ mặt") và **(2) luật HÀNH VI** (`_derive_behavioral_rule` trích chữ ký công cụ trên `User-Agent` (sqlmap/nikto/nmap...) hoặc token tấn công trên `URI`, score 50 — "nhớ NGÓN ĐÒN" để Tier-1 bắt IP MỚI cùng kỹ thuật; suy biến nhẹ: không có chữ ký an toàn → chỉ giữ luật IP). `LoopDetector` chống vô hạn. *(record_incident KHÔNG ở đây — nó ở node_llm_triage.)*
     *   `node_human_in_the_loop`: nhánh `AWAIT_HITL` — đẩy quyết định mập mờ/bị Consensus-Guard ép xuống vào hàng đợi chờ analyst duyệt (không tự thực thi), rồi kết thúc cycle.
 *   **Mối quan hệ:** Gọi `DualRetriever`, `llm_client`, `threat_memory`, `executor`, `feedback_listener`.
 
@@ -409,9 +409,9 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ## **KIỂM THỬ (TESTS)**
 
-> Bộ test đảm bảo tính toàn vẹn — `pytest 207 passed` (unit+tier1+adversarial), `E2E 22/22`.
+> Bộ test đảm bảo tính toàn vẹn — `pytest 248 passed` (unit+tier1+adversarial), `E2E 22/22`.
 
-*   **`tests/unit/`** — data_validator, decision_validator (+ Anti-Self-DoS shield + tier-consensus guard), feedback_validator, **feedback_listener** (HITL lifecycle), output_sanitizer, prompt_filter, rag_sanitizer, template_miner, entropy_scorer, threat_memory (+ APT-chain-context), **subscriber** (chống lộ nhãn dataset vào LLM + hợp đồng enrich↔strip), **semantic_cache**, **auth** (PBKDF2/RBAC), **executor** (HMAC chain, đã cô lập DB tạm), agent, rag, **attack_mapper** (35 test: curated 10 web-attack, anchor, RRF fallback, schema — không cần LLM), **token_monitor**.
+*   **`tests/unit/`** — data_validator, decision_validator (+ Anti-Self-DoS shield + tier-consensus guard), feedback_validator, **feedback_listener** (HITL lifecycle), output_sanitizer, prompt_filter, rag_sanitizer, template_miner, entropy_scorer, threat_memory (+ APT-chain-context), **subscriber** (chống lộ nhãn dataset vào LLM + hợp đồng enrich↔strip), **semantic_cache**, **auth** (PBKDF2/RBAC), **executor** (HMAC chain, đã cô lập DB tạm), agent, rag, **attack_mapper** (35 test: curated 10 web-attack, anchor, RRF fallback, schema — không cần LLM), **token_monitor**, **behavioral_learning** (14 test: `_derive_behavioral_rule` chữ ký UA/URI + loại benign/curl; alias user_agent/uri; Tier-1 bắt IP MỚI cùng kỹ thuật; không over-block benign).
 *   **`tests/integration/`** — `test_unified_stream.py` (3 nguồn trộn + APT emergent + **bất biến zero-day real-derived**), `test_streaming_pipeline.py` (routing đa-nguồn), `test_end_to_end.py`.
 *   **`tests/test_adversarial.py`** + **`tests/test_tier1_filter.py`** + **`tests/conftest.py`** (sys.path root).
 </content>

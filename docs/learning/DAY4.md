@@ -152,28 +152,32 @@ Batch ESCALATE (từ subscriber #9, DAY1) ──► agent_app.invoke(SentinelSta
   2. `llm_client.invoke` (Gemma, seed=42) — **suy biến an toàn**: bọc `try/except`, nếu LLM cục bộ chết → log lỗi, response rỗng → đồ thị KHÔNG vỡ, đẩy `AWAIT_HITL` (Tier-1 vẫn bảo vệ độc lập).
   3. Parse JSON → `DecisionValidator.validate_decision` + **`enforce_tier_consensus`** (lá chắn social-engineering, DAY2 — G6): truyền `tier1_flagged_attack=True` khi log có `tier1_action ∈ {BLOCK_IP,ESCALATE,AWAIT_HITL,ALERT}` hoặc `tier1_score≥30`.
   4. Ghi `AuditLogger` (DAY2 — G9).
-- **Dòng:** [131-326](../../src/agent/nodes.py#L131-L326)
+  5. **`threat_memory.record_incident`** (reputation + MITRE) cho action ∈ {BLOCK_IP, ALERT, AWAIT_HITL} + `check_apt_pattern`/`check_apt_chain` ([288](../../src/agent/nodes.py#L288)). *(record_incident nằm ở node NÀY, không phải action_executor.)*
+- **Dòng:** [132-327](../../src/agent/nodes.py#L132-L327)
 
 ### `node_attack_mapper(state) -> dict`
 - **Mục đích:** Với threat verdict → NEO vào technique-id triage đã gán, gọi `map_attack` (D4) cấu trúc hoá thành bản ghi MITRE, bồi đắp vào `AgentDecision`.
-- **Dòng:** [327-401](../../src/agent/nodes.py#L327-L401)
+- **Dòng:** [328-446](../../src/agent/nodes.py#L328-L446)
 
 ### `node_action_executor(state) -> dict`
-- **Mục đích:** Thực thi action.
-- **Luồng:** `BLOCK_IP` → `block_ip()` (FIREWALL MOCK, D9) **VÀ** `FeedbackListener.receive_new_rule()` (sinh luật PENDING cho HITL, DAY1) + `threat_memory.record_incident`; nếu `check_apt_chain` BẬT → ghi indicator `multi_day_chain`. `LoopDetector` chống vòng lặp vô hạn.
-- **Dòng:** [402-446](../../src/agent/nodes.py#L402-L446)
+- **Mục đích:** Thực thi action + **học ngược luật cho Tier-1**.
+- **Luồng:** `BLOCK_IP` → `block_ip()` (FIREWALL MOCK, D9) **VÀ** sinh **HAI** luật PENDING qua `FeedbackListener.receive_new_rule()`:
+  - **(1) Luật IP** — `Source IP`, score 100 ("nhớ mặt" kẻ tấn công).
+  - **(2) Luật HÀNH VI** — `_derive_behavioral_rule()` trích chữ ký công cụ trên `User-Agent` (sqlmap/nikto/nmap...) hoặc token tấn công trên `URI` (score 50, "nhớ NGÓN ĐÒN") → Tier-1 bắt nhanh **IP MỚI cùng kỹ thuật**. Suy biến nhẹ: không có chữ ký an toàn → chỉ giữ luật IP.
+- `LoopDetector` chống vòng lặp vô hạn. *(record_incident KHÔNG ở đây — nó ở `node_llm_triage:287`.)*
+- **Dòng:** [471-542](../../src/agent/nodes.py#L471-L542) · helper `_derive_behavioral_rule` [447-470](../../src/agent/nodes.py#L447-L470)
 
 ### `node_human_in_the_loop(state) -> dict`
 - **Mục đích:** Nhánh `AWAIT_HITL` — đẩy quyết định mập mờ / bị Consensus-Guard ép xuống vào hàng đợi chờ analyst (KHÔNG tự thực thi) rồi kết thúc cycle.
-- **Dòng:** [447-478](../../src/agent/nodes.py#L447-L478)
+- **Dòng:** [543-574](../../src/agent/nodes.py#L543-L574)
 
 ### `route_triage_decision(state) -> str`
 - **Mục đích:** Cổng SAU mapper → `execute_action` / `await_hitl` / `end_cycle`.
-- **Dòng:** [479-497](../../src/agent/nodes.py#L479-L497)
+- **Dòng:** [575-593](../../src/agent/nodes.py#L575-L593)
 
 ### `route_after_triage(state) -> str`
 - **Mục đích:** Cổng SAU triage (theo ACTION): threat verdict → `attack_mapper`; benign `LOG` → thẳng theo action.
-- **Dòng:** [498-515](../../src/agent/nodes.py#L498-L515)
+- **Dòng:** [594-611](../../src/agent/nodes.py#L594-L611)
 
 ---
 
@@ -330,6 +334,7 @@ Batch ESCALATE (từ subscriber #9, DAY1) ──► agent_app.invoke(SentinelSta
 
 ### Cải tiến tích cực (nên nêu trước hội đồng)
 - ✅ **Đồ thị 6-node tường minh** (LangGraph) — dễ chèn node, graceful degradation, cổng theo ACTION.
+- ✅ **Tự tiến hoá (self-evolving) học 2 cấp:** Tier-2 ghi ngược Tier-1 cả **luật IP** ("nhớ mặt") lẫn **luật HÀNH VI** ("nhớ ngón đòn" — chữ ký UA/URI) → IP MỚI cùng kỹ thuật bị Tier-1 bắt ở **~10µs** thay vì ~11s gọi LLM; vẫn qua Zero-Trust `FeedbackValidator` + HITL. Đo bởi `tests/unit/test_behavioral_learning.py` (14 test).
 - ✅ **LLM tất định** (seed=42) + **suy biến an toàn** (LLM chết → AWAIT_HITL, hệ không vỡ).
 - ✅ **Ánh xạ MITRE có cấu trúc, kiểm chứng Pydantic** — 3 đường (curated/anchor/RRF), trung thực về giới hạn.
 - ✅ **Bộ nhớ Đe dọa đa-ngày** — APT emergent + reputation decay; chống Memory Poisoning bằng `output_sanitizer`.

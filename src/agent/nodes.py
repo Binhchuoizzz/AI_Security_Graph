@@ -26,6 +26,7 @@ from src.guardrails import (
     loop_detector,
     output_sanitizer,
 )
+from src.guardrails.constants import normalize_log_keys
 from src.rag.retriever import DualRetriever
 from src.response.executor import block_ip, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
@@ -399,6 +400,74 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     return {"decisions": [decision]}
 
 
+# ── Học "kỹ thuật" (behavioral signature) — không chỉ nhớ IP ─────────────────
+# Điểm cho luật hành vi: đủ vượt risk_threshold để Tier-1 CỜ (flag/ESCALATE) IP
+# mới cùng ngón đòn, nhưng KHÔNG cao như luật IP (100) để tránh hard-block mù trên
+# một heuristic hành vi (an toàn: vẫn PENDING + HITL duyệt trước khi ACTIVE).
+BEHAVIORAL_RULE_SCORE = 50
+
+# Chữ ký công cụ tấn công RÕ RÀNG trên User-Agent (an toàn, khái quát hoá tốt —
+# bất kỳ IP nào dùng công cụ này đều đáng ngờ). CỐ Ý loại "curl"/"python-requests"
+# vì quá phổ biến trong automation hợp lệ → tránh dương-tính-giả.
+_TOOL_SIGNATURES = (
+    "sqlmap",
+    "nikto",
+    "nmap",
+    "masscan",
+    "hydra",
+    "gobuster",
+    "dirbuster",
+    "dirb",
+    "wpscan",
+    "nuclei",
+    "zgrab",
+    "acunetix",
+    "havij",
+    "metasploit",
+    "fuzz",
+)
+
+# Token tấn công đặc trưng trên URI (đủ hẹp để không FP diện rộng ở score 50).
+_URI_ATTACK_TOKENS = (
+    "union select",
+    "../../",
+    "..\\..\\",
+    "/etc/passwd",
+    "<script",
+    "cmd.exe",
+    "/bin/bash",
+    "%00",
+    "' or '1'='1",
+    "exec(",
+    "; ls",
+    "wget http",
+)
+
+
+def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
+    """
+    Trích một CHỮ KÝ HÀNH VI an toàn từ log gây ra BLOCK để Tier-1 có thể bắt
+    nhanh một IP KHÁC dùng CÙNG kỹ thuật (không chỉ nhớ đúng IP cũ).
+
+    Ưu tiên chữ ký công cụ trên User-Agent (khái quát nhất); fallback token tấn
+    công trên URI. Trả `None` nếu không có chữ ký an toàn → chỉ ghi luật IP
+    (suy biến nhẹ nhàng). Field trả về LUÔN là nơi token thực sự nằm, để luật
+    khớp đúng field của log tương lai. Mọi field/score đều qua FeedbackValidator.
+    """
+    norm = normalize_log_keys(log_entry)
+    ua = str(norm.get("User-Agent", "")).strip()
+    uri = str(norm.get("URI", "")).strip()
+    ua_l, uri_l = ua.lower(), uri.lower()
+
+    for tool in _TOOL_SIGNATURES:
+        if tool in ua_l:
+            return ("User-Agent", tool, BEHAVIORAL_RULE_SCORE)
+    for tok in _URI_ATTACK_TOKENS:
+        if tok in uri_l:
+            return ("URI", tok, BEHAVIORAL_RULE_SCORE)
+    return None
+
+
 def node_action_executor(state: SentinelState) -> dict[str, Any]:
     """
     Action Executor Node: Xử lý các action BLOCK_IP hoặc ALERT.
@@ -427,13 +496,40 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
 
         rule_pattern = latest_decision.get("target", "UNKNOWN_IP")
 
-        # Gọi feedback listener (chạy qua FeedbackValidator ngầm định)
+        # (1) Luật theo IP — "nhớ mặt" kẻ tấn công (chạy qua FeedbackValidator ngầm định)
         FeedbackListener().receive_new_rule(
             "Source IP",
             rule_pattern,
             score=100,
             reason=raw_reasoning,
         )
+
+        # (2) Luật theo CHỮ KÝ HÀNH VI — "nhớ ngón đòn": trích chữ ký công cụ/URI từ
+        # log gây ra block để Tier-1 CỜ nhanh một IP KHÁC dùng CÙNG kỹ thuật. Suy biến
+        # nhẹ nhàng: không có log hoặc không có chữ ký an toàn → bỏ qua, chỉ giữ luật IP.
+        offending = next(
+            (
+                lg
+                for lg in state.current_batch_logs
+                if str(normalize_log_keys(lg).get("Source IP", "")) == str(rule_pattern)
+            ),
+            None,
+        )
+        if offending:
+            beh = _derive_behavioral_rule(offending)
+            if beh:
+                b_field, b_pattern, b_score = beh
+                FeedbackListener().receive_new_rule(
+                    b_field,
+                    b_pattern,
+                    score=b_score,
+                    source="langgraph_agent_behavioral",
+                    reason=f"Behavioral signature learned from {rule_pattern}: {raw_reasoning}",
+                )
+                logger.info(
+                    f"--- LEARNED TECHNIQUE: {b_field}~'{b_pattern}' (score {b_score}) "
+                    f"from {rule_pattern} ---"
+                )
 
     elif action == "ALERT":
         raise_alert(
