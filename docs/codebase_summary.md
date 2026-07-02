@@ -394,7 +394,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 ### 63. `scripts/convert_report.py` & `scripts/switch_model.sh` & `scripts/cleanup.sh`
 *   **convert_report.py:** Markdown → DOCX (báo cáo tiến độ).
 *   **switch_model.sh:** Hot-swap LLM (`gemma`/`llama`), sửa `.env` + restart container `sentinel_llm`, chờ healthy.
-*   **cleanup.sh:** Dọn artifact tạm AN TOÀN — chỉ xóa thứ tái tạo được/gitignored (mlruns, eval DB tạm, faiss index cache, logs, `__pycache__`/caches). **KHÔNG** xóa `results/*.json` hay `plots/*.png` (dữ liệu luận văn đã commit — đã sửa footgun).
+*   **cleanup.sh:** Dọn artifact tạm AN TOÀN — chỉ xóa thứ tái tạo được/gitignored (mlruns, eval DB tạm, faiss index cache, logs, `__pycache__`/caches). **KHÔNG** đụng dữ liệu thực nghiệm. *(Ghi chú chính xác về bằng chứng đã commit: nằm ở **`experiments/results/attack_mapper_eval_*.json`** (4 file eval mapper) + **`reports/unified_stream_evaluation_report.md`** + **`docs/METRICS_SUMMARY.md`**. Thư mục **`results/` top-level** (ablation/latency/plots) là **scratch — regenerate từ script**, KHÔNG commit; con số vẫn tái lập bằng cách chạy lại `run_ablation_*`/`measure_latency_baseline`/`plot_results`.)*
 
 ---
 
