@@ -58,9 +58,9 @@ services:
       - LLM_API_BASE=http://llm:8080/v1
     depends_on:
       mlflow:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       llm:
         condition: service_healthy
     networks:
@@ -96,6 +96,13 @@ services:
           memory: 1G
           cpus: '1.0'
     restart: unless-stopped
+    healthcheck:
+      # mlflow image không có curl/wget → dùng python urllib tới /health
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
   # ================================================================
   # REDIS — Streaming Queue + Session Cache
@@ -121,6 +128,13 @@ services:
           memory: 512M
           cpus: '0.5'
     restart: unless-stopped
+    healthcheck:
+      # Auth-aware PING (redis yêu cầu password); grep PONG để chắc chắn server sống
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:-SentinelSecurePass2026!}\" ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ================================================================
   # NEO4J — Vulnerability Knowledge Graph (Optional)
@@ -144,6 +158,13 @@ services:
           memory: 1G
           cpus: '1.0'
     restart: unless-stopped
+    healthcheck:
+      # Neo4j sẵn wget; kiểm cổng HTTP Browser 7474 (không cần auth cho landing)
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
 networks:
   sentinel_net:

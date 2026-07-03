@@ -128,10 +128,12 @@ docker-compose up -d
 
 ### Chi tiết xử lý kỹ thuật của Docker-Compose
 *   `llm` (sentinel_llm): Kích hoạt máy chủ **llama.cpp** hỗ trợ gia tốc phần cứng GPU CUDA. Nó sẽ tự động nạp mô hình `gemma-2-9b-it-Q6_K.gguf` từ thư mục được mount và expose cổng `5000` (OpenAI-compatible API).
-*   `redis` (sentinel_redis): Khởi chạy Redis làm hàng đợi tin nhắn (Message Queue) cho luồng log thời gian thực và cache phiên làm việc.
-*   `mlflow` (sentinel_mlflow): Khởi chạy MLflow tracking server lưu trữ kết quả và các chỉ số thử nghiệm của Ablation Study.
-*   `neo4j` (sentinel_neo4j): Cơ sở dữ liệu đồ thị lưu trữ lỗ hổng bảo mật dạng tri thức đồ thị (Graph Database).
-*   `agent_ui` (sentinel_dashboard): Khởi chạy giao diện HITL SOC Streamlit Dashboard (chỉ bắt đầu chạy sau khi kiểm tra máy chủ `llm` đã ở trạng thái `healthy`).
+*   `redis` (sentinel_redis): Khởi chạy Redis làm hàng đợi tin nhắn (Message Queue) cho luồng log thời gian thực và cache phiên làm việc. **Healthcheck:** `redis-cli -a <pass> ping` (auth-aware).
+*   `mlflow` (sentinel_mlflow): Khởi chạy MLflow tracking server lưu trữ kết quả và các chỉ số thử nghiệm của Ablation Study. **Healthcheck:** `python urllib` tới `/health` (image không có curl/wget).
+*   `neo4j` (sentinel_neo4j): Cơ sở dữ liệu đồ thị lưu trữ lỗ hổng bảo mật dạng tri thức đồ thị (Graph Database). **Healthcheck:** `wget` cổng HTTP Browser `7474`.
+*   `agent_ui` (sentinel_dashboard): Khởi chạy giao diện HITL SOC Streamlit Dashboard. **Startup gating chặt:** chỉ khởi động sau khi **cả `redis`, `mlflow`, `llm` đều `healthy`** (`depends_on: condition: service_healthy`) — tránh dashboard lên trước khi backend sẵn sàng. Bản thân agent_ui có healthcheck `/_stcore/health` (khai báo trong Dockerfile).
+
+> **Toàn bộ 5 dịch vụ đều có `healthcheck` + `restart: unless-stopped` + resource limits.** Nhờ đó `docker-compose up -d` tự xếp thứ tự khởi động theo tình trạng healthy thực tế (không chỉ "đã start"), tăng độ ổn định khi cold-boot.
 
 ### Kiểm tra trạng thái dịch vụ
 
