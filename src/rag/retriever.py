@@ -151,8 +151,11 @@ class DualRetriever:
         fetch_k = min(self.top_k * 3, total_docs)
 
         # 1. Tìm kiếm Vector Ngữ nghĩa (Dense Search)
-        query_embedding = self.model.encode([query_text], normalize_embeddings=True).astype(
-            "float32"
+        # np.asarray(..., dtype) thay cho .astype(): encode() có kiểu trả về union
+        # (Tensor|ndarray) nên .astype không type-safe khi thiếu venv (CI). Runtime
+        # encode trả ndarray → np.asarray là no-op cùng kết quả, nhưng type tất định.
+        query_embedding = np.asarray(
+            self.model.encode([query_text], normalize_embeddings=True), dtype="float32"
         )
         dense_results = self._dense_search(query_embedding, source_key, fetch_k)
 
