@@ -25,10 +25,11 @@ LABEL description="SENTINEL SOC - Autonomous AI Security Agent"
 LABEL version="1.0.0"
 
 # Install Trivy for Vulnerability Scanning (modern GPG key method)
-RUN apt-get update && apt-get install -y wget apt-transport-https gnupg \
+# --no-install-recommends: giảm attack surface + kích thước image (đồng bộ builder stage)
+RUN apt-get update && apt-get install -y --no-install-recommends wget apt-transport-https gnupg \
     && wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | tee /etc/apt/sources.list.d/trivy.list \
-    && apt-get update && apt-get install -y trivy \
+    && apt-get update && apt-get install -y --no-install-recommends trivy \
     && rm -rf /var/lib/apt/lists/*
 
 # Security: Create non-root user

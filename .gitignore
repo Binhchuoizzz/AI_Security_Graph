@@ -22,6 +22,17 @@ knowledge_base/faiss_index/*_metadata.json
 .gemini/
 *.pid
 
+# Test / coverage / type-check caches (regenerated; never commit)
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.trivy-config.sarif
+trivy-config.sarif
+
 # Ignore all markdown files except README.md and specific reports
 **/*.md
 *.md

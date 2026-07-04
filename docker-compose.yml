@@ -44,7 +44,10 @@ services:
     build: .
     container_name: sentinel_dashboard
     ports:
-      - "8501:8501"
+      # Security: bind localhost only (đồng bộ với llm/redis/mlflow/neo4j — triết lý
+      # air-gapped). Truy cập demo qua http://localhost:8501. Nếu cần truy cập từ máy
+      # khác trong LAN, đổi thành "0.0.0.0:8501:8501" (dashboard vẫn có auth PBKDF2/RBAC).
+      - "127.0.0.1:8501:8501"
     volumes:
       - .:/app:ro                 # Read-only mount to prevent container escape writes
       - ./logs:/app/logs          # Only logs directory is writable

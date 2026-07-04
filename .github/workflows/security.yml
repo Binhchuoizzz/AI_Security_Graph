@@ -20,12 +20,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -34,7 +34,7 @@ jobs:
         # drain3 installed separately (cachetools version conflict)
         pip install drain3==0.9.11 --no-deps
         pip install jsonpickle>=1.5.1
-        
+
     - name: Run pip-audit (CVE scan)
       run: |
         # Audit project dependencies, ignoring pip itself (tooling, not project dep)
@@ -53,3 +53,42 @@ jobs:
       uses: trufflesecurity/trufflehog@main
       with:
         extra_args: --only-verified
+
+  # ── Dockerfile best-practices lint (deterministic, non-redundant với ruff) ──
+  dockerfile-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Lint Dockerfile (hadolint)
+      uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: Dockerfile
+        # Chỉ chặn ở mức error (bỏ style/info) để không nhiễu pipeline defense
+        failure-threshold: error
+
+  # ── IaC misconfig scan cho Dockerfile + docker-compose (Trivy config) ──────
+  # Report-only: đẩy SARIF lên tab Security để trưng bày security posture
+  # (localhost binds, resource limits, healthchecks, read-only mounts...) mà
+  # KHÔNG bao giờ làm đỏ pipeline vì một rule Trivy mới — an toàn cho ngày bảo vệ.
+  iac-misconfig-scan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Trivy config scan (Dockerfile + compose)
+      uses: aquasecurity/trivy-action@v0.36.0
+      with:
+        scan-type: config
+        scan-ref: .
+        format: sarif
+        output: trivy-config.sarif
+        severity: HIGH,CRITICAL
+        exit-code: '0'   # report-only
+
+    - name: Upload Trivy results to Security tab
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-config.sarif
+        category: trivy-iac-misconfig
