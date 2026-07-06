@@ -18,7 +18,7 @@
 
 | Dimension | Metric | Value | Source |
 |---|---|---|---|
-| **Accuracy** | Unified-Stream classification F1 (P / R) | **0.5941** (0.9385 / 1.000) | `unified_stream_results.json` |
+| **Accuracy** | Unified-Stream classification F1 (P / R) | **0.5941** (0.9385 / 0.4346) | `unified_stream_results.json` |
 | | Unified-Stream accuracy; avg detection lag | 0.4479; 8.33 events | `unified_stream_results.json` |
 | | APT-chain recall / specificity | **3/3 = 1.00** / **1.00** (0 false firings, 9 chains) | `apt_negative_control_results.json` |
 | **Performance** | LLM-only vs Two-Tier mean latency | 26{,}882 ms → **4{,}577 ms** | `latency_benchmark.json` |

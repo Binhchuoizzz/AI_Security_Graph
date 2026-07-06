@@ -237,14 +237,14 @@ Kết quả hiệu năng. Tier-1 quyết định trong khoảng 0.6 mili-giây, 
 
 ## Kết quả 2 — Độ chính xác
 
-- **Phân loại (Unified Stream):** F1 = **0.594** · Precision = **0.939** · Recall = **1.0**.
+- **Phân loại (Unified Stream):** F1 = **0.594** · Precision = **0.939** · Recall = **0.435**.
 - **APT đa-ngày:** **3/3** chiến dịch · recall **1.0** · specificity **1.0**.
 - **Zero-day:** Welford bắt **7/7** ngoại lệ signature-less mà engine tĩnh **bỏ sót**.
 
 <span class="small">*Ghi chú trung thực:* Precision cao (0.94) nhưng Recall/F1 phản ánh việc Tier-1 ưu-tiên-precision (đánh đổi có chủ đích); giá trị kiến trúc nằm ở suy luận có ngữ cảnh + APT + zero-day, không chỉ ở phân loại nhị phân.*</span>
 
 <!--
-Về độ chính xác: trên luồng gộp, F1 đạt 0.594 với precision 0.939 và recall 1.0. Trên APT, phát hiện cả 3 chiến dịch với recall và specificity đều bằng 1. Với zero-day, bộ lọc Welford bắt được cả 7 ngoại lệ không có chữ ký mà engine tĩnh bỏ sót. Em xin nói thẳng: precision cao nhưng đây là thiết kế ưu tiên precision có chủ đích; giá trị thật của kiến trúc nằm ở suy luận có ngữ cảnh, phát hiện APT và zero-day, chứ không chỉ ở phân loại nhị phân.
+Về độ chính xác: trên luồng gộp, F1 đạt 0.594 với precision 0.939 và recall 0.435. Trên APT, phát hiện cả 3 chiến dịch với recall và specificity đều bằng 1. Với zero-day, bộ lọc Welford bắt được cả 7 ngoại lệ không có chữ ký mà engine tĩnh bỏ sót. Em xin nói thẳng: precision cao nhưng đây là thiết kế ưu tiên precision có chủ đích; giá trị thật của kiến trúc nằm ở suy luận có ngữ cảnh, phát hiện APT và zero-day, chứ không chỉ ở phân loại nhị phân.
 -->
 
 ---
