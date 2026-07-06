@@ -104,16 +104,16 @@
     \vspace*{1cm}
     {\large\textbf{MINISTRY OF EDUCATION AND TRAINING}}\\[0.1cm]
     {\large\textbf{FPT UNIVERSITY}}\\[3cm]
-    
+
     {\Large A TWO-TIER COGNITIVE ARCHITECTURE FOR AUTOMATED THREAT DETECTION AND RESPONSE USING AGENTIC AI}\\[3cm]
-    
+
     by\\[1cm]
-    
+
     Nguyen Duc Binh\\[3cm]
-    
+
     A thesis submitted in conformity with the requirements\\
     for the degree of Master of Software Engineering\\[1cm]
-    
+
     \vfill
     {\normalsize \copyright\ Copyright by Nguyen Duc Binh 2026}
 \end{titlepage}
@@ -124,20 +124,20 @@
     \vspace*{1cm}
     {\large\textbf{MINISTRY OF EDUCATION AND TRAINING}}\\[0.1cm]
     {\large\textbf{FPT UNIVERSITY}}\\[3cm]
-    
+
     {\Large A TWO-TIER COGNITIVE ARCHITECTURE FOR AUTOMATED THREAT DETECTION AND RESPONSE USING AGENTIC AI}\\[3cm]
-    
+
     by\\[1cm]
-    
+
     Nguyen Duc Binh\\[3cm]
-    
+
     A thesis submitted in conformity with the requirements\\
     for the degree of Master of Software Engineering\\[2cm]
-    
+
     Supervisor:\\
     Dr. Bui Van Hieu\\
     Dr. Dang Van Hieu\\[1cm]
-    
+
     \vfill
     {\normalsize \copyright\ Copyright by Nguyen Duc Binh 2026}
 \end{titlepage}
@@ -160,7 +160,7 @@
 \begin{singlespace}
 In the contemporary cybersecurity landscape, Security Operations Centers (SOCs) are consistently overwhelmed by the sheer volume of network alerts, leading to severe alert fatigue and the potential oversight of critical Advanced Persistent Threats (APTs). To address the inherent limitations of traditional, static rule-based systems and the latency bottlenecks of processing raw logs directly through Large Language Models (LLMs), this thesis introduces SENTINEL, a two-tier cognitive architecture for automated threat detection and response. The framework deploys Welford's online statistical algorithm at a stateless Transport Tier (Tier-1) to filter benign traffic at wire speed in $O(1)$ time and memory, while a LangGraph-driven Cognitive Agent Tier (Tier-2)—equipped with a Dual Retrieval-Augmented Generation (Dual-RAG) mechanism over MITRE ATT\&CK techniques and NIST SP 800-61r2 playbooks—performs grounded contextual reasoning behind cryptographic guardrails.
 
-Evaluated on the CSE-CIC-IDS2018 and DAPT2020 datasets, SENTINEL escalates only the genuinely ambiguous minority of traffic to the LLM: the deterministic tier resolves a decision in roughly $0.6$\,ms versus a $4$--$6$\,s LLM inference, a separation confirmed as statistically significant by a Mann-Whitney~U test ($p = 2.8\times10^{-17}$). The online Welford filter caught all seven injected signature-less zero-day outliers that the static engine missed, and emergent multi-day correlation in the persistent Threat Memory recovered all three DAPT2020 APT campaigns (recall $= 1.0$). A cross-family LLM-as-Judge evaluation rated the agent's grounded reasoning at $3.91/5$ overall, with a Faithfulness of $4.00/5$, while a defense-in-depth guardrail design---Delimited Data Encapsulation, output sanitization, and HMAC log chaining---blocked all encoding-based injection payloads and routed residual semantic manipulations to human review while preserving forensic integrity. These findings demonstrate that pairing a deterministic wire-speed filter with an explainable, cryptographically isolated Agentic AI tier yields a scalable and security-hardened automation solution for modern network defense.
+Evaluated on the CSE-CIC-IDS2018 and DAPT2020 datasets, SENTINEL escalates only the genuinely ambiguous minority of traffic to the LLM: the deterministic tier resolves a decision in roughly $0.6$\,ms versus a $4$--$6$\,s LLM inference, a separation confirmed as statistically significant by a Mann-Whitney~U test ($p = 2.8\times10^{-17}$). As foundational capabilities of the same architecture---validated here as proofs-of-concept and positioned for production-grade extension rather than as headline results---the online Welford filter escalated all seven injected signature-less zero-day outliers that the static engine missed, and emergent multi-day correlation in the persistent Threat Memory linked all three DAPT2020 APT campaigns in a controlled evaluation (recall $= 1.0$, Wilson $95\%$ CI $[0.44, 1.0]$). A cross-family LLM-as-Judge evaluation rated the agent's grounded reasoning at $3.91/5$ overall, with a Faithfulness of $4.00/5$, while a defense-in-depth guardrail design---Delimited Data Encapsulation, output sanitization, and HMAC log chaining---blocked all encoding-based injection payloads and routed residual semantic manipulations to human review while preserving forensic integrity. These findings demonstrate that pairing a deterministic wire-speed filter with an explainable, cryptographically isolated Agentic AI tier yields a scalable and security-hardened automation solution for modern network defense.
 
 
 \end{singlespace}

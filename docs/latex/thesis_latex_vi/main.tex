@@ -105,16 +105,16 @@
     \vspace*{1cm}
     {\large\textbf{BỘ GIÁO DỤC VÀ ĐÀO TẠO}}\\[0.1cm]
     {\large\textbf{TRƯỜNG ĐẠI HỌC FPT}}\\[3cm]
-    
+
     {\Large KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ (AGENTIC AI)}\\[3cm]
-    
+
     thực hiện bởi\\[1cm]
-    
+
     Nguyễn Đức Bình\\[3cm]
-    
+
     Luận văn được nộp để đáp ứng yêu cầu\\
     của học vị Thạc sĩ Kỹ thuật Phần mềm\\[1cm]
-    
+
     \vfill
     {\normalsize \copyright\ Bản quyền thuộc về Nguyễn Đức Bình 2026}
 \end{titlepage}
@@ -125,20 +125,20 @@
     \vspace*{1cm}
     {\large\textbf{BỘ GIÁO DỤC VÀ ĐÀO TẠO}}\\[0.1cm]
     {\large\textbf{TRƯỜNG ĐẠI HỌC FPT}}\\[3cm]
-    
+
     {\Large KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ (AGENTIC AI)}\\[3cm]
-    
+
     thực hiện bởi\\[1cm]
-    
+
     Nguyễn Đức Bình\\[3cm]
-    
+
     Luận văn được nộp để đáp ứng yêu cầu\\
     của học vị Thạc sĩ Kỹ thuật Phần mềm\\[2cm]
-    
+
     Giảng viên hướng dẫn:\\
     TS. Bùi Văn Hiệu\\
     TS. Đặng Văn Hiếu\\[1cm]
-    
+
     \vfill
     {\normalsize \copyright\ Bản quyền thuộc về Nguyễn Đức Bình 2026}
 \end{titlepage}
@@ -161,7 +161,7 @@
 \begin{singlespace}
 Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh mạng (SOC) luôn bị quá tải bởi số lượng cảnh báo khổng lồ, dẫn đến hội chứng "bội thực cảnh báo" và nguy cơ bỏ sót các Cuộc tấn công có chủ đích (APT) nghiêm trọng. Để giải quyết những hạn chế cố hữu của các hệ thống dựa trên luật tĩnh truyền thống và nút thắt về độ trễ khi xử lý trực tiếp log mạng qua Mô hình Ngôn ngữ Lớn (LLM), luận văn này giới thiệu SENTINEL, một kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động. Khung đề xuất triển khai thuật toán thống kê trực tuyến Welford ở Tầng Truyền tải phi trạng thái (Tầng 1) để lọc lưu lượng vô hại ở tốc độ đường truyền với độ phức tạp thời gian và bộ nhớ $O(1)$, trong khi Tầng Tác tử Nhận thức (Tầng 2) dựa trên LangGraph --- được trang bị cơ chế Sinh tăng cường truy xuất kép (Dual-RAG) trên các kỹ thuật MITRE ATT\&CK và kịch bản NIST SP 800-61r2 --- thực hiện suy luận ngữ cảnh có nền tảng phía sau các rào chắn mật mã.
 
-Được đánh giá trên các bộ dữ liệu CSE-CIC-IDS2018 và DAPT2020, SENTINEL chỉ leo thang phần thiểu số lưu lượng thực sự mơ hồ lên LLM: tầng tất định ra quyết định trong khoảng $0.6$\,ms so với $4$--$6$\,s cho mỗi lượt suy luận LLM, một sự tách biệt được kiểm định Mann-Whitney~U xác nhận là có ý nghĩa thống kê ($p = 2.8\times10^{-17}$). Bộ lọc Welford trực tuyến bắt được toàn bộ bảy điểm dị biệt zero-day không chữ ký mà bộ máy tĩnh bỏ sót, và cơ chế liên kết đa-ngày nổi lên trong Bộ nhớ Đe dọa bền vững đã phục hồi cả ba chiến dịch APT của DAPT2020 (recall $= 1.0$). Một đánh giá LLM-Trọng tài khác họ chấm chất lượng suy luận có nền tảng của tác tử đạt $3.91/5$ tổng thể, với Faithfulness $4.00/5$, trong khi thiết kế rào chắn phòng thủ nhiều lớp --- Đóng gói Dữ liệu phân tách, làm sạch đầu ra, và chuỗi log HMAC --- chặn toàn bộ tải trọng tiêm dựa trên mã hóa và định tuyến các thao túng ngữ nghĩa còn lại tới khâu duyệt của con người trong khi vẫn bảo toàn tính toàn vẹn pháp y. Các phát hiện này cho thấy việc kết hợp một bộ lọc tất định tốc độ đường truyền với một tầng AI Tác tử có thể giải thích và được cô lập bằng mật mã mang lại một giải pháp tự động hóa an toàn, dễ mở rộng cho phòng thủ mạng hiện đại.
+Được đánh giá trên các bộ dữ liệu CSE-CIC-IDS2018 và DAPT2020, SENTINEL chỉ leo thang phần thiểu số lưu lượng thực sự mơ hồ lên LLM: tầng tất định ra quyết định trong khoảng $0.6$\,ms so với $4$--$6$\,s cho mỗi lượt suy luận LLM, một sự tách biệt được kiểm định Mann-Whitney~U xác nhận là có ý nghĩa thống kê ($p = 2.8\times10^{-17}$). Như các năng lực nền tảng của cùng kiến trúc---được kiểm chứng ở đây như những minh chứng khả thi và định vị cho việc mở rộng ở mức production chứ không phải là kết quả điểm nhấn---bộ lọc Welford trực tuyến đã leo thang toàn bộ bảy điểm dị biệt zero-day không chữ ký mà bộ máy tĩnh bỏ sót, và cơ chế liên kết đa-ngày nổi lên trong Bộ nhớ Đe dọa bền vững đã liên kết cả ba chiến dịch APT của DAPT2020 trong một đánh giá có kiểm soát (recall $= 1.0$, khoảng tin cậy Wilson $95\%$ $[0.44, 1.0]$). Một đánh giá LLM-Trọng tài khác họ chấm chất lượng suy luận có nền tảng của tác tử đạt $3.91/5$ tổng thể, với Faithfulness $4.00/5$, trong khi thiết kế rào chắn phòng thủ nhiều lớp --- Đóng gói Dữ liệu phân tách, làm sạch đầu ra, và chuỗi log HMAC --- chặn toàn bộ tải trọng tiêm dựa trên mã hóa và định tuyến các thao túng ngữ nghĩa còn lại tới khâu duyệt của con người trong khi vẫn bảo toàn tính toàn vẹn pháp y. Các phát hiện này cho thấy việc kết hợp một bộ lọc tất định tốc độ đường truyền với một tầng AI Tác tử có thể giải thích và được cô lập bằng mật mã mang lại một giải pháp tự động hóa an toàn, dễ mở rộng cho phòng thủ mạng hiện đại.
 
 
 \end{singlespace}
