@@ -1,0 +1,43 @@
+// SENTINEL Tier-2 agent state-graph (source of truth for Figure: agentic_fsm_workflow.png)
+// Mirrors src/agent/workflow.py exactly: 6 nodes, acyclic DAG, no loops.
+// Render: dot -Tpng -Gdpi=200 agentic_fsm_workflow.dot -o agentic_fsm_workflow.png
+digraph agentic_fsm {
+    rankdir=TB;
+    bgcolor="white";
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12, margin="0.18,0.10"];
+    edge [fontname="Helvetica", fontsize=10, color="#444444"];
+
+    start   [label="START\n(escalated event from Tier-1)", shape=oval, fillcolor="#cfe8ff"];
+
+    guard   [label="guardrails\n(input validation + injection defense,\nDelimited Encapsulation)", fillcolor="#e8f5e9"];
+    rag     [label="rag_context\n(Dual-RAG: MITRE ATT&CK + NIST 800-61r2,\nFAISS + BM25 fused by RRF)", fillcolor="#e8f5e9"];
+    triage  [label="llm_triage\n(Gemma-2-9B-IT Q6_K, temp 0.1\n-> structured JSON verdict)", fillcolor="#e8f5e9"];
+
+    route1  [label="route_after_triage\n(threat & confidence > 0.7 ?)", shape=diamond, fillcolor="#fff3cd"];
+    mapper  [label="attack_mapper\n(structured MITRE ATT&CK enrichment)", fillcolor="#e8f5e9"];
+    route2  [label="route by action", shape=diamond, fillcolor="#fff3cd"];
+
+    exec    [label="action_executor\n(firewall policy / report /\nforensic record)", fillcolor="#f8d7da"];
+    hitl    [label="human_in_the_loop\n(analyst approval queue)", fillcolor="#ffe0b2"];
+
+    done    [label="END", shape=oval, fillcolor="#e2e3e5"];
+
+    // Linear backbone
+    start -> guard -> rag -> triage -> route1;
+
+    // Conditional routing after triage
+    route1 -> mapper [label="map"];
+    route1 -> exec   [label="execute_action"];
+    route1 -> hitl   [label="await_hitl"];
+    route1 -> done   [label="end_cycle (LOG / benign)"];
+
+    // After MITRE enrichment, route by action
+    mapper -> route2;
+    route2 -> exec [label="execute_action"];
+    route2 -> hitl [label="await_hitl"];
+    route2 -> done [label="end_cycle"];
+
+    // Terminal edges
+    exec -> done;
+    hitl -> done;
+}
