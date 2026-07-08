@@ -39,33 +39,6 @@ In terms of concrete research methods, this approach unfolds in three stages. Th
 
 Finally, the study draws on two kinds of data. The quantitative data comprise the numerical network measurements the system ingests together with its own measured outputs, such as detection accuracy and processing latency. The qualitative data, namely the natural-language explanations the model produces, are converted into numerical scores through an automated evaluation framework~\cite{ragas2023} and an independent, cross-family language-model judge, so that even the quality of the system's reasoning can be assessed on a comparable, quantitative basis.
 
-\section{Related Works}
-Research on automated threat detection has evolved through several waves. Classical intrusion detection relies on machine learning (e.g., Random Forests, SVMs) or deep learning (e.g., LSTMs, CNNs)~\cite{mlids2016}; although accurate, such models operate as unexplainable ``black boxes.'' The subsequent arrival of Large Language Models has opened a broad research front across cybersecurity tasks, as catalogued by recent systematic reviews spanning hundreds of studies and dozens of downstream scenarios~\cite{llmsec_survey2025}, motivating a shift from opaque classifiers toward systems that can also explain and act on their findings.
-
-Closest to this thesis is a recent wave of agentic frameworks that pair LLM reasoning with retrieval for security operations. Splunk-based triage overlays couple an LLM with SIEM workflows for policy-guided threat hunting~\cite{splunkllm2026}; CyberRAG orchestrates fine-tuned classifiers with an iterative retrieve-and-reason loop for attack classification and reporting~\cite{cyberrag2025}; LanG unifies correlation, rule generation, and kill-chain reconstruction under a governance-aware, tool-calling platform~\cite{lang2026}; and multi-agent designs such as AutoBnB-RAG extend retrieval-augmented collaboration to incident-response investigation~\cite{autobnb2025}. These systems establish the value of agentic, retrieval-grounded SOC automation, and most already incorporate a pre-filter and, in some cases, an input guardrail.
-
-A parallel line of work exposes the security cost of placing a generative model in the decision loop: indirect, log-substrate prompt injection lets attacker-controlled content hijack the model's reasoning~\cite{promptinjection2023, watchtower2026}, a risk now codified in application-security guidance for LLM systems~\cite{owasp_llm2025}. Where existing SOC frameworks address this at all, they tend to rely on a learned semantic classifier that a novel payload may still evade.
-
-Against this backdrop, SENTINEL differs along three deliberate design axes rather than by a single missing feature. First, its Tier-1 gate is a training-free, $O(1)$ Welford statistic rather than a learned pre-filter (autoencoders and deep reinforcement learning~\cite{splunkllm2026}, or fine-tuned classifiers~\cite{cyberrag2025}) that requires training data and periodic retraining. Second, it replaces a learned injection classifier~\cite{lang2026} with deterministic, structural isolation through Delimited Data Encapsulation, a tier-consensus guard, and an HMAC-chained audit trail. Third, in contrast to tool-calling agents with iterative reasoning loops, it adopts an acyclic, tool-free orchestration running entirely on a single local quantized model, prioritizing determinism, auditability, and data sovereignty. A comparison of these paradigms against SENTINEL across key operational dimensions is presented in Table~\ref{tab:architecture_comparison_intro}.
-
-\begin{table}[!htbp]
-    \centering
-    \caption{Comparison of Threat Detection and SOC Automation Paradigms. (Source: Author)}
-    \label{tab:architecture_comparison_intro}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|}
-        \hline
-        \textbf{Dimension / Model} & \textbf{Traditional SIEM (Rules)} & \textbf{ML/DL-based IDS} & \textbf{Standard LLM Triage} & \textbf{SENTINEL (Proposed)} \\
-        \hline
-        \textbf{Throughput / Speed} & Ultra-high ($O(1)$) & High ($1$--$10$\,ms) & Very Low ($4$--$10$\,s) & High (hybrid speedup) \\
-        \hline
-        \textbf{Explainability} & High (rules) & Low (black-box) & High (textual) & Very High (playbooks) \\
-        \hline
-        \textbf{Adversarial Security} & High (non-LLM) & Medium (evasion) & Very Low (injections) & High (guardrails) \\
-        \hline
-        \textbf{APT Correlation} & Poor (stateless) & Medium (LSTMs) & Poor (VRAM limits) & High (Threat Memory) \\
-        \hline
-    \end{tabular}
-\end{table}
 
 \section{Contributions of the Thesis}
 The main contributions of this thesis are three-fold, and each is stated at the scope its evidence supports. Architecturally, the work designs and validates a two-tier cognitive pipeline that makes a locally hosted, multi-second Large Language Model operationally feasible inside a Security Operations Center. The contribution is not the pre-filter in isolation, which any LLM-integrated pipeline requires, but the composition: a stateless $O(1)$ statistical gate absorbs benign and unambiguous traffic at wire-speed and protects the network deterministically, while the costly cognitive tier is invoked asynchronously and only on the ambiguous minority. This decoupling of deterministic protection from cognitive enrichment is what makes local LLM reasoning deployable under real cost and latency constraints.
@@ -77,7 +50,7 @@ In terms of orchestration, the thesis replaces rigid, static Runbook Automation 
 Two further capabilities that the architecture enables, signature-less anomaly escalation and emergent multi-day campaign correlation, are offered as foundational, honestly bounded proofs of concept rather than headline results, with their production-grade maturation deferred to future work. Throughout, results are reported at their true scope, so that each claim is stated only as strongly as its evidence permits.
 
 \section{Structure of the Thesis}
-The remainder of this thesis is organized into five chapters. Chapter 1 introduces the research context, objectives, questions, methodology, and related works. Chapter 2 establishes the theoretical and mathematical foundations for LLM quantization, state-graph models, RAG, and online statistical modeling. Chapter 3 details the system design and technical implementation of the proposed SENTINEL architecture, covering the two-tier filter, stateful agentic FSM, hybrid retrieval, guardrail logic, dashboard layout, and deployment. Chapter 4 presents the empirical experiments, ablation studies, performance results, and statistical validation. Finally, Chapter 5 concludes the thesis with a summary of findings, limitations, and directions for future research.
+The remainder of this thesis is organized into five chapters. Chapter 1 introduces the research context, objectives, questions, and methodology. Chapter 2 establishes the theoretical and mathematical foundations for LLM quantization, state-graph models, RAG, and online statistical modeling, and reviews the related literature on agentic-AI security operations. Chapter 3 details the system design and technical implementation of the proposed SENTINEL architecture, covering the two-tier filter, stateful agentic FSM, hybrid retrieval, guardrail logic, dashboard layout, and deployment. Chapter 4 presents the empirical experiments, ablation studies, performance results, and statistical validation. Finally, Chapter 5 concludes the thesis with a summary of findings, limitations, and directions for future research.
 
 \section{Chapter Summary}
 This chapter established the research framework for SENTINEL. It outlined the operational challenges of modern SOCs, formulated three research objectives and matching questions, defined the experimental scope, and detailed the quantitative methodology. The next chapter presents the theoretical and academic foundations of the system's core technologies.

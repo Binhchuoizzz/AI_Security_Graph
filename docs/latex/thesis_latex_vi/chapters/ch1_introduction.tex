@@ -39,33 +39,6 @@ Về mặt phương pháp nghiên cứu cụ thể, hướng tiếp cận này t
 
 Cuối cùng, nghiên cứu sử dụng hai loại dữ liệu. Dữ liệu định lượng gồm các số đo mạng mà hệ thống thu nhận cùng các đầu ra đo được của chính nó, chẳng hạn độ chính xác phát hiện và độ trễ xử lý. Dữ liệu định tính, tức các giải thích bằng ngôn ngữ tự nhiên mà mô hình sinh ra, được chuyển thành điểm số thông qua một khung đánh giá tự động~\cite{ragas2023} và một mô hình ngôn ngữ đóng vai trọng tài độc lập khác họ, để ngay cả chất lượng lập luận của hệ thống cũng được đánh giá trên một cơ sở định lượng, có thể so sánh.
 
-\section{Các Công trình Liên quan (Related Works)}
-Các phương pháp phát hiện xâm nhập truyền thống sử dụng học máy (Random Forests, SVM) hoặc học sâu (LSTM, CNN)~\cite{mlids2016}. Tuy nhiên, chúng là những "hộp đen" thiếu tính giải thích. Nghiên cứu về phát hiện mối đe dọa tự động đã trải qua nhiều làn sóng. Phát hiện xâm nhập cổ điển dựa trên học máy (Random Forests, SVM) hoặc học sâu (LSTM, CNN)~\cite{mlids2016}; tuy chính xác, các mô hình này vận hành như những ``hộp đen'' thiếu tính giải thích. Sự xuất hiện tiếp theo của các Mô hình Ngôn ngữ Lớn đã mở ra một mặt trận nghiên cứu rộng khắp các tác vụ an ninh mạng, như được tổng hợp trong các khảo sát hệ thống gần đây trải trên hàng trăm công trình và hàng chục kịch bản ứng dụng~\cite{llmsec_survey2025}, thúc đẩy sự dịch chuyển từ các bộ phân loại mờ đục sang những hệ thống có thể giải thích và hành động trên phát hiện của mình.
-
-Gần với luận văn này nhất là một làn sóng các khung agentic gần đây ghép suy luận LLM với truy xuất cho vận hành an ninh. Các lớp phủ triage trên Splunk ghép một LLM với quy trình SIEM để săn mối đe dọa theo chính sách~\cite{splunkllm2026}; CyberRAG điều phối các bộ phân loại tinh chỉnh cùng một vòng lặp truy-xuất-và-suy-luận để phân loại và báo cáo tấn công~\cite{cyberrag2025}; LanG hợp nhất tương quan, sinh luật và tái dựng kill-chain dưới một nền tảng gọi công cụ có ý thức quản trị~\cite{lang2026}; và các thiết kế đa tác tử như AutoBnB-RAG mở rộng hợp tác tăng cường truy xuất sang điều tra ứng phó sự cố~\cite{autobnb2025}. Các hệ này khẳng định giá trị của tự động hóa SOC theo hướng agentic, neo bằng truy xuất, và phần lớn đã tích hợp một bộ tiền lọc, một số còn có cả rào chắn đầu vào.
-
-Một hướng song song phơi bày cái giá an ninh khi đặt một mô hình sinh vào vòng quyết định: tấn công tiêm prompt gián tiếp từ nền log cho phép nội dung do kẻ tấn công kiểm soát chiếm quyền suy luận của mô hình~\cite{promptinjection2023, watchtower2026}, một rủi ro nay đã được hệ thống hóa trong hướng dẫn bảo mật ứng dụng cho các hệ LLM~\cite{owasp_llm2025}. Ở nơi các khung SOC hiện có có xử lý vấn đề này, chúng thường dựa vào một bộ phân loại ngữ nghĩa học được mà một tải trọng mới vẫn có thể qua mặt.
-
-Trên bối cảnh đó, SENTINEL khác biệt ở ba trục thiết kế có chủ đích, chứ không phải ở một tính năng đơn lẻ mà họ thiếu. Thứ nhất, cổng Tầng 1 của nó là một thống kê Welford $O(1)$ không cần huấn luyện, thay vì một bộ tiền lọc học được (autoencoder và học tăng cường sâu~\cite{splunkllm2026}, hoặc các bộ phân loại tinh chỉnh~\cite{cyberrag2025}) vốn cần dữ liệu huấn luyện và tái huấn luyện định kỳ. Thứ hai, nó thay một bộ phân loại injection học được~\cite{lang2026} bằng cô lập có cấu trúc và tất định qua Đóng gói Dữ liệu Phân tách, lá chắn đồng thuận hai tầng, và chuỗi audit móc xích HMAC. Thứ ba, trái với các tác tử gọi công cụ có vòng lặp suy luận lặp đi lặp lại, nó chọn một điều phối phi chu trình, không gọi công cụ, chạy hoàn toàn trên một mô hình lượng tử hóa cục bộ duy nhất, ưu tiên tính tất định, khả năng kiểm toán và chủ quyền dữ liệu. Một so sánh các mô hình này với SENTINEL trên các chiều vận hành chính được trình bày trong Bảng~\ref{tab:architecture_comparison_intro}.
-
-\begin{table}[!htbp]
-    \centering
-    \caption{So sánh các mô hình tự động hóa SOC và phát hiện mối đe dọa. (Nguồn: Tác giả)}
-    \label{tab:architecture_comparison_intro}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.25\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|}
-        \hline
-        \textbf{Khía cạnh / Mô hình} & \textbf{SIEM truyền thống (Luật tĩnh)} & \textbf{ML/DL-based IDS} & \textbf{Phân loại LLM thông thường} & \textbf{SENTINEL (Đề xuất)} \\
-        \hline
-        \textbf{Băng thông / Tốc độ} & Cực cao ($O(1)$) & Cao ($1$--$10$\,ms) & Rất thấp ($4$--$10$\,s) & Cao (tăng tốc độ lai) \\
-        \hline
-        \textbf{Tính giải thích} & Cao (luật tĩnh) & Thấp (hộp đen) & Cao (văn bản) & Rất cao (kịch bản) \\
-        \hline
-        \textbf{Bảo mật đối kháng} & Cao (không dùng LLM) & Trung bình (tránh né) & Rất thấp (tiêm prompt) & Cao (có rào chắn) \\
-        \hline
-        \textbf{Liên kết APT} & Kém (không trạng thái) & Trung bình (LSTMs) & Kém (giới hạn ngữ cảnh) & Cao (Bộ nhớ Đe dọa) \\
-        \hline
-    \end{tabular}
-\end{table}
 
 \section{Đóng góp của Luận văn}
 Các đóng góp chính của luận văn này gồm ba khía cạnh, và mỗi khía cạnh được phát biểu đúng ở phạm vi mà bằng chứng cho phép. Về mặt kiến trúc, nghiên cứu thiết kế và kiểm chứng một pipeline nhận thức hai tầng giúp một Mô hình Ngôn ngữ Lớn chạy cục bộ, tốn vài giây, trở nên khả thi về vận hành ngay trong một Trung tâm Điều hành An ninh. Đóng góp không nằm ở bản thân bộ tiền lọc, thứ mà bất kỳ pipeline tích hợp LLM nào cũng cần, mà ở sự phối hợp: một cổng thống kê $O(1)$ phi trạng thái hấp thụ lưu lượng lành tính và rõ ràng ở tốc độ đường truyền và bảo vệ mạng một cách tất định, trong khi tầng nhận thức tốn kém chỉ được gọi bất đồng bộ và chỉ trên phần thiểu số mơ hồ. Chính việc tách bạch bảo vệ tất định khỏi làm giàu nhận thức này khiến suy luận LLM cục bộ triển khai được dưới các ràng buộc chi phí và độ trễ thực tế.
@@ -77,7 +50,7 @@ Về mặt điều phối, luận văn thay thế kịch bản tự động hóa
 Hai năng lực khác mà kiến trúc này cho phép, leo thang bất thường không chữ ký và liên kết chiến dịch đa ngày nổi lên, được đưa ra như những minh chứng khả thi mang tính nền tảng, có biên giới trung thực, chứ không phải kết quả điểm nhấn, với phần trưởng thành hóa ở mức production được dời sang hướng phát triển tương lai. Xuyên suốt, kết quả được báo cáo đúng phạm vi thật của nó, để mỗi khẳng định chỉ được phát biểu mạnh đúng bằng mức bằng chứng cho phép.
 
 \section{Cấu trúc của Luận văn}
-Phần còn lại của luận văn được tổ chức thành năm chương chính. Chương 1 giới thiệu bối cảnh nghiên cứu, mục tiêu, câu hỏi nghiên cứu, phương pháp luận và các công trình liên quan. Chương 2 thiết lập cơ sở lý thuyết và nền tảng toán học cho lượng tử hóa LLM, mô hình đồ thị trạng thái, RAG và mô hình thống kê trực tuyến. Chương 3 trình bày chi tiết thiết kế hệ thống và triển khai kỹ thuật của kiến trúc SENTINEL đề xuất, bao gồm bộ lọc Tầng 1, tác tử Tầng 2, cơ chế RAG kép, rào chắn bảo mật AI, cấu trúc bảng điều khiển Streamlit và hạ tầng ảo hóa Docker. Chương 4 báo cáo kết quả thực nghiệm, nghiên cứu loại trừ và kiểm định thống kê. Cuối cùng, Chương 5 tóm tắt các phát hiện chính, thảo luận giới hạn hệ thống và đề xuất hướng nghiên cứu tương lai.
+Phần còn lại của luận văn được tổ chức thành năm chương chính. Chương 1 giới thiệu bối cảnh nghiên cứu, mục tiêu, câu hỏi nghiên cứu và phương pháp luận. Chương 2 thiết lập cơ sở lý thuyết và nền tảng toán học cho lượng tử hóa LLM, mô hình đồ thị trạng thái, RAG và mô hình thống kê trực tuyến, đồng thời tổng quan các nghiên cứu liên quan về AI tác tử cho vận hành an ninh. Chương 3 trình bày chi tiết thiết kế hệ thống và triển khai kỹ thuật của kiến trúc SENTINEL đề xuất, bao gồm bộ lọc Tầng 1, tác tử Tầng 2, cơ chế RAG kép, rào chắn bảo mật AI, cấu trúc bảng điều khiển Streamlit và hạ tầng ảo hóa Docker. Chương 4 báo cáo kết quả thực nghiệm, nghiên cứu loại trừ và kiểm định thống kê. Cuối cùng, Chương 5 tóm tắt các phát hiện chính, thảo luận giới hạn hệ thống và đề xuất hướng nghiên cứu tương lai.
 
 \section{Tóm tắt chương}
 Chương này đã phác thảo khung nghiên cứu cho hệ thống SENTINEL. Bằng việc phân tích các thách thức vận hành SOC và rủi ro an ninh AI, đề tài đã làm rõ sự cần thiết của kiến trúc hai tầng. Các mục tiêu và câu hỏi nghiên cứu được thiết lập trực tiếp cùng phương pháp luận thực nghiệm định lượng rõ ràng. Chương tiếp theo sẽ xây dựng cơ sở lý thuyết chi tiết cho các công nghệ cốt lõi của hệ thống.
