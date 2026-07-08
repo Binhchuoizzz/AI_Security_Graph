@@ -45,9 +45,9 @@ Furthermore, running multi-billion parameter models locally presents substantial
 
 \section{Agentic AI Architecture and State-Graph Models}
 
-To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) towards autonomous Agentic AI systems, two paradigms that differ fundamentally in their operational logic. Runbook Automation relies on static, pre-defined rules and deterministic scripts for linear alert handling; this approach is highly efficient yet structurally blind to zero-day conditions and polymorphic alert formats. Agentic AI systems, by contrast, exhibit cognitive autonomy (encompassing self-reflection, multi-step planning, and adaptive context routing) which enables them to adjust their analysis dynamically in response to intermediate security findings.
+To address these challenges, automated security systems are shifting from rigid Runbook Automation (RBA) towards autonomous Agentic AI systems, two paradigms that differ fundamentally in their operational logic~\cite{soar2025}. Runbook Automation relies on static, pre-defined rules and deterministic scripts for linear alert handling; this approach is highly efficient yet structurally blind to zero-day conditions and polymorphic alert formats. Agentic AI systems, by contrast, exhibit cognitive autonomy (encompassing self-reflection, multi-step planning, and adaptive context routing) which enables them to adjust their analysis dynamically in response to intermediate security findings.
 
-These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs), where nodes represent distinct computational or cognitive actions (such as CTI retrieval, vulnerability scanning, and response generation) and conditional edges enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
+These autonomous agents are modeled mathematically as stateful Directed Graphs functioning as Finite State Machines (FSMs)~\cite{langgraph2024}, where nodes represent distinct computational or cognitive actions (such as CTI retrieval, vulnerability scanning, and response generation) and conditional edges enforce dynamic, LLM-driven routing based on the intermediate outputs of parent nodes.
 
 \begin{figure}[!htbp]
     \centering
