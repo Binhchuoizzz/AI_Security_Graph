@@ -13,6 +13,7 @@ TRIẾT LÝ THIẾT KẾ:
   → dynamic_rules được load tại khởi tạo và reload khi có notify
 """
 
+import json
 import math
 import os
 import re
@@ -63,6 +64,20 @@ class RunningStats:
 
     def std_dev(self) -> float:
         return math.sqrt(self.variance()) if self.n > 1 else 0.0
+
+    def seed(self, n: int, mean: float, m2: float) -> None:
+        """Nạp sẵn trạng thái Welford (n, mean, M2) từ một hồ sơ baseline 'golden'
+        tính offline trên lưu lượng benign đã kiểm định. Sau khi seed, push() tiếp tục
+        cập nhật đúng theo công thức Welford incremental từ điểm khởi tạo này."""
+        if n < 1:
+            return
+        self.n = n
+        self.old_m = self.new_m = mean
+        self.old_s = self.new_s = m2
+
+    def as_state(self) -> dict[str, float]:
+        """Trạng thái Welford thô (n, mean, M2) để lưu vào hồ sơ golden baseline."""
+        return {"n": self.n, "mean": self.new_m, "m2": self.new_s}
 
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
@@ -384,6 +399,64 @@ class RuleEngine:
         # Cần 100 mẫu sạch để khởi tạo baseline tin cậy trước khi tính Z-score
         self.warmup_count = 100
         self.total_processed_logs = 0
+
+        # Seed baseline từ hồ sơ 'golden' (benign đã kiểm định) nếu bật trong config;
+        # sau đó baseline vẫn cập nhật online CÓ ĐIỀU KIỆN (chỉ DROP/LOG) như bình thường.
+        self._seed_golden_baseline(tier1_config)
+
+    def _seed_golden_baseline(self, tier1_config: dict) -> None:
+        """Nạp golden baseline (trạng thái Welford của lưu lượng benign đã kiểm định)
+        vào global_stats nếu được bật trong config. Mặc định TẮT để tương thích ngược.
+        Sau khi seed, baseline vẫn cập nhật online CÓ ĐIỀU KIỆN (chỉ DROP/LOG)."""
+        gb = tier1_config.get("golden_baseline", {}) if isinstance(tier1_config, dict) else {}
+        if not (isinstance(gb, dict) and gb.get("enabled")):
+            return
+        path = str(gb.get("path", "")).strip()
+        if not path:
+            return
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.dirname(__file__), "..", "..", path)
+        if not os.path.exists(path):
+            print(
+                f"[Tier-1] Golden baseline bật nhưng thiếu file: {path} (bỏ qua, dùng warmup online)."
+            )
+            return
+        try:
+            with open(path, encoding="utf-8") as f:
+                profile = json.load(f)
+        except (OSError, ValueError) as exc:
+            print(f"[Tier-1] Không đọc được golden baseline ({exc}); bỏ qua.")
+            return
+        features = profile.get("features", {}) if isinstance(profile, dict) else {}
+        seeded = 0
+        for key, st in features.items():
+            if key in self.global_stats and isinstance(st, dict):
+                n = st.get("n", 0)
+                if isinstance(n, (int, float)) and n >= 2:
+                    self.global_stats[key].seed(
+                        int(n), float(st.get("mean", 0.0)), float(st.get("m2", 0.0))
+                    )
+                    seeded += 1
+        if seeded:
+            print(
+                f"[Tier-1] Seed golden baseline: {seeded}/{len(self.global_stats)} feature "
+                f"(nguồn: {os.path.basename(path)}); cập nhật online có điều kiện tiếp tục như thường."
+            )
+
+    def learn_baseline(self, log_entry: dict) -> None:
+        """Cập nhật baseline Welford KHÔNG điều kiện từ một bản ghi benign đã kiểm định.
+        Dùng OFFLINE để dựng golden baseline (mọi mẫu đều đã biết là sạch), khác với
+        đường runtime vốn chỉ cập nhật với phán quyết DROP/LOG."""
+        for key, aliases in _RAW_TO_CANONICAL.items():
+            if key not in self.global_stats:
+                continue
+            for alias in aliases:
+                if alias in log_entry:
+                    try:
+                        self.global_stats[key].push(float(log_entry[alias]))
+                        break
+                    except (ValueError, TypeError):
+                        pass
 
     def _check_waf_signatures(self, log_entry: dict) -> str | None:
         """

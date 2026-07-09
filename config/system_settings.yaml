@@ -112,6 +112,12 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
+  # Seed baseline Welford từ hồ sơ benign đã kiểm định (golden baseline), tạo bằng
+  # experiments/build_golden_baseline.py. Bật để khởi tạo baseline từ dữ liệu sạch
+  # thay vì warmup online; sau seed vẫn cập nhật online có điều kiện (chỉ DROP/LOG).
+  golden_baseline:
+    enabled: false
+    path: config/golden_baseline.json
   dynamic_rules:
   - created_at: '2026-06-12T13:44:44.100323+00:00'
     field: Source IP
