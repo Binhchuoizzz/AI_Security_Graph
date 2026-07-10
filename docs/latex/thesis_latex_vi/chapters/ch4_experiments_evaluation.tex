@@ -7,11 +7,11 @@ Chương này trình bày các minh chứng thực nghiệm của luận văn, k
 \section{Môi trường Thực nghiệm và Bộ Dữ liệu}
 Để thực hiện các đánh giá thực nghiệm, một hệ thống phần cứng cục bộ chuyên dụng đã được thiết lập. Cấu hình phần cứng bao gồm CPU Intel Core i7-14700KF, 32GB RAM DDR5 và GPU NVIDIA RTX 4060 Ti 16GB, được sử dụng để thực thi mô hình \textit{Gemma-2-9B-IT} lượng tử hóa ở định dạng Q6\_K. Quá trình thực nghiệm dựa trên hai bộ dữ liệu lớn: bộ dữ liệu CSE-CIC-IDS2018~\cite{ids2018} bao gồm nhiều dạng tấn công mạng phổ biến như Brute Force, DoS và Web Attack làm cơ sở đánh giá độ chính xác tổng quát của phân loại; và bộ dữ liệu DAPT2020~\cite{dapt2020} được sử dụng để kiểm thử khả năng liên kết chuỗi tấn công APT đa giai đoạn diễn ra trong thời gian dài. Để mô phỏng chân thực môi trường SIEM thực tế, một bộ giả lập luồng dữ liệu Unified Stream được lập trình để trộn và phát lại các dòng log theo đúng mốc thời gian ảo, chuyển giao dữ liệu trực tiếp tới hàng đợi phát hiện của hệ thống.
 
-Tổng quan chi tiết về các nhãn tấn công trong CSE-CIC-IDS2018, ánh xạ kỹ thuật MITRE ATT\&CK tương ứng, các hành động xử lý mặc định trong đường dẫn SENTINEL, và các tệp dữ liệu nguồn tương ứng được tóm tắt trong Bảng~\ref{tab:dataset_distribution}.
+Một ánh xạ hợp nhất các họ tấn công chính trong CSE-CIC-IDS2018 (mỗi hàng gộp các nhãn thô theo luồng có liên quan) sang các kỹ thuật MITRE ATT\&CK cấp cao tương ứng, các hành động xử lý mặc định trong đường dẫn SENTINEL, và các tệp dữ liệu nguồn được tóm tắt trong Bảng~\ref{tab:dataset_distribution}; đây là một tham chiếu thiết kế mang tính đại diện, không phải danh mục liệt kê đầy đủ tới từng nhãn hay từng kỹ thuật con.
 
 \begin{table}[!htbp]
     \centering
-    \caption{Nhãn tấn công CSE-CIC-IDS2018, ánh xạ MITRE ATT\&CK và hành động xử lý mặc định. (Nguồn: Tác giả)}
+    \caption{Ánh xạ đại diện các họ tấn công chính trong CSE-CIC-IDS2018 sang kỹ thuật MITRE ATT\&CK cấp cao và hành động xử lý mặc định. (Nguồn: Tác giả)}
     \label{tab:dataset_distribution}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\raggedright\arraybackslash}p{0.24\textwidth}|}
         \hline

@@ -7,11 +7,11 @@ This chapter presents the empirical evidence of the thesis, validating the resea
 \section{Experimental Environment and Datasets}
 To execute the empirical evaluations, a dedicated local hardware testbed was configured. The hardware setup consists of an Intel Core i7 CPU (specifically the i7-14700KF model), 32GB of DDR5 RAM, and an NVIDIA RTX 4060 Ti 16GB GPU, which was utilized to execute the local quantized \textit{Gemma-2-9B-IT} Q6\_K model. The evaluations rely on two major datasets: the CSE-CIC-IDS2018 dataset~\cite{ids2018}, which encompasses diverse network attack typologies (including Brute Force, DoS, and Web Attacks) serving as the baseline for evaluating classification accuracy; and the DAPT2020 dataset~\cite{dapt2020}, which is employed for testing the system's capacity to correlate multi-stage Advanced Persistent Threat (APT) campaigns over prolonged timelines. To replicate the properties of a live SIEM environment, a Unified Data Stream simulator was scripted to merge and replay the network logs chronologically according to virtual timestamps, feeding them to the detection queues in real time.
 
-A detailed overview of the CSE-CIC-IDS2018 attack labels, their mapped MITRE ATT\&CK techniques, the default mitigation actions configured in the SENTINEL pipeline, and the source raw data files is summarized in Table~\ref{tab:dataset_distribution}.
+A consolidated mapping of the principal CSE-CIC-IDS2018 attack families (each row groups the related raw per-flow labels) to their assigned top-level MITRE ATT\&CK techniques, the default mitigation actions configured in the SENTINEL pipeline, and the source raw data files is summarized in Table~\ref{tab:dataset_distribution}; it is a representative design reference rather than an exhaustive per-label, per-sub-technique catalogue.
 
 \begin{table}[!htbp]
     \centering
-    \caption{CSE-CIC-IDS2018 Attack Labels, MITRE ATT\&CK Mapping, and Default Response Actions. (Source: Author)}
+    \caption{Representative Mapping of the Principal CSE-CIC-IDS2018 Attack Families to Top-Level MITRE ATT\&CK Techniques and Default Response Actions. (Source: Author)}
     \label{tab:dataset_distribution}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\raggedright\arraybackslash}p{0.24\textwidth}|}
         \hline
