@@ -25,6 +25,17 @@
 \usepackage{array}
 \usepackage{longtable}
 \usepackage{float}
+% --- Keep every table/figure inside the section that discusses it ---
+% placeins gives \FloatBarrier; we insert a barrier at the start of each section
+% and subsection so a float can never drift past the next heading (e.g. Table 6,
+% referenced in Section 3.6, floating down into Section 3.7).
+\usepackage{placeins}
+\makeatletter
+\let\sentinel@section\section
+\renewcommand{\section}{\FloatBarrier\sentinel@section}
+\let\sentinel@subsection\subsection
+\renewcommand{\subsection}{\FloatBarrier\sentinel@subsection}
+\makeatother
 \usepackage{listings}
 \usepackage{xcolor}
 
@@ -53,9 +64,10 @@
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{6pt}
 
-% --- Headings Formatting (Maximum 3 levels) ---
-\setcounter{secnumdepth}{3}
-% Mục lục chỉ hiển thị tới cấp mục (X.Y); ẩn tiểu mục (X.Y.Z) cho gọn, chuyên nghiệp
+% --- Headings Formatting ---
+% Chỉ đánh số tới cấp mục (X.Y); tiểu mục hiển thị dạng tiêu đề in đậm KHÔNG số (bỏ X.Y.Z)
+\setcounter{secnumdepth}{1}
+% Mục lục chỉ hiển thị tới cấp mục (X.Y); ẩn tiểu mục cho gọn, chuyên nghiệp
 \setcounter{tocdepth}{1}
 \titleformat{\chapter}[display]{\Large\bfseries\centering}{\chaptername\ \thechapter}{0.5em}{}
 \titleformat{\section}{\large\bfseries}{\thesection}{0.5em}{}

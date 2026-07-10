@@ -25,6 +25,17 @@
 \usepackage{array}
 \usepackage{longtable}
 \usepackage{float}
+% --- Giữ mọi bảng/hình nằm trong đúng mục đã tham chiếu chúng ---
+% placeins cung cấp \FloatBarrier; ta chèn rào cản float ở đầu mỗi mục (section) và
+% tiểu mục (subsection) để một float không bao giờ trôi vượt qua tiêu đề kế tiếp
+% (ví dụ: Bảng 6 được nêu ở Mục 3.6 nhưng bị đẩy trôi xuống Mục 3.7).
+\usepackage{placeins}
+\makeatletter
+\let\sentinel@section\section
+\renewcommand{\section}{\FloatBarrier\sentinel@section}
+\let\sentinel@subsection\subsection
+\renewcommand{\subsection}{\FloatBarrier\sentinel@subsection}
+\makeatother
 \usepackage{listings}
 \usepackage{xcolor}
 
@@ -55,7 +66,8 @@
 \setlength{\parskip}{6pt}
 
 % --- Headings Formatting (Maximum 3 levels) ---
-\setcounter{secnumdepth}{3}
+% Chỉ đánh số tới cấp mục (X.Y); tiểu mục hiển thị dạng tiêu đề in đậm KHÔNG số (bỏ X.Y.Z)
+\setcounter{secnumdepth}{1}
 % Mục lục chỉ hiển thị tới cấp mục (X.Y); ẩn tiểu mục (X.Y.Z) cho gọn, chuyên nghiệp
 \setcounter{tocdepth}{1}
 \titleformat{\chapter}[display]{\Large\bfseries\centering}{\chaptername\ \thechapter}{0.5em}{}
