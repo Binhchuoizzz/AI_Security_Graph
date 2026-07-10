@@ -15,6 +15,15 @@
 > `--mode e2e --per-class 20` (pipeline triển khai, cần LLM server; tự CÔ LẬP DB/audit/config tạm,
 > không đụng dữ liệu thật). Bộ web-payload: thêm `--ground-truth experiments/ground_truth_webattacks.json`.
 
+> 🔁 **Chạy lại TOÀN BỘ (2026-07-10, GPU RTX 4060 Ti):** Bộ **offline tất định** tái lập đúng
+> mọi số liệu luận văn — unified-stream **F1=0.594** (P=0.939, R=0.435), APT **3/3** recall +
+> Wilson **[0.44, 1.00]** + specificity 1.0, zero-day **7/7** (Z 7.5→318k), robustness tĩnh
+> **50%** (60/120), độ nhạy ngưỡng τ (3.5σ→F1 0.594), zero-day phân cấp bão hòa **≈4σ**,
+> context-stress (RAW tràn n_ctx tại N=100, Drain giữ ~80 tok). Hạ tầng Docker
+> (redis/mlflow/llm/dashboard) **healthy**, LLM **Gemma-2-9B** phục vụ inference thật;
+> E2E offline **21/22** (T19 latency cần LLM), **pytest 221 passed**. **Mới:** *golden-baseline
+> seeding* (`experiments/build_golden_baseline.py` + cờ `tier1.golden_baseline.enabled`) — xem **mục 2b**.
+
 ---
 
 ## 📋 Mục lục
@@ -67,6 +76,24 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 
 ---
 
+## ⭐ Khi Lên Hội Đồng Chỉ Cần Demo Gì (Kịch Bản Tối Thiểu ~12–15 phút)
+
+15 demo bên trên là **kho đầy đủ** để phòng thủ mọi câu hỏi phản biện — **buổi bảo vệ KHÔNG cần chạy hết**. Chọn **6 demo cốt lõi** dưới đây là kể trọn câu chuyện kiến trúc; phần còn lại giữ làm "dự phòng" khi hội đồng hỏi sâu.
+
+| # | Demo | Chứng minh luận điểm | ~Phút |
+| :--- | :--- | :--- | :--- |
+| 1 | **DEMO 1** — `docker-compose ps` + `curl :5000/v1/models` | Hệ thống chạy thật; LLM **cục bộ / air-gapped** (không gửi log lên cloud) | 1 |
+| 2 | **DEMO 6/11 (Bước 5)** — Full pipeline online (publisher → LLM ra `BLOCK`/`ALERT`) | E2E realtime: Redis → Tier‑1 → Guardrails → RAG → LLM → **ATT&CK Mapper** → Executor → Audit | 3 |
+| 3 | **DEMO 7** — Dashboard (đăng nhập `analyst`→`manager`, duyệt 1 rule HITL) | Human‑in‑the‑Loop, phân quyền RBAC, chuỗi audit HMAC | 3 |
+| 4 | **DEMO 8** — Adversarial (tĩnh 50% + Tier‑2 Consensus **0% compromise**) | Defense‑in‑depth chống prompt‑injection/social‑engineering | 2 |
+| 5 | **`evaluate_unified_stream.py`** (F1 **0.594** + APT **3/3** + zero‑day **7/7**) | Benchmark **trung thực**, 1 luồng gộp, memory sạch (không circular) | 2 |
+| 6 | **DEMO 9 + 13** — Ablation + thống kê (**Mann‑Whitney p<0.05**) | Đóng góp từng thành phần + khác biệt độ trễ **có ý nghĩa thống kê** | 2 |
+
+> 🎯 **Mẹo chạy trơn tru:** NGAY TRƯỚC buổi bảo vệ, chạy sẵn `docker-compose up -d` (chờ `healthy`) + bộ offline (`evaluate_unified_stream.py`, `evaluate_robustness.py`) để **có sẵn kết quả**; lúc demo chỉ "show" lại output + dashboard live (tránh rủi ro chạy LLM chậm/timeout trước hội đồng). Các câu hỏi sâu → mở đúng demo bằng chứng:
+> **"Zero‑day nhạy tới đâu?"** → DEMO 14 zero‑day phân cấp (≈4σ); **"Số F1 cao có phải base‑rate?"** → ablation cân bằng 150/150; **"Chống tràn context?"** → context‑stress; **"Baseline bị đầu độc thì sao?"** → **mục 2b golden‑baseline** + §3.11.
+
+---
+
 ## 2. Thiết Lập Môi Trường (Environment Setup)
 
 ### Bước 1: Khởi tạo Virtual Environment (Môi trường ảo Python)
@@ -111,6 +138,37 @@ cp .env.example .env
   "python.terminal.useEnvFile": true
 }
 ```
+
+---
+
+## 2b. (Tùy chọn) Golden-Baseline Seeding cho Welford (Tier-1)
+
+### Mục đích
+Thay vì để Welford "warmup" 100 mẫu đầu (dễ bị đầu độc nếu lưu lượng lúc khởi động đã nhiễm), hệ thống có thể **seed sẵn đường cơ sở** (n, mean, M2) từ một hồ sơ benign **đã kiểm định** để Z-score hoạt động ngay từ **gói đầu tiên**. Sau khi seed, baseline vẫn cập nhật online **CÓ ĐIỀU KIỆN** (chỉ trên phán quyết `DROP`/`LOG`) — chống đầu độc "ếch luộc". Được tài liệu hóa trong luận văn **§3.3** (hai lớp bảo vệ baseline) và **§3.11** (suy biến dưới lũ đối kháng).
+
+### Lệnh thực thi
+
+```bash
+# 1) Dựng hồ sơ vàng từ các flow benign trong ground_truth (11 feature Tier-1, 300 flow)
+.venv/bin/python experiments/build_golden_baseline.py
+#    -> ghi config/golden_baseline.json
+
+# 2) Bật cờ trong config/system_settings.yaml:
+#      tier1:
+#        golden_baseline:
+#          enabled: true            # mặc định false
+#          path: config/golden_baseline.json
+```
+
+### Kết quả thực đo (2026-07-10)
+
+```text
+Golden baseline: 11 feature từ 300 flow benign -> config/golden_baseline.json
+  Flow Duration   n=300  mean=18878287.62 ...  (11/11 feature)
+Seeded feature 'Flow Duration': n=300, mean=18878287.62
+warmup(100) satisfied immediately: True -> Z-score active from packet #1 (no cold-start warmup)
+```
+> Khi `enabled: true`, `RuleEngine` tự seed 11/11 feature lúc khởi tạo; warmup được thỏa ngay, và cơ chế cập nhật có điều kiện (DROP/LOG) tiếp tục như thường. Toán học seed+push **trùng khớp** với một lượt warmup online đầy đủ (kiểm chứng ở `tests/`).
 
 ---
 
