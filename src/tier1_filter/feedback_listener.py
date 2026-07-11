@@ -23,7 +23,7 @@ Luồng hoạt động:
 import logging
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime
 
 import yaml  # type: ignore
 from filelock import FileLock  # type: ignore
@@ -109,7 +109,9 @@ class FeedbackListener:
             "field": field,
             "pattern": pattern,
             "score": score,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            # Dùng giờ CỤC BỘ (naive) để KHỚP với timestamp audit_trail do executor ghi
+            # (cùng tiến trình subscriber) — tránh lệch 7h giữa "Tạo lúc" (HITL) và giờ cảnh báo.
+            "created_at": datetime.now().isoformat(timespec="seconds"),
             "source": source,
             "reason": reason,
             "status": "PENDING_APPROVAL",  # Trạng thái chờ kiểm duyệt

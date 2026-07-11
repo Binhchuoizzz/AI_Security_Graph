@@ -56,6 +56,8 @@ services:
       - ./config:/app/config      # Writable Config (database, dynamic rules)
       - ./knowledge_base:/app/knowledge_base  # Writable KB (for FAISS updates)
     environment:
+      # Đồng bộ múi giờ container với host (subscriber) để timestamp audit/HITL không lệch giờ
+      - TZ=Asia/Ho_Chi_Minh
       - MLFLOW_TRACKING_URI=http://mlflow:5000
       - REDIS_URL=redis://:${REDIS_PASSWORD:-SentinelSecurePass2026!}@redis:6379/0
       - LLM_API_BASE=http://llm:8080/v1

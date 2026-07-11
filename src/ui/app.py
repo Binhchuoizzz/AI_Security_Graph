@@ -5,6 +5,7 @@ Khởi chạy bằng lệnh: streamlit run src/ui/app.py
 
 import math
 import os
+import re
 import sys
 
 import pandas as pd  # type: ignore
@@ -52,6 +53,22 @@ if os.path.exists(css_path):
 require_auth()
 
 feedback_mgr = FeedbackListener()
+
+
+def _extract_mitre_technique(reason: str) -> str:
+    """Rút mã kỹ thuật MITRE từ chuỗi reason dạng '[MITRE: T1110 - Brute Force] ...'."""
+    m = re.search(r"\[MITRE:\s*([^\]]+)\]", reason or "")
+    return m.group(1).strip() if m else ""
+
+
+def _rule_severity(score) -> tuple[str, str]:
+    """Ánh xạ điểm luật -> (icon, nhãn mức độ nghiêm trọng) cho HITL."""
+    s = score or 0
+    if s >= 100:
+        return ("🔴", "CAO")
+    if s >= 50:
+        return ("🟠", "TRUNG BÌNH")
+    return ("🟡", "THẤP")
 
 
 def handle_whitelist_approval(ip: str):
@@ -109,7 +126,7 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
                     "Thời gian": str(a.get("timestamp", ""))[5:19],
                     "Hành động": a.get("action", ""),
                     "Đối tượng": a.get("target", ""),
-                    "MITRE": a.get("mitre_technique", "") or "—",
+                    "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
                 }
                 for a in all_alerts[:10]
             ]
@@ -546,14 +563,36 @@ def main_dashboard():
         if not pending_rules:
             st.info("Không có luật nào đang chờ phê duyệt.")
         else:
-            for rule in pending_rules:
+            # Sắp xếp: mức độ nghiêm trọng (score) giảm dần, rồi thời gian tạo mới nhất trước
+            sorted_pending = sorted(
+                pending_rules,
+                key=lambda r: (r.get("score") or 0, str(r.get("created_at") or "")),
+                reverse=True,
+            )
+            # Phân trang cho dễ nhìn
+            rules_per_page = 5
+            n_pages = max(1, math.ceil(len(sorted_pending) / rules_per_page))
+            if st.session_state.get("hitl_page", 1) > n_pages:
+                st.session_state["hitl_page"] = n_pages
+            cur = st.session_state.get("hitl_page", 1)
+            page_rules = sorted_pending[(cur - 1) * rules_per_page : cur * rules_per_page]
+            st.caption(
+                f"🔽 Sắp theo mức độ nghiêm trọng rồi thời gian · {len(sorted_pending)} luật chờ duyệt"
+            )
+
+            for rule in page_rules:
+                sev_icon, sev_label = _rule_severity(rule.get("score"))
+                created = str(rule.get("created_at") or "—")[:19].replace("T", " ")
                 with st.expander(
-                    f"Luật chờ duyệt: {rule.get('pattern')} (Mức độ: {rule.get('score')})",
+                    f"{sev_icon} [{sev_label}] {rule.get('pattern')} · 🕒 {created} · score {rule.get('score')}",
                     expanded=True,
                 ):
+                    st.write(
+                        f"**Mức độ nghiêm trọng:** {sev_icon} {sev_label} (score {rule.get('score')})"
+                    )
+                    st.write(f"**Thời gian tạo:** {created}")
                     st.write(f"**Trường dữ liệu:** {rule.get('field')}")
                     st.write(f"**Lý do (LLM):** {rule.get('reason')}")
-                    st.write(f"**Tạo lúc:** {rule.get('created_at')}")
 
                     if st.session_state.get("role") == "L3_Manager":
                         col1, col2 = st.columns([1, 1])
@@ -572,14 +611,36 @@ def main_dashboard():
                     else:
                         st.warning("Bạn không có quyền L3_Manager để phê duyệt.")
 
+            # Điều hướng trang (HITL)
+            if n_pages > 1:
+                cprev, cmid, cnext = st.columns([1, 2, 1])
+                with cprev:
+                    if st.button("⬅️ Trang trước", disabled=(cur == 1), key="hitl_prev"):
+                        st.session_state["hitl_page"] = cur - 1
+                        st.rerun()
+                with cmid:
+                    st.markdown(
+                        f"<div style='text-align:center;padding-top:5px;font-weight:bold;'>Trang {cur} / {n_pages}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with cnext:
+                    if st.button("Trang sau ➡️", disabled=(cur == n_pages), key="hitl_next"):
+                        st.session_state["hitl_page"] = cur + 1
+                        st.rerun()
+
         st.markdown("---")
         st.subheader("Luật Đang Hoạt Động (Active Rules)")
         if not active_rules:
             st.info("Không có luật nào đang hoạt động.")
         else:
-            for rule in active_rules:
+            for rule in sorted(
+                active_rules,
+                key=lambda r: (r.get("score") or 0, str(r.get("created_at") or "")),
+                reverse=True,
+            ):
+                _si, _sl = _rule_severity(rule.get("score"))
                 with st.expander(
-                    f"Luật đang hoạt động: {rule.get('pattern')} (Mức độ: {rule.get('score')})",
+                    f"{_si} [{_sl}] {rule.get('pattern')} · score {rule.get('score')}",
                     expanded=False,
                 ):
                     st.write(f"**Trường dữ liệu:** {rule.get('field')}")
@@ -679,8 +740,6 @@ def main_dashboard():
                 st.markdown(f"#### 🔍 Kết quả điều tra đối tượng cho IP: `{selected_ip}`")
 
                 # Render hồ sơ danh tiếng & lý do bị cảnh báo bằng giao diện premium
-                import re
-
                 latest_reason = "Không có lý do chi tiết từ AI Agent."
                 if ip_history:
                     # Lấy lý do từ cảnh báo mới nhất

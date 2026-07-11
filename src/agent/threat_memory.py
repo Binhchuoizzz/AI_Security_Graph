@@ -209,19 +209,23 @@ class ThreatMemoryStore:
 
     def get_high_risk_ips(self, min_score: float = 50.0, limit: int = 20) -> list[dict]:
         """Lấy danh sách IPs có reputation score cao (nguy hiểm)."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            c = conn.cursor()
-            c.execute(
-                """
-                SELECT * FROM ip_reputation
-                WHERE reputation_score >= ?
-                ORDER BY reputation_score DESC
-                LIMIT ?
-            """,
-                (min_score, limit),
-            )
-            return [dict(row) for row in c.fetchall()]
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                c = conn.cursor()
+                c.execute(
+                    """
+                    SELECT * FROM ip_reputation
+                    WHERE reputation_score >= ?
+                    ORDER BY reputation_score DESC
+                    LIMIT ?
+                """,
+                    (min_score, limit),
+                )
+                return [dict(row) for row in c.fetchall()]
+        except sqlite3.OperationalError:
+            self._init_db()  # DB chưa khởi tạo (vd đang reset) -> tạo bảng, trả rỗng an toàn
+            return []
 
     def decay_reputation(self, decay_rate: float = 0.95, inactive_days: int = 7):
         """
@@ -309,11 +313,15 @@ class ThreatMemoryStore:
 
     def get_all_known_entities(self) -> list[dict]:
         """Lấy toàn bộ known entities đang active."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            c = conn.cursor()
-            c.execute("SELECT * FROM known_entities WHERE is_active = 1 ORDER BY added_at DESC")
-            return [dict(row) for row in c.fetchall()]
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                c = conn.cursor()
+                c.execute("SELECT * FROM known_entities WHERE is_active = 1 ORDER BY added_at DESC")
+                return [dict(row) for row in c.fetchall()]
+        except sqlite3.OperationalError:
+            self._init_db()
+            return []
 
     # =========================================================================
     # THEO DÕI CHUỖI APT (Tích hợp DAPT2020)
@@ -556,33 +564,47 @@ class ThreatMemoryStore:
 
     def get_stats(self) -> dict:
         """Lấy thống kê tổng quan cho Dashboard."""
-        with sqlite3.connect(self.db_path) as conn:
-            c = conn.cursor()
-            c.execute("SELECT COUNT(*) FROM ip_reputation")
-            total_ips = c.fetchone()[0]
-            c.execute("SELECT COUNT(*) FROM ip_reputation WHERE reputation_score >= 50")
-            high_risk = c.fetchone()[0]
-            c.execute("SELECT COUNT(*) FROM known_entities WHERE is_active = 1")
-            known = c.fetchone()[0]
-            c.execute("SELECT COUNT(*) FROM apt_indicators WHERE status = 'MONITORING'")
-            apt = c.fetchone()[0]
-        return {
-            "total_tracked_ips": total_ips,
-            "high_risk_ips": high_risk,
-            "known_entities": known,
-            "apt_indicators": apt,
+        empty = {
+            "total_tracked_ips": 0,
+            "high_risk_ips": 0,
+            "known_entities": 0,
+            "apt_indicators": 0,
         }
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                c = conn.cursor()
+                c.execute("SELECT COUNT(*) FROM ip_reputation")
+                total_ips = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM ip_reputation WHERE reputation_score >= 50")
+                high_risk = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM known_entities WHERE is_active = 1")
+                known = c.fetchone()[0]
+                c.execute("SELECT COUNT(*) FROM apt_indicators WHERE status = 'MONITORING'")
+                apt = c.fetchone()[0]
+            return {
+                "total_tracked_ips": total_ips,
+                "high_risk_ips": high_risk,
+                "known_entities": known,
+                "apt_indicators": apt,
+            }
+        except sqlite3.OperationalError:
+            self._init_db()
+            return empty
 
     def get_all_threat_events(self, limit: int = 50) -> list[dict]:
         """Lấy toàn bộ threat events cho UI."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            c = conn.cursor()
-            c.execute(
-                "SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events ORDER BY id DESC LIMIT ?",
-                (limit,),
-            )
-            return [dict(row) for row in c.fetchall()]
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                c = conn.cursor()
+                c.execute(
+                    "SELECT id, src_ip, dst_ip, apt_phase, apt_day, label, timestamp FROM threat_events ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                )
+                return [dict(row) for row in c.fetchall()]
+        except sqlite3.OperationalError:
+            self._init_db()
+            return []
 
     def get_threat_events_for_ip(self, ip: str, limit: int = 50) -> list[dict]:
         """Lấy threat events liên quan đến IP cụ thể (IP nguồn hoặc IP đích)."""

@@ -47,9 +47,10 @@ You MUST respond in pure JSON format matching this exact schema:
 {{
   "action": "BLOCK_IP" | "ALERT" | "LOG" | "AWAIT_HITL",
   "confidence": <float between 0.0 and 1.0>,
-  "mitre_technique": "<ID - Name from RAG context, or N/A>",
+  "mitre_technique": "<ID - Name khớp NHẤT với hành vi quan sát (lấy từ RAG context). Nếu KHÔNG technique nào khớp, ghi 'N/A'>",
+  "attack_method": "<Ngắn gọn (tiếng Việt): họ tấn công + thủ đoạn cụ thể, ví dụ 'Brute-force SSH bằng password spraying' hoặc 'Log-substrate prompt injection qua delimiter smuggling'. Nếu chưa chắc, ghi phỏng đoán khả dĩ nhất>",
   "nist_control": "<Phase/Control - Name from NIST SP 800-61r2 context, or N/A>",
-  "reasoning": "<Mô tả chi tiết HOÀN TOÀN bằng tiếng Việt (2-3 câu) về hành vi kẻ tấn công đang cố làm và lập luận tại sao chọn hành động này. Ví dụ: 'Phát hiện IP nguồn thực hiện quét cổng qua nhiều cổng khác nhau, khớp với kỹ thuật trinh sát T1046. Hệ thống thực hiện chặn IP để bảo vệ an toàn.'>",
+  "reasoning": "<Phân tích CHI TIẾT bằng tiếng Việt (4-6 câu) theo 4 phần: (1) BẰNG CHỨNG — payload/đặc trưng CỤ THỂ quan sát được (chuỗi injection, cổng, số gói/byte, tần suất, Z-score...); (2) PHƯƠNG PHÁP — kẻ tấn công đang dùng kỹ thuật gì và nó hoạt động ra sao; (3) KỸ THUẬT — nếu khớp MITRE thì nêu ID+tên và VÌ SAO khớp, nếu KHÔNG khớp technique nào (mitre_technique=N/A) thì VẪN PHẢI dự đoán họ tấn công/phương pháp khả dĩ nhất và giải thích căn cứ; (4) HÀNH ĐỘNG — vì sao chọn action này. Ví dụ: 'Bằng chứng: User-Agent chứa chuỗi <<<DATA_END>>> kèm exec(). Phương pháp: tiêm chỉ thị qua trường log để chiếm quyền suy luận LLM. Kỹ thuật: khớp AML.T0051 (LLM Prompt Injection) vì payload cố ghi đè chỉ thị hệ thống. Hành động: BLOCK_IP để cô lập nguồn.'>",
   "extracted_iocs": [
     {{"ioc_type": "ip", "value": "192.168.1.1", "severity": "high"}},
     {{"ioc_type": "cve", "value": "CVE-2014-0160", "severity": "critical"}}
