@@ -91,6 +91,18 @@ docs/latex/thesis_latex*/*.lot
 docs/latex/thesis_latex*/*.bbl
 docs/latex/thesis_latex*/*.blg
 
+# LaTeX thesis compile files — VỊ TRÍ MỚI sau reorg (docs/Thesis/latex/...)
+docs/Thesis/latex/**/*.aux
+docs/Thesis/latex/**/*.out
+docs/Thesis/latex/**/*.toc
+docs/Thesis/latex/**/*.fls
+docs/Thesis/latex/**/*.fdb_latexmk
+docs/Thesis/latex/**/*.synctex*
+docs/Thesis/latex/**/*.lof
+docs/Thesis/latex/**/*.lot
+docs/Thesis/latex/**/*.bbl
+docs/Thesis/latex/**/*.blg
+
 config/pipeline_stats.json
 config/tier1_blocks.json
 

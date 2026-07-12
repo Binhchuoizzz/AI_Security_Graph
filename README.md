@@ -137,7 +137,7 @@ SENTINEL implements defense-in-depth, protecting both the protected infrastructu
 ### 2. Infrastructure & Audit Trail Hardening
 * **Cryptographic Audit Trail (HMAC Log Chaining):** Response-executor logs written to `config/audit_trail.db` are chained using HMAC-SHA-256 (like a private blockchain). The hash of each log entry depends on the hash of the preceding entry. Any database modification by an intruder breaks the chain and triggers an alert. *(This is distinct from the research-metadata store `logs/guardrails_audit.db` used by the runtime state monitor.)*
 * **Persistent Lockout & Lockout Auto-Reset:** Protection against credential brute-forcing stored in SQLite (resistant to session clearing or private window bypass). Once the lockout duration expires, the system automatically resets attempts to `0` for seamless usability.
-* **No hardcoded credentials (CWE-798):** Dashboard auth uses PBKDF2-HMAC-SHA256 (100k iters) with **pre-computed hashes** in source (no plaintext passwords); demo credentials live in `docs/guides/RUN_PROJECT.md`, and a fail-loud warning fires if the demo HASH/SALT are still in use.
+* **No hardcoded credentials (CWE-798):** Dashboard auth uses PBKDF2-HMAC-SHA256 (100k iters) with **pre-computed hashes** in source (no plaintext passwords); demo credentials live in `docs/Codebase/guides/RUN_PROJECT.md`, and a fail-loud warning fires if the demo HASH/SALT are still in use.
 * **Real "Noise Reduction" KPI (not estimated):** the Subscriber counts actual raw logs through Tier-1 and the number dropped, writing `config/pipeline_stats.json`; the Dashboard reports the *measured* reduction (e.g. 550 raw → 548 dropped → 99.6%) rather than a heuristic estimate.
 * **Clickjacking & CSRF Prevention:** Streamlit configuration hardened with `enableCORS = false`, `enableXsrfProtection = true`, and `frameAncestors = ["'none'"]` to prevent unauthorized iframe embedding.
 
@@ -245,7 +245,7 @@ AI_Security_Graph/
 
 ## 🚀 Quick Start
 
-For detailed step-by-step instructions on deploying the full stack, please consult [RUN_PROJECT.md](docs/guides/RUN_PROJECT.md).
+For detailed step-by-step instructions on deploying the full stack, please consult [RUN_PROJECT.md](docs/Codebase/guides/RUN_PROJECT.md). For per-flow committee demos see [DEMO_FLOWS.md](docs/Codebase/guides/DEMO_FLOWS.md) and [COMMITTEE_DEMO.md](docs/Codebase/guides/COMMITTEE_DEMO.md).
 
 ### 1. Environment Setup
 ```bash

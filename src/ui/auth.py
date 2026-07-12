@@ -6,7 +6,7 @@ Mật khẩu được băm PBKDF2-HMAC-SHA256 (Tương thích CWE-916 & CWE-259)
 THIẾT KẾ BẢO MẬT:
   - KHÔNG ghi cứng mật khẩu DẠNG RÕ (plaintext) trong mã nguồn (CWE-798): chỉ lưu
     HASH đã tính sẵn. Mật khẩu rõ của bộ demo nằm trong tài liệu triển khai
-    (docs/guides/RUN_PROJECT.md), KHÔNG nằm trong source.
+    (docs/Codebase/guides/RUN_PROJECT.md), KHÔNG nằm trong source.
   - Ưu tiên đọc HASH + SALT từ biến môi trường (OS Environment Variables).
   - Khi rơi về HASH/SALT demo mặc định -> CẢNH BÁO rõ ràng (không dùng cho production).
   - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ.

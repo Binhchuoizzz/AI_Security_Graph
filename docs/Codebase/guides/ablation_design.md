@@ -73,7 +73,7 @@
 - F > D > E for Context Relevance : Dual contexts richer than single
 - D > E for MITRE Mapping Accuracy : MITRE RAG directly provides technique data
 - E > D for Recommendation Quality : NIST phases provide specific response actions
-- **5D Framework Integration**: 
+- **5D Framework Integration**:
   - Classification & Operational metrics use **Statistical Evaluation (McNemar + Mann-Whitney U)** để đảm bảo tính khách quan.
   - Context Quality dùng **Cross-Family LLM-as-a-Judge (Llama 3 đánh giá Gemma)** lấy cảm hứng từ RAGAS để chống Self-Enhancement Bias.
   - Explainability dùng deterministic logic (Audit Completeness).
@@ -122,4 +122,3 @@ rag:
   - Operational: MTTD_Proxy_Tier1_sec, MTTR_Proxy_Tier2_sec, HITL_Escalation_Rate_pct, RAG_Cache_Hit_Rate_pct
   - Context Quality (RAGAS-inspired): Context_Precision, Answer_Relevancy, Faithfulness, Context_Recall
   - Explainability: Audit_Completeness_Rate_pct
-

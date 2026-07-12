@@ -135,7 +135,7 @@ def ingest_real_apt():
     Muốn DEMO APT emergent SỐNG trên dashboard (bản án nổi lên dần thay vì lịch sử
     nạp sẵn): KHÔNG chạy hàm này; thay vào đó xóa `config/threat_memory.db` rồi chạy
     `experiments/stream_unified_online.py` + `main.py --mode server`
-    (docs/guides/RUN_PROJECT.md — Bước 5).
+    (docs/Codebase/guides/RUN_PROJECT.md — Bước 5).
     """
     from src.agent.threat_memory import ThreatMemoryStore
 
