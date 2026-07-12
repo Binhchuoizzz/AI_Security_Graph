@@ -343,10 +343,20 @@ def main_dashboard():
         st.markdown("---")
         st.markdown("### ⚙️ Quản lý Lịch sử")
 
-        # Nút xóa lịch sử quét
+        # Nút Reset — gated L3_Manager + tích xác nhận để tránh xoá nhầm dữ liệu demo
+        _is_mgr = st.session_state.get("role") == "L3_Manager"
+        _confirm_reset = st.checkbox(
+            "Xác nhận: xoá TẤT CẢ dữ liệu demo (audit · danh tiếng IP · APT · luật · Tier-1 blocks) — KHÔNG hoàn tác",
+            key="confirm_reset_db",
+            disabled=not _is_mgr,
+        )
+        if not _is_mgr:
+            st.caption("🔒 Chỉ tài khoản L3_Manager mới được Reset hệ thống.")
         if st.button(
             "🗑️ Reset Hệ thống & Demo từ đầu",
-            help="Xóa sạch toàn bộ lịch sử cảnh báo và danh tiếng IP để chạy lại demo từ đầu",
+            disabled=not (_is_mgr and _confirm_reset),
+            help="Xóa sạch audit, danh tiếng IP, sự kiện APT, luật động và Tier-1 blocks để chạy lại demo. "
+            "Lưu ý: blacklist Redis tự hết hạn theo TTL (dashboard không truy cập Redis được).",
         ):
             import sqlite3
 
@@ -402,6 +412,18 @@ def main_dashboard():
                     )
                     if os.path.exists(_stats_f):
                         os.remove(_stats_f)
+                except Exception:
+                    pass
+
+                # 7. Xoá file Tier-1 blocks (panel "Tier-1 đã chặn" đọc từ đây)
+                try:
+                    _t1b = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                        "config",
+                        "tier1_blocks.json",
+                    )
+                    if os.path.exists(_t1b):
+                        os.remove(_t1b)
                 except Exception:
                     pass
 
@@ -760,6 +782,12 @@ def main_dashboard():
 
     with tab3:
         st.subheader("Giám sát Chuỗi APT & Danh tiếng IP")
+        st.caption(
+            "ℹ️ Phân biệt: **Điểm danh tiếng** = lịch sử vi phạm của MỘT IP (1 lần BLOCK = 30đ, "
+            "cap 100, tự giảm theo thời gian) — KHÔNG phải 'điểm APT'. **APT thật** (bảng phía dưới) "
+            "chỉ gán khi một IP xuất hiện ở **≥2 ngày KHÁC NHAU** (COUNT DISTINCT apt_day ≥ 2); "
+            "chỉ dữ liệu DAPT2020 (có apt_phase) mới vào đây — log escalate lên LLM thường KHÔNG bị tính là APT."
+        )
 
         # Lấy danh sách IP nguy hiểm từ Long-term Memory
         high_risk_ips = threat_memory.get_high_risk_ips(min_score=1.0)
