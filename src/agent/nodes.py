@@ -348,6 +348,15 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
 
     decision = dict(state.decisions[-1])  # copy để bồi đắp, giữ action/target/confidence
 
+    # Kỹ thuật LLM tự suy (GIỮ LẠI trước khi mapper chuẩn hoá). Nếu triage đã nêu 1
+    # technique CỤ THỂ (Txxxx / AML.Txxxx) thì ƯU TIÊN giữ nó cho badge — để badge KHỚP
+    # với phần reasoning người xem đọc, và tránh mọi alert bị gom hết về AML.T0051 chỉ vì
+    # tín hiệu injection lọt trong tier1_reasons. Chỉ dùng kết quả mapper khi LLM để N/A.
+    import re as _re
+
+    _llm_tech_raw = str(decision.get("mitre_technique", "")).strip()
+    _llm_tech_m = _re.search(r"\b(AML\.T\d{4}|T\d{4}(?:\.\d{3})?)\b", _llm_tech_raw, _re.IGNORECASE)
+
     # Dựng đầu vào mapper từ triage + batch log thật.
     first_log = state.current_batch_logs[0] if state.current_batch_logs else {}
     payload = (str(first_log.get("message", "")) + " " + str(first_log.get("payload", ""))).strip()
@@ -374,15 +383,23 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         logger.error(f"[ATT&CK MAPPER] Lỗi ánh xạ ({e}). Giữ nguyên quyết định triage.")
         return {}
 
+    # Ưu tiên technique CỤ THỂ của LLM cho hiển thị (badge == reasoning); fallback mapper
+    # khi LLM để N/A / không nêu technique-id hợp lệ. Enrichment tactic/url/response vẫn
+    # luôn lấy từ mapper (có cấu trúc, verify được).
+    if _llm_tech_m and _llm_tech_raw.upper() != "N/A":
+        _final_tech = _llm_tech_raw
+        _final_tech_id = _llm_tech_m.group(1).upper()
+    else:
+        _final_tech = f"{mapping.mitre_technique_id} - {mapping.mitre_technique}".strip(" -")
+        _final_tech_id = mapping.mitre_technique_id
+
     # Bồi đắp các trường có cấu trúc vào quyết định (free-text được thay bằng chuẩn hoá).
     decision.update(
         {
-            "mitre_technique": f"{mapping.mitre_technique_id} - {mapping.mitre_technique}".strip(
-                " -"
-            ),
+            "mitre_technique": _final_tech,
             "mitre_tactic": mapping.mitre_tactic,
             "mitre_tactic_id": mapping.mitre_tactic_id,
-            "mitre_technique_id": mapping.mitre_technique_id,
+            "mitre_technique_id": _final_tech_id,
             "mitre_subtechnique": mapping.mitre_subtechnique or "",
             "mitre_subtechnique_id": mapping.mitre_subtechnique_id or "",
             "mitre_url": mapping.mitre_url,
@@ -468,6 +485,26 @@ def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
     return None
 
 
+def _serialize_repr_log(batch_logs: list, target_ip: str) -> str:
+    """Chọn LOG THÔ đại diện cho một quyết định (khớp Source IP == target, fallback log
+    đầu batch) và tuần tự hoá JSON để đính kèm audit -> Dashboard hiển thị đầu vào thô.
+    Suy biến an toàn: batch rỗng / lỗi serialize -> '{}'."""
+    import json as _json
+
+    repr_log = next(
+        (
+            lg
+            for lg in (batch_logs or [])
+            if str(normalize_log_keys(lg).get("Source IP", "")) == target_ip
+        ),
+        ((batch_logs or [{}])[0] if batch_logs else {}),
+    )
+    try:
+        return _json.dumps(repr_log, ensure_ascii=False, default=str)
+    except Exception:
+        return "{}"
+
+
 def node_action_executor(state: SentinelState) -> dict[str, Any]:
     """
     Action Executor Node: Xử lý các action BLOCK_IP hoặc ALERT.
@@ -488,10 +525,17 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     safe_reasoning = output_sanitizer.sanitize(raw_reasoning)
     formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {safe_reasoning}"
 
+    # LOG THÔ đại diện (khớp target, fallback log đầu batch) -> đính kèm audit để Dashboard
+    # hiển thị "cái gì đã vào Tier-1/LLM". Đây là đặc trưng luồng ĐÃ LOẠI nhãn (label leak).
+    raw_log_json = _serialize_repr_log(
+        state.current_batch_logs, str(latest_decision.get("target", ""))
+    )
+
     if action == "BLOCK_IP":
         block_ip(
             latest_decision.get("target", "UNKNOWN_IP"),
             formatted_reasoning,
+            raw_log=raw_log_json,
         )
 
         rule_pattern = latest_decision.get("target", "UNKNOWN_IP")
@@ -535,6 +579,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
         raise_alert(
             latest_decision.get("target", "UNKNOWN_TARGET"),
             formatted_reasoning,
+            raw_log=raw_log_json,
         )
 
     return {}
@@ -562,7 +607,15 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
 
     from src.response.executor import _log_to_db
 
-    _log_to_db("AWAIT_HITL", latest_decision.get("target", "UNKNOWN_TARGET"), formatted_reasoning)
+    raw_log_json = _serialize_repr_log(
+        state.current_batch_logs, str(latest_decision.get("target", ""))
+    )
+    _log_to_db(
+        "AWAIT_HITL",
+        latest_decision.get("target", "UNKNOWN_TARGET"),
+        formatted_reasoning,
+        raw_log=raw_log_json,
+    )
 
     return {}
 

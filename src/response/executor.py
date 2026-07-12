@@ -104,6 +104,11 @@ def _init_db():
         columns = [col[1] for col in c.fetchall()]
         if "integrity_hash" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN integrity_hash TEXT")
+        # Cột raw_log: lưu LOG THÔ đầu vào (đặc trưng luồng đã loại nhãn) để Dashboard hiển
+        # thị minh bạch "cái gì đã vào Tier-1/LLM". KHÔNG nằm trong HMAC — chữ ký chỉ phủ
+        # QUYẾT ĐỊNH (action/target/reason); raw_log là ngữ cảnh đầu vào đính kèm.
+        if "raw_log" not in columns:
+            c.execute("ALTER TABLE audit_trail ADD COLUMN raw_log TEXT")
 
         conn.commit()
 
@@ -111,8 +116,11 @@ def _init_db():
 _init_db()
 
 
-def _log_to_db(action: str, target: str, reason: str):
-    """Ghi nhật ký kiểm toán (audit trail) kèm xác thực, làm sạch đầu vào và liên kết mã HMAC."""
+def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
+    """Ghi nhật ký kiểm toán (audit trail) kèm xác thực, làm sạch đầu vào và liên kết mã HMAC.
+
+    raw_log: chuỗi JSON của LOG THÔ đầu vào (đặc trưng luồng đã loại nhãn) — chỉ để hiển
+    thị minh bạch trên Dashboard, KHÔNG tham gia HMAC (chữ ký phủ quyết định)."""
     # Xác thực hành động
     if not _validator.validate_action(action):
         logger.error(
@@ -144,31 +152,31 @@ def _log_to_db(action: str, target: str, reason: str):
             message = f"{prev_hash}|{timestamp}|{action}|{safe_target}|{safe_reason}".encode()
             current_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
 
-            # 3. Ghi vào database
+            # 3. Ghi vào database (raw_log là ngữ cảnh đầu vào, ngoài phạm vi HMAC)
             c.execute(
-                "INSERT INTO audit_trail (timestamp, action, target, reason, integrity_hash) VALUES (?, ?, ?, ?, ?)",
-                (timestamp, action, safe_target, safe_reason, current_hash),
+                "INSERT INTO audit_trail (timestamp, action, target, reason, integrity_hash, raw_log) VALUES (?, ?, ?, ?, ?, ?)",
+                (timestamp, action, safe_target, safe_reason, current_hash, raw_log or ""),
             )
             conn.commit()
     except Exception as e:
         logger.error(f"Lỗi ghi audit trail: {e}")
 
 
-def block_ip(ip: str, reason: str):
+def block_ip(ip: str, reason: str, raw_log: str = ""):
     safe_ip = _validator.sanitize_target(ip)
     logger.warning(f" [FIREWALL MOCK] BLOCKING IP: {safe_ip} | Lý do: {reason}")
-    _log_to_db("BLOCK_IP", safe_ip, reason)
+    _log_to_db("BLOCK_IP", safe_ip, reason, raw_log)
 
 
-def quarantine_host(host: str, reason: str):
+def quarantine_host(host: str, reason: str, raw_log: str = ""):
     safe_host = _validator.sanitize_target(host)
     logger.warning(f" [EDR MOCK] QUARANTINE HOST: {safe_host} | Lý do: {reason}")
-    _log_to_db("QUARANTINE", safe_host, reason)
+    _log_to_db("QUARANTINE", safe_host, reason, raw_log)
 
 
-def raise_alert(msg: str, reason: str):
+def raise_alert(msg: str, reason: str, raw_log: str = ""):
     logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
-    _log_to_db("ALERT", msg, reason)
+    _log_to_db("ALERT", msg, reason, raw_log)
 
 
 def get_audit_trail(limit=50):
@@ -176,11 +184,20 @@ def get_audit_trail(limit=50):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute(
-                "SELECT timestamp, action, target, reason FROM audit_trail ORDER BY id DESC LIMIT ?",
+                "SELECT timestamp, action, target, reason, raw_log FROM audit_trail ORDER BY id DESC LIMIT ?",
                 (limit,),
             )
             rows = c.fetchall()
-        return [{"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]} for r in rows]
+        return [
+            {
+                "timestamp": r[0],
+                "action": r[1],
+                "target": r[2],
+                "reason": r[3],
+                "raw_log": r[4] or "",
+            }
+            for r in rows
+        ]
     except Exception:
         return []
 
@@ -190,11 +207,20 @@ def get_audit_trail_for_ip(ip: str, limit=100):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute(
-                "SELECT timestamp, action, target, reason FROM audit_trail WHERE target = ? ORDER BY id DESC LIMIT ?",
+                "SELECT timestamp, action, target, reason, raw_log FROM audit_trail WHERE target = ? ORDER BY id DESC LIMIT ?",
                 (ip, limit),
             )
             rows = c.fetchall()
-        return [{"timestamp": r[0], "action": r[1], "target": r[2], "reason": r[3]} for r in rows]
+        return [
+            {
+                "timestamp": r[0],
+                "action": r[1],
+                "target": r[2],
+                "reason": r[3],
+                "raw_log": r[4] or "",
+            }
+            for r in rows
+        ]
     except Exception:
         return []
 

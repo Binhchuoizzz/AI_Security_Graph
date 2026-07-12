@@ -15,6 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import html
 import json
 import time
+from datetime import datetime
 
 import streamlit as st  # type: ignore
 from streamlit_autorefresh import st_autorefresh  # type: ignore
@@ -59,6 +60,21 @@ def _extract_mitre_technique(reason: str) -> str:
     """Rút mã kỹ thuật MITRE từ chuỗi reason dạng '[MITRE: T1110 - Brute Force] ...'."""
     m = re.search(r"\[MITRE:\s*([^\]]+)\]", reason or "")
     return m.group(1).strip() if m else ""
+
+
+def _fmt_local_ts(raw) -> str:
+    """Đổi timestamp ISO (thường UTC +00:00 do record_incident lưu) sang GIỜ ĐỊA
+    PHƯƠNG, để tab APT/Investigation đồng bộ với audit/HITL (đã sửa về giờ local).
+    Chuỗi không parse được -> trả nguyên trạng (an toàn)."""
+    if not raw or str(raw) == "N/A":
+        return "N/A"
+    try:
+        dt = datetime.fromisoformat(str(raw))
+        if dt.tzinfo is not None:
+            dt = dt.astimezone()  # -> TZ tiến trình (container: Asia/Ho_Chi_Minh)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(raw)
 
 
 def _rule_severity(score) -> tuple[str, str]:
@@ -886,10 +902,10 @@ def main_dashboard():
                 safe_ip = html.escape(str(selected_ip))
                 safe_latest_reason = html.escape(latest_reason)
                 safe_first_seen = (
-                    html.escape(str(ip_rep.get("first_seen", "N/A"))) if ip_rep else "N/A"
+                    html.escape(_fmt_local_ts(ip_rep.get("first_seen", "N/A"))) if ip_rep else "N/A"
                 )
                 safe_last_seen = (
-                    html.escape(str(ip_rep.get("last_seen", "N/A"))) if ip_rep else "N/A"
+                    html.escape(_fmt_local_ts(ip_rep.get("last_seen", "N/A"))) if ip_rep else "N/A"
                 )
                 safe_last_mitre = (
                     html.escape(str(ip_rep.get("last_mitre_technique") or "T1190"))
@@ -1016,13 +1032,22 @@ def main_dashboard():
         active_blocks_count = len([r for r in ip_blocks if r.get("status") == "ACTIVE"])
         pending_blocks_count = len([r for r in ip_blocks if r.get("status") == "PENDING_APPROVAL"])
         whitelisted_count = len(whitelisted_ips)
+        # Chặn TỨC THỜI của Tier-1 (WAF/injection/cổng nhạy cảm) -> Redis blacklist TTL 1h.
+        # Dashboard container KHÔNG reach được Redis nên đọc qua file tier1_blocks.json
+        # (subscriber ghi). Trước đây tab này bỏ sót -> hiển thị nhầm "0 đang chặn".
+        tier1_temp_blocks = _get_tier1_blocks(show=25)
+        tier1_temp_count = len(tier1_temp_blocks)
 
         st.markdown(
             f"""
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
             <div style="background: rgba(255, 77, 79, 0.1); border: 1px solid rgba(255, 77, 79, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{active_blocks_count}</div>
-                <div style="font-size: 0.85rem; color: #ff7875; font-weight: 600; text-transform: uppercase;">IP Đang Chặn (Active)</div>
+                <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{tier1_temp_count}</div>
+                <div style="font-size: 0.85rem; color: #ff7875; font-weight: 600; text-transform: uppercase;">🛡️ Tier-1 Tạm thời (TTL 1h)</div>
+            </div>
+            <div style="background: rgba(114, 46, 209, 0.1); border: 1px solid rgba(114, 46, 209, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #b37feb;">{active_blocks_count}</div>
+                <div style="font-size: 0.85rem; color: #d3adf7; font-weight: 600; text-transform: uppercase;">Luật Vĩnh viễn (Active)</div>
             </div>
             <div style="background: rgba(250, 173, 20, 0.1); border: 1px solid rgba(250, 173, 20, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
                 <div style="font-size: 1.5rem; font-weight: bold; color: #faad14;">{pending_blocks_count}</div>
@@ -1033,6 +1058,10 @@ def main_dashboard():
                 <div style="font-size: 0.85rem; color: #95de64; font-weight: 600; text-transform: uppercase;">IP Đặc Cách (Whitelist)</div>
             </div>
         </div>
+        <p style="font-size: 0.8rem; color: #8E9AA8; margin-top: -12px; margin-bottom: 20px;">
+            🛡️ <b>Tier-1 Tạm thời</b>: IP bị chặn tức thời bởi chữ ký WAF/injection/cổng nhạy cảm (Redis blacklist, tự hết hạn TTL 1h).
+            <b>Luật Vĩnh viễn</b>: luật động do Tier-2/LLM đề xuất, đã được Analyst DUYỆT (HITL) — không hết hạn.
+        </p>
         """,
             unsafe_allow_html=True,
         )
@@ -1040,7 +1069,27 @@ def main_dashboard():
         col_left, col_right = st.columns([3, 2])
 
         with col_left:
-            st.markdown("### 🛑 Danh sách Blocklist & Lịch sử chặn")
+            # ── Chặn TỨC THỜI của Tier-1 (Redis TTL 1h) — trước đây tab này bỏ sót ──
+            st.markdown("### 🛡️ Chặn tức thời bởi Tier-1 (Redis TTL 1h)")
+            if not tier1_temp_blocks:
+                st.info("Chưa có IP nào bị Tier-1 chặn tức thời trong phiên gần đây.")
+            else:
+                t1_rows = [
+                    {
+                        "Địa chỉ IP": b.get("ip"),
+                        "Điểm": b.get("score", 0),
+                        "Lý do Tier-1": " · ".join(b.get("reasons", [])) or "—",
+                    }
+                    for b in tier1_temp_blocks
+                ]
+                st.dataframe(pd.DataFrame(t1_rows), use_container_width=True, hide_index=True)
+                st.caption(
+                    "⏳ Các block này **tạm thời** (Redis blacklist, tự hết hạn sau 1 giờ). "
+                    "Dashboard không truy cập Redis trực tiếp nên đọc qua file `tier1_blocks.json` "
+                    "do subscriber ghi."
+                )
+
+            st.markdown("### 🛑 Luật chặn Vĩnh viễn & Lịch sử (Dynamic Rules)")
 
             if not ip_blocks:
                 st.info("Chưa ghi nhận địa chỉ IP nào bị chặn trong cấu hình.")

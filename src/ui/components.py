@@ -4,6 +4,7 @@ NÂNG CẤP PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
 """
 
 import html as html_lib
+import json
 import re
 from datetime import datetime
 
@@ -171,16 +172,27 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
                 help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).",
             )
 
-    # Đây là BẢN GHI QUYẾT ĐỊNH (output audit record đã ký HMAC), KHÔNG phải input log thô.
-    # action/MITRE/lập luận ở đây là KẾT QUẢ tác tử sinh ra — không bao giờ là đầu vào của LLM.
-    with st.expander("🔍 Xem bản ghi Quyết định (Audit Record JSON)", expanded=False):
+    # LOG THÔ ĐẦU VÀO (đặc trưng luồng đã loại nhãn) — chính là dữ liệu đã đưa vào
+    # Tier-1/LLM, KHÔNG phải bản ghi quyết định. Minh bạch "cái gì đã vào hệ thống".
+    with st.expander("🔍 Xem LOG THÔ đầu vào (Raw Flow đã đưa vào Tier-1/LLM)", expanded=False):
         st.caption(
-            "ℹ️ Đây là **bản ghi quyết định** (output, đã ký HMAC) — `action`/`MITRE`/lập luận là "
-            "**kết quả** tác tử suy luận ra. Đầu vào của LLM chỉ gồm **đặc trưng luồng mạng thô** "
-            "(IP, cổng, số gói/byte, thời lượng luồng…), **KHÔNG** chứa nhãn/đáp án (xem "
-            "`tests/unit/test_subscriber.py` — kiểm thử chống lộ nhãn)."
+            "ℹ️ Đây là **log thô đầu vào** — **đặc trưng luồng mạng** (IP, cổng, số gói/byte, "
+            "thời lượng luồng, payload…) đã đưa vào Tier-1/LLM. Đã **LOẠI nhãn/đáp án** (chống lộ "
+            "nhãn — xem `tests/unit/test_subscriber.py`). `action`/`MITRE` là **kết quả** tác tử "
+            "suy ra từ chính log này (bản ghi quyết định đã ký HMAC nằm ở Audit Trail)."
         )
-        st.json(alert)
+        raw_log_str = alert.get("raw_log") if isinstance(alert, dict) else None
+        if raw_log_str:
+            try:
+                st.json(json.loads(raw_log_str))
+            except (ValueError, TypeError):
+                st.code(str(raw_log_str), language="json")
+        else:
+            st.caption(
+                "⚠️ Bản ghi này chưa đính kèm log thô (được tạo trước khi bật tính năng, "
+                "hoặc là hành động thủ công). Hiển thị bản ghi quyết định thay thế:"
+            )
+            st.json(alert)
 
 
 def render_ioc_table(iocs):
@@ -268,7 +280,9 @@ def render_threat_intel_tables(high_risk_ips, known_entities):
             selection = st.dataframe(
                 cast(
                     Any,
-                    df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"]),
+                    df_high_risk.style.map(
+                        color_score, subset=["Điểm danh tiếng (Reputation)"]
+                    ).format({"Điểm danh tiếng (Reputation)": "{:.1f}"}),
                 ),
                 on_select="rerun",
                 selection_mode="single-row",
