@@ -92,6 +92,7 @@ docs/latex/thesis_latex*/*.bbl
 docs/latex/thesis_latex*/*.blg
 
 config/pipeline_stats.json
+config/tier1_blocks.json
 
 # Runtime LLM token/context observability counters (regenerated each run)
 config/llm_token_stats.json

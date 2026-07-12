@@ -151,6 +151,23 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
         except Exception:
             pass
 
+    # Ring buffer các block Tier-1 gần nhất (kèm LÝ DO) -> config/tier1_blocks.json.
+    # Dashboard container đọc qua volume config/ (KHÔNG reach được Redis — xem chú thích trên),
+    # để hiển thị "Tier-1 đã chặn gì" mà không tốn LLM.
+    _t1blocks_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "config", "tier1_blocks.json"
+    )
+    tier1_recent_blocks: list[dict] = []
+
+    def _flush_tier1_blocks():
+        try:
+            _tmp = _t1blocks_path + ".tmp"
+            with open(_tmp, "w") as _f:
+                json.dump(tier1_recent_blocks[-50:], _f, ensure_ascii=False)
+            os.replace(_tmp, _t1blocks_path)
+        except Exception:
+            pass
+
     while True:
         try:
             # XREADGROUP lắng nghe trên nhiều stream cùng lúc.
@@ -240,6 +257,20 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                                 if src_ip:
                                     print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
                                     r.setex(f"blacklist:{src_ip}", 3600, "1")
+                                    # Lưu block Tier-1 (kèm lý do) cho Dashboard đọc qua file
+                                    tier1_recent_blocks.append(
+                                        {
+                                            "ip": src_ip,
+                                            "score": evaluated_log.get("tier1_score", 0),
+                                            "reasons": [
+                                                str(x)
+                                                for x in (evaluated_log.get("tier1_reasons") or [])
+                                            ],
+                                            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                        }
+                                    )
+                                    if len(tier1_recent_blocks) > 200:
+                                        del tier1_recent_blocks[:-100]
                                 # Ghi nhận vào log quyết định để phục vụ ablation study
                                 r.rpush("queue_decisions", json.dumps(evaluated_log))
 
@@ -261,6 +292,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
 
                 # Ghi counter THẬT ra file (Dashboard container đọc qua volume config/)
                 _flush_stats()
+                _flush_tier1_blocks()
 
             # Kiểm tra xem có cần trigger batch không
             current_time = time.time()

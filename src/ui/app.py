@@ -77,6 +77,40 @@ def handle_whitelist_approval(ip: str):
     st.session_state[f"whitelisted_{ip}"] = True
 
 
+def _get_tier1_blocks(show: int = 12) -> list[dict]:
+    """Đọc config/tier1_blocks.json (do subscriber ghi) -> block Tier-1 gần nhất kèm LÝ DO.
+
+    Dùng FILE qua volume config/ — KHÔNG dùng Redis, vì Redis chỉ reach được từ host,
+    container Dashboard không reach được (cùng lý do pipeline_stats.json đọc từ file).
+    Khử trùng theo IP (mới nhất trước). An toàn khi thiếu file -> trả rỗng.
+    """
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+        "config",
+        "tier1_blocks.json",
+    )
+    try:
+        with open(path) as f:
+            blocks = json.load(f)
+    except Exception:
+        return []
+    if not isinstance(blocks, list):
+        return []
+    seen: dict[str, dict] = {}
+    for b in reversed(blocks):  # mới nhất trước
+        if not isinstance(b, dict):
+            continue
+        ip = b.get("ip")
+        if not isinstance(ip, str) or not ip or ip in seen:  # ip phải là str hashable, không rỗng
+            continue
+        _r = b.get("reasons")
+        reasons = [str(x) for x in _r] if isinstance(_r, list) else []
+        seen[ip] = {"ip": ip, "score": b.get("score", 0), "reasons": reasons}
+        if len(seen) >= show:
+            break
+    return list(seen.values())
+
+
 def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count, noise_reduction):
     """Tab Tổng quan Trình diễn — gom mọi thứ cần show trước hội đồng vào MỘT màn hình."""
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
@@ -194,6 +228,76 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
         else:
             st.caption(
                 "ℹ️ Ngân sách ngữ cảnh: chưa có dữ liệu token — chạy pipeline/eval để thu thập."
+            )
+
+    # ---------- Vòng phản hồi Hai tầng: Tier-1 chặn ↔ Tier-2 dạy ----------
+    st.markdown("---")
+    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ Tier-2 dạy ngược)")
+    fb_left, fb_right = st.columns(2)
+
+    with fb_left:
+        st.markdown("#### 🛡️ Tier-1 đã chặn (tốc độ đường truyền · KHÔNG cần LLM)")
+        t1_blocks = _get_tier1_blocks()
+        if t1_blocks:
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "IP nguồn": b["ip"],
+                            "Điểm": b["score"],
+                            "Lý do Tier-1": " · ".join(b["reasons"][:2]) or "—",
+                        }
+                        for b in t1_blocks
+                    ]
+                ),
+                width="stretch",
+                height=248,
+                hide_index=True,
+            )
+            st.caption(
+                "Tấn công RÕ RÀNG (chữ ký WAF/injection, cổng nhạy cảm, quét cổng) bị chặn "
+                "TỨC THỜI bằng luật xác định — không tốn LLM. Chặn này là **tạm thời** "
+                "(Redis blacklist, TTL 1 giờ, tự hết hạn) nên số 'đang chặn' giảm dần theo thời gian."
+            )
+        else:
+            st.info(
+                "Chưa có block Tier-1 gần đây (queue_decisions rỗng hoặc chưa chạy luồng). "
+                "Đẩy adversarial/CICIDS để minh hoạ."
+            )
+
+    with fb_right:
+        st.markdown("#### 🔄 Tier-2 đã dạy Tier-1 (luật học được · lâu dài)")
+        # ACTIVE (luật đã duyệt, đang chặn) hiển thị TRƯỚC để không bị ẩn khi nhiều PENDING
+        loop_rules = list(active_rules or []) + list(pending_rules or [])
+        if loop_rules:
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Trạng thái": (
+                                "✅ Đang chặn" if rule.get("status") == "ACTIVE" else "⏳ Chờ duyệt"
+                            ),
+                            "Pattern": rule.get("pattern", ""),
+                            "Điểm": rule.get("score", ""),
+                            "Lý do (LLM)": (str(rule.get("reason", "")) or "—")[:90],
+                        }
+                        for rule in loop_rules[:12]
+                    ]
+                ),
+                width="stretch",
+                height=248,
+                hide_index=True,
+            )
+            st.caption(
+                f"Mỗi phán quyết BLOCK của LLM sinh **1 luật** cho Tier-1 học "
+                f"({len(pending_rules or [])} chờ duyệt · {len(active_rules or [])} đang chặn). "
+                "Analyst DUYỆT (HITL) → luật **ACTIVE** → Tier-1 chặn ngay ở tốc độ cao lần sau. "
+                "Khác với block Redis (TTL 1h), luật đã duyệt **KHÔNG hết hạn** — đây là lý do số "
+                "'luật chờ duyệt' có thể nhiều hơn số 'đang chặn tức thời'."
+            )
+        else:
+            st.info(
+                "Chưa có luật nào Tier-2 dạy cho Tier-1. Chạy luồng có escalate để LLM sinh luật."
             )
 
     st.markdown("---")
