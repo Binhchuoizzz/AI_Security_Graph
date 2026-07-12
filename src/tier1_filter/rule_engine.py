@@ -633,6 +633,9 @@ class RuleEngine:
             pass
 
         # --- Tầng 2: Dynamic Rules (Từ Feedback Loop) ---
+        # dynamic_ip_block: luật Source-IP ĐÃ được Analyst DUYỆT (HITL) khớp CHÍNH XÁC ->
+        # Tier-1 TỰ CHẶN ngay lần tái phạm, KHÔNG cần leo thang Tier-2 (đây là "Tier-1 học được").
+        dynamic_ip_block = False
         for rule in self.dynamic_rules:
             rule_field = rule.get("field")
             rule_pattern = rule.get("pattern")
@@ -642,6 +645,11 @@ class RuleEngine:
                 if rule_pattern in field_value:
                     score += rule_score
                     reasons.append(f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'")
+                    # Chỉ auto-block khi là luật Source-IP và khớp CHÍNH XÁC (tránh '198.51.100.15'
+                    # khớp nhầm '198.51.100.150' do so khớp substring ở scoring). self.dynamic_rules
+                    # chỉ chứa luật status=ACTIVE nên đây chắc chắn là IP người đã duyệt chặn.
+                    if rule_field == "Source IP" and rule_pattern == field_value:
+                        dynamic_ip_block = True
 
         # --- Tầng 3: Session Baseline ---
         source_ip = log_entry.get("Source IP", "unknown")
@@ -679,7 +687,11 @@ class RuleEngine:
                 "Prompt Injection Pattern:" in r or "Jailbreak Pattern:" in r for r in reasons
             )
 
-            if has_waf_match:
+            if dynamic_ip_block:
+                # IP đã được Analyst DUYỆT chặn (HITL -> luật ACTIVE): Tier-1 TỰ CHẶN ngay,
+                # KHÔNG tốn LLM. Ưu tiên CAO NHẤT — kẻ tái phạm không cần leo thang lại.
+                log_entry["tier1_action"] = "BLOCK_IP"
+            elif has_waf_match:
                 log_entry["tier1_action"] = "BLOCK_IP"
             elif has_injection_match:
                 # Prompt Injection / Jailbreak: gửi lên Tier-2 xử lý
