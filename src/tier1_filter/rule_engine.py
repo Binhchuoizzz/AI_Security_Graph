@@ -360,6 +360,19 @@ class RuleEngine:
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
         self.whitelist_ips = tier1_config.get("whitelist_ips", [])
 
+        # --- Reputation-based enforcement (tiền sử IP từ Threat Memory) ---
+        # IP đã có "hồ sơ đen": điểm danh tiếng >= block_threshold -> Tier-1 CHẶN NGAY
+        # (không tốn LLM); >= hitl_threshold -> AWAIT_HITL (đưa lên analyst) DÙ gói hiện
+        # tại trông lành. Đây là "known-bad short-circuit": kẻ đã bị chứng minh xấu không
+        # cần escalate lại. Có thể TẮT bằng reputation_enforcement=false.
+        self.reputation_enforcement = tier1_config.get("reputation_enforcement", True)
+        self.reputation_block_threshold = tier1_config.get("reputation_block_threshold", 70)
+        self.reputation_hitl_threshold = tier1_config.get("reputation_hitl_threshold", 50)
+        # Cache reputation trong RAM (TTL ngắn) để GIỮ Tier-1 ở tốc độ đường truyền —
+        # tránh truy vấn SQLite cho MỖI log; IP lặp lại chỉ tốn O(1) trong burst.
+        self._rep_cache: dict[str, tuple[float, float]] = {}
+        self._rep_cache_ttl = tier1_config.get("reputation_cache_ttl", 5.0)
+
         # Theo dõi file modification time để hot-reload
         self.last_config_mtime = os.path.getmtime(CONFIG_PATH) if os.path.exists(CONFIG_PATH) else 0
         self.last_config_check_time = time.time()  # Chống I/O bottleneck
@@ -522,6 +535,30 @@ class RuleEngine:
                         return f"Jailbreak Pattern: Phát hiện '{pattern.pattern}' trong '{field}'"
         return None
 
+    def _get_reputation_score(self, ip: str) -> float:
+        """Lấy điểm danh tiếng của IP từ Threat Memory (có cache TTL để giữ Tier-1 nhanh).
+
+        AN TOÀN TUYỆT ĐỐI: mọi lỗi truy vấn/DB chưa sẵn sàng -> trả 0.0. Tier-1 KHÔNG
+        BAO GIỜ được sập chỉ vì tra cứu bộ nhớ dài hạn.
+        """
+        if not ip or ip == "unknown":
+            return 0.0
+        now = time.time()
+        cached = self._rep_cache.get(ip)
+        if cached and cached[1] > now:
+            return cached[0]
+        score = 0.0
+        try:
+            from src.agent.threat_memory import threat_memory
+
+            rep = threat_memory.get_ip_reputation(ip)
+            if rep:
+                score = float(rep.get("reputation_score", 0.0) or 0.0)
+        except Exception:
+            score = 0.0
+        self._rep_cache[ip] = (score, now + self._rep_cache_ttl)
+        return score
+
     def evaluate(self, log_entry: dict) -> dict:
         """
         Đánh giá log entry qua các tầng: Whitelist -> Static/Dynamic Rules -> Session Baseline -> Action.
@@ -659,6 +696,25 @@ class RuleEngine:
             score += baseline_result["deviation_score"]
             reasons.extend(baseline_result["deviation_reasons"])
 
+        # --- Tầng 3.5: Reputation Enforcement (tiền sử IP) ---
+        # Kẻ ĐÃ bị chứng minh xấu không cần escalate lại: chặn/HITL ngay theo hồ sơ danh
+        # tiếng, ĐỘC LẬP với điểm gói hiện tại (gói lành từ IP xấu vẫn bị nâng cấp).
+        rep_action = None
+        if self.reputation_enforcement:
+            rep_score = self._get_reputation_score(source_ip)
+            if rep_score >= self.reputation_block_threshold:
+                rep_action = "BLOCK_IP"
+                reasons.append(
+                    f"IP có tiền sử NGUY HIỂM (điểm danh tiếng {rep_score:.0f} ≥ "
+                    f"{self.reputation_block_threshold}) → chặn tự động"
+                )
+            elif rep_score >= self.reputation_hitl_threshold:
+                rep_action = "AWAIT_HITL"
+                reasons.append(
+                    f"IP có tiền sử đáng ngờ (điểm danh tiếng {rep_score:.0f} ≥ "
+                    f"{self.reputation_hitl_threshold}) → chờ phân tích (HITL)"
+                )
+
         # --- Đánh giá & Phân luồng Action (Tier 1 Action Differentiation) ---
         log_entry["tier1_score"] = score
         log_entry["tier1_reasons"] = reasons
@@ -668,7 +724,11 @@ class RuleEngine:
             "ip_unique_ports": baseline_result["unique_ports"],
         }
 
-        if score >= self.risk_threshold:
+        if rep_action == "BLOCK_IP":
+            # Tiền sử NGUY HIỂM (reputation >= ngưỡng block): CHẶN NGAY, ĐỘC LẬP với điểm
+            # gói hiện tại — kẻ đã bị chứng minh xấu không cần escalate lại, không tốn LLM.
+            log_entry["tier1_action"] = "BLOCK_IP"
+        elif score >= self.risk_threshold:
             dest_port_val = 0
             try:
                 dest_port_val = int(dest_port)
@@ -710,6 +770,11 @@ class RuleEngine:
         else:
             log_entry["tier1_action"] = "DROP" if not reasons else "LOG"
 
+        # Sàn HITL theo tiền sử: IP đáng ngờ (reputation >= ngưỡng HITL) mà gói hiện tại
+        # chưa đủ mạnh -> NÂNG lên AWAIT_HITL cho analyst xem, thay vì lặng lẽ DROP/LOG.
+        if rep_action == "AWAIT_HITL" and log_entry["tier1_action"] in ("DROP", "LOG"):
+            log_entry["tier1_action"] = "AWAIT_HITL"
+
         # --- Tầng 0.6: Cập nhật RunningStats CHỈ với dữ liệu được coi là benign (DROP hoặc LOG) ---
         # Điều này chống Baseline Poisoning (tấn công Slow-Rate baseline drift)
         if log_entry["tier1_action"] in ("DROP", "LOG"):
@@ -731,6 +796,15 @@ class RuleEngine:
         self.sensitive_ports = tier1_config.get("sensitive_ports", self.sensitive_ports)
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", self.max_fwd_packets)
         self.whitelist_ips = tier1_config.get("whitelist_ips", self.whitelist_ips)
+        self.reputation_enforcement = tier1_config.get(
+            "reputation_enforcement", self.reputation_enforcement
+        )
+        self.reputation_block_threshold = tier1_config.get(
+            "reputation_block_threshold", self.reputation_block_threshold
+        )
+        self.reputation_hitl_threshold = tier1_config.get(
+            "reputation_hitl_threshold", self.reputation_hitl_threshold
+        )
 
         all_rules = tier1_config.get("dynamic_rules", [])
         self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]

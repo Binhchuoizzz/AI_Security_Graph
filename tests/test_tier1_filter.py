@@ -19,6 +19,9 @@ class TestRuleEngine:
         self.engine = RuleEngine()
         self.engine.session_baseline = SessionBaseline()
         self.engine.dynamic_rules = []  # Isolate from Feedback Loop runtime state
+        # Cô lập khỏi Threat Memory runtime: các test dưới đây kiểm tra logic chữ ký/cổng/
+        # baseline, KHÔNG phải reputation. Tắt để kết quả không phụ thuộc DB thật.
+        self.engine.reputation_enforcement = False
 
     def test_sensitive_port_ssh_escalate(self):
         """Port 22 phải bị block IP (BLOCK_IP)."""
@@ -210,6 +213,76 @@ class TestSessionBaseline:
 
         # Kiểm tra có ít nhất 1 result trả về
         assert len(results) == 50
+
+
+class TestReputationEnforcement:
+    """Kiểm thử Tier-1 auto-block/HITL theo điểm danh tiếng (tiền sử IP).
+
+    Reputation được monkeypatch cố định -> test KHÔNG phụ thuộc Threat Memory DB thật.
+    Gói dùng để test đều là gói LÀNH (port 443, ít gói, không payload) nên bình thường
+    sẽ DROP — mọi thay đổi action đến TỪ reputation.
+    """
+
+    def _engine(self, rep_score: float):
+        engine = RuleEngine()
+        engine.session_baseline = SessionBaseline()
+        engine.dynamic_rules = []
+        engine.reputation_enforcement = True
+        engine.reputation_block_threshold = 70
+        engine.reputation_hitl_threshold = 50
+        engine._get_reputation_score = lambda ip: rep_score  # type: ignore[assignment]
+        return engine
+
+    @staticmethod
+    def _benign(ip: str) -> dict:
+        return {"Source IP": ip, "Destination Port": 443, "Total Fwd Packets": 5}
+
+    def test_reputation_block_above_threshold(self):
+        """Reputation 80 (≥70) trên gói LÀNH -> BLOCK_IP."""
+        result = self._engine(80.0).evaluate(self._benign("203.0.113.5"))
+        assert result["tier1_action"] == "BLOCK_IP"
+        assert any("tiền sử" in r.lower() for r in result["tier1_reasons"])
+
+    def test_reputation_block_at_threshold(self):
+        """Đúng ngưỡng 70 -> BLOCK_IP (dùng >=)."""
+        result = self._engine(70.0).evaluate(self._benign("203.0.113.6"))
+        assert result["tier1_action"] == "BLOCK_IP"
+
+    def test_reputation_hitl_mid_band(self):
+        """Reputation 55 (50–69) trên gói LÀNH -> AWAIT_HITL (alert + HITL)."""
+        result = self._engine(55.0).evaluate(self._benign("203.0.113.7"))
+        assert result["tier1_action"] == "AWAIT_HITL"
+
+    def test_reputation_hitl_at_threshold(self):
+        """Đúng ngưỡng 50 -> AWAIT_HITL."""
+        result = self._engine(50.0).evaluate(self._benign("203.0.113.8"))
+        assert result["tier1_action"] == "AWAIT_HITL"
+
+    def test_reputation_below_threshold_no_effect(self):
+        """Reputation 40 (<50) -> không ảnh hưởng, gói lành vẫn DROP."""
+        result = self._engine(40.0).evaluate(self._benign("203.0.113.9"))
+        assert result["tier1_action"] == "DROP"
+
+    def test_reputation_whitelist_exempt(self):
+        """IP reputation cao nhưng nằm Whitelist -> vẫn DROP (miễn trừ)."""
+        engine = self._engine(90.0)
+        engine.whitelist_ips = ["203.0.113.10"]
+        result = engine.evaluate(self._benign("203.0.113.10"))
+        assert result["tier1_action"] == "DROP"
+
+    def test_reputation_disabled_no_effect(self):
+        """Tắt reputation_enforcement -> điểm cao cũng không tác động."""
+        engine = self._engine(95.0)
+        engine.reputation_enforcement = False
+        result = engine.evaluate(self._benign("203.0.113.11"))
+        assert result["tier1_action"] == "DROP"
+
+    def test_reputation_does_not_downgrade_strong_signal(self):
+        """Reputation HITL (55) KHÔNG được hạ cấp tín hiệu mạnh hơn: cổng nhạy cảm vẫn BLOCK_IP."""
+        engine = self._engine(55.0)
+        log = {"Source IP": "203.0.113.12", "Destination Port": 22, "Total Fwd Packets": 5}
+        result = engine.evaluate(log)
+        assert result["tier1_action"] == "BLOCK_IP"
 
 
 if __name__ == "__main__":
