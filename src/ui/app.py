@@ -143,7 +143,7 @@ def _get_tier1_blocks(show: int = 12) -> list[dict]:
 
 
 def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count, noise_reduction):
-    """Tab Tổng quan Trình diễn — gom mọi thứ cần show trước hội đồng vào MỘT màn hình."""
+    """Tab Tổng quan Trình diễn — gom mọi thứ cần show vào MỘT màn hình."""
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
@@ -336,7 +336,7 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
 
     st.markdown("---")
     st.caption(
-        "💡 Tab này gom toàn bộ thành phần để trình bày trước hội đồng. Các tab kế tiếp cung cấp "
+        "💡 Tab này gom toàn bộ thành phần để trình bày tổng quan. Các tab kế tiếp cung cấp "
         "chi tiết: Nhật ký SIEM & Audit, Phê duyệt Luật (HITL), Giám sát APT, Blocklist/Whitelist, và Tri thức Graph."
     )
 
@@ -590,7 +590,7 @@ def main_dashboard():
 
     tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
-            "🎬 Tổng quan Demo (Hội đồng)",
+            "🎬 Tổng quan Demo",
             "📊 Nhật ký SIEM & Audit Trail",
             "🧑‍💻 Phê duyệt Luật (HITL)",
             "🎯 Giám sát APT & Threat Intel",

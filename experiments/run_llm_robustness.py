@@ -1,7 +1,7 @@
 """
 SENTINEL — Độ Bền LLM & Quy Trình (Determinism + Graceful Degradation)
 ======================================================================
-Hai mối lo của hội đồng/TS về việc dùng LLM cục bộ trong quy trình SOC:
+Hai mối lo phản biện/TS về việc dùng LLM cục bộ trong quy trình SOC:
 
   (A) TÁI LẬP: temp=0.1 vẫn lấy mẫu — kết quả có lặp lại được không?
       -> Đặt seed cố định (config llm.seed) rồi gọi CÙNG prompt N lần, kiểm tra

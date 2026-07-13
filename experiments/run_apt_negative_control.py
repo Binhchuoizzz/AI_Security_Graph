@@ -2,7 +2,7 @@
 SENTINEL — APT: Đối chứng ÂM tính + Khoảng tin cậy (Negative Control + CI)
 =========================================================================
 Bổ sung cho phần APT (vốn chỉ báo recall=1.0 trên n nhỏ, KHÔNG có đối chứng âm).
-Hai câu hỏi của hội đồng:
+Hai câu hỏi phản biện:
 
   (a) "recall=1.0 trên n=? — có ý nghĩa thống kê không?"  -> báo Wilson 95% CI.
   (b) "Bộ phát hiện APT có BÁO NHẦM trên IP benign xuất hiện NHIỀU NGÀY không?"

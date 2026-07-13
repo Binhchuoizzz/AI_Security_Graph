@@ -440,7 +440,7 @@ PIPELINE B — Batch / APT memory (DAPT2020):
 | 7 | 🟢 Xác minh | **Liên kết Ngày 1 ↔ Ngày 2 đồng bộ:** `tier1_action/score` gắn vào log → `enforce_tier_consensus` (G6); `map_to_cicids` đủ `REQUIRED_FIELDS` (G3); tên chuẩn `_KEY_ALIASES` ≡ `KEY_ALIASES` (G1) ở 5 trường chung; `FeedbackListener` nhúng `FeedbackValidator` (G8). | nodes.py / simulate_traffic.py / feedback_listener.py |
 | 8 | 🟡 Vừa | `chain_length` trong `dapt2020_chains.jsonl` là độ dài chuỗi GỐC (trước cap 50+10) — KHÁC `len(events)`. Code đọc downstream phải dùng `len(events)` khi đếm event thực. | [build_dapt_chains.py:170](../scripts/build_dapt_chains.py#L170) |
 
-### Cải tiến tích cực (nên nêu trước hội đồng)
+### Cải tiến tích cực (nên nêu khi bảo vệ)
 - ✅ **At-least-once delivery** (consumer group + `xack`) — không mất log khi crash.
 - ✅ **Chống Baseline Poisoning** (chỉ học từ DROP/LOG) + **per-key warmup**.
 - ✅ **State Exhaustion protection** (`max_profiles` + LRU eviction).

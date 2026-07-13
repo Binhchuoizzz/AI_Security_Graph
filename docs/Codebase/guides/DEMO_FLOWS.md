@@ -3,7 +3,7 @@
 **CICIDS · DAPT · Zero-day · Adversarial** — trình diễn **tách bạch** từng kịch bản qua **FULL pipeline live** (Tier-1 → Tier-2 LangGraph/Gemma → Dashboard), thay vì luồng gộp.
 
 > Mọi lệnh dùng `scripts/push_flow.py` — **tái dùng data & logic đã kiểm thử, không bịa số liệu**.
-> Tài liệu liên quan: [RUN_PROJECT.md](RUN_PROJECT.md) (thiết lập + 15 kịch bản) · [COMMITTEE_DEMO.md](COMMITTEE_DEMO.md) (kịch bản hội đồng ~15 phút).
+> Tài liệu liên quan: [RUN_PROJECT.md](RUN_PROJECT.md) (thiết lập + 15 kịch bản) · [COMMITTEE_DEMO.md](COMMITTEE_DEMO.md) (kịch bản demo tổng thể ~15 phút).
 
 ---
 

@@ -10,7 +10,7 @@
 ## 💡 Sơ đồ 1 phút (đọc để hình dung nhanh)
 
 > **UI** là cửa sổ HITL: analyst xem cảnh báo, **Duyệt/Bác luật** → persist YAML → Tier-1 hot-reload ⇒ **khép vòng phản hồi**. Mọi số KPI đọc từ **file/DB THẬT** (`pipeline_stats.json`, `audit_trail.db`, `threat_memory.db`, `llm_token_stats.json`) — không bịa.
-> **Khung đánh giá** = "phòng thí nghiệm" tất định: gộp CICIDS+DAPT+zero-day thành **một luồng** rồi đo 5 trục — **Phân loại (Ablation A–F), Vận hành (Latency), Kháng cự (Adversarial), Chất lượng ngữ cảnh (LLM-Judge), Luồng gộp (APT+zero-day)** — cộng 5 script **rigor** trả lời trực diện các câu phản biện hội đồng (ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM).
+> **Khung đánh giá** = "phòng thí nghiệm" tất định: gộp CICIDS+DAPT+zero-day thành **một luồng** rồi đo 5 trục — **Phân loại (Ablation A–F), Vận hành (Latency), Kháng cự (Adversarial), Chất lượng ngữ cảnh (LLM-Judge), Luồng gộp (APT+zero-day)** — cộng 5 script **rigor** trả lời trực diện các câu phản biện (ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM).
 
 ---
 
@@ -79,7 +79,7 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
 | `render_demo_overview(...)` | Trang tổng quan: KPI header + phân phối action + Noise Reduction **THẬT** (đọc `pipeline_stats.json`, bỏ ước lượng ×35). | [63-188](../../src/ui/app.py#L63-L188) |
 | `main_dashboard()` ⭐ | Điều phối 5 tab; nút **Duyệt/Bác** → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce; KPI "Context Budget" đọc `llm_token_stats.json`; nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json`. | [189-1340](../../src/ui/app.py#L189-L1340) |
 
-> **Số liệu THẬT (nêu trước hội đồng):** "Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` do **subscriber ghi**, KHÔNG phải ước lượng. Dashboard chạy qua Docker (`streamlit run src/ui/app.py`), KHÔNG do `main.py` bật.
+> **Số liệu THẬT (nêu khi bảo vệ):** "Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` do **subscriber ghi**, KHÔNG phải ước lượng. Dashboard chạy qua Docker (`streamlit run src/ui/app.py`), KHÔNG do `main.py` bật.
 
 ---
 
@@ -253,7 +253,7 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
 # Phụ lục — Bản đồ 5D & điểm cần lưu ý
 
 ### Ánh xạ 5 trục đánh giá ↔ script ↔ con số chốt
-| Trục (5D) | Script chính | Con số chốt (nêu hội đồng) |
+| Trục (5D) | Script chính | Con số chốt (nêu khi bảo vệ) |
 |-----------|--------------|----------------------------|
 | 1. Phân loại | E5–E7 ablation + E8 stat | F1 0.594 (P 0.939/R 1.0); McNemar p=1.0 |
 | 2. Vận hành | E19 latency | Latency **−82.97%**; Mann-Whitney **p=2.8×10⁻¹⁷** |
@@ -272,7 +272,7 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
 | 5 | 🟢 | Auth **PBKDF2 100k vòng** + constant-time compare + lockout — không hardcode plaintext. | [auth.py:40](../../src/ui/auth.py#L40) |
 | 6 | 🟡 | `main.py` KHÔNG bật Streamlit — Dashboard chạy riêng qua Docker (dễ nhầm khi demo). | [main.py:81](../../main.py#L81) |
 
-### Cải tiến tích cực (nên nêu trước hội đồng)
+### Cải tiến tích cực (nên nêu khi bảo vệ)
 - ✅ **Khung 5D tất định** — mọi trục đo trên cùng luồng gộp thật, tái lập bằng seed=42.
 - ✅ **Đối chứng âm + Wilson CI** cho APT — không chỉ báo recall trên n nhỏ.
 - ✅ **5 script rigor** trả lời trực diện phản biện (ngưỡng cherry-pick, zero-day, specificity, tràn ngữ cảnh, độ bền LLM).

@@ -212,7 +212,7 @@ Batch ESCALATE (từ subscriber #9, DAY1) ──► agent_app.invoke(SentinelSta
 
 ### `map_attack(inp, retriever, llm) -> MitreMapping` ⭐
 - **Mục đích:** Điều phối 3 đường (curated → anchor → RRF), luôn trả schema hợp lệ.
-- **TRUNG THỰC (nêu trước hội đồng):** prompt-injection gắn cờ **ATLAS** (không Enterprise); IDOR không có technique riêng → T1190 confidence thấp — không "tô hồng" độ phủ.
+- **TRUNG THỰC (nêu khi bảo vệ):** prompt-injection gắn cờ **ATLAS** (không Enterprise); IDOR không có technique riêng → T1190 confidence thấp — không "tô hồng" độ phủ.
 - **Dòng:** [585-610](../../src/agent/attack_mapper.py#L585-L610)
 - **Đo:** `scripts/eval_attack_mapper.py` (DAY5 #61b); test `tests/unit/test_attack_mapper.py` (35 test, không cần LLM).
 
@@ -314,7 +314,7 @@ Batch ESCALATE (từ subscriber #9, DAY1) ──► agent_app.invoke(SentinelSta
 | `verify_audit_trail_integrity()` | Duyệt lại toàn chuỗi HMAC → phát hiện giả mạo (True/False + vị trí). | [202-242](../../src/response/executor.py#L202-L242) |
 | `get/increment/reset_login_attempts`, `lock_user` | Khoá brute-force đăng nhập Dashboard (dùng bởi `auth.py`, DAY5). | [243-327](../../src/response/executor.py#L243-L327) |
 
-> ⚠️ **Đánh đổi (nêu trước hội đồng):** `_log_to_db` ghi **tuần tự** (đọc hash dòng trước rồi insert) → không ghi song song; đánh đổi throughput lấy **toàn vẹn** (tamper-evidence). Đúng ưu tiên cho audit.
+> ⚠️ **Đánh đổi (nêu khi bảo vệ):** `_log_to_db` ghi **tuần tự** (đọc hash dòng trước rồi insert) → không ghi song song; đánh đổi throughput lấy **toàn vẹn** (tamper-evidence). Đúng ưu tiên cho audit.
 
 ---
 
@@ -332,7 +332,7 @@ Batch ESCALATE (từ subscriber #9, DAY1) ──► agent_app.invoke(SentinelSta
 | 7 | 🟡 Vừa | Luật `ACTIVE` do HITL duyệt hiện **không có TTL** (sống mãi, cho demo). Production cần eviction (LRU/TTL 24h) — trùng lưu ý DAY1 (feedback_listener). | feedback_listener (DAY1) |
 | 8 | 🟢 Trung thực | `map_attack` gắn cờ ATLAS cho prompt-injection (không Enterprise), IDOR→T1190 confidence thấp — **không tô hồng** độ phủ KB. | [attack_mapper.py:585](../../src/agent/attack_mapper.py#L585) |
 
-### Cải tiến tích cực (nên nêu trước hội đồng)
+### Cải tiến tích cực (nên nêu khi bảo vệ)
 - ✅ **Đồ thị 6-node tường minh** (LangGraph) — dễ chèn node, graceful degradation, cổng theo ACTION.
 - ✅ **Tự tiến hoá (self-evolving) học 2 cấp:** Tier-2 ghi ngược Tier-1 cả **luật IP** ("nhớ mặt") lẫn **luật HÀNH VI** ("nhớ ngón đòn" — chữ ký UA/URI) → IP MỚI cùng kỹ thuật bị Tier-1 bắt ở **~10µs** thay vì ~11s gọi LLM; vẫn qua Zero-Trust `FeedbackValidator` + HITL. Đo bởi `tests/unit/test_behavioral_learning.py` (14 test).
 - ✅ **LLM tất định** (seed=42) + **suy biến an toàn** (LLM chết → AWAIT_HITL, hệ không vỡ).

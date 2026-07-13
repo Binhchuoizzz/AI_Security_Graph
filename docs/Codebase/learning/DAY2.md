@@ -364,7 +364,7 @@ XUYÊN SUỐT:
 | 6 | 🟢 Thấp | `EncodingNeutralizer` **strip** `<script>` thành `[SCRIPT_STRIPPED]` (an toàn hơn HTML-escape) — test E2E T08 đã đồng bộ theo hành vi này. | [prompt_filter.py:213](../src/guardrails/prompt_filter.py#L213) |
 | 7 | 🟢 Mới | `EncodingNeutralizer` bổ sung **6 phương thức mới** (homoglyph/leet/rot13/base32/expose_obfuscated) đóng lỗ hổng encoding bypass, `neutralize()` nay gọi `_expose_obfuscated()` trước `neutralize_html_entities()`. | [prompt_filter.py:191-314](../src/guardrails/prompt_filter.py#L191-L314) |
 
-### Cải tiến tích cực (nên nêu trước hội đồng)
+### Cải tiến tích cực (nên nêu khi bảo vệ)
 - ✅ **Defense-in-depth đầu vào:** 3 tầng (pattern detect → encoding neutralize → nonce encapsulation) + chỉ giữ `ALLOWED_FIELDS`.
 - ✅ **Defense-in-depth đầu ra:** sanitize reasoning + strip XSS/markdown + giải obfuscation base64/hex sâu.
 - ✅ **Tier-1/Tier-2 Consensus Guard:** tầng deterministic làm trọng tài kiểm tra tầng LLM bị thao túng.

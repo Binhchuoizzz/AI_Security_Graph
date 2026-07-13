@@ -1,5 +1,5 @@
 """
-push_flow.py — Đẩy RIÊNG từng luồng dữ liệu lên Redis để demo từng kịch bản trước hội đồng.
+push_flow.py — Đẩy RIÊNG từng luồng dữ liệu lên Redis để demo từng kịch bản tách bạch.
 
 Khác `stream_unified_online.py` (đẩy luồng GỘP cicids+dapt+zeroday), script này cho phép
 đẩy CHỈ MỘT nguồn để trình diễn tách bạch:
@@ -107,7 +107,7 @@ def _adversarial_logs():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Đẩy RIÊNG từng luồng lên Redis (demo hội đồng).")
+    ap = argparse.ArgumentParser(description="Đẩy RIÊNG từng luồng lên Redis (demo tách luồng).")
     ap.add_argument(
         "--source",
         required=True,

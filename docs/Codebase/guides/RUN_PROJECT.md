@@ -52,7 +52,7 @@
 
 ## 1. Tổng Quan Về 15 Kịch Bản Demo
 
-Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tầng Nhận Thức)** kết hợp **Tác tử AI (Agentic AI)** để giải quyết vấn đề quá tải cảnh báo (Alert Fatigue) và tối ưu hóa phản ứng sự cố mạng. 15 kịch bản demo dưới đây được thiết kế nhằm chứng minh các luận điểm khoa học và tính thực tiễn của đề tài trước Hội đồng phản biện.
+Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tầng Nhận Thức)** kết hợp **Tác tử AI (Agentic AI)** để giải quyết vấn đề quá tải cảnh báo (Alert Fatigue) và tối ưu hóa phản ứng sự cố mạng. 15 kịch bản demo dưới đây được thiết kế nhằm chứng minh các luận điểm khoa học và tính thực tiễn của đề tài.
 
 | Demo # | Tên Kịch Bản Demo | Mục Tiêu & Ý Nghĩa Khoa Học | Công Việc Xử Lý Chính |
 | :--- | :--- | :--- | :--- |
@@ -76,9 +76,9 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 
 ---
 
-## ⭐ Khi Lên Hội Đồng Chỉ Cần Demo Gì (Kịch Bản Tối Thiểu ~12–15 phút)
+## ⭐ Khi Bảo Vệ Chỉ Cần Demo Gì (Kịch Bản Tối Thiểu ~12–15 phút)
 
-15 demo bên trên là **kho đầy đủ** để phòng thủ mọi câu hỏi phản biện — **buổi bảo vệ KHÔNG cần chạy hết**. Chọn **6 demo cốt lõi** dưới đây là kể trọn câu chuyện kiến trúc; phần còn lại giữ làm "dự phòng" khi hội đồng hỏi sâu.
+15 demo bên trên là **kho đầy đủ** để phòng thủ mọi câu hỏi phản biện — **buổi bảo vệ KHÔNG cần chạy hết**. Chọn **6 demo cốt lõi** dưới đây là kể trọn câu chuyện kiến trúc; phần còn lại giữ làm "dự phòng" khi bị hỏi sâu.
 
 | # | Demo | Chứng minh luận điểm | ~Phút |
 | :--- | :--- | :--- | :--- |
@@ -89,7 +89,7 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 | 5 | **`evaluate_unified_stream.py`** (F1 **0.594** + APT **3/3** + zero‑day **7/7**) | Benchmark **trung thực**, 1 luồng gộp, memory sạch (không circular) | 2 |
 | 6 | **DEMO 9 + 13** — Ablation + thống kê (**Mann‑Whitney p<0.05**) | Đóng góp từng thành phần + khác biệt độ trễ **có ý nghĩa thống kê** | 2 |
 
-> 🎯 **Mẹo chạy trơn tru:** NGAY TRƯỚC buổi bảo vệ, chạy sẵn `docker-compose up -d` (chờ `healthy`) + bộ offline (`evaluate_unified_stream.py`, `evaluate_robustness.py`) để **có sẵn kết quả**; lúc demo chỉ "show" lại output + dashboard live (tránh rủi ro chạy LLM chậm/timeout trước hội đồng). Các câu hỏi sâu → mở đúng demo bằng chứng:
+> 🎯 **Mẹo chạy trơn tru:** NGAY TRƯỚC buổi bảo vệ, chạy sẵn `docker-compose up -d` (chờ `healthy`) + bộ offline (`evaluate_unified_stream.py`, `evaluate_robustness.py`) để **có sẵn kết quả**; lúc demo chỉ "show" lại output + dashboard live (tránh rủi ro chạy LLM chậm/timeout lúc demo). Các câu hỏi sâu → mở đúng demo bằng chứng:
 > **"Zero‑day nhạy tới đâu?"** → DEMO 14 zero‑day phân cấp (≈4σ); **"Số F1 cao có phải base‑rate?"** → ablation cân bằng 150/150; **"Chống tràn context?"** → context‑stress; **"Baseline bị đầu độc thì sao?"** → **mục 2b golden‑baseline** + §3.11.
 
 ---
@@ -498,8 +498,8 @@ Mở trình duyệt web và truy cập: `http://localhost:8501`
 | `analyst` | `HanoiAnalyst2026@` | **L1 Analyst** | Xem màn hình giám sát, xem danh sách cảnh báo, xem Audit Trail. |
 | `manager` | `HanoiManager2026@` | **L3 Manager** | Có toàn quyền: Phê duyệt/Từ chối các Rule chặn IP do Agent đề xuất, thêm IP vào Whitelist. |
 
-### Các bước trình diễn demo trước Hội đồng
-1.  Đăng nhập bằng tài khoản `analyst`: Chỉ ra cho hội đồng các cảnh báo đang đổ về thời gian thực (Real-time Alert Queue).
+### Các bước trình diễn demo
+1.  Đăng nhập bằng tài khoản `analyst`: Chỉ ra các cảnh báo đang đổ về thời gian thực (Real-time Alert Queue).
 2.  Bấm vào một cảnh báo: Hiển thị chi tiết luồng suy luận của AI (Prompt, Ngữ cảnh MITRE/NIST và quyết định của Agent).
 3.  Đăng nhập bằng tài khoản `manager`: Chuyển tới tab **Active Quarantine Queue** (Hàng đợi cách ly). Bấm **Approve (Phê duyệt)** một đề xuất chặn IP của Agent và chỉ ra rằng hành động chặn này đã được chuyển thành Rule thực tế để cấu hình cho Rule Engine ở Tier 1.
 
@@ -556,7 +556,7 @@ SAU khi vá:    Resisted 12/12 (100%)  | Compromised 0/12 (0%)
 =========================================================
 ```
 
-*Giải thích cho Hội đồng (defense-in-depth + cách vá):* Lớp Guardrails **tĩnh** chặn
+*Giải thích (defense-in-depth + cách vá):* Lớp Guardrails **tĩnh** chặn
 50.8% (sau khi vá encoding lên 100% nhóm encoding; trước đó chỉ 37.5%) — vẫn thua jailbreak
 (10%) và semantic (0%) vì đây là việc của tầng LLM. **Tier-2 LLM** ban đầu kháng 83.3% nhưng
 **bị social-engineering ngữ nghĩa** (giả mạo thẩm quyền/ngữ cảnh) ép hạ cấp 16.7%. Lỗ hổng
@@ -770,7 +770,7 @@ Latency Reduction: <reduction>%   Target: ≥ 60%   Status: PASS/FAIL
 ## 15. DEMO 13: Kiểm Định Giả Thuyết Thống Kê (Statistical Hypothesis Testing)
 
 ### Mục đích
-Chứng minh sự khác biệt về mặt hiệu năng phân loại (Classification Accuracy) và hiệu năng độ trễ (Latency) giữa các cấu hình thử nghiệm là có ý nghĩa thống kê (Statistically Significant), khẳng định tính thuyết phục khoa học của thực nghiệm trước Hội đồng phản biện.
+Chứng minh sự khác biệt về mặt hiệu năng phân loại (Classification Accuracy) và hiệu năng độ trễ (Latency) giữa các cấu hình thử nghiệm là có ý nghĩa thống kê (Statistically Significant), khẳng định tính thuyết phục khoa học của thực nghiệm.
 *   **McNemar's Test**: So sánh trực tiếp chất lượng phân loại giữa Config A (chỉ dùng Rule) và Config F (SENTINEL đầy đủ) trên tập dữ liệu ground truth.
 *   **Mann-Whitney U Test**: Kiểm định sự khác biệt về phân phối độ trễ (Latency distribution) giữa hai Config.
 
@@ -887,7 +887,7 @@ Dưới đây là các cổng dịch vụ và API mặc định được mở tr
 
 ## 19. Cheat Sheet Lệnh Nhanh
 
-Anh có thể in hoặc lưu lại bảng lệnh rút gọn này để copy-paste nhanh trong quá trình demo trực tiếp trước Hội đồng:
+Anh có thể in hoặc lưu lại bảng lệnh rút gọn này để copy-paste nhanh trong quá trình demo trực tiếp:
 
 ```bash
 # 1. Bật toàn bộ hạ tầng Docker
@@ -937,7 +937,7 @@ docker-compose down
 # 14. Xây dựng chuỗi sự kiện APT từ DAPT2020
 .venv/bin/python scripts/build_dapt_chains.py
 
-# 15. Thực nghiệm Rigor & Robustness bổ sung (rebut hội đồng + độ bền LLM + quan sát ngữ cảnh)
+# 15. Thực nghiệm Rigor & Robustness bổ sung (rebut phản biện + độ bền LLM + quan sát ngữ cảnh)
 .venv/bin/python experiments/run_ablation_bcde.py            # Ablation B–E (pure-LLM/gate/dense-RAG/hybrid-RAG)
 .venv/bin/python experiments/run_ablation_balanced.py       # Ablation cân bằng 150/150 (A–F, cần LLM)
 .venv/bin/python experiments/run_threshold_sensitivity.py   # Độ nhạy ngưỡng Welford (τ 2.0–5.0)

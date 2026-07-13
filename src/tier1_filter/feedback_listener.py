@@ -14,7 +14,7 @@ Luồng hoạt động:
 Đây là cơ chế "Feedback Loop" giúp hệ thống tự tiến hóa:
   Tier 1 (lọc) → Tier 2 (phân tích) → Feedback Loop → Tier 1 (cập nhật luật mới)
 
-*Conscious Design Decision (Dành cho Hội đồng):*
+*Conscious Design Decision:*
 - State Machine chỉ có 1 chiều: PENDING_APPROVAL -> ACTIVE hoặc REJECTED.
 - Các rule bị REJECTED sẽ không được re-submit trong cùng phiên làm việc để tránh spam L3 Manager.
 - Hiện tại các ACTIVE rules không có TTL (sống mãi mãi trong file cấu hình) nhằm phục vụ demo tính ổn định. Trong môi trường production thực tế, một eviction policy (LRU hoặc Fixed TTL 24h) phải được áp dụng để đảm bảo RuleEngine không bị tràn bộ nhớ.

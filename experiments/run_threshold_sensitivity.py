@@ -1,7 +1,7 @@
 """
 SENTINEL — Phân Tích Độ Nhạy Ngưỡng Welford (Z-score Threshold Sensitivity)
 ===========================================================================
-Trả lời câu hỏi của hội đồng: "Ngưỡng 3.5σ có phải chọn may rủi / tinh chỉnh
+Trả lời câu hỏi phản biện: "Ngưỡng 3.5σ có phải chọn may rủi / tinh chỉnh
 quá khớp (cherry-pick) không?". Ta QUÉT ngưỡng Z-score của bộ phát hiện dị biệt
 Welford trên ĐÚNG luồng gộp thật của `evaluate_unified_stream.py` (Tier-1 ĐẦY ĐỦ,
 KHÔNG LLM, tất định) và đo trade-off:
