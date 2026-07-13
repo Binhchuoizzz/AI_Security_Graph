@@ -44,7 +44,7 @@ def follow_file(filepath):
 
 def push_to_redis(queue_name, log_entry):
     payload = {"log": json.dumps(log_entry)}
-    r.xadd(queue_name, payload, maxlen=10000, approximate=True)
+    r.xadd(queue_name, payload, maxlen=10000, approximate=True)  # pyright: ignore[reportArgumentType]
     print(
         f"[+] Pushed to Redis [{queue_name}]: {log_entry['Source IP']} -> {log_entry.get('message') or log_entry.get('payload')}"
     )

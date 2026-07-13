@@ -224,9 +224,9 @@ def main(limit=300):
 
     for c in "BCDE":
         yt, yp = R[c]["y_true"], R[c]["y_pred"]
-        f1 = f1_score(yt, yp, zero_division=0)
-        prec = precision_score(yt, yp, zero_division=0)
-        rec = recall_score(yt, yp, zero_division=0)
+        f1 = f1_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
+        prec = precision_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
+        rec = recall_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
         esc = 100.0 * np.mean(R[c]["escalated"])
         mean_lat = float(np.mean(R[c]["latencies"]))
         print(

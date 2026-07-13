@@ -295,11 +295,11 @@ def fetch_and_build(
             df_filtered = df[available_cols].copy()
 
             # Chuẩn hóa chuỗi nhãn
-            df_filtered["Label"] = df_filtered["Label"].str.strip()
+            df_filtered["Label"] = df_filtered["Label"].str.strip()  # pyright: ignore[reportAttributeAccessIssue]
 
             # Chỉ giữ các nhãn có trong LABEL_MAP
             valid_labels = list(LABEL_MAP.keys())
-            df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]
+            df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]  # pyright: ignore[reportAttributeAccessIssue]
             all_data.append(df_filtered)
             print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm.")
         except Exception as e:

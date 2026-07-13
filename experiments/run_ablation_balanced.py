@@ -193,9 +193,9 @@ def main():
     print(f"{'Cfg':>3} | {'F1':>6} | {'Prec':>6} | {'Rec':>6} | {'Esc%':>5} | {'Lat(s)':>7}")
     for c in "ABCDEF":
         yt, yp = R[c]["y_true"], R[c]["y_pred"]
-        f1 = f1_score(yt, yp, zero_division=0)
-        prec = precision_score(yt, yp, zero_division=0)
-        rec = recall_score(yt, yp, zero_division=0)
+        f1 = f1_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
+        prec = precision_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
+        rec = recall_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
         esc = 100.0 * np.mean(R[c]["escalated"])
         lat = float(np.mean(R[c]["latencies"]))
         print(f"{c:>3} | {f1:>6.4f} | {prec:>6.4f} | {rec:>6.4f} | {esc:>5.1f} | {lat:>7.3f}")

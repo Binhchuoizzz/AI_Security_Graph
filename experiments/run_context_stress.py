@@ -51,7 +51,8 @@ def main():
     print("=" * 70)
 
     cfg = load_config()
-    token_budget = int(cfg.get("guardrails", {}).get("token_budget", 4000))
+    _tb = cfg.get("guardrails", {}).get("token_budget", 4000)
+    token_budget = int(_tb) if isinstance(_tb, (int, float, str)) else 4000
     pool = load_log_pool()
     print(f"[*] Pool log thật: {len(pool)} | n_ctx={N_CTX} | token_budget={token_budget}")
 
