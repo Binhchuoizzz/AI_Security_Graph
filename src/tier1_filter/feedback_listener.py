@@ -32,6 +32,28 @@ from src.guardrails import FeedbackValidator
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 LOCK_PATH = CONFIG_PATH + ".lock"
+
+
+def _ensure_lock_writable():
+    """Đảm bảo file .lock GHI được bởi cả host (uid 1000) lẫn container (uid 999).
+
+    Docker mount config/ chung: nếu file lock cũ do UID KHÁC tạo (mode 0644) thì bên còn
+    lại KHÔNG mở ghi được -> FileLock ném Permission denied (bug reset_all không xoá nổi
+    luật động). Thư mục config/ thuộc host nên ta XOÁ lock cũ rồi tạo lại 0666. Bọc lỗi để
+    KHÔNG BAO GIỜ làm hỏng luồng import.
+    """
+    try:
+        if os.path.exists(LOCK_PATH) and not os.access(LOCK_PATH, os.W_OK):
+            os.remove(LOCK_PATH)  # dir config/ host-owned -> xoá được dù file thuộc uid khác
+        if not os.path.exists(LOCK_PATH):
+            fd = os.open(LOCK_PATH, os.O_CREAT | os.O_WRONLY, 0o666)
+            os.close(fd)
+        os.chmod(LOCK_PATH, 0o666)  # noqa: S103  (cross-UID: có thể fail nếu thuộc uid khác -> nuốt)
+    except Exception:
+        pass
+
+
+_ensure_lock_writable()
 _lock = FileLock(LOCK_PATH)
 
 logger = logging.getLogger(__name__)
@@ -44,10 +66,13 @@ def _save_config_atomically(config: dict):
     try:
         with open(fd, "w") as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
-        # mkstemp tạo file mode 0600 -> os.replace giữ nguyên khiến container (user khác
-        # uid) KHÔNG đọc được config. Đặt 0644 để các tiến trình khác (Dashboard trong
-        # Docker, RuleEngine) vẫn đọc được dynamic_rules/whitelist sau khi Agent lưu rule.
-        os.chmod(temp_path, 0o644)
+        # mkstemp tạo file mode 0600 -> os.replace giữ nguyên khiến tiến trình UID khác
+        # KHÔNG dùng được config. Docker mount config/ chung cho Dashboard (container uid
+        # 999) VÀ subscriber/reset (host uid 1000): hai bên luân phiên GHI cùng file. Đặt
+        # 0666 để bên nào cũng ghi ĐÈ in-place được (nếu 0644 thì chỉ owner ghi -> bên kia
+        # bị Permission denied, vd reset_all không xoá nổi luật động). os.replace đổi chủ sở
+        # hữu mỗi lần ghi nên phải 0666 để tự chữa lành cross-UID.
+        os.chmod(temp_path, 0o666)  # noqa: S103  (cross-UID Docker: host↔container cùng ghi)
         os.replace(temp_path, CONFIG_PATH)
     except Exception as e:
         if os.path.exists(temp_path):
@@ -213,9 +238,10 @@ class FeedbackListener:
     def reject_rule(self, pattern: str, field: str | None = None) -> bool:
         return self.update_rule_status(pattern, "REJECTED", field)
 
-    def clear_all_dynamic_rules(self):
-        """Reset toàn bộ dynamic rules (dùng khi chạy experiment mới)."""
+    def clear_all_dynamic_rules(self) -> bool:
+        """Reset toàn bộ dynamic rules (dùng khi chạy experiment mới). Trả True nếu thành công."""
         try:
+            _ensure_lock_writable()  # phòng lock cũ do UID khác chiếm (Docker cross-UID)
             with _lock:
                 with open(CONFIG_PATH) as f:
                     config = yaml.safe_load(f)
@@ -223,8 +249,10 @@ class FeedbackListener:
                 _save_config_atomically(config)
             self.feedback_log = []
             logger.info("[Feedback] All dynamic rules cleared.")
+            return True
         except Exception as e:
             logger.error(f"[Feedback] Failed to clear rules: {e}")
+            return False
 
     def add_to_whitelist(self, ip: str) -> bool:
         """Thêm một IP vào whitelist trong config (Dùng cho luồng phê duyệt Pentest/Internal)."""

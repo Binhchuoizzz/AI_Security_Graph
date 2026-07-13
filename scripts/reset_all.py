@@ -88,7 +88,6 @@ def clear_data(dry_run: bool = False) -> None:
 
     from src.agent.threat_memory import MEMORY_DB_PATH as THREAT
     from src.response.executor import DB_PATH as AUDIT
-    from src.tier1_filter.feedback_listener import FeedbackListener
 
     db_tables = {
         THREAT: ["ip_reputation", "known_entities", "apt_indicators", "threat_events"],
@@ -143,12 +142,36 @@ def clear_data(dry_run: bool = False) -> None:
     except Exception as e:  # noqa: BLE001
         print(f"      [!] lỗi reset config JSON: {e}")
 
-    # --- luật động (system_settings.yaml) ---
+    # --- luật động + whitelist (system_settings.yaml) ---
+    # Ghi TRỰC TIẾP host-side (KHÔNG qua FileLock) để bền với cross-UID Docker: đây là điểm
+    # reset_all TRƯỚC ĐÂY fail thầm lặng — file .lock/yaml do container (uid 999) chiếm nên
+    # host (uid 1000) bị Permission denied. Thư mục config/ thuộc host nên ta xoá file cũ
+    # rồi ghi lại 0666 (cả host lẫn container ghi được về sau).
+    import tempfile
+
+    import yaml  # type: ignore
+
+    cfg_path = os.path.join(ROOT, "config", "system_settings.yaml")
     try:
-        FeedbackListener().clear_all_dynamic_rules()
-        print("      -> xoá luật động (system_settings.yaml)")
+        with open(cfg_path) as f:
+            cfg = yaml.safe_load(f) or {}
+        cfg.setdefault("tier1", {})
+        n_rules = len(cfg["tier1"].get("dynamic_rules", []) or [])
+        cfg["tier1"]["dynamic_rules"] = []
+        cfg["tier1"]["whitelist_ips"] = ["127.0.0.1", "10.0.0.99", "192.168.1.254"]
+        for p in (cfg_path, cfg_path + ".lock"):
+            try:
+                os.remove(p)
+            except FileNotFoundError:
+                pass
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(cfg_path), suffix=".tmp")
+        with open(fd, "w") as f:
+            yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True)
+        os.chmod(tmp, 0o666)  # noqa: S103  (cross-UID Docker: host↔container cùng ghi)
+        os.replace(tmp, cfg_path)
+        print(f"      -> xoá {n_rules} luật động + reset whitelist (host-owned 0666)")
     except Exception as e:  # noqa: BLE001
-        print(f"      [!] lỗi xoá luật động: {e}")
+        print(f"      [!] lỗi reset luật động/whitelist: {e}")
 
     # --- Redis stream + blacklist ---
     try:
