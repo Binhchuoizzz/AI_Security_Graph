@@ -32,6 +32,8 @@ from src.guardrails import FeedbackValidator
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 LOCK_PATH = CONFIG_PATH + ".lock"
+# Whitelist mặc định khi reset demo (loopback + scanner nội bộ + gateway).
+DEFAULT_WHITELIST_IPS = ["127.0.0.1", "10.0.0.99", "192.168.1.254"]
 
 
 def _ensure_lock_writable():
@@ -252,6 +254,25 @@ class FeedbackListener:
             return True
         except Exception as e:
             logger.error(f"[Feedback] Failed to clear rules: {e}")
+            return False
+
+    def reset_whitelist_to_defaults(self) -> bool:
+        """Đặt whitelist về mặc định (dùng khi reset demo). Trả True nếu thành công.
+
+        Whitelist là trạng thái do HỆ THỐNG quản lý -> mọi nơi (UI Reset, reset_all) gọi
+        method này thay vì tự sửa YAML, để đồng bộ & bền với cross-UID (0666 + lock).
+        """
+        try:
+            _ensure_lock_writable()
+            with _lock:
+                with open(CONFIG_PATH) as f:
+                    config = yaml.safe_load(f)
+                config.setdefault("tier1", {})["whitelist_ips"] = list(DEFAULT_WHITELIST_IPS)
+                _save_config_atomically(config)
+            logger.info("[Feedback] Whitelist reset to defaults.")
+            return True
+        except Exception as e:
+            logger.error(f"[Feedback] Failed to reset whitelist: {e}")
             return False
 
     def add_to_whitelist(self, ip: str) -> bool:

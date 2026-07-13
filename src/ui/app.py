@@ -368,7 +368,7 @@ def main_dashboard():
         # ghi chú benign/quản trị, không phải sự cố cần phân loại → tránh bộ lọc rỗng).
         action_filter = st.selectbox(
             "Phân loại Hành động",
-            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "QUARANTINE"],
+            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "QUARANTINE", "WHITELIST"],
             index=0,
             key="action_filter_sb",
         )
@@ -401,8 +401,6 @@ def main_dashboard():
         ):
             import sqlite3
 
-            import yaml  # type: ignore
-
             from src.agent.threat_memory import MEMORY_DB_PATH as THREAT_DB
             from src.response.executor import DB_PATH as AUDIT_DB
 
@@ -423,26 +421,10 @@ def main_dashboard():
                 # 3. Seed lại default known entities
                 threat_memory._init_db()
 
-                # 4. Clear dynamic rules trong system_settings.yaml
+                # 4-5. Clear dynamic rules + reset whitelist qua API HỆ THỐNG (đồng bộ với
+                # reset_all; FeedbackListener bền cross-UID 0666+lock, tránh tự sửa YAML).
                 feedback_mgr.clear_all_dynamic_rules()
-
-                # 5. Reset whitelist_ips trong system_settings.yaml về mặc định
-                config_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "config",
-                    "system_settings.yaml",
-                )
-                if os.path.exists(config_path):
-                    with open(config_path) as f:
-                        config_data = yaml.safe_load(f)
-                    if "tier1" in config_data:
-                        config_data["tier1"]["whitelist_ips"] = [
-                            "127.0.0.1",
-                            "10.0.0.99",
-                            "192.168.1.254",
-                        ]
-                        with open(config_path, "w") as f:
-                            yaml.dump(config_data, f, default_flow_style=False, allow_unicode=True)
+                feedback_mgr.reset_whitelist_to_defaults()
 
                 # 6. Reset counter log thô THẬT (file pipeline_stats.json)
                 try:

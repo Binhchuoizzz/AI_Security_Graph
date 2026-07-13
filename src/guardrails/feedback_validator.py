@@ -18,12 +18,6 @@ class FeedbackValidator:
     Chống bypass bằng wildcard và chặn/cho phép sai IP (Zero-Trust Principle).
     """
 
-    # Dải TEST-NET tài liệu (RFC 5737): 192.0.2.0/24 · 198.51.100.0/24 · 203.0.113.0/24.
-    # KHÔNG định tuyến trên Internet thật -> whitelist AN TOÀN. Bộ demo adversarial dùng
-    # 198.51.100.x/203.0.113.x làm IP tấn công thử, nên cho phép whitelist các dải này để
-    # trình diễn tính năng (đồng bộ với whitelist nội bộ tin cậy).
-    DEMO_DOC_RANGES = ["192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24"]
-
     def __init__(self):
         config = load_config()
         subnets = config.get("guardrails", {}).get(
@@ -31,8 +25,6 @@ class FeedbackValidator:
             ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
         )
         self.trusted_subnets = subnets
-        # Dải được phép whitelist = nội bộ tin cậy + TEST-NET tài liệu (demo).
-        self._whitelist_allowed = list(subnets) + self.DEMO_DOC_RANGES
         self.allowed_fields = ["Source IP", "Destination Port", "Protocol", "URI", "User-Agent"]
 
     def validate_rule(self, field: str, pattern: str, score: int) -> tuple[bool, list[str]]:
@@ -84,7 +76,7 @@ class FeedbackValidator:
                     else:
                         ip = ipaddress.ip_address(pattern_str)
                         # Kiểm tra xem có trùng với hạ tầng quan trọng
-                        for subnet_str in self._whitelist_allowed:
+                        for subnet_str in self.trusted_subnets:
                             network = ipaddress.ip_network(subnet_str, strict=False)
                             # Không cho chặn toàn bộ subnet nội bộ
                             if ip == network.network_address:
@@ -107,44 +99,32 @@ class FeedbackValidator:
         return len(errors) == 0, errors
 
     def validate_whitelist_ip(self, ip_str: str) -> tuple[bool, list[str]]:
-        """
-        Xác thực IP whitelist mới: Chỉ cho phép whitelist
-        các dải nội bộ/tin cậy.
-        Không cho phép whitelist IP công cộng ngoài Internet.
+        """Xác thực IP whitelist mới.
+
+        Analyst được whitelist MỘT HOST cụ thể ở BẤT KỲ dải nào (nội bộ, TEST-NET, hay
+        public như DAPT) — đây là quyết định có chủ đích cho mọi luồng demo/vận hành.
+        CHỈ CẤM thứ thực sự nguy hiểm (Zero-Trust): wildcard toàn Internet và dải CIDR quá
+        lớn (nuốt cả vùng địa chỉ). Whitelist host cụ thể là hợp lệ; whitelist cả DẢI thì không.
         """
         errors = []
         ip_str = ip_str.strip()
 
-        if ip_str in ["0.0.0.0", "0.0.0.0/0", "*", "::/0"]:
+        if ip_str in ["0.0.0.0", "0.0.0.0/0", "*", "any", "all", "::/0"]:
             errors.append("Cannot whitelist wildcard internet ranges")
             return False, errors
 
         try:
             if "/" in ip_str:
                 net = ipaddress.ip_network(ip_str, strict=False)
-                # Phải nằm trong các subnet nội bộ tin cậy
-                is_within = False
-                for subnet_str in self._whitelist_allowed:
-                    network = ipaddress.ip_network(subnet_str, strict=False)
-                    if net.network_address in network and net.broadcast_address in network:
-                        is_within = True
-                        break
-                if not is_within:
+                # Cấm dải quá lớn: prefix < /16 (IPv4) nghĩa là > 65k host -> quá rộng để tin.
+                min_prefix = 16 if net.version == 4 else 64
+                if net.prefixlen < min_prefix:
                     errors.append(
-                        f"IP range {ip_str} is outside the allowed whitelist ranges (internal trusted + demo TEST-NET)"
+                        f"CIDR {ip_str} quá rộng để whitelist (yêu cầu /{min_prefix} trở lên); "
+                        "chỉ whitelist host cụ thể hoặc dải nhỏ."
                     )
             else:
-                ip = ipaddress.ip_address(ip_str)
-                is_within = False
-                for subnet_str in self._whitelist_allowed:
-                    network = ipaddress.ip_network(subnet_str, strict=False)
-                    if ip in network:
-                        is_within = True
-                        break
-                if not is_within:
-                    errors.append(
-                        f"IP {ip_str} is outside the allowed whitelist ranges (internal trusted + demo TEST-NET)"
-                    )
+                ipaddress.ip_address(ip_str)  # host cụ thể: chỉ cần hợp lệ là whitelist được
         except ValueError:
             errors.append(f"Invalid IP address or CIDR format: {ip_str}")
 
