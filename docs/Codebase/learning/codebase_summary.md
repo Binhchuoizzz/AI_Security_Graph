@@ -3,7 +3,7 @@
 Tài liệu này tổng hợp **toàn bộ tệp mã nguồn** của hệ thống SENTINEL, phân bổ theo **Luồng dữ liệu (Dataflow)** và xếp theo **Lộ trình học tập 5 ngày**. Mỗi file phân tích rõ: **Mục đích → Tác dụng → Mối quan hệ** với các cấu phần khác. Đã đối chiếu sát với code ở HEAD (cập nhật 2026-06: luồng gộp online, zero-day real-derived, Anti-Self-DoS shield hẹp, raw-log counter thật, BLOCK_IP brute-force, FIREWALL MOCK; **bổ sung mới nhất:** quan sát ngữ cảnh `token_monitor` + seed tất định + suy biến an toàn ở Agent, và 7 experiment rigor: ablation B–E/cân bằng, độ nhạy ngưỡng, zero-day phân cấp, đối chứng âm APT, stress ngữ cảnh, độ bền LLM; và **Lớp ánh xạ MITRE ATT&CK có cấu trúc** — node thứ 6 `attack_mapper` sau triage, cổng theo ACTION, eval `scripts/eval_attack_mapper.py`).
 
 > **Bản đồ luồng:** Dataset → **Tier-1** (RuleEngine + Welford) → **Guardrails** → **Dual-RAG** → **LangGraph Agent (LLM + ATT&CK Mapper)** → **Response/Audit** → **Dashboard HITL** → Feedback Loop về Tier-1.
-> **Trạng thái kiểm thử:** `pytest 248 passed` (unit+tier1+adversarial), `E2E 22/22 PASSED`.
+> **Trạng thái kiểm thử:** `pytest 256 passed` (unit+tier1+adversarial; gồm 8 test Reputation-enforcement Tier-1), `E2E 22/22 PASSED`.
 > **Hạ tầng & quan sát (deployment/observability):** docker-compose **5 dịch vụ** (llm · redis · mlflow · neo4j · agent_ui) — **tất cả có `healthcheck` + `restart: unless-stopped` + resource limits**; `agent_ui` khởi động chỉ khi redis/mlflow/llm đều `healthy` (`depends_on: service_healthy`). Quan sát: MLflow (metrics thí nghiệm) · `token_monitor`→`llm_token_stats.json` (ngân sách ngữ cảnh) · `subscriber`→`pipeline_stats.json` (Noise Reduction thật) · audit HMAC chain · logging 20 module. Dockerfile multi-stage non-root (`--no-install-recommends`) + Trivy self-scan; **mọi host-port bind `127.0.0.1`** (Zero-Trust — kể cả dashboard). CI/CD 2 workflow: `ci.yml` (ruff-lint + **pyright** type-check pinned + pytest đa-version **có coverage**) và `security.yml` (pip-audit CVE + trufflehog secrets + **hadolint** Dockerfile-lint + **Trivy IaC misconfig**→SARIF lên tab Security). Chi tiết vận hành: [RUN_PROJECT.md](guides/RUN_PROJECT.md).
 >
 > **📚 Lộ trình học chi tiết theo từng hàm (5 ngày):** [DAY1](learning/DAY1.md) Tier-1 & Streaming · [DAY2](learning/DAY2.md) Guardrails · [DAY3](learning/DAY3.md) Dual-RAG & Knowledge Graph · [DAY4](learning/DAY4.md) LangGraph Agent + Response/Audit · [DAY5](learning/DAY5.md) SOC UI + Khung đánh giá 5D. Mỗi file có "💡 Sơ đồ 1 phút" để hình dung nhanh trước khi đọc sâu.
@@ -21,8 +21,8 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 2. **Tiêu thụ (Subscriber):** `subscriber.py` (#9) đọc qua consumer group `sentinel_group` (`xreadgroup`), gọi `RuleEngine.evaluate(log)`.
 3. **Tier-1 quyết định** (`rule_engine.py` #10): trả `tier1_action` → định tuyến:
    - `DROP`/`LOG` (benign) → đếm vào `pipeline_stats.json`, KHÔNG leo thang.
-   - `BLOCK_IP` → blacklist ngay.
-   - `AWAIT_HITL` → `queue_hitl`.
+   - `BLOCK_IP` → blacklist ngay. *(Reputation ≥70 ÉP `BLOCK_IP` dù gói lành — kẻ tái phạm bị chặn không cần LLM.)*
+   - `AWAIT_HITL` → `queue_hitl`. *(Reputation 50–69 ÉP `AWAIT_HITL`.)*
    - `ALERT` → `queue_decisions`.
    - `ESCALATE` → gom batch gọi Agent. *(APT emergent: `record_apt_event`+`check_apt_chain` có thể ÉP `ESCALATE`.)*
 4. **Agent (LangGraph)** — batch escalate → `agent_app.invoke(SentinelState)` (`workflow.py` #34). Đồ thị **6 node**: `guardrails → rag_context → llm_triage →` (rẽ nhánh `route_after_triage`) `attack_mapper` (nếu là threat verdict) `→ action_executor` / `human_in_the_loop`; hoặc thẳng `END` (benign `LOG`).
@@ -94,7 +94,8 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 *   **Tác dụng:**
     *   `RunningStats`: thuật toán **Welford** cập nhật Mean/StdDev trực tuyến, $O(1)$ RAM/CPU.
     *   `SessionBaseline`: IP profiles, phát hiện **port scan** (>10 cổng non-HTTP), tần suất/dung lượng bất thường; eviction TTL chống OOM.
-    *   `evaluate()` theo tầng: Whitelist → **WAF signature** (SQLi/XSS/Path/Cmd-Inj) → **Injection/Jailbreak signature** → **Z-Score anomaly** (warmup 100 mẫu sạch, lệch > `z_threshold`σ (tham số, mặc định 3.5) → zero-day) → Static rules (cổng nhạy cảm, volumetric) → **Dynamic rules (status `ACTIVE`)** → Session baseline → action (DROP/LOG/ALERT/BLOCK_IP/AWAIT_HITL/ESCALATE).
+    *   `evaluate()` theo tầng: Whitelist → **WAF signature** (SQLi/XSS/Path/Cmd-Inj) → **Injection/Jailbreak signature** → **Z-Score anomaly** (warmup 100 mẫu sạch, lệch > `z_threshold`σ (tham số, mặc định 3.5) → zero-day) → Static rules (cổng nhạy cảm, volumetric) → **Dynamic rules (status `ACTIVE`)** → Session baseline → **Reputation enforcement (Tầng 3.5)** → action (DROP/LOG/ALERT/BLOCK_IP/AWAIT_HITL/ESCALATE).
+    *   **Reputation enforcement (`_get_reputation_score`, cache TTL):** tra điểm danh tiếng IP từ Threat Memory; **≥ `reputation_block_threshold`** (mặc định 70) → `BLOCK_IP`; **≥ `reputation_hitl_threshold`** (mặc định 50) → `AWAIT_HITL` — **độc lập điểm gói** (kẻ đã bị chứng minh xấu bị chặn/HITL dù gói hiện tại lành), KHÔNG hạ cấp tín hiệu mạnh hơn, miễn trừ Whitelist, KHÔNG tốn LLM. Tắt/chỉnh qua `tier1.reputation_*` (hot-reload). Cache RAM giữ Tier-1 ở tốc độ cao (tránh SELECT SQLite mỗi log).
     *   **Chống Baseline Poisoning:** chỉ nạp flow benign (DROP/LOG) vào `global_stats`. **Hot-reload** config mỗi 5s.
     *   `z_threshold` được tham số hóa (đọc `tier1.z_threshold`, mặc định 3.5) để `run_threshold_sensitivity.py` quét độ nhạy mà KHÔNG đổi hành vi production.
 *   **Mối quan hệ:** Nhận logs từ `subscriber.py`; đọc/hot-reload `system_settings.yaml`; trả quyết định Tier-1. Luật ACTIVE (do HITL duyệt) được enforce ở đây bằng **substring match** `pattern in log[field]` — bao gồm cả luật HÀNH VI (`User-Agent`/`URI`), nên IP MỚI dùng cùng chữ ký kỹ thuật cũng bị CỜ. `_KEY_ALIASES` nay chuẩn hoá cả `user_agent`→`User-Agent`, `uri`→`URI` (đồng bộ Guardrails G1) để luật khớp bất kể log nguồn viết hoa/thường.
@@ -266,7 +267,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 ### 39. `src/agent/threat_memory.py`
 *   **Mục đích:** Uy tín IP dài hạn, chuỗi APT, chống Memory Poisoning.
 *   **Tác dụng:** SQLite (`config/threat_memory.db`): `record_incident`/`get_ip_reputation`; **`record_apt_event` + `check_apt_chain`** (đánh dấu APT khi IP xuất hiện ở **≥2 NGÀY khác nhau** — không phải "≥3 giai đoạn"); `get_context_for_prompt` (reputation + known-entity + **APT CHAIN đa-ngày** inject vào LLM); `ingest_dapt_chains` (bulk seed dashboard); known entities; `output_sanitizer` cho mọi trường trước khi ghi.
-*   **Mối quan hệ:** Gọi bởi `node_action_executor` (ghi) và `node_rag_context` (nạp lịch sử); `subscriber` ghi APT emergent.
+*   **Mối quan hệ:** Gọi bởi `node_action_executor` (ghi) và `node_rag_context` (nạp lịch sử); `subscriber` ghi APT emergent. **`get_ip_reputation` nay còn được `RuleEngine` (Tier-1) ĐỌC** (qua cache) để tự chặn/HITL IP có tiền sử ≥70/≥50 — Threat Memory không chỉ nuôi Tier-2 mà còn khép vòng về Tier-1.
 
 ### 40. `src/response/executor.py`
 *   **Mục đích:** Audit trail không thể chối cãi + hành động ứng phó.
@@ -279,7 +280,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ### 41. `src/ui/app.py`
 *   **Mục đích:** Web Dashboard Streamlit (SOC HITL).
-*   **Tác dụng:** 5 tab (Nhật ký SIEM & Audit / Phê duyệt Luật HITL / Giám sát APT / Blocklist & Whitelist / Lỗ hổng & Graph). KPI header: "Cảnh báo Escalated", "Luật chờ duyệt/đang chặn", "Live FPR" và **"Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (SỐ THẬT** do subscriber ghi — bỏ ước lượng ×35); KPI "Context Budget" đọc `config/llm_token_stats.json`. Nút Duyệt/Bác → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce. Nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json`.
+*   **Tác dụng:** 5 tab (Nhật ký SIEM & Audit / Phê duyệt Luật HITL / Giám sát APT / Blocklist & Whitelist / Lỗ hổng & Graph). KPI header: "Cảnh báo Escalated", "Luật chờ duyệt/đang chặn", "Live FPR" và **"Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (SỐ THẬT** do subscriber ghi — bỏ ước lượng ×35); KPI "Context Budget" đọc `config/llm_token_stats.json`. Nút Duyệt/Bác → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce. Nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json` *(CLI tương đương 1 lệnh: `scripts/reset_all.py` — tự dừng/xoá/bật lại đúng 1 subscriber)*. Panel **"Tier-1 đã chặn"** (`_get_tier1_blocks`) khử trùng theo IP nhưng hiện **Số lần** chặn + **Lần cuối** (timestamp) để không che mất việc 1 IP bị chặn nhiều lần.
 *   **Mối quan hệ:** Đọc `audit_trail.db`/`threat_memory.db`/`feedback_listener`/`pipeline_stats.json`/`llm_token_stats.json`.
 
 ### 42. `src/ui/components.py`

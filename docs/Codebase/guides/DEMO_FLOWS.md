@@ -29,8 +29,8 @@
 cd /home/binhchuoiz/Projects/Thesis/AI_Security_Graph
 
 # (1) Hạ tầng Docker: LLM (Gemma-2-9B) + Redis + MLflow + Neo4j + Dashboard
-docker compose up -d
-docker compose ps            # đợi tất cả (healthy)
+docker-compose up -d
+docker-compose ps            # đợi tất cả (healthy)
 
 # (2) Subscriber trên HOST = Tier-1 + Tier-2, ghi DB/config cho Dashboard đọc.
 #     (Dashboard container KHÔNG reach được Redis → subscriber BẮT BUỘC chạy ở host.)
@@ -56,35 +56,12 @@ pkill -f "main.py --mode server"
 
 **Cách 1 — nút UI** (nhanh, GIỮ Redis, không cần restart): đăng nhập `manager` → sidebar → tích ô xác nhận → **🗑️ Reset Hệ thống & Demo từ đầu**. Xoá audit · reputation · APT · luật động · whitelist · pipeline_stats · tier1_blocks.
 
-**Cách 2 — CLI sạch hoàn toàn** (xoá cả Redis stream). Thứ tự bắt buộc **DỪNG → XOÁ → CHẠY LẠI**:
+**Cách 2 — CLI sạch hoàn toàn 1 lệnh** (khuyến nghị). `reset_all.py` tự làm đủ **DỪNG → XOÁ (SQLite + config + Redis stream + blacklist) → BẬT LẠI đúng 1 subscriber**, và **tự chống 2 lỗi** hay gặp (chạy >1 subscriber; quên bật lại):
 
 ```bash
-cd /home/binhchuoiz/Projects/Thesis/AI_Security_Graph
-
-# 1) DỪNG subscriber (tránh lỗi NOGROUP khi xoá stream)
-pkill -f "main.py --mode server"; sleep 2
-
-# 2) XOÁ dữ liệu app + Redis stream
-.venv/bin/python - <<'PY'
-import sqlite3, json, redis
-from src.agent.threat_memory import MEMORY_DB_PATH as THREAT
-from src.response.executor import DB_PATH as AUDIT
-from src.tier1_filter.feedback_listener import FeedbackListener
-for db, tbls in {THREAT: ["ip_reputation", "known_entities", "apt_indicators", "threat_events"],
-                 AUDIT:  ["audit_trail", "login_attempts"]}.items():
-    c = sqlite3.connect(db); [c.execute(f"DELETE FROM {t}") for t in tbls]; c.commit(); c.close()
-json.dump({"raw_logs_total": 0, "tier1_dropped_total": 0}, open("config/pipeline_stats.json", "w"))
-json.dump([], open("config/tier1_blocks.json", "w"))
-FeedbackListener().clear_all_dynamic_rules()
-r = redis.Redis.from_url("redis://:SentinelSecurePass2026!@localhost:6379/0", decode_responses=True)
-for k in ["queue_waf", "queue_firewall", "queue_sysmon", "queue_decisions", "queue_hitl"]:
-    r.delete(k)
-bl = r.keys("blacklist:*"); r.delete(*bl) if bl else None
-print("✅ reset xong")
-PY
-
-# 3) CHẠY LẠI subscriber ở HOST (tự tạo lại consumer group)
-nohup .venv/bin/python main.py --mode server > logs/subscriber.log 2>&1 &
+.venv/bin/python scripts/reset_all.py              # reset + bật lại subscriber
+.venv/bin/python scripts/reset_all.py --dry-run    # xem việc sẽ làm, KHÔNG đổi gì
+.venv/bin/python scripts/reset_all.py --no-restart # chỉ reset, không bật lại
 ```
 
 ---
@@ -114,6 +91,7 @@ nohup .venv/bin/python main.py --mode server > logs/subscriber.log 2>&1 &
 - **Xem ở** tab *🎯 Giám sát APT & Threat Intel* → “Nhật ký chuỗi tấn công APT (DAPT2020 Tracker)”.
 - **Kỳ vọng:** 3/3 IP-APT thật được phát hiện (`apt_negative_control_results.json`: recall **1.00**, specificity **1.00**, 0 báo giả trên 4 chuỗi benign đa ngày).
 - ⚠️ **Phân biệt:** *điểm danh tiếng* (1 BLOCK = +30) **≠** *APT* (cần ≥2 ngày, chỉ dữ liệu DAPT).
+- 🆕 **Reputation-enforcement (Tier-1):** khi một IP tích luỹ **điểm danh tiếng ≥ 70** → Tier-1 **tự chặn** (BLOCK_IP) lần sau; **50–69** → AWAIT_HITL — **KHÔNG tốn LLM**. Chạy lại DAPT (KHÔNG reset) để thấy IP tái phạm bị chặn thẳng ở Tier-1.
 
 ---
 
@@ -185,4 +163,5 @@ PY
 | Đẩy đủ CICIDS có nhãn (4267) | `.venv/bin/python scripts/simulate_traffic.py` |
 | Đẩy luồng GỘP cicids+dapt+zeroday | `.venv/bin/python experiments/stream_unified_online.py` |
 | Chỉ kiểm phân bố (không đẩy) | thêm `--dry-run` |
-| Kiểm số subscriber đang chạy | `ps -ef \| grep "main.py --mode server" \| grep -v grep` |
+| Kiểm số subscriber đang chạy (đếm chuẩn) | `.venv/bin/python scripts/reset_all.py --dry-run` (dòng `[1/3]`) |
+| Reset sạch + bật lại 1 subscriber | `.venv/bin/python scripts/reset_all.py` |

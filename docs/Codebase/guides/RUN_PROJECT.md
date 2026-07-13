@@ -313,6 +313,7 @@ exit()
 ### Chi tiết xử lý
 *   **Stateless Filter**: So khớp cổng đích (Destination Port) và số lượng gói tin với các quy tắc tĩnh định nghĩa sẵn.
 *   **Stateful Filter**: Ghi nhận tần suất truy cập của từng IP nguồn vào Redis cache. Nếu số lượng cổng truy cập vượt ngưỡng quy định trong một khoảng thời gian, hệ thống sẽ tự động gán nhãn `Port scanning detected`.
+*   **Reputation Enforcement (Tầng 3.5)**: Tier-1 tra **điểm danh tiếng** IP từ Threat Memory (có cache). IP có tiền sử **≥ 70** → `BLOCK_IP` tự động; **50–69** → `AWAIT_HITL` — **độc lập điểm gói hiện tại**, KHÔNG tốn LLM (kẻ đã bị chứng minh xấu không cần escalate lại). Miễn trừ Whitelist; cấu hình/tắt qua `tier1.reputation_*` trong `system_settings.yaml`.
 
 ---
 
@@ -446,6 +447,9 @@ Minh họa cách hệ thống SENTINEL hoạt động tự động hoàn toàn d
 ```bash
 .venv/bin/python main.py --mode server --log-level INFO
 ```
+
+> ⚠️ **CHỈ 1 SUBSCRIBER.** Nhiều tiến trình cùng consumer group `sentinel_group` sẽ **chia** log → Dashboard hiển thị THIẾU (vd đẩy 120 chỉ thấy 63). Trước khi start mới, luôn `pkill -f "main.py --mode server"`.
+> 🔄 **Reset sạch + bật lại đúng 1 subscriber trong 1 lệnh:** `.venv/bin/python scripts/reset_all.py` (tự DỪNG → XOÁ DB/config/Redis → BẬT LẠI; `--dry-run` để xem trước, `--no-restart` để chỉ reset).
 
 *   **Công việc xử lý:** Subscriber lắng nghe Redis queue `sentinel_logs`, nhận dữ liệu log thô, lọc qua Tier 1 Rule Engine. Nếu log bị gán nhãn `ESCALATE`, nó sẽ chạy qua Guardrails, gọi Dual-RAG để lấy thông tin MITRE/NIST, gọi LLM cục bộ (llama.cpp) để phân tích sự cố, **rồi node `attack_mapper` làm giàu thành bản ghi MITRE ATT&CK có cấu trúc** (tactic/technique/URL/recommended_response) trước khi lưu kết quả vào SQLite DB.
 
