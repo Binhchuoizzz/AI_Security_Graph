@@ -112,6 +112,15 @@ def _get_tier1_blocks(show: int = 12) -> list[dict]:
         return []
     if not isinstance(blocks, list):
         return []
+    # Đếm TỔNG số lần mỗi IP bị Tier-1 chặn (trên toàn bộ lịch sử file, gồm nhiều lần chạy)
+    counts: dict[str, int] = {}
+    for b in blocks:
+        if isinstance(b, dict):
+            ip = b.get("ip")
+            if isinstance(ip, str) and ip:
+                counts[ip] = counts.get(ip, 0) + 1
+
+    # Khử trùng để hiển thị (mới nhất trước) nhưng ĐÍNH KÈM số lần + timestamp lần cuối.
     seen: dict[str, dict] = {}
     for b in reversed(blocks):  # mới nhất trước
         if not isinstance(b, dict):
@@ -121,7 +130,13 @@ def _get_tier1_blocks(show: int = 12) -> list[dict]:
             continue
         _r = b.get("reasons")
         reasons = [str(x) for x in _r] if isinstance(_r, list) else []
-        seen[ip] = {"ip": ip, "score": b.get("score", 0), "reasons": reasons}
+        seen[ip] = {
+            "ip": ip,
+            "score": b.get("score", 0),
+            "reasons": reasons,
+            "count": counts.get(ip, 1),  # số lần bị chặn (không bị dedup che mất)
+            "ts": str(b.get("ts", "")),  # timestamp lần chặn gần nhất
+        }
         if len(seen) >= show:
             break
     return list(seen.values())
@@ -261,6 +276,8 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
                         {
                             "IP nguồn": b["ip"],
                             "Điểm": b["score"],
+                            "Số lần": b.get("count", 1),
+                            "Lần cuối": (b.get("ts") or "")[-8:] or "—",
                             "Lý do Tier-1": " · ".join(b["reasons"][:2]) or "—",
                         }
                         for b in t1_blocks
@@ -272,8 +289,9 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
             )
             st.caption(
                 "Tấn công RÕ RÀNG (chữ ký WAF/injection, cổng nhạy cảm, quét cổng) bị chặn "
-                "TỨC THỜI bằng luật xác định — không tốn LLM. Chặn này là **tạm thời** "
-                "(Redis blacklist, TTL 1 giờ, tự hết hạn) nên số 'đang chặn' giảm dần theo thời gian."
+                "TỨC THỜI bằng luật xác định — không tốn LLM. **Số lần** = tổng số lần IP đó bị "
+                "Tier-1 chặn (gộp mọi lần chạy); **Lần cuối** = thời điểm chặn gần nhất. Chặn này "
+                "là **tạm thời** (Redis blacklist, TTL 1 giờ, tự hết hạn)."
             )
         else:
             st.info(
@@ -1078,6 +1096,8 @@ def main_dashboard():
                     {
                         "Địa chỉ IP": b.get("ip"),
                         "Điểm": b.get("score", 0),
+                        "Số lần chặn": b.get("count", 1),
+                        "Lần cuối": (b.get("ts") or "")[-8:] or "—",
                         "Lý do Tier-1": " · ".join(b.get("reasons", [])) or "—",
                     }
                     for b in tier1_temp_blocks
