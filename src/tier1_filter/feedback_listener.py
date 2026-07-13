@@ -235,7 +235,18 @@ class FeedbackListener:
             return False
 
     def approve_rule(self, pattern: str, field: str | None = None) -> bool:
-        return self.update_rule_status(pattern, "ACTIVE", field)
+        ok = self.update_rule_status(pattern, "ACTIVE", field)
+        # ĐỒNG BỘ block ↔ whitelist (LOẠI TRỪ LẪN NHAU · "hành động sau cùng thắng"):
+        # kích hoạt CHẶN một Source IP thì phải GỠ nó khỏi whitelist. Nếu không, whitelist
+        # (ưu tiên CAO NHẤT ở Tier-1) sẽ khiến luật chặn vừa duyệt trở nên VÔ HIỆU — IP nằm
+        # cả 2 danh sách nên Tier-1 vẫn cho qua. Đây là việc của HỆ THỐNG, không phụ thuộc UI.
+        if ok and field == "Source IP" and pattern in self.get_whitelisted_ips():
+            self.remove_from_whitelist(pattern)
+            logger.info(
+                f"[Feedback] IP {pattern} đã GỠ khỏi whitelist do chuyển sang CHẶN "
+                "(block ↔ whitelist loại trừ lẫn nhau)."
+            )
+        return ok
 
     def reject_rule(self, pattern: str, field: str | None = None) -> bool:
         return self.update_rule_status(pattern, "REJECTED", field)

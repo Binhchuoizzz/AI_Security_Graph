@@ -73,6 +73,45 @@ class TestReceiveNewRule:
         assert _rules(tmp_config) == []
 
 
+class TestBlockWhitelistMutualExclusion:
+    """block ↔ whitelist LOẠI TRỪ LẪN NHAU: kích hoạt chặn 1 Source IP thì gỡ nó khỏi
+    whitelist (nếu không whitelist ưu tiên cao nhất ở Tier-1 sẽ vô hiệu luật chặn)."""
+
+    def _write(self, cfg, rules, whitelist):
+        cfg.write_text(
+            yaml.dump({"tier1": {"dynamic_rules": rules, "whitelist_ips": whitelist}}),
+            encoding="utf-8",
+        )
+
+    def test_approve_source_ip_block_removes_from_whitelist(self, tmp_config):
+        ip = "198.51.100.15"
+        self._write(
+            tmp_config,
+            [{"field": "Source IP", "pattern": ip, "score": 100, "status": "PENDING_APPROVAL"}],
+            ["127.0.0.1", ip],
+        )
+        listener = fl.FeedbackListener()
+        assert listener.approve_rule(ip, "Source IP") is True
+        cfg = yaml.safe_load(tmp_config.read_text())["tier1"]
+        # Luật -> ACTIVE và IP KHÔNG còn trong whitelist.
+        assert cfg["dynamic_rules"][0]["status"] == "ACTIVE"
+        assert ip not in cfg["whitelist_ips"]
+        assert "127.0.0.1" in cfg["whitelist_ips"]  # IP khác giữ nguyên
+
+    def test_approve_non_source_ip_rule_keeps_whitelist(self, tmp_config):
+        """Duyệt luật KHÔNG phải Source IP (vd URI) không đụng whitelist."""
+        ip = "198.51.100.15"
+        self._write(
+            tmp_config,
+            [{"field": "URI", "pattern": "/evil", "score": 50, "status": "PENDING_APPROVAL"}],
+            [ip],
+        )
+        listener = fl.FeedbackListener()
+        assert listener.approve_rule("/evil", "URI") is True
+        cfg = yaml.safe_load(tmp_config.read_text())["tier1"]
+        assert ip in cfg["whitelist_ips"]  # whitelist không bị đụng
+
+
 class TestActiveRules:
     def test_get_active_filters_out_pending(self, tmp_config):
         """Chỉ rule status ACTIVE được nạp vào Tier-1; PENDING chờ HITL duyệt."""

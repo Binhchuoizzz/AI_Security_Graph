@@ -95,7 +95,8 @@ def handle_whitelist_approval(ip: str):
         st.toast(f"✅ Đã whitelist {ip}", icon="✅")
     else:
         st.toast(
-            f"⚠️ Không whitelist được {ip} (ngoài dải cho phép: nội bộ tin cậy + TEST-NET demo)",
+            f"⚠️ Không whitelist được {ip} — chỉ CHẶN dải quá rộng (wildcard 0.0.0.0/0, "
+            "*, any, hoặc CIDR < /16). IP host cụ thể đều được phép.",
             icon="⚠️",
         )
 
@@ -165,7 +166,13 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
         apt_events = []
     apt_ips = sorted({s for e in apt_events if (s := e.get("src_ip"))})
     try:
-        high_risk = threat_memory.get_high_risk_ips(min_score=1.0) or []
+        # ĐỒNG BỘ WHITELIST: bỏ IP đã whitelist khỏi đếm "IP rủi ro cao" (đã miễn trừ).
+        _wl_demo = set(feedback_mgr.get_whitelisted_ips() or [])
+        high_risk = [
+            r
+            for r in (threat_memory.get_high_risk_ips(min_score=1.0) or [])
+            if r["ip"] not in _wl_demo
+        ]
     except Exception:
         high_risk = []
     try:
@@ -340,6 +347,42 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
             st.info(
                 "Chưa có luật nào Tier-2 dạy cho Tier-1. Chạy luồng có escalate để LLM sinh luật."
             )
+
+    # ---------- Tier-2 (LLM/Agent) đã CHẶN — phán quyết ghi vào Audit Trail ----------
+    st.markdown("---")
+    st.markdown("### 🧠 Tier-2 (LLM/Agent) đã CHẶN (phán quyết có suy luận MITRE/NIST)")
+    _t2_blocks = [
+        a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP", "QUARANTINE")
+    ]
+    if _t2_blocks:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Thời gian": str(a.get("timestamp", ""))[5:19],
+                        "Hành động": a.get("action", ""),
+                        "IP / Host": a.get("target", ""),
+                        "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
+                        "Lý do (LLM)": (str(a.get("reason", "")) or "—")[:110],
+                    }
+                    for a in _t2_blocks[:15]
+                ]
+            ),
+            width="stretch",
+            height=280,
+            hide_index=True,
+        )
+        st.caption(
+            f"**{len(_t2_blocks)}** quyết định CHẶN do Tác tử Tier-2 (và thao tác thủ công của "
+            "Analyst) ghi vào Audit Trail HMAC-SHA256. Khác với *Tier-1 đã chặn* (chữ ký tốc độ "
+            "cao, TTL 1h ở Redis): đây là phán quyết **có suy luận MITRE/NIST** của LLM sau khi "
+            "leo thang. IP đã whitelist KHÔNG bao giờ xuất hiện ở đây (đã miễn trừ)."
+        )
+    else:
+        st.info(
+            "Chưa có quyết định CHẶN nào từ Tier-2. Chạy luồng có escalate (adversarial/APT) để "
+            "LLM phán quyết và ghi vào Audit Trail."
+        )
 
     st.markdown("---")
     st.caption(
@@ -747,7 +790,29 @@ def main_dashboard():
                         col1, col2 = st.columns([1, 1])
                         with col1:
                             if st.button("✅ Phê duyệt", key=f"app_{rule.get('pattern')}"):
+                                # Phát hiện xung đột block↔whitelist TRƯỚC khi duyệt (approve_rule
+                                # sẽ tự gỡ khỏi whitelist) để thông báo cho analyst.
+                                _was_wl = (
+                                    rule.get("field") == "Source IP"
+                                    and rule.get("pattern") in feedback_mgr.get_whitelisted_ips()
+                                )
                                 feedback_mgr.approve_rule(rule.get("pattern"), rule.get("field"))
+                                # Ghi audit khi DUYỆT luật (đồng bộ: duyệt block cũng để lại
+                                # 1 bản ghi như duyệt whitelist). Luật Source IP -> BLOCK_IP.
+                                from src.response.executor import _log_to_db
+
+                                _act = "BLOCK_IP" if rule.get("field") == "Source IP" else "LOG"
+                                _log_to_db(
+                                    _act,
+                                    str(rule.get("pattern")),
+                                    f"Luật được DUYỆT (HITL) bởi "
+                                    f"{st.session_state.get('username')}: {rule.get('reason')}",
+                                )
+                                if _was_wl:
+                                    st.warning(
+                                        f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist vì "
+                                        "chuyển sang CHẶN (block ↔ whitelist loại trừ lẫn nhau)."
+                                    )
                                 st.success(f"Đã duyệt luật {rule.get('pattern')}")
                                 time.sleep(0.5)
                                 st.rerun()
@@ -812,8 +877,14 @@ def main_dashboard():
             "chỉ dữ liệu DAPT2020 (có apt_phase) mới vào đây — log escalate lên LLM thường KHÔNG bị tính là APT."
         )
 
-        # Lấy danh sách IP nguy hiểm từ Long-term Memory
-        high_risk_ips = threat_memory.get_high_risk_ips(min_score=1.0)
+        # Lấy danh sách IP nguy hiểm từ Long-term Memory. ĐỒNG BỘ WHITELIST: IP đã whitelist
+        # được MIỄN TRỪ enforcement -> KHÔNG hiển thị như "Threat Actor nguy cơ cao" (tránh
+        # mâu thuẫn: vừa whitelist vừa bị liệt kê nguy hiểm). Vẫn thấy hành vi của nó ở thẻ
+        # Whitelist trong Audit Trail.
+        _wl_set = set(feedback_mgr.get_whitelisted_ips() or [])
+        high_risk_ips = [
+            r for r in threat_memory.get_high_risk_ips(min_score=1.0) if r["ip"] not in _wl_set
+        ]
         high_risk_data = [[r["ip"], r["reputation_score"]] for r in high_risk_ips]
 
         # Lấy danh sách Known Entities nội bộ
@@ -1215,7 +1286,10 @@ def main_dashboard():
                                         "🛑 Tái kích hoạt chặn IP này",
                                         key=f"reblock_{selected_block_ip}",
                                     ):
-                                        # Set status thành ACTIVE
+                                        # Set status thành ACTIVE (tự gỡ khỏi whitelist nếu có)
+                                        _was_wl = (
+                                            selected_block_ip in feedback_mgr.get_whitelisted_ips()
+                                        )
                                         feedback_mgr.approve_rule(selected_block_ip, "Source IP")
                                         from src.response.executor import _log_to_db
 
@@ -1224,6 +1298,11 @@ def main_dashboard():
                                             selected_block_ip,
                                             f"Manual re-block by Administrator ({st.session_state.get('username')})",
                                         )
+                                        if _was_wl:
+                                            st.warning(
+                                                f"⚠️ {selected_block_ip} đã được GỠ khỏi Whitelist "
+                                                "vì chuyển sang CHẶN."
+                                            )
                                         st.success(
                                             f"Đã tái kích hoạt luật chặn cho IP {selected_block_ip}"
                                         )
@@ -1254,8 +1333,9 @@ def main_dashboard():
                                             )
                                         else:
                                             st.error(
-                                                f"❌ Không whitelist được {selected_block_ip} — ngoài dải "
-                                                "cho phép (nội bộ tin cậy + TEST-NET demo). Block rule GIỮ NGUYÊN."
+                                                f"❌ Không whitelist được {selected_block_ip} — chỉ "
+                                                "CHẶN dải quá rộng (wildcard 0.0.0.0/0, *, any, hoặc "
+                                                "CIDR < /16). Block rule GIỮ NGUYÊN."
                                             )
                                         time.sleep(0.5)
                                         st.rerun()
@@ -1305,7 +1385,8 @@ def main_dashboard():
                             source=f"manual_{st.session_state.get('username')}",
                             reason=manual_block_reason,
                         )
-                        # Duyệt luôn
+                        # Duyệt luôn (tự gỡ khỏi whitelist nếu IP đang được whitelist)
+                        _was_wl = manual_block_ip in feedback_mgr.get_whitelisted_ips()
                         feedback_mgr.approve_rule(manual_block_ip, "Source IP")
 
                         # Ghi audit log
@@ -1313,6 +1394,10 @@ def main_dashboard():
 
                         block_ip(manual_block_ip, f"Chặn thủ công: {manual_block_reason}")
 
+                        if _was_wl:
+                            st.warning(
+                                f"⚠️ {manual_block_ip} đã được GỠ khỏi Whitelist vì chuyển sang CHẶN."
+                            )
                         st.success(f"Đã kích hoạt chặn IP {manual_block_ip} thành công!")
                         time.sleep(0.5)
                         st.rerun()
@@ -1350,8 +1435,9 @@ def main_dashboard():
                             st.rerun()
                         else:
                             st.error(
-                                f"❌ Không whitelist được {manual_wl_ip} — chỉ cho phép IP nội bộ tin cậy "
-                                "hoặc TEST-NET demo (198.51.100.x / 203.0.113.x / 192.0.2.x)."
+                                f"❌ Không whitelist được {manual_wl_ip} — chỉ CHẶN dải quá rộng "
+                                "(wildcard 0.0.0.0/0, *, any, all, ::/0, hoặc CIDR < /16). "
+                                "Mọi IP host cụ thể đều được phép."
                             )
 
             # Danh sách Whitelisted IPs hiện tại
