@@ -19,8 +19,8 @@ import tempfile
 
 import pytest  # type: ignore
 
-from experiments.evaluate_unified_stream import build_stream
 from experiments.stream_unified_online import build_sequence, determine_queue, enrich
+from experiments.unified_dataset import build_stream
 from src.agent.threat_memory import ThreatMemoryStore
 
 
@@ -170,7 +170,7 @@ def test_zerodays_real_derived_invariants():
     3. Nền là flow benign 'static-clean' (cổng KHÔNG nhạy cảm, fwd <= max_fwd_packets)
        => luật TĨNH (đối chứng) phải BỎ SÓT (DROP) toàn bộ — tính signature-less.
     """
-    from experiments.evaluate_unified_stream import (
+    from experiments.unified_dataset import (
         GT_PATH,
         ZD_SPECS,
         _build_zerodays,

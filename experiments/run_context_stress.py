@@ -1,5 +1,6 @@
 """
 SENTINEL — Stress Ngữ cảnh: Token Input vs Số lượng Log (Context Budget Curve)
+[Luận văn Ch.4 §Context-Budget Observability & Stress — token vs số log, nén Drain, tránh tràn n_ctx]
 ==============================================================================
 Trả lời "log quá dài/nhiều thì tràn ngữ cảnh không, và biết tinh chỉnh thế nào":
 đẩy số log tăng dần N ∈ {1..2000} và đo token đưa vào LLM theo HAI cách:

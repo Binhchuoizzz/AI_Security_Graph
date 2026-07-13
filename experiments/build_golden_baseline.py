@@ -19,7 +19,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from experiments.evaluate_unified_stream import map_cicids  # noqa: E402
+from experiments.unified_dataset import map_cicids  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")

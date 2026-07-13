@@ -1,5 +1,6 @@
 """
 SENTINEL — Độ Bền LLM & Quy Trình (Determinism + Graceful Degradation)
+[Luận văn Ch.4 §Decision Determinism + §Graceful Degradation — LLM tất định + suy biến an toàn]
 ======================================================================
 Hai mối lo phản biện/TS về việc dùng LLM cục bộ trong quy trình SOC:
 

@@ -1,5 +1,6 @@
 """
 SENTINEL — APT: Đối chứng ÂM tính + Khoảng tin cậy (Negative Control + CI)
+[Luận văn Ch.4 §Emergent APT (đối chứng âm) — chứng minh KHÔNG báo APT nhầm, specificity]
 =========================================================================
 Bổ sung cho phần APT (vốn chỉ báo recall=1.0 trên n nhỏ, KHÔNG có đối chứng âm).
 Hai câu hỏi phản biện:
@@ -25,7 +26,7 @@ from collections import defaultdict
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from experiments.evaluate_unified_stream import BENIGN_PHASES, _safe_int, build_stream  # noqa: E402
+from experiments.unified_dataset import BENIGN_PHASES, _safe_int, build_stream  # noqa: E402
 from src.agent.threat_memory import ThreatMemoryStore  # noqa: E402
 
 OUT_JSON = os.path.join(os.path.dirname(__file__), "results", "apt_negative_control_results.json")

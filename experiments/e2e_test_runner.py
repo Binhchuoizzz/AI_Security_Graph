@@ -553,7 +553,7 @@ def test_20_rank_bm25(r: TestResult):
 def test_21_unified_stream(r: TestResult):
     """Kiểm chứng luồng gộp (CICIDS + DAPT + zero-day) hợp lệ: data thật được
     TRỘN xen kẽ, có IP APT đa-ngày thật. Smoke-test offline, không ghi file."""
-    from experiments.evaluate_unified_stream import build_stream
+    from experiments.unified_dataset import build_stream
 
     warmup, main, apt_truth, n_chains = build_stream()
 

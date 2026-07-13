@@ -1,5 +1,6 @@
 """
 SENTINEL — Phân Tích Độ Nhạy Ngưỡng Welford (Z-score Threshold Sensitivity)
+[Luận văn Ch.4 §Welford Threshold Sensitivity — biện minh chọn 3.5σ, chống cherry-pick]
 ===========================================================================
 Trả lời câu hỏi phản biện: "Ngưỡng 3.5σ có phải chọn may rủi / tinh chỉnh
 quá khớp (cherry-pick) không?". Ta QUÉT ngưỡng Z-score của bộ phát hiện dị biệt
@@ -23,7 +24,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from experiments.evaluate_unified_stream import (  # noqa: E402
+from experiments.unified_dataset import (  # noqa: E402
     BENIGN_ACTIONS,
     _is_threat,
     build_stream,

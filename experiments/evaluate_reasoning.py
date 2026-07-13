@@ -5,7 +5,7 @@ Sử dụng Llama 3 8B (Meta) làm trọng tài độc lập để đánh giá c
 suy luận của Gemma 9B (Google) — tránh Self-Enhancement Bias.
 
 WORKFLOW:
-  1. Chạy run_ablation_study.py với Gemma 9B → lưu reasoning_outputs
+  1. Chạy run_ablation.py --mode af với Gemma 9B → lưu reasoning_outputs
   2. Unload Gemma 9B → Load Llama 3 8B trên LLM server
   3. Chạy script này → Llama 3 chấm điểm reasoning quality
   4. Kết quả: reasoning_eval_results.json + MLflow metrics
@@ -158,7 +158,7 @@ def run_judge_evaluation():
     # Kiểm tra xem file kết quả thử nghiệm loại trừ (ablation results) có tồn tại không
     if not os.path.exists(ABLATION_RESULTS_PATH):
         print("[!] ERROR: ablation_results.json not found!")
-        print("    Run 'python experiments/run_ablation_study.py' with Gemma 9B first.")
+        print("    Run 'python experiments/run_ablation.py --mode af' with Gemma 9B first.")
         sys.exit(1)
 
     with open(ABLATION_RESULTS_PATH) as f:

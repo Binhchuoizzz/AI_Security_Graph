@@ -38,7 +38,7 @@ load_dotenv()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
-from experiments.evaluate_unified_stream import build_stream  # noqa: E402
+from experiments.unified_dataset import build_stream  # noqa: E402
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 # Delay mỗi batch (giây) + số sự kiện/batch — giữ demo chạy trong thời gian hợp lý.
@@ -86,22 +86,43 @@ def enrich(ev: dict) -> dict:
         log["zd_id"] = ev.get("id")
         log["zd_mitre"] = ev.get("mitre")
         log["zd_name"] = ev.get("name")
+    elif ev["source"] == "adversarial":
+        # payload OWASP LLM Top-10 để thử Guardrails/Tier-2 khi escalate
+        log["adv_id"] = ev["log"].get("gt_id", "")
+        log["adv_source"] = "owasp_llm_top10"
     else:  # cicids
         log["gt_label"] = ev.get("label", "")
         log["expected_threat"] = bool(ev.get("expected_threat"))
     return log
 
 
-def build_sequence():
-    """Luồng phát: 150 benign warmup TRƯỚC (làm ấm Welford) rồi luồng chính trộn."""
+def _adversarial_events():
+    """120 payload adversarial (OWASP LLM) dưới dạng event luồng gộp. TÁI DÙNG loader
+    `_adversarial_logs()` của scripts/push_flow.py (đọc experiments/adversarial/*/samples.json
+    + map_to_cicids) — lazy import để tránh vòng import (push_flow import ngược file này)."""
+    from scripts.push_flow import _adversarial_logs
+
+    return [{"source": "adversarial", "log": log} for _q, log in _adversarial_logs()]
+
+
+def build_sequence(include_adversarial: bool = False):
+    """Luồng phát: 150 benign warmup TRƯỚC (làm ấm Welford) rồi luồng chính trộn.
+
+    include_adversarial=True: nối thêm 120 payload adversarial vào CUỐI luồng chính để
+    1 lệnh đẩy được CICIDS + DAPT + Zero-day + Adversarial (mặc định TẮT để giữ luồng
+    phân loại gọn — adversarial là phép thử Guardrails/Tier-2, không phải phân loại flow).
+    """
     warmup, main, apt_truth, n_chains = build_stream()
-    seq = list(warmup) + list(main)  # warmup giữ prefix; main đã sort theo thời gian
+    main = list(main)
+    if include_adversarial:
+        main = main + _adversarial_events()
+    seq = list(warmup) + main  # warmup giữ prefix; main đã sort theo thời gian
     return seq, warmup, main, apt_truth, n_chains
 
 
-def dry_run():
+def dry_run(include_adversarial: bool = False):
     """Kiểm tra logic publisher KHÔNG cần Redis: phân bố queue/nguồn + phủ metadata."""
-    seq, warmup, main, apt_truth, n_chains = build_sequence()
+    seq, warmup, main, apt_truth, n_chains = build_sequence(include_adversarial)
     q_counter, src_counter = Counter(), Counter()
     dapt_attack_with_meta = 0
     zd_with_meta = 0
@@ -124,16 +145,20 @@ def dry_run():
     print(f"  DAPT chuỗi / IP-APT thật : {n_chains} / {len(apt_truth)}")
     print(f"  DAPT attack mang apt_meta: {dapt_attack_with_meta}")
     print(f"  Zero-day mang zd_meta    : {zd_with_meta}")
+    if include_adversarial:
+        print(f"  Adversarial (OWASP LLM)  : {src_counter['adversarial']}")
     # Bất biến tối thiểu để khỏi regress thầm lặng
     assert {"cicids", "dapt", "zeroday"}.issubset(set(src_counter)), "thiếu nguồn"
     assert dapt_attack_with_meta > 0, "DAPT attack không mang metadata APT"
     assert zd_with_meta == src_counter["zeroday"], "zero-day thiếu metadata"
     assert len(apt_truth) >= 1, "không có IP APT thật"
+    if include_adversarial:
+        assert src_counter["adversarial"] > 0, "bật --include-adversarial nhưng không có mẫu"
     print("  [OK] Bất biến publisher đạt — sẵn sàng đẩy online.")
     return True
 
 
-def publish():
+def publish(include_adversarial: bool = False):
     import redis  # type: ignore
 
     print(f"[*] Connecting to Redis: {REDIS_URL}")
@@ -145,7 +170,7 @@ def publish():
         print(f"[!] Redis không kết nối được: {e}")
         return
 
-    seq, warmup, main, apt_truth, n_chains = build_sequence()
+    seq, warmup, main, apt_truth, n_chains = build_sequence(include_adversarial)
     print(
         f"[*] Phát {len(seq)} sự kiện (warmup {len(warmup)} + main {len(main)}) "
         f"| DAPT {n_chains} chuỗi, {len(apt_truth)} IP-APT thật"
@@ -200,8 +225,13 @@ if __name__ == "__main__":
         action="store_true",
         help="Chỉ kiểm tra logic (phân bố queue/metadata), KHÔNG đẩy Redis",
     )
+    ap.add_argument(
+        "--include-adversarial",
+        action="store_true",
+        help="Nối thêm 120 payload adversarial (OWASP LLM) vào luồng → đẩy TẤT CẢ nguồn 1 lệnh",
+    )
     args = ap.parse_args()
     if args.dry_run:
-        dry_run()
+        dry_run(args.include_adversarial)
     else:
-        publish()
+        publish(args.include_adversarial)

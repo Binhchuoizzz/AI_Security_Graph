@@ -1,5 +1,6 @@
 """
 Đánh giá Hiệu năng Độ trễ: Hệ thống 2 Lớp (Two-Tier) so với LLM-only
+[Luận văn Ch.4 §Two-Tier Latency Trade-off — claim độ trễ chủ đạo ~0.6ms / −99% vs LLM]
 
 CHỨC NĂNG:
   Đo độ trễ của 2 chế độ:

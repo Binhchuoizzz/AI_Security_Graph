@@ -1,5 +1,6 @@
 """
 SENTINEL — Zero-Day PHÂN CẤP (Graded Deviation Detection Curve)
+[Luận văn Ch.4 §Graded Detection Boundary — vượt "7/7 nhị phân", vẽ đường cong phát hiện]
 ===============================================================
 Thay vì chỉ 7 mẫu zero-day ở cực trị (lệch hàng trăm σ -> bắt 7/7 gần như hiển
 nhiên), ở đây ta QUÉT độ lệch k ∈ {2,3,3.5,4,5,6,8,10,20,50,100}·σ trên NHIỀU
@@ -23,7 +24,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from experiments.evaluate_unified_stream import _safe_int, build_stream, map_cicids  # noqa: E402
+from experiments.unified_dataset import _safe_int, build_stream, map_cicids  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 OUT_JSON = os.path.join(os.path.dirname(__file__), "results", "zeroday_graded_results.json")
