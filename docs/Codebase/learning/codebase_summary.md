@@ -168,7 +168,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 ### 23. `scripts/build_adversarial_suite.py`
 *   **Mục đích:** Sinh bộ adversarial mở rộng (120 mẫu / 5 nhóm) theo OWASP LLM Top 10.
 *   **Tác dụng:** Sinh `encoding_bypass`(45)/`structural_attacks`(20)/`semantic_confusion`(20)/`jailbreak`(20)/`rag_poisoning`(15) ra `experiments/adversarial/{cat}/samples.json`.
-*   **Mối quan hệ:** Đầu vào cho `evaluate_robustness.py` và `evaluate_adversarial_pipeline.py`.
+*   **Mối quan hệ:** Đầu vào cho `evaluate_adversarial.py --mode static` và `--mode pipeline`.
 
 ### 24. `demos/demo_guardrails.py`
 *   **Mục đích:** Demo tích hợp Guardrails.
@@ -299,32 +299,34 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 *   **Tác dụng:** CSS variables, Glassmorphism, Neon Glow, severity glow + pulse critical, KPI cards (accent bar), tabs/headers/sidebar/buttons, gradient bg, scrollbar, panel `.soc-empty` (empty-state trung tính), console box (font Inter).
 *   **Mối quan hệ:** Load trong `app.py`.
 
-### 45. `experiments/run_ablation_study.py`
-*   **Mục đích:** Ablation Study (đóng góp từng thành phần).
+> **Ghi chú (gộp file):** 3 file ablation cũ (`run_ablation_study/bcde/balanced.py`) nay HỢP NHẤT vào **`experiments/run_ablation.py`** với `--mode {af,bcde,balanced,all}`. Ba entry dưới mô tả 3 mode của CÙNG một file; tên file kết quả GIỮ NGUYÊN.
+
+### 45. `experiments/run_ablation.py --mode af`
+*   **Mục đích:** Ablation A vs F (đóng góp 2 đầu mút).
 *   **Tác dụng:** So sánh **Config A** (Tier-1 đầy đủ, không LLM) vs **Config F** (full SENTINEL) trên ground_truth; đo Precision/Recall/F1/FPR/latency; sinh `Config_F.reasoning_outputs` (cho trọng tài); đẩy MLflow. *(Config A ở đây = Tier-1 đầy đủ — KHÁC "static-only" trong unified stream.)*
 *   **Mối quan hệ:** Output `results/ablation_results.json` dùng cho `statistical_tests` + `evaluate_reasoning`.
 
-### 46. `experiments/run_ablation_bcde.py`
-*   **Mục đích:** Bù đủ Ablation **Configs B, C, D, E** (run_ablation_study.py chỉ chạy A & F) — chạy THẬT, không ước tính.
+### 46. `experiments/run_ablation.py --mode bcde`
+*   **Mục đích:** Ablation **Configs B, C, D, E** — chạy THẬT, không ước tính.
 *   **Tác dụng:** Trên CÙNG 300 mẫu phân tầng tất định: **B** Pure LLM (mọi mẫu→LLM, KHÔNG gate/RAG/guardrails), **C** Welford-gate + LLM (không RAG), **D** gate + dense-RAG (FAISS-only), **E** gate + hybrid-RAG (FAISS+BM25+RRF). Gate Welford tính 1 lần/mẫu, dùng chung C/D/E → escalation set giống hệt nên hiệu số D−C, E−D cô lập đúng đóng góp từng tầng RAG. Verdict = action thô LLM (không áp consensus-guard) để đo năng lực phân loại thuần.
-*   **Mối quan hệ:** Output `results/ablation_bcde_results.json`; ghép với A/F của `run_ablation_study.py`.
+*   **Mối quan hệ:** Output `results/ablation_bcde_results.json`; ghép với A/F của `--mode af`.
 
-### 47. `experiments/run_ablation_balanced.py`
+### 47. `experiments/run_ablation.py --mode balanced`
 *   **Mục đích:** Ablation **CÂN BẰNG 150/150** — cả 6 cấu hình A–F trên cùng tập, để phép so cấu phần CÓ ý nghĩa (tập gốc 93% tấn công khiến mọi cấu hình suy biến về dự đoán toàn-dương, F1 ≈ base rate).
 *   **Tác dụng:** Dựng 150 benign (expected=LOG, **warmup Welford bằng benign THẬT held-out** `benign[150:300]`) + 150 tấn công (phân tầng đều 10/lớp × 15 lớp). Có benign thật → gate Welford/Tier-1 có cơ hội DROP benign (true negative) nên C/D/E/F không còn buộc trùng nhau; đo P/R/F1/FPR + latency từng cấu hình + McNemar (B-vs-gated).
-*   **Mối quan hệ:** Tái dùng hàm gate/RAG/LLM từ `run_ablation_bcde.py`; cần LLM server; output `results/ablation_balanced_results.json`.
+*   **Mối quan hệ:** Cùng file (dùng chung hàm gate/RAG/LLM nội bộ); cần LLM server; output `results/ablation_balanced_results.json`.
 
 ### 48. `experiments/statistical_tests.py` *(Quan trọng)*
 *   **Mục đích:** Kiểm định ý nghĩa thống kê.
 *   **Tác dụng:** **McNemar's Test** (khác biệt phân loại Config A vs F) + **Mann-Whitney U** (khác biệt độ trễ), đọc `ablation_results.json`.
 *   **Mối quan hệ:** Chạy sau Ablation.
 
-### 49. `experiments/evaluate_robustness.py`
+### 49. `experiments/evaluate_adversarial.py --mode static`
 *   **Mục đích:** Đo kháng adversarial của Guardrails **TĨNH** (120 mẫu / 5 nhóm).
 *   **Tác dụng:** Bơm payload qua lớp tĩnh, tính **block rate / bypass rate** (đã sửa naming khỏi "defeat_rate" gây hiểu lầm); ghi `results/robustness_results.json`.
 *   **Mối quan hệ:** Đọc `experiments/adversarial/`; output cho `plot_results`.
 
-### 50. `experiments/evaluate_adversarial_pipeline.py`
+### 50. `experiments/evaluate_adversarial.py --mode pipeline`
 *   **Mục đích:** Đo kháng của **FULL pipeline (Tier-2 LLM)** với payload KHÓ.
 *   **Tác dụng:** Nhúng payload (semantic/jailbreak/rag-poison) vào flow tấn công thật, đẩy qua Tier-1→Guardrails→RAG→LLM; đếm RESISTED vs COMPROMISED (LLM bị ép ra LOG/DROP).
 *   **Mối quan hệ:** Chứng minh `enforce_tier_consensus` đóng lỗ hổng social-engineering.
@@ -332,7 +334,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 ### 51. `experiments/evaluate_reasoning.py`
 *   **Mục đích:** Đánh giá chất lượng suy luận (LLM-as-Judge cross-family).
 *   **Tác dụng:** Hot-swap sang **Llama-3 8B (Meta)** chấm reasoning của **Gemma-2 (Google)** từ `ablation_results.json` → Context Precision/Answer Relevancy/Faithfulness/Context Recall/Audit Completeness (chuẩn RAGAS); đẩy MLflow.
-*   **Mối quan hệ:** Cần `run_ablation_study` chạy trước (sinh reasoning_outputs); dùng `switch_model.sh`.
+*   **Mối quan hệ:** Cần `run_ablation.py --mode af` chạy trước (sinh reasoning_outputs); dùng `switch_model.sh`.
 
 ### 52. `experiments/evaluate_unified_stream.py`
 *   **Mục đích:** Đánh giá luồng gộp THỐNG NHẤT (offline, tất định) — thay phương pháp 3 luồng circular cũ.
@@ -341,7 +343,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ### 53. `experiments/stream_unified_online.py`
 *   **Mục đích:** Publisher ONLINE phát cùng luồng gộp qua TOÀN BỘ hệ thống (demo realtime).
-*   **Tác dụng:** `build_sequence()` + `enrich()` (gắn metadata DAPT/zero-day) → đẩy Redis qua pipeline thật (Tier-1 → APT emergent ở subscriber → LLM Agent → Dashboard); có `--dry-run`. Chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC). *(Offline #52 = benchmark tất định; online #53 = chứng minh end-to-end.)*
+*   **Tác dụng:** `build_sequence()` + `enrich()` (gắn metadata DAPT/zero-day/adversarial) → đẩy Redis qua pipeline thật (Tier-1 → APT emergent ở subscriber → LLM Agent → Dashboard); có `--dry-run`. **Cờ `--include-adversarial`: 1 LỆNH đẩy CẢ 4 nguồn** (CICIDS + DAPT + Zero-day + **120 payload adversarial**, tổng 4796 sự kiện) — tái dùng loader `_adversarial_logs()` của `push_flow.py` (lazy import tránh vòng import). Chỉ event ESCALATE mới gọi LLM (đúng thiết kế SOC). *(Offline #52 = benchmark tất định; online #53 = chứng minh end-to-end. Đây là lệnh "chạy FULL" cho demo hội đồng — xem `docs/Codebase/guides/COMMITTEE_DEMO.md`.)*
 *   **Mối quan hệ:** Dùng chung `build_stream()` với #52; cần Redis + `main.py --mode server`.
 
 ### 54. `experiments/run_threshold_sensitivity.py` *(MỚI — rigor)*

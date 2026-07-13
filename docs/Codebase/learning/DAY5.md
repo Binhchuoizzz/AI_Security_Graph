@@ -20,9 +20,9 @@
 - [NHÓM 1 — Dashboard SOC (Streamlit UI)](#nhom-1)
   - [E1. `src/ui/app.py`](#e1-apppy) · [E2. `src/ui/components.py`](#e2-componentspy) · [E3. `src/ui/auth.py`](#e3-authpy) · [E4. `src/ui/style.css`](#e4-stylecss)
 - [NHÓM 2 — Ablation & Kiểm định thống kê](#nhom-2)
-  - [E5–E8. `run_ablation_*` + `statistical_tests`](#e5-e8)
+  - [E5–E8. `run_ablation.py` (A–F) + `statistical_tests`](#e5-e8)
 - [NHÓM 3 — Kháng cự & Chất lượng suy luận](#nhom-3)
-  - [E9–E11. `evaluate_robustness / adversarial_pipeline / reasoning`](#e9-e11)
+  - [E9–E11. `evaluate_adversarial.py` (static/pipeline) + `reasoning`](#e9-e11)
 - [NHÓM 4 — Luồng gộp thống nhất & Rigor](#nhom-4)
   - [E12–E18. `unified_stream` + 5 script rigor](#e12-e18)
 - [NHÓM 5 — Độ trễ · Vẽ · E2E · Mapper eval](#nhom-5)
@@ -49,9 +49,9 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
         │
         ▼  build_stream()  (evaluate_unified_stream #E12 — nguồn dùng chung)
    ┌───────────────────────────────────────────────────────────────────────┐
-   │ 1. Phân loại   : run_ablation_study (A,F) + bcde (B–E) + balanced(A–F)  │──► statistical_tests (McNemar, Mann-Whitney U)
+   │ 1. Phân loại   : run_ablation.py --mode all (A–F, 3 tập)               │──► statistical_tests (McNemar, Mann-Whitney U)
    │ 2. Vận hành    : measure_latency_baseline (Two-Tier vs LLM-only)        │
-   │ 3. Kháng cự    : evaluate_robustness (tĩnh) + adversarial_pipeline(LLM) │
+   │ 3. Kháng cự    : evaluate_adversarial.py --mode all (tĩnh + LLM)        │
    │ 4. Ngữ cảnh    : evaluate_reasoning (Llama-3 chấm Gemma-2, RAGAS)       │
    │ 5. Luồng gộp   : evaluate_unified_stream (phân loại+APT+zero-day)       │
    │ + RIGOR (5)    : threshold_sensitivity · zeroday_graded · apt_negative  │
@@ -121,17 +121,17 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
 # NHÓM 2 — Ablation & Kiểm định thống kê *(Trục 1: Phân loại)*
 
 <a name="e5-e8"></a>
-### E5. `experiments/run_ablation_study.py` — Ablation A & F
+### E5. `experiments/run_ablation.py --mode af` — Ablation A & F
 - **Mục đích:** So **Config A** (Tier-1 đầy đủ, KHÔNG LLM) vs **Config F** (full SENTINEL) trên `ground_truth.json`.
 - **Tác dụng:** Đo Precision/Recall/F1/FPR/latency; sinh `Config_F.reasoning_outputs` (cho trọng tài #E11); đẩy MLflow.
 - **Quan hệ:** Output `results/ablation_results.json` → `statistical_tests` (#E8) + `evaluate_reasoning` (#E11).
 
-### E6. `experiments/run_ablation_bcde.py` — Configs B, C, D, E
+### E6. `experiments/run_ablation.py --mode bcde` — Configs B, C, D, E
 - **Mục đích:** Bù 4 cấu hình giữa (A chỉ có ở #E5) — chạy THẬT, không ước tính.
 - **Tác dụng:** Trên CÙNG 300 mẫu phân tầng tất định: **B** Pure-LLM (mọi mẫu→LLM, không gate/RAG/guardrails); **C** Welford-gate + LLM (không RAG); **D** gate + dense-RAG (FAISS-only); **E** gate + hybrid-RAG (FAISS+BM25+RRF). Gate Welford tính 1 lần/mẫu, dùng chung C/D/E → escalation set giống hệt nên hiệu số **D−C, E−D** cô lập đúng đóng góp từng tầng RAG. Verdict = action thô LLM (không áp consensus-guard) để đo năng lực phân loại thuần.
 - **Quan hệ:** `results/ablation_bcde_results.json`; ghép với A/F của #E5.
 
-### E7. `experiments/run_ablation_balanced.py` — Cân bằng 150/150 (A–F)
+### E7. `experiments/run_ablation.py --mode balanced` — Cân bằng 150/150 (A–F)
 - **Mục đích:** Ablation **CÂN BẰNG** để phép so cấu phần CÓ ý nghĩa (tập gốc 93% tấn công khiến mọi cấu hình suy biến về dự đoán toàn-dương, F1 ≈ base rate).
 - **Tác dụng:** 150 benign (expected=LOG, **warmup Welford bằng benign THẬT held-out** `benign[150:300]`) + 150 tấn công (10/lớp × 15 lớp). Có benign thật → gate có cơ hội DROP benign (true negative) nên C/D/E/F không còn buộc trùng nhau; đo P/R/F1/FPR + latency + **McNemar (B-vs-gated)**.
 - **Quan hệ:** Tái dùng hàm gate/RAG/LLM từ #E6; cần LLM server; `results/ablation_balanced_results.json`.
@@ -147,12 +147,12 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
 # NHÓM 3 — Kháng cự & Chất lượng suy luận *(Trục 3 & 4)*
 
 <a name="e9-e11"></a>
-### E9. `experiments/evaluate_robustness.py` — Kháng cự Guardrails TĨNH
+### E9. `experiments/evaluate_adversarial.py --mode static` — Kháng cự Guardrails TĨNH
 - **Mục đích:** Đo kháng adversarial của lớp tĩnh (120 mẫu / 5 nhóm OWASP LLM Top-10).
 - **Tác dụng:** Bơm payload qua lớp tĩnh, tính **block rate / bypass rate** (đã sửa naming khỏi "defeat_rate"). Đọc `experiments/adversarial/` (sinh bởi `build_adversarial_suite.py`, DAY2 #23).
 - **Quan hệ:** `results/robustness_results.json` → `plot_results`.
 
-### E10. `experiments/evaluate_adversarial_pipeline.py` — Kháng cự FULL pipeline (LLM)
+### E10. `experiments/evaluate_adversarial.py --mode pipeline` — Kháng cự FULL pipeline (LLM)
 - **Mục đích:** Đo kháng của **toàn pipeline Tier-2** với payload KHÓ.
 - **Tác dụng:** Nhúng payload (semantic/jailbreak/rag-poison) vào flow tấn công thật → Tier-1→Guardrails→RAG→LLM; đếm **RESISTED vs COMPROMISED** (LLM bị ép ra LOG/DROP).
 - **Quan hệ:** Chứng minh `enforce_tier_consensus` (DAY4) đóng lỗ hổng social-engineering (16.7%→0%).

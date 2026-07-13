@@ -1,7 +1,7 @@
 # Ablation Study Design for the Two-Tier Architecture
 
 > **Status:** IMPLEMENTED (v4 — 2026-06)
-> **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và NIST-only RAG) và bổ sung Statistical Validity Framework. **v4:** Configs B–E nay ĐÃ triển khai script tự động (`run_ablation_bcde.py`) với trục cô lập **gate Welford + từng tầng RAG**, và bổ sung **bản cân bằng 150/150** (`run_ablation_balanced.py`) chạy cả A–F để khắc phục hiệu ứng base-rate. Xem §1b để biết ánh xạ thiết kế-YAML ↔ runner thật.
+> **Update:** Mở rộng từ 4 → 6 configs (thêm MITRE-only RAG và NIST-only RAG) và bổ sung Statistical Validity Framework. **v4:** Configs B–E nay ĐÃ triển khai script tự động (`run_ablation.py --mode bcde`) với trục cô lập **gate Welford + từng tầng RAG**, và bổ sung **bản cân bằng 150/150** (`run_ablation.py --mode balanced`) chạy cả A–F để khắc phục hiệu ứng base-rate. Xem §1b để biết ánh xạ thiết kế-YAML ↔ runner thật.
 > **Trả lời câu hỏi:** "Mỗi component contribute gì? Sự khác biệt có ý nghĩa thống kê (statistically significant) không?"
 
 ---
@@ -25,15 +25,15 @@
 
 | Config | Runner thật | Ngữ nghĩa thực đo | Output JSON |
 |---|---|---|---|
-| **A** | `run_ablation_study.py` | Tier-1 đầy đủ, KHÔNG LLM | `ablation_results.json` |
-| **B** | `run_ablation_bcde.py` | Pure LLM (không gate / RAG / guardrails) | `ablation_bcde_results.json` |
-| **C** | `run_ablation_bcde.py` | Welford-gate + LLM (không RAG) | `ablation_bcde_results.json` |
-| **D** | `run_ablation_bcde.py` | gate + **dense-RAG** (FAISS-only) | `ablation_bcde_results.json` |
-| **E** | `run_ablation_bcde.py` | gate + **hybrid-RAG** (FAISS+BM25+RRF) | `ablation_bcde_results.json` |
-| **F** | `run_ablation_study.py` | full agent + Consensus Guard | `ablation_results.json` |
-| **A–F cân bằng** | `run_ablation_balanced.py` | 150 benign + 150 tấn công (đều 15 lớp), warmup Welford benign thật, McNemar B-vs-gated | `ablation_balanced_results.json` |
+| **A** | `run_ablation.py --mode af` | Tier-1 đầy đủ, KHÔNG LLM | `ablation_results.json` |
+| **B** | `run_ablation.py --mode bcde` | Pure LLM (không gate / RAG / guardrails) | `ablation_bcde_results.json` |
+| **C** | `run_ablation.py --mode bcde` | Welford-gate + LLM (không RAG) | `ablation_bcde_results.json` |
+| **D** | `run_ablation.py --mode bcde` | gate + **dense-RAG** (FAISS-only) | `ablation_bcde_results.json` |
+| **E** | `run_ablation.py --mode bcde` | gate + **hybrid-RAG** (FAISS+BM25+RRF) | `ablation_bcde_results.json` |
+| **F** | `run_ablation.py --mode af` | full agent + Consensus Guard | `ablation_results.json` |
+| **A–F cân bằng** | `run_ablation.py --mode balanced` | 150 benign + 150 tấn công (đều 15 lớp), warmup Welford benign thật, McNemar B-vs-gated | `ablation_balanced_results.json` |
 
-> **Lý do hai trục khác nhau:** thiết kế YAML cô lập *loại tri thức RAG* (MITRE-only vs NIST-only); runner `run_ablation_bcde.py` cô lập *kiến trúc truy xuất* (no-RAG → dense → hybrid) vì đây là đóng góp kỹ thuật cốt lõi (RRF hybrid). Gate Welford tính 1 lần/mẫu dùng chung C/D/E nên hiệu số D−C, E−D tách đúng đóng góp từng tầng. Bản cân bằng giải quyết hiệu ứng base-rate (tập gốc 93% tấn công → mọi cấu hình suy biến về dự đoán toàn-dương, F1 ≈ base rate).
+> **Lý do hai trục khác nhau:** thiết kế YAML cô lập *loại tri thức RAG* (MITRE-only vs NIST-only); runner `run_ablation.py --mode bcde` cô lập *kiến trúc truy xuất* (no-RAG → dense → hybrid) vì đây là đóng góp kỹ thuật cốt lõi (RRF hybrid). Gate Welford tính 1 lần/mẫu dùng chung C/D/E nên hiệu số D−C, E−D tách đúng đóng góp từng tầng. Bản cân bằng giải quyết hiệu ứng base-rate (tập gốc 93% tấn công → mọi cấu hình suy biến về dự đoán toàn-dương, F1 ≈ base rate).
 
 ---
 
@@ -89,11 +89,11 @@
 
 | Run | Config | Script | Dataset | Sample Size | Estimated Time |
 |---|---|---|---|---|---|
-| 1 | A & F (Rule-only ↔ Full) | `run_ablation_study.py` | Ground Truth (stratified) | 300 | ~20-30 min (LLM cho F) |
-| 2 | B, C, D, E | `run_ablation_bcde.py` | Ground Truth (cùng 300 mẫu) | 300 | ~30-60 min (LLM) |
-| 3 | A–F cân bằng | `run_ablation_balanced.py` | 150 benign + 150 attack | 300 | ~30-60 min (LLM) |
+| 1 | A & F (Rule-only ↔ Full) | `run_ablation.py --mode af` | Ground Truth (stratified) | 300 | ~20-30 min (LLM cho F) |
+| 2 | B, C, D, E | `run_ablation.py --mode bcde` | Ground Truth (cùng 300 mẫu) | 300 | ~30-60 min (LLM) |
+| 3 | A–F cân bằng | `run_ablation.py --mode balanced` | 150 benign + 150 attack | 300 | ~30-60 min (LLM) |
 
-> **Lưu ý (v4):** Config A & F là hai đầu mút cốt lõi trả lời RQ1 (Rule-only vs Full SENTINEL) và sinh `Config_F.reasoning_outputs` cho LLM-as-Judge. Các Config B–E nay ĐÃ có script tự động (`run_ablation_bcde.py`, trục no-RAG→dense→hybrid) và bản cân bằng 150/150 (`run_ablation_balanced.py`). Run #2/#3 chạy trên cùng tập (hoặc tập cân bằng) để so sánh nhất quán.
+> **Lưu ý (v4):** Config A & F là hai đầu mút cốt lõi trả lời RQ1 (Rule-only vs Full SENTINEL) và sinh `Config_F.reasoning_outputs` cho LLM-as-Judge. Các Config B–E nay ĐÃ có script tự động (`run_ablation.py --mode bcde`, trục no-RAG→dense→hybrid) và bản cân bằng 150/150 (`run_ablation.py --mode balanced`). Run #2/#3 chạy trên cùng tập (hoặc tập cân bằng) để so sánh nhất quán.
 
 ---
 
