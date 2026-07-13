@@ -590,8 +590,12 @@ class RuleEngine:
         source_ip = log_entry.get("Source IP", "unknown")
         if source_ip in self.whitelist_ips:
             log_entry["tier1_score"] = 0
-            log_entry["tier1_reasons"] = ["IP nằm trong Whitelist (An toàn)"]
-            log_entry["tier1_action"] = "DROP"
+            log_entry["tier1_reasons"] = ["IP nằm trong Whitelist (An toàn) — cho qua & ghi nhận"]
+            # WHITELIST_DROP: vẫn CHO QUA (đếm noise như DROP) nhưng phân biệt được với DROP
+            # thường -> subscriber ghi 1 bản LOG riêng để UI hiển thị bằng thẻ Whitelist
+            # (không phân tích tấn công/MITRE). KHÔNG feed baseline (không học từ IP bỏ qua).
+            log_entry["tier1_action"] = "WHITELIST_DROP"
+            log_entry["is_whitelisted"] = True
             log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
             return log_entry
 

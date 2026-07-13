@@ -66,7 +66,7 @@ class TestRuleEngine:
         assert result["tier1_score"] < 15
 
     def test_whitelist_ip_drop(self):
-        """Traffic từ IP trong whitelist phải bị DROP dù là port nhạy cảm."""
+        """Traffic từ IP trong whitelist -> WHITELIST_DROP (cho qua) dù là port nhạy cảm."""
         self.engine.whitelist_ips = ["10.0.0.99"]
         log = {
             "Source IP": "10.0.0.99",
@@ -74,8 +74,9 @@ class TestRuleEngine:
             "Total Fwd Packets": 5000,
         }
         result = self.engine.evaluate(log)
-        assert result["tier1_action"] == "DROP"
+        assert result["tier1_action"] == "WHITELIST_DROP"
         assert result["tier1_score"] == 0
+        assert result.get("is_whitelisted") is True
 
     def test_ftp_port_escalate(self):
         """Port 21 (FTP) phải bị block IP (BLOCK_IP)."""
@@ -264,11 +265,11 @@ class TestReputationEnforcement:
         assert result["tier1_action"] == "DROP"
 
     def test_reputation_whitelist_exempt(self):
-        """IP reputation cao nhưng nằm Whitelist -> vẫn DROP (miễn trừ)."""
+        """IP reputation cao nhưng nằm Whitelist -> vẫn cho qua (WHITELIST_DROP), miễn trừ reputation."""
         engine = self._engine(90.0)
         engine.whitelist_ips = ["203.0.113.10"]
         result = engine.evaluate(self._benign("203.0.113.10"))
-        assert result["tier1_action"] == "DROP"
+        assert result["tier1_action"] == "WHITELIST_DROP"
 
     def test_reputation_disabled_no_effect(self):
         """Tắt reputation_enforcement -> điểm cao cũng không tác động."""

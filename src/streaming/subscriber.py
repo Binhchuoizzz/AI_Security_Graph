@@ -278,6 +278,24 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                                 # Chỉ ghi nhận vào ablation log phục vụ thống kê nghiên cứu
                                 r.rpush("queue_decisions", json.dumps(evaluated_log))
 
+                            elif action == "WHITELIST_DROP":
+                                # IP whitelist: CHO QUA nhưng ghi 1 bản audit RIÊNG (action=
+                                # WHITELIST) để UI hiển thị bằng thẻ Whitelist — KHÔNG phân tích
+                                # tấn công/MITRE/LLM. Vẫn thấy được "IP whitelist tiếp tục truy cập".
+                                src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                    "src_ip", ""
+                                )
+                                if src_ip:
+                                    from src.response.executor import _log_to_db
+
+                                    _log_to_db(
+                                        "WHITELIST",
+                                        src_ip,
+                                        "IP nằm trong Whitelist — hệ thống cho qua và ghi nhận truy cập "
+                                        "(không phân tích tấn công).",
+                                        raw_log=json.dumps(_strip_dataset_labels(evaluated_log)),
+                                    )
+
                         except json.JSONDecodeError:
                             print(f"[!] Malformed JSON in message {msg_id}. Bỏ qua (đã xack).")
                         except Exception as e:

@@ -31,7 +31,11 @@ class ActionValidator:
     Từ chối các hành động khác -> ngăn LLM bị thao túng để thực thi lệnh tùy ý.
     """
 
-    ALLOWED_ACTIONS = frozenset({"BLOCK_IP", "QUARANTINE", "ALERT", "LOG", "AWAIT_HITL"})
+    # WHITELIST: bản ghi audit cho truy cập được đặc cách cho qua (không phải hành động
+    # phản ứng, chỉ để ghi nhận + hiển thị thẻ riêng trên UI).
+    ALLOWED_ACTIONS = frozenset(
+        {"BLOCK_IP", "QUARANTINE", "ALERT", "LOG", "AWAIT_HITL", "WHITELIST"}
+    )
 
     # Các mẫu nguy hiểm trong trường target/reason (command injection)
     DANGEROUS_PATTERNS = re.compile(

@@ -36,6 +36,43 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
     target = html_lib.escape(str(alert.get("target", "N/A")))
     raw_reason = str(alert.get("reason", "N/A"))
 
+    # ── Thẻ RIÊNG cho truy cập được WHITELIST cho qua ──────────────────────────
+    # IP whitelist vẫn được ghi nhận + hiển thị, NHƯNG bằng thẻ xanh "cho qua",
+    # KHÔNG phải thẻ tấn công (không MITRE/độ tin cậy/suy luận LLM) — nó không phải
+    # tấn công, chỉ là truy cập hợp lệ đã được đặc cách.
+    if action == "WHITELIST":
+        wl_html = (
+            '<div class="soc-card" style="border-left:4px solid #52c41a;'
+            'background:rgba(82,196,26,0.06);">'
+            '<div class="soc-card-header">'
+            '<h4 class="soc-card-title">✅ [WHITELIST] Truy cập được cho qua</h4>'
+            f'<span class="soc-timestamp">{formatted_time}</span>'
+            "</div>"
+            '<div class="soc-detail-row">'
+            '<span class="soc-label">IP nguồn:</span>'
+            f'<span class="soc-value-code">{target}</span>'
+            "</div>"
+            '<div class="soc-detail-row">'
+            '<span class="soc-badge" style="background:rgba(82,196,26,0.15);'
+            'color:#95de64;border:1px solid rgba(82,196,26,0.35);">'
+            "✅ WHITELIST · KHÔNG phân tích tấn công</span>"
+            "</div>"
+            f'<div style="color:#95de64;font-size:0.85rem;margin-top:6px;">'
+            f"{html_lib.escape(raw_reason)}</div>"
+            "</div>"
+        )
+        st.markdown("".join(line.strip() for line in wl_html.split("\n")), unsafe_allow_html=True)
+        with st.expander("🔍 Xem LOG THÔ (Raw Flow từ IP Whitelist)", expanded=False):
+            _wl_raw = alert.get("raw_log") if isinstance(alert, dict) else None
+            if _wl_raw:
+                try:
+                    st.json(json.loads(_wl_raw))
+                except Exception:
+                    st.code(str(_wl_raw))
+            else:
+                st.caption("Không có log thô đính kèm.")
+        return
+
     # Bóc tách Regex từ chuỗi Reason
     mitre_tech = "N/A"
     confidence = "Chưa rõ"
