@@ -23,6 +23,40 @@ def is_valid_ip(ip_str: str) -> bool:
     return bool(re.match(ipv6_pattern, ip_str))
 
 
+def _derive_tier1_attack_type(reasons: list[str]) -> str:
+    """Suy ra nhãn 'kiểu tấn công' ngắn gọn từ danh sách lý do Tier-1 (chữ ký/thống kê).
+
+    Dùng cho thẻ Whitelist: IP whitelist vẫn được phân tích nên phải nêu được nó ĐANG
+    làm kỹ thuật gì, dù không bị chặn. Trả nhãn tổng hợp (nối bằng ' + ').
+    """
+    labels: list[str] = []
+    joined = " ".join(reasons)
+    # WAF: "WAF: Phát hiện <loại> trong '<field>'"
+    for m in re.finditer(r"WAF:\s*Phát hiện\s*([^']+?)\s*trong", joined):
+        lbl = m.group(1).strip()
+        if lbl and lbl not in labels:
+            labels.append(lbl)
+    if "Prompt Injection Pattern" in joined and "Prompt Injection" not in labels:
+        labels.append("Prompt Injection")
+    if "Jailbreak Pattern" in joined and "Jailbreak / Bypass" not in labels:
+        labels.append("Jailbreak / Bypass")
+    if ("Zero-day" in joined or "dị biệt thống kê" in joined) and (
+        "Bất thường thống kê (nghi Zero-day)" not in labels
+    ):
+        labels.append("Bất thường thống kê (nghi Zero-day)")
+    if "cổng nhạy cảm" in joined and "Truy cập cổng nhạy cảm" not in labels:
+        labels.append("Truy cập cổng nhạy cảm")
+    if "APT chain" in joined and "Chuỗi APT đa ngày" not in labels:
+        labels.append("Chuỗi APT đa ngày")
+    if not labels:
+        return (
+            "Không có dấu hiệu tấn công (truy cập thường)"
+            if not reasons
+            else "Hoạt động đáng chú ý"
+        )
+    return " + ".join(labels)
+
+
 def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id=""):
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
@@ -37,15 +71,37 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
     raw_reason = str(alert.get("reason", "N/A"))
 
     # ── Thẻ RIÊNG cho truy cập được WHITELIST cho qua ──────────────────────────
-    # IP whitelist vẫn được ghi nhận + hiển thị, NHƯNG bằng thẻ xanh "cho qua",
-    # KHÔNG phải thẻ tấn công (không MITRE/độ tin cậy/suy luận LLM) — nó không phải
-    # tấn công, chỉ là truy cập hợp lệ đã được đặc cách.
+    # IP whitelist VẪN được Tier-1 phân tích đầy đủ (kiểu tấn công + suy luận) để
+    # analyst QUAN SÁT — hiển thị bằng thẻ XANH "cho qua". Khác thẻ tấn công ở chỗ:
+    # đã đặc cách nên KHÔNG bị chặn / không escalate LLM / không HITL. Nhờ vậy lần
+    # chạy thứ 2 vẫn thấy được hành vi của IP whitelist thay vì bị nuốt lặng.
     if action == "WHITELIST":
+        # Lấy phân tích Tier-1 từ raw_log (tier1_reasons/score) — nguồn "kiểu tấn công + suy luận".
+        _wl_raw = alert.get("raw_log") if isinstance(alert, dict) else None
+        _wl_reasons: list[str] = []
+        _wl_score = None
+        if _wl_raw:
+            try:
+                _wl_obj = json.loads(_wl_raw)
+                _wl_reasons = [str(x) for x in (_wl_obj.get("tier1_reasons") or [])]
+                _wl_score = _wl_obj.get("tier1_score")
+            except Exception:
+                _wl_reasons = []
+        attack_type = _derive_tier1_attack_type(_wl_reasons)
+        score_txt = f" · điểm Tier-1 {_wl_score}" if _wl_score is not None else ""
+
+        reasons_html = (
+            "".join(
+                f'<li style="margin-bottom:3px;">{html_lib.escape(r)}</li>' for r in _wl_reasons
+            )
+            or '<li style="color:#95de64;">Không có dấu hiệu tấn công — truy cập thường.</li>'
+        )
+
         wl_html = (
             '<div class="soc-card" style="border-left:4px solid #52c41a;'
             'background:rgba(82,196,26,0.06);">'
             '<div class="soc-card-header">'
-            '<h4 class="soc-card-title">✅ [WHITELIST] Truy cập được cho qua</h4>'
+            '<h4 class="soc-card-title">✅ [WHITELIST] Truy cập được CHO QUA (không chặn)</h4>'
             f'<span class="soc-timestamp">{formatted_time}</span>'
             "</div>"
             '<div class="soc-detail-row">'
@@ -53,17 +109,23 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
             f'<span class="soc-value-code">{target}</span>'
             "</div>"
             '<div class="soc-detail-row">'
+            '<span class="soc-label">Kiểu phát hiện (Tier-1):</span>'
+            f'<span class="soc-value-code" style="color:#ffa940;">{html_lib.escape(attack_type)}</span>'
+            f'<span style="color:#8c8c8c;font-size:0.8rem;">{html_lib.escape(score_txt)}</span>'
+            "</div>"
+            '<div class="soc-reasoning-box" style="margin-top:8px;">'
+            '<div class="soc-reasoning-title">🔎 Suy luận Tier-1 (để giám sát, KHÔNG dùng LLM):</div>'
+            f'<ul style="margin:6px 0 0 18px;font-size:0.85rem;color:#d9d9d9;">{reasons_html}</ul>'
+            "</div>"
+            '<div class="soc-detail-row" style="margin-top:8px;">'
             '<span class="soc-badge" style="background:rgba(82,196,26,0.15);'
             'color:#95de64;border:1px solid rgba(82,196,26,0.35);">'
-            "✅ WHITELIST · KHÔNG phân tích tấn công</span>"
+            "✅ WHITELIST · đặc cách CHO QUA — không chặn / không escalate</span>"
             "</div>"
-            f'<div style="color:#95de64;font-size:0.85rem;margin-top:6px;">'
-            f"{html_lib.escape(raw_reason)}</div>"
             "</div>"
         )
         st.markdown("".join(line.strip() for line in wl_html.split("\n")), unsafe_allow_html=True)
         with st.expander("🔍 Xem LOG THÔ (Raw Flow từ IP Whitelist)", expanded=False):
-            _wl_raw = alert.get("raw_log") if isinstance(alert, dict) else None
             if _wl_raw:
                 try:
                     st.json(json.loads(_wl_raw))

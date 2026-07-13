@@ -66,7 +66,9 @@ class TestRuleEngine:
         assert result["tier1_score"] < 15
 
     def test_whitelist_ip_drop(self):
-        """Traffic từ IP trong whitelist -> WHITELIST_DROP (cho qua) dù là port nhạy cảm."""
+        """IP whitelist: CHO QUA (WHITELIST_DROP) NHƯNG vẫn được phân tích đầy đủ để analyst
+        quan sát — action bị ép cho qua, còn score/reasons vẫn phản ánh hành vi (cổng 22 nhạy
+        cảm + dung lượng cao) thay vì bị nuốt lặng ở Tầng 0."""
         self.engine.whitelist_ips = ["10.0.0.99"]
         log = {
             "Source IP": "10.0.0.99",
@@ -75,8 +77,10 @@ class TestRuleEngine:
         }
         result = self.engine.evaluate(log)
         assert result["tier1_action"] == "WHITELIST_DROP"
-        assert result["tier1_score"] == 0
         assert result.get("is_whitelisted") is True
+        # Vẫn PHÂN TÍCH: điểm > 0 và có lý do (kiểu tấn công) cho human quan sát.
+        assert result["tier1_score"] > 0
+        assert len(result["tier1_reasons"]) > 0
 
     def test_ftp_port_escalate(self):
         """Port 21 (FTP) phải bị block IP (BLOCK_IP)."""

@@ -10,7 +10,43 @@ và demo online mất giá trị khoa học.
 
 import pytest  # type: ignore
 
-from src.streaming.subscriber import _DATASET_LABEL_KEYS, _strip_dataset_labels
+from src.streaming.subscriber import (
+    _DATASET_LABEL_KEYS,
+    _apply_blacklist_memory,
+    _strip_dataset_labels,
+)
+
+
+class TestBlacklistMemory:
+    """TRÍ NHỚ Tier-1: IP trong blacklist (đã bị chặn gần đây) -> chặn thẳng lần sau,
+    KHÔNG leo thang Tier-2 lại. Whitelist & log đang BLOCK được giữ nguyên."""
+
+    def test_blacklisted_benign_flow_forced_block(self):
+        log = {"tier1_action": "DROP", "tier1_reasons": []}
+        assert _apply_blacklist_memory("DROP", log, is_blacklisted=True) == "BLOCK_IP"
+        assert log["tier1_action"] == "BLOCK_IP"
+        assert any("TRÍ NHỚ" in r for r in log["tier1_reasons"])
+
+    def test_blacklisted_escalate_downgraded_to_block_no_llm(self):
+        """Đang định ESCALATE (tốn LLM) nhưng IP đã bị chặn -> ép BLOCK, KHÔNG leo thang."""
+        log = {"tier1_action": "ESCALATE"}
+        assert _apply_blacklist_memory("ESCALATE", log, is_blacklisted=True) == "BLOCK_IP"
+
+    def test_whitelisted_not_overridden(self):
+        """Whitelist ưu tiên cao hơn blacklist -> KHÔNG bị ép BLOCK."""
+        log = {"tier1_action": "WHITELIST_DROP", "is_whitelisted": True}
+        assert (
+            _apply_blacklist_memory("WHITELIST_DROP", log, is_blacklisted=True) == "WHITELIST_DROP"
+        )
+
+    def test_not_blacklisted_unchanged(self):
+        log = {"tier1_action": "DROP"}
+        assert _apply_blacklist_memory("DROP", log, is_blacklisted=False) == "DROP"
+
+    def test_already_block_not_duplicated(self):
+        log = {"tier1_action": "BLOCK_IP", "tier1_reasons": ["WAF"]}
+        assert _apply_blacklist_memory("BLOCK_IP", log, is_blacklisted=True) == "BLOCK_IP"
+        assert log["tier1_reasons"] == ["WAF"]  # không thêm lý do trùng
 
 
 class TestStripDatasetLabels:

@@ -75,6 +75,28 @@ def _strip_dataset_labels(log: dict) -> dict:
     return {k: v for k, v in log.items() if k not in _DATASET_LABEL_KEYS}
 
 
+def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bool) -> str:
+    """TRÍ NHỚ Tier-1 (Redis blacklist, TTL 1h): IP đã bị chặn gần đây (bởi Tier-1 HOẶC
+    Tier-2) -> Tier-1 CHẶN NGAY lần tái phạm, KHÔNG leo thang Tier-2 lại. Đây là cơ chế
+    "nhớ mặt" trả lời cho 'chạy lần 2 sao Tier-2 lại block tiếp'.
+
+    Whitelist (đã cho qua) và log đang BLOCK_IP được GIỮ NGUYÊN — không đè. Trả về action
+    (có thể đã bị ép BLOCK_IP) và ghi lý do vào evaluated_log để hiển thị/đối chiếu.
+    """
+    if (
+        is_blacklisted
+        and not evaluated_log.get("is_whitelisted")
+        and action not in ("BLOCK_IP", "WHITELIST_DROP")
+    ):
+        evaluated_log["tier1_action"] = "BLOCK_IP"
+        evaluated_log["tier1_reasons"] = (evaluated_log.get("tier1_reasons") or []) + [
+            "TRÍ NHỚ Tier-1: IP đã bị chặn gần đây (blacklist TTL 1h) — chặn ngay, "
+            "KHÔNG leo thang Tier-2 lại"
+        ]
+        return "BLOCK_IP"
+    return action
+
+
 def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
     """
     on_batch_ready: Hàm callback được gọi khi đủ batch size hoặc hết timeout.
@@ -219,6 +241,9 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                                         (not before["is_apt"])
                                         and after["is_apt"]
                                         and apt_ip not in apt_fired
+                                        # IP whitelist: KHÔNG escalate lên LLM (giữ đặc cách
+                                        # cho qua) — vẫn ghi chuỗi APT ở trên để quan sát.
+                                        and not evaluated_log.get("is_whitelisted")
                                     ):
                                         apt_fired.add(apt_ip)
                                         evaluated_log["apt_emergent"] = True
@@ -234,6 +259,19 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                                             f"{after.get('max_day_seen')} -> ESCALATE lên Agent"
                                         )
                                         action = "ESCALATE"  # đẩy APT qua full pipeline (LLM)
+
+                            # ── TRÍ NHỚ Tier-1 (Redis blacklist, TTL 1h) ────────────────────
+                            # Kẻ ĐÃ bị chặn gần đây (Tier-1 HOẶC Tier-2) -> chặn thẳng lần tái
+                            # phạm, không leo thang Tier-2 lại. (logic tách ra _apply_blacklist_memory)
+                            _mem_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                "src_ip", ""
+                            )
+                            if _mem_ip and action not in ("BLOCK_IP", "WHITELIST_DROP"):
+                                try:
+                                    _is_bl = bool(r.exists(f"blacklist:{_mem_ip}"))
+                                except Exception:
+                                    _is_bl = False
+                                action = _apply_blacklist_memory(action, evaluated_log, _is_bl)
 
                             # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
                             if action == "ESCALATE":
@@ -279,20 +317,30 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
                                 r.rpush("queue_decisions", json.dumps(evaluated_log))
 
                             elif action == "WHITELIST_DROP":
-                                # IP whitelist: CHO QUA nhưng ghi 1 bản audit RIÊNG (action=
-                                # WHITELIST) để UI hiển thị bằng thẻ Whitelist — KHÔNG phân tích
-                                # tấn công/MITRE/LLM. Vẫn thấy được "IP whitelist tiếp tục truy cập".
+                                # IP whitelist: CHO QUA (không chặn) nhưng VẪN được Tier-1 phân
+                                # tích đầy đủ — ghi 1 bản audit RIÊNG (action=WHITELIST) mang theo
+                                # "kiểu tấn công + suy luận" (tier1_reasons) để analyst QUAN SÁT
+                                # bằng thẻ Whitelist. Khác log tấn công ở chỗ: KHÔNG bị chặn/HITL.
                                 src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
                                     "src_ip", ""
                                 )
                                 if src_ip:
                                     from src.response.executor import _log_to_db
 
+                                    _wl_reasons = [
+                                        str(x) for x in (evaluated_log.get("tier1_reasons") or [])
+                                    ]
+                                    _wl_summary = (
+                                        " · ".join(_wl_reasons[:2])
+                                        if _wl_reasons
+                                        else "không có dấu hiệu tấn công"
+                                    )
+                                    _wl_score = evaluated_log.get("tier1_score", 0)
                                     _log_to_db(
                                         "WHITELIST",
                                         src_ip,
-                                        "IP nằm trong Whitelist — hệ thống cho qua và ghi nhận truy cập "
-                                        "(không phân tích tấn công).",
+                                        f"IP whitelist — CHO QUA, KHÔNG chặn (điểm Tier-1 "
+                                        f"{_wl_score}). Phân tích để giám sát: {_wl_summary}",
                                         raw_log=json.dumps(_strip_dataset_labels(evaluated_log)),
                                     )
 

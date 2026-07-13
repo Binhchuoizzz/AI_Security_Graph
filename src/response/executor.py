@@ -19,6 +19,35 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "audit_trail.db")
+CONFIG_YAML_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
+)
+
+# Cache whitelist (đọc từ YAML) để phòng vệ chiều sâu KHÔNG tốn I/O mỗi lần chặn.
+# Khử cache theo MTIME của file: hễ whitelist đổi (vd approve_rule vừa gỡ 1 IP) là
+# đọc lại NGAY — tránh đua dữ liệu khi block ngay sau khi gỡ khỏi whitelist.
+_wl_cache: dict = {"mtime": None, "ips": frozenset()}
+
+
+def _whitelisted_ips() -> frozenset:
+    """Đọc whitelist_ips từ config, cache theo mtime. Dùng để executor KHÔNG chặn nhầm IP
+    đã whitelist — nhất quán với Tier-1 dù suy luận LLM có nêu tên IP đó."""
+    try:
+        mtime = os.path.getmtime(CONFIG_YAML_PATH)
+    except OSError:
+        return _wl_cache["ips"]
+    if mtime == _wl_cache["mtime"]:
+        return _wl_cache["ips"]
+    try:
+        import yaml
+
+        with open(CONFIG_YAML_PATH) as f:
+            cfg = yaml.safe_load(f) or {}
+        ips = frozenset(cfg.get("tier1", {}).get("whitelist_ips", []) or [])
+    except Exception:
+        ips = _wl_cache["ips"]
+    _wl_cache.update({"mtime": mtime, "ips": ips})
+    return ips
 
 
 # =========================================================================
@@ -166,10 +195,53 @@ def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
         logger.error(f"Lỗi ghi audit trail: {e}")
 
 
+def _redis_url() -> str:
+    """URL Redis: ưu tiên env REDIS_URL (agent/subscriber có sẵn), fallback config."""
+    url = os.getenv("REDIS_URL")
+    if url:
+        return url
+    try:
+        import yaml
+
+        with open(CONFIG_YAML_PATH) as f:
+            return (yaml.safe_load(f) or {}).get("redis", {}).get("url", "redis://localhost:6379/0")
+    except Exception:
+        return "redis://localhost:6379/0"
+
+
+def _add_to_blacklist(ip: str, ttl: int = 3600) -> None:
+    """Ghi IP vào Redis blacklist (TTL 1h) để Tier-1 NHỚ MẶT và chặn ngay lần tái phạm mà
+    KHÔNG cần leo thang Tier-2 lại. Best-effort: agent chạy trên host reach được Redis;
+    dashboard container KHÔNG reach -> bỏ qua im lặng (block vẫn ghi audit + tạo luật)."""
+    try:
+        import redis  # type: ignore
+
+        redis.Redis.from_url(_redis_url(), socket_connect_timeout=0.5).setex(
+            f"blacklist:{ip}", ttl, "1"
+        )
+    except Exception:
+        pass
+
+
 def block_ip(ip: str, reason: str, raw_log: str = ""):
     safe_ip = _validator.sanitize_target(ip)
+    # ĐỒNG BỘ WHITELIST (phòng vệ chiều sâu): IP đã whitelist KHÔNG BAO GIỜ bị chặn thật —
+    # dù suy luận LLM/Tier-2 có nêu tên nó trong 1 batch nhiều IP. Ghi bản WHITELIST (cho
+    # qua) thay vì BLOCK_IP để UI nhất quán, tránh mâu thuẫn "vừa whitelist vừa bị chặn".
+    if safe_ip in _whitelisted_ips():
+        logger.warning(f" [FIREWALL MOCK] BỎ QUA chặn (đã whitelist): {safe_ip}")
+        _log_to_db(
+            "WHITELIST",
+            safe_ip,
+            f"IP whitelist — BỎ QUA lệnh chặn từ Tier-2/LLM (giữ đặc cách cho qua). "
+            f"Lý do gốc: {reason}",
+            raw_log,
+        )
+        return
     logger.warning(f" [FIREWALL MOCK] BLOCKING IP: {safe_ip} | Lý do: {reason}")
     _log_to_db("BLOCK_IP", safe_ip, reason, raw_log)
+    # TRÍ NHỚ: đưa vào blacklist để Tier-1 chặn thẳng lần sau (Tier-2 không phải xử lại).
+    _add_to_blacklist(safe_ip)
 
 
 def quarantine_host(host: str, reason: str, raw_log: str = ""):

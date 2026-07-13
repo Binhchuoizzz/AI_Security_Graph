@@ -586,18 +586,15 @@ class RuleEngine:
             if alias in log_entry and canonical not in log_entry:
                 log_entry[canonical] = log_entry[alias]
 
-        # --- Tầng 0: Whitelist Check ---
+        # --- Tầng 0: Whitelist Check (ĐÁNH DẤU — KHÔNG return sớm) ---
+        # IP whitelist VẪN được phân tích ĐẦY ĐỦ ở Tier-1 (chữ ký WAF/injection, Z-score,
+        # luật tĩnh/động, baseline...) để analyst QUAN SÁT hành vi — nhưng hành động cuối
+        # LUÔN bị ép về WHITELIST_DROP: CHO QUA, KHÔNG chặn / không escalate / không HITL /
+        # miễn trừ reputation. Nhờ vậy lần chạy thứ 2 vẫn hiện "kiểu tấn công + suy luận"
+        # như log thường (chỉ khác: không bị chặn) thay vì bị nuốt lặng ở Tầng 0.
         source_ip = log_entry.get("Source IP", "unknown")
-        if source_ip in self.whitelist_ips:
-            log_entry["tier1_score"] = 0
-            log_entry["tier1_reasons"] = ["IP nằm trong Whitelist (An toàn) — cho qua & ghi nhận"]
-            # WHITELIST_DROP: vẫn CHO QUA (đếm noise như DROP) nhưng phân biệt được với DROP
-            # thường -> subscriber ghi 1 bản LOG riêng để UI hiển thị bằng thẻ Whitelist
-            # (không phân tích tấn công/MITRE). KHÔNG feed baseline (không học từ IP bỏ qua).
-            log_entry["tier1_action"] = "WHITELIST_DROP"
-            log_entry["is_whitelisted"] = True
-            log_entry["tier1_baseline"] = {"ip_request_count": 0, "ip_unique_ports": 0}
-            return log_entry
+        is_whitelisted = source_ip in self.whitelist_ips
+        log_entry["is_whitelisted"] = is_whitelisted
 
         # --- Tầng 0.1: WAF Signature Check (Chống LLM Starvation) ---
         waf_reason = self._check_waf_signatures(log_entry)
@@ -704,7 +701,7 @@ class RuleEngine:
         # Kẻ ĐÃ bị chứng minh xấu không cần escalate lại: chặn/HITL ngay theo hồ sơ danh
         # tiếng, ĐỘC LẬP với điểm gói hiện tại (gói lành từ IP xấu vẫn bị nâng cấp).
         rep_action = None
-        if self.reputation_enforcement:
+        if self.reputation_enforcement and not is_whitelisted:
             rep_score = self._get_reputation_score(source_ip)
             if rep_score >= self.reputation_block_threshold:
                 rep_action = "BLOCK_IP"
@@ -728,7 +725,11 @@ class RuleEngine:
             "ip_unique_ports": baseline_result["unique_ports"],
         }
 
-        if rep_action == "BLOCK_IP":
+        if is_whitelisted:
+            # IP whitelist: ĐÃ phân tích đầy đủ ở trên (score + reasons giữ nguyên để
+            # analyst quan sát) nhưng LUÔN cho qua — ưu tiên CAO NHẤT, đè mọi nhánh chặn.
+            log_entry["tier1_action"] = "WHITELIST_DROP"
+        elif rep_action == "BLOCK_IP":
             # Tiền sử NGUY HIỂM (reputation >= ngưỡng block): CHẶN NGAY, ĐỘC LẬP với điểm
             # gói hiện tại — kẻ đã bị chứng minh xấu không cần escalate lại, không tốn LLM.
             log_entry["tier1_action"] = "BLOCK_IP"
