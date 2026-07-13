@@ -18,6 +18,12 @@ class FeedbackValidator:
     Chống bypass bằng wildcard và chặn/cho phép sai IP (Zero-Trust Principle).
     """
 
+    # Dải TEST-NET tài liệu (RFC 5737): 192.0.2.0/24 · 198.51.100.0/24 · 203.0.113.0/24.
+    # KHÔNG định tuyến trên Internet thật -> whitelist AN TOÀN. Bộ demo adversarial dùng
+    # 198.51.100.x/203.0.113.x làm IP tấn công thử, nên cho phép whitelist các dải này để
+    # trình diễn tính năng (đồng bộ với whitelist nội bộ tin cậy).
+    DEMO_DOC_RANGES = ["192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24"]
+
     def __init__(self):
         config = load_config()
         subnets = config.get("guardrails", {}).get(
@@ -25,6 +31,8 @@ class FeedbackValidator:
             ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
         )
         self.trusted_subnets = subnets
+        # Dải được phép whitelist = nội bộ tin cậy + TEST-NET tài liệu (demo).
+        self._whitelist_allowed = list(subnets) + self.DEMO_DOC_RANGES
         self.allowed_fields = ["Source IP", "Destination Port", "Protocol", "URI", "User-Agent"]
 
     def validate_rule(self, field: str, pattern: str, score: int) -> tuple[bool, list[str]]:
@@ -76,7 +84,7 @@ class FeedbackValidator:
                     else:
                         ip = ipaddress.ip_address(pattern_str)
                         # Kiểm tra xem có trùng với hạ tầng quan trọng
-                        for subnet_str in self.trusted_subnets:
+                        for subnet_str in self._whitelist_allowed:
                             network = ipaddress.ip_network(subnet_str, strict=False)
                             # Không cho chặn toàn bộ subnet nội bộ
                             if ip == network.network_address:
@@ -116,23 +124,27 @@ class FeedbackValidator:
                 net = ipaddress.ip_network(ip_str, strict=False)
                 # Phải nằm trong các subnet nội bộ tin cậy
                 is_within = False
-                for subnet_str in self.trusted_subnets:
+                for subnet_str in self._whitelist_allowed:
                     network = ipaddress.ip_network(subnet_str, strict=False)
                     if net.network_address in network and net.broadcast_address in network:
                         is_within = True
                         break
                 if not is_within:
-                    errors.append(f"IP range {ip_str} is outside the trusted internal subnets")
+                    errors.append(
+                        f"IP range {ip_str} is outside the allowed whitelist ranges (internal trusted + demo TEST-NET)"
+                    )
             else:
                 ip = ipaddress.ip_address(ip_str)
                 is_within = False
-                for subnet_str in self.trusted_subnets:
+                for subnet_str in self._whitelist_allowed:
                     network = ipaddress.ip_network(subnet_str, strict=False)
                     if ip in network:
                         is_within = True
                         break
                 if not is_within:
-                    errors.append(f"IP {ip_str} is outside the trusted internal subnets")
+                    errors.append(
+                        f"IP {ip_str} is outside the allowed whitelist ranges (internal trusted + demo TEST-NET)"
+                    )
         except ValueError:
             errors.append(f"Invalid IP address or CIDR format: {ip_str}")
 

@@ -31,7 +31,17 @@ def test_feedback_validator_whitelist_ip():
     # Chặn whitelist IP ngoài Internet (ví dụ: public DNS)
     v2, err2 = validator.validate_whitelist_ip("8.8.8.8")
     assert v2 is False
-    assert any("trusted internal subnets" in e for e in err2)
+    assert any("allowed whitelist ranges" in e for e in err2)
+
+    # Cho phép whitelist dải TEST-NET tài liệu (RFC 5737) dùng cho demo adversarial
+    v3, _ = validator.validate_whitelist_ip("198.51.100.113")
+    assert v3 is True
+    v4, _ = validator.validate_whitelist_ip("203.0.113.5")
+    assert v4 is True
+
+    # Vẫn CHẶN IP công cộng thật (không phải TEST-NET), vd DAPT public IP
+    v5, _ = validator.validate_whitelist_ip("209.147.138.11")
+    assert v5 is False
 
 
 def test_feedback_validator_invalid_regex():

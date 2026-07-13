@@ -88,9 +88,16 @@ def _rule_severity(score) -> tuple[str, str]:
 
 
 def handle_whitelist_approval(ip: str):
-    """Callback xử lý thêm IP vào Whitelist (Pentest/Internal)."""
-    feedback_mgr.add_to_whitelist(ip)
-    st.session_state[f"whitelisted_{ip}"] = True
+    """Callback thêm IP vào Whitelist — TÔN TRỌNG kết quả validator (không báo giả)."""
+    ok = feedback_mgr.add_to_whitelist(ip)
+    st.session_state[f"whitelisted_{ip}"] = ok
+    if ok:
+        st.toast(f"✅ Đã whitelist {ip}", icon="✅")
+    else:
+        st.toast(
+            f"⚠️ Không whitelist được {ip} (ngoài dải cho phép: nội bộ tin cậy + TEST-NET demo)",
+            icon="⚠️",
+        )
 
 
 def _get_tier1_blocks(show: int = 12) -> list[dict]:
@@ -361,7 +368,7 @@ def main_dashboard():
         # ghi chú benign/quản trị, không phải sự cố cần phân loại → tránh bộ lọc rỗng).
         action_filter = st.selectbox(
             "Phân loại Hành động",
-            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL"],
+            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "QUARANTINE"],
             index=0,
             key="action_filter_sb",
         )
@@ -1247,18 +1254,27 @@ def main_dashboard():
                                         "🛡️ Đưa thẳng vào Whitelist",
                                         key=f"towhitelist_{selected_block_ip}",
                                     ):
-                                        # Remove block rule or reject it
-                                        feedback_mgr.reject_rule(selected_block_ip, "Source IP")
-                                        # Add to whitelist
-                                        feedback_mgr.add_to_whitelist(selected_block_ip)
-                                        from src.response.executor import _log_to_db
+                                        # Whitelist TRƯỚC; chỉ gỡ block rule nếu whitelist THÀNH
+                                        # CÔNG (tránh bug: gỡ block xong whitelist fail -> IP hết
+                                        # block lẫn whitelist, lần sau lại bị chặn).
+                                        ok = feedback_mgr.add_to_whitelist(selected_block_ip)
+                                        if ok:
+                                            feedback_mgr.reject_rule(selected_block_ip, "Source IP")
+                                            from src.response.executor import _log_to_db
 
-                                        _log_to_db(
-                                            "LOG",
-                                            selected_block_ip,
-                                            f"IP whitelisted and block rule removed by Administrator ({st.session_state.get('username')})",
-                                        )
-                                        st.success(f"Đã đưa IP {selected_block_ip} vào Whitelist!")
+                                            _log_to_db(
+                                                "LOG",
+                                                selected_block_ip,
+                                                f"IP whitelisted and block rule removed by Administrator ({st.session_state.get('username')})",
+                                            )
+                                            st.success(
+                                                f"Đã đưa IP {selected_block_ip} vào Whitelist!"
+                                            )
+                                        else:
+                                            st.error(
+                                                f"❌ Không whitelist được {selected_block_ip} — ngoài dải "
+                                                "cho phép (nội bộ tin cậy + TEST-NET demo). Block rule GIỮ NGUYÊN."
+                                            )
                                         time.sleep(0.5)
                                         st.rerun()
                         else:
@@ -1338,17 +1354,23 @@ def main_dashboard():
                     elif not is_valid_ip(manual_wl_ip):
                         st.error("Địa chỉ IP không đúng định dạng.")
                     else:
-                        feedback_mgr.add_to_whitelist(manual_wl_ip)
-                        from src.response.executor import _log_to_db
+                        ok = feedback_mgr.add_to_whitelist(manual_wl_ip)
+                        if ok:
+                            from src.response.executor import _log_to_db
 
-                        _log_to_db(
-                            "LOG",
-                            manual_wl_ip,
-                            f"IP added to Whitelist manually by {st.session_state.get('username')}",
-                        )
-                        st.success(f"Đã thêm IP {manual_wl_ip} vào Whitelist thành công!")
-                        time.sleep(0.5)
-                        st.rerun()
+                            _log_to_db(
+                                "LOG",
+                                manual_wl_ip,
+                                f"IP added to Whitelist manually by {st.session_state.get('username')}",
+                            )
+                            st.success(f"Đã thêm IP {manual_wl_ip} vào Whitelist thành công!")
+                            time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error(
+                                f"❌ Không whitelist được {manual_wl_ip} — chỉ cho phép IP nội bộ tin cậy "
+                                "hoặc TEST-NET demo (198.51.100.x / 203.0.113.x / 192.0.2.x)."
+                            )
 
             # Danh sách Whitelisted IPs hiện tại
             st.markdown("---")

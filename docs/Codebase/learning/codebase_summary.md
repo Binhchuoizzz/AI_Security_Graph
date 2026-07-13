@@ -102,7 +102,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ### 11. `src/tier1_filter/feedback_listener.py`
 *   **Mục đích:** Vòng phản hồi đồng bộ rule động UI/Agent ↔ Tier-1.
-*   **Tác dụng:** Nhận rule mới (`receive_new_rule` qua `FeedbackValidator`), persist `system_settings.yaml` bằng **atomic write** (`mkstemp`+`chmod 0644`+`os.replace`) + `FileLock`. Rule có thể theo **IP** (`Source IP`) HOẶC theo **HÀNH VI** (`URI`/`User-Agent` — chữ ký kỹ thuật do Agent học ngược). Vòng đời `PENDING_APPROVAL → ACTIVE/REJECTED` (HITL); `approve_rule`/`reject_rule`/`get_pending_rules`/`get_active_dynamic_rules`; whitelist; clamp score `[0,100]`.
+*   **Tác dụng:** Nhận rule mới (`receive_new_rule` qua `FeedbackValidator`), persist `system_settings.yaml` bằng **atomic write** (`mkstemp`+`chmod 0666`+`os.replace`) + `FileLock`. **Cross-UID Docker:** Dashboard (container uid 999) VÀ subscriber/reset (host uid 1000) luân phiên GHI chung file mount `config/` → phải `chmod 0666` (nếu 0644 thì chỉ owner ghi được, bên kia Permission denied — từng khiến `reset_all` không xoá nổi luật động). `_ensure_lock_writable()` xoá+tạo lại file `.lock` 0666 nếu bị UID khác chiếm. Rule có thể theo **IP** (`Source IP`) HOẶC theo **HÀNH VI** (`URI`/`User-Agent`). Vòng đời `PENDING_APPROVAL → ACTIVE/REJECTED` (HITL); `approve_rule`/`reject_rule`/`get_pending_rules`/`get_active_dynamic_rules`; `clear_all_dynamic_rules` **trả bool**; whitelist; clamp score `[0,100]`.
 *   **Mối quan hệ:** Gọi bởi `node_action_executor` (Agent khi BLOCK_IP) và Dashboard (nút Duyệt); RuleEngine hot-reload rule ACTIVE.
 
 ### 12. `src/tier1_filter/scanner.py`
@@ -161,7 +161,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ### 22. `src/guardrails/feedback_validator.py`
 *   **Mục đích:** Zero-Trust cho rule động & whitelist đẩy về Tier-1.
-*   **Tác dụng:** Chặn wildcard (`0.0.0.0/0`, `*`, `any`), CIDR ≥ `/8`, cấm chặn IP hạ tầng (`127.0.0.1`/`10.0.0.99`); validate regex URI/User-Agent; chỉ whitelist IP trong subnet tin cậy (`trusted_internal_subnets`).
+*   **Tác dụng:** Chặn wildcard (`0.0.0.0/0`, `*`, `any`), CIDR ≥ `/8`, cấm chặn IP hạ tầng (`127.0.0.1`/`10.0.0.99`); validate regex URI/User-Agent; whitelist chỉ cho IP trong **subnet nội bộ tin cậy** (`trusted_internal_subnets`) **+ dải TEST-NET tài liệu RFC 5737** (`192.0.2.0/24`·`198.51.100.0/24`·`203.0.113.0/24` — dùng cho demo adversarial; KHÔNG định tuyến Internet thật) → `validate_whitelist_ip` trả (ok, errors); UI `app.py` TÔN TRỌNG return (không báo giả).
 *   **Mối quan hệ:** Dùng bởi `FeedbackListener` kiểm duyệt rule.
 
 ### 23. `scripts/build_adversarial_suite.py`
@@ -280,7 +280,7 @@ Phần này mô tả ĐÚNG đường đi của **một bản ghi log** qua hệ
 
 ### 41. `src/ui/app.py`
 *   **Mục đích:** Web Dashboard Streamlit (SOC HITL).
-*   **Tác dụng:** 5 tab (Nhật ký SIEM & Audit / Phê duyệt Luật HITL / Giám sát APT / Blocklist & Whitelist / Lỗ hổng & Graph). KPI header: "Cảnh báo Escalated", "Luật chờ duyệt/đang chặn", "Live FPR" và **"Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (SỐ THẬT** do subscriber ghi — bỏ ước lượng ×35); KPI "Context Budget" đọc `config/llm_token_stats.json`. Nút Duyệt/Bác → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce. Nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json` *(CLI tương đương 1 lệnh: `scripts/reset_all.py` — tự dừng/xoá/bật lại đúng 1 subscriber)*. Panel **"Tier-1 đã chặn"** (`_get_tier1_blocks`) khử trùng theo IP nhưng hiện **Số lần** chặn + **Lần cuối** (timestamp) để không che mất việc 1 IP bị chặn nhiều lần.
+*   **Tác dụng:** 5 tab (Nhật ký SIEM & Audit / Phê duyệt Luật HITL / Giám sát APT / Blocklist & Whitelist / Lỗ hổng & Graph). KPI header: "Cảnh báo Escalated", "Luật chờ duyệt/đang chặn", "Live FPR" và **"Logs thô"/"Noise Reduction" đọc `config/pipeline_stats.json` (SỐ THẬT** do subscriber ghi — bỏ ước lượng ×35); KPI "Context Budget" đọc `config/llm_token_stats.json`. Nút Duyệt/Bác → `approve_rule`/`reject_rule` persist YAML → Tier-1 enforce. Nút Reset xóa DBs + dynamic_rules + `pipeline_stats.json` *(CLI tương đương 1 lệnh: `scripts/reset_all.py` — tự dừng/xoá/bật lại đúng 1 subscriber)*. Panel **"Tier-1 đã chặn"** (`_get_tier1_blocks`) khử trùng theo IP nhưng hiện **Số lần** chặn + **Lần cuối** (timestamp) để không che mất việc 1 IP bị chặn nhiều lần. Bộ lọc "Phân loại Hành động" gồm `BLOCK_IP/ALERT/AWAIT_HITL/LOG/QUARANTINE`. Nút Whitelist (mọi chỗ) **kiểm return `add_to_whitelist`** — thất bại thì báo lỗi thật + GIỮ block rule (trước đây báo giả "whitelisted" rồi gỡ block → lần sau bị chặn lại).
 *   **Mối quan hệ:** Đọc `audit_trail.db`/`threat_memory.db`/`feedback_listener`/`pipeline_stats.json`/`llm_token_stats.json`.
 
 ### 42. `src/ui/components.py`
