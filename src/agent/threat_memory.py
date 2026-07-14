@@ -27,6 +27,7 @@ MỤC ĐÍCH:
 import logging
 import os
 import sqlite3
+import threading
 from datetime import datetime, timedelta, timezone
 
 from src.guardrails.output_sanitizer import output_sanitizer
@@ -34,6 +35,11 @@ from src.guardrails.output_sanitizer import output_sanitizer
 logger = logging.getLogger(__name__)
 
 MEMORY_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "threat_memory.db")
+
+# Khóa GHI cấp MODULE (dùng chung cho MỌI ThreatMemoryStore vì cùng ghi 1 file DB): serialize
+# các thao tác read-modify-write (reputation) + INSERT (APT event) khi nhiều worker Tier-2 chạy
+# song song. Đơn luồng (production/test) không tranh chấp = chi phí ~0, hành vi Y HỆT như trước.
+_write_lock = threading.Lock()
 
 
 class ThreatMemoryStore:
@@ -150,7 +156,7 @@ class ThreatMemoryStore:
             "LOG": 1.0,
         }.get(action, 0.0)
 
-        with sqlite3.connect(self.db_path) as conn:
+        with _write_lock, sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
 
             # Thêm mới hoặc cập nhật danh tiếng IP (Upsert)
@@ -344,7 +350,7 @@ class ThreatMemoryStore:
         label = output_sanitizer.sanitize(label)
         timestamp = output_sanitizer.sanitize(timestamp)
         now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.db_path) as conn:
+        with _write_lock, sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
             c.execute(
                 """

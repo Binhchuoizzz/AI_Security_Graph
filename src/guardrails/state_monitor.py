@@ -62,11 +62,23 @@ class LoopDetector:
 
     def __init__(self, max_iterations: int = 10):
         self.max_iterations = max_iterations
-        self.node_counter = {}
+        # node_counter là THREAD-LOCAL: mỗi luồng worker Tier-2 giữ bộ đếm riêng, để nhiều
+        # lần agent_app.invoke() chạy SONG SONG (nhiều slot LLM) KHÔNG lẫn trạng thái vòng
+        # lặp của nhau. Đơn luồng (production/test) hành vi Y HỆT như trước.
+        self._local = threading.local()
+
+    @property
+    def node_counter(self) -> dict:
+        nc = getattr(self._local, "node_counter", None)
+        if nc is None:
+            nc = {}
+            self._local.node_counter = nc
+        return nc
 
     def record_visit(self, node_name: str) -> dict:
-        self.node_counter[node_name] = self.node_counter.get(node_name, 0) + 1
-        count = self.node_counter[node_name]
+        nc = self.node_counter
+        nc[node_name] = nc.get(node_name, 0) + 1
+        count = nc[node_name]
 
         if count > self.max_iterations:
             return {
@@ -78,7 +90,7 @@ class LoopDetector:
         return {"node": node_name, "visits": count, "action": "CONTINUE"}
 
     def reset(self):
-        self.node_counter = {}
+        self._local.node_counter = {}
 
 
 class AuditLogger:

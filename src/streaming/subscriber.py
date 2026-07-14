@@ -16,7 +16,9 @@ chuỗi APT lên Agent. Traffic thường không có metadata APT nên đường
 
 import json
 import os
+import queue
 import sys
+import threading
 import time
 from typing import Any, cast
 
@@ -97,9 +99,13 @@ def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bo
     return action
 
 
-def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
+def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_workers=1):
     """
     on_batch_ready: Hàm callback được gọi khi đủ batch size hoặc hết timeout.
+    agent_workers: số worker nền xử lý Tier-2 (LLM). >=1 => DECOUPLE khỏi vòng đọc Redis
+        (vòng đọc + Tier-1 + thống kê KHÔNG bị chặn bởi LLM chậm -> Dashboard cập nhật tức
+        thì). >=2 => chạy nhiều lô SONG SONG, tận dụng các slot llama.cpp (-np). =0 => gọi
+        đồng bộ trong vòng đọc (hành vi CŨ, giữ để tương thích/kiểm thử).
     """
     print(f"[*] Connecting Subscriber to Redis: {REDIS_URL}")
     try:
@@ -189,6 +195,42 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             os.replace(_tmp, _t1blocks_path)
         except Exception:
             pass
+
+    # ── Bộ worker Tier-2 (DECOUPLE LLM khỏi vòng đọc Redis) ─────────────────────────
+    # on_batch_ready (agent LLM) là phần CHẬM (~15-25s/lô). Gọi ĐỒNG BỘ trong vòng đọc sẽ
+    # chặn việc nạp Redis + cập nhật thống kê -> Dashboard "đơ". Thay vào đó đẩy lô escalate
+    # vào hàng đợi BỊ CHẶN (bounded, tránh OOM) để N worker nền xử lý — nhiều worker chạy
+    # nhiều lô SONG SONG, tận dụng các slot llama.cpp (-np). Quyết định KHÔNG đổi (các khóa
+    # ở audit/reputation/cache + loop_detector thread-local đã bảo đảm an toàn đa luồng).
+    agent_q: queue.Queue | None = None
+    agent_pool: list[threading.Thread] = []
+    agent_stop = threading.Event()
+    if on_batch_ready and agent_workers >= 1:
+        agent_q = queue.Queue(maxsize=max(64, agent_workers * 32))
+
+        def _agent_worker(q: queue.Queue):
+            while not agent_stop.is_set():
+                try:
+                    batch = q.get(timeout=1.0)
+                except queue.Empty:
+                    continue
+                if batch is None:  # sentinel dừng sạch
+                    q.task_done()
+                    break
+                try:
+                    on_batch_ready(batch)
+                except Exception as e:  # 1 lô lỗi KHÔNG được giết worker
+                    print(f"[!] Agent worker lỗi xử lý lô: {e}")
+                finally:
+                    q.task_done()
+
+        for _i in range(agent_workers):
+            _t = threading.Thread(
+                target=_agent_worker, args=(agent_q,), name=f"agent-worker-{_i}", daemon=True
+            )
+            _t.start()
+            agent_pool.append(_t)
+        print(f"[*] Tier-2 agent pool: {agent_workers} worker song song (decoupled khỏi vòng đọc).")
 
     while True:
         try:
@@ -365,7 +407,17 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             if batch_buffer and (
                 len(batch_buffer) >= batch_size or (current_time - last_batch_time) > timeout_sec
             ):
-                if on_batch_ready:
+                if agent_q is not None:
+                    # ĐẨY sang worker nền — KHÔNG chặn vòng đọc (Dashboard cập nhật tức thì).
+                    # Bounded queue: nếu LLM tụt hậu quá xa, put() chờ (backpressure) — an toàn,
+                    # KHÔNG OOM, KHÔNG mất sự kiện escalate.
+                    print(
+                        f"[*] Enqueue lô {len(batch_buffer)} logs -> Tier-2 pool "
+                        f"(qsize~{agent_q.qsize()})"
+                    )
+                    agent_q.put(list(batch_buffer))
+                elif on_batch_ready:
+                    # Đường ĐỒNG BỘ (agent_workers=0) — hành vi cũ, giữ để tương thích.
                     print(f"[*] Triggering Agent Workflow for batch of {len(batch_buffer)} logs...")
                     on_batch_ready(batch_buffer)
                 else:
@@ -390,6 +442,18 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5):
             print("[!] Malformed JSON Log received via Redis. Skipping.")
         except Exception as e:
             print(f"[!] Unexpected error in stream processing: {e}")
+
+    # ── Dừng SẠCH worker pool khi thoát vòng lặp (KeyboardInterrupt) ──
+    if agent_q is not None:
+        print(f"[*] Dừng {len(agent_pool)} worker Tier-2 (drain lô đang chờ, tối đa 3s/worker)...")
+        agent_stop.set()
+        for _ in agent_pool:
+            try:
+                agent_q.put_nowait(None)  # sentinel đánh thức worker idle để thoát
+            except queue.Full:
+                pass
+        for _t in agent_pool:
+            _t.join(timeout=3.0)
 
 
 if __name__ == "__main__":

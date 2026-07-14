@@ -8,6 +8,7 @@ Khởi chạy và kết nối 2 Tier:
 
 import argparse
 import logging
+import os
 
 from dotenv import load_dotenv  # type: ignore
 
@@ -114,9 +115,18 @@ def main():
             return
 
     # Chế độ Server / Full: Khởi chạy APT Detection Engine
-    logger.info("[MAIN] Starting Tier 1 Subscriber Loop (APT Detection Engine)...")
+    # Số worker Tier-2 song song (decouple LLM khỏi vòng đọc + dùng nhiều slot llama.cpp).
+    # Mặc định 2 (khớp llama.cpp -np 2). Đặt SENTINEL_AGENT_WORKERS=1 để chạy an toàn tối đa
+    # (1 luồng agent, vẫn decoupled) hoặc =0 để về hành vi ĐỒNG BỘ cũ.
+    agent_workers = int(os.getenv("SENTINEL_AGENT_WORKERS", "2"))
+    logger.info(f"[MAIN] Starting Tier 1 Subscriber Loop (agent_workers={agent_workers})...")
     try:
-        start_listening(on_batch_ready=handle_escalated_batch, batch_size=10, timeout_sec=5)
+        start_listening(
+            on_batch_ready=handle_escalated_batch,
+            batch_size=10,
+            timeout_sec=5,
+            agent_workers=agent_workers,
+        )
     except KeyboardInterrupt:
         logger.info("[MAIN] Shutting down SENTINEL system.")
 

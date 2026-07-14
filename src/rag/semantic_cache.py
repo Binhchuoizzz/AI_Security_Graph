@@ -23,6 +23,7 @@ GIẢI PHÁP: Semantic Cache
 """
 
 import hashlib
+import threading
 import time
 from collections import OrderedDict
 
@@ -47,6 +48,10 @@ class SemanticCache:
             "misses": 0,
             "evictions": 0,
         }
+        # Khóa bảo vệ OrderedDict + stats khi NHIỀU worker Tier-2 truy cập cache song
+        # song (move_to_end/popitem trên OrderedDict KHÔNG an toàn đa luồng). RLock để
+        # get()/put() có thể gọi lồng nhau an toàn. Đơn luồng: không tranh chấp = ~0 chi phí.
+        self._lock = threading.RLock()
 
     def _make_key(self, query_text: str) -> str:
         """
@@ -74,21 +79,22 @@ class SemanticCache:
         """
         key = self._make_key(query_text)
 
-        if key in self.cache:
-            entry = self.cache[key]
-            # Kiểm tra TTL
-            if (time.time() - entry["timestamp"]) <= self.ttl_seconds:
-                # Đưa lên đầu (LRU: phần tử được sử dụng gần nhất)
-                self.cache.move_to_end(key)
-                self.stats["hits"] += 1
-                return {"hit": True, "result": entry["result"]}
-            else:
-                # Đã hết hạn (Expired)
-                del self.cache[key]
-                self.stats["evictions"] += 1
+        with self._lock:
+            if key in self.cache:
+                entry = self.cache[key]
+                # Kiểm tra TTL
+                if (time.time() - entry["timestamp"]) <= self.ttl_seconds:
+                    # Đưa lên đầu (LRU: phần tử được sử dụng gần nhất)
+                    self.cache.move_to_end(key)
+                    self.stats["hits"] += 1
+                    return {"hit": True, "result": entry["result"]}
+                else:
+                    # Đã hết hạn (Expired)
+                    del self.cache[key]
+                    self.stats["evictions"] += 1
 
-        self.stats["misses"] += 1
-        return {"hit": False}
+            self.stats["misses"] += 1
+            return {"hit": False}
 
     def put(self, query_text: str, result: dict):
         """
@@ -97,18 +103,19 @@ class SemanticCache:
         """
         key = self._make_key(query_text)
 
-        # Nếu key đã tồn tại, cập nhật lại
-        if key in self.cache:
-            self.cache.move_to_end(key)
+        with self._lock:
+            # Nếu key đã tồn tại, cập nhật lại
+            if key in self.cache:
+                self.cache.move_to_end(key)
+                self.cache[key] = {"result": result, "timestamp": time.time()}
+                return
+
+            # Xóa phần tử cũ nhất (LRU) nếu cache đầy
+            while len(self.cache) >= self.max_size:
+                self.cache.popitem(last=False)  # Xóa phần tử cũ nhất
+                self.stats["evictions"] += 1
+
             self.cache[key] = {"result": result, "timestamp": time.time()}
-            return
-
-        # Xóa phần tử cũ nhất (LRU) nếu cache đầy
-        while len(self.cache) >= self.max_size:
-            self.cache.popitem(last=False)  # Xóa phần tử cũ nhất
-            self.stats["evictions"] += 1
-
-        self.cache[key] = {"result": result, "timestamp": time.time()}
 
     def get_hit_rate(self) -> float:
         """Tính cache hit rate (metric cho MLflow)."""

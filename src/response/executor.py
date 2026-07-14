@@ -14,11 +14,18 @@ import logging
 import os
 import re
 import sqlite3
+import threading
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "audit_trail.db")
+
+# Khóa GHI chuỗi audit HMAC: _log_to_db là read-modify-write (đọc prev_hash → tính HMAC →
+# INSERT). Hai worker Tier-2 song song mà không khóa sẽ CÙNG móc vào một prev_hash → chuỗi
+# HMAC BỊ RẼ NHÁNH và verify_audit_trail_integrity() báo gãy. Khóa này serialize đúng đoạn
+# tối hậu đó; đơn luồng (production/test) không tranh chấp = chi phí ~0, chuỗi Y HỆT như trước.
+_audit_lock = threading.Lock()
 CONFIG_YAML_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
@@ -168,7 +175,7 @@ def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with _audit_lock, sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
 
             # 1. Lấy integrity_hash của dòng log cuối cùng để liên kết (chaining)
