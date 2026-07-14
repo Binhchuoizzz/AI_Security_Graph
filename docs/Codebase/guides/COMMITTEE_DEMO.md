@@ -33,6 +33,24 @@ docker-compose down
 
 ---
 
+## ⚡ CHẠY FULL — **1 LỆNH DUY NHẤT** (khuyến nghị)
+
+> Một script gộp TẤT CẢ: containers (Redis + LLM + MLflow + Dashboard) → reset sạch +
+> bật đúng 1 subscriber (Tier-1 + Tier-2) → Dashboard → **đẩy luồng gộp 4 nguồn** vào UI.
+
+```bash
+./scripts/run_demo.sh              # FULL: dựng tất cả + đẩy 4.796 sự kiện vào Dashboard
+# ./scripts/run_demo.sh --no-push  # chỉ dựng hạ tầng (subscriber + UI), tự đẩy sau
+# ./scripts/run_demo.sh --small    # đẩy nhanh hơn (delay nhỏ) cho demo ngắn
+```
+
+> Xong → mở **http://localhost:8501** (đăng nhập **`manager`**). Dashboard điền dần theo tốc
+> độ LLM (đúng thiết kế SOC). Muốn chạy TỪNG BƯỚC bằng tay (giải thích rõ) → xem §0–§1 dưới.
+
+**Tắt sau demo:** `pkill -f "main.py --mode server"` rồi `docker-compose stop` (xem đầu file).
+
+---
+
 ## 0. Chuẩn bị (~3 phút) — 3 lệnh
 
 ```bash
