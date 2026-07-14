@@ -42,7 +42,7 @@ Một ánh xạ hợp nhất các họ tấn công chính trong CSE-CIC-IDS2018 
 Hiệu năng phân tích của hệ thống được đo lường thông qua khung đánh giá năm chiều. Các chỉ số 5D bao gồm Độ chính xác (đo bằng F1-Score, Precision, Recall), Hiệu suất (đo bằng độ trễ và băng thông xử lý), Bảo mật (độ hiệu quả ngăn chặn tấn công đối kháng), Tính giải thích (đánh giá mức độ chi tiết của báo cáo pháp y) và Tính toàn vẹn (xác thực tính toàn vẹn qua chuỗi HMAC). Nhằm tách biệt và làm rõ đóng góp định lượng của từng cấu phần đề xuất, nghiên cứu thiết lập sáu cấu hình thử nghiệm loại trừ. Cấu hình~A (baseline tường lửa luật tĩnh) chỉ sử dụng bộ lọc luật tĩnh truyền thống tại tầng thu nạp mà không áp dụng mô hình LLM. Cấu hình~B (baseline LLM thuần túy) gửi trực tiếp mọi log mạng tới LLM cục bộ mà không qua bộ lọc Welford Tầng 1, ngữ cảnh RAG hay rào chắn bảo mật. Cấu hình~C (LLM có lọc Welford) chèn bộ lọc thống kê Welford Tầng 1 trước khi gửi dữ liệu đến LLM nhằm giảm đáng kể khối lượng cần xử lý. Cấu hình~D (RAG vector đơn lẻ) bổ sung một cơ sở dữ liệu tìm kiếm vector dày đặc đơn lẻ (FAISS với MiniLM embeddings) vào quy trình phân loại LLM đã lọc. Cấu hình~E (RAG tìm kiếm lai) mở rộng cấu phần truy xuất này thành một tổ hợp lai giữa tìm kiếm vector dày đặc (FAISS) và tìm kiếm từ khóa thưa thớt (BM25). Cuối cùng, Cấu hình~F (SENTINEL toàn diện) kết hợp đồng bộ bộ lọc Welford Tầng 1, tác tử nhận thức LangGraph Tầng 2, hệ RAG kép (FAISS + BM25) tổng hợp qua RRF, và các rào chắn bảo mật.
 Cả sáu cấu hình đều được đánh giá thực nghiệm trên cùng một tập con phân tầng 300 mẫu của dữ liệu đã gán nhãn, nhờ đó đóng góp biên của từng cấu phần được thêm vào (bản thân mô hình LLM, bộ tiền lọc Welford, truy xuất dày đặc, truy xuất lai, và lớp rào chắn) có thể được cô lập qua hiệu số giữa các cấu hình liền kề.
 
-Trước khi trình bày kết quả, hai quy ước được cố định để các con số luôn diễn giải được. Ánh xạ metric--câu hỏi. SENTINEL là một pipeline lọc-và-suy-luận hai tầng chứ không phải một bộ phân loại nhị phân nguyên khối; vì vậy mỗi câu hỏi nghiên cứu được đánh giá bằng đúng metric đo nó, và F1 nhị phân được xem là chỉ số chẩn đoán \emph{phụ} cho điểm vận hành của cổng Tầng 1 chứ không phải con số tiêu biểu. RQ1 (lọc tốc độ đường truyền) được đo bằng tỷ lệ lọc benign và tỷ lệ leo thang cùng độ trễ Tầng 1; RQ2 (phân loại an toàn, độ trễ thấp) bằng tỷ lệ chặn tấn công đối kháng, điểm chất lượng suy luận, và sự tách biệt độ trễ Tầng 1/Tầng 2; còn RQ3 (nền tảng, bộ nhớ, kiểm chứng) bằng điểm RAGAS faithfulness/relevancy và liên kết APT nổi lên. Quy ước dự đoán. Một quy tắc dương duy nhất được áp dụng đồng nhất xuyên suốt: một luồng được tính là phát hiện dương khi hệ thống KHÔNG âm thầm loại bỏ nó, tức khi Tầng 1 ra một phán quyết hành động hoặc leo thang (BLOCK\_IP, ALERT, AWAIT\_HITL, hoặc ESCALATE). Độ hạt và con số tiêu biểu. Hai độ hạt đánh giá xuất hiện và không bao giờ bị trộn trong cùng một phép so sánh. Benchmark \emph{theo-từng-sự-kiện} trên Luồng Gộp thực tế (Bảng~\ref{tab:classification}, $\mathrm{F1}=0.594$) phát lại từng sự kiện riêng lẻ qua pipeline sạch và được lấy làm con số độ chính xác trung thực; còn ablation \emph{theo-từng-mẫu} (Bảng~\ref{tab:ablation}) gộp mỗi sự cố đã gán nhãn thành một phán quyết theo lô trên tập con thiên về tấn công, nơi $\mathrm{F1}=0.967$ thu được đúng bằng base rate của tập con đó nên chỉ dùng để cô lập độ trễ theo cấu phần, không bao giờ là một tuyên bố về độ chính xác.
+Trước khi trình bày kết quả, hai quy ước được cố định để các con số luôn diễn giải được. Ánh xạ metric--câu hỏi. SENTINEL là một pipeline lọc-và-suy-luận hai tầng chứ không phải một bộ phân loại nhị phân nguyên khối; vì vậy mỗi câu hỏi nghiên cứu được đánh giá bằng đúng metric đo nó, và F1 nhị phân được xem là chỉ số chẩn đoán \emph{phụ} cho điểm vận hành của cổng Tầng 1 chứ không phải con số tiêu biểu. RQ1 (lọc tốc độ đường truyền) được đo bằng tỷ lệ lọc benign và tỷ lệ leo thang cùng độ trễ Tầng 1; RQ2 (phân loại an toàn, độ trễ thấp) bằng tỷ lệ chặn tấn công đối kháng, điểm chất lượng suy luận, và sự tách biệt độ trễ Tầng 1/Tầng 2; còn RQ3 (nền tảng, bộ nhớ, kiểm chứng) bằng điểm RAGAS faithfulness/relevancy và liên kết APT nổi lên. Quy ước dự đoán. Một quy tắc dương duy nhất được áp dụng đồng nhất xuyên suốt: một luồng được tính là phát hiện dương khi hệ thống KHÔNG âm thầm loại bỏ nó, tức khi Tầng 1 ra một phán quyết hành động hoặc leo thang (BLOCK\_IP, ALERT, AWAIT\_HITL, hoặc ESCALATE). Độ hạt và con số tiêu biểu. Hai độ hạt đánh giá xuất hiện và không bao giờ bị trộn trong cùng một phép so sánh. Benchmark \emph{theo-từng-sự-kiện} trên Luồng Gộp thực tế (Bảng~\ref{tab:classification}, $\mathrm{F1}=0.610$) phát lại từng sự kiện riêng lẻ qua pipeline sạch và được lấy làm con số độ chính xác trung thực; còn ablation \emph{theo-từng-mẫu} (Bảng~\ref{tab:ablation}) gộp mỗi sự cố đã gán nhãn thành một phán quyết theo lô trên tập con thiên về tấn công, nơi $\mathrm{F1}=0.967$ thu được đúng bằng base rate của tập con đó nên chỉ dùng để cô lập độ trễ theo cấu phần, không bao giờ là một tuyên bố về độ chính xác.
 
 \section{Độ chính xác Phân loại trên Luồng Gộp Thống nhất}
 Đánh giá độ chính xác chính được thực hiện trên Luồng Gộp Thống nhất, một luồng đơn sắp theo thời gian gồm 150 luồng benign khởi động và 4526 sự kiện luồng chính (tấn công và lưu lượng lành tính CSE-CIC-IDS2018, sự kiện APT DAPT2020, và bảy điểm dị biệt zero-day real-derived), được xử lý đầu-cuối với Bộ nhớ Đe dọa khởi tạo sạch. Bảng~\ref{tab:classification} trình bày hiệu năng phân loại nhị phân của cổng lọc Tầng 1 trên luồng này.
@@ -55,20 +55,43 @@ Trước khi trình bày kết quả, hai quy ước được cố định để
         \hline
         \textbf{Chỉ số} & \textbf{Giá trị} \\
         \hline
-        Precision & 0.939 \\
+        Precision & 0.948 \\
         \hline
-        Recall (tấn công) & 0.435 \\
+        Recall (tấn công) & 0.450 \\
         \hline
-        F1-score & 0.594 \\
+        F1-score & 0.610 \\
         \hline
-        Accuracy & 0.448 \\
+        Accuracy & 0.465 \\
         \hline
-        TP / FP / TN / FN & 1724 / 113 / 187 / 2243 \\
+        TP / FP / TN / FN & 1784 / 98 / 202 / 2183 \\
         \hline
     \end{tabular}
 \end{table}
 
-Cổng lọc Tầng 1 đạt precision cao (0.939) ở mức recall trung bình (0.435). Con số recall này là một đặc tính thiết kế có chủ đích chứ không phải khiếm khuyết: Tầng 1 chỉ chặn các tấn công lộ rõ ở tầng mạng và \emph{leo thang} các tín hiệu tinh vi hơn lên tác tử Tầng 2, cố ý đánh đổi recall thô để giữ tỷ lệ dương tính giả thấp và bảo toàn các chuỗi sự kiện chậm-và-âm thầm (low-and-slow). Khả năng phục hồi đầu-cuối các trường hợp leo thang này được định lượng qua các phân tích APT, zero-day và ablation tiếp theo.
+Cổng lọc Tầng 1 đạt precision cao (0.948) ở mức recall trung bình (0.450). Con số recall này là một đặc tính thiết kế có chủ đích chứ không phải khiếm khuyết: Tầng 1 chỉ chặn các tấn công lộ rõ ở tầng mạng và \emph{leo thang} các tín hiệu tinh vi hơn lên tác tử Tầng 2, cố ý đánh đổi recall thô để giữ tỷ lệ dương tính giả thấp và bảo toàn các chuỗi sự kiện chậm-và-âm thầm (low-and-slow). Khả năng phục hồi đầu-cuối các trường hợp leo thang này được định lượng qua các phân tích APT, zero-day và ablation tiếp theo.
+
+Một câu hỏi bổ trợ là tầng nhận thức \emph{phán xử} ra sao đối với các sự kiện mà cổng lọc đẩy lên, bởi F1 ở trên chỉ đặc trưng cho riêng bộ lọc Tầng 1. Trên 651 sự kiện mà Tầng 1 ra phán quyết ESCALATE trên Luồng Gộp (594 mối đe doạ thật và 57 luồng benign lọt qua cổng), mỗi sự kiện được phát lại riêng lẻ qua toàn bộ pipeline Guardrails\,$\rightarrow$\,RAG\,$\rightarrow$\,LLM\,$\rightarrow$\,đồng thuận; Bảng~\ref{tab:tier2adjudication} báo cáo kết quả. Tác tử gắn cờ tất cả 594 mối đe doạ (recall có điều kiện $=1.00$, không sót ca nào) và, nhất quán với thiết kế ưu tiên precision có con người trong vòng lặp, KHÔNG bao giờ âm thầm cho qua một sự kiện đã leo thang: 631 ca được đẩy về analyst duyệt (\texttt{AWAIT\_HITL}) và 20 ca tự cảnh báo. Nó không lật ngược 57 ca leo thang nhầm của cổng (specificity có điều kiện $=0.00$), nên độ chính xác phán xử thô $0.912$ đúng bằng base rate mối đe doạ của tập leo thang và---y hệt F1 ablation ở Bảng~\ref{tab:ablation}---là thuộc tính của tập mẫu chứ không phải năng lực phân biệt. Bảo đảm cốt lõi vì thế là một-chiều nhưng mạnh: không mối đe doạ nào tới được Tầng 2 mà bị nó vứt bỏ, và mọi ca mơ hồ đều được hoãn lại cho con người thay vì tự quyết. Vì mỗi sự kiện ở đây được phán xử cô lập, đây là cận dưới thận trọng về tính quyết đoán; khi triển khai, tác tử gộp lô các sự kiện cùng leo thang, cấp thêm ngữ cảnh cho mỗi phán quyết.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Phán xử leo thang Tầng 2 trên 651 sự kiện Tầng 1 đẩy lên (theo-từng-sự-kiện, toàn pipeline nhận thức). (Nguồn: Tác giả)}
+    \label{tab:tier2adjudication}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Chỉ số} & \textbf{Giá trị} \\
+        \hline
+        Sự kiện leo thang (đe doạ / benign) & 651 (594 / 57) \\
+        \hline
+        Recall có điều kiện trên đe doạ & 1.00 (594/594) \\
+        \hline
+        Specificity có điều kiện trên benign & 0.00 (0/57) \\
+        \hline
+        Độ chính xác phán xử ($=$ base rate) & 0.912 \\
+        \hline
+        Phân bố hành động (\texttt{AWAIT\_HITL} / \texttt{ALERT}) & 631 / 20 \\
+        \hline
+    \end{tabular}
+\end{table}
 
 \section{Liên kết APT Đa ngày Nổi lên: Một Năng lực Nền tảng}
 Mục này báo cáo một kết quả \emph{thứ cấp, mang tính nền tảng} chứ không phải một đóng góp chính: nó chứng minh rằng Bộ nhớ Đe dọa có trạng thái ở Tầng 2 \emph{cho phép} liên kết chiến dịch đa-ngày như một sản phẩm phụ nổi lên của kiến trúc, và được đánh giá ở đây như một minh chứng khả thi (proof-of-concept), phần củng cố ở mức production được cố ý dời sang các hướng phát triển tương lai ở Chương~\ref{ch:conclusion}. Năng lực liên kết APT được đánh giá trên các chuỗi DAPT2020 nhúng trong cùng luồng, với Bộ nhớ Đe dọa khởi tạo \emph{rỗng} để mọi phán quyết chiến dịch phải tích lũy dần trong quá trình phát lại luồng chứ không tồn tại từ trước. Bảng~\ref{tab:apt} tóm tắt kết quả.
@@ -143,17 +166,17 @@ Bảy điểm dị biệt ở trên nằm ở độ lệch cực trị ($Z \gg 1
         \hline
         \textbf{Độ lệch $k$ ($\sigma$)} & \textbf{$Z$ thực TB} & \textbf{Nhận biết ($Z>3.5\sigma$)} & \textbf{Leo thang $\rightarrow$ Tầng 2} \\
         \hline
-        2.0 & 2.5 & 8.6\% & 8.6\% \\
+        2.0 & 2.5 & 2.9\% & 2.9\% \\
         \hline
-        3.0 & 3.2 & 8.6\% & 8.6\% \\
+        3.0 & 3.3 & 2.9\% & 2.9\% \\
         \hline
-        \textbf{3.5 (v.hành)} & 3.7 & \textbf{21.4\%} & \textbf{21.4\%} \\
+        \textbf{3.5 (v.hành)} & 3.8 & \textbf{17.1\%} & \textbf{17.1\%} \\
         \hline
-        \textbf{4.0} & 4.2 & \textbf{100\%} & \textbf{100\%} \\
+        \textbf{4.0} & 4.3 & \textbf{100\%} & \textbf{100\%} \\
         \hline
-        5.0 & 5.1 & 100\% & 100\% \\
+        5.0 & 5.2 & 100\% & 100\% \\
         \hline
-        10.0 & 10.0 & 100\% & 100\% \\
+        10.0 & 10.1 & 100\% & 100\% \\
         \hline
         100.0 & 100.0 & 100\% & 100\% \\
         \hline
@@ -167,7 +190,7 @@ Bảy điểm dị biệt ở trên nằm ở độ lệch cực trị ($Z \gg 1
     \label{fig:zeroday_graded}
 \end{figure}
 
-Ba vùng được nhìn thấy. Dưới $3.5\sigma$, độ lệch tiêm vào không phân biệt được về mặt thống kê với đuôi benign, và phát hiện nằm ở sàn $8.6\%$, tỷ lệ dư khi một flow nền vốn đã chứa sẵn một feature dị thường tự nhiên. Tại điểm vận hành $3.5\sigma$, tỷ lệ phát hiện tăng lên $21.4\%$, đánh dấu điểm khởi phát của chuyển tiếp, và đến $4\sigma$ nó bão hòa ở $100\%$ rồi giữ nguyên cho mọi độ lệch lớn hơn. Ranh giới hiệu dụng của bộ phát hiện vì thế là $\approx 4\sigma$, với ngưỡng triển khai $3.5\sigma$ được đặt có chủ đích tại điểm khởi phát của khuỷu để các dị thường chớm nở được phát lộ sớm. Bảy mẫu zero-day tiêu biểu, ở $Z \gg 100\sigma$, nằm sâu trong vùng bão hòa, đó là lý do kết quả thô $7/7$ báo ở trên là vững; đường cong phân cấp cung cấp ranh giới định lượng mà con số nhị phân đơn thuần không thể. Đáng chú ý, tỷ lệ nhận biết và leo thang trùng nhau ở mọi mức, khẳng định rằng trên nền benign sạch, một dị thường một-feature đã được nhận biết thì cũng được leo thang chứ không bị âm thầm chỉ ghi log.
+Ba vùng được nhìn thấy. Dưới $3.5\sigma$, độ lệch tiêm vào không phân biệt được về mặt thống kê với đuôi benign, và phát hiện nằm ở sàn $2.9\%$, tỷ lệ dư khi một flow nền vốn đã chứa sẵn một feature dị thường tự nhiên. Tại điểm vận hành $3.5\sigma$, tỷ lệ phát hiện tăng lên $17.1\%$, đánh dấu điểm khởi phát của chuyển tiếp, và đến $4\sigma$ nó bão hòa ở $100\%$ rồi giữ nguyên cho mọi độ lệch lớn hơn. Ranh giới hiệu dụng của bộ phát hiện vì thế là $\approx 4\sigma$, với ngưỡng triển khai $3.5\sigma$ được đặt có chủ đích tại điểm khởi phát của khuỷu để các dị thường chớm nở được phát lộ sớm. Bảy mẫu zero-day tiêu biểu, ở $Z \gg 100\sigma$, nằm sâu trong vùng bão hòa, đó là lý do kết quả thô $7/7$ báo ở trên là vững; đường cong phân cấp cung cấp ranh giới định lượng mà con số nhị phân đơn thuần không thể. Đáng chú ý, tỷ lệ nhận biết và leo thang trùng nhau ở mọi mức, khẳng định rằng trên nền benign sạch, một dị thường một-feature đã được nhận biết thì cũng được leo thang chứ không bị âm thầm chỉ ghi log.
 
 \section{Nghiên cứu Loại trừ: Đánh đổi Độ trễ Hai tầng và Kiểm định Thống kê}
 Nghiên cứu loại trừ cô lập đóng góp của từng cấu phần bằng cách chạy cả sáu cấu hình (A--F) trên cùng một tập con phân tầng 300 mẫu của dữ liệu đã gán nhãn. Hai kiểm định phi tham số neo phép so sánh giữa hai đầu mút tất định và đầy đủ: kiểm định McNemar~\cite{mcnemar1947} trên các phán quyết nhị phân theo cặp, và kiểm định Mann-Whitney~U~\cite{mannwhitney1947} trên phân phối độ trễ mỗi sự kiện. Kết quả tóm tắt trong Bảng~\ref{tab:ablation}.
@@ -197,7 +220,7 @@ Nghiên cứu loại trừ cô lập đóng góp của từng cấu phần bằn
     \end{tabular}
 \end{table}
 
-Ba phát hiện nổi lên. Thứ nhất, và đáng chú ý nhất, cả sáu cấu hình cho phán quyết nhị phân \emph{giống hệt nhau} trên từng mẫu trong 300 mẫu (không có cặp bất đồng nào so với Cấu hình~A, với $\mathrm{F1}=0.967$, precision $=0.937$, recall $=1.000$ xuyên suốt). Việc lần lượt thêm mô hình LLM (B), bộ lọc Welford (C), truy xuất dày đặc (D), truy xuất lai (E), và toàn bộ lớp rào chắn (F) không làm thay đổi quyết định thô tấn công/lành tính, nên kiểm định McNemar bị suy biến với mọi cặp ($p = 1.0$, không cặp bất đồng). Giá trị kiến trúc của các cấu phần này vì vậy \emph{trực giao} với phân loại nhị phân: nó nằm ở suy luận theo ngữ cảnh, nền tảng MITRE/NIST, leo thang zero-day, và kháng tấn công đối kháng được định lượng ở các phần khác của chương này, chứ không ở việc tăng độ chính xác phân loại thô. (Tập con phân tầng có $94\%$ là tấn công theo cách dựng; vì mọi cấu hình đều dự đoán lớp dương trên mọi mẫu, giá trị $\mathrm{F1}=0.967$ chung ấy \emph{đúng bằng} điểm số của một bộ phân loại toàn-dương tầm thường, tức base rate của tập con này, nên đó là thuộc tính của bộ benchmark chứ không phải năng lực của riêng cấu hình nào. Con số độ chính xác đầu-cuối trung thực phải là kết quả Luồng Gộp cân bằng ở Bảng~\ref{tab:classification}, $\mathrm{F1}=0.594$; ablation hiện tại chỉ cô lập so sánh \emph{độ trễ} theo từng cấu phần và sự tương đương phán quyết, không phải độ chính xác phân loại.)
+Ba phát hiện nổi lên. Thứ nhất, và đáng chú ý nhất, cả sáu cấu hình cho phán quyết nhị phân \emph{giống hệt nhau} trên từng mẫu trong 300 mẫu (không có cặp bất đồng nào so với Cấu hình~A, với $\mathrm{F1}=0.967$, precision $=0.937$, recall $=1.000$ xuyên suốt). Việc lần lượt thêm mô hình LLM (B), bộ lọc Welford (C), truy xuất dày đặc (D), truy xuất lai (E), và toàn bộ lớp rào chắn (F) không làm thay đổi quyết định thô tấn công/lành tính, nên kiểm định McNemar bị suy biến với mọi cặp ($p = 1.0$, không cặp bất đồng). Giá trị kiến trúc của các cấu phần này vì vậy \emph{trực giao} với phân loại nhị phân: nó nằm ở suy luận theo ngữ cảnh, nền tảng MITRE/NIST, leo thang zero-day, và kháng tấn công đối kháng được định lượng ở các phần khác của chương này, chứ không ở việc tăng độ chính xác phân loại thô. (Tập con phân tầng có $94\%$ là tấn công theo cách dựng; vì mọi cấu hình đều dự đoán lớp dương trên mọi mẫu, giá trị $\mathrm{F1}=0.967$ chung ấy \emph{đúng bằng} điểm số của một bộ phân loại toàn-dương tầm thường, tức base rate của tập con này, nên đó là thuộc tính của bộ benchmark chứ không phải năng lực của riêng cấu hình nào. Con số độ chính xác đầu-cuối trung thực phải là kết quả Luồng Gộp cân bằng ở Bảng~\ref{tab:classification}, $\mathrm{F1}=0.610$; ablation hiện tại chỉ cô lập so sánh \emph{độ trễ} theo từng cấu phần và sự tương đương phán quyết, không phải độ chính xác phân loại.)
 
 Thứ hai, nơi các cấu hình khác biệt mạnh là \emph{độ trễ}, và tiến trình tăng dần cô lập chi phí của từng cấu phần. Gửi mọi sự kiện vào LLM (Cấu hình~B) chịu độ trễ trung bình cao nhất, $7.29$~s; chèn bộ lọc Welford (Cấu hình~C) cắt xuống $3.95$~s nhờ giải quyết $37.3\%$ lưu lượng ở tốc độ đường truyền, leo thang giảm từ $100\%$ xuống $62.7\%$, nên đóng góp của tiền lọc là về thông lượng, không phải độ chính xác. Thêm RAG dày đặc (Cấu hình~D, $5.62$~s) rồi RAG lai BM25\,$+$\,RRF (Cấu hình~E, $6.07$~s) mỗi bước thêm chi phí truy xuất mà không đổi F1, khẳng định vai trò của bộ truy xuất là chất lượng nền tảng (Bảng~\ref{tab:ragas}) chứ không phải phân loại. Hệ đầy đủ (Cấu hình~F) trung bình $5.74$~s mỗi sự kiện leo thang so với $0.6$~ms ở Tầng 1, và kiểm định Mann-Whitney~U khẳng định sự tách biệt độ trễ Tầng 1/Tầng 2 này có ý nghĩa thống kê rất cao ($U=27{,}053.5,\; p = 2.8\times10^{-17}$).
 
@@ -246,19 +269,19 @@ Một phản biện tự nhiên là liệu ngưỡng leo thang Welford $3.5\sigm
         \hline
         \textbf{$\tau$ ($\sigma$)} & \textbf{F1} & \textbf{Prec.} & \textbf{Rec.} & \textbf{FP lành tính} & \textbf{Leo thang} & \textbf{Zero-day} \\
         \hline
-        2.0 & 0.676 & 0.939 & 0.529 & 0.453 & 0.563 & 7/7 \\
+        2.0 & 0.661 & 0.938 & 0.510 & 0.447 & 0.547 & 7/7 \\
         \hline
-        2.5 & 0.667 & 0.943 & 0.516 & 0.417 & 0.552 & 7/7 \\
+        2.5 & 0.659 & 0.940 & 0.507 & 0.427 & 0.543 & 7/7 \\
         \hline
-        3.0 & 0.663 & 0.942 & 0.512 & 0.417 & 0.548 & 7/7 \\
+        3.0 & 0.658 & 0.942 & 0.506 & 0.413 & 0.542 & 7/7 \\
         \hline
-        \textbf{3.5 (v.hành)} & \textbf{0.594} & \textbf{0.939} & \textbf{0.435} & \textbf{0.377} & \textbf{0.478} & \textbf{7/7} \\
+        \textbf{3.5 (v.hành)} & \textbf{0.610} & \textbf{0.948} & \textbf{0.450} & \textbf{0.327} & \textbf{0.488} & \textbf{7/7} \\
         \hline
-        4.0 & 0.582 & 0.941 & 0.422 & 0.350 & 0.464 & 7/7 \\
+        4.0 & 0.576 & 0.947 & 0.413 & 0.307 & 0.456 & 7/7 \\
         \hline
-        4.5 & 0.578 & 0.942 & 0.416 & 0.337 & 0.459 & 7/7 \\
+        4.5 & 0.574 & 0.948 & 0.411 & 0.297 & 0.454 & 7/7 \\
         \hline
-        5.0 & 0.576 & 0.945 & 0.414 & 0.317 & 0.456 & 7/7 \\
+        5.0 & 0.571 & 0.949 & 0.409 & 0.293 & 0.452 & 7/7 \\
         \hline
     \end{tabular}
 \end{table}
@@ -266,11 +289,11 @@ Một phản biện tự nhiên là liệu ngưỡng leo thang Welford $3.5\sigm
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.92\textwidth]{images/threshold_sensitivity.png}
- \caption{Độ nhạy ngưỡng Welford của Tầng 1. Precision bất biến ($0.939$--$0.945$) và recall zero-day bão hòa ($7/7$) trên toàn dải, trong khi tỷ lệ leo thang và tỷ lệ báo động nhầm benign biến thiên mượt, khiến $\tau$ là một núm chỉnh tải có thể tinh chỉnh chứ không phải một điểm ngọt mong manh. (Nguồn: Tác giả)}
+ \caption{Độ nhạy ngưỡng Welford của Tầng 1. Precision bất biến ($0.938$--$0.949$) và recall zero-day bão hòa ($7/7$) trên toàn dải, trong khi tỷ lệ leo thang và tỷ lệ báo động nhầm benign biến thiên mượt, khiến $\tau$ là một núm chỉnh tải có thể tinh chỉnh chứ không phải một điểm ngọt mong manh. (Nguồn: Tác giả)}
     \label{fig:sensitivity}
 \end{figure}
 
-Ba quan sát được rút ra. Thứ nhất, precision của Tầng 1 gần như bất biến theo ngưỡng, luôn nằm trong dải hẹp $0.939$--$0.945$ trên toàn bộ phép quét $[2.0\sigma, 5.0\sigma]$; thuộc tính báo động nhầm thấp của bộ lọc vì thế là một đặc tính cấu trúc chứ không phải tạo tác của một giá trị tinh chỉnh duy nhất. Thứ hai, cả bảy điểm dị biệt zero-day không-chữ-ký đều bị bắt ở mọi ngưỡng ($7/7$): vì một dị biệt thực sự lệch tới hàng trăm độ lệch chuẩn, $3.5\sigma$ không phải một điểm ngọt mong manh được chọn để tối đa hóa recall zero-day. Thứ ba, ngưỡng hành xử như một núm vận hành đơn điệu giữa độ nhạy và chi phí hạ nguồn, siết $\tau$ từ $2.0\sigma$ lên $5.0\sigma$ làm giảm tỷ lệ leo thang từ $56.3\%$ xuống $45.6\%$ và tỷ lệ báo động nhầm benign từ $45.3\%$ xuống $31.7\%$, đánh đổi bằng recall ($52.9\% \rightarrow 41.4\%$). Giá trị triển khai $3.5\sigma$, quy tắc ba-sigma cổ điển làm tròn lên để thận trọng, nằm gần điểm khuỷu của đường cong này, tái lập đúng F1 Tầng 1 tiêu biểu $0.594$ (Bảng~\ref{tab:classification}) trong khi giữ chưa tới một nửa số sự kiện trên đường Tầng 2 tốn kém.
+Ba quan sát được rút ra. Thứ nhất, precision của Tầng 1 gần như bất biến theo ngưỡng, luôn nằm trong dải hẹp $0.938$--$0.949$ trên toàn bộ phép quét $[2.0\sigma, 5.0\sigma]$; thuộc tính báo động nhầm thấp của bộ lọc vì thế là một đặc tính cấu trúc chứ không phải tạo tác của một giá trị tinh chỉnh duy nhất. Thứ hai, cả bảy điểm dị biệt zero-day không-chữ-ký đều bị bắt ở mọi ngưỡng ($7/7$): vì một dị biệt thực sự lệch tới hàng trăm độ lệch chuẩn, $3.5\sigma$ không phải một điểm ngọt mong manh được chọn để tối đa hóa recall zero-day. Thứ ba, ngưỡng hành xử như một núm vận hành đơn điệu giữa độ nhạy và chi phí hạ nguồn, siết $\tau$ từ $2.0\sigma$ lên $5.0\sigma$ làm giảm tỷ lệ leo thang từ $54.7\%$ xuống $45.2\%$ và tỷ lệ báo động nhầm benign từ $44.7\%$ xuống $29.3\%$, đánh đổi bằng recall ($51.0\% \rightarrow 40.9\%$). Giá trị triển khai $3.5\sigma$, quy tắc ba-sigma cổ điển làm tròn lên để thận trọng, nằm gần điểm khuỷu của đường cong này, tái lập đúng F1 Tầng 1 tiêu biểu $0.610$ (Bảng~\ref{tab:classification}) trong khi giữ chưa tới một nửa số sự kiện trên đường Tầng 2 tốn kém.
 
 \section{Đánh giá Năng lực Phòng thủ Đối kháng (Bảo mật)}
 Để đánh giá mức độ an toàn của tầng nhận thức, một bộ tấn công đối kháng do tác giả biên soạn, không thích ứng, gồm 120 tải trọng thuộc năm nhóm theo chuẩn OWASP~\cite{owasp_llm2025} đã được lập: ngụy trang mã hóa (encoding bypass), tấn công cấu trúc (delimiter), gây nhiễu ngữ nghĩa (semantic confusion), bẻ khóa (jailbreak), và đầu độc RAG. Mỗi tải trọng cố gắng chiếm quyền điều khiển suy luận của tác tử bằng cách hạ cấp một mối đe dọa đã bị gắn cờ (ví dụ: ra lệnh cho LLM bỏ qua các chính sách bảo mật và gắn nhãn an toàn cho một IP độc hại), nên bộ dữ liệu dò xét đúng mô hình đe dọa ``hạ cấp ngữ nghĩa''. Bảng~\ref{tab:robustness} báo cáo tỷ lệ chặn của \textit{tầng rào chắn tĩnh} (trung hòa mã hóa, làm sạch dấu phân tách, lọc mẫu) khi đo riêng lẻ.
@@ -430,7 +453,7 @@ Bảng~\ref{tab:5d_summary} tổng hợp các phát hiện chính trên cả nă
         \hline
         \textbf{Chiều} & \textbf{Chỉ số định lượng} & \textbf{Kết quả} \\
         \hline
-        Độ chính xác & F1 Tầng 1 (Luồng Gộp); recall APT; zero-day bắt được & $0.594$; $1.00$; $7/7$ \\
+        Độ chính xác & F1 Tầng 1 (Luồng Gộp); recall APT; zero-day bắt được & $0.610$; $1.00$; $7/7$ \\
         \hline
         Hiệu suất & Độ trễ trung bình Tầng 1 vs.\ Tầng 2; tỷ lệ leo thang LLM & $0.6$\,ms vs.\ $5.7$\,s; $62.7\%$ \\
         \hline

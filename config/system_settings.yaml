@@ -114,7 +114,7 @@ threat_memory:
 tier1:
   dynamic_rules: []
   golden_baseline:
-    enabled: false
+    enabled: true
     path: config/golden_baseline.json
   max_fwd_packets: 1000
   risk_threshold: 15

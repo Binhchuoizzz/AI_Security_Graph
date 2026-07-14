@@ -84,7 +84,7 @@ Trong khi luồng chảy, chỉ vào từng tab (số liệu benchmark ở §5, 
 
 | # | Trục | Nhìn ở đâu trên Dashboard | Nói (số bỏ túi) |
 | :-- | :--- | :--- | :--- |
-| 1 | **Accuracy** | Tab *Tổng quan* → thẻ header `LOGS THÔ`, **`TỶ LỆ GIẢM TẢI`**, phân bố `BLOCK/ALERT/DROP` | Đa số benign **DROP ở Tier-1**, không phiền LLM. F1 phân loại **0.594** — thành thật recall **0.43** (Tier-1 ưu tiên tốc độ, đẩy ca tinh vi lên Tier-2). |
+| 1 | **Accuracy** | Tab *Tổng quan* → thẻ header `LOGS THÔ`, **`TỶ LỆ GIẢM TẢI`**, phân bố `BLOCK/ALERT/DROP` | Đa số benign **DROP ở Tier-1**, không phiền LLM. F1 phân loại **0.61** — thành thật recall **0.45** (Tier-1 ưu tiên tốc độ, đẩy ca tinh vi lên Tier-2). |
 | 2 | **APT (Accuracy)** | Tab *Giám sát APT* → *Nhật ký chuỗi tấn công APT (DAPT2020)* | Bước lẻ tín hiệu thấp → thường DROP. Khi 1 IP xuất hiện ở **≥2 ngày**, bản án `is_apt` **nổi lên** & leo thang. **Recall 3/3 = 1.00**, **specificity 1.00** (0 báo động giả / 4 chuỗi benign đa ngày). |
 | 3 | **Zero-day (Accuracy)** | Tab *Live Feed* → event `zeroday` chuyển **AWAIT_HITL/ESCALATE** | 7 biến thể; luật **tĩnh bỏ sót cả 7** (DROP). Welford bắt được: Z từ **~7.5 → ~318.000** (≫ 3.5σ) — phát hiện **không cần nhãn**. |
 | 4 | **Security** | Tab *Tổng quan* → *🔁 Vòng phản hồi Hai tầng* + *Live Threat Feed* | 120 payload OWASP LLM đi qua **toàn bộ** Tier-1 (điển hình ~104 DROP + 2 BLOCK + 14 ESCALATE). Guardrail Tier-2 kháng **100%** khi payload tới nơi. **Trung thực:** payload mã hoá/ngữ nghĩa Tier-1 không giải mã sẽ **lọt bằng DROP** — giới hạn của bộ lọc chữ ký, đã nêu trong luận văn. |
@@ -129,7 +129,7 @@ lệnh offline tất định (cùng luồng gộp, bộ nhớ SẠCH):
 
 | Trục 5D | Chỉ số | Giá trị | Nguồn |
 | --- | --- | --- | --- |
-| Accuracy | F1 phân loại (P / R) | **0.594** (0.939 / 0.435) | `unified_stream_results.json` |
+| Accuracy | F1 phân loại (P / R) | **0.61** (0.948 / 0.450) | `unified_stream_results.json` |
 | Accuracy | APT recall / độ trễ | **3/3 = 1.00** / ~8.33 sự kiện | `unified_stream_results.json` |
 | Accuracy | APT specificity | **1.00** (0 báo động giả / 4 benign đa ngày) | `apt_negative_control_results.json` |
 | Accuracy | Zero-day bắt được | **7/7** (Welford, static bỏ sót cả 7) | `unified_stream_results.json` |

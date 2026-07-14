@@ -38,7 +38,7 @@ from src.agent.nodes import retriever  # noqa: E402
 from src.agent.prompts import build_triage_prompt  # noqa: E402
 from src.agent.state import SentinelState  # noqa: E402
 from src.agent.workflow import agent_app  # noqa: E402
-from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
+from src.tier1_filter.rule_engine import RuleEngine, RunningStats  # noqa: E402
 
 GROUND_TRUTH_PATH = os.path.join(os.path.dirname(__file__), "ground_truth.json")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
@@ -74,6 +74,22 @@ def stratified(dataset, limit):
     for _lbl, samples in by_label.items():
         selected.extend(samples[:per_class])
     return selected[:limit]
+
+
+def _fresh_engine() -> RuleEngine:
+    """RuleEngine CÔ LẬP khỏi golden baseline cho Ablation.
+
+    Ablation là thí nghiệm ĐỐI CHỨNG (so verdict-equivalence + độ trễ theo cấu phần
+    trên tập con thiên tấn công), có warmup RIÊNG (synthetic cho af/bcde, benign
+    held-out cho balanced). Kể từ khi bật tier1.golden_baseline.enabled=true,
+    RuleEngine() tự seed 300 flow benign lúc init — điều đó sẽ LÀM NHIỄU baseline
+    có kiểm soát của ablation (gate bỗng DROP true-negative, phá tính tương đương
+    phán quyết). Vì thế ablation LUÔN reset Welford về rỗng để tái lập đúng thiết
+    kế đối chứng, ĐỘC LẬP với golden (vốn là tính năng của luồng-gộp/triển khai thật)."""
+    engine = RuleEngine()
+    for _k in engine.global_stats:
+        engine.global_stats[_k] = RunningStats()
+    return engine
 
 
 def _synthetic_warmup(rule_engine):
@@ -222,7 +238,7 @@ def run_af(limit=None, out=None):
         mlflow.log_param("config_f", "Full SENTINEL 2-Tier")
 
         print(f"[*] Chay Ablation Study (A vs F) tren {len(dataset)} mau...")
-        rule_engine = RuleEngine()
+        rule_engine = _fresh_engine()
         _synthetic_warmup(rule_engine)
 
         for idx, sample in enumerate(dataset):
@@ -371,7 +387,7 @@ def run_bcde(limit=300, out=None):
     dataset = stratified(load_ground_truth(), limit)
     print(f"[*] Ablation B-E tren {len(dataset)} mau (cung tap phan tang voi A/F)...")
 
-    rule_engine = RuleEngine()
+    rule_engine = _fresh_engine()
     _synthetic_warmup(rule_engine)
 
     R = {c: {"y_true": [], "y_pred": [], "latencies": [], "escalated": []} for c in "BCDE"}
@@ -468,7 +484,7 @@ def run_balanced(out=None):
     n_a = len(dataset) - n_b
     print(f"[*] Ablation CÂN BẰNG: {len(dataset)} mẫu ({n_b} benign + {n_a} attack)")
 
-    rule_engine = RuleEngine()
+    rule_engine = _fresh_engine()
     print(f"[*] Warmup baseline Welford trên {len(warmup_logs)} flow benign THẬT (held-out)...")
     for log in warmup_logs:
         rule_engine.evaluate(dict(log))

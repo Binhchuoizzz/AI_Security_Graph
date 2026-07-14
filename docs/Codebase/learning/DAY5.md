@@ -255,7 +255,7 @@ B. KHUNG ĐÁNH GIÁ 5D (offline, tất định — không cần Redis):
 ### Ánh xạ 5 trục đánh giá ↔ script ↔ con số chốt
 | Trục (5D) | Script chính | Con số chốt (nêu khi bảo vệ) |
 |-----------|--------------|----------------------------|
-| 1. Phân loại | E5–E7 ablation + E8 stat | F1 0.594 (P 0.939/R 1.0); McNemar p=1.0 |
+| 1. Phân loại | E5–E7 ablation + E8 stat | F1 0.61 (P 0.948/R 0.45); ablation McNemar p=1.0 |
 | 2. Vận hành | E19 latency | Latency **−82.97%**; Mann-Whitney **p=2.8×10⁻¹⁷** |
 | 3. Kháng cự | E9 tĩnh + E10 pipeline | full-pipeline adversarial **100%** RESISTED |
 | 4. Ngữ cảnh | E11 LLM-Judge | Faithfulness **4.00**; reasoning 3.91/5 |

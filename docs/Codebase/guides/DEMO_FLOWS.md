@@ -76,7 +76,7 @@ pkill -f "main.py --mode server"
 - **Là gì:** lưu lượng THẬT CSE-CIC-IDS2018 (benign + tấn công). Tier-1 chấm điểm bằng luật tĩnh + Welford; chỉ ca đáng ngờ mới lên Tier-2.
 - **Xem ở** tab *Tổng quan / Nhật ký SIEM*: thẻ `LOGS THÔ`, `TỶ LỆ GIẢM TẢI`, phân bố `BLOCK_IP / ALERT / DROP`.
 - **Kỳ vọng:** đa số benign → DROP (giảm tải); tấn công rõ → BLOCK/ALERT.
-- **Số luận văn** (`unified_stream_results.json`): **F1 = 0.594** (P 0.94 / R 0.43).
+- **Số luận văn** (`unified_stream_results.json`): **F1 = 0.61** (P 0.95 / R 0.45).
 
 ---
 

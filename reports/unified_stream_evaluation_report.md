@@ -2,7 +2,7 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-06-24T09:31:36
+> **Sinh lúc:** 2026-07-14T11:57:36
 
 ---
 
@@ -20,11 +20,11 @@ Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ `d
 
 | Metric (Tier-1 gate) | Giá trị |
 | :--- | :---: |
-| F1 | **0.5941** |
-| Accuracy | 0.4479 |
-| Precision | 0.9385 |
-| Recall (attack) | 0.4346 |
-| TP / FP / TN / FN | 1724 / 113 / 187 / 2243 |
+| F1 | **0.61** |
+| Accuracy | 0.4654 |
+| Precision | 0.9479 |
+| Recall (attack) | 0.4497 |
+| TP / FP / TN / FN | 1784 / 98 / 202 / 2183 |
 
 ## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn
 
@@ -46,13 +46,13 @@ Tổng: **7** | Welford bắt được (mà static bỏ sót): **7/7**
 
 | ID | Kịch bản | Rule tĩnh (static-only, đối chứng) | Full Tier-1 (Welford) | Z-Score |
 | :--- | :--- | :---: | :---: | :---: |
-| ZD-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **AWAIT_HITL** | 7.52 ✅ |
-| ZD-001 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **AWAIT_HITL** | 22075.95 ✅ |
-| ZD-003 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **AWAIT_HITL** | 15547.21 ✅ |
-| ZD-004 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **AWAIT_HITL** | 266.02 ✅ |
-| ZD-005 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 318508.6 ✅ |
-| ZD-006 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **AWAIT_HITL** | 118783.41 ✅ |
-| ZD-007 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 3786.94 ✅ |
+| ZD-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **AWAIT_HITL** | 8.12 ✅ |
+| ZD-001 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **AWAIT_HITL** | 5224.42 ✅ |
+| ZD-003 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **AWAIT_HITL** | 5587.91 ✅ |
+| ZD-004 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **AWAIT_HITL** | 275.36 ✅ |
+| ZD-005 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 129858.49 ✅ |
+| ZD-006 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **AWAIT_HITL** | 150139.77 ✅ |
+| ZD-007 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 3617.5 ✅ |
 
 ---
 

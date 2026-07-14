@@ -20,7 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from experiments.unified_dataset import map_cicids  # noqa: E402
-from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
+from src.tier1_filter.rule_engine import RuleEngine, RunningStats  # noqa: E402
 
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
 OUT_PATH = os.path.join(ROOT, "config", "golden_baseline.json")
@@ -31,8 +31,13 @@ def main() -> None:
         gt = json.load(f)
     samples = gt if isinstance(gt, list) else gt.get("samples", gt)
 
-    # RuleEngine với global_stats rỗng (golden_baseline mặc định TẮT nên không tự seed).
+    # Dựng golden PHẢI bắt đầu từ trạng thái Welford RỖNG. Kể từ khi bật
+    # tier1.golden_baseline.enabled=true, RuleEngine() TỰ seed golden lúc init — nếu
+    # không reset, ta sẽ tích lũy CHỒNG lên chính golden cũ (n gấp đôi). Reset về
+    # RunningStats() trống đảm bảo rebuild luôn thuần (tất định, tái lập).
     engine = RuleEngine()
+    for _k in engine.global_stats:
+        engine.global_stats[_k] = RunningStats()
     n_benign = 0
     for s in samples:
         inp = s.get("input", {})

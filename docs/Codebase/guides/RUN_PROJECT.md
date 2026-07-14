@@ -16,9 +16,9 @@
 > không đụng dữ liệu thật). Bộ web-payload: thêm `--ground-truth experiments/ground_truth_webattacks.json`.
 
 > 🔁 **Chạy lại TOÀN BỘ (2026-07-10, GPU RTX 4060 Ti):** Bộ **offline tất định** tái lập đúng
-> mọi số liệu luận văn — unified-stream **F1=0.594** (P=0.939, R=0.435), APT **3/3** recall +
+> mọi số liệu luận văn — unified-stream **F1=0.61** (P=0.948, R=0.450), APT **3/3** recall +
 > Wilson **[0.44, 1.00]** + specificity 1.0, zero-day **7/7** (Z 7.5→318k), robustness tĩnh
-> **50%** (60/120), độ nhạy ngưỡng τ (3.5σ→F1 0.594), zero-day phân cấp bão hòa **≈4σ**,
+> **50%** (60/120), độ nhạy ngưỡng τ (3.5σ→F1 0.61), zero-day phân cấp bão hòa **≈4σ**,
 > context-stress (RAW tràn n_ctx tại N=100, Drain giữ ~80 tok). Hạ tầng Docker
 > (redis/mlflow/llm/dashboard) **healthy**, LLM **Gemma-2-9B** phục vụ inference thật;
 > E2E offline **21/22** (T19 latency cần LLM), **pytest 221 passed**. **Mới:** *golden-baseline
@@ -86,7 +86,7 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 | 2 | **DEMO 6/11 (Bước 5)** — Full pipeline online (publisher → LLM ra `BLOCK`/`ALERT`) | E2E realtime: Redis → Tier‑1 → Guardrails → RAG → LLM → **ATT&CK Mapper** → Executor → Audit | 3 |
 | 3 | **DEMO 7** — Dashboard (đăng nhập `analyst`→`manager`, duyệt 1 rule HITL) | Human‑in‑the‑Loop, phân quyền RBAC, chuỗi audit HMAC | 3 |
 | 4 | **DEMO 8** — Adversarial (tĩnh 50% + Tier‑2 Consensus **0% compromise**) | Defense‑in‑depth chống prompt‑injection/social‑engineering | 2 |
-| 5 | **`evaluate_unified_stream.py`** (F1 **0.594** + APT **3/3** + zero‑day **7/7**) | Benchmark **trung thực**, 1 luồng gộp, memory sạch (không circular) | 2 |
+| 5 | **`evaluate_unified_stream.py`** (F1 **0.61** + APT **3/3** + zero‑day **7/7**) | Benchmark **trung thực**, 1 luồng gộp, memory sạch (không circular) | 2 |
 | 6 | **DEMO 9 + 13** — Ablation + thống kê (**Mann‑Whitney p<0.05**) | Đóng góp từng thành phần + khác biệt độ trễ **có ý nghĩa thống kê** | 2 |
 
 > 🎯 **Mẹo chạy trơn tru:** NGAY TRƯỚC buổi bảo vệ, chạy sẵn `docker-compose up -d` (chờ `healthy`) + bộ offline (`evaluate_unified_stream.py`, `evaluate_adversarial.py --mode static`) để **có sẵn kết quả**; lúc demo chỉ "show" lại output + dashboard live (tránh rủi ro chạy LLM chậm/timeout lúc demo). Các câu hỏi sâu → mở đúng demo bằng chứng:
