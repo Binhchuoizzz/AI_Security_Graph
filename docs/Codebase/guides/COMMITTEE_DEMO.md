@@ -14,6 +14,25 @@
 
 ---
 
+## ⏻ TẮT HỆ THỐNG (giải phóng RAM khi không demo)
+
+> Container **`sentinel_llm` ăn ~8 GB RAM/VRAM** (Gemma-2-9B) — nặng nhất. Tắt khi không dùng:
+
+```bash
+# 1) Tắt subscriber chạy trên host (Tier-1 + Tier-2)
+pkill -f "main.py --mode server"
+
+# 2) Dừng TẤT CẢ container → giải phóng RAM (llm 8GB + dashboard + neo4j + mlflow + redis)
+docker-compose stop              # tạm dừng, GIỮ container (bật lại nhanh: docker-compose start)
+#   hoặc nhẹ nhất, xoá hẳn container (vẫn giữ image + volume dữ liệu):
+docker-compose down
+```
+
+**Kiểm tra đã tắt:** `docker ps | grep sentinel` (rỗng = đã tắt) · `nvidia-smi` (VRAM đã nhả).
+**Bật lại để demo:** `docker-compose up -d` → `./scripts/switch_model.sh gemma` → `.venv/bin/python scripts/reset_all.py` (xem §0).
+
+---
+
 ## 0. Chuẩn bị (~3 phút) — 3 lệnh
 
 ```bash
