@@ -154,7 +154,7 @@ lệnh offline tất định (cùng luồng gộp, bộ nhớ SẠCH):
 | Performance | Giảm độ trễ (2-tier vs LLM-only) | **82.97%** (26.882 → 4.577 ms) | `latency_benchmark.json` |
 | Security | Guardrail Tier-2 kháng adversarial | **100%** (4/4 nạp thẳng) | `adversarial_pipeline_results.json` |
 | Security | Guardrail-only block (120 payload) | **50%** (encoding 100% · structural 35% · rag 40% · jailbreak 10% · semantic 0%) | `robustness_results.json` |
-| Explainability | LLM-as-Judge chéo họ (300 mẫu) | **3.9 / 5** (audit 100%, faithfulness 4.0) | `reasoning_eval_results.json` |
+| Explainability | LLM-as-Judge chéo họ (188 ca escalate/300) | **3.9 / 5** (audit 100%, faithfulness 4.0) | `reasoning_eval_results.json` |
 | Integrity | Chuỗi audit HMAC-SHA256 | tamper-evident | `executor.py` / audit DB |
 
 ---
