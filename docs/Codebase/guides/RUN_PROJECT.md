@@ -21,8 +21,12 @@
 > **50%** (60/120), độ nhạy ngưỡng τ (3.5σ→F1 0.61), zero-day phân cấp bão hòa **≈4σ**,
 > context-stress (RAW tràn n_ctx tại N=100, Drain giữ ~80 tok). Hạ tầng Docker
 > (redis/mlflow/llm/dashboard) **healthy**, LLM **Gemma-2-9B** phục vụ inference thật;
-> E2E offline **21/22** (T19 latency cần LLM), **pytest 221 passed**. **Mới:** *golden-baseline
-> seeding* (`experiments/build_golden_baseline.py` + cờ `tier1.golden_baseline.enabled`) — xem **mục 2b**.
+> E2E offline **21/22** (T19 latency cần LLM), **pytest 267 passed**.
+>
+> 🆕 **2026-07-14:** (1) **golden-baseline = base DUY NHẤT** (bật mặc định) → F1 luồng-gộp
+> **0.594→0.61** (P 0.948/R 0.450), APT 3/3 + zero-day 7/7 giữ nguyên, ablation cô lập (F1 0.967) — **§2b**.
+> (2) chỉ số **phán xử Tier-2** (`evaluate_tier2_decision.py`, 651 ca escalate): recall **1.00** — **§10b**.
+> (3) demo **1 lệnh**: `./scripts/run_demo.sh` — **§0a**.
 
 ---
 
@@ -72,7 +76,7 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 | **DEMO 14** | Vẽ Đồ Thị Thực Nghiệm | Trực quan hóa kết quả nghiên cứu khoa học để đưa trực tiếp vào báo cáo Luận văn Thạc sĩ. | Sinh biểu đồ cột so sánh F1-score/Accuracy của Ablation configurations và lưu trữ file ảnh tĩnh. |
 | **DEMO 15** | Tiền Xử Lý Dữ Liệu | Chuẩn bị dữ liệu chuỗi tấn công APT từ tập DAPT2020 thô và mô phỏng logs mạng CICIDS2018. | Chạy script xây dựng chuỗi sự kiện theo ngày để nạp vào bộ nhớ SQLite Threat Memory dài hạn. |
 
-> **Thực nghiệm bổ sung (ngoài 15 demo — rigor/độ bền/quan sát, xem mục #15 Cheat Sheet):** Ablation B–E (`run_ablation.py --mode bcde`) & cân bằng 150/150 (`run_ablation.py --mode balanced`), độ nhạy ngưỡng Welford (`run_threshold_sensitivity.py`), zero-day phân cấp (`run_zeroday_graded.py`), đối chứng âm APT + Wilson CI (`run_apt_negative_control.py`), stress ngữ cảnh (`run_context_stress.py`), độ bền LLM determinism + suy biến an toàn (`run_llm_robustness.py`), kháng adversarial full-pipeline (`evaluate_adversarial.py --mode pipeline`). Quan sát token ngữ cảnh runtime qua `src/agent/token_monitor.py` → `config/llm_token_stats.json`.
+> **Thực nghiệm bổ sung (ngoài 15 demo — rigor/độ bền/quan sát, xem mục #15 Cheat Sheet):** Ablation B–E (`run_ablation.py --mode bcde`) & cân bằng 150/150 (`run_ablation.py --mode balanced`), độ nhạy ngưỡng Welford (`run_threshold_sensitivity.py`), zero-day phân cấp (`run_zeroday_graded.py`), đối chứng âm APT + Wilson CI (`run_apt_negative_control.py`), stress ngữ cảnh (`run_context_stress.py`), độ bền LLM determinism + suy biến an toàn (`run_llm_robustness.py`), kháng adversarial full-pipeline (`evaluate_adversarial.py --mode pipeline`), **phán xử Tier-2 khi escalate** (`evaluate_tier2_decision.py` — recall 1.00, §10b). Quan sát token ngữ cảnh runtime qua `src/agent/token_monitor.py` → `config/llm_token_stats.json`.
 
 ---
 
@@ -91,6 +95,20 @@ Hệ thống **SENTINEL** sử dụng kiến trúc **Cognitive Two-Tier (2 Tần
 
 > 🎯 **Mẹo chạy trơn tru:** NGAY TRƯỚC buổi bảo vệ, chạy sẵn `docker-compose up -d` (chờ `healthy`) + bộ offline (`evaluate_unified_stream.py`, `evaluate_adversarial.py --mode static`) để **có sẵn kết quả**; lúc demo chỉ "show" lại output + dashboard live (tránh rủi ro chạy LLM chậm/timeout lúc demo). Các câu hỏi sâu → mở đúng demo bằng chứng:
 > **"Zero‑day nhạy tới đâu?"** → DEMO 14 zero‑day phân cấp (≈4σ); **"Số F1 cao có phải base‑rate?"** → ablation cân bằng 150/150; **"Chống tràn context?"** → context‑stress; **"Baseline bị đầu độc thì sao?"** → **mục 2b golden‑baseline** + §3.11.
+
+---
+
+## 0a. ⚡ CHẠY FULL DEMO — **1 LỆNH**
+
+Sau khi setup (§2) 1 lần, mỗi lần demo chỉ cần 1 lệnh (containers → subscriber → UI → đẩy luồng gộp 4 nguồn):
+
+```bash
+./scripts/run_demo.sh              # dựng tất cả + đẩy 4.796 sự kiện vào Dashboard
+./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng    | --small: đẩy nhanh (demo ngắn)
+```
+
+> Mở `http://localhost:8501` (`manager`). Tier-1 lọc ~93%; ~651 ca ESCALATE trôi qua LLM ~10–15 phút
+> → Dashboard điền dần (gốc của **giảm 82.97% độ trễ**). Tắt: `pkill -f "main.py --mode server"; docker-compose stop`.
 
 ---
 
@@ -141,22 +159,25 @@ cp .env.example .env
 
 ---
 
-## 2b. (Tùy chọn) Golden-Baseline Seeding cho Welford (Tier-1)
+## 2b. Golden-Baseline — BASE DUY NHẤT của Welford (bật MẶC ĐỊNH)
 
 ### Mục đích
-Thay vì để Welford "warmup" 100 mẫu đầu (dễ bị đầu độc nếu lưu lượng lúc khởi động đã nhiễm), hệ thống có thể **seed sẵn đường cơ sở** (n, mean, M2) từ một hồ sơ benign **đã kiểm định** để Z-score hoạt động ngay từ **gói đầu tiên**. Sau khi seed, baseline vẫn cập nhật online **CÓ ĐIỀU KIỆN** (chỉ trên phán quyết `DROP`/`LOG`) — chống đầu độc "ếch luộc". Được tài liệu hóa trong luận văn **§3.3** (hai lớp bảo vệ baseline) và **§3.11** (suy biến dưới lũ đối kháng).
+Golden-baseline là **đường cơ sở benign DUY NHẤT** của Tier-1: thay vì để Welford "warmup" 100 mẫu đầu ad-hoc (dễ bị đầu độc nếu lưu lượng lúc khởi động đã nhiễm), hệ thống **seed sẵn** (n, mean, M2) từ **300 flow benign đã kiểm định** để Z-score hoạt động ngay từ **gói đầu tiên**. Sau khi seed, baseline vẫn cập nhật online **CÓ ĐIỀU KIỆN** (chỉ trên phán quyết `DROP`/`LOG`) — chống đầu độc "ếch luộc". Được tài liệu hóa trong luận văn **§3.3** (hai lớp bảo vệ baseline) và **§3.11**.
+
+> **Từ 2026-07-14: mặc định `enabled: true`.** F1 luồng-gộp 0.594→0.61 (FP 113→98), APT 3/3 +
+> zero-day 7/7 giữ nguyên; ablation được **cô lập** khỏi golden (`_fresh_engine`) nên F1 0.967 không đổi.
 
 ### Lệnh thực thi
 
 ```bash
-# 1) Dựng hồ sơ vàng từ các flow benign trong ground_truth (11 feature Tier-1, 300 flow)
+# 1) (Chỉ khi cần dựng lại) hồ sơ vàng từ flow benign trong ground_truth (11 feature, 300 flow)
 .venv/bin/python experiments/build_golden_baseline.py
-#    -> ghi config/golden_baseline.json
+#    -> ghi config/golden_baseline.json  (tự reset Welford trước khi dựng → luôn n=300, không tự-seed chồng)
 
-# 2) Bật cờ trong config/system_settings.yaml:
+# 2) Cờ trong config/system_settings.yaml (ĐÃ bật sẵn mặc định):
 #      tier1:
 #        golden_baseline:
-#          enabled: true            # mặc định false
+#          enabled: true            # mặc định true (base duy nhất)
 #          path: config/golden_baseline.json
 ```
 
@@ -570,6 +591,18 @@ này đã được **vá bằng 2 lớp** (xem [DAY2.md](../learning/DAY2.md) / 
 
 Sau vá: **0% compromise** trên cùng bộ tấn công. Đây là minh chứng defense-in-depth: tầng
 deterministic kiểm tra tầng có thể bị thao túng, và HITL là chốt chặn cuối cho ca mơ hồ.
+
+---
+
+## 10b. Chỉ số Phán xử Tier-2 (LLM quyết định ĐÚNG khi escalate?)
+
+F1 luồng-gộp (0.61) đo tầng **LỌC** Tier-1; chỉ số này đo riêng năng lực **phán quyết** của LLM trên đúng tập ESCALATE (cần LLM server):
+
+```bash
+.venv/bin/python experiments/evaluate_tier2_decision.py   # 651 ca escalate; --limit 12 để thử nhanh
+```
+
+Kết quả thực đo (2026-07-14): **651 ca** (594 threat / 57 benign lọt) → **recall 1.00** (594/594, không sót đe doạ) · specificity 0.00 · accuracy **0.912** (= base-rate, như ablation) · action **631 AWAIT_HITL / 20 ALERT** (defer về con người). ⟹ *không đe doạ nào tới Tier-2 mà bị vứt bỏ.* Đã vào luận văn Ch4 (bảng "Phán xử leo thang Tầng 2").
 
 ---
 
