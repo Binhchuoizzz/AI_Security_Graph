@@ -589,7 +589,8 @@ class GuardrailsPipeline:
         self.detector = PromptInjectionDetector()
         self.jailbreak_detector = JailbreakDetector()
         self.neutralizer = EncodingNeutralizer()
-        self.encapsulator = DelimitedDataEncapsulator()
+        # KHÔNG giữ encapsulator dạng thuộc-tính singleton: mỗi lô tạo nonce MỚI trong
+        # process()/process_batch() (dynamic per-batch + thread-safe cho worker song song).
 
     def process(self, log_entry: dict) -> dict:
         """
@@ -599,7 +600,12 @@ class GuardrailsPipeline:
         flagged = self.detector.scan(normalized)
         flagged = self.jailbreak_detector.scan(flagged)
         neutralized = self.neutralizer.neutralize(flagged)
-        encapsulated = self.encapsulator.encapsulate_fields(neutralized)
+        # Nonce ĐỘNG mỗi lần gọi: mỗi lô có delimiter riêng (attacker không đoán được mốc
+        # kết thúc để smuggle) — đúng tuyên bố "dynamic per-batch" & thread-safe (không dùng
+        # chung self.encapsulator giữa các worker song song). encapsulate + system_instruction
+        # PHẢI dùng CÙNG một enc để nonce khớp trong prompt.
+        enc = DelimitedDataEncapsulator()
+        encapsulated = enc.encapsulate_fields(neutralized)
 
         return {
             "sanitized_log": neutralized,
@@ -610,7 +616,7 @@ class GuardrailsPipeline:
             "jailbreak_detected": flagged.get("_jailbreak_detected", False),
             "jailbreak_patterns": flagged.get("_jailbreak_patterns", []),
             "isolation_level": flagged.get("_isolation_level", "NORMAL"),
-            "system_instruction": self.encapsulator.get_system_instruction(),
+            "system_instruction": enc.get_system_instruction(),
         }
 
     def process_batch(self, logs: list) -> dict:
@@ -660,13 +666,14 @@ class GuardrailsPipeline:
             elif r["isolation_level"] == "HIGH":
                 max_isolation = "HIGH"
 
-        # 5. Đóng gói trong delimiter ngẫu nhiên động
-        batch_encapsulated = self.encapsulator.encapsulate(budgeted_text, max_isolation)
+        # 5. Đóng gói trong delimiter ngẫu nhiên ĐỘNG (nonce mới mỗi lô — xem process()).
+        enc = DelimitedDataEncapsulator()
+        batch_encapsulated = enc.encapsulate(budgeted_text, max_isolation)
 
         return {
             "individual_results": results,
             "batch_encapsulated": batch_encapsulated,
             "injection_count": injection_count,
             "total_logs": len(logs),
-            "system_instruction": self.encapsulator.get_system_instruction(),
+            "system_instruction": enc.get_system_instruction(),
         }

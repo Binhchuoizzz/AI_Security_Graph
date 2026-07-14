@@ -47,13 +47,14 @@ class OutputSanitizer:
         ]
         self._strip_count = 0
 
-    def _sanitize_base64(self, text: str) -> str:
+    def _sanitize_base64(self, text: str) -> tuple[str, int]:
         # Tìm kiếm khối Base64 hợp lệ, độ dài tối thiểu 8
         # để giảm chi phí false positive
         pattern = re.compile(r"\b[A-Za-z0-9+/]{8,}={0,2}\b")
-        clean = text
+        count = 0
 
         def repl(match):
+            nonlocal count
             val = match.group(0)
             try:
                 pad = len(val) % 4
@@ -64,31 +65,32 @@ class OutputSanitizer:
                 )
                 triggers = ["<script", "<img", "javascript:", "onload=", "onerror=", "iframe"]
                 if len(decoded) > 3 and any(char in decoded.lower() for char in triggers):
-                    self._strip_count += 1
+                    count += 1
                     return "[BASE64_OBFUSCATED_STRIPPED]"
             except Exception:
                 pass
             return match.group(0)
 
-        return pattern.sub(repl, clean)
+        return pattern.sub(repl, text), count
 
-    def _sanitize_hex(self, text: str) -> str:
+    def _sanitize_hex(self, text: str) -> tuple[str, int]:
         pattern = re.compile(r"\b(0x)?([a-fA-F0-9]{8,})\b")
-        clean = text
+        count = 0
 
         def repl(match):
+            nonlocal count
             hex_digits = match.group(2)
             try:
                 decoded = bytes.fromhex(hex_digits).decode("utf-8", errors="ignore")
                 triggers = ["<script", "<img", "javascript:", "onload=", "onerror=", "iframe"]
                 if len(decoded) > 3 and any(char in decoded.lower() for char in triggers):
-                    self._strip_count += 1
+                    count += 1
                     return "[HEX_OBFUSCATED_STRIPPED]"
             except Exception:
                 pass
             return match.group(0)
 
-        return pattern.sub(repl, clean)
+        return pattern.sub(repl, text), count
 
     def sanitize(self, text: str) -> str:
         """
@@ -99,7 +101,10 @@ class OutputSanitizer:
         if not text:
             return text
 
-        self._strip_count = 0
+        # Đếm CỤC BỘ (không phải self.*): OutputSanitizer là singleton dùng bởi nhiều
+        # worker Tier-2 SONG SONG — nếu đếm trên self._strip_count thì các thread ghi
+        # đè lẫn nhau (đua). Text sạch vốn đã đúng (biến local), nhưng đếm/log phải cục bộ.
+        strip_count = 0
         clean = text
 
         # 1. Loại bỏ các ký tự ẩn tàng hình (Zero-width characters)
@@ -113,19 +118,22 @@ class OutputSanitizer:
         for compiled_re, replacement in self.compiled_patterns:
             matches = compiled_re.findall(clean)
             if matches:
-                self._strip_count += len(matches)
+                strip_count += len(matches)
                 clean = compiled_re.sub(replacement, clean)
 
         # 4. Quét giải mã Base64/Hex SÂU để phát hiện payload ẩn
-        clean = self._sanitize_base64(clean)
-        clean = self._sanitize_hex(clean)
+        clean, b64_count = self._sanitize_base64(clean)
+        clean, hex_count = self._sanitize_hex(clean)
+        strip_count += b64_count + hex_count
 
-        if self._strip_count > 0:
+        if strip_count > 0:
             logger.warning(
-                f"[OUTPUT SANITIZER] Stripped {self._strip_count} dangerous "
+                f"[OUTPUT SANITIZER] Stripped {strip_count} dangerous "
                 f"patterns/obfuscated vectors from LLM output"
             )
 
+        # Best-effort cho property last_strip_count (quan sát; đa luồng chỉ gần đúng).
+        self._strip_count = strip_count
         return clean
 
     def sanitize_for_db(self, text: str) -> str:

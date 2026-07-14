@@ -60,14 +60,17 @@ def preflight_check(messages, max_output_tokens: int) -> int:
     est = estimate_tokens(messages)
     input_budget = max(N_CTX - max_output_tokens, 1)
     if est > WARN_RATIO * input_budget:
+        # _persist() PHẢI nằm trong lock: record_usage() ở worker khác cũng persist()
+        # dưới lock — nếu preflight persist NGOÀI lock thì hai thread cùng ghi STATS_PATH
+        # -> JSON hỏng. Gộp vào lock để ghi file được serialize.
         with _lock:
             _state["overflow_warnings"] += 1
+            _persist()
         logger.warning(
             f"[CONTEXT GUARD] Prompt ước lượng ~{est} token > {int(WARN_RATIO * 100)}% ngân sách "
             f"input ({input_budget}/{N_CTX}). Nguy cơ cắt ngữ cảnh — nên nén template mạnh hơn "
             f"hoặc giảm RAG/memory budget."
         )
-        _persist()
     return est
 
 

@@ -121,8 +121,10 @@ class LLMClient:
                 # Ghi token THẬT do server trả về (prompt/completion) để quan sát & tinh chỉnh.
                 token_monitor.record_usage(getattr(response, "usage", None))
 
-                # Trả về văn bản
-                return response.choices[0].message.content
+                # Trả về văn bản. `content` có thể là None theo schema OpenAI (vd
+                # finish_reason=length/content_filter, hay tool-call) → ép "" để
+                # parse_llm_response KHÔNG ném TypeError và suy biến an toàn AWAIT_HITL.
+                return response.choices[0].message.content or ""
 
             except openai.APITimeoutError as e:
                 logger.warning(f"LLM Timeout (attempt {retries + 1}/{self.max_retries + 1}): {e}")
