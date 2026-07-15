@@ -230,6 +230,34 @@ def _add_to_blacklist(ip: str, ttl: int = 3600) -> None:
         pass
 
 
+def _remove_from_blacklist(ip: str) -> None:
+    """Xóa IP khỏi Redis blacklist."""
+    try:
+        import redis  # type: ignore
+
+        redis.Redis.from_url(_redis_url(), socket_connect_timeout=0.5).delete(f"blacklist:{ip}")
+    except Exception:
+        pass
+
+
+def unblock_ip(ip: str):
+    """Gỡ chặn IP bằng cách xóa khỏi Tier-1 Redis blacklist và reset Reputation."""
+    safe_ip = _validator.sanitize_target(ip)
+
+    # 1. Xoá khỏi Redis cache chặn tốc độ cao
+    _remove_from_blacklist(safe_ip)
+    logger.info(f" [FIREWALL MOCK] UNBLOCKED IP: {safe_ip} (removed from Redis)")
+
+    # 2. Xoá tiền sử danh tiếng xấu trong DB để tránh Tier-1 auto-block lại ngay lập tức
+    try:
+        from src.agent.threat_memory import ThreatMemoryStore
+
+        mem = ThreatMemoryStore()
+        mem.reset_ip_reputation(safe_ip)
+    except Exception as e:
+        logger.error(f"[FIREWALL MOCK] Failed to reset reputation for {safe_ip}: {e}")
+
+
 def block_ip(ip: str, reason: str, raw_log: str = ""):
     safe_ip = _validator.sanitize_target(ip)
     # ĐỒNG BỘ WHITELIST (phòng vệ chiều sâu): IP đã whitelist KHÔNG BAO GIỜ bị chặn thật —

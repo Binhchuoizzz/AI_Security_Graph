@@ -92,6 +92,9 @@ def handle_whitelist_approval(ip: str):
     ok = feedback_mgr.add_to_whitelist(ip)
     st.session_state[f"whitelisted_{ip}"] = ok
     if ok:
+        from src.response.executor import unblock_ip
+
+        unblock_ip(ip)
         st.toast(f"✅ Đã whitelist {ip}", icon="✅")
     else:
         st.toast(
@@ -99,6 +102,30 @@ def handle_whitelist_approval(ip: str):
             "*, any, hoặc CIDR < /16). IP host cụ thể đều được phép.",
             icon="⚠️",
         )
+    time.sleep(0.5)
+    st.rerun()
+
+
+def handle_block_approval(ip: str):
+    """Callback chặn thủ công IP từ tab Nhật ký SIEM."""
+    feedback_mgr.receive_new_rule(
+        "Source IP",
+        ip,
+        score=100,
+        source=f"manual_{st.session_state.get('username')}",
+        reason=f"Chặn thủ công từ tab Nhật ký SIEM bởi {st.session_state.get('username')}",
+    )
+    # Duyệt luôn
+    feedback_mgr.approve_rule(ip, "Source IP")
+
+    # Ghi audit log
+    from src.response.executor import block_ip
+
+    block_ip(ip, "Chặn thủ công qua nút bấm SIEM")
+
+    st.toast(f"🛑 Đã block {ip} thành công", icon="🛑")
+    time.sleep(0.5)
+    st.rerun()
 
 
 def _get_tier1_blocks(show: int = 12) -> list[dict]:
@@ -181,7 +208,8 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
         integ_valid = True
 
     escalated = len(all_alerts)
-    nr = noise_reduction if noise_reduction is not None else 99.6
+    # Không bịa số khi chưa đo được: 99.6 hardcode cũ khiến demo trống vẫn khoe 99.6%.
+    nr = noise_reduction
 
     # ---------- Hàng chỉ số vận hành ----------
     st.markdown("### 📊 Chỉ số Vận hành Thời gian thực")
@@ -722,6 +750,7 @@ def main_dashboard():
                     alert,
                     is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
                     on_whitelist=handle_whitelist_approval if not is_whitelisted else None,
+                    on_block=handle_block_approval,
                     card_id=f"{start_idx + idx}",
                 )
 
@@ -775,10 +804,27 @@ def main_dashboard():
             for rule in page_rules:
                 sev_icon, sev_label = _rule_severity(rule.get("score"))
                 created = str(rule.get("created_at") or "—")[:19].replace("T", " ")
+
+                # Phân loại rõ loại HITL dựa vào nguồn
+                src = rule.get("source", "")
+                if "langgraph_agent_hitl" in src:
+                    hitl_type = "🤔 AWAIT_HITL (AI cần con người phân tích thêm)"
+                    hitl_color = "#faad14"
+                elif "langgraph_agent" in src:
+                    hitl_type = "🛑 BLOCK_IP (AI đề xuất chặn, chờ duyệt)"
+                    hitl_color = "#ff4d4f"
+                else:
+                    hitl_type = f"🔧 MANUAL ({src})"
+                    hitl_color = "#1890ff"
+
                 with st.expander(
                     f"{sev_icon} [{sev_label}] {rule.get('pattern')} · 🕒 {created} · score {rule.get('score')}",
                     expanded=True,
                 ):
+                    st.markdown(
+                        f"**Loại chờ duyệt (HITL Type):** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
+                        unsafe_allow_html=True,
+                    )
                     st.write(
                         f"**Mức độ nghiêm trọng:** {sev_icon} {sev_label} (score {rule.get('score')})"
                     )
@@ -819,6 +865,11 @@ def main_dashboard():
                         with col2:
                             if st.button("❌ Từ chối", key=f"rej_{rule.get('pattern')}"):
                                 feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
+                                # Xóa khỏi Redis blacklist (trường hợp LLM đã block tạm thời)
+                                if rule.get("field") == "Source IP":
+                                    from src.response.executor import unblock_ip
+
+                                    unblock_ip(str(rule.get("pattern")))
                                 st.warning(f"Đã từ chối luật {rule.get('pattern')}")
                                 time.sleep(0.5)
                                 st.rerun()
@@ -887,14 +938,8 @@ def main_dashboard():
         ]
         high_risk_data = [[r["ip"], r["reputation_score"]] for r in high_risk_ips]
 
-        # Lấy danh sách Known Entities nội bộ
-        known_entities = threat_memory.get_all_known_entities()
-        known_entities_data = [
-            [e["entity_value"], f"{e['entity_type']} - {e['description']}"] for e in known_entities
-        ]
-
         # Hiển thị bảng danh tiếng và whitelist, đồng thời nhận IP được click chọn (nếu có)
-        selected_actor_ip = render_threat_intel_tables(high_risk_data, known_entities_data)
+        selected_actor_ip = render_threat_intel_tables(high_risk_data)
 
         st.markdown("---")
 
@@ -1147,29 +1192,40 @@ def main_dashboard():
         col_left, col_right = st.columns([3, 2])
 
         with col_left:
-            # ── Chặn TỨC THỜI của Tier-1 (Redis TTL 1h) — trước đây tab này bỏ sót ──
-            st.markdown("### 🛡️ Chặn tức thời bởi Tier-1 (Redis TTL 1h)")
-            if not tier1_temp_blocks:
-                st.info("Chưa có IP nào bị Tier-1 chặn tức thời trong phiên gần đây.")
+            # ── Danh sách Whitelisted IPs hiện tại (Thay thế Chặn tức thời Tier-1) ──
+            st.markdown("### ✅ Danh sách Whitelist hiện tại")
+            if not whitelisted_ips:
+                st.info("Chưa có IP nào trong danh sách Whitelist.")
             else:
-                t1_rows = [
-                    {
-                        "Địa chỉ IP": b.get("ip"),
-                        "Điểm": b.get("score", 0),
-                        "Số lần chặn": b.get("count", 1),
-                        "Lần cuối": (b.get("ts") or "")[-8:] or "—",
-                        "Lý do Tier-1": " · ".join(b.get("reasons", [])) or "—",
-                    }
-                    for b in tier1_temp_blocks
-                ]
-                st.dataframe(pd.DataFrame(t1_rows), use_container_width=True, hide_index=True)
-                st.caption(
-                    "⏳ Các block này **tạm thời** (Redis blacklist, tự hết hạn sau 1 giờ). "
-                    "Dashboard không truy cập Redis trực tiếp nên đọc qua file `tier1_blocks.json` "
-                    "do subscriber ghi."
-                )
+                for ip in whitelisted_ips:
+                    with st.expander(f"✅ Whitelisted: {ip}", expanded=False):
+                        st.write(f"Mọi traffic từ `{ip}` sẽ được bỏ qua bởi Rule Engine.")
+                        if is_l3:
+                            if st.button("❌ Gỡ khỏi Whitelist", key=f"rmwl_t4_top_{ip}"):
+                                feedback_mgr.remove_from_whitelist(ip)
+
+                                # Khôi phục trạng thái ACTIVE nếu có lịch sử bị chặn
+                                all_rules_now = feedback_mgr.get_all_dynamic_rules()
+                                for r in all_rules_now:
+                                    if r.get("pattern") == ip:
+                                        feedback_mgr.update_rule_status(ip, "ACTIVE", "Source IP")
+                                        break
+
+                                from src.response.executor import _log_to_db
+
+                                _log_to_db(
+                                    "LOG",
+                                    ip,
+                                    f"IP removed from Whitelist by {st.session_state.get('username')}",
+                                )
+                                st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
+                                time.sleep(0.5)
+                                st.rerun()
 
             st.markdown("### 🛑 Luật chặn Vĩnh viễn & Lịch sử (Dynamic Rules)")
+
+            # Lọc bỏ các IP đang nằm trong Whitelist để không hiển thị ở 2 bảng cùng lúc
+            ip_blocks = [r for r in ip_blocks if r.get("pattern") not in whitelisted_ips]
 
             if not ip_blocks:
                 st.info("Chưa ghi nhận địa chỉ IP nào bị chặn trong cấu hình.")
@@ -1178,7 +1234,6 @@ def main_dashboard():
                 block_rows = []
                 for rule in ip_blocks:
                     status_val = rule.get("status", "ACTIVE")
-                    # Tạo nhãn status có icon
                     status_icon = (
                         "🛑 ACTIVE"
                         if status_val == "ACTIVE"
@@ -1186,10 +1241,21 @@ def main_dashboard():
                         if status_val == "PENDING_APPROVAL"
                         else "🔓 UNBLOCKED"
                     )
+
+                    # Phân loại HITL/Nguồn
+                    src = rule.get("source", "")
+                    if "langgraph_agent_hitl" in src:
+                        phan_loai = "🤔 AWAIT_HITL"
+                    elif "langgraph_agent" in src:
+                        phan_loai = "🛑 BLOCK_IP (AI)"
+                    else:
+                        phan_loai = "🔧 MANUAL"
+
                     block_rows.append(
                         {
                             "Địa chỉ IP": rule.get("pattern"),
                             "Trạng thái": status_icon,
+                            "Phân loại": phan_loai,
                             "Điểm Risk": rule.get("score", 50),
                             "Ngày tạo": rule.get("created_at", "N/A")[:19].replace("T", " "),
                             "Lý do": rule.get("reason", "N/A"),
@@ -1228,7 +1294,8 @@ def main_dashboard():
                 block_rows = block_select_data.get("rows", [])
                 if block_rows:
                     selected_row_idx = block_rows[0]
-                    selected_block_ip = df_blocks.iloc[selected_row_idx]["Địa chỉ IP"]
+                    if selected_row_idx < len(df_blocks):
+                        selected_block_ip = df_blocks.iloc[selected_row_idx]["Địa chỉ IP"]
 
                 # Nếu người dùng đã chọn một IP
                 if selected_block_ip:
@@ -1268,9 +1335,11 @@ def main_dashboard():
                                     ):
                                         # Set status thành REJECTED
                                         feedback_mgr.reject_rule(selected_block_ip, "Source IP")
-                                        # Log hành động unblock vào audit_trail
-                                        from src.response.executor import _log_to_db
+                                        # Xóa khỏi Redis blacklist
+                                        from src.response.executor import _log_to_db, unblock_ip
 
+                                        unblock_ip(selected_block_ip)
+                                        # Log hành động unblock vào audit_trail
                                         _log_to_db(
                                             "LOG",
                                             selected_block_ip,
@@ -1423,8 +1492,9 @@ def main_dashboard():
                     else:
                         ok = feedback_mgr.add_to_whitelist(manual_wl_ip)
                         if ok:
-                            from src.response.executor import _log_to_db
+                            from src.response.executor import _log_to_db, unblock_ip
 
+                            unblock_ip(manual_wl_ip)
                             _log_to_db(
                                 "LOG",
                                 manual_wl_ip,
@@ -1440,28 +1510,7 @@ def main_dashboard():
                                 "Mọi IP host cụ thể đều được phép."
                             )
 
-            # Danh sách Whitelisted IPs hiện tại
-            st.markdown("---")
-            st.markdown("#### ✅ Danh sách Whitelist hiện tại")
-            if not whitelisted_ips:
-                st.info("Chưa có IP nào trong danh sách Whitelist.")
-            else:
-                for ip in whitelisted_ips:
-                    with st.expander(f"✅ Whitelisted: {ip}", expanded=False):
-                        st.write(f"Mọi traffic từ `{ip}` sẽ được bỏ qua bởi Rule Engine.")
-                        if is_l3:
-                            if st.button("❌ Gỡ khỏi Whitelist", key=f"rmwl_t4_{ip}"):
-                                feedback_mgr.remove_from_whitelist(ip)
-                                from src.response.executor import _log_to_db
-
-                                _log_to_db(
-                                    "LOG",
-                                    ip,
-                                    f"IP removed from Whitelist by {st.session_state.get('username')}",
-                                )
-                                st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
-                                time.sleep(0.5)
-                                st.rerun()
+            # Đã chuyển Danh sách Whitelist lên trên
 
     with tab5:
         st.subheader("🔍 Quản lý Lỗ hổng & Tri thức Graph (Vulnerabilities & Graph)")

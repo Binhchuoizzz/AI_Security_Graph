@@ -129,6 +129,32 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
     }
 
 
+def _degraded_reason(decision: dict) -> str:
+    """Câu giải thích cho analyst khi quyết định KHÔNG có phần lập luận của LLM.
+
+    Chỉ xảy ra ở đường suy biến an toàn (LLM trả JSON hỏng / rỗng). Nói rõ nguyên nhân
+    thay vì "No reasoning provided." — analyst cần biết đây là LỖI ĐỊNH DẠNG của model,
+    không phải hệ thống đánh giá sự cố là vô hại, và vì sao độ tin cậy = 0.
+    """
+    err = str(decision.get("error", "") or "")
+    if err == "parse_failed":
+        return (
+            "Tác tử AI đã phân tích nhưng model trả về JSON KHÔNG hợp lệ — không trích được "
+            "phần lập luận. Hệ thống suy biến an toàn: chuyển sự cố cho người xử lý thay vì "
+            "tự quyết. Độ tin cậy 0 phản ánh việc KHÔNG có phán quyết hợp lệ, KHÔNG có nghĩa "
+            "là sự cố vô hại. Xem LOG THÔ bên dưới để phân tích thủ công."
+        )
+    if err:
+        return (
+            f"Không có lập luận của tác tử AI (lỗi: {err}). Hệ thống suy biến an toàn: chuyển "
+            f"người xử lý. Xem LOG THÔ bên dưới."
+        )
+    return (
+        "Model không trả về phần lập luận cho quyết định này. Chuyển người xử lý để đảm bảo "
+        "an toàn. Xem LOG THÔ bên dưới."
+    )
+
+
 def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     """
     LLM Triage Node: Phân tích toàn bộ cụm log (Incident-Level) và đưa ra 1 quyết định duy nhất.
@@ -216,7 +242,11 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
 
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
-    reasoning = validated_decision.get("reasoning", "No reasoning provided.")
+    # Khi LLM trả JSON hỏng, parse_llm_response suy biến an toàn về AWAIT_HITL và KHÔNG có
+    # khoá 'reasoning'. Mặc định cũ ("No reasoning provided.") khiến Dashboard trông như
+    # agent im lặng/hỏng, trong khi thực tế là: agent ĐÃ chạy, LLM ĐÃ trả lời, nhưng câu
+    # trả lời sai định dạng -> chuyển người xử lý. Nói thẳng điều đó cho analyst.
+    reasoning = validated_decision.get("reasoning") or _degraded_reason(validated_decision)
     new_iocs = validated_decision.get("extracted_iocs", [])
 
     # Ghi nhận vào MLflow (Tracking)
@@ -521,7 +551,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
 
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
-    raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
+    raw_reasoning = latest_decision.get("reasoning") or _degraded_reason(latest_decision)
     safe_reasoning = output_sanitizer.sanitize(raw_reasoning)
     formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {safe_reasoning}"
 
@@ -600,7 +630,7 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
 
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
-    raw_reasoning = latest_decision.get("reasoning", "No reasoning provided.")
+    raw_reasoning = latest_decision.get("reasoning") or _degraded_reason(latest_decision)
     formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {raw_reasoning}"
 
     logger.warning(f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}")
@@ -616,6 +646,19 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
         formatted_reasoning,
         raw_log=raw_log_json,
     )
+
+    # Đưa vào hàng đợi duyệt luật (Tab Phê duyệt Luật HITL) để human có thể xem xét
+    target_ip = latest_decision.get("target", "UNKNOWN_TARGET")
+    if target_ip != "UNKNOWN_TARGET":
+        from src.tier1_filter.feedback_listener import FeedbackListener
+
+        FeedbackListener().receive_new_rule(
+            "Source IP",
+            target_ip,
+            score=50,  # 50 cho AWAIT_HITL vì chưa chắc chắn
+            source="langgraph_agent_hitl",
+            reason=formatted_reasoning,
+        )
 
     return {}
 

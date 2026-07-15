@@ -7,170 +7,130 @@
 
 > **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence, **N**eutralization, **E**scalation and **L**og-correlation
 
-SENTINEL is an enterprise-grade Cognitive Two-Tier Architecture designed for Security Operations Center (SOC) automation. It addresses the **SOC Alert Fatigue Paradox** by combining real-time, low-latency heuristic filtering at Tier 1 with an advanced Agentic AI reasoning pipeline driven by Dual-RAG, Threat Memory, and graph correlation at Tier 2.
+SENTINEL attacks the **SOC Alert Fatigue Paradox** with a two-tier split: a cheap, deterministic **Tier-1** filter runs on every log at wire speed, while an expensive **Tier-2 LangGraph agent** (Gemma-2-9B-IT, running locally) reasons only over what survives. The design bet is that most logs never deserve an LLM — and the measured **−82.97% latency** versus an LLM-on-everything baseline is the payoff.
+
+This is a running system (Python · Redis Streams · LangGraph · llama.cpp · Streamlit · Docker) built for a Master's thesis: **267 pytest · 22/22 E2E**.
 
 ---
 
-## 📐 Architecture Overview
-
-SENTINEL operates on a strict **Separation of Concerns** model to minimize processing latency while maintaining deep cognitive analytical capabilities:
+## 📐 Architecture
 
 ```text
-                     CSE-CIC-IDS2018 / DAPT2020 / Syslogs
-                                     │
-                               [ Redis Stream ]
-                                     │
-    ┌────────────────────────────────┴────────────────────────────────┐
-    │ TIER 1 - Stateful/Stateless Rule Engine & Unsupervised Anomaly  │
-    │          Detection (Welford's Algorithm - Outliers Z-Score > 3.5)│
-    └────────────────────────────────┬────────────────────────────────┘
-                                     ├─ Benign (F1=1.0) ──> [ DROP ] (Noise Reduction)
-                                     └─ Anomalous / Escalated
+   CSE-CIC-IDS2018 · DAPT2020 · Zero-day · Adversarial suite
+                          │
+                   [ Redis Streams ]
+                          │
+   ┌──────────────────────┴──────────────────────┐
+   │ TIER 1 — Rule Engine (O(1)/log, 7 layers)   │
+   │ whitelist → WAF sig → injection sig →       │
+   │ Welford Z-score >3.5σ → static rules →      │
+   │ dynamic rules → session baseline            │
+   └──────────────────────┬──────────────────────┘
+                          │  6-action routing
+      ┌────────┬──────────┼──────────┬────────┬──────────┐
+    DROP      LOG     BLOCK_IP   AWAIT_HITL  ALERT   ESCALATE
+      │                                                 │ (only this calls the LLM)
+   (noise)                        ┌──────────────────────┴──────────┐
+                                  │ GUARDRAILS (5 layers)           │
+                                  │ nonce encapsulation · encoding  │
+                                  │ neutralizer · jailbreak detect  │
+                                  │ Drain3 compress · consensus gate│
+                                  └──────────────────┬──────────────┘
+                                                     │
+   ┌─────────────────────────────────────────────────┴──────────┐
+   │ TIER 2 — LangGraph, 6 nodes (conditional DAG, no loops)     │
+   │   Dual-RAG (MITRE + NIST · FAISS + BM25 · RRF k=60)         │
+   │   Threat Memory (SQLite · APT chain linker · IP reputation) │
+   └─────────────────────────────────────────────────┬──────────┘
+                                                     │
+                                     [ HMAC-SHA256 audit chain ]
+                                                     │
+                        ┌────────────────────────────┼──────────────┐
+                      ALERT                     AWAIT_HITL       BLOCK_IP
+                        │                            │               │
+                  [ Dashboard ] ←────────── [ HITL queue ] → [ Response Executor ]
+                        └────────── approved? ───────┴───────────────┘
                                              │
-    ┌────────────────────────────────────────┴────────────────────────────────┐
-    │ GUARDRAILS & PRE-PROCESSING LAYER                                       │
-    │  1. Nonce-based Delimited Data Encapsulation (Anti Prompt-Injection)   │
-    │  2. Encoding Neutralization (URL, Base64, Hex decoding & sanitization)  │
-    │  3. Jailbreak & DAN Detector (Critical isolation)                       │
-    │  4. Drain3 Log Template Miner (Token compression)                       │
-    │  5. Decision Validator + Tier-Consensus Guard (anti social-eng)        │
-    └────────────────────────────────────────┬────────────────────────────────┘
-                                             │
-    ┌────────────────────────────────────────┴────────────────────────────────┐
-    │ TIER 2 - LangGraph Agentic Reasoning (Gemma-2-9B-IT via llama.cpp)      │
-    └────────────────────┬────────────────────────────────┬───────────────────┘
-                         │                                │
-        ┌────────────────┴────────────────┐      ┌────────┴────────┐
-        │     Dual-RAG Knowledge Retrieval│      │  Threat Memory  │
-        │ - MITRE ATT&CK (TTP mapping)    │      │ - SQLite Store  │
-        │ - NIST SP 800-61r2 (Playbooks)  │      │ - APT Linker    │
-        │ - FAISS + BM25 Hybrid Search   │      └────────┬────────┘
-        └────────────────┬────────────────┘               │
-                         └────────────────┬───────────────┘
-                                          │
-                                [ LangGraph Workflow ]
-                                 (Few-shot Active Learning)
-                                          │
-                        ┌─────────────────┼─────────────────┐
-                  (Decision: ALERT) (Decision: AWAIT_HITL) (Decision: BLOCK_IP)
-                        │                 │                 │
-                  [ Dashboard ]     [ HITL Queue ]    [ Response Executor ]
-                        │                 │                 │
-                        └───────── Approved? ───────────────┘
-                                          │
-                                   [ Feedback Loop ]
-                                          │
-                       (Dynamic Rules & Human-in-the-Loop FPR)
-                                          │
-                                     [ Tier 1 ]
+                          [ Feedback → dynamic rules → Tier 1 ]
 ```
 
-### Core Architecture Modules
+**The loop that matters:** Tier-2 verdicts and human approvals become Tier-1 dynamic rules and IP reputation, so the cheap tier keeps absorbing what the expensive tier already learned.
 
-| ID | Component | Layer | Technology Stack | Core Role |
+### Core modules
+
+| # | Component | Layer | Stack | Role |
 | :--- | :--- | :--- | :--- | :--- |
-| **1** | **Rule Engine & Unsupervised Detector** | Tier 1 | Python + Redis | Stateless/stateful filtering + online Welford statistics checking for statistical zero-day anomalies. |
-| **2** | **Guardrails Defenses** | Pre/Post-processing | Regex + Delimiter Encapsulation | Delimited Data Encapsulation, Encoding Neutralization, Jailbreak defense, Output Sanitizer, and the Tier-Consensus decision guard. |
-| **3** | **Drain3 Template Miner** | Pre-processing | Python Drain3 | Compresses high-volume syslog and network stream tokens before LLM input. |
-| **4** | **Dual-RAG Hybrid Search** | Tier 2 (RAG) | FAISS + BM25 + RRF | Fetches context from MITRE ATT&CK and NIST SP 800-61r2 using hybrid indexes. |
-| **5** | **LangGraph Agent** | Tier 2 (Reasoning) | LangGraph + Gemma-2-9B-IT | Orchestrates cognitive threat analysis, TTP mapping, and mitigation actions with few-shot learning. |
-| **6** | **Threat Memory** | Tier 2 (Memory) | SQLite + Correlation Engine | Tracks long-term host behaviors, correlating multi-day APT attack chains (DAPT2020). |
-| **7** | **HMAC Log Chaining** | Integrity | SQLite + HMAC SHA-256 | Cryptographically chains audit logs. Automatically flags DB tampering. |
-| **8** | Persist Lockout & Live FPR | Auth / Admin | SQLite + Streamlit UI | Real-time false positive metrics + brute-force protection (max 5 attempts, lockout). |
-| **9** | **Trivy & Neo4j KB Graph** | Vulnerability | Neo4j + Trivy + Graphviz | Scans system files and links vulnerabilities into an interactive threat knowledge graph. |
-| **10**| **HITL Streamlit Dashboard** | UI/UX | Streamlit + Glassmorphism | SOC Operator control panel, live monitoring, log auditor, and whitelist controls. |
+| 1 | **Rule Engine** | Tier 1 | Python + Redis | 7-layer O(1) filter + online Welford statistics for signature-less anomalies. |
+| 2 | **Guardrails** | Pre/Post | Regex + nonce delimiters | Data encapsulation, encoding neutralizer, jailbreak detection, output sanitizer, Tier-consensus gate. |
+| 3 | **Drain3 Miner** | Pre | Drain3 | Compresses log tokens before LLM input (context budget). |
+| 4 | **Dual-RAG** | Tier 2 | FAISS + BM25 + RRF | Hybrid retrieval over MITRE ATT&CK + NIST SP 800-61r2. |
+| 5 | **LangGraph Agent** | Tier 2 | LangGraph + Gemma-2-9B-IT Q6_K | 6-node reasoning DAG: triage → ATT&CK mapping → response. |
+| 6 | **Threat Memory** | Tier 2 | SQLite | Long-term host behavior, multi-day APT correlation, IP reputation. |
+| 7 | **HMAC Audit Chain** | Integrity | SQLite + HMAC-SHA256 | Each entry hashes the previous → tamper-evident trail. |
+| 8 | **Auth & Live FPR** | UI | SQLite + PBKDF2 | Persistent lockout, real-time false-positive metrics. |
+| 9 | **Trivy + Neo4j KB** | Vuln | Neo4j + Trivy | Container scan → interactive vulnerability graph. |
+| 10 | **HITL Dashboard** | UI | Streamlit | SOC operator console: live monitor, log auditor, approvals. |
 
 ---
 
-## 🎯 MITRE ATT&CK Mapping Layer (Tier-2 enrichment node)
+## 📊 Measured Results
 
-A dedicated LangGraph node — [`src/agent/attack_mapper.py`](src/agent/attack_mapper.py),
-wired as `attack_mapper` in [`src/agent/workflow.py`](src/agent/workflow.py) — turns the
-triage step's **free-text** `mitre_technique` (e.g. `"T1190 - ..."`) into a **structured,
-schema-validated** ATT&CK record.
+Offline deterministic run (2026-07-14, RTX 4060 Ti 16GB). **These are the honest numbers — missed targets included.**
 
-* **When it runs:** a conditional edge after `llm_triage` (`route_after_triage`). It fires
-  on every actionable threat verdict (`BLOCK_IP` / `ALERT` / `AWAIT_HITL`) — benign `LOG`
-  events are never mapped. (The gate is **action-based**: an earlier `confidence > 0.7`
-  threshold was dropped after measurement showed the triage assigns ~0.6–0.7 confidence to
-  flow-only anomalies, so a strict threshold filtered out almost every real verdict.) The
-  enriched decision is then routed on to the HITL node / Action Executor.
-* **Reuses existing infrastructure — no parallel system:** the same
-  `knowledge_base/mitre_attack.json` (299 techniques), the same `DualRetriever`
-  (FAISS + BM25, **RRF k=60**), and the same `llm_client` (Gemma-2-9B-IT **Q6_K** via
-  llama.cpp at `127.0.0.1:5000`). No STIX re-download, no second KB, no Ollama endpoint.
-* **Two resolution paths:**
-  1. **Deterministic** — common web attacks (SQLi, XSS, Path Traversal, LFI, RFI, SSRF,
-     XXE, Command Injection, IDOR, Prompt Injection) resolve from a hand-verified curated
-     map. Every Tactic/Technique ID is a real ATT&CK/ATLAS entry. Reproducible, **no LLM
-     call**, low latency.
-  2. **Inference** — for an unseen `attack_type`, RRF returns the top-3 candidate techniques
-     from the KB and the local LLM selects the best match (with graceful fallback to the
-     top-RRF candidate if the LLM is unavailable).
-* **Output schema** (Pydantic `MitreMapping`, always valid): `attack_type`, `confidence`,
-  `framework`, `mitre_tactic` (+`_id`), `mitre_technique` (+`_id`), `mitre_subtechnique`
-  (+`_id`), `mitre_url`, `mapping_confidence`, `mapping_status` (`resolved` |
-  `low_confidence`), `recommended_response` (rule-based by tactic).
-* **Honesty notes:** Prompt Injection is not an ATT&CK Enterprise technique — it is mapped
-  to **MITRE ATLAS `AML.T0051`** with its tactic ID intentionally left blank (unverified, no
-  fabrication). IDOR has no dedicated ATT&CK technique, so it maps to `T1190` with a lower
-  `mapping_confidence`.
-* **Tests:** [`tests/unit/test_attack_mapper.py`](tests/unit/test_attack_mapper.py) — 29
-  CI-safe tests (no LLM/Redis needed) covering all 10 attack types, schema validity, URL
-  building, and the RRF/graceful-degradation paths.
-
----
-
-## 🛡️ Core Security Novelty & Defensive Controls
-
-SENTINEL implements defense-in-depth, protecting both the protected infrastructure and the AI system itself from adversarial threats:
-
-### 1. Adversarial AI Protection (LLM Guardrails)
-* **Delimited Data Encapsulation:** Wraps raw log payloads in dynamic, single-use cryptographic delimiters (`secrets.token_hex(8)`, a fresh nonce per encapsulator instance) to isolate instruction from data. Strips any nested delimiter tokens in raw inputs to prevent **Delimiter Smuggling**.
-* **Encoding Neutralizer:** Decodes and sanitizes Base64, Hex, URL, and Unicode homoglyph payloads prior to analysis, neutralising obfuscation bypass techniques.
-* **Jailbreak Detection:** Real-time analysis of incoming payloads against signature-based and semantic patterns associated with "Do-Anything-Now" (DAN) roleplay-based attacks.
-* **Tier-1 Injection/Jailbreak Pre-screen:** The Tier-1 rule engine signature-matches the *same* `injection_patterns`/`jailbreak_patterns` set used by the Guardrails layer (single source of truth, hot-reloadable). Matches add risk score and `ESCALATE` the event into Tier-2 Guardrails instead of being silently dropped.
-* **Tier-1/Tier-2 Decision Consensus Guard:** Defends against **semantic social-engineering** (forged authority / "already-approved" claims embedded in logs). If the deterministic Tier-1 engine flagged an event as an attack but the LLM tries to downgrade it to `LOG`/`DROP`, the validator overrides the decision to `AWAIT_HITL` — the deterministic tier cannot be "talked down" the way an LLM can.
-* **Anti-Self-DoS Shield (scoped):** The `DecisionValidator` downgrades a `BLOCK_IP` to `ALERT` **only** when the target is in `critical_infrastructure_subnets` (a *narrow* allowlist — loopback + specific gateway/DNS/host, NOT the whole RFC1918 space). This protects core infrastructure from being auto-blocked while still allowing containment of internal/lateral/insider attackers (a broad RFC1918 shield would silently neuter every internal block — and the HITL rule queue).
-* **Output Sanitizer:** Prevents **Indirect Prompt Injection (Data Exfiltration)** by stripping markdown image links (`![](...)`), malicious HTML/JavaScript tags, and deep Base64/Hex-obfuscated payloads generated by the LLM before they reach the operator UI or the database.
-
-### 2. Infrastructure & Audit Trail Hardening
-* **Cryptographic Audit Trail (HMAC Log Chaining):** Response-executor logs written to `config/audit_trail.db` are chained using HMAC-SHA-256 (like a private blockchain). The hash of each log entry depends on the hash of the preceding entry. Any database modification by an intruder breaks the chain and triggers an alert. *(This is distinct from the research-metadata store `logs/guardrails_audit.db` used by the runtime state monitor.)*
-* **Persistent Lockout & Lockout Auto-Reset:** Protection against credential brute-forcing stored in SQLite (resistant to session clearing or private window bypass). Once the lockout duration expires, the system automatically resets attempts to `0` for seamless usability.
-* **No hardcoded credentials (CWE-798):** Dashboard auth uses PBKDF2-HMAC-SHA256 (100k iters) with **pre-computed hashes** in source (no plaintext passwords); demo credentials live in `docs/Codebase/guides/RUN_PROJECT.md`, and a fail-loud warning fires if the demo HASH/SALT are still in use.
-* **Real "Noise Reduction" KPI (not estimated):** the Subscriber counts actual raw logs through Tier-1 and the number dropped, writing `config/pipeline_stats.json`; the Dashboard reports the *measured* reduction (e.g. 550 raw → 548 dropped → 99.6%) rather than a heuristic estimate.
-* **Clickjacking & CSRF Prevention:** Streamlit configuration hardened with `enableCORS = false`, `enableXsrfProtection = true`, and `frameAncestors = ["'none'"]` to prevent unauthorized iframe embedding.
-
-> **Enforcement honesty:** `block_ip()` is a `[FIREWALL MOCK]` (writes the audit trail; it does **not** call iptables/OS firewall). Real enforcement happens inside SENTINEL: an approved dynamic rule makes Tier-1 flag that IP's future traffic (score 100). The mock is the integration point — production swaps it for a real firewall API.
-
-### 3. Vulnerability Management & RAG Integrity
-* **RAG Document Checksum Auditor:** Dynamically validates the integrity of raw MITRE ATT&CK and NIST SP 800-61r2 sources using SHA-256 hashing. Prevents document poisoning attacks.
-* **Trivy static scan & Neo4j graph representation:** Runs automated container scans on requirements/Dockerfiles, populating a Neo4j Graph DB and visualising structural vulnerabilities dynamically in the UI.
-
----
-
-## 📊 5-Dimensional Evaluation Framework (5D-EF)
-
-SENTINEL is systematically benchmarked across five analytical axes:
-
-| Axis | Metric / Target | Statistical Evaluation | Verification Script |
+| Axis | Target | **Measured** | Verdict |
 | :--- | :--- | :--- | :--- |
-| **1. Classification** | F1-Score $\ge 0.90$ (Triage accuracy) | McNemar's Test ($p < 0.05$) | `experiments/run_ablation.py --mode af` |
-| **2. Operational** | Latency Reduction $\ge 60\%$ (Tier 1 filter rate)| Mann-Whitney U Test ($p < 0.05$) | `experiments/measure_latency_baseline.py` |
-| **3. Robustness** | Guardrail Bypass Rate $< 10\%$ | 120-sample Adversarial Suite (5 categories) | `evaluate_adversarial.py --mode static` + `--mode pipeline` (full LLM) |
-| **4. Context Quality**| Context Relevance $\ge 0.85$ (RAG context) | LLM-as-a-Judge (Llama 3 8B) | `experiments/evaluate_reasoning.py` |
-| **5. Explainability**| Completeness Index $= 100\%$ (Audit Trail) | Deterministic schema checks | `experiments/evaluate_reasoning.py` |
+| **1. Classification** (merged stream) | F1 ≥ 0.90 | **F1 0.61** — P 0.948 / R 0.450 | ❌ **Missed.** High precision, low recall: Tier-1 is tuned not to cry wolf, and pays for it in misses. |
+| **2. Operational latency** | ≥ 60% reduction | **−82.97%** (26.9s → 4.6s) · Mann-Whitney p<0.05 | ✅ Met |
+| **3. Robustness — static guardrails** | bypass < 10% | **50% bypass** (60/120 blocked) | ❌ **Missed.** Encoding 100% blocked, but semantic 0% and jailbreak 10%. |
+| **3b. Robustness — full pipeline** | — | **100% resisted** (4/4) | ⚠️ Indicative only — n=4 is far too small to claim a rate. |
+| **4. Context quality** (LLM-as-Judge) | ≥ 0.85 relevance | **3.9/5 overall** — Faithfulness 4.0 · Answer-Rel 4.62 · Ctx-Recall 4.01 · **Ctx-Precision 2.99** | ⚠️ Mixed; retrieval precision is the weak link. |
+| **5. Explainability** | 100% audit completeness | **100%** (deterministic schema check) | ✅ Met |
 
-> **Supplementary (beyond the 5 axes):** multi-day **APT detection (emergent)** and **signature-less zero-day** detection are validated together in a single time-ordered stream by `experiments/evaluate_unified_stream.py` (report: `reports/unified_stream_evaluation_report.md`) — memory starts clean, so the APT verdict emerges incrementally rather than being pre-seeded. The **same merged stream** can also be replayed **online end-to-end** (Redis → Tier-1 → emergent APT → LLM Agent → Dashboard) via `experiments/stream_unified_online.py` for the live demo; the offline run remains the deterministic benchmark.
+**Tier-2 decision quality** (651 escalated cases): **threat recall 1.00** (594/594 — nothing malicious slipped through) · accuracy 0.912 · but **benign specificity 0.00** (all 57 benign cases were flagged too), with 631/651 routed to `AWAIT_HITL`. Read honestly: Tier-2 is a safety net that never misses and never clears — it removes the miss risk, it does not reduce the human workload.
+
+**Judge methodology:** cross-family (Llama-3-8B judges Gemma-2-9B) to avoid self-enhancement bias, n=188 escalated of 300 samples. Source of truth: `experiments/results/reasoning_eval_results.json`.
+
+> **Foundational capabilities — proof-of-concept, routed to Future Work, *not* headline claims:**
+> **Zero-day:** 7/7 caught by Welford where static rules missed all 7 (graded boundary ≈4.0σ, pool n=30). **Emergent APT:** 3/3 recall on DAPT2020, specificity 1.0 against 4 benign multi-day IPs, Wilson 95% CI [0.44, 1.00]. Both run on small n with wide intervals — they show the mechanism works; they do not establish a rate.
+
+Benchmarks come from the **offline deterministic path** (`experiments/evaluate_unified_stream.py`), never from the live demo, which is timing- and LLM-dependent.
+
+---
+
+## 🛡️ Security Controls
+
+**Protecting the AI itself:**
+
+* **Delimited Data Encapsulation** — wraps log payloads in a fresh `secrets.token_hex(8)` nonce **per batch**, isolating instruction from data; nested delimiter tokens in raw input are stripped (anti delimiter-smuggling).
+* **Encoding Neutralizer** — decodes and sanitizes Base64, Hex, URL, and Unicode homoglyph payloads before analysis.
+* **Jailbreak & DAN detection** — signature + semantic patterns, shared as a single hot-reloadable source of truth with Tier-1's pre-screen, so a match escalates into Guardrails instead of being silently dropped.
+* **Tier-1/Tier-2 Consensus Guard** — if the deterministic Tier-1 flagged an attack but the LLM downgrades it to `LOG`/`DROP`, the verdict is overridden to `AWAIT_HITL`. This defends against social-engineering payloads embedded in logs ("already approved by admin"): you can talk an LLM down, you cannot talk a rule engine down.
+* **Scoped anti-self-DoS** — `BLOCK_IP` downgrades to `ALERT` only for a narrow `critical_infrastructure_subnets` allowlist (loopback + specific gateway/DNS), not all of RFC1918 — a broad shield would silently neuter every internal block.
+* **Output Sanitizer** — strips markdown image exfil (`![](...)`), HTML/JS, and deep Base64/Hex-obfuscated payloads from LLM output before it reaches the UI or the database.
+
+**Infrastructure & audit:**
+
+* **HMAC log chaining** — entries in `config/audit_trail.db` chain by hash, so any tampering breaks the chain and raises an alert. (Distinct from the research store `logs/guardrails_audit.db`.)
+* **Persistent lockout** — SQLite-backed brute-force protection that survives session clearing and private windows, auto-resetting after the lockout window.
+* **No hardcoded credentials (CWE-798)** — PBKDF2-HMAC-SHA256 (100k iterations), pre-computed hashes only, with a fail-loud warning if the demo HASH/SALT are still in use.
+* **Measured noise reduction** — the subscriber counts real raw-vs-dropped logs into `config/pipeline_stats.json`, and the Dashboard reports that measured per-run rate rather than an estimate.
+* **RAG checksum auditor** — SHA-256 over MITRE/NIST sources to block document poisoning.
+* **Hardened Streamlit** — `enableCORS=false`, `enableXsrfProtection=true`, `frameAncestors=['none']`.
+
+> **Enforcement honesty:** `block_ip()` is a `[FIREWALL MOCK]` — it writes the audit trail, it does **not** call iptables. Real enforcement happens inside SENTINEL: an approved dynamic rule makes Tier-1 score that IP's future traffic at 100. The mock is the integration point; production swaps in a firewall API.
+>
+> **ATT&CK mapping honesty:** Prompt Injection is not an ATT&CK Enterprise technique — it maps to **MITRE ATLAS `AML.T0051`** with its tactic ID deliberately left blank rather than fabricated. IDOR has no dedicated technique, so it maps to `T1190` with a lowered `mapping_confidence`. Details: [codebase_summary.md](docs/Codebase/learning/codebase_summary.md).
 
 ---
 
 ## 📂 Datasets
 
-* **CSE-CIC-IDS2018:** Millions of rows of network traffic capturing **14 distinct attack classes** (SSH/FTP brute-force, DoS/DDoS families, Web attacks, Botnet, Infiltration, etc.). Cleaned + stratified-sampled into a **4,267-sample labelled benchmark** (`ground_truth.json`) used to score Tier-1 filtering.
-* **DAPT2020:** A multi-day Advanced Persistent Threat (APT) dataset spanning 5 phases (Reconnaissance → Establish Foothold → Lateral Movement → Data Exfiltration). The pipeline correlates per-attacker events into multi-day APT chains (**9 chains / 402 events, 324 malicious**) that feed the SQLite Threat Memory.
-* **Adversarial Suite:** **120 curated attack vectors** across 5 generated categories (`encoding_bypass` 45, `structural_attacks` 20, `semantic_confusion` 20, `jailbreak` 20, `rag_poisoning` 15) for Guardrails robustness benchmarking. A 6th category, `rule_injection`, is scaffolded (design README) but not yet generated.
-* **MITRE ATT&CK & NIST SP 800-61r2:** Curated textual databases indexed into FAISS vector indexes and BM25 lexicons for hybrid semantic search.
+| Dataset | Scale | Use |
+| :--- | :--- | :--- |
+| **CSE-CIC-IDS2018** | 14 attack classes → **4,267-sample** stratified benchmark (`ground_truth.json`) | Tier-1 classification scoring |
+| **DAPT2020** | 5 APT phases → **9 chains / 402 events** (324 malicious) | Emergent multi-day APT correlation |
+| **Adversarial suite** | **120 vectors** in 5 categories (encoding 45 · structural 20 · semantic 20 · jailbreak 20 · rag_poisoning 15) | Guardrails robustness. A 6th, `rule_injection`, is designed but **not yet generated**. |
+| **MITRE ATT&CK + NIST SP 800-61r2** | 299 techniques + IR playbooks | FAISS + BM25 hybrid retrieval |
 
 ---
 
@@ -178,149 +138,121 @@ SENTINEL is systematically benchmarked across five analytical axes:
 
 ```text
 AI_Security_Graph/
-├── config/
-│   ├── ablation/                     # 6 configuration files (A-F) for Ablation studies
-│   ├── system_settings.yaml          # Core configuration file (Tier 1 thresholds, DB locations)
-│   ├── audit_trail.db                # SQLite audit trail DB (auto-generated)
-│   └── threat_memory.db              # SQLite threat memory DB (auto-generated)
-├── data/
-│   ├── raw/cicids2018/               # Network traffic CSV captures
-│   ├── raw/dapt2020/                 # Day-by-day APT events
-│   ├── knowledge/                    # Source PDF/TXT playbooks for RAG
-│   └── processed/                    # Structured APT chains
-├── experiments/                      # Evaluation SCRIPTS + benchmarks + results
-│   ├── adversarial/                  # 120-sample adversarial suite (5 generated categories)
-│   ├── ground_truth.json             # 4,267-sample labelled benchmark (14 classes + benign + adversarial)
-│   ├── adversarial_samples.json      # 50 adversarial vectors (25 structural + 25 semantic)
-│   ├── run_ablation.py               # Ablation A-F, all modes: --mode af | bcde | balanced | all
-│   ├── evaluate_adversarial.py       # Adversarial defense: --mode static (Guardrails) | pipeline (full LLM)
-│   ├── evaluate_reasoning.py         # Runs LLM-as-a-Judge evaluation (Llama 3)
-│   ├── unified_dataset.py            # SHARED merged-stream builder (build_stream: CICIDS + DAPT + zero-day)
-│   ├── evaluate_unified_stream.py    # Unified stream eval (offline): classification + emergent APT + zero-day
-│   ├── stream_unified_online.py      # ONLINE publisher: same merged stream via Redis (--include-adversarial for all sources)
-│   ├── run_threshold_sensitivity.py  # Welford Z-score threshold sweep (rebuts "3.5σ cherry-picked")
-│   ├── run_zeroday_graded.py         # Graded zero-day detection-boundary curve (k·σ sweep)
-│   ├── run_apt_negative_control.py   # APT negative control + Wilson 95% CI (specificity on benign multi-day IPs)
-│   ├── run_context_stress.py         # Context-budget curve: RAW vs Drain-compressed token growth vs n_ctx
-│   ├── run_llm_robustness.py         # LLM determinism (seed) + graceful degradation (LLM-down -> AWAIT_HITL)
-│   ├── measure_latency_baseline.py   # Latency comparison (Tier 1 vs Tier 2 bypass)
-│   ├── statistical_tests.py          # McNemar / Mann-Whitney U significance tests
-│   ├── e2e_test_runner.py            # Automated E2E integration test suite
-│   └── results/                      # All result JSONs + plots/ (ablation, robustness, reasoning, unified, latency)
-├── demos/                            # Standalone CLI demos (demo_tier1.py, demo_guardrails.py, demo_rag.py)
-├── knowledge_base/
-│   ├── mitre_attack.json             # Structured MITRE TTPs
-│   ├── nist_800_61r2.json            # Structured NIST incident response playbooks
-│   └── faiss_index/                  # Embedded FAISS and BM25 vector indexes
-├── reports/
-│   ├── test_report_FINAL.md          # E2E PASS verification report (current suite: 22 tests)
-│   └── unified_stream_evaluation_report.md  # Unified streaming eval report (classification + APT + zero-day)
-├── scripts/
-│   └── switch_model.sh               # Utility script to hot-swap LLM models in Docker
+├── main.py                       # CLI entrypoint (--mode server | scan | full)
 ├── src/
-│   ├── streaming/                    # Publisher/Subscriber message broker (Redis Streams)
-│   ├── tier1_filter/                 # Rule engine, session monitor & feedback logic
-│   ├── guardrails/                   # Prompt-injection, jailbreak, & XSS sanitization
-│   ├── rag/                          # Embedders, FAISS database client, RAG caching
-│   ├── agent/                        # LangGraph workflow engine, agent states, LLM APIs, token-budget monitor
-│   ├── response/                     # Action executor, DB client, lockout, & HMAC log signer
-│   └── ui/                           # Glassmorphism Streamlit UI & authentication logic
+│   ├── streaming/                # Redis Streams publisher/subscriber (Tier-1 read loop)
+│   ├── tier1_filter/             # Rule engine (Welford), session monitor, feedback listener
+│   ├── guardrails/               # Prompt filter, encoding neutralizer, output sanitizer, validators
+│   ├── rag/                      # Embedder, FAISS+BM25 retriever, RRF, semantic cache
+│   ├── agent/                    # LangGraph workflow + 6 nodes, LLM client, token monitor
+│   ├── response/                 # Action executor, HMAC audit chain, threat memory
+│   └── ui/                       # Streamlit HITL dashboard + auth
+├── experiments/                  # Evaluation scripts + benchmarks + results
+│   ├── unified_dataset.py        # SHARED merged-stream builder (CICIDS + DAPT + zero-day)
+│   ├── evaluate_unified_stream.py    # Offline deterministic benchmark (classification + APT + zero-day)
+│   ├── stream_unified_online.py  # Online publisher, same stream (--include-adversarial → all 4 sources)
+│   ├── run_ablation.py           # Ablation A–F   (--mode af | bcde | balanced | all)
+│   ├── evaluate_adversarial.py   # Adversarial    (--mode static | pipeline)
+│   ├── evaluate_reasoning.py     # LLM-as-a-Judge (Llama-3 judges Gemma-2)
+│   ├── evaluate_tier2_decision.py    # Tier-2 verdict quality on escalated cases
+│   ├── run_threshold_sensitivity.py  # Welford σ sweep (rebuts "3.5σ cherry-picked")
+│   ├── run_zeroday_graded.py     # Zero-day detection-boundary curve
+│   ├── run_apt_negative_control.py   # APT specificity + Wilson 95% CI
+│   ├── run_context_stress.py     # Token growth: raw vs Drain-compressed vs n_ctx
+│   ├── run_llm_robustness.py     # Determinism (seed) + graceful degradation (LLM down → AWAIT_HITL)
+│   ├── measure_latency_baseline.py   # Two-tier vs LLM-only latency
+│   ├── statistical_tests.py      # McNemar / Mann-Whitney U
+│   ├── e2e_test_runner.py        # E2E suite (22 tests)
+│   ├── adversarial/              # 120-sample suite (5 generated categories)
+│   ├── ground_truth.json         # 4,267-sample labelled benchmark
+│   └── results/                  # All result JSONs + plots/
+├── scripts/
+│   ├── run_demo.sh               # ONE-COMMAND full demo (infra + subscriber + UI + stream)
+│   ├── push_flow.py              # Push the merged flow into Redis
+│   ├── switch_model.sh           # Hot-swap the served LLM (gemma ⇄ llama judge)
+│   └── build_*.py                # KB / RAG index / DAPT chain / adversarial suite builders
+├── demos/                        # Standalone CLI demos (tier1, guardrails, rag)
+├── config/                       # system_settings.yaml, ablation/ (A–F), *.db (auto-generated)
+├── knowledge_base/               # mitre_attack.json, nist_800_61r2.json, faiss_index/
+├── data/                         # raw/cicids2018, raw/dapt2020, knowledge/, processed/
+├── reports/                      # test_report_FINAL.md, unified_stream_evaluation_report.md
 ├── docs/
-│   ├── guides/                       # RUN_PROJECT.md, ablation_design.md, E2E_TESTS_GUIDE.md
-│   ├── latex/                        # Thesis/proposal LaTeX sources + Template
-│   ├── learning/                     # DAY1/DAY2/DAY3 5-day learning-path notes
-│   └── *.md                          # Architecture, codebase_summary, threat model, reproducibility...
-├── tests/
-│   ├── unit/                         # Pytest unit tests
-│   └── integration/                  # End-to-end flow tests
-├── main.py                           # Application CLI entrypoint
-├── requirements.txt                  # Python dependencies
-├── Dockerfile                        # Application containerization
-└── docker-compose.yml                # Microservices orchestration (Neo4j, Redis, MLflow, LLM)
+│   ├── Codebase/guides/          # RUN_PROJECT.md, DEMO_FLOWS.md, COMMITTEE_DEMO.md
+│   ├── Codebase/learning/        # codebase_summary.md, 00_DOC_CODE_THEO_LUONG.md
+│   └── Thesis/                   # latex/, slides/, literature_review/
+├── tests/                        # unit/ + integration/  (267 pytest)
+├── requirements.txt
+├── Dockerfile
+└── docker-compose.yml            # Neo4j, Redis, MLflow, llama.cpp
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-For detailed step-by-step instructions on deploying the full stack, please consult [RUN_PROJECT.md](docs/Codebase/guides/RUN_PROJECT.md). For per-flow committee demos see [DEMO_FLOWS.md](docs/Codebase/guides/DEMO_FLOWS.md) and [COMMITTEE_DEMO.md](docs/Codebase/guides/COMMITTEE_DEMO.md).
+Full deployment steps: **[RUN_PROJECT.md](docs/Codebase/guides/RUN_PROJECT.md)**. Per-flow committee demos: [DEMO_FLOWS.md](docs/Codebase/guides/DEMO_FLOWS.md) · [COMMITTEE_DEMO.md](docs/Codebase/guides/COMMITTEE_DEMO.md). Reading the code by runtime flow: [00_DOC_CODE_THEO_LUONG.md](docs/Codebase/learning/00_DOC_CODE_THEO_LUONG.md).
 
-### 1. Environment Setup
+### 1. Setup (once)
+
 ```bash
-# Clone the repository
 git clone https://github.com/Binhchuoizzz/AI_Security_Graph.git
 cd AI_Security_Graph
-
-# Create and activate a Python 3.10 virtual environment
-python3.10 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
+python3.10 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# drain3 is installed separately: its metadata pins an old cachetools (4.2.1),
-# but it works fine with the modern one, so install it without dependencies.
+# drain3's metadata pins an old cachetools (4.2.1) but it works with the modern one:
 pip install drain3==0.9.11 --no-deps && pip install "jsonpickle>=1.5.1"
 
-# Configure environment variables
 cp .env.example .env
+python src/rag/embedder.py        # REQUIRED: builds FAISS + BM25 indexes and RAG checksums
 ```
 
-**Note (VS Code Interpreter):** To avoid linter errors in VS Code (unresolved imports due to lack of virtual environment paths), configure your workspace settings in `.vscode/settings.json`:
-```json
-{
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-  "python.analysis.extraPaths": ["${workspaceFolder}"]
-}
-```
+### 2. Run the whole demo — one command
 
-### 2. Initialize RAG Vectors & Checksums
-Before running tests or deploying, you must initialize the hybrid RAG indexes (FAISS and BM25) and calculate document integrity checksums to prevent validation integrity audit failures:
 ```bash
-python src/rag/embedder.py
+./scripts/run_demo.sh             # infra + subscriber + UI + push 4,796 events (4 sources)
+./scripts/run_demo.sh --small     # short demo (less LLM waiting)
+./scripts/run_demo.sh --no-push   # infra only
 ```
 
-### 3. Run E2E Integration Suite (Offline Mode)
+Then open <http://localhost:8501>. Teardown: `pkill -f "main.py --mode server" ; docker-compose stop`
+
+### 3. Or run it manually
+
 ```bash
-python experiments/e2e_test_runner.py --offline
+docker-compose up -d                              # Neo4j, Redis, MLflow, llama.cpp CUDA server
+python main.py --mode server                      # streaming subscriber (Tier-1 → Tier-2)
+streamlit run src/ui/app.py                       # SOC dashboard
+python experiments/e2e_test_runner.py --offline   # E2E suite, no LLM needed
 ```
 
-### 4. Deploy Infrastructure & Start Server
-```bash
-# Spin up Neo4j, Redis, MLflow and llama.cpp CUDA server
-docker-compose up -d
+### 4. Reproduce the benchmarks
 
-# Start the SENTINEL streaming subscriber
-python main.py --mode server
+```bash
+python experiments/evaluate_unified_stream.py     # classification + APT + zero-day
+python experiments/measure_latency_baseline.py    # latency reduction
+python experiments/evaluate_adversarial.py --mode static
+python experiments/run_ablation.py --mode all
 ```
 
-### 5. Launch the SOC Dashboard
-```bash
-streamlit run src/ui/app.py
-```
+### 5. (Optional) Hot-swap the LLM
 
-### 6. (Optional) Hot-Swap the LLM
-The reasoning Agent runs **Gemma-2-9B-IT** by default; the 5D-EF *Context Quality* axis uses **Meta-Llama-3-8B-Instruct** as an independent LLM-as-a-Judge. Switch the model served by llama.cpp without rebuilding:
+The agent runs **Gemma-2-9B-IT**; the LLM-as-Judge axis uses **Meta-Llama-3-8B-Instruct** as an independent, cross-family judge.
+
 ```bash
-# scripts/switch_model.sh [gemma | llama | <model_file.gguf>]
-./scripts/switch_model.sh llama     # swap to the Llama-3 judge model
-./scripts/switch_model.sh gemma     # swap back to the Gemma reasoning model
+./scripts/switch_model.sh llama     # swap to the judge model
+./scripts/switch_model.sh gemma     # swap back
 ```
 
 ---
 
-## 💻 System & Hardware Requirements
+## 💻 Requirements
 
-* **GPU:** Nvidia RTX 4060 Ti 16GB VRAM (minimum) / RTX 4090 (recommended) for hosting the quantized Gemma-2-9B-IT model.
-* **RAM:** 32 GB.
-* **OS:** Linux (Ubuntu 22.04 LTS or newer).
-* **Storage:** 50 GB SSD storage.
-
----
+**GPU** RTX 4060 Ti 16GB VRAM (minimum) / RTX 4090 (recommended) · **RAM** 32 GB · **OS** Ubuntu 22.04 LTS or newer · **Storage** 50 GB SSD.
 
 ## 📄 License & Authorship
 
-Distributed under the MIT License. See `LICENSE` for details.
+Distributed under the MIT License — see [LICENSE](LICENSE).
 
 * **Author:** Nguyễn Đức Bình
-* **Academic Context:** Master's Thesis — AI & Machine Learning Specialization.
+* **Academic context:** Master's Thesis — AI & Machine Learning specialization.

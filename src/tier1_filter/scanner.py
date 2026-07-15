@@ -23,9 +23,15 @@ logger = logging.getLogger(__name__)
 class VulnerabilityScanner:
     """Lớp bọc (wrapper) cho bộ quét lỗ hổng Trivy."""
 
-    def __init__(self, target_dir="/app", output_file="data/trivy-results.json"):
+    def __init__(
+        self,
+        target_dir="/app",
+        output_file="data/trivy-results.json",
+        sast_output_file="data/bandit-results.json",
+    ):
         self.target_dir = target_dir
         self.output_file = output_file
+        self.sast_output_file = sast_output_file
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
 
     def run_scan(self):
@@ -89,3 +95,54 @@ class VulnerabilityScanner:
         with open(self.output_file, "w") as f:
             json.dump(mock_data, f, indent=2)
         logger.info(f"Generated mock Trivy results at {self.output_file}")
+
+    def run_sast_scan(self):
+        """Chạy quét Bandit SAST trên thư mục đích."""
+        logger.info(f"Running Bandit SAST scan on {self.target_dir}...")
+
+        try:
+            subprocess.run(["bandit", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.warning("Bandit is not installed or not in PATH. Skipping actual SAST scan.")
+            self._generate_mock_sast_results()
+            return self.sast_output_file
+
+        try:
+            cmd = [
+                "bandit",
+                "-r",
+                self.target_dir,
+                "-f",
+                "json",
+                "-o",
+                self.sast_output_file,
+                "-ll",
+            ]
+            subprocess.run(
+                cmd, check=False, capture_output=True
+            )  # Bandit returns non-zero if issues found
+            logger.info(f"Bandit SAST scan completed. Results saved to {self.sast_output_file}")
+            return self.sast_output_file
+        except Exception as e:
+            logger.error(f"Bandit scan failed: {e}")
+            self._generate_mock_sast_results()
+            return self.sast_output_file
+
+    def _generate_mock_sast_results(self):
+        """Tạo kết quả giả lập nếu Bandit không khả dụng."""
+        mock_data = {
+            "results": [
+                {
+                    "code": "print('Mock vulnerability')",
+                    "filename": "mock_file.py",
+                    "issue_confidence": "HIGH",
+                    "issue_severity": "MEDIUM",
+                    "issue_text": "Mock SAST vulnerability for testing.",
+                    "test_id": "B999",
+                    "test_name": "mock_test",
+                }
+            ]
+        }
+        with open(self.sast_output_file, "w") as f:
+            json.dump(mock_data, f, indent=2)
+        logger.info(f"Generated mock Bandit results at {self.sast_output_file}")

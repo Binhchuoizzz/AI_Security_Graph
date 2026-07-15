@@ -11,15 +11,15 @@ services:
     volumes:
       # Mount thư mục chứa model GGUF (read-only)
       - /home/binhchuoiz/text-generation-webui/user_data/models:/models:ro
-    command: -m /models/${LLM_MODEL_FILE:-gemma-2-9b-it-Q6_K.gguf} -c 16384 --host 0.0.0.0 --port 8080 -ngl 99 --flash-attn on -np 2
+    command: -m /models/${LLM_MODEL_FILE:-gemma-2-9b-it-Q6_K.gguf} -c ${LLAMA_ARG_CTX_SIZE:-16384} --host 0.0.0.0 --port 8080 -ngl 99 --flash-attn on -np ${LLAMA_ARG_N_PARALLEL:-2}
     environment:
       # Buộc sử dụng toàn bộ GPU layers (offload hết lên VRAM)
       LLAMA_ARG_N_GPU_LAYERS: "99"
       LLAMA_ARG_MODEL: "/models/${LLM_MODEL_FILE:-gemma-2-9b-it-Q6_K.gguf}"
-      LLAMA_ARG_CTX_SIZE: "16384"
+      LLAMA_ARG_CTX_SIZE: "${LLAMA_ARG_CTX_SIZE:-16384}"
       LLAMA_ARG_HOST: "0.0.0.0"
       LLAMA_ARG_PORT: "8080"
-      LLAMA_ARG_N_PARALLEL: "2"       # 2 concurrent requests
+      LLAMA_ARG_N_PARALLEL: "${LLAMA_ARG_N_PARALLEL:-2}"       # concurrent requests
       LLAMA_ARG_FLASH_ATTN: "1"       # Enable Flash Attention
       NVIDIA_VISIBLE_DEVICES: "all"
       NVIDIA_DRIVER_CAPABILITIES: "all"

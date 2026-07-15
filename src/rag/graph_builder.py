@@ -91,9 +91,57 @@ class KnowledgeGraphBuilder:
             count = single_result["count"] if single_result else 0
             logger.info(f"Knowledge Graph updated. Total nodes: {count}")
 
+    def build_from_bandit(self, bandit_json_path="data/bandit-results.json"):
+        """Đọc kết quả từ Bandit SAST và xây dựng các nút/cạnh trong đồ thị."""
+        if not self.driver:
+            logger.warning("No Neo4j connection. Running mock graph build for SAST.")
+            return
+
+        try:
+            with open(bandit_json_path) as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            logger.error(f"Failed to read Bandit results from {bandit_json_path}")
+            return
+
+        logger.info("Building Knowledge Graph from Bandit results...")
+        with self.driver.session() as session:
+            results = data.get("results", [])
+            for result in results:
+                target_file = result.get("filename", "Unknown")
+                vuln_id = result.get("test_id", "Unknown")
+                severity = result.get("issue_severity", "UNKNOWN")
+                test_name = result.get("test_name", "Unknown")
+                description = result.get("issue_text", "")[:200]
+
+                session.run(
+                    "MERGE (t:SubComponent {name: $name}) "
+                    "MERGE (c:Component {name: 'SENTINEL_SOC'}) "
+                    "MERGE (c)-[:CONTAINS]->(t)",
+                    name=target_file,
+                )
+
+                session.run(
+                    "MERGE (v:Vulnerability {id: $vuln_id}) "
+                    "SET v.severity = $severity, v.package = $test_name, v.description = $description, v.type = 'SAST' "
+                    "MERGE (t:SubComponent {name: $target}) "
+                    "MERGE (t)-[:HAS_VULNERABILITY]->(v)",
+                    vuln_id=vuln_id,
+                    severity=severity,
+                    test_name=test_name,
+                    description=description,
+                    target=target_file,
+                )
+
+            # Đếm số lượng nút
+            result_count = session.run("MATCH (n) RETURN count(n) as count")
+            single_result = result_count.single()
+            count = single_result["count"] if single_result else 0
+            logger.info(f"Knowledge Graph updated (SAST). Total nodes: {count}")
+
     def _mock_build(self):
         """Cơ chế giả lập (mock) khi Neo4j ngoại tuyến hoặc thiếu demo."""
         logger.info("Generating mock Knowledge Graph output (Neo4j unreachable)")
-        os.makedirs("demo_outputs", exist_ok=True)
-        with open("demo_outputs/knowledge_graph.json", "w") as f:
+        os.makedirs("data/demo_outputs", exist_ok=True)
+        with open("data/demo_outputs/knowledge_graph.json", "w") as f:
             f.write('{"nodes": 450, "edges": 1200, "status": "Mocked Successfully"}')

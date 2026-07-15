@@ -8,6 +8,13 @@
 #   ./scripts/run_demo.sh              # full: hạ tầng + subscriber + UI + đẩy luồng
 #   ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng (subscriber + UI), KHÔNG đẩy
 #   ./scripts/run_demo.sh --small      # đẩy tập nhỏ (demo nhanh, ít chờ LLM)
+#   SENTINEL_LITE=0 ./scripts/run_demo.sh   # baseline nặng: Gemma 2 9B, ctx 16384, 2 parallel
+#
+# Mặc định script chạy ở chế độ LOW-VRAM cho máy RAM 32GB / GPU VRAM thấp:
+# - Llama 3 8B Q5_K_M
+# - ctx 8192
+# - 1 parallel
+# - tắt Neo4j (vì là nhánh V2 tùy chọn, không nằm trên đường đi lõi)
 #
 # Sau khi chạy: mở http://localhost:8501 (đăng nhập: manager).
 # Tắt để giải phóng RAM:  pkill -f "main.py --mode server" ; docker-compose stop
@@ -29,10 +36,31 @@ case "${1:-}" in
   --small)   PUSH="small" ;;
 esac
 
-echo "▶ [1/5] Hạ tầng: Redis + LLM (llama.cpp) + MLflow + Dashboard containers…"
-$DC up -d >/dev/null
+# Profile phần cứng mặc định cho máy hiện tại: nhẹ hơn để tránh OOM VRAM/RAM.
+if [ "${SENTINEL_LITE:-1}" = "1" ]; then
+  : "${LLM_MODEL_FILE:=Meta-Llama-3-8B-Instruct-Q5_K_M.gguf}"
+  : "${LLAMA_ARG_CTX_SIZE:=8192}"
+  : "${LLAMA_ARG_N_PARALLEL:=1}"
+  : "${SENTINEL_AGENT_WORKERS:=1}"
+  : "${SENTINEL_ENABLE_NEO4J:=0}"
+else
+  : "${LLM_MODEL_FILE:=gemma-2-9b-it-Q6_K.gguf}"
+  : "${LLAMA_ARG_CTX_SIZE:=16384}"
+  : "${LLAMA_ARG_N_PARALLEL:=2}"
+  : "${SENTINEL_AGENT_WORKERS:=2}"
+  : "${SENTINEL_ENABLE_NEO4J:=1}"
+fi
+export LLM_MODEL_FILE LLAMA_ARG_CTX_SIZE LLAMA_ARG_N_PARALLEL SENTINEL_AGENT_WORKERS SENTINEL_ENABLE_NEO4J
 
-echo "▶ [2/5] Chờ LLM cục bộ sẵn sàng (Gemma-2-9B qua llama.cpp)…"
+if [ "$SENTINEL_ENABLE_NEO4J" = "1" ]; then
+  echo "▶ [1/5] Hạ tầng: Redis + LLM (llama.cpp) + MLflow + Dashboard + Neo4j containers…"
+  $DC up -d >/dev/null
+else
+  echo "▶ [1/5] Hạ tầng: Redis + LLM (llama.cpp) + MLflow + Dashboard containers… (Neo4j tắt để tiết kiệm RAM)"
+  $DC up -d redis llm mlflow agent_ui >/dev/null
+fi
+
+echo "▶ [2/5] Chờ LLM cục bộ sẵn sàng (${LLM_MODEL_FILE} qua llama.cpp)…"
 for i in $(seq 1 60); do
   if curl -sf -m 3 "$LLM_URL/models" >/dev/null 2>&1; then echo "   ✓ LLM online"; break; fi
   [ "$i" -eq 60 ] && { echo "   ✗ LLM chưa lên — xem: docker logs sentinel_llm"; exit 1; }

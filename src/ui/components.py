@@ -57,7 +57,7 @@ def _derive_tier1_attack_type(reasons: list[str]) -> str:
     return " + ".join(labels)
 
 
-def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id=""):
+def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=None, card_id=""):
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
     try:
@@ -241,35 +241,54 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, card_id="")
     clean_html = "".join([line.strip() for line in html_content.split("\n")])
     st.markdown(clean_html, unsafe_allow_html=True)
 
-    # Nút Whitelist IP dành cho mọi alert có target là IP hợp lệ
+    # Nút Whitelist và Block IP dành cho mọi alert có target là IP hợp lệ
     cleaned_target = target.strip()
     if is_valid_ip(cleaned_target):
         st.write("")
-        if on_whitelist:
-            # IP chưa được Whitelist
-            if is_l3_manager:
-                if st.button(
-                    f"🛡️ Whitelist IP: {cleaned_target}",
-                    key=f"wl_btn_{cleaned_target}_{timestamp}_{card_id}",
-                ):
-                    on_whitelist(cleaned_target)
-                    st.success(f"IP {cleaned_target} đã được thêm vào Whitelist thành công!")
-                    st.rerun()
+        col_btn1, col_btn2 = st.columns([1, 4])
+        with col_btn1:
+            if on_whitelist:
+                # IP chưa được Whitelist
+                if is_l3_manager:
+                    if st.button(
+                        f"🛡️ Whitelist IP: {cleaned_target}",
+                        key=f"wl_btn_{cleaned_target}_{timestamp}_{card_id}",
+                    ):
+                        on_whitelist(cleaned_target)
+                        st.success(f"IP {cleaned_target} đã được thêm vào Whitelist thành công!")
+                        st.rerun()
+                else:
+                    st.button(
+                        f"🛡️ Whitelist IP: {cleaned_target}",
+                        key=f"wl_btn_dis_{cleaned_target}_{timestamp}_{card_id}",
+                        disabled=True,
+                        help="💡 Yêu cầu vai trò L3 Manager để whitelist IP này.",
+                    )
             else:
+                # IP đã được Whitelist rồi
                 st.button(
-                    f"🛡️ Whitelist IP: {cleaned_target}",
-                    key=f"wl_btn_dis_{cleaned_target}_{timestamp}_{card_id}",
+                    f"✅ Đã Whitelist IP: {cleaned_target}",
+                    key=f"wl_btn_done_{cleaned_target}_{timestamp}_{card_id}",
                     disabled=True,
-                    help="💡 Yêu cầu vai trò L3 Manager để whitelist IP này.",
+                    help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).",
                 )
-        else:
-            # IP đã được Whitelist rồi
-            st.button(
-                f"✅ Đã Whitelist IP: {cleaned_target}",
-                key=f"wl_btn_done_{cleaned_target}_{timestamp}_{card_id}",
-                disabled=True,
-                help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).",
-            )
+        with col_btn2:
+            if on_block and action != "BLOCK_IP":
+                if is_l3_manager:
+                    if st.button(
+                        f"🛑 Block IP: {cleaned_target}",
+                        key=f"blk_btn_{cleaned_target}_{timestamp}_{card_id}",
+                    ):
+                        on_block(cleaned_target)
+                        st.success(f"IP {cleaned_target} đã được thêm vào Blocklist thành công!")
+                        st.rerun()
+                else:
+                    st.button(
+                        f"🛑 Block IP: {cleaned_target}",
+                        key=f"blk_btn_dis_{cleaned_target}_{timestamp}_{card_id}",
+                        disabled=True,
+                        help="💡 Yêu cầu vai trò L3 Manager để Block IP này.",
+                    )
 
     # LOG THÔ ĐẦU VÀO (đặc trưng luồng đã loại nhãn) — chính là dữ liệu đã đưa vào
     # Tier-1/LLM, KHÔNG phải bản ghi quyết định. Minh bạch "cái gì đã vào hệ thống".
@@ -309,8 +328,14 @@ def render_metrics_header(
 ):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
 
-    noise_reduction: nếu được truyền (đo THẬT từ counter Tier-1) thì dùng trực tiếp;
-    None -> fallback ước lượng (raw-alerts)/raw cho tương thích ngược.
+    noise_reduction = (log thô − cảnh báo gửi analyst) / log thô.
+
+    ĐỌC CHO ĐÚNG: đây là mức giảm tải mà ANALYST cảm nhận, KHÔNG phải tỉ lệ lọc của
+    Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Tier-2 GỘP
+    nhiều log escalate thành 1 phán quyết. Ví dụ đo thật 2026-07-15 trên luồng gộp:
+    4796 thô -> Tier-1 escalate 2034 (tức Tier-1 chỉ lọc 57.6%) -> gộp thành 218 cảnh
+    báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier-1 thì lấy từ
+    config/pipeline_stats.json (raw_logs_total vs số escalate), ĐỪNG suy từ số này.
     """
     if noise_reduction is None:
         noise_reduction = 0.0
@@ -332,11 +357,11 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #ff4d4f;">{total_alerts}</div>'
-        f'    <div class="kpi-label">Cảnh báo Escalated</div>'
+        f'    <div class="kpi-label">Cảnh báo gửi Analyst</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #52c41a;">{noise_reduction:.1f}%</div>'
-        f'    <div class="kpi-label">Tỷ lệ giảm tải (Noise Reduction)</div>'
+        f'    <div class="kpi-label">Giảm tải Analyst (thô→cảnh báo)</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'
@@ -355,52 +380,43 @@ def render_metrics_header(
     st.markdown(html_kpi, unsafe_allow_html=True)
 
 
-def render_threat_intel_tables(high_risk_ips, known_entities):
+def render_threat_intel_tables(high_risk_ips):
     """Hiển thị bảng Threat Intelligence với màu sắc neon trực quan. Hỗ trợ chọn hàng để điều tra."""
-    col1, col2 = st.columns(2)
     selected_ip = None
 
-    with col1:
-        st.subheader("🔴 Địa chỉ IP nguy cơ cao (Threat Actor)")
-        if not high_risk_ips:
-            st.info("Chưa ghi nhận Threat Actor nào.")
-        else:
-            df_high_risk = pd.DataFrame(
-                high_risk_ips,
-                columns=["Địa chỉ IP", "Điểm danh tiếng (Reputation)"],  # type: ignore
-            )
+    st.subheader("🔴 Địa chỉ IP nguy cơ cao (Threat Actor)")
+    if not high_risk_ips:
+        st.info("Chưa ghi nhận Threat Actor nào.")
+    else:
+        df_high_risk = pd.DataFrame(
+            high_risk_ips,
+            columns=["Địa chỉ IP", "Điểm danh tiếng (Reputation)"],  # type: ignore
+        )
 
-            def color_score(val):
-                color = "#ff4d4f" if val >= 70 else "#faad14" if val >= 40 else "#52c41a"
-                return f"color: {color}; font-weight: bold; font-family: monospace;"
+        def color_score(val):
+            color = "#ff4d4f" if val >= 70 else "#faad14" if val >= 40 else "#52c41a"
+            return f"color: {color}; font-weight: bold; font-family: monospace;"
 
-            from typing import Any, cast
+        from typing import Any, cast
 
-            selection = st.dataframe(
-                cast(
-                    Any,
-                    df_high_risk.style.map(
-                        color_score, subset=["Điểm danh tiếng (Reputation)"]
-                    ).format({"Điểm danh tiếng (Reputation)": "{:.1f}"}),
+        selection = st.dataframe(
+            cast(
+                Any,
+                df_high_risk.style.map(color_score, subset=["Điểm danh tiếng (Reputation)"]).format(
+                    {"Điểm danh tiếng (Reputation)": "{:.1f}"}
                 ),
-                on_select="rerun",
-                selection_mode="single-row",
-                key="threat_actor_table_select",
-            )
+            ),
+            on_select="rerun",
+            selection_mode="single-row",
+            key="threat_actor_table_select",
+            use_container_width=True,
+        )
 
-            select_data = selection.get("selection", {}) if selection else {}
-            rows = select_data.get("rows", [])
-            if rows:
-                row_idx = rows[0]
-                selected_ip = df_high_risk.iloc[row_idx]["Địa chỉ IP"]
-
-    with col2:
-        st.subheader("🟢 Thực thể mạng nội bộ tin tưởng (Known Entities)")
-        if not known_entities:
-            st.info("Chưa có thực thể nội bộ nào.")
-        else:
-            df_entities = pd.DataFrame(known_entities, columns=["Thiết bị / IP", "Vai trò / Mô tả"])  # type: ignore
-            st.dataframe(df_entities, width="stretch")
+        select_data = selection.get("selection", {}) if selection else {}
+        rows = select_data.get("rows", [])
+        if rows:
+            row_idx = rows[0]
+            selected_ip = df_high_risk.iloc[row_idx]["Địa chỉ IP"]
 
     return selected_ip
 

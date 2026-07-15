@@ -306,8 +306,21 @@ class FeedbackListener:
 
                 if ip not in config["tier1"]["whitelist_ips"]:
                     config["tier1"]["whitelist_ips"].append(ip)
-                    _save_config_atomically(config)
-                    logger.info(f"[Feedback] IP {ip} has been added to Whitelist.")
+
+                # Hủy bỏ luật chặn động (dynamic rules) nếu có
+                rules = config["tier1"].get("dynamic_rules", [])
+                updated_rules = False
+                for rule in rules:
+                    if rule.get("pattern") == ip and rule.get("status") == "ACTIVE":
+                        rule["status"] = "REJECTED"
+                        updated_rules = True
+
+                _save_config_atomically(config)
+                logger.info(f"[Feedback] IP {ip} has been added to Whitelist.")
+                if updated_rules:
+                    logger.info(
+                        f"[Feedback] IP {ip} has been REJECTED from dynamic_rules because it was added to whitelist."
+                    )
             return True
         except Exception as e:
             logger.error(f"[Feedback] Failed to add {ip} to whitelist: {e}")

@@ -21,6 +21,14 @@ Phương pháp (điều kiện-hoá theo escalation, KHÔNG bịa dữ liệu):
      {BLOCK_IP, ALERT, AWAIT_HITL, ESCALATE}. Threat đúng khi flagged; benign (lọt
      Tier-1) đúng khi được hạ cấp {DROP/LOG}.
 
+HAI RÀO CHẮN TÍNH HỢP LỆ (thêm sau sự cố 2026-07-14, xem `n_invoke_errors`):
+  - Ca agent KHÔNG cho ra phán quyết (crash / no_decision) bị LOẠI khỏi mẫu số chấm
+    điểm và tính riêng thành `agent_reliability`. Trước đây các ca này rơi về mặc
+    định AWAIT_HITL và bị tính là "bắt đúng đe doạ" -> recall giả 1.00.
+  - `majority_baseline` (= tỉ lệ threat) luôn được in kèm accuracy: một stub luôn hô
+    "threat" đạt đúng mốc này, nên accuracy KHÔNG vượt mốc = không có năng lực phân
+    biệt. `metric_valid=false` nếu >5% ca lỗi.
+
 Kết quả: accuracy tổng, recall trên threat, specificity trên benign, ma trận nhầm
 lẫn, phân bố action LLM, phân rã theo nguồn → `results/tier2_decision_results.json`.
 
@@ -42,6 +50,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from experiments.unified_dataset import ROOT, build_stream  # noqa: E402
 from src.agent.state import SentinelState  # noqa: E402
 from src.agent.workflow import agent_app  # noqa: E402
+from src.guardrails import loop_detector  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "tier2_decision_results.json")
@@ -92,6 +101,12 @@ def _tier2_decide(item: dict) -> dict:
         current_batch_logs=[item["log"]], current_batch_size=1, narrative_summary=""
     )
     action, confidence, err = "AWAIT_HITL", 0.0, ""
+    # BẮT BUỘC (giống main.py:66 và eval_attack_mapper.py:162): loop-guard đếm CỘNG DỒN
+    # qua các invoke. Bộ đếm là thread-local nên reset ngay trong worker này là đúng phạm vi.
+    # Thiếu dòng này => sau max_iterations(=10) invoke/luồng, MỌI invoke sau đều FORCE_STOP
+    # -> RuntimeError -> rơi vào nhánh except -> AWAIT_HITL bị TÍNH LÀ "bắt đúng đe doạ".
+    loop_detector.reset()
+    invoke_error = ""
     try:
         final = agent_app.invoke(state)
         decisions = final.get("decisions", [])
@@ -100,8 +115,11 @@ def _tier2_decide(item: dict) -> dict:
             action = d.get("action", "AWAIT_HITL")
             confidence = float(d.get("confidence", 0.0) or 0.0)
             err = d.get("error", "") or ""
+        else:
+            # Agent chạy xong nhưng KHÔNG sinh phán quyết nào -> KHÔNG có gì để chấm.
+            invoke_error = "no_decision"
     except Exception as exc:  # noqa: BLE001 — 1 sự kiện lỗi không được làm hỏng cả eval
-        action, err = "AWAIT_HITL", f"invoke_error:{type(exc).__name__}"
+        invoke_error = f"invoke_error:{type(exc).__name__}"
     return {
         "source": item["source"],
         "is_threat": item["is_threat"],
@@ -109,6 +127,10 @@ def _tier2_decide(item: dict) -> dict:
         "confidence": round(confidence, 3),
         "flagged": _is_flagged(action),
         "error": err,
+        # != "" nghĩa là agent KHÔNG cho ra phán quyết hợp lệ. Ca này phải bị LOẠI khỏi
+        # mẫu số chất lượng phán quyết — nếu không, một cú crash rơi về mặc định
+        # AWAIT_HITL sẽ được tính là "bắt đúng đe doạ" (TP) và bơm recall lên 1.00.
+        "invoke_error": invoke_error,
     }
 
 
@@ -138,20 +160,36 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
             if done % 25 == 0 or done == n:
                 print(f"    ... {done}/{n} sự kiện đã phán quyết")
 
-    # --- Ma trận nhầm lẫn có ĐIỀU KIỆN escalate --------------------------- #
-    tp = sum(1 for r in results if r["is_threat"] and r["flagged"])
-    fn = sum(1 for r in results if r["is_threat"] and not r["flagged"])
-    tn = sum(1 for r in results if not r["is_threat"] and not r["flagged"])
-    fp = sum(1 for r in results if not r["is_threat"] and r["flagged"])
+    # --- ĐỘ TIN CẬY của agent: TÁCH khỏi chất lượng phán quyết ------------- #
+    # Ca mà agent không cho ra phán quyết (crash / no_decision) KHÔNG có gì để chấm.
+    # Trộn chúng vào ma trận nhầm lẫn = tính một cú crash thành "bắt đúng đe doạ".
+    errored = [r for r in results if r["invoke_error"]]
+    scored = [r for r in results if not r["invoke_error"]]
+    n_err = len(errored)
+    error_rate = n_err / n if n else 0.0
+    agent_reliability = round(1.0 - error_rate, 4)
+    err_dist = dict(Counter(r["invoke_error"] for r in errored))
+    # Chỉ số chỉ đáng tin khi tuyệt đại đa số ca thực sự được phán quyết.
+    metric_valid = error_rate <= 0.05
+
+    # --- Ma trận nhầm lẫn có ĐIỀU KIỆN escalate (CHỈ trên ca chấm được) ---- #
+    tp = sum(1 for r in scored if r["is_threat"] and r["flagged"])
+    fn = sum(1 for r in scored if r["is_threat"] and not r["flagged"])
+    tn = sum(1 for r in scored if not r["is_threat"] and not r["flagged"])
+    fp = sum(1 for r in scored if not r["is_threat"] and r["flagged"])
+    n_scored = len(scored)
     n_threat, n_benign = tp + fn, tn + fp
-    accuracy = (tp + tn) / n if n else 0.0
+    accuracy = (tp + tn) / n_scored if n_scored else 0.0
     threat_recall = tp / n_threat if n_threat else 0.0
     benign_specificity = tn / n_benign if n_benign else 0.0
+    # Mốc đối chứng BẮT BUỘC đọc kèm accuracy: một stub luôn hô "threat" đạt đúng
+    # base rate. accuracy <= mốc này => chỉ số KHÔNG có năng lực phân biệt.
+    majority_baseline = round(n_threat / n_scored, 4) if n_scored else 0.0
 
-    action_dist = Counter(r["llm_action"] for r in results)
+    action_dist = Counter(r["llm_action"] for r in scored)
     by_source = {}
-    for src in sorted({r["source"] for r in results}):
-        sub = [r for r in results if r["source"] == src]
+    for src in sorted({r["source"] for r in scored}):
+        sub = [r for r in scored if r["source"] == src]
         s_tp = sum(1 for r in sub if r["is_threat"] and r["flagged"])
         s_thr = sum(1 for r in sub if r["is_threat"])
         by_source[src] = {
@@ -160,16 +198,22 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
             "threat_flagged": s_tp,
             "threat_recall": round(s_tp / s_thr, 4) if s_thr else None,
         }
-    n_parse_fail = sum(1 for r in results if r["error"] in ("parse_failed", "parse_salvaged"))
-    confs = [r["confidence"] for r in results if r["flagged"]]
+    n_parse_fail = sum(1 for r in scored if r["error"] in ("parse_failed", "parse_salvaged"))
+    confs = [r["confidence"] for r in scored if r["flagged"]]
     mean_conf_flagged = round(sum(confs) / len(confs), 3) if confs else 0.0
 
     summary = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "metric_valid": metric_valid,
         "n_escalated": n,
+        "n_scored": n_scored,
+        "n_invoke_errors": n_err,
+        "agent_reliability": agent_reliability,
+        "invoke_error_distribution": err_dist,
         "n_threat": n_threat,
         "n_benign": n_benign,
         "accuracy": round(accuracy, 4),
+        "majority_baseline": majority_baseline,
         "threat_recall": round(threat_recall, 4),
         "benign_specificity": round(benign_specificity, 4),
         "confusion": {"tp": tp, "fn": fn, "tn": tn, "fp": fp},
@@ -190,10 +234,16 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
 def _print(s: dict):
     print("\n" + "-" * 72)
     print(
-        f"  Escalate tới LLM      : {s['n_escalated']} (threat {s['n_threat']} / benign {s['n_benign']})"
+        f"  Escalate tới LLM      : {s['n_escalated']} (chấm được {s['n_scored']}, lỗi {s['n_invoke_errors']})"
+    )
+    print(f"  Độ tin cậy agent       : {s['agent_reliability']}  {s['invoke_error_distribution']}")
+    print(f"  Tập chấm điểm          : threat {s['n_threat']} / benign {s['n_benign']}")
+    print(
+        f"  ĐỘ CHÍNH XÁC phán quyết: {s['accuracy']}  (đúng {s['confusion']['tp'] + s['confusion']['tn']}/{s['n_scored']})"
     )
     print(
-        f"  ĐỘ CHÍNH XÁC phán quyết: {s['accuracy']}  (đúng {s['confusion']['tp'] + s['confusion']['tn']}/{s['n_escalated']})"
+        f"    ↳ mốc đối chứng (luôn hô 'threat'): {s['majority_baseline']}"
+        f"  => {'KHÔNG hơn mốc — không có năng lực phân biệt' if s['accuracy'] <= s['majority_baseline'] else 'vượt mốc'}"
     )
     print(
         f"  Recall trên threat     : {s['threat_recall']}  (bắt {s['confusion']['tp']}/{s['n_threat']})"
@@ -207,6 +257,15 @@ def _print(s: dict):
     print(f"  Phân bố action LLM     : {s['llm_action_distribution']}")
     print(f"  Fallback parse (an toàn): {s['n_parse_fallback']}")
     print("-" * 72)
+    if not s["metric_valid"]:
+        print(
+            f"\n  {'!' * 68}\n"
+            f"  [!] CHỈ SỐ KHÔNG HỢP LỆ — {s['n_invoke_errors']}/{s['n_escalated']} ca agent KHÔNG cho ra\n"
+            f"      phán quyết ({s['invoke_error_distribution']}). Ngưỡng cho phép: 5%.\n"
+            f"      TUYỆT ĐỐI KHÔNG trích số của lần chạy này vào luận văn/báo cáo.\n"
+            f"      Sửa nguyên nhân rồi chạy lại.\n"
+            f"  {'!' * 68}\n"
+        )
 
 
 def _write_report(s: dict):
@@ -219,8 +278,20 @@ def _write_report(s: dict):
         f"> **Sinh lúc:** {s['timestamp']}\n",
         "---\n",
         "## Kết quả\n",
-        f"- Sự kiện escalate tới LLM: **{s['n_escalated']}** (threat **{s['n_threat']}** / benign lọt **{s['n_benign']}**)",
-        f"- **Độ chính xác phán quyết: {s['accuracy']}** (đúng {c['tp'] + c['tn']}/{s['n_escalated']})",
+    ]
+    if not s["metric_valid"]:
+        lines.append(
+            f"> 🚨 **CHỈ SỐ KHÔNG HỢP LỆ** — {s['n_invoke_errors']}/{s['n_escalated']} ca agent KHÔNG cho ra "
+            f"phán quyết ({s['invoke_error_distribution']}), vượt ngưỡng 5%. **Không trích số dưới đây** "
+            f"vào luận văn; sửa nguyên nhân rồi chạy lại.\n"
+        )
+    lines += [
+        f"- Sự kiện escalate tới LLM: **{s['n_escalated']}** — chấm được **{s['n_scored']}**, "
+        f"lỗi **{s['n_invoke_errors']}** (độ tin cậy agent **{s['agent_reliability']}**)",
+        f"- Tập chấm điểm: threat **{s['n_threat']}** / benign lọt **{s['n_benign']}**",
+        f"- **Độ chính xác phán quyết: {s['accuracy']}** (đúng {c['tp'] + c['tn']}/{s['n_scored']})",
+        f"  - Mốc đối chứng *luôn hô 'threat'*: **{s['majority_baseline']}** — accuracy chỉ có ý nghĩa "
+        f"nếu **vượt** mốc này; bằng mốc = không có năng lực phân biệt.",
         f"- Recall trên threat (không bỏ sót): **{s['threat_recall']}** (bắt {c['tp']}/{s['n_threat']})",
         f"- Specificity trên benign (hạ cấp đúng): **{s['benign_specificity']}** ({c['tn']}/{s['n_benign']})",
         f"- Ma trận nhầm lẫn — TP/FN/TN/FP: **{c['tp']} / {c['fn']} / {c['tn']} / {c['fp']}**",

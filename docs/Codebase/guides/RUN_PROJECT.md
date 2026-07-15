@@ -26,6 +26,7 @@ Sau khi setup (§1) 1 lần, mỗi lần demo:
 ```bash
 ./scripts/run_demo.sh              # containers → subscriber → UI → đẩy 4.796 sự kiện (4 nguồn)
 ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng   |   --small: đẩy nhanh (demo ngắn)
+# GPU VRAM thấp: `SENTINEL_LITE=1 ./scripts/run_demo.sh` (Llama 3 8B, ctx 8192, 1 parallel, Neo4j tắt)
 ```
 
 Mở `http://localhost:8501` (đăng nhập `manager`). Tier-1 lọc ~93%; ~651 ca ESCALATE trôi qua LLM ~10–15 phút → **Dashboard điền dần** (đúng thiết kế SOC — LLM là nút cổ chai chủ đích, KHÔNG phải bug). Tắt: `pkill -f "main.py --mode server"; docker-compose stop`.

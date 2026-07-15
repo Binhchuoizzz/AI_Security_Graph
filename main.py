@@ -31,18 +31,26 @@ def setup_logger(log_level: str):
 
 
 def run_vulnerability_scan():
-    """Quét lỗ hổng dùng Trivy và nạp vào Neo4j (V2 Architecture)"""
-    logger.info("[PIPELINE] Running Vulnerability Scan (Trivy)...")
-    scanner = VulnerabilityScanner(target_dir="/app", output_file="data/trivy-results.json")
+    """Quét lỗ hổng dùng Trivy và Bandit SAST."""
+    logger.info("[PIPELINE] Running Vulnerability Scans (Trivy + Bandit)...")
+    scanner = VulnerabilityScanner(
+        target_dir=".",
+        output_file="data/trivy-results.json",
+        sast_output_file="data/bandit-results.json",
+    )
     results_path = scanner.run_scan()
-    logger.info(f"[PIPELINE] Vulnerability Scan complete. Findings saved to {results_path}")
+    sast_results_path = scanner.run_sast_scan()
+    logger.info(
+        f"[PIPELINE] Vulnerability Scans complete. Findings saved to {results_path} and {sast_results_path}"
+    )
 
 
 def build_knowledge_graph():
-    """Xây dựng Knowledge Graph từ OSV/Trivy results (V2 Architecture)"""
+    """Xây dựng Knowledge Graph từ OSV/Trivy và Bandit results (V2 Architecture)"""
     logger.info("[PIPELINE] Building Knowledge Graph (Neo4j)...")
     builder = KnowledgeGraphBuilder()
     builder.build_from_trivy(trivy_json_path="data/trivy-results.json")
+    builder.build_from_bandit(bandit_json_path="data/bandit-results.json")
     builder.close()
     logger.info("[PIPELINE] Knowledge Graph build complete.")
 

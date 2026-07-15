@@ -254,6 +254,17 @@ class ThreatMemoryStore:
         if affected > 0:
             logger.info(f"[THREAT MEMORY] Decayed reputation for {affected} inactive IPs")
 
+    def reset_ip_reputation(self, ip: str) -> None:
+        """Reset reputation score của IP về 0 (ví dụ khi admin gỡ chặn / whitelist)."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                c = conn.cursor()
+                c.execute("UPDATE ip_reputation SET reputation_score = 0.0 WHERE ip = ?", (ip,))
+                conn.commit()
+                logger.info(f"[THREAT MEMORY] Reset reputation score for IP {ip}")
+        except Exception as e:
+            logger.error(f"[THREAT MEMORY] Failed to reset reputation for {ip}: {e}")
+
     # =========================================================================
     # ORGANIZATIONAL CONTEXT (Known Entities)
     # =========================================================================
