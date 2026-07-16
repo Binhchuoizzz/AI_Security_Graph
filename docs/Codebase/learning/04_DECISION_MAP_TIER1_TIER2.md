@@ -6,7 +6,7 @@
 flowchart TD
     LOG_IN["📥 Log đầu vào\n(Redis Stream)"] --> SUB["subscriber.py\n(Nhận log)"]
     SUB --> T1["⚡ Tier-1 Filter\nrule_engine.evaluate()"]
-    
+
     T1 --> |"score < 50\nkhông có reasons"| DROP["🗑️ DROP\n(Vứt bỏ)"]
     T1 --> |"score < 50\ncó reasons nhẹ"| LOG_ACT["📝 LOG\n(Ghi sổ)"]
     T1 --> |"IP trong Whitelist"| WL["✅ WHITELIST_DROP\n(Cho qua đặc cách)"]
@@ -17,15 +17,15 @@ flowchart TD
     T1 --> |"Fwd pkts > max"| T1_ALERT["⚠️ Tier-1 ALERT"]
     T1 --> |"Port lạ\n(không 80/443)"| T1_HITL["🧑‍💻 Tier-1 AWAIT_HITL"]
     T1 --> |"Prompt Injection\nhoặc mờ ám"| ESC["🔀 ESCALATE\n→ Tier-2"]
-    
+
     T1_BLOCK --> BLK_FILE["tier1_blocks.json\n(KHÔNG vào audit_trail)"]
     T1_ALERT --> Q_DEC["queue_decisions\n(Redis)"]
     T1_HITL --> Q_HITL["queue_hitl\n(Redis)"]
     WL --> AUD_WL["audit_trail DB\n(action=WHITELIST)"]
-    
+
     ESC --> BUF["ip_buffers\n(gom 10 log/IP)"]
     BUF --> |"đủ batch_size"| T2["🧠 Tier-2 Agent\nLangGraph Workflow"]
-    
+
     T2 --> GR["1. Guardrails\n(Nén + Lọc)"]
     GR --> RAG["2. RAG Context\n(MITRE + NIST)"]
     RAG --> LLM["3. LLM Triage\n(Gemma-2-9B-IT)"]
@@ -34,10 +34,10 @@ flowchart TD
     MAP --> |"BLOCK_IP\n(Tấn công rõ ràng, đa bước,\nhoặc nhắm port nhạy cảm)"| EXEC["5. Action Executor\n→ block_ip() / alert()"]
     MAP --> |"ALERT\n(Bất thường nhẹ, hoặc DDoS\nnghi vấn spoof IP)"| EXEC
     MAP --> |"AWAIT_HITL\n(Mơ hồ, mục tiêu VIP,\nhoặc xung đột với Tier-1)"| T2_HITL["6. HITL Node\n→ _log_to_db(AWAIT_HITL)"]
-    
+
     EXEC --> AUD_T2["audit_trail DB\n(BLOCK_IP/ALERT)"]
     T2_HITL --> AUD_T2
-    
+
     style T1 fill:#1a1a2e,stroke:#e94560
     style T2 fill:#0f3460,stroke:#00d2ff
     style T1_BLOCK fill:#ff4757,color:#fff
@@ -49,8 +49,8 @@ flowchart TD
 
 ## 🔴 TIER-1: Rule Engine (Bộ lọc tốc độ cao, KHÔNG dùng LLM)
 
-> **File chính:** [rule_engine.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/tier1_filter/rule_engine.py)  
-> **Hàm quyết định:** [evaluate()](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/tier1_filter/rule_engine.py#L562-L790)  
+> **File chính:** [rule_engine.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/tier1_filter/rule_engine.py)
+> **Hàm quyết định:** [evaluate()](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/tier1_filter/rule_engine.py#L562-L790)
 > **Dispatcher:** [subscriber.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/streaming/subscriber.py#L319-L382)
 
 ### Cơ chế chấm điểm (Scoring Layers)
@@ -125,8 +125,8 @@ Bổ trợ: rep_action == "AWAIT_HITL" + action ∈ {DROP, LOG}?
 
 ## 🔵 TIER-2: Agent AI (LangGraph + LLM suy luận sâu)
 
-> **File workflow:** [workflow.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/agent/workflow.py)  
-> **File nodes:** [nodes.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/agent/nodes.py)  
+> **File workflow:** [workflow.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/agent/workflow.py)
+> **File nodes:** [nodes.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/agent/nodes.py)
 > **File prompts:** [prompts.py](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/agent/prompts.py)
 
 ### Luồng xử lý (6 Node LangGraph)

@@ -298,10 +298,10 @@ def fetch_and_build(
             # Chỉ giữ các nhãn có trong LABEL_MAP
             valid_labels = list(LABEL_MAP.keys())
             df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]  # pyright: ignore[reportAttributeAccessIssue]
-            
+
             # Downsample early to prevent OOM
             df_filtered = df_filtered.groupby("Label").head(10000)
-            
+
             all_data.append(df_filtered)
             print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm (sau downsample).")
         except Exception as e:
@@ -443,27 +443,30 @@ def fetch_and_build(
 
             log = row.to_dict()
             for k, v in log.items():
-                if pd.isna(v): log[k] = 0
-            log.update({
-                "timestamp": timestamp,
-                "src_ip": src_ip,
-                "dst_ip": dst_ip,
-                "src_port": src_port,
-                "dst_port": dst_port,
-                "protocol": safe_int(row.get("Protocol", 6)),
-                "flow_duration_us": safe_int(row.get("Flow Duration", 0)),
-                "fwd_packets": safe_int(row.get("Tot Fwd Pkts", 0)),
-                "bwd_packets": safe_int(row.get("Tot Bwd Pkts", 0)),
-                "fwd_bytes": safe_int(row.get("TotLen Fwd Pkts", 0)),
-                "bwd_bytes": safe_int(row.get("TotLen Bwd Pkts", 0)),
-                "fwd_seg_size_min": safe_int(row.get("Fwd Seg Size Min", 0)),
-                "init_fwd_win_byts": safe_int(row.get("Init Fwd Win Byts", 0)),
-                "init_bwd_win_byts": safe_int(row.get("Init Bwd Win Byts", 0)),
-                "bwd_pkt_len_min": safe_int(row.get("Bwd Pkt Len Min", 0)),
-                "flow_pkts_s": safe_float(row.get("Flow Pkts/s", 0.0)),
-                "psh_flag_cnt": safe_int(row.get("PSH Flag Cnt", 0)),
-                "service": _infer_service(dst_port),
-            })
+                if pd.isna(v):
+                    log[k] = 0
+            log.update(
+                {
+                    "timestamp": timestamp,
+                    "src_ip": src_ip,
+                    "dst_ip": dst_ip,
+                    "src_port": src_port,
+                    "dst_port": dst_port,
+                    "protocol": safe_int(row.get("Protocol", 6)),
+                    "flow_duration_us": safe_int(row.get("Flow Duration", 0)),
+                    "fwd_packets": safe_int(row.get("Tot Fwd Pkts", 0)),
+                    "bwd_packets": safe_int(row.get("Tot Bwd Pkts", 0)),
+                    "fwd_bytes": safe_int(row.get("TotLen Fwd Pkts", 0)),
+                    "bwd_bytes": safe_int(row.get("TotLen Bwd Pkts", 0)),
+                    "fwd_seg_size_min": safe_int(row.get("Fwd Seg Size Min", 0)),
+                    "init_fwd_win_byts": safe_int(row.get("Init Fwd Win Byts", 0)),
+                    "init_bwd_win_byts": safe_int(row.get("Init Bwd Win Byts", 0)),
+                    "bwd_pkt_len_min": safe_int(row.get("Bwd Pkt Len Min", 0)),
+                    "flow_pkts_s": safe_float(row.get("Flow Pkts/s", 0.0)),
+                    "psh_flag_cnt": safe_int(row.get("PSH Flag Cnt", 0)),
+                    "service": _infer_service(dst_port),
+                }
+            )
             log.pop("Label", None)
             log.pop("Timestamp", None)
             log.pop("Flow ID", None)
@@ -490,7 +493,7 @@ def fetch_and_build(
                         "user_agent": None,
                     },
                     "cicids_label": label,
-                }
+                },
             }
             samples.append(sample)
             gt_counter += 1

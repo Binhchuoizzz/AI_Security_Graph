@@ -47,7 +47,7 @@ rename_map = {
     "Init Fwd Win Byts": "Init Fwd Win Byts",
     "Init Bwd Win Byts": "Init Bwd Win Byts",
     "Bwd Pkt Len Min": "Bwd Pkt Len Min",
-    "PSH Flag Cnt": "PSH Flag Cnt"
+    "PSH Flag Cnt": "PSH Flag Cnt",
 }
 
 df = df.rename(columns=rename_map)

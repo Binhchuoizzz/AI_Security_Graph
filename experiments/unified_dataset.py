@@ -60,7 +60,7 @@ def map_cicids(nl: dict) -> dict:
     """network_layer (ground_truth) -> schema CICIDS mà RuleEngine mong đợi."""
     # Trả về toàn bộ các key trong nl, đảm bảo tính đồng bộ với ML pipeline
     res = nl.copy()
-    
+
     # Chuẩn hoá các key cũ nếu có (dành cho ground_truth.json cũ)
     mapping = {
         "src_ip": "Source IP",
@@ -77,9 +77,9 @@ def map_cicids(nl: dict) -> dict:
         "init_fwd_win_byts": "Init Fwd Win Byts",
         "init_bwd_win_byts": "Init Bwd Win Byts",
         "bwd_pkt_len_min": "Bwd Pkt Len Min",
-        "psh_flag_cnt": "PSH Flag Cnt"
+        "psh_flag_cnt": "PSH Flag Cnt",
     }
-    
+
     for old_k, new_k in mapping.items():
         if old_k in res and new_k not in res:
             res[new_k] = res.pop(old_k)
@@ -494,13 +494,15 @@ def build_stream():
                 if pd.isna(v):
                     log[k] = 0
             # Overlay specific fields we want to override
-            log.update({
-                "Source IP": f"192.168.2.{i % 254}",
-                "Destination IP": "10.0.0.1",
-                "Destination Port": 80 if is_attack else _safe_int(row.get("Dst Port", 443)),
-                "Protocol": 6,
-                "service": "HTTP",
-            })
+            log.update(
+                {
+                    "Source IP": f"192.168.2.{i % 254}",
+                    "Destination IP": "10.0.0.1",
+                    "Destination Port": 80 if is_attack else _safe_int(row.get("Dst Port", 443)),
+                    "Protocol": 6,
+                    "service": "HTTP",
+                }
+            )
             log.pop("Label", None)
             log.pop("Timestamp", None)
             log.pop("Flow ID", None)

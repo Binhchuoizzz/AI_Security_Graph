@@ -122,5 +122,3 @@ Trong khi luồng chảy, chỉ vào từng tab (số liệu benchmark ở §5, 
 | 3 | **Zero-day (Accuracy)** | Tab *Live Feed* → event `zeroday` chuyển **AWAIT_HITL/ESCALATE** | 7 biến thể; luật **tĩnh bỏ sót cả 7** (DROP). Welford bắt được: Z từ **~7.5 → ~318.000** (≫ 3.5σ) — phát hiện **không cần nhãn**. |
 | 4 | **Security** | Tab *Tổng quan* → *🔁 Vòng phản hồi* + *Live Threat Feed* | 120 payload OWASP LLM đi qua **toàn bộ** Tier 1 và Tier 2 (điển hình ~104 DROP + 2 BLOCK + 14 ESCALATE). Guardrail Tier 3 kháng **100%** khi payload tới nơi. **Trung thực:** payload mã hoá/ngữ nghĩa Tier 1/2 không giải mã sẽ **lọt bằng DROP** — giới hạn của bộ lọc chữ ký, đã nêu trong luận văn. |
 | 5 | **Explainability + Integrity** | Bấm 1 thẻ cảnh báo → *🔍 Xem LOG THÔ đầu vào* + thẻ *Audit HMAC-SHA256* | Đầu vào LLM **đã loại nhãn/đáp án** (chống lộ nhãn). Mỗi quyết định kèm **MITRE + suy luận 4 phần + playbook NIST**. Nhật ký ký chuỗi HMAC — chống sửa. LLM-as-Judge chéo họ **3.9/5**. |
-
-
