@@ -177,12 +177,14 @@ def _get_tier1_blocks(show: int = 12) -> list[dict]:
     return list(seen.values())
 
 
-def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count, noise_reduction):
+def render_demo_overview(
+    all_alerts, active_rules, pending_rules, raw_logs_count, noise_reduction, pending_llm=0
+):
     """Tab Tổng quan Trình diễn — gom mọi thứ cần show vào MỘT màn hình."""
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
-        "Welford $O(1)$ → **Tier-2** tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
+        "Welford $O(1)$ → **Tier-2** (Cổng ML → tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
         "**Dual-RAG** (MITRE ATT&CK / NIST SP 800-61r2) phía sau rào chắn mật mã, có **HITL** giám sát.*"
     )
 
@@ -213,13 +215,15 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
 
     # ---------- Hàng chỉ số vận hành ----------
     st.markdown("### 📊 Chỉ số Vận hành Thời gian thực")
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
     c1.metric("Logs thô đầu vào", f"{raw_logs_count:,}")
-    c2.metric("Escalated → AI", f"{escalated:,}")
-    c3.metric("Giảm tải nhiễu", f"{nr:.1f}%")
-    c4.metric("IP rủi ro cao", f"{len(high_risk)}")
-    c5.metric("Luật chờ HITL", f"{len(pending_rules)}")
-    c6.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
+    c2.metric("Tổng Cảnh báo (T1+T2)", f"{escalated:,}")
+    c3.metric("Đang chờ LLM ⏳", f"{pending_llm}")
+    nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
+    c4.metric("Giảm tải nhiễu", nr_str)
+    c5.metric("IP rủi ro cao", f"{len(high_risk)}")
+    c6.metric("Phê duyệt Tier-2", f"{len(pending_rules)}")
+    c7.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
 
     st.markdown("---")
     col_left, col_right = st.columns([3, 2])
@@ -267,12 +271,12 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
         e1, e2 = st.columns(2)
         e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
-        e2.metric("Suy luận Tier-2", "≈5.7 s", "62.7% escalate")
+        e2.metric("Suy luận Tier-2 (LLM)", "≈5.7 s", "62.7% escalate")
         e3, e4 = st.columns(2)
-        e3.metric("Zero-day bắt được", "7 / 7", "Welford > 3.5σ")
+        e3.metric("Lọc rác Welford", "> 99%", "Welford > 3.5σ")
         e4.metric("APT recall", "1.00", "DAPT2020")
         e5, e6 = st.columns(2)
-        e5.metric("RAGAS (chéo họ)", "3.91 / 5", "Faithfulness 4.0")
+        e5.metric("ML Tier 2 F1", "1.000", "Siêu nhẹ (0.000s)")
         e6.metric("Chặn mã hoá-bypass", "100%", "rào chắn tĩnh 50%")
         st.caption(
             "Mann-Whitney U: p = 2.8×10⁻¹⁷ · McNemar (Tier-1 vs Đầy đủ): p = 1.0 · Audit HMAC: 100%."
@@ -355,7 +359,7 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
                             ),
                             "Pattern": rule.get("pattern", ""),
                             "Điểm": rule.get("score", ""),
-                            "Lý do (LLM)": (str(rule.get("reason", "")) or "—")[:90],
+                            "Lý do": (str(rule.get("reason", "")) or "—")[:90],
                         }
                         for rule in loop_rules[:12]
                     ]
@@ -376,9 +380,9 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
                 "Chưa có luật nào Tier-2 dạy cho Tier-1. Chạy luồng có escalate để LLM sinh luật."
             )
 
-    # ---------- Tier-2 (LLM/Agent) đã CHẶN — phán quyết ghi vào Audit Trail ----------
+    # ---------- Tier-2 (Cổng ML + LLM) đã CHẶN — phán quyết ghi vào Audit Trail ----------
     st.markdown("---")
-    st.markdown("### 🧠 Tier-2 (LLM/Agent) đã CHẶN (phán quyết có suy luận MITRE/NIST)")
+    st.markdown("### 🧠 Tier-2 (Cổng ML + LLM Agent) đã CHẶN (ghi chép Audit Trail)")
     _t2_blocks = [
         a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP", "QUARANTINE")
     ]
@@ -390,8 +394,14 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
                         "Thời gian": str(a.get("timestamp", ""))[5:19],
                         "Hành động": a.get("action", ""),
                         "IP / Host": a.get("target", ""),
+                        "Quyết định bởi": "Cổng ML ⚡"
+                        if any(
+                            k in str(a.get("reason", ""))
+                            for k in ("Cổng ML", "ML Tier 2", "Decision Tree")
+                        )
+                        else "LLM 🧠",
                         "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
-                        "Lý do (LLM)": (str(a.get("reason", "")) or "—")[:110],
+                        "Lý do": (str(a.get("reason", "")) or "—")[:110],
                     }
                     for a in _t2_blocks[:15]
                 ]
@@ -401,7 +411,7 @@ def render_demo_overview(all_alerts, active_rules, pending_rules, raw_logs_count
             hide_index=True,
         )
         st.caption(
-            f"**{len(_t2_blocks)}** quyết định CHẶN do Tác tử Tier-2 (và thao tác thủ công của "
+            f"**{len(_t2_blocks)}** quyết định CHẶN do Tier-2 (và thao tác thủ công của "
             "Analyst) ghi vào Audit Trail HMAC-SHA256. Khác với *Tier-1 đã chặn* (chữ ký tốc độ "
             "cao, TTL 1h ở Redis): đây là phán quyết **có suy luận MITRE/NIST** của LLM sau khi "
             "leo thang. IP đã whitelist KHÔNG bao giờ xuất hiện ở đây (đã miễn trừ)."
@@ -571,7 +581,7 @@ def main_dashboard():
             '    <div class="glossary-desc">Session Baselining giám sát hành vi mạng và lọc bỏ >95% logs sạch, chống Alert Fatigue cho Analyst.</div>'
             "  </div>"
             '  <div class="glossary-item">'
-            '    <span class="glossary-title">Tier 2 (AI Agent):</span>'
+            '    <span class="glossary-title">Tier-2 · LLM Agent:</span>'
             '    <div class="glossary-desc">LangGraph Agent truy xuất tri thức Dual-RAG (MITRE & NIST) giúp Gemma-2-9B ra quyết định ngăn chặn.</div>'
             "  </div>"
             '  <div class="glossary-item">'
@@ -599,10 +609,11 @@ def main_dashboard():
     filtered_alerts = all_alerts
     if action_filter != "Tất cả":
         filtered_alerts = [a for a in filtered_alerts if a.get("action") == action_filter]
-    if search_ip:
-        filtered_alerts = [a for a in filtered_alerts if search_ip in a.get("target", "")]
+    search_ip_tab1 = st.session_state.get("search_ip_tab1", "").strip()
+    active_search_ip = search_ip or search_ip_tab1
 
-    total_filtered = len(filtered_alerts)
+    if active_search_ip:
+        filtered_alerts = [a for a in filtered_alerts if active_search_ip in a.get("target", "")]
 
     # Tính toán Live FPR dựa trên các rule được Duyệt (ACTIVE) vs Bác bỏ (REJECTED) bởi con người
     all_rules = feedback_mgr.get_all_dynamic_rules()
@@ -627,7 +638,9 @@ def main_dashboard():
         with open(_stats_p) as _sf:
             _ps = _json.load(_sf)
         raw_logs_count = int(_ps.get("raw_logs_total", 0))
+        pending_llm_count = int(_ps.get("pending_llm_queue", 0))
     except Exception:
+        pending_llm_count = 0
         pass
 
     # MỘT nguồn sự thật: Tỷ lệ giảm tải = (log thô − cảnh báo escalated) / log thô.
@@ -638,7 +651,6 @@ def main_dashboard():
     else:
         noise_reduction = None  # raw chưa hợp lệ -> header dùng fallback an toàn
 
-    # Hiển thị số lượng sự cố (Metrics Header chuẩn SOC)
     render_metrics_header(
         len(all_alerts),
         len(pending_rules),
@@ -646,13 +658,14 @@ def main_dashboard():
         raw_logs_count,
         live_fpr,
         noise_reduction,
+        pending_llm_count=pending_llm_count,
     )
 
     tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
             "🎬 Tổng quan Demo",
             "📊 Nhật ký SIEM & Audit Trail",
-            "🧑‍💻 Phê duyệt Luật (HITL)",
+            "🧑‍💻 Phê duyệt Luật Block (Tier-2 HITL)",
             "🎯 Giám sát APT & Threat Intel",
             "🔒 Quản lý Blocklist & Whitelist",
             "🔍 Lỗ hổng & Tri thức Graph",
@@ -661,7 +674,12 @@ def main_dashboard():
 
     with tab0:
         render_demo_overview(
-            all_alerts, active_rules, pending_rules, raw_logs_count, noise_reduction
+            all_alerts,
+            active_rules,
+            pending_rules,
+            raw_logs_count,
+            noise_reduction,
+            pending_llm=pending_llm_count,
         )
 
     with tab1:
@@ -699,6 +717,18 @@ def main_dashboard():
                     st.write("Không thể vẽ biểu đồ phân tích SIEM:", e)
 
         st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
+        st.caption(
+            "🔵 **Tier-2 · LLM Agent**: Quyết định do LLM/Agent suy luận sau khi Tier-1 leo thang (ESCALATE).  ·  "
+            "🟢 **Tier-1 Filter**: Whitelist cho qua hoặc chặn tự động (không cần LLM).  ·  "
+            'Tier-1 BLOCK riêng được hiển thị tại bảng *"Vòng phản hồi Hai tầng"* ở tab Tổng quan.'
+        )
+
+        # Thêm ô tìm kiếm IP trực tiếp trong Tab 1
+        st.text_input(
+            "🔍 Tìm kiếm nhanh theo IP mục tiêu:",
+            placeholder="Nhập địa chỉ IP để lọc lịch sử bên dưới...",
+            key="search_ip_tab1",
+        )
 
         # Xuất dữ liệu CSV để lưu trữ lịch sử
         if filtered_alerts:
@@ -729,169 +759,242 @@ def main_dashboard():
                 </div>""",
                 unsafe_allow_html=True,
             )
-        else:
-            # Phân trang
-            total_pages = max(1, math.ceil(total_filtered / page_size))
-            if "current_page" not in st.session_state:
-                st.session_state["current_page"] = 1
-            if st.session_state["current_page"] > total_pages:
-                st.session_state["current_page"] = total_pages
+            # Chia thành 3 Tier
+            alerts_t1 = []
+            alerts_t2 = []
+            alerts_t3 = []
+            for alert in filtered_alerts:
+                r = alert.get("reason", "")
+                # Detect theo MARKER: "Cổng ML" (mới) / "ML Tier 2" (bản ghi cũ trong DB)
+                # / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM giờ cũng ghi Tier-2.
+                if "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
+                    alerts_t1.append(alert)
+                elif "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r:
+                    alerts_t2.append(alert)
+                else:
+                    alerts_t3.append(alert)
 
-            start_idx = (st.session_state["current_page"] - 1) * page_size
-            end_idx = start_idx + page_size
-            page_alerts = filtered_alerts[start_idx:end_idx]
+            t1_tab, t2_tab, t3_tab = st.tabs(
+                [
+                    f"🟢 Tier-1 Filter ({len(alerts_t1)})",
+                    f"⚡ Tier-2 · Cổng ML ({len(alerts_t2)})",
+                    f"🧠 Tier-2 · LLM ({len(alerts_t3)})",
+                ]
+            )
 
-            # Hiển thị các Alert Cards cho trang hiện tại
-            for idx, alert in enumerate(page_alerts):
-                target_ip = alert.get("target", "N/A")
-                is_whitelisted = target_ip in whitelisted_ips
+            def _render_alerts_list(alert_list, tab_key):
+                if not alert_list:
+                    st.info("Không có sự cố nào ở Tier này.")
+                    return
 
-                render_alert_card(
-                    alert,
-                    is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
-                    on_whitelist=handle_whitelist_approval if not is_whitelisted else None,
-                    on_block=handle_block_approval,
-                    card_id=f"{start_idx + idx}",
-                )
+                total_pages = max(1, math.ceil(len(alert_list) / page_size))
+                page_key = f"current_page_{tab_key}"
+                if page_key not in st.session_state:
+                    st.session_state[page_key] = 1
+                if st.session_state[page_key] > total_pages:
+                    st.session_state[page_key] = total_pages
 
-            # Điều hướng trang
-            st.write("")
-            col_prev, col_page, col_next = st.columns([1, 2, 1])
-            with col_prev:
-                if st.button(
-                    "⬅️ Trang trước",
-                    disabled=(st.session_state["current_page"] == 1),
-                    key="btn_prev_page",
-                ):
-                    st.session_state["current_page"] -= 1
-                    st.rerun()
-            with col_page:
-                st.markdown(
-                    f"<div style='text-align: center; padding-top: 5px; font-weight: bold;'>Trang {st.session_state['current_page']} / {total_pages} (Tổng cộng {total_filtered} sự cố)</div>",
-                    unsafe_allow_html=True,
-                )
-            with col_next:
-                if st.button(
-                    "Trang sau ➡️",
-                    disabled=(st.session_state["current_page"] == total_pages),
-                    key="btn_next_page",
-                ):
-                    st.session_state["current_page"] += 1
-                    st.rerun()
+                start_idx = (st.session_state[page_key] - 1) * page_size
+                end_idx = start_idx + page_size
+                page_alerts = alert_list[start_idx:end_idx]
+
+                # Hiển thị các Alert Cards cho trang hiện tại
+                for idx, alert in enumerate(page_alerts):
+                    render_alert_card(
+                        alert,
+                        is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
+                        card_id=f"{tab_key}_{start_idx + idx}",
+                    )
+
+                # Điều hướng trang
+                if total_pages > 1:
+                    st.write("")
+                    col_prev, col_page, col_next = st.columns([1, 2, 1])
+                    with col_prev:
+                        if st.button(
+                            "⬅️ Trang trước",
+                            disabled=(st.session_state[page_key] == 1),
+                            key=f"prev_{tab_key}",
+                        ):
+                            st.session_state[page_key] -= 1
+                            st.rerun()
+                    with col_page:
+                        st.markdown(
+                            f"<div style='text-align:center;padding-top:5px;font-weight:bold;'>Trang {st.session_state[page_key]} / {total_pages}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    with col_next:
+                        if st.button(
+                            "Trang sau ➡️",
+                            disabled=(st.session_state[page_key] == total_pages),
+                            key=f"next_{tab_key}",
+                        ):
+                            st.session_state[page_key] += 1
+                            st.rerun()
+
+            with t1_tab:
+                _render_alerts_list(alerts_t1, "t1")
+            with t2_tab:
+                _render_alerts_list(alerts_t2, "t2")
+            with t3_tab:
+                _render_alerts_list(alerts_t3, "t3")
 
     with tab2:
         st.subheader("Phê duyệt Luật Tường lửa (Dynamic Rules)")
         if not pending_rules:
             st.info("Không có luật nào đang chờ phê duyệt.")
         else:
-            # Sắp xếp: mức độ nghiêm trọng (score) giảm dần, rồi thời gian tạo mới nhất trước
-            sorted_pending = sorted(
-                pending_rules,
-                key=lambda r: (r.get("score") or 0, str(r.get("created_at") or "")),
-                reverse=True,
-            )
-            # Phân trang cho dễ nhìn
-            rules_per_page = 5
-            n_pages = max(1, math.ceil(len(sorted_pending) / rules_per_page))
-            if st.session_state.get("hitl_page", 1) > n_pages:
-                st.session_state["hitl_page"] = n_pages
-            cur = st.session_state.get("hitl_page", 1)
-            page_rules = sorted_pending[(cur - 1) * rules_per_page : cur * rules_per_page]
-            st.caption(
-                f"🔽 Sắp theo mức độ nghiêm trọng rồi thời gian · {len(sorted_pending)} luật chờ duyệt"
-            )
-
-            for rule in page_rules:
-                sev_icon, sev_label = _rule_severity(rule.get("score"))
-                created = str(rule.get("created_at") or "—")[:19].replace("T", " ")
-
-                # Phân loại rõ loại HITL dựa vào nguồn
-                src = rule.get("source", "")
-                if "langgraph_agent_hitl" in src:
-                    hitl_type = "🤔 AWAIT_HITL (AI cần con người phân tích thêm)"
-                    hitl_color = "#faad14"
-                elif "langgraph_agent" in src:
-                    hitl_type = "🛑 BLOCK_IP (AI đề xuất chặn, chờ duyệt)"
-                    hitl_color = "#ff4d4f"
+            pending_t1 = []
+            pending_t2 = []
+            pending_t3 = []
+            for r in pending_rules:
+                reason = str(r.get("reason", ""))
+                # Marker như trên: "Cổng ML"/"ML Tier 2"(cũ)/"Decision Tree" — không dùng "ML" trần.
+                if "Tier 1" in reason or "Tier-1" in reason or "whitelist" in reason.lower():
+                    pending_t1.append(r)
+                elif "Cổng ML" in reason or "ML Tier 2" in reason or "Decision Tree" in reason:
+                    pending_t2.append(r)
                 else:
-                    hitl_type = f"🔧 MANUAL ({src})"
-                    hitl_color = "#1890ff"
+                    pending_t3.append(r)
 
-                with st.expander(
-                    f"{sev_icon} [{sev_label}] {rule.get('pattern')} · 🕒 {created} · score {rule.get('score')}",
-                    expanded=True,
-                ):
-                    st.markdown(
-                        f"**Loại chờ duyệt (HITL Type):** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
-                        unsafe_allow_html=True,
-                    )
-                    st.write(
-                        f"**Mức độ nghiêm trọng:** {sev_icon} {sev_label} (score {rule.get('score')})"
-                    )
-                    st.write(f"**Thời gian tạo:** {created}")
-                    st.write(f"**Trường dữ liệu:** {rule.get('field')}")
-                    st.write(f"**Lý do (LLM):** {rule.get('reason')}")
+            tab_t1, tab_t2, tab_t3 = st.tabs(
+                [
+                    f"🟢 Tier-1 Filter ({len(pending_t1)})",
+                    f"⚡ Tier-2 · Cổng ML ({len(pending_t2)})",
+                    f"🧠 Tier-2 · LLM ({len(pending_t3)})",
+                ]
+            )
 
-                    if st.session_state.get("role") == "L3_Manager":
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            if st.button("✅ Phê duyệt", key=f"app_{rule.get('pattern')}"):
-                                # Phát hiện xung đột block↔whitelist TRƯỚC khi duyệt (approve_rule
-                                # sẽ tự gỡ khỏi whitelist) để thông báo cho analyst.
-                                _was_wl = (
-                                    rule.get("field") == "Source IP"
-                                    and rule.get("pattern") in feedback_mgr.get_whitelisted_ips()
-                                )
-                                feedback_mgr.approve_rule(rule.get("pattern"), rule.get("field"))
-                                # Ghi audit khi DUYỆT luật (đồng bộ: duyệt block cũng để lại
-                                # 1 bản ghi như duyệt whitelist). Luật Source IP -> BLOCK_IP.
-                                from src.response.executor import _log_to_db
+            def _render_pending_list(rules_list, page_key):
+                if not rules_list:
+                    st.info("Không có luật nào đang chờ phê duyệt ở Tier này.")
+                    return
+                # Sắp xếp: mức độ nghiêm trọng (score) giảm dần, rồi thời gian tạo mới nhất trước
+                sorted_pending = sorted(
+                    rules_list,
+                    key=lambda r: (r.get("score") or 0, str(r.get("created_at") or "")),
+                    reverse=True,
+                )
+                # Phân trang cho dễ nhìn
+                rules_per_page = 5
+                n_pages = max(1, math.ceil(len(sorted_pending) / rules_per_page))
+                if st.session_state.get(page_key, 1) > n_pages:
+                    st.session_state[page_key] = n_pages
+                cur = st.session_state.get(page_key, 1)
+                page_rules = sorted_pending[(cur - 1) * rules_per_page : cur * rules_per_page]
+                st.caption(
+                    f"🔽 Sắp theo mức độ nghiêm trọng rồi thời gian · {len(sorted_pending)} luật chờ duyệt"
+                )
 
-                                _act = "BLOCK_IP" if rule.get("field") == "Source IP" else "LOG"
-                                _log_to_db(
-                                    _act,
-                                    str(rule.get("pattern")),
-                                    f"Luật được DUYỆT (HITL) bởi "
-                                    f"{st.session_state.get('username')}: {rule.get('reason')}",
-                                )
-                                if _was_wl:
-                                    st.warning(
-                                        f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist vì "
-                                        "chuyển sang CHẶN (block ↔ whitelist loại trừ lẫn nhau)."
-                                    )
-                                st.success(f"Đã duyệt luật {rule.get('pattern')}")
-                                time.sleep(0.5)
-                                st.rerun()
-                        with col2:
-                            if st.button("❌ Từ chối", key=f"rej_{rule.get('pattern')}"):
-                                feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
-                                # Xóa khỏi Redis blacklist (trường hợp LLM đã block tạm thời)
-                                if rule.get("field") == "Source IP":
-                                    from src.response.executor import unblock_ip
+                for rule in page_rules:
+                    sev_icon, sev_label = _rule_severity(rule.get("score"))
+                    created = str(rule.get("created_at") or "—")[:19].replace("T", " ")
 
-                                    unblock_ip(str(rule.get("pattern")))
-                                st.warning(f"Đã từ chối luật {rule.get('pattern')}")
-                                time.sleep(0.5)
-                                st.rerun()
+                    # Phân loại rõ loại HITL dựa vào nguồn
+                    src = rule.get("source", "")
+                    if "langgraph_agent_hitl" in src:
+                        hitl_type = "🤔 AWAIT_HITL (Hệ thống cần con người phân tích thêm)"
+                        hitl_color = "#faad14"
+                    elif "langgraph_agent" in src:
+                        hitl_type = "🛑 BLOCK_IP (Hệ thống đề xuất chặn, chờ duyệt)"
+                        hitl_color = "#ff4d4f"
                     else:
-                        st.warning("Bạn không có quyền L3_Manager để phê duyệt.")
+                        hitl_type = f"🔧 MANUAL ({src})"
+                        hitl_color = "#1890ff"
 
-            # Điều hướng trang (HITL)
-            if n_pages > 1:
-                cprev, cmid, cnext = st.columns([1, 2, 1])
-                with cprev:
-                    if st.button("⬅️ Trang trước", disabled=(cur == 1), key="hitl_prev"):
-                        st.session_state["hitl_page"] = cur - 1
-                        st.rerun()
-                with cmid:
-                    st.markdown(
-                        f"<div style='text-align:center;padding-top:5px;font-weight:bold;'>Trang {cur} / {n_pages}</div>",
-                        unsafe_allow_html=True,
-                    )
-                with cnext:
-                    if st.button("Trang sau ➡️", disabled=(cur == n_pages), key="hitl_next"):
-                        st.session_state["hitl_page"] = cur + 1
-                        st.rerun()
+                    with st.expander(
+                        f"{sev_icon} [{sev_label}] {rule.get('pattern')} · 🕒 {created} · score {rule.get('score')}",
+                        expanded=True,
+                    ):
+                        st.markdown(
+                            f"**Loại chờ duyệt (HITL Type):** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
+                            unsafe_allow_html=True,
+                        )
+                        st.write(
+                            f"**Mức độ nghiêm trọng:** {sev_icon} {sev_label} (score {rule.get('score')})"
+                        )
+                        st.write(f"**Thời gian tạo:** {created}")
+                        st.write(f"**Trường dữ liệu:** {rule.get('field')}")
+                        st.write(f"**Lý do:** {rule.get('reason')}")
+
+                        if st.session_state.get("role") == "L3_Manager":
+                            col1, col2 = st.columns([1, 1])
+                            with col1:
+                                if st.button(
+                                    "✅ Phê duyệt", key=f"app_{rule.get('pattern')}_{page_key}"
+                                ):
+                                    # Phát hiện xung đột block↔whitelist TRƯỚC khi duyệt (approve_rule
+                                    # sẽ tự gỡ khỏi whitelist) để thông báo cho analyst.
+                                    _was_wl = (
+                                        rule.get("field") == "Source IP"
+                                        and rule.get("pattern")
+                                        in feedback_mgr.get_whitelisted_ips()
+                                    )
+                                    feedback_mgr.approve_rule(
+                                        rule.get("pattern"), rule.get("field")
+                                    )
+                                    # Ghi audit khi DUYỆT luật (đồng bộ: duyệt block cũng để lại
+                                    # 1 bản ghi như duyệt whitelist). Luật Source IP -> BLOCK_IP.
+                                    from src.response.executor import _log_to_db
+
+                                    _act = "BLOCK_IP" if rule.get("field") == "Source IP" else "LOG"
+                                    _log_to_db(
+                                        _act,
+                                        str(rule.get("pattern")),
+                                        f"Luật được DUYỆT (HITL) bởi "
+                                        f"{st.session_state.get('username')}: {rule.get('reason')}",
+                                    )
+                                    if _was_wl:
+                                        st.warning(
+                                            f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist vì "
+                                            "chuyển sang CHẶN (block ↔ whitelist loại trừ lẫn nhau)."
+                                        )
+                                    st.success(f"Đã duyệt luật {rule.get('pattern')}")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                            with col2:
+                                if st.button(
+                                    "❌ Từ chối", key=f"rej_{rule.get('pattern')}_{page_key}"
+                                ):
+                                    feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
+                                    # Xóa khỏi Redis blacklist (trường hợp LLM đã block tạm thời)
+                                    if rule.get("field") == "Source IP":
+                                        from src.response.executor import unblock_ip
+
+                                        unblock_ip(str(rule.get("pattern")))
+                                    st.warning(f"Đã từ chối luật {rule.get('pattern')}")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                        else:
+                            st.warning("Bạn không có quyền L3_Manager để phê duyệt.")
+
+                # Điều hướng trang (HITL)
+                if n_pages > 1:
+                    cprev, cmid, cnext = st.columns([1, 2, 1])
+                    with cprev:
+                        if st.button(
+                            "⬅️ Trang trước", disabled=(cur == 1), key=f"hitl_prev_{page_key}"
+                        ):
+                            st.session_state[page_key] = cur - 1
+                            st.rerun()
+                    with cmid:
+                        st.markdown(
+                            f"<div style='text-align:center;padding-top:5px;font-weight:bold;'>Trang {cur} / {n_pages}</div>",
+                            unsafe_allow_html=True,
+                        )
+                    with cnext:
+                        if st.button(
+                            "Trang sau ➡️", disabled=(cur == n_pages), key=f"hitl_next_{page_key}"
+                        ):
+                            st.session_state[page_key] = cur + 1
+                            st.rerun()
+
+            with tab_t1:
+                _render_pending_list(pending_t1, "hitl_page_t1")
+            with tab_t2:
+                _render_pending_list(pending_t2, "hitl_page_t2")
+            with tab_t3:
+                _render_pending_list(pending_t3, "hitl_page_t3")
 
         st.markdown("---")
         st.subheader("Luật Đang Hoạt Động (Active Rules)")
@@ -909,7 +1012,7 @@ def main_dashboard():
                     expanded=False,
                 ):
                     st.write(f"**Trường dữ liệu:** {rule.get('field')}")
-                    st.write(f"**Lý do (LLM):** {rule.get('reason')}")
+                    st.write(f"**Lý do:** {rule.get('reason')}")
                     st.write(f"**Tạo lúc:** {rule.get('created_at')}")
 
                     if st.session_state.get("role") == "L3_Manager":
@@ -1183,7 +1286,7 @@ def main_dashboard():
         </div>
         <p style="font-size: 0.8rem; color: #8E9AA8; margin-top: -12px; margin-bottom: 20px;">
             🛡️ <b>Tier-1 Tạm thời</b>: IP bị chặn tức thời bởi chữ ký WAF/injection/cổng nhạy cảm (Redis blacklist, tự hết hạn TTL 1h).
-            <b>Luật Vĩnh viễn</b>: luật động do Tier-2/LLM đề xuất, đã được Analyst DUYỆT (HITL) — không hết hạn.
+            <b>Luật Vĩnh viễn</b>: luật động do Tier-2 (LLM) đề xuất, đã được Analyst DUYỆT (HITL) — không hết hạn.
         </p>
         """,
             unsafe_allow_html=True,
@@ -1390,8 +1493,9 @@ def main_dashboard():
                                         ok = feedback_mgr.add_to_whitelist(selected_block_ip)
                                         if ok:
                                             feedback_mgr.reject_rule(selected_block_ip, "Source IP")
-                                            from src.response.executor import _log_to_db
+                                            from src.response.executor import _log_to_db, unblock_ip
 
+                                            unblock_ip(selected_block_ip)
                                             _log_to_db(
                                                 "LOG",
                                                 selected_block_ip,
@@ -1726,7 +1830,7 @@ def main_dashboard():
                 'T1 [label="Tier-1 Welford Filter", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
-                'LLM [label="Tier-2 Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '
+                'LLM [label="Tier-2 LLM Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '
                 'MEM [label="Threat Memory (APT)", fillcolor="#1d39c4", color="#1d39c4"]; '
                 'SOC -> T1 [label="ingest"]; T1 -> GR [label="escalate"]; '
                 'GR -> RAG [label="ground"]; RAG -> LLM [label="reason"]; '

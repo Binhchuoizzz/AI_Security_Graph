@@ -148,6 +148,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
 
     # Bộ đệm gom sự cố (Incident-Level Aggregation Buffers - Entity-based)
     import collections
+
     ip_buffers = collections.defaultdict(list)
     ip_last_updated = {}
 
@@ -173,7 +174,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
             _tmp = _stats_path + ".tmp"
             with open(_tmp, "w") as _f:
                 json.dump(
-                    {"raw_logs_total": raw_logs_total, "tier1_dropped_total": tier1_dropped_total},
+                    {
+                        "raw_logs_total": raw_logs_total,
+                        "tier1_dropped_total": tier1_dropped_total,
+                        "pending_llm_queue": agent_q.qsize() if agent_q is not None else 0,
+                    },
                     _f,
                 )
             os.replace(_tmp, _stats_path)
@@ -198,16 +203,27 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
             pass
 
     # ── Bộ worker Tier-2 (DECOUPLE LLM khỏi vòng đọc Redis) ─────────────────────────
-    # on_batch_ready (agent LLM) là phần CHẬM (~15-25s/lô). Gọi ĐỒNG BỘ trong vòng đọc sẽ
-    # chặn việc nạp Redis + cập nhật thống kê -> Dashboard "đơ". Thay vào đó đẩy lô escalate
-    # vào hàng đợi BỊ CHẶN (bounded, tránh OOM) để N worker nền xử lý — nhiều worker chạy
-    # nhiều lô SONG SONG, tận dụng các slot llama.cpp (-np). Quyết định KHÔNG đổi (các khóa
-    # ở audit/reputation/cache + loop_detector thread-local đã bảo đảm an toàn đa luồng).
+    # on_batch_ready (agent) là phần CHẬM. Gọi ĐỒNG BỘ trong vòng đọc sẽ chặn việc nạp
+    # Redis + cập nhật thống kê -> Dashboard "đơ". Thay vào đó đẩy lô escalate vào hàng
+    # đợi cho N worker nền xử lý song song (tận dụng slot llama.cpp -np; các khóa ở
+    # audit/reputation/cache + loop_detector thread-local bảo đảm an toàn đa luồng).
+    #
+    # HÀNG ĐỢI KHÔNG GIỚI HẠN (maxsize=0) — quyết định CÓ CHỦ ĐÍCH (2026-07-16):
+    # bản bounded(64) cũ khiến put() CHẶN vòng đọc khi Tier-2 tụt hậu (đo thật: qsize
+    # kẹt 64/64 suốt lượt chạy 4.796 sự kiện). Đổi sang không giới hạn vì:
+    #   1) Vòng đọc Tier-1 không bao giờ được phép đứng (Dashboard/stats phải sống);
+    #   2) Redis stream (maxlen 10k/queue) mới là buffer bền thật sự phía trước;
+    #   3) Cổng ML của Tier-2 hấp thụ phần lớn lô nên backlog thực tế nhỏ.
+    # RỦI RO CHẤP NHẬN: backlog nằm trong RAM tiến trình — quy mô demo (nghìn lô nhỏ)
+    # là an toàn; hướng sản xuất (Kafka persistent) đã ghi ở thesis ch5. Có cảnh báo
+    # HIGH-WATER bên dưới để backlog phình là thấy ngay trong log.
     agent_q: queue.Queue | None = None
     agent_pool: list[threading.Thread] = []
     agent_stop = threading.Event()
+    # Ngưỡng cảnh báo backlog kế tiếp (512 rồi gấp đôi dần: 1024, 2048, ...)
+    agent_q_highwater = 512
     if on_batch_ready and agent_workers >= 1:
-        agent_q = queue.Queue(maxsize=max(64, agent_workers * 32))
+        agent_q = queue.Queue(maxsize=0)
 
         def _agent_worker(q: queue.Queue):
             while not agent_stop.is_set():
@@ -232,6 +248,18 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
             _t.start()
             agent_pool.append(_t)
         print(f"[*] Tier-2 agent pool: {agent_workers} worker song song (decoupled khỏi vòng đọc).")
+
+    def _warn_backlog():
+        """High-water cho hàng đợi KHÔNG giới hạn: backlog vượt ngưỡng (512, 1024, ...)
+        thì la to trong log — phình RAM phải THẤY được, không được phình im lặng."""
+        nonlocal agent_q_highwater
+        if agent_q is not None and agent_q.qsize() >= agent_q_highwater:
+            print(
+                f"[!] HIGH-WATER: hàng đợi Tier-2 đang gánh {agent_q.qsize()} lô trong RAM "
+                f"(vượt ngưỡng {agent_q_highwater}). Tier-2 tụt hậu xa — cân nhắc tăng "
+                f"agent_workers / slot llama.cpp (-np), hoặc hạ tốc độ đẩy luồng."
+            )
+            agent_q_highwater *= 2
 
     while True:
         try:
@@ -318,39 +346,85 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
 
                             # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
                             if action == "ESCALATE":
-                                alert_msg = f"[!] ESCALATE TO AI | Source: {stream_name} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
-                                print(alert_msg)
-                                # Loại nhãn dataset trước khi lên LLM (chống label leakage);
-                                # bản FULL (kèm nhãn) vẫn nằm ở queue_decisions/queue_hitl
-                                # để đối chiếu hậu kiểm.
-                                _src_ip = evaluated_log.get("Source IP") or evaluated_log.get("src_ip", "UNKNOWN")
-                                ip_buffers[_src_ip].append(_strip_dataset_labels(evaluated_log))
-                                ip_last_updated[_src_ip] = time.time()
-                                
-                                # ── Kiểm tra cục bộ cho riêng IP này ──
-                                if len(ip_buffers[_src_ip]) >= batch_size:
-                                    if agent_q is not None:
-                                        print(
-                                            f"[*] Enqueue lô {len(ip_buffers[_src_ip])} logs (IP: {_src_ip}) -> Tier-2 pool "
-                                            f"(qsize~{agent_q.qsize()})"
-                                        )
-                                        agent_q.put(list(ip_buffers[_src_ip]))
-                                    elif on_batch_ready:
-                                        print(f"[*] Triggering Agent Workflow for batch of {len(ip_buffers[_src_ip])} logs (IP: {_src_ip})...")
-                                        on_batch_ready(ip_buffers[_src_ip])
-                                    else:
-                                        for log in ip_buffers[_src_ip]:
+                                _src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                    "src_ip", "UNKNOWN"
+                                )
+
+                                # CƠ CHẾ SUPPRESSION (ỨC CHẾ SPAM LLM)
+                                _suppressed = False
+                                if _src_ip != "UNKNOWN":
+                                    try:
+                                        _is_pending = bool(r.exists(f"pending_ai:{_src_ip}"))
+                                    except Exception:
+                                        _is_pending = False
+                                    if _is_pending:
+                                        _suppressed = True
+
+                                if _suppressed:
+                                    # Ghi nhận thầm lặng, không đẩy lên queue LLM để tránh spam
+                                    r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                else:
+                                    alert_msg = f"[!] ESCALATE TO AI | Source: {stream_name} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
+                                    print(alert_msg)
+                                    # Loại nhãn dataset trước khi lên LLM (chống label leakage);
+                                    # bản FULL (kèm nhãn) vẫn nằm ở queue_decisions/queue_hitl
+                                    # để đối chiếu hậu kiểm.
+                                    ip_buffers[_src_ip].append(_strip_dataset_labels(evaluated_log))
+                                    ip_last_updated[_src_ip] = time.time()
+
+                                    # ── Kiểm tra cục bộ cho riêng IP này ──
+                                    if len(ip_buffers[_src_ip]) >= batch_size:
+                                        if agent_q is not None:
                                             print(
-                                                f"[ESCALATE] gt_id={log.get('gt_id')} "
-                                                f"ip={log.get('Source IP')} score={log.get('tier1_score')}"
+                                                f"[*] Enqueue lô {len(ip_buffers[_src_ip])} logs (IP: {_src_ip}) -> Tier-2 pool "
+                                                f"(qsize~{agent_q.qsize()})"
                                             )
-                                    del ip_buffers[_src_ip]
-                                    del ip_last_updated[_src_ip]
+                                            agent_q.put(list(ip_buffers[_src_ip]))
+                                            _warn_backlog()
+                                            # CẮM CỜ PENDING_AI KHI BẮT ĐẦU ĐẨY LÊN LLM
+                                            try:
+                                                r.setex(f"pending_ai:{_src_ip}", 60, "1")
+                                            except Exception:
+                                                pass
+                                        elif on_batch_ready:
+                                            print(
+                                                f"[*] Triggering Agent Workflow for batch of {len(ip_buffers[_src_ip])} logs (IP: {_src_ip})..."
+                                            )
+                                            on_batch_ready(ip_buffers[_src_ip])
+                                        else:
+                                            for log in ip_buffers[_src_ip]:
+                                                print(
+                                                    f"[ESCALATE] gt_id={log.get('gt_id')} "
+                                                    f"ip={log.get('Source IP')} score={log.get('tier1_score')}"
+                                                )
+                                        del ip_buffers[_src_ip]
+                                        del ip_last_updated[_src_ip]
 
                             elif action == "AWAIT_HITL":
                                 # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
                                 print(f"[*] routing AWAIT_HITL (Infiltration) -> {ESCALATED_QUEUE}")
                                 r.rpush(ESCALATED_QUEUE, json.dumps(evaluated_log))
+                                # Ghi trực tiếp vào DB để hiển thị trên Dashboard SIEM
+                                src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                    "src_ip", ""
+                                )
+                                if src_ip:
+                                    from src.response.executor import _log_to_db
+
+                                    _wl_reasons = [
+                                        str(x) for x in (evaluated_log.get("tier1_reasons") or [])
+                                    ]
+                                    _wl_summary = (
+                                        " · ".join(_wl_reasons[:2])
+                                        if _wl_reasons
+                                        else "Yêu cầu HITL"
+                                    )
+                                    _log_to_db(
+                                        "AWAIT_HITL",
+                                        src_ip,
+                                        f"Tier-1 chặn sơ bộ và yêu cầu phân tích HITL: {_wl_summary}",
+                                        raw_log=json.dumps(_strip_dataset_labels(evaluated_log)),
+                                    )
 
                             elif action == "BLOCK_IP":
                                 # Đẩy IP vào blacklist của Redis với TTL 1 giờ
@@ -380,6 +454,30 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                             elif action in ("ALERT", "LOG"):
                                 # Chỉ ghi nhận vào ablation log phục vụ thống kê nghiên cứu
                                 r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                if action == "ALERT":
+                                    src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
+                                        "src_ip", ""
+                                    )
+                                    if src_ip:
+                                        from src.response.executor import _log_to_db
+
+                                        _wl_reasons = [
+                                            str(x)
+                                            for x in (evaluated_log.get("tier1_reasons") or [])
+                                        ]
+                                        _wl_summary = (
+                                            " · ".join(_wl_reasons[:2])
+                                            if _wl_reasons
+                                            else "Cảnh báo"
+                                        )
+                                        _log_to_db(
+                                            "ALERT",
+                                            src_ip,
+                                            f"Tier-1 Cảnh báo (ALERT): {_wl_summary}",
+                                            raw_log=json.dumps(
+                                                _strip_dataset_labels(evaluated_log)
+                                            ),
+                                        )
 
                             elif action == "WHITELIST_DROP":
                                 # IP whitelist: CHO QUA (không chặn) nhưng VẪN được Tier-1 phân
@@ -421,17 +519,13 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                             except Exception:
                                 pass
 
-                # Ghi counter THẬT ra file (Dashboard container đọc qua volume config/)
-                _flush_stats()
-                _flush_tier1_blocks()
-
             # Kiem tra xem co can trigger batch do timeout khong
             current_time = time.time()
             stale_ips = []
             for ip, last_time in ip_last_updated.items():
                 if (current_time - last_time) > timeout_sec and len(ip_buffers[ip]) > 0:
                     stale_ips.append(ip)
-            
+
             for ip in stale_ips:
                 if agent_q is not None:
                     print(
@@ -439,8 +533,15 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                         f"(qsize~{agent_q.qsize()})"
                     )
                     agent_q.put(list(ip_buffers[ip]))
+                    _warn_backlog()
+                    try:
+                        r.setex(f"pending_ai:{ip}", 60, "1")
+                    except Exception:
+                        pass
                 elif on_batch_ready:
-                    print(f"[*] Triggering Agent Workflow for batch of {len(ip_buffers[ip])} logs (IP: {ip}, Timeout)...")
+                    print(
+                        f"[*] Triggering Agent Workflow for batch of {len(ip_buffers[ip])} logs (IP: {ip}, Timeout)..."
+                    )
                     on_batch_ready(ip_buffers[ip])
                 else:
                     for log in ip_buffers[ip]:
@@ -450,6 +551,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                         )
                 del ip_buffers[ip]
                 del ip_last_updated[ip]
+
+            # Ghi counter THẬT ra file (Dashboard container đọc qua volume config/)
+            # Được gọi ở ĐÂY để dù không có log mới (idle), Dashboard vẫn thấy Queue giảm dần
+            _flush_stats()
+            _flush_tier1_blocks()
 
         except KeyboardInterrupt:
             print("\n[*] Subscriber offline (Shutdown).")

@@ -157,6 +157,12 @@ class SentinelState:
     cycle_count: int = 0
     """Số batch đã xử lý (tăng dần)."""
 
+    _ml_bypass: bool = False
+    """Cờ hiệu cho biết ML Triage đã bypass RAG/LLM."""
+
+    _ml_bypass_action: str = ""
+    """Action được gán bởi ML Triage khi bypass."""
+
     last_updated: str = ""
     """Timestamp ISO format của lần cập nhật state gần nhất."""
 

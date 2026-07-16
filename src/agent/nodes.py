@@ -4,10 +4,12 @@ LangGraph Nodes for SENTINEL Agent
 
 import logging
 import os
+import pickle
 import time
 from typing import Any
 
 import mlflow  # type: ignore
+import numpy as np
 
 from src.agent.attack_mapper import (
     AttackMapperInput,
@@ -215,7 +217,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         raw_response = llm_client.invoke(messages=messages, temperature=0.1)
     except Exception as e:
         logger.error(
-            f"[LLM UNAVAILABLE] Tier-2 call thất bại ({e}). Suy biến an toàn -> AWAIT_HITL; "
+            f"[LLM UNAVAILABLE] Tier-2 (LLM) call thất bại ({e}). Suy biến an toàn -> AWAIT_HITL; "
             f"Tier-1 vẫn bảo vệ độc lập."
         )
         raw_response = ""
@@ -663,9 +665,177 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     return {}
 
 
+# === CỔNG ML CỦA TIER-2 (EARLY-EXIT TRƯỚC LLM) ===
+# Thuật ngữ thống nhất với luận văn "Two-Tier": Tier-2 = Cổng ML + Tác tử LLM — ML là
+# hàng rào rẻ đứng trước, hấp thụ các ca rõ ràng; LLM chỉ nhận ca khó. KHÔNG gọi là
+# "Tier 1.5"/"Tier 3" để không phá danh xưng hai tầng.
+ML_PIPELINE = None
+
+
+def _get_ml_pipeline():
+    global ML_PIPELINE
+    if ML_PIPELINE is None:
+        try:
+            model_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "ml_lab",
+                "tier_2_model.pkl",
+            )
+            with open(model_path, "rb") as f:
+                ML_PIPELINE = pickle.load(f)
+        except Exception as e:
+            logger.error(f"[TIER-2 ML GATE] Lỗi load mô hình: {e}")
+            ML_PIPELINE = {}
+    return ML_PIPELINE
+
+
+def node_ml_triage(state: SentinelState) -> dict:
+    """
+    Cổng ML của Tier-2 (DecisionTreeClassifier + StandardScaler, xem ml_lab/):
+    Đánh giá nhanh feature số học. Nếu độ tin cậy > 95%, bỏ qua LLM (Early Exit).
+    Nếu không đủ đặc trưng (WAF payload) hoặc độ tin cậy thấp, trả về dict rỗng để đi tiếp vào LLM.
+    """
+    logger.info("--- NODE: TIER-2 ML GATE ---")
+
+    # 1. Phát hiện vòng lặp vô hạn
+    visit_res = loop_detector.record_visit("node_ml_triage")
+    if visit_res["action"] == "FORCE_STOP":
+        raise RuntimeError(visit_res["reason"])
+
+    if not state.current_batch_logs:
+        return {"_ml_bypass": False}
+
+    pipeline = _get_ml_pipeline()
+    if not pipeline or "model" not in pipeline:
+        return {"_ml_bypass": False}
+
+    features = pipeline.get("features", [])
+    model = pipeline["model"]
+    scaler = pipeline["scaler"]
+
+    log = state.current_batch_logs[0]
+
+    # Check if we have numeric features (CICIDS data). If this is a pure WAF log without flow metrics, it won't have these.
+    # We require at least some flow features to be present to avoid predicting randomly on zero-imputed DAPT/WAF logs.
+    required = ["Flow Duration", "Total Fwd Packets", "Flow Pkts/s"]
+    has_features = sum(1 for req in required if req in log and log[req] not in ["", None, 0])
+    if has_features == 0 and "Source IP" in log:
+        # Likely a payload-based log (DAPT/WAF), skip ML Tier 2
+        logger.info(
+            "[TIER-2 ML GATE] Bỏ qua vì thiếu đặc trưng luồng (Flow Metrics). Chuyển cho LLM."
+        )
+        return {"_ml_bypass": False}
+
+    X = []
+    for f_name in features:
+        val = log.get(f_name, 0)
+        try:
+            X.append(float(val) if val != "" and val is not None else 0.0)
+        except Exception:
+            X.append(0.0)
+
+    try:
+        X_arr = np.array([X])
+        X_scaled = scaler.transform(X_arr)
+        proba = model.predict_proba(X_scaled)[0]
+    except Exception as e:
+        logger.error(f"[TIER-2 ML GATE] Lỗi dự đoán: {e}")
+        return {"_ml_bypass": False}
+
+    confidence_benign = proba[0]
+    confidence_attack = proba[1]
+
+    CONF_THRESHOLD = 0.95
+    action = None
+    reasoning = None
+    confidence = 0.0
+
+    # Chuỗi "Cổng ML Tier-2" là MARKER để UI phân loại nguồn phán quyết — đổi chữ này
+    # thì phải đổi cả detect ở src/ui/app.py + components.py (đang match "Cổng ML").
+    if confidence_attack >= CONF_THRESHOLD:
+        action = "BLOCK_IP"
+        reasoning = f"Phát hiện tấn công bởi Cổng ML Tier-2 (Decision Tree). Độ tin cậy: {confidence_attack:.2%}"
+        confidence = float(confidence_attack)
+    elif confidence_benign >= CONF_THRESHOLD:
+        action = "LOG"
+        reasoning = f"Xác nhận an toàn bởi Cổng ML Tier-2 (Decision Tree). Độ tin cậy: {confidence_benign:.2%}"
+        confidence = float(confidence_benign)
+    else:
+        logger.info(
+            f"[TIER-2 ML GATE] Độ tin cậy thấp (Attack: {confidence_attack:.2%}, Benign: {confidence_benign:.2%}). Chuyển cho LLM."
+        )
+        return {"_ml_bypass": False}
+
+    target = log.get("Source IP") or log.get("src_ip", "UNKNOWN_TARGET")
+
+    decision_entry = {
+        "action": action,
+        "confidence": confidence,
+        "reasoning": reasoning,
+        "target": target,
+        "mitre_technique": "N/A",  # ML không định tuyến được Mitre, attack_mapper sẽ bổ sung nếu là Attack
+        "nist_control": "N/A",
+        "cycle_count": state.cycle_count + 1,
+        # Marker MÁY-ĐỌC cho biết phán quyết do Cổng ML (không phải LLM) — run_ablation
+        # đếm ML_Bypass_Rate bằng field này thay vì grep chuỗi văn xuôi (dễ gãy khi đổi lời).
+        "ml_model": "DecisionTree",
+    }
+
+    # Audit trail cho hành động của ML (Bypass LLM)
+    try:
+        import mlflow
+
+        if mlflow.active_run():
+            mlflow.log_metric("ML_Triage_Bypass", 1)
+            mlflow.log_metric("ML_Triage_Confidence", confidence)
+    except Exception:
+        pass
+
+    audit_event = {
+        "event_type": "ML_TRIAGE_DECISION",
+        "source_ip": target,
+        "agent_decision": action,
+        "agent_reasoning": reasoning,
+        "latency_ms": 1,  # Extremely fast
+        "metadata": {
+            # SỰ THẬT model: ml_lab/tier_2_model.pkl là DecisionTreeClassifier (+ scaler)
+            # — KHÔNG phải XGBoost (train_and_compare so sánh 5 thuật toán, cây thắng).
+            "ml_model": "DecisionTree",
+            "confidence_attack": float(confidence_attack),
+            "confidence_benign": float(confidence_benign),
+        },
+    }
+    audit_logger.log_event(audit_event)
+
+    logger.info(f"[TIER-2 ML GATE] EARLY EXIT KÍCH HOẠT: {action} (Confidence: {confidence:.2%})")
+
+    return {
+        "decisions": [decision_entry],
+        "narrative_summary": f"Cổng ML Tier-2 (Decision Tree) determined: {action} with {confidence:.2%} confidence",
+        "cycle_count": state.cycle_count + 1,
+        "_ml_bypass": True,  # Cờ hiệu để định tuyến bỏ qua RAG/LLM
+        "_ml_bypass_action": action,
+    }
+
+
 # ==============================================================================
 # CONDITIONAL EDGES (ROUTING)
 # ==============================================================================
+
+
+def route_after_ml_triage(state: SentinelState) -> str:
+    """
+    Định tuyến từ ML Triage (Tier 2).
+    Nếu ML đủ tự tin (có cờ bypass), đi thẳng đến Action hoặc Mapper.
+    Ngược lại, rơi xuống RAG Context -> LLM Triage.
+    """
+    bypass = getattr(state, "_ml_bypass", False)
+    if bypass:
+        bypass_action = getattr(state, "_ml_bypass_action", "LOG")
+        if bypass_action in _MAPPABLE_ACTIONS:
+            return "map"
+        return "end_cycle"
+    return "rag_context"
 
 
 def route_triage_decision(state: SentinelState) -> str:

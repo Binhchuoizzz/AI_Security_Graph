@@ -102,6 +102,9 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
             'background:rgba(82,196,26,0.06);">'
             '<div class="soc-card-header">'
             '<h4 class="soc-card-title">✅ [WHITELIST] Truy cập được CHO QUA (không chặn)</h4>'
+            '<span class="soc-badge" style="background:rgba(82,196,26,0.2);color:#95de64;'
+            "border:1px solid rgba(82,196,26,0.4);font-size:0.75rem;padding:2px 8px;"
+            'border-radius:4px;margin-left:8px;">🟢 Tier-1 Filter</span>'
             f'<span class="soc-timestamp">{formatted_time}</span>'
             "</div>"
             '<div class="soc-detail-row">'
@@ -141,7 +144,9 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
 
     # Lấy toàn bộ nội dung trong [MITRE: ...] bằng cách split hoặc regex không tham lam
     # Vì mitre_technique có thể chứa [Tự suy luận] (ngoặc vuông lồng nhau), regex sẽ hơi khác
-    mitre_match = re.search(r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", raw_reason, re.IGNORECASE)
+    mitre_match = re.search(
+        r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", raw_reason, re.IGNORECASE
+    )
     if mitre_match:
         mitre_tech = mitre_match.group(1).strip()
         # Đảm bảo xoá ngoặc vuông thừa ở cuối nếu regex chưa bắt hết
@@ -191,7 +196,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         "BLOCK_IP": "CHẶN IP (BLOCK)",
         "QUARANTINE": "CÁCH LY (QUARANTINE)",
         "ALERT": "CẢNH BÁO (ALERT)",
-        "AWAIT_HITL": "CHỜ PHÊ DUYỆT (HITL)",
+        "AWAIT_HITL": "ĐỀ XUẤT CHẶN (AWAIT_HITL)",
         "LOG": "GHI LOG (LOG)",
     }
     action_display = action_translations.get(action, action)
@@ -200,22 +205,56 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
     is_self_inferred = "Tự suy luận" in raw_reason
     inference_badge = ""
     if is_self_inferred:
-        inference_badge = f'<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 AI Tự Suy Đoán</span>'
+        inference_badge = '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 Tự Suy Đoán</span>'
 
     # Làm sạch chuỗi lý do phân tích (loại bỏ các thẻ tag [MITRE...] để hiển thị text sạch)
     clean_reason = html_lib.escape(raw_reason)
-    clean_reason = re.sub(r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", "", clean_reason, flags=re.IGNORECASE)
-    clean_reason = re.sub(r"\[MITRE:.*?\]", "", clean_reason, flags=re.IGNORECASE) # fallback
+    clean_reason = re.sub(
+        r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", "", clean_reason, flags=re.IGNORECASE
+    )
+    clean_reason = re.sub(r"\[MITRE:.*?\]", "", clean_reason, flags=re.IGNORECASE)  # fallback
     clean_reason = re.sub(r"\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]", "", clean_reason).strip()
 
     # Xoá ngoặc vuông đóng lẻ tẻ do regex không tham lam để lại
     if clean_reason.startswith("]"):
         clean_reason = clean_reason[1:].strip()
 
-    # Tạo tiêu đề MITRE kỹ thuật
-    mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
-    if mitre_tech == "N/A":
-        mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận)"
+    # Phân nguồn phán quyết: Tier-1 (rule) / Tier-2 Cổng ML / Tier-2 LLM.
+    # LƯU Ý detect theo MARKER đặc thù, KHÔNG dùng chữ "Tier-2"/"ML" trần — vì chuỗi
+    # Tier-2 giờ xuất hiện ở cả nhánh LLM. Giữ "ML Tier 2" để nhận bản ghi CŨ trong DB.
+    is_tier1 = "Tier-1" in raw_reason or "whitelist" in raw_reason.lower()
+    is_ml_gate = (
+        "Cổng ML" in raw_reason or "ML Tier 2" in raw_reason or "Decision Tree" in raw_reason
+    )
+
+    if is_tier1:
+        tier_badge = (
+            '<span class="soc-badge" style="background:rgba(82, 196, 26, 0.2);color:#95de64;'
+            "border:1px solid rgba(82, 196, 26, 0.4);font-size:0.75rem;padding:2px 8px;"
+            'border-radius:4px;margin-left:8px;">🟢 Tier-1 Filter</span>'
+        )
+        reasoning_title = "⚡ Lập luận tĩnh (Tier-1 Rule/Filter):"
+        mitre_section_text = "🎯 Ánh xạ: Phân tích ban đầu từ Log thô"
+    elif is_ml_gate:
+        tier_badge = (
+            '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.2);color:#faad14;'
+            "border:1px solid rgba(250, 173, 20, 0.4);font-size:0.75rem;padding:2px 8px;"
+            'border-radius:4px;margin-left:8px;">⚡ Tier-2 · Cổng ML</span>'
+        )
+        reasoning_title = "⚡ Lập luận của Cổng ML Tier-2 (Decision Tree):"
+        mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
+        if mitre_tech == "N/A":
+            mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận tự động)"
+    else:
+        tier_badge = (
+            '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#69c0ff;'
+            "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
+            'border-radius:4px;margin-left:8px;">🧠 Tier-2 · LLM Agent</span>'
+        )
+        reasoning_title = "🤖 Lập luận của Tác tử LLM (Agentic Reasoning):"
+        mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
+        if mitre_tech == "N/A":
+            mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận)"
 
     # Thiết lập playbook ứng phó NIST
     nist_playbook_text = (
@@ -233,6 +272,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         f'<div class="soc-card {css_class}">'
         f'    <div class="soc-card-header">'
         f'        <h4 class="soc-card-title">{icon} [{severity_level}] {action_display}</h4>'
+        f"        {tier_badge}"
         f'        <span class="soc-timestamp">{formatted_time}</span>'
         f"    </div>"
         f'    <div class="soc-detail-row">'
@@ -242,11 +282,11 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         f'    <div class="soc-detail-row">'
         f'        <span class="soc-label">Ngữ cảnh:</span>'
         f'        <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>'
-        f'        <span class="soc-badge soc-conf-badge">Độ tin cậy AI: {confidence}</span>'
-        f'        {inference_badge}'
+        f'        <span class="soc-badge soc-conf-badge">Độ tin cậy: {confidence}</span>'
+        f"        {inference_badge}"
         f"    </div>"
         f'    <div class="soc-reasoning-box">'
-        f'        <div class="soc-reasoning-title">🤖 Lập luận của Tác tử AI (Agentic Reasoning):</div>'
+        f'        <div class="soc-reasoning-title">{reasoning_title}</div>'
         f'        <div style="margin-bottom: 8px;">{clean_reason}</div>'
         f'        <div class="soc-reasoning-section" style="color: #D3ADF7;">{mitre_section_text}</div>'
         f'        <div style="color: #98FB98; margin-top: 4px; font-size: 0.85rem; font-weight: 500;">{nist_playbook_text}</div>'
@@ -309,7 +349,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
 
     # LOG THÔ ĐẦU VÀO (đặc trưng luồng đã loại nhãn) — chính là dữ liệu đã đưa vào
     # Tier-1/LLM, KHÔNG phải bản ghi quyết định. Minh bạch "cái gì đã vào hệ thống".
-    
+
     # Tạo tiêu đề động cho Expander chứa Log thô
     mitre_display_title = mitre_tech if mitre_tech != "N/A" else "Không xác định"
     expander_title = f"🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng cho {mitre_display_title})"
@@ -345,7 +385,13 @@ def render_ioc_table(iocs):
 
 
 def render_metrics_header(
-    total_alerts, pending_rules, active_rules, total_raw_logs=0, live_fpr=0.0, noise_reduction=None
+    total_alerts,
+    pending_rules,
+    active_rules,
+    total_raw_logs=0,
+    live_fpr=0.0,
+    noise_reduction=None,
+    pending_llm_count=0,
 ):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
 
@@ -354,8 +400,8 @@ def render_metrics_header(
     ĐỌC CHO ĐÚNG: đây là mức giảm tải mà ANALYST cảm nhận, KHÔNG phải tỉ lệ lọc của
     Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Tier-2 GỘP
     nhiều log escalate thành 1 phán quyết. Ví dụ đo thật 2026-07-15 trên luồng gộp:
-    4796 thô -> Tier-1 escalate 2034 (tức Tier-1 chỉ lọc 57.6%) -> gộp thành 218 cảnh
-    báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier-1 thì lấy từ
+    4796 thô -> Tier 1 escalate 2034 (tức Tier 1 chỉ lọc 57.6%) -> gộp thành 218 cảnh
+    báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier 1 thì lấy từ
     config/pipeline_stats.json (raw_logs_total vs số escalate), ĐỪNG suy từ số này.
     """
     if noise_reduction is None:
@@ -378,7 +424,11 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #ff4d4f;">{total_alerts}</div>'
-        f'    <div class="kpi-label">Cảnh báo gửi Analyst</div>'
+        f'    <div class="kpi-label">Tổng Cảnh báo (T1+T2+T3)</div>'
+        f"  </div>"
+        f'  <div class="kpi-card">'
+        f'    <div class="kpi-val" style="color: #d4b106;">{pending_llm_count}</div>'
+        f'    <div class="kpi-label">Đang chờ LLM ⏳</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #52c41a;">{noise_reduction:.1f}%</div>'
@@ -386,7 +436,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'
-        f'    <div class="kpi-label">Luật chờ duyệt (HITL)</div>'
+        f'    <div class="kpi-label">Phê duyệt (Tier-2 HITL)</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #13c2c2;">{active_rules}</div>'

@@ -241,6 +241,8 @@ def run_af(limit=None, out=None):
         rule_engine = _fresh_engine()
         _synthetic_warmup(rule_engine)
 
+        ml_bypassed_count = 0
+
         for idx, sample in enumerate(dataset):
             is_attack = 1 if sample["expected_action"] in ["BLOCK_IP", "ALERT", "AWAIT_HITL"] else 0
             logs = sample.get("logs", [])
@@ -297,6 +299,11 @@ def run_af(limit=None, out=None):
                     reasoning_output["decisions"] = decisions
                     if decisions:
                         action = decisions[-1].get("action", "UNKNOWN")
+                        # Đếm bằng field máy-đọc `ml_model` do node_ml_triage gắn — bản cũ
+                        # grep "XGBoost" trong reasoning LUÔN ra 0 vì reasoning thật ghi
+                        # "Decision Tree" (model thật là DecisionTreeClassifier).
+                        if decisions[-1].get("ml_model"):
+                            ml_bypassed_count += 1
                         results["Config_F"]["actions"].append(action)
                         if action in ["BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"]:
                             pred_f = 1
@@ -348,6 +355,8 @@ def run_af(limit=None, out=None):
         )
         cache_hit_rate = cache_stats.get("hit_rate", 0.0)
 
+        ml_bypass_rate = (ml_bypassed_count / total_f) * 100 if total_f > 0 else 0.0
+
         mlflow.log_metric("Config_A_F1", f1_a)
         mlflow.log_metric("Config_A_Precision", prec_a)
         mlflow.log_metric("Config_A_Recall", rec_a)
@@ -360,6 +369,7 @@ def run_af(limit=None, out=None):
         mlflow.log_metric("MTTR_Proxy_Tier2_sec", float(np.mean(results["Config_F"]["latencies"])))
         mlflow.log_metric("HITL_Escalation_Rate_pct", hitl_ratio)
         mlflow.log_metric("RAG_Cache_Hit_Rate_pct", cache_hit_rate)
+        mlflow.log_metric("ML_Bypass_Rate_pct", ml_bypass_rate)
 
         print(
             f"\n[+] Config A: F1={f1_a:.4f} | Prec={prec_a:.4f} | Rec={rec_a:.4f} | "
@@ -370,7 +380,7 @@ def run_af(limit=None, out=None):
             f"FPR={fpr_f:.4f} | MTTR_Proxy={np.mean(results['Config_F']['latencies']):.3f}s"
         )
         print(
-            f"[+] Operational: RAG Cache Hit Rate = {cache_hit_rate:.1f}% | HITL Ratio = {hitl_ratio:.1f}%"
+            f"[+] Operational: RAG Cache Hit Rate = {cache_hit_rate:.1f}% | HITL Ratio = {hitl_ratio:.1f}% | ML Bypass Rate = {ml_bypass_rate:.1f}%"
         )
         print(
             "[!] DISCLAIMER: Processing Latency is used as a proxy for MTTD/MTTR under offline "
