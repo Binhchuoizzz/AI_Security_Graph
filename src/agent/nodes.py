@@ -279,6 +279,9 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         "mitre_technique": validated_decision.get("mitre_technique", ""),
         "nist_control": validated_decision.get("nist_control", ""),
         "cycle_count": state.cycle_count + 1,
+        # Cờ tình trạng parse LLM (parse_failed/parse_salvaged) — để attack_mapper KHÔNG
+        # dập một technique "tự tin" lên một triage rỗng/hỏng (tránh MITRE gây hiểu lầm).
+        "error": validated_decision.get("error", ""),
     }
 
     new_narrative = f"Last Incident: {action} based on RAG - {validated_decision.get('mitre_technique', 'None')}. Reasoning: {reasoning}"
@@ -379,6 +382,29 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         return {}
 
     decision = dict(state.decisions[-1])  # copy để bồi đắp, giữ action/target/confidence
+
+    # GATE: nếu triage KHÔNG đọc được (parse_failed) thì KHÔNG dập một MITRE "tự tin" lên một
+    # triage rỗng — sẽ gây hiểu lầm (vd T1548.003 "Sudo Caching" trên một flow mạng). Để
+    # technique NEUTRAL, giữ reasoning trung thực; con người xác minh (đã AWAIT_HITL).
+    if decision.get("error") == "parse_failed":
+        logger.warning(
+            "[ATT&CK MAPPER] Bỏ qua ánh xạ vì triage parse_failed — tránh MITRE gây hiểu lầm."
+        )
+        decision.update(
+            {
+                "mitre_technique": "N/A — chưa phân loại (LLM parse lỗi)",
+                "mitre_technique_id": "",
+                "mitre_tactic": "",
+                "mitre_tactic_id": "",
+                "mitre_subtechnique": "",
+                "mitre_subtechnique_id": "",
+                "mitre_url": "",
+                "mapping_confidence": 0.0,
+                "mapping_status": "unmapped_parse_failed",
+                "recommended_response": "Chờ người xác minh (AWAIT_HITL).",
+            }
+        )
+        return {"decisions": [decision]}
 
     # Kỹ thuật LLM tự suy (GIỮ LẠI trước khi mapper chuẩn hoá). Nếu triage đã nêu 1
     # technique CỤ THỂ (Txxxx / AML.Txxxx) thì ƯU TIÊN giữ nó cho badge — để badge KHỚP

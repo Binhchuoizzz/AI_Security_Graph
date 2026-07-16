@@ -176,14 +176,57 @@ class LLMClient:
                 except json.JSONDecodeError:
                     pass
 
-            # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash
+            # Cứu vãn từng TRƯỜNG từ JSON bị CẮT CỤT (thường do max_tokens) hoặc lệch định
+            # dạng — thay vì mất trắng cả reasoning (đây là nguyên nhân #1 của thẻ hiển thị
+            # "No reasoning provided / tin cậy 0%").
+            salvaged = self._salvage_fields(clean)
+            if salvaged.get("action") or salvaged.get("reasoning"):
+                salvaged.setdefault("action", "AWAIT_HITL")
+                salvaged.setdefault("confidence", 0.0)
+                salvaged["error"] = "parse_salvaged"
+                logger.warning("JSON parse failed nhưng đã vớt được trường qua regex.")
+                return salvaged
+
+            # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash. GẮN reasoning
+            # TRUNG THỰC để analyst hiểu (không để trống thành "No reasoning provided").
             logger.error("All JSON parse attempts failed. Using safe default.")
             return {
                 "action": "AWAIT_HITL",
                 "confidence": 0.0,
+                "reasoning": (
+                    "⚠️ Không đọc được phản hồi LLM (JSON parse lỗi — thường do output bị cắt "
+                    "cụt theo max_tokens hoặc sai định dạng). Tự động leo thang AWAIT_HITL để "
+                    "người xác minh; Tier-1 (xác định) vẫn bảo vệ độc lập."
+                ),
                 "error": "parse_failed",
                 "raw": raw[:200],
             }
+
+    def _salvage_fields(self, text: str) -> dict:
+        """Vớt action/confidence/reasoning/mitre_technique từ output LLM hỏng hoặc bị cắt cụt
+        bằng regex từng trường — để không mất reasoning khi JSON không parse trọn vẹn."""
+        out: dict = {}
+        m = re.search(r'"action"\s*:\s*"([^"]+)"', text)
+        if m:
+            out["action"] = m.group(1).strip().upper()
+        m = re.search(r'"confidence"\s*:\s*([0-9]*\.?[0-9]+)', text)
+        if m:
+            try:
+                out["confidence"] = float(m.group(1))
+            except ValueError:
+                pass
+        m = re.search(r'"mitre_technique"\s*:\s*"([^"]+)"', text)
+        if m:
+            out["mitre_technique"] = m.group(1).strip()
+        # reasoning: ưu tiên chuỗi có dấu đóng; nếu bị cắt cụt (không có "), vớt phần còn lại.
+        m = re.search(r'"reasoning"\s*:\s*"(.+?)"(?:\s*[,}]|$)', text, re.DOTALL)
+        if m:
+            out["reasoning"] = m.group(1).strip()
+        else:
+            m = re.search(r'"reasoning"\s*:\s*"(.+)$', text, re.DOTALL)
+            if m:
+                out["reasoning"] = m.group(1).strip().rstrip('"') + " …(bị cắt cụt)"
+        return out
 
     def check_health(self) -> bool:
         """Ping API để kiểm tra model đã load xong chưa."""
