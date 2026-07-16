@@ -76,6 +76,7 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 - 🎯 **Bản chất:** dựng prompt → gọi LLM → **KHÔNG tin ngay**: kiểm chứng bằng validator + lá chắn đồng thuận, rồi mới ghi. LLM chết → suy biến an toàn về `AWAIT_HITL`.
 - 📂 [nodes.py:132 `node_llm_triage`](../../../src/agent/nodes.py#L132). Kèm: [prompts.py:124 `build_triage_prompt`](../../../src/agent/prompts.py#L124) · [llm_client.py:65 `invoke`](../../../src/agent/llm_client.py#L65) · [decision_validator.py:148 `enforce_tier_consensus`](../../../src/guardrails/decision_validator.py#L148).
 - ⚙️ **Gemma-2-9B-IT Q6_K** qua **llama.cpp** (OpenAI API), temp 0.1 + **seed 42** → tất định.
+- 🔑 **Prompt Engineering nâng cao:** LLM bị ép phân tích chuỗi tấn công (Attack Chain) theo trình tự thời gian và đếm số lượng hành vi. Nó bắt buộc viết lý do bằng **ngôn ngữ tự nhiên (storytelling)** của chuyên gia SOC. Nếu gặp Zero-day không có trong RAG, nó được phép **Tự suy luận** kỹ thuật gần nhất, gắn nhãn `[Tự suy luận]`, và cấm ảo tưởng (hallucinate) các bước không có thật.
 - 🔑 **`enforce_tier_consensus`** = tinh túy bảo mật: Tier-1 nói tấn công mà LLM hạ xuống LOG/DROP → hệ KHÔNG tin LLM, ép `AWAIT_HITL`.
 - ➡️ Threat verdict → `node_attack_mapper`; benign → kết thúc.
 
@@ -113,10 +114,10 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 
 ### ⑪ Vòng phản hồi + Dashboard — `feedback_listener.py` + `ui/app.py`
 
-- 🎯 **Bản chất:** Tier-2 sinh luật → **người duyệt** → Tier-1 nạp nóng → lần sau chặn ở tốc độ cao (hệ "học"). Con người là chốt chặn cuối.
-- 📂 [feedback_listener.py:97 `receive_new_rule`](../../../src/tier1_filter/feedback_listener.py#L97) → [feedback_listener.py:237 `approve_rule`](../../../src/tier1_filter/feedback_listener.py#L237); UI ở [ui/app.py](../../../src/ui/app.py).
-- ⚙️ Ghi `system_settings.yaml` atomic + FileLock; **Tier-1 hot-reload theo mtime mỗi 5s**; Dashboard **Streamlit** + auth PBKDF2/RBAC.
-- 👀 Đăng nhập `manager` → **Approve** 1 rule → thấy nó thành ACTIVE.
+- 🎯 **Bản chất:** Tier-2 sinh luật → **người duyệt** → Tier-1 nạp nóng → lần sau chặn ở tốc độ cao (hệ "học"). Con người là chốt chặn cuối. Giao diện (UI) hiển thị tường minh mọi suy luận của Agent.
+- 📂 [feedback_listener.py:97 `receive_new_rule`](../../../src/tier1_filter/feedback_listener.py#L97) → [feedback_listener.py:237 `approve_rule`](../../../src/tier1_filter/feedback_listener.py#L237); UI ở [ui/app.py](../../../src/ui/app.py) và [components.py](../../../src/ui/components.py) (nơi bóc tách nhãn MITRE tự suy luận).
+- ⚙️ Ghi `system_settings.yaml` atomic + FileLock; **Tier-1 hot-reload theo mtime mỗi 5s**; Dashboard **Streamlit** tự động render thẻ badge **🤖 AI Tự Suy Đoán** nếu phát hiện log không khớp RAG.
+- 👀 Đăng nhập `manager` → **Approve** 1 rule → thấy nó thành ACTIVE. Xem log cảnh báo để thấy đoạn lập luận ngôn ngữ tự nhiên.
 - ➡️ Quay lại ③ (Tier-1) — **vòng khép kín**.
 
 ---
