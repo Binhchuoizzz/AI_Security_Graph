@@ -139,9 +139,14 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
     mitre_tech = "N/A"
     confidence = "Chưa rõ"
 
-    mitre_match = re.search(r"MITRE:\s*([^\s\]]+)", raw_reason, re.IGNORECASE)
+    # Lấy toàn bộ nội dung trong [MITRE: ...] bằng cách split hoặc regex không tham lam
+    # Vì mitre_technique có thể chứa [Tự suy luận] (ngoặc vuông lồng nhau), regex sẽ hơi khác
+    mitre_match = re.search(r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", raw_reason, re.IGNORECASE)
     if mitre_match:
         mitre_tech = mitre_match.group(1).strip()
+        # Đảm bảo xoá ngoặc vuông thừa ở cuối nếu regex chưa bắt hết
+        if mitre_tech.endswith("]"):
+            mitre_tech = mitre_tech[:-1].strip()
     elif t_match := re.search(r"(T\d{4}(?:\.\d{3})?)", raw_reason):
         mitre_tech = t_match.group(1)
 
@@ -191,10 +196,21 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
     }
     action_display = action_translations.get(action, action)
 
+    # Kiểm tra xem AI có tự suy luận không
+    is_self_inferred = "Tự suy luận" in raw_reason
+    inference_badge = ""
+    if is_self_inferred:
+        inference_badge = f'<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 AI Tự Suy Đoán</span>'
+
     # Làm sạch chuỗi lý do phân tích (loại bỏ các thẻ tag [MITRE...] để hiển thị text sạch)
     clean_reason = html_lib.escape(raw_reason)
-    clean_reason = re.sub(r"\[MITRE:\s*[^\]]*\]", "", clean_reason)
+    clean_reason = re.sub(r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", "", clean_reason, flags=re.IGNORECASE)
+    clean_reason = re.sub(r"\[MITRE:.*?\]", "", clean_reason, flags=re.IGNORECASE) # fallback
     clean_reason = re.sub(r"\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]", "", clean_reason).strip()
+
+    # Xoá ngoặc vuông đóng lẻ tẻ do regex không tham lam để lại
+    if clean_reason.startswith("]"):
+        clean_reason = clean_reason[1:].strip()
 
     # Tạo tiêu đề MITRE kỹ thuật
     mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
@@ -227,6 +243,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         f'        <span class="soc-label">Ngữ cảnh:</span>'
         f'        <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>'
         f'        <span class="soc-badge soc-conf-badge">Độ tin cậy AI: {confidence}</span>'
+        f'        {inference_badge}'
         f"    </div>"
         f'    <div class="soc-reasoning-box">'
         f'        <div class="soc-reasoning-title">🤖 Lập luận của Tác tử AI (Agentic Reasoning):</div>'
