@@ -146,9 +146,10 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
     memory = ThreatMemoryStore()
     apt_fired: set[str] = set()  # IP đã bật cảnh báo APT (tránh leo thang lặp)
 
-    # Bộ đệm gom sự cố (Incident-Level Aggregation Buffers)
-    batch_buffer = []
-    last_batch_time = time.time()
+    # Bộ đệm gom sự cố (Incident-Level Aggregation Buffers - Entity-based)
+    import collections
+    ip_buffers = collections.defaultdict(list)
+    ip_last_updated = {}
 
     # Chuẩn bị luồng đọc (dùng dict[Any, Any] để tránh lỗi ép kiểu static analysis của redis-py)
     streams_dict: dict[Any, Any] = {str(q): ">" for q in QUEUES}
@@ -322,7 +323,29 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                 # Loại nhãn dataset trước khi lên LLM (chống label leakage);
                                 # bản FULL (kèm nhãn) vẫn nằm ở queue_decisions/queue_hitl
                                 # để đối chiếu hậu kiểm.
-                                batch_buffer.append(_strip_dataset_labels(evaluated_log))
+                                _src_ip = evaluated_log.get("Source IP") or evaluated_log.get("src_ip", "UNKNOWN")
+                                ip_buffers[_src_ip].append(_strip_dataset_labels(evaluated_log))
+                                ip_last_updated[_src_ip] = time.time()
+                                
+                                # ── Kiểm tra cục bộ cho riêng IP này ──
+                                if len(ip_buffers[_src_ip]) >= batch_size:
+                                    if agent_q is not None:
+                                        print(
+                                            f"[*] Enqueue lô {len(ip_buffers[_src_ip])} logs (IP: {_src_ip}) -> Tier-2 pool "
+                                            f"(qsize~{agent_q.qsize()})"
+                                        )
+                                        agent_q.put(list(ip_buffers[_src_ip]))
+                                    elif on_batch_ready:
+                                        print(f"[*] Triggering Agent Workflow for batch of {len(ip_buffers[_src_ip])} logs (IP: {_src_ip})...")
+                                        on_batch_ready(ip_buffers[_src_ip])
+                                    else:
+                                        for log in ip_buffers[_src_ip]:
+                                            print(
+                                                f"[ESCALATE] gt_id={log.get('gt_id')} "
+                                                f"ip={log.get('Source IP')} score={log.get('tier1_score')}"
+                                            )
+                                    del ip_buffers[_src_ip]
+                                    del ip_last_updated[_src_ip]
 
                             elif action == "AWAIT_HITL":
                                 # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
@@ -402,35 +425,31 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                 _flush_stats()
                 _flush_tier1_blocks()
 
-            # Kiểm tra xem có cần trigger batch không
+            # Kiem tra xem co can trigger batch do timeout khong
             current_time = time.time()
-            if batch_buffer and (
-                len(batch_buffer) >= batch_size or (current_time - last_batch_time) > timeout_sec
-            ):
+            stale_ips = []
+            for ip, last_time in ip_last_updated.items():
+                if (current_time - last_time) > timeout_sec and len(ip_buffers[ip]) > 0:
+                    stale_ips.append(ip)
+            
+            for ip in stale_ips:
                 if agent_q is not None:
-                    # ĐẨY sang worker nền — KHÔNG chặn vòng đọc (Dashboard cập nhật tức thì).
-                    # Bounded queue: nếu LLM tụt hậu quá xa, put() chờ (backpressure) — an toàn,
-                    # KHÔNG OOM, KHÔNG mất sự kiện escalate.
                     print(
-                        f"[*] Enqueue lô {len(batch_buffer)} logs -> Tier-2 pool "
+                        f"[*] Enqueue lô {len(ip_buffers[ip])} logs (IP: {ip}, Timeout) -> Tier-2 pool "
                         f"(qsize~{agent_q.qsize()})"
                     )
-                    agent_q.put(list(batch_buffer))
+                    agent_q.put(list(ip_buffers[ip]))
                 elif on_batch_ready:
-                    # Đường ĐỒNG BỘ (agent_workers=0) — hành vi cũ, giữ để tương thích.
-                    print(f"[*] Triggering Agent Workflow for batch of {len(batch_buffer)} logs...")
-                    on_batch_ready(batch_buffer)
+                    print(f"[*] Triggering Agent Workflow for batch of {len(ip_buffers[ip])} logs (IP: {ip}, Timeout)...")
+                    on_batch_ready(ip_buffers[ip])
                 else:
-                    # Chế độ độc lập (standalone mode) — ghi log ra màn hình (console)
-                    for log in batch_buffer:
+                    for log in ip_buffers[ip]:
                         print(
                             f"[ESCALATE] gt_id={log.get('gt_id')} "
                             f"ip={log.get('Source IP')} score={log.get('tier1_score')}"
                         )
-                batch_buffer = []
-                last_batch_time = current_time
-            elif not batch_buffer:
-                last_batch_time = current_time  # Đặt lại timer khi nhàn rỗi (tránh timing bug)
+                del ip_buffers[ip]
+                del ip_last_updated[ip]
 
         except KeyboardInterrupt:
             print("\n[*] Subscriber offline (Shutdown).")
