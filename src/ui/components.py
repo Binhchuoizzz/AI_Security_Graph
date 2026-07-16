@@ -309,12 +309,16 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
 
     # LOG THÔ ĐẦU VÀO (đặc trưng luồng đã loại nhãn) — chính là dữ liệu đã đưa vào
     # Tier-1/LLM, KHÔNG phải bản ghi quyết định. Minh bạch "cái gì đã vào hệ thống".
-    with st.expander("🔍 Xem LOG THÔ đầu vào (Raw Flow đã đưa vào Tier-1/LLM)", expanded=False):
+    
+    # Tạo tiêu đề động cho Expander chứa Log thô
+    mitre_display_title = mitre_tech if mitre_tech != "N/A" else "Không xác định"
+    expander_title = f"🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng cho {mitre_display_title})"
+
+    with st.expander(expander_title, expanded=False):
         st.caption(
-            "ℹ️ Đây là **log thô đầu vào** — **đặc trưng luồng mạng** (IP, cổng, số gói/byte, "
-            "thời lượng luồng, payload…) đã đưa vào Tier-1/LLM. Đã **LOẠI nhãn/đáp án** (chống lộ "
-            "nhãn — xem `tests/unit/test_subscriber.py`). `action`/`MITRE` là **kết quả** tác tử "
-            "suy ra từ chính log này (bản ghi quyết định đã ký HMAC nằm ở Audit Trail)."
+            "ℹ️ Đây là **log đặc trưng tiêu biểu** nhất được rút trích ra từ toàn bộ quá trình "
+            f"của IP {cleaned_target}. Hệ thống chỉ lưu log đại diện này làm bằng chứng kỹ thuật gốc "
+            "nhằm tiết kiệm DB. Đã LOẠI nhãn/đáp án chống lộ nhãn (Label Leakage)."
         )
         raw_log_str = alert.get("raw_log") if isinstance(alert, dict) else None
         if raw_log_str:
