@@ -14,7 +14,9 @@ class KnowledgeGraphBuilder:
     def __init__(self):
         self.uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user = os.getenv("NEO4J_USER", "neo4j")
-        self.password = os.getenv("NEO4J_PASSWORD", "SentinelGraphPass2026!")
+        # KHÔNG hardcode mật khẩu thật trong code (git track). Thiếu env -> giá trị
+        # placeholder chắc chắn SAI để kết nối fail-loud thay vì lộ secret.
+        self.password = os.getenv("NEO4J_PASSWORD", "set-NEO4J_PASSWORD-in-.env")
         self.driver = None
 
         try:

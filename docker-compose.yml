@@ -59,7 +59,7 @@ services:
       # Đồng bộ múi giờ container với host (subscriber) để timestamp audit/HITL không lệch giờ
       - TZ=Asia/Ho_Chi_Minh
       - MLFLOW_TRACKING_URI=http://mlflow:5000
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-SentinelSecurePass2026!}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}@redis:6379/0
       - LLM_API_BASE=http://llm:8080/v1
     depends_on:
       mlflow:
@@ -119,7 +119,7 @@ services:
       - "127.0.0.1:6379:6379"    # Security: Bind to localhost only
     command: >
       redis-server
-      --requirepass "${REDIS_PASSWORD:-SentinelSecurePass2026!}"
+      --requirepass "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"
       --maxmemory 512mb
       --maxmemory-policy allkeys-lru
       --rename-command FLUSHALL ""
@@ -135,7 +135,7 @@ services:
     restart: unless-stopped
     healthcheck:
       # Auth-aware PING (redis yêu cầu password); grep PONG để chắc chắn server sống
-      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:-SentinelSecurePass2026!}\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}\" ping | grep -q PONG"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -151,7 +151,7 @@ services:
       - "127.0.0.1:7474:7474"              # Security: Bind to localhost only (HTTP Browser)
       - "127.0.0.1:7687:7687"              # Security: Bind to localhost only (Bolt protocol)
     environment:
-      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-SentinelGraphPass2026!}
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env}
       - NEO4J_PLUGINS=["apoc"]
     volumes:
       - neo4j_data:/data

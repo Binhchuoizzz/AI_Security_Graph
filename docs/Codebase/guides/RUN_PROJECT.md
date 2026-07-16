@@ -182,7 +182,7 @@ Thay vì warmup 100 mẫu đầu ad-hoc (dễ bị đầu độc lúc khởi đ�
 | Dashboard HITL | `http://localhost:8501` | Streamlit + auth PBKDF2/RBAC |
 | MLflow | `http://localhost:5001` | So sánh ablation |
 | Redis | `localhost:6379` | Hàng đợi log |
-| Neo4j Browser | `http://localhost:7474` | `neo4j` / `SentinelGraphPass2026!` |
+| Neo4j Browser | `http://localhost:7474` | `neo4j` / xem `NEO4J_PASSWORD` trong `.env` |
 
 > Muốn demo cho máy khác trong LAN: đổi mapping thành `0.0.0.0:<port>` trong `docker-compose.yml`.
 

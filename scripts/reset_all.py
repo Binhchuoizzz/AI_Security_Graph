@@ -30,7 +30,11 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://:SentinelSecurePass2026!@localhost:6379/0")
+# Secret chỉ sống trong .env — nạp trước khi đọc REDIS_URL (script chạy standalone).
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv()
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 LLM_API_BASE = os.getenv("LLM_API_BASE", "http://localhost:5000/v1")
 SUBSCRIBER_PATTERN = "main.py --mode server"
 STREAMS = ["queue_waf", "queue_firewall", "queue_sysmon", "queue_decisions", "queue_hitl"]

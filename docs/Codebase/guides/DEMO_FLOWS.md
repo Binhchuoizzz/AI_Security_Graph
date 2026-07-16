@@ -34,7 +34,7 @@ docker-compose ps            # đợi tất cả (healthy)
 
 # (2) Subscriber trên HOST = Tier-1 + Tier-2, ghi DB/config cho Dashboard đọc.
 #     (Dashboard container KHÔNG reach được Redis → subscriber BẮT BUỘC chạy ở host.)
-REDIS_URL="redis://:SentinelSecurePass2026!@localhost:6379/0" \
+# REDIS_URL tự nạp từ .env (main.py có load_dotenv) — KHÔNG viết mật khẩu vào lệnh/tài liệu.
 LLM_API_BASE="http://localhost:5000/v1" \
 nohup .venv/bin/python main.py --mode server --log-level INFO > logs/subscriber.log 2>&1 &
 
@@ -138,9 +138,10 @@ pkill -f "main.py --mode server"
 
 # B3: đẩy lại traffic từ đúng IP đó
 .venv/bin/python - <<'PY'
-import json, time, redis
+import json, os, time, redis
+from dotenv import load_dotenv; load_dotenv()   # REDIS_URL (kèm mật khẩu) lấy từ .env
 from scripts.simulate_traffic import map_to_cicids, determine_queue
-r = redis.Redis.from_url("redis://:SentinelSecurePass2026!@localhost:6379/0", decode_responses=True)
+r = redis.Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
 nl = {"src_ip": "198.51.100.15", "dst_ip": "10.0.0.10", "src_port": 45001, "dst_port": 80,
       "protocol": 6, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"), "flow_duration_us": 50000,
       "fwd_packets": 6, "bwd_packets": 5, "fwd_bytes": 800, "bwd_bytes": 1200, "flow_pkts_s": 20.0}
@@ -153,6 +154,38 @@ PY
 
 - **Kỳ vọng (đã kiểm chứng live):** `198.51.100.15` xuất hiện ở **“Tier-1 đã chặn”** với reason `Luật động [từ Tác tử]: Source IP='198.51.100.15'`; blacklist +.15; **audit_trail KHÔNG tăng** (⇒ KHÔNG leo Tier-2, KHÔNG tốn LLM). Đây là điểm `#11` — vòng phản hồi khép kín.
 - **Ghi chú:** luật chỉ auto-block khi **khớp IP chính xác** (`.15` ≠ `.150`) và **đã được duyệt** (status=ACTIVE). IP chưa học vẫn theo luồng bình thường.
+
+---
+
+## 6️⃣ 🤖 Đổi Model LLM & Đánh giá (Benchmarking)
+
+Hệ thống cho phép thay thế (hot-swap) các mô hình LLM chuyên dụng cho Cybersecurity (như WhiteRabbitNeo) để so sánh hiệu năng trực tiếp với model gốc Gemma-2.
+
+**1. Sử dụng Script Đổi Model:**
+Chạy script tiện ích để liệt kê và tự động đổi model:
+```bash
+./scripts/switch_model.sh
+```
+Hệ thống sẽ hiển thị danh sách các model dạng `.gguf` có sẵn. Gõ lại lệnh kèm số thứ tự (vd: `./scripts/switch_model.sh 2`) để tự động ghi đè cấu hình vào file `.env` và restart lại container `sentinel_llm` mà không làm gián đoạn hệ thống.
+
+**2. Quy trình Benchmarking Khách quan:**
+Để có dữ liệu sạch đưa vào Luận văn, hãy làm theo quy trình chuẩn sau cho từng model:
+1. **Chuyển model:** Chạy lệnh switch và chờ ~30s để Docker nạp xong model lên VRAM.
+2. **Reset hệ thống:** Làm sạch toàn bộ CSDL, Redis Cache và bật lại luồng Tier-1:
+   ```bash
+   .venv/bin/python scripts/reset_all.py
+   ```
+3. **Mở log giám sát:** Mở một Terminal riêng để theo dõi độ trễ thực của LLM backend:
+   ```bash
+   docker logs -f --tail 0 sentinel_llm
+   ```
+4. **Đẩy tập Test (Push flows):** Quay lại Terminal chính và đẩy tập logs:
+   ```bash
+   .venv/bin/python scripts/push_flow.py --source adversarial
+   ```
+5. **Ghi nhận Chỉ số (Metrics):**
+   - **Bên Terminal Log LLM:** Dòng `total time = ... ms` chính là **Độ trễ (Latency)** cho 1 Lô (mặc định 10 logs). Dòng `eval time = ... tokens per second` thể hiện tốc độ **Throughput**.
+   - **Bên giao diện Dashboard:** Ghi nhận tỷ lệ bắt được Zero-day, % Giảm tải nhiễu, và chất lượng giải thích chiến thuật MITRE ATT&CK. Từ đó phân tích sức mạnh giữa Model đa dụng (Llama-3/Gemma-2) vs Model chuyên Cyber (WhiteRabbitNeo).
 
 ---
 

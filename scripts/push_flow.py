@@ -40,6 +40,9 @@ import redis  # type: ignore
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
+# Secret chỉ sống trong .env — nạp trước khi đọc REDIS_URL (script chạy standalone).
+from dotenv import load_dotenv  # noqa: E402
+
 from experiments.stream_unified_online import (  # noqa: E402
     build_sequence,
     determine_queue as uni_queue,
@@ -50,7 +53,8 @@ from scripts.simulate_traffic import (  # noqa: E402
     map_to_cicids,
 )
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://:SentinelSecurePass2026!@localhost:6379/0")
+load_dotenv()
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 ADV_GLOB = os.path.join(ROOT, "experiments", "adversarial", "*", "samples.json")
 MAX_QUEUE_SIZE = 10_000
 
