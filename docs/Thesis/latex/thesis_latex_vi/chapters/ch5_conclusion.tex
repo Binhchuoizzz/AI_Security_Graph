@@ -42,7 +42,7 @@ Trục thứ tư là \textit{cụm nhân công nhận thức co giãn (elastic w
 
 Đặt một bộ cân bằng tải trước tầng bảng điều khiển phi trạng thái và một bộ giới hạn tốc độ (rate limiter) phía thu nhận đứng trước bộ môi giới để hấp thụ các trận lũ lưu lượng sẽ hoàn thiện bức tranh. Gộp lại, năm trục này vạch ra một lộ trình di trú cụ thể từ một nguyên mẫu nghiên cứu đơn-máy đã được kiểm chứng sang một triển khai chịu lỗi, mở rộng được theo chiều ngang, giải quyết đúng các giới hạn bão hòa và một-GPU đã nêu ở trên, mà không làm thay đổi kiến trúc nhận thức hai tầng mà luận văn này đã xác thực.
 
-Đặc biệt, để sẵn sàng triển khai hệ thống trong môi trường doanh nghiệp (Enterprise-scale) tại các tổ chức như FPT Software, bốn định hướng tối ưu hóa triệt để sau đây được đề xuất:
+Đặc biệt, để sẵn sàng triển khai hệ thống trong môi trường doanh nghiệp (Enterprise-scale) tại các tổ chức như FPT Software, năm định hướng tối ưu hóa triệt để sau đây được đề xuất:
 \begin{itemize}
     \item \textbf{Tách biệt Microservice hoàn toàn:} Thay vì luồng Tầng 1 và Tầng 2 chia sẻ chung một tiến trình Python (bị giới hạn bởi GIL), Tầng 2 sẽ được tách thành một dịch vụ độc lập, giao tiếp với Tầng 1 hoàn toàn qua Message Broker, cho phép nhân bản (scale out) Tầng 2 trên nhiều máy chủ vật lý khác nhau một cách không giới hạn.
     \item \textbf{Tối ưu hiệu năng Tầng 1 (Cổng gác) bằng Golang/Rust:} Viết lại bộ phận \texttt{RuleEngine} của Tầng 1 bằng các ngôn ngữ biên dịch hệ thống (Golang hoặc Rust) thay vì Python để triệt tiêu chi phí giải mã JSON (Deserialization) và tối đa hóa thông lượng xử lý tính toán Z-Score, WAF Regex, giúp hệ thống chịu tải mượt mà hàng triệu sự kiện mỗi giây.

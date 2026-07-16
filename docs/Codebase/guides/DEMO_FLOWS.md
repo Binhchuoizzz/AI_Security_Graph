@@ -140,7 +140,7 @@ pkill -f "main.py --mode server"
 .venv/bin/python - <<'PY'
 import json, os, time, redis
 from dotenv import load_dotenv; load_dotenv()   # REDIS_URL (kèm mật khẩu) lấy từ .env
-from scripts.simulate_traffic import map_to_cicids, determine_queue
+from experiments.unified_dataset import determine_queue  # (map_to_cicids cũ đã gỡ cùng simulate_traffic)
 r = redis.Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
 nl = {"src_ip": "198.51.100.15", "dst_ip": "10.0.0.10", "src_port": 45001, "dst_port": 80,
       "protocol": 6, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"), "flow_duration_us": 50000,
@@ -193,8 +193,8 @@ Hệ thống sẽ hiển thị danh sách các model dạng `.gguf` có sẵn. G
 
 | Việc | Lệnh |
 | --- | --- |
-| Đẩy đủ CICIDS có nhãn (4267) | `.venv/bin/python scripts/simulate_traffic.py` |
-| Đẩy luồng GỘP cicids+dapt+zeroday | `.venv/bin/python experiments/stream_unified_online.py` |
+| Đẩy đủ luồng gộp có nhãn | `.venv/bin/python scripts/push_datatest.py` (dựng bằng `build_datatest.py`) |
+| Đẩy luồng GỘP cicids+dapt+zeroday+adversarial | `.venv/bin/python scripts/push_datatest.py` (dựng trước bằng `scripts/build_datatest.py`) |
 | Chỉ kiểm phân bố (không đẩy) | thêm `--dry-run` |
 | Kiểm số subscriber đang chạy (đếm chuẩn) | `.venv/bin/python scripts/reset_all.py --dry-run` (dòng `[1/3]`) |
 | Reset sạch + bật lại 1 subscriber | `.venv/bin/python scripts/reset_all.py` |

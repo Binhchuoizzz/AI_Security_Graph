@@ -13,8 +13,8 @@ Bám **luồng runtime 9 chặng** trong [Sơ đồ Luồng Hệ thống](https:
 ## ① Thu nhận — 4 nguồn → Redis Streams (`xadd`, maxlen chống OOM, 3 queue firewall/waf/sysmon)
 
 - **`streaming/publisher.py`** — stream CSV THÔ quy mô lớn (chunk 500 dòng, load-test).
-- **`scripts/simulate_traffic.py`** — replay `ground_truth.json` (4267 mẫu có nhãn) cho demo/ablation.
-- **`experiments/stream_unified_online.py`** — luồng gộp CICIDS+DAPT+zero-day; cờ `--include-adversarial` = 1 lệnh đẩy CẢ 4 nguồn (4796 sự kiện). *Nguồn demo chính.*
+- *(đã gỡ `scripts/simulate_traffic.py` — demo dùng `build_datatest.py`/`push_datatest.py` ở trên; ablation đọc thẳng `ground_truth.json`)*
+- **`scripts/build_datatest.py` → `scripts/push_datatest.py`** (hoặc `build_demo.py` → `demo.py` bản 10k) — luồng gộp CẢ 4 nguồn (CICIDS + DAPT + zero-day + adversarial), logic chung nằm ở `experiments/unified_dataset.py`. *Nguồn demo chính.*
 - **`scripts/live_log_collector.py`** — bắt log THẬT: tail `/var/log/auth.log` + decoy WAF (demo pentest).
 
 ## ② Tiêu thụ — `streaming/subscriber.py`

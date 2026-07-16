@@ -6,32 +6,8 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
-from experiments.unified_dataset import build_stream
-
-
-def enrich(ev: dict) -> dict:
-    """Gắn metadata theo nguồn vào log giống hệt như stream_unified_online.py cũ"""
-    log = dict(ev["log"])
-    log["dataset_source"] = "unified_stream"
-    log["unified_source"] = ev["source"]
-
-    if ev["source"].startswith("dapt"):
-        log["apt_phase"] = ev.get("phase")
-        log["apt_day"] = ev.get("day")
-        log["apt_label"] = ev.get("label", "")
-        log["apt_is_attack"] = bool(ev.get("is_attack"))
-        log["apt_timestamp"] = ev.get("timestamp", "")
-    elif ev["source"] == "zeroday":
-        log["zd_id"] = ev.get("id")
-        log["zd_mitre"] = ev.get("mitre")
-        log["zd_name"] = ev.get("name")
-    elif ev["source"] == "adversarial":
-        log["adv_id"] = ev["log"].get("gt_id", "")
-        log["adv_source"] = "owasp_llm_top10"
-    else:  # cicids
-        log["gt_label"] = ev.get("label", "")
-        log["expected_threat"] = bool(ev.get("expected_threat"))
-    return log
+# enrich dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
+from experiments.unified_dataset import build_stream, enrich
 
 
 def main():
@@ -43,12 +19,12 @@ def main():
     cicids_attacks = [
         e
         for e in stream
-        if e.get("source", "").startswith("cicids") and e.get("expected_threat") == True
+        if e.get("source", "").startswith("cicids") and e.get("expected_threat") is True
     ]
     cicids_benign = [
         e
         for e in stream
-        if e.get("source", "").startswith("cicids") and e.get("expected_threat") == False
+        if e.get("source", "").startswith("cicids") and e.get("expected_threat") is False
     ]
     dapt = [e for e in stream if e.get("source", "").startswith("dapt")]
     zeroday = [e for e in stream if e.get("source") == "zeroday"]

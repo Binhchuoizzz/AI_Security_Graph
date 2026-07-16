@@ -44,7 +44,7 @@ nó phục vụ mục luận văn nào.
 
 | File | Chạy | Ghi chú |
 | :--- | :--- | :--- |
-| `stream_unified_online.py` | `python -m experiments.stream_unified_online [--include-adversarial] [--dry-run]` | Đẩy luồng gộp lên Redis → chảy qua **toàn hệ thống thật** (subscriber → Agent → Dashboard). `--include-adversarial` nối thêm 120 payload OWASP LLM để 1 lệnh đẩy **tất cả** nguồn. Dùng chung `build_stream()` với eval offline. |
+| `scripts/demo.py` / `scripts/push_datatest.py` | `python scripts/build_datatest.py && python scripts/push_datatest.py` | Đẩy luồng gộp lên Redis → chảy qua **toàn hệ thống thật** (subscriber → Agent → Dashboard). Luồng đã gộp sẵn **cả 4 nguồn** (CICIDS + DAPT + zero-day + adversarial). Dùng chung `build_stream()`/`enrich()` (experiments/unified_dataset.py) với eval offline. |
 
 ## 5. Dữ liệu
 

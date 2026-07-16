@@ -19,8 +19,7 @@ import tempfile
 
 import pytest  # type: ignore
 
-from experiments.stream_unified_online import build_sequence, determine_queue, enrich
-from experiments.unified_dataset import build_stream
+from experiments.unified_dataset import build_sequence, build_stream, determine_queue, enrich
 from src.agent.threat_memory import ThreatMemoryStore
 
 

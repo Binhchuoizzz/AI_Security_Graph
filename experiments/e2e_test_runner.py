@@ -576,10 +576,11 @@ def test_21_unified_stream(r: TestResult):
 # TEST 22: Unified ONLINE publisher (mang metadata DAPT/zero-day, định tuyến queue)
 # ============================================================================
 def test_22_unified_online(r: TestResult):
-    """Kiểm chứng publisher ONLINE (`stream_unified_online.py`): cùng luồng gộp thật
+    """Kiểm chứng giao ước publisher ONLINE (`unified_dataset.build_sequence/enrich`,
+    dùng bởi scripts/build_datatest.py + demo.py): cùng luồng gộp thật
     được enrich đủ metadata (DAPT apt_phase/day, zero-day zd_id/mitre) và định tuyến
     đúng queue. Offline thuần (không cần Redis)."""
-    from experiments.stream_unified_online import build_sequence, determine_queue, enrich
+    from experiments.unified_dataset import build_sequence, determine_queue, enrich
 
     seq, warmup, main, apt_truth, n_chains = build_sequence()
     srcs, queues = set(), set()

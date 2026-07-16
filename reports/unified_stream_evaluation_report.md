@@ -2,7 +2,7 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-07-16T21:43:38
+> **Sinh lúc:** 2026-07-16T22:19:57
 
 ---
 
@@ -10,8 +10,8 @@
 
 Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ `dapt2020_chains.jsonl`); zero-day là biến thể **REAL-DERIVED** — nền là flow benign THẬT, chỉ đẩy **một** feature lên cực trị, rải qua nhiều ngày. Các nguồn được **trộn xen kẽ trong từng ngày** bằng khóa thời gian golden-ratio (không xếp khối theo nguồn); DAPT giữ nguyên ngày thật.
 
-- Warmup benign CICIDS (học baseline Welford): **50**
-- Luồng chính trộn (benign nền + tấn công CICIDS + mọi sự kiện DAPT + zero-day): **21171** sự kiện
+- Warmup benign CICIDS (học baseline Welford): **150**
+- Luồng chính trộn (benign nền + tấn công CICIDS + mọi sự kiện DAPT + zero-day): **21071** sự kiện
 - DAPT chuỗi: **9** | IP là APT thật (≥2 ngày tấn công): **3**
 
 ## 1. Phân loại ở TẦNG LỌC Tier-1 (gate) trên luồng trộn
@@ -20,11 +20,11 @@ Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ `d
 
 | Metric (Tier-1 gate) | Giá trị |
 | :--- | :---: |
-| F1 | **0.5386** |
-| Accuracy | 0.4025 |
-| Precision | 0.9755 |
+| F1 | **0.4991** |
+| Accuracy | 0.3778 |
+| Precision | 0.7582 |
 | Recall (attack) | 0.372 |
-| TP / FP / TN / FN | 279 / 7 / 43 / 471 |
+| TP / FP / TN / FN | 279 / 89 / 61 / 471 |
 
 ## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn
 
@@ -46,21 +46,21 @@ Tổng: **15** | Welford bắt được (mà static bỏ sót): **12/15**
 
 | ID | Kịch bản | Rule tĩnh (static-only, đối chứng) | Full Tier-1 (Welford) | Z-Score |
 | :--- | :--- | :---: | :---: | :---: |
-| ZD-008 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 2.78 ⚠️ |
+| ZD-008 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 2.81 ⚠️ |
 | ZD-013 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **AWAIT_HITL** | 110.58 ✅ |
-| ZD-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **ESCALATE** | 5.31 ✅ |
-| ZD-009 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 2.83 ⚠️ |
+| ZD-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **ESCALATE** | 5.27 ✅ |
+| ZD-009 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 2.89 ⚠️ |
 | ZD-001 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 3331.98 ✅ |
-| ZD-014 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **AWAIT_HITL** | 289.47 ✅ |
-| ZD-003 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **AWAIT_HITL** | 3700.45 ✅ |
-| ZD-010 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 2.47 ⚠️ |
-| ZD-004 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **AWAIT_HITL** | 263.36 ✅ |
+| ZD-014 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **AWAIT_HITL** | 293.34 ✅ |
+| ZD-003 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **AWAIT_HITL** | 3751.04 ✅ |
+| ZD-010 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 2.5 ⚠️ |
+| ZD-004 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **AWAIT_HITL** | 266.46 ✅ |
 | ZD-006 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 118023.25 ✅ |
-| ZD-011 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 401.83 ✅ |
+| ZD-011 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 403.52 ✅ |
 | ZD-005 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 81207.23 ✅ |
 | ZD-015 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 1135.42 ✅ |
-| ZD-007 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **AWAIT_HITL** | 3342.43 ✅ |
-| ZD-012 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 20036.29 ✅ |
+| ZD-007 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **AWAIT_HITL** | 3347.47 ✅ |
+| ZD-012 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 20012.87 ✅ |
 
 ---
 

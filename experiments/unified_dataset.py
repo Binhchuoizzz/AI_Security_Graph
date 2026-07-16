@@ -4,8 +4,13 @@ SENTINEL — Bộ dựng DỮ LIỆU GỘP dùng chung (Unified Dataset Builder)
 Module TRUNG LẬP chứa toàn bộ logic dựng luồng gộp (CICIDS + DAPT2020 + Zero-day
 REAL-DERIVED) đã sắp theo thời gian. Trước đây code này nằm trong
 `evaluate_unified_stream.py` (file EVAL offline) và bị các nơi khác import NGƯỢC
-("lòng vòng"). Tách ra đây để CẢ luồng online (`stream_unified_online.py`), eval
-offline (`evaluate_unified_stream.py`) và các thí nghiệm rigor cùng import từ 1 chỗ.
+("lòng vòng"). Tách ra đây để CẢ đường online (`scripts/build_demo.py`,
+`scripts/build_datatest.py` → `scripts/demo.py`/`push_datatest.py`), eval offline
+(`evaluate_unified_stream.py`) và các thí nghiệm rigor cùng import từ 1 chỗ.
+
+Ngoài `build_stream()`, module này cũng là NGUỒN DUY NHẤT của `enrich()`,
+`determine_queue()` và `build_sequence()` (kế thừa từ `stream_unified_online.py`
+đã gỡ bỏ) — mọi script push/demo và test đều import từ đây, KHÔNG copy tay.
 
 Mọi sự kiện đều là DATA THẬT: CICIDS từ `ground_truth.json`, DAPT từ
 `dapt2020_chains.jsonl`. Zero-day là biến thể REAL-DERIVED (nền benign THẬT, đẩy
@@ -516,7 +521,14 @@ def build_stream():
                 "label": "Attack" if is_attack else "Benign",
                 "t": tkey(1 + i % 5),
             }
-            main.append(ev)
+            # Ground_truth mới CÂN BẰNG (chỉ 50 benign) không đủ WARMUP_N=150 —
+            # Welford cần >= warmup_count(100)/key mới bật Z-score. Bù warmup bằng
+            # benign THẬT unseen của cicids_max (không phải sinh thêm dữ liệu).
+            if not is_attack and len(warmup) < WARMUP_N:
+                ev.pop("t", None)
+                warmup.append(ev)
+            else:
+                main.append(ev)
 
     # 2. Load DAPT2020 unseen data (skip first 15000 rows used in train)
     dapt_path = os.path.join(ROOT, "data", "raw", "dapt2020", "day1.csv")
@@ -540,7 +552,7 @@ def build_stream():
                 "Total Backward Packets": _safe_int(row.get("Total Bwd packets")),
                 "Total Length of Fwd Packets": _safe_int(row.get("Total Length of Fwd Packet")),
                 "Total Length of Bwd Packets": _safe_int(row.get("Total Length of Bwd Packet")),
-                "Flow Pkts/s": float(row.get("Flow Packets/s", 0) or 0),
+                "Flow Pkts/s": _safe_float(row.get("Flow Packets/s")),
                 "Fwd Seg Size Min": _safe_int(row.get("Fwd Segment Size Min", 0)),
                 "Init Fwd Win Byts": _safe_int(row.get("FWD Init Win Bytes")),
                 "Init Bwd Win Byts": _safe_int(row.get("Bwd Init Win Bytes")),
@@ -559,3 +571,68 @@ def build_stream():
 
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)
+
+
+# --------------------------------------------------------------------------- #
+# Giao ước ONLINE dùng chung (kế thừa stream_unified_online.py đã gỡ bỏ):
+# enrich + determine_queue + build_sequence — scripts/demo.py, push_datatest.py,
+# build_demo.py, build_datatest.py và tests đều import từ ĐÂY (1 nguồn chân lý).
+# --------------------------------------------------------------------------- #
+FIREWALL_PORTS = {21, 22, 23, 53, 139, 445, 3389}
+WAF_PORTS = {80, 443, 8080}
+
+
+def determine_queue(log: dict) -> str:
+    """Port-based → payload/UA → default firewall."""
+    try:
+        port = int(log.get("Destination Port", 0) or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if port in FIREWALL_PORTS:
+        return "queue_firewall"
+    if port in WAF_PORTS:
+        return "queue_waf"
+    if log.get("payload") or log.get("user_agent"):
+        return "queue_waf"
+    return "queue_firewall"
+
+
+def enrich(ev: dict) -> dict:
+    """Gắn metadata theo nguồn vào log để subscriber/agent/dashboard dùng được.
+
+    Toàn bộ đi trong MỘT blob JSON dưới field 'log' (đúng giao ước publisher).
+    """
+    log = dict(ev["log"])
+    log["dataset_source"] = "unified_stream"
+    log["unified_source"] = ev["source"]
+
+    if ev["source"] == "dapt":
+        # Metadata để subscriber ghi chuỗi APT (emergent) vào Threat Memory.
+        log["apt_phase"] = ev.get("phase")
+        log["apt_day"] = ev.get("day")
+        log["apt_label"] = ev.get("label", "")
+        log["apt_is_attack"] = bool(ev.get("is_attack"))
+        log["apt_timestamp"] = ev.get("timestamp", "")
+    elif ev["source"] == "zeroday":
+        log["zd_id"] = ev.get("id")
+        log["zd_mitre"] = ev.get("mitre")
+        log["zd_name"] = ev.get("name")
+    elif ev["source"] == "adversarial":
+        # payload OWASP LLM Top-10 để thử Guardrails/Tier-2 khi escalate
+        log["adv_id"] = ev["log"].get("gt_id", "")
+        log["adv_source"] = "owasp_llm_top10"
+    else:  # cicids / cicids_max / dapt_max: flow có nhãn ground-truth phẳng
+        log["gt_label"] = ev.get("label", "")
+        log["expected_threat"] = bool(ev.get("expected_threat"))
+    return log
+
+
+def build_sequence():
+    """Luồng phát online: warmup benign TRƯỚC (làm ấm Welford) rồi luồng chính trộn.
+
+    Adversarial (OWASP LLM) đã được build_stream() trộn sẵn trong main — không cần
+    cờ --include-adversarial như bản cũ. Trả về (seq, warmup, main, apt_truth, n_chains).
+    """
+    warmup, main, apt_truth, n_chains = build_stream()
+    seq = list(warmup) + list(main)  # warmup giữ prefix; main đã sort theo thời gian
+    return seq, warmup, main, apt_truth, n_chains

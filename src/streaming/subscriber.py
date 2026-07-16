@@ -9,7 +9,7 @@ Mỗi log đi qua Tier-1 (RuleEngine + Welford) rồi ĐỊNH TUYẾN theo mức
   ESCALATE (đáng ngờ -> Agent/LLM). Đa số log dừng ở Tier-1; chỉ ESCALATE mới gọi Tier-2.
 
 APT EMERGENT (kích hoạt khi message mang metadata DAPT — vd luồng gộp online
-`experiments/stream_unified_online.py`): mỗi sự kiện APT lẻ tín hiệu thấp được GHI
+`experiments/unified_dataset.py` → scripts/demo.py): mỗi sự kiện APT lẻ tín hiệu thấp được GHI
 dần vào Threat Memory; khi tích lũy đủ đa-ngày, `check_apt_chain` BẬT -> escalate
 chuỗi APT lên Agent. Traffic thường không có metadata APT nên đường production không đổi.
 """
@@ -141,7 +141,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
     print(f"[*] Subscribed and listening on multiple streams via group '{GROUP_NAME}': {QUEUES}...")
 
     # Threat Memory để ghi chuỗi APT EMERGENT từ luồng (chỉ kích hoạt khi message
-    # mang metadata DAPT, ví dụ stream_unified_online.py). Traffic thường không có
+    # mang metadata DAPT, ví dụ luồng gộp từ scripts/demo.py). Traffic thường không có
     # apt_phase nên đường production không bị ảnh hưởng.
     memory = ThreatMemoryStore()
     apt_fired: set[str] = set()  # IP đã bật cảnh báo APT (tránh leo thang lặp)

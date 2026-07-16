@@ -20,31 +20,31 @@ class TestMultiSourceRouting:
     """Test Multi-source Log Correlation routing logic."""
 
     def test_firewall_routing(self):
-        from scripts.simulate_traffic import determine_queue
+        from experiments.unified_dataset import determine_queue
 
         log = {"Destination Port": 22, "payload": ""}
         assert determine_queue(log) == "queue_firewall"
 
     def test_waf_routing(self):
-        from scripts.simulate_traffic import determine_queue
+        from experiments.unified_dataset import determine_queue
 
         log = {"Destination Port": 80, "payload": "GET /admin"}
         assert determine_queue(log) == "queue_waf"
 
     def test_unrecognized_port_goes_to_firewall(self):
-        from scripts.simulate_traffic import determine_queue
+        from experiments.unified_dataset import determine_queue
 
         log = {"Destination Port": 9999, "payload": ""}
         assert determine_queue(log) == "queue_firewall"
 
     def test_rdp_goes_to_firewall(self):
-        from scripts.simulate_traffic import determine_queue
+        from experiments.unified_dataset import determine_queue
 
         log = {"Destination Port": 3389, "payload": ""}
         assert determine_queue(log) == "queue_firewall"
 
     def test_https_goes_to_waf(self):
-        from scripts.simulate_traffic import determine_queue
+        from experiments.unified_dataset import determine_queue
 
         log = {"Destination Port": 443, "payload": ""}
         assert determine_queue(log) == "queue_waf"

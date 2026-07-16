@@ -24,7 +24,7 @@
 Sau khi setup (§1) 1 lần, mỗi lần demo:
 
 ```bash
-./scripts/run_demo.sh              # containers → subscriber → UI → đẩy 4.796 sự kiện (4 nguồn)
+./scripts/run_demo.sh              # containers → subscriber → UI → đẩy 10.000 sự kiện (4 nguồn)
 ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng   |   --small: đẩy nhanh (demo ngắn)
 # GPU VRAM thấp: `SENTINEL_LITE=1 ./scripts/run_demo.sh` (Llama 3 8B, ctx 8192, 1 parallel, Neo4j tắt)
 ```
@@ -106,8 +106,9 @@ Dùng khi muốn tách 3 terminal thay cho `run_demo.sh`:
 .venv/bin/python main.py --mode server --log-level INFO
 # Terminal 3 — phát luồng (chọn 1)
 .venv/bin/python src/streaming/publisher.py                            # raw CSV
-.venv/bin/python experiments/stream_unified_online.py                  # luồng gộp (APT emergent)
-.venv/bin/python experiments/stream_unified_online.py --include-adversarial   # ✦ FULL 4 nguồn
+.venv/bin/python scripts/build_datatest.py    # dựng data/datatest.json (~2k sự kiện, đủ 4 nguồn)
+.venv/bin/python scripts/push_datatest.py     # ✦ đẩy luồng gộp FULL 4 nguồn (APT emergent)
+# Bản demo 10k sự kiện: scripts/build_demo.py → scripts/demo.py
 ```
 
 > ⚠️ **CHỈ 1 SUBSCRIBER.** Nhiều tiến trình cùng consumer group `sentinel_group` sẽ **chia** log → Dashboard thiếu. Reset sạch + bật lại đúng 1 subscriber trong 1 lệnh:
@@ -208,4 +209,4 @@ docker-compose down                                        # 13. tắt
 #        run_apt_negative_control · run_context_stress · run_llm_robustness · evaluate_adversarial --mode pipeline
 ```
 
-**Demo online thủ công:** Terminal 1 `main.py --mode server` · Terminal 2 `stream_unified_online.py [--include-adversarial]` (CHỈ 1 subscriber!).
+**Demo online thủ công:** Terminal 1 `main.py --mode server` · Terminal 2 `scripts/push_datatest.py` (hoặc `scripts/demo.py` cho bản 10k) (CHỈ 1 subscriber!).

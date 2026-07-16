@@ -777,9 +777,9 @@ def main_dashboard():
 
             t1_tab, t2_tab, t3_tab = st.tabs(
                 [
-                    "🟢 Tier 1 (Filter)",
-                    "⚡ Tier 2 (ML)",
-                    "🧠 Tier 3 (LLM)",
+                    "🟢 Tier-1 Filter",
+                    "⚡ Tier-2 · Cổng ML",
+                    "🧠 Tier-2 · LLM",
                 ]
             )
 
@@ -865,9 +865,9 @@ def main_dashboard():
 
             tab_t1, tab_t2, tab_t3 = st.tabs(
                 [
-                    "🟢 Tier 1 (Filter)",
-                    "⚡ Tier 2 (ML)",
-                    "🧠 Tier 3 (LLM)",
+                    "🟢 Tier-1 Filter",
+                    "⚡ Tier-2 · Cổng ML",
+                    "🧠 Tier-2 · LLM",
                 ]
             )
 

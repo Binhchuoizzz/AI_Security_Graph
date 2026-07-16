@@ -717,7 +717,7 @@ def _get_ml_pipeline():
 
 def node_ml_triage(state: SentinelState) -> dict:
     """
-    Cổng ML của Tier-2 (DecisionTreeClassifier + StandardScaler, xem ml_lab/):
+    Cổng ML của Tier-2 (LGBMClassifier + StandardScaler, 76 features — xem ml_lab/):
     Đánh giá nhanh feature số học. Nếu độ tin cậy > 95%, bỏ qua LLM (Early Exit).
     Nếu không đủ đặc trưng (WAF payload) hoặc độ tin cậy thấp, trả về dict rỗng để đi tiếp vào LLM.
     """
@@ -780,11 +780,15 @@ def node_ml_triage(state: SentinelState) -> dict:
     # thì phải đổi cả detect ở src/ui/app.py + components.py (đang match "Cổng ML").
     if confidence_attack >= CONF_THRESHOLD:
         action = "BLOCK_IP"
-        reasoning = f"Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
+        reasoning = (
+            f"Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
+        )
         confidence = float(confidence_attack)
     elif confidence_benign >= CONF_THRESHOLD:
         action = "LOG"
-        reasoning = f"Xác nhận an toàn bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"
+        reasoning = (
+            f"Xác nhận an toàn bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"
+        )
         confidence = float(confidence_benign)
     else:
         logger.info(
@@ -824,8 +828,9 @@ def node_ml_triage(state: SentinelState) -> dict:
         "agent_reasoning": reasoning,
         "latency_ms": 1,  # Extremely fast
         "metadata": {
-            # SỰ THẬT model: ml_lab/tier_2_model.pkl là DecisionTreeClassifier (+ scaler)
-            # — KHÔNG phải XGBoost (train_and_compare so sánh 5 thuật toán, cây thắng).
+            # SỰ THẬT model: ml_lab/tier_2_model.pkl là dict{scaler, model, features};
+            # model = LGBMClassifier (train_and_compare so 5 thuật toán, LightGBM thắng
+            # F1 0.9666). Nếu train lại ra model khác thì PHẢI đổi nhãn ở đây + reasoning.
             "ml_model": "LightGBM",
             "confidence_attack": float(confidence_attack),
             "confidence_benign": float(confidence_benign),

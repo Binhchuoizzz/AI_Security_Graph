@@ -150,7 +150,7 @@ AI_Security_Graph/
 ├── experiments/                  # Evaluation scripts + benchmarks + results
 │   ├── unified_dataset.py        # SHARED merged-stream builder (CICIDS + DAPT + zero-day)
 │   ├── evaluate_unified_stream.py    # Offline deterministic benchmark (classification + APT + zero-day)
-│   ├── stream_unified_online.py  # Online publisher, same stream (--include-adversarial → all 4 sources)
+│   ├── unified_dataset.py        # Shared stream builder + enrich/determine_queue (single source of truth)
 │   ├── run_ablation.py           # Ablation A–F   (--mode af | bcde | balanced | all)
 │   ├── evaluate_adversarial.py   # Adversarial    (--mode static | pipeline)
 │   ├── evaluate_reasoning.py     # LLM-as-a-Judge (Llama-3 judges Gemma-2)
@@ -210,7 +210,7 @@ python src/rag/embedder.py        # REQUIRED: builds FAISS + BM25 indexes and RA
 ### 2. Run the whole demo — one command
 
 ```bash
-./scripts/run_demo.sh             # infra + subscriber + UI + push 4,796 events (4 sources)
+./scripts/run_demo.sh             # infra + subscriber + UI + push 10,000 events (4 sources)
 ./scripts/run_demo.sh --small     # short demo (less LLM waiting)
 ./scripts/run_demo.sh --no-push   # infra only
 ```

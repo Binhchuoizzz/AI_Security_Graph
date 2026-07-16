@@ -7,7 +7,8 @@ Vai trò trong bộ BA PUBLISHER (không trùng nhau):
     Dùng cho LOAD TEST / chứng minh tầng ingestion; KHÔNG mang nhãn ground-truth
     hay metadata APT.
   - scripts/simulate_traffic.py: replay ground_truth.json (có nhãn, demo dashboard).
-  - experiments/stream_unified_online.py: phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
+  - scripts/demo.py + push_datatest.py (dựng bởi scripts/build_demo.py /
+    build_datatest.py): phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
     metadata APT (demo end-to-end APT emergent — khuyến nghị cho demo luồng gộp).
 """
 

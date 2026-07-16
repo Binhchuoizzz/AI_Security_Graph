@@ -1,7 +1,8 @@
 """
 Unit tests cho Subscriber — CHỐNG LỘ NHÃN dataset vào prompt LLM (label leakage).
 
-Bối cảnh: luồng gộp online (`experiments/stream_unified_online.py`) mang metadata
+Bối cảnh: luồng gộp online (`experiments.unified_dataset.enrich` → scripts
+build_datatest/demo) mang metadata
 nhãn (gt_*/apt_*/zd_*) để subscriber ghi APT emergent và collector đối chiếu hậu
 kiểm. Nhưng TRƯỚC khi batch ESCALATE được đưa lên Agent/LLM, mọi khóa nhãn phải
 bị loại — nếu không prompt sẽ chứa sẵn "đáp án" (gt_expected_action, zd_mitre...)
@@ -108,7 +109,7 @@ def test_online_enrich_labels_fully_covered_by_strip_set():
     `_DATASET_LABEL_KEYS`. Nếu sau này enrich thêm khóa nhãn mới mà quên bổ sung
     strip-set -> test này ĐỎ, chặn việc lộ đáp án âm thầm.
     """
-    from experiments.stream_unified_online import enrich
+    from experiments.unified_dataset import enrich
 
     PROVENANCE_OK = {"dataset_source", "unified_source"}  # nguồn gốc, không phải đáp án
     sample_events = [
