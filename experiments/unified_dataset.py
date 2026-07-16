@@ -42,6 +42,16 @@ def _safe_int(v, default=0):
         return default
 
 
+def _safe_float(v, default=0.0):
+    """float() an toàn cho CSV CICIDS: header lặp giữa file (giá trị = tên cột),
+    'Infinity'/NaN đều trả default thay vì ném ValueError giết cả build_stream."""
+    try:
+        f = float(v)
+        return f if math.isfinite(f) else default
+    except (TypeError, ValueError):
+        return default
+
+
 def _is_threat(action: str) -> bool:
     return action in THREAT_ACTIONS
 
@@ -155,6 +165,117 @@ ZD_SPECS = [
         "T1095 Non-Application Layer Protocol",
         5,
     ),
+    (
+        "ZD-008",
+        "C2 Beacon cực nhỏ và ẩn",
+        "Total Length of Bwd Packets",
+        20,
+        "203.0.113.88",
+        "T1071.001 Web Protocols",
+        1,
+    ),
+    (
+        "ZD-009",
+        "Cửa sổ Fwd âm (anomaly)",
+        "Init Fwd Win Byts",
+        -10,
+        "198.51.100.99",
+        "T1059 Command and Scripting Interpreter",
+        2,
+    ),
+    (
+        "ZD-010",
+        "Gói SYN liên tục siêu nhỏ",
+        "Fwd Seg Size Min",
+        1,
+        "192.0.2.11",
+        "T1046 Network Service Discovery",
+        3,
+    ),
+    (
+        "ZD-011",
+        "Mảnh payload Bwd quá to",
+        "Bwd Pkt Len Min",
+        15000,
+        "203.0.113.111",
+        "T1071 Application Layer Protocol",
+        4,
+    ),
+    (
+        "ZD-012",
+        "C2 PSH Flag chìm",
+        "PSH Flag Cnt",
+        9999,
+        "192.0.2.222",
+        "T1573 Encrypted Channel",
+        5,
+    ),
+    (
+        "ZD-013",
+        "Burst Fwd packets đột biến",
+        "Total Fwd Packets",
+        995,
+        "203.0.113.33",
+        "T1498 Network Denial of Service",
+        1,
+    ),
+    (
+        "ZD-014",
+        "Time delay khổng lồ",
+        "Flow Duration",
+        10_000_000_000,
+        "198.51.100.22",
+        "T1102 Web Service",
+        3,
+    ),
+    (
+        "ZD-015",
+        "Exfil gián đoạn Bwd burst",
+        "Total Length of Bwd Packets",
+        15_000_000,
+        "192.0.2.99",
+        "T1048 Exfiltration",
+        4,
+    ),
+]
+
+ADV_SPECS = [
+    (
+        "ADV-001",
+        "SQL Injection ngụy trang Unicode",
+        "payload",
+        "SELECT * FROM users WHERE username = %s AND 1=1",
+        "10.0.0.88",
+        "T1190 Exploit Public-Facing Application",
+        2,
+    ),
+    (
+        "ADV-002",
+        "XSS chèn qua header",
+        "payload",
+        "<svg/onload=alert(1)>",
+        "10.0.0.89",
+        "T1190 Exploit Public-Facing Application",
+        3,
+    ),
+    (
+        "ADV-003",
+        "Command Injection dạng mã hóa Base64",
+        "payload",
+        "YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4wLjAuMS84MDgwIDA+JjE=",
+        "10.0.0.90",
+        "T1059 Command and Scripting Interpreter",
+        4,
+    ),
+    (
+        "ADV-004",
+        "Dir Traversal nhiều cấp độ",
+        "payload",
+        "../../../../../../../etc/shadow",
+        "10.0.0.91",
+        "T1190 Exploit Public-Facing Application",
+        5,
+    ),
 ]
 
 
@@ -210,6 +331,36 @@ def _build_zerodays(samples, tkey):
 # --------------------------------------------------------------------------- #
 # Build unified, time-ordered event stream
 # --------------------------------------------------------------------------- #
+
+
+def _build_adversarials(tkey):
+    out = []
+    for i, (aid, name, _feat, val, dst, mitre, day) in enumerate(ADV_SPECS):
+        log = {
+            "Source IP": f"10.0.0.{100 + i}",
+            "Destination IP": dst,
+            "Destination Port": 80,
+            "Protocol": 6,
+            "service": "HTTP",
+            "message": val,  # DAPT/WAF style payload
+            "user_agent": f"adv-probe/{aid}",
+        }
+        out.append(
+            {
+                "id": aid,
+                "name": f"Adversarial {name}",
+                "mitre": mitre,
+                "source": "adversarial",
+                "day": day,
+                "t": tkey(day),
+                "log": log,
+                "expected_threat": True,
+                "label": "Attack",
+            }
+        )
+    return out
+
+
 def build_stream():
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
@@ -306,6 +457,93 @@ def build_stream():
     #     Cổng cho phép + fwd thấp + không signature => luật TĨNH bỏ sót; nhưng lệch
     #     baseline cực mạnh => Welford Z-score bắt. warmup prefix đảm bảo baseline đã ấm.
     main.extend(_build_zerodays(samples, tkey))
+
+    # --- Inject Adversarial ---
+    main.extend(_build_adversarials(tkey))
+
+    # --- MAX DỮ LIỆU THÔ TỪ RAW (KHÁC TẬP TRAIN) ---
+    import os
+
+    import pandas as pd
+
+    print("LOADING UNSEEN RAW DATA FOR DEMO...")
+
+    # 1. Load CICIDS2018 unseen data (skip first 80000 rows used in train)
+    cic_path = os.path.join(
+        ROOT, "data", "raw", "cicids2018", "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv"
+    )
+    if os.path.exists(cic_path):
+        df_cic = pd.read_csv(
+            cic_path, skiprows=list(range(1, 80001)), nrows=20000, low_memory=False
+        )
+        df_cic.rename(columns=lambda x: x.strip(), inplace=True)
+        for i, (_, row) in enumerate(df_cic.iterrows()):
+            is_attack = str(row.get("Label", "")).strip().lower() != "benign"
+            log = {
+                "Source IP": f"192.168.2.{i % 254}",
+                "Destination IP": "10.0.0.1",
+                "Destination Port": 80 if is_attack else _safe_int(row.get("Dst Port", 443)),
+                "Protocol": 6,
+                "Flow Duration": _safe_int(row.get("Flow Duration")),
+                "Total Fwd Packets": _safe_int(row.get("Tot Fwd Pkts")),
+                "Total Backward Packets": _safe_int(row.get("Tot Bwd Pkts")),
+                "Total Length of Fwd Packets": _safe_int(row.get("TotLen Fwd Pkts")),
+                "Total Length of Bwd Packets": _safe_int(row.get("TotLen Bwd Pkts")),
+                "Flow Pkts/s": _safe_float(row.get("Flow Pkts/s")),
+                "Fwd Seg Size Min": _safe_int(row.get("Fwd Seg Size Min")),
+                "Init Fwd Win Byts": _safe_int(row.get("Init Fwd Win Byts")),
+                "Init Bwd Win Byts": _safe_int(row.get("Init Bwd Win Byts")),
+                "Bwd Pkt Len Min": _safe_int(row.get("Bwd Pkt Len Min")),
+                "PSH Flag Cnt": _safe_int(row.get("PSH Flag Cnt")),
+                "service": "HTTP",
+            }
+            ev = {
+                "source": "cicids_max",
+                "log": log,
+                "expected_threat": is_attack,
+                "label": "Attack" if is_attack else "Benign",
+                "t": tkey(1 + i % 5),
+            }
+            main.append(ev)
+
+    # 2. Load DAPT2020 unseen data (skip first 15000 rows used in train)
+    dapt_path = os.path.join(ROOT, "data", "raw", "dapt2020", "day1.csv")
+    if os.path.exists(dapt_path):
+        df_dapt = pd.read_csv(
+            dapt_path, skiprows=list(range(1, 15001)), nrows=5000, low_memory=False
+        )
+        df_dapt.rename(columns=lambda x: x.strip(), inplace=True)
+        for i, (_, row) in enumerate(df_dapt.iterrows()):
+            label = str(row.get("Label", row.get("label", ""))).strip().lower()
+            is_attack = label not in ["normal", "benign"]
+            log = {
+                "Source IP": f"192.168.3.{i % 254}",
+                "Destination IP": "10.0.0.1",
+                "Destination Port": 80 if is_attack else 443,
+                "Protocol": 6,
+                "Flow Duration": _safe_int(
+                    row.get("Flow Duration", row.get("Flow Bytes/s", 0))
+                ),  # Approximation mapping if needed
+                "Total Fwd Packets": _safe_int(row.get("Total Fwd Packet")),
+                "Total Backward Packets": _safe_int(row.get("Total Bwd packets")),
+                "Total Length of Fwd Packets": _safe_int(row.get("Total Length of Fwd Packet")),
+                "Total Length of Bwd Packets": _safe_int(row.get("Total Length of Bwd Packet")),
+                "Flow Pkts/s": float(row.get("Flow Packets/s", 0) or 0),
+                "Fwd Seg Size Min": _safe_int(row.get("Fwd Segment Size Min", 0)),
+                "Init Fwd Win Byts": _safe_int(row.get("FWD Init Win Bytes")),
+                "Init Bwd Win Byts": _safe_int(row.get("Bwd Init Win Bytes")),
+                "Bwd Pkt Len Min": _safe_int(row.get("Bwd Packet Length Min")),
+                "PSH Flag Cnt": _safe_int(row.get("PSH Flag Count")),
+                "service": "HTTP",
+            }
+            ev = {
+                "source": "dapt_max",
+                "log": log,
+                "expected_threat": is_attack,
+                "label": "Attack" if is_attack else "Benign",
+                "t": tkey(1 + i % 5),
+            }
+            main.append(ev)
 
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)

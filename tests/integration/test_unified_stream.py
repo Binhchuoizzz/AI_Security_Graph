@@ -182,9 +182,12 @@ def test_zerodays_real_derived_invariants():
         gt = json.load(f)
     zds = _build_zerodays(gt, tkey=lambda day: float(day))
 
-    assert len(zds) == len(ZD_SPECS) == 7
-    assert len({z["id"] for z in zds}) == 7, "id zero-day bị trùng"
-    assert {z["day"] for z in zds} == {2, 3, 4, 5}, "zero-day phải rải ngày 2-5"
+    # Số spec là biến (đã mở rộng 7 -> 15). Test bám THEO ZD_SPECS, không chốt cứng con số,
+    # nhưng vẫn giữ các bất biến bản chất: đủ số, id duy nhất, rải nhiều ngày.
+    assert len(zds) == len(ZD_SPECS) >= 7
+    assert len({z["id"] for z in zds}) == len(ZD_SPECS), "id zero-day bị trùng"
+    assert {z["day"] for z in zds} == {s[6] for s in ZD_SPECS}, "ngày zero-day phải khớp spec"
+    assert len({z["day"] for z in zds}) >= 4, "zero-day phải rải trên nhiều ngày (>=4)"
 
     engine = RuleEngine()
     for z, (zid, _name, feat, val, _dst, _mitre, day) in zip(zds, ZD_SPECS, strict=False):
