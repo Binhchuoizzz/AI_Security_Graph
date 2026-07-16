@@ -2,7 +2,7 @@
 
 > Bạn KHÔNG cần đọc hết 37 file `src/`. Chỉ cần **bám theo hành trình của MỘT bản ghi log** đi qua hệ thống — mỗi điểm dừng học **1 khái niệm + 1 công nghệ + 1 hàm cốt lõi**, rồi chạy 1 lệnh để **thấy tận mắt**. Đọc xong 11 điểm dừng dưới đây là đủ hiểu + giải thích được toàn hệ.
 >
-> Tài liệu bạn đọc: **file này** (đọc code theo luồng) → [codebase_summary.md](codebase_summary.md) (bản đồ file→vai trò) → [RUN_PROJECT.md](../guides/RUN_PROJECT.md) (cách chạy).
+> Tài liệu bạn đọc: **file này** (đọc code theo luồng) → [Bản đồ Quyết định 2 Tier](04_DECISION_MAP_TIER1_TIER2.md) (chi tiết điều kiện Block/Alert) → [codebase_summary.md](codebase_summary.md) (bản đồ file→vai trò) → [RUN_PROJECT.md](../guides/RUN_PROJECT.md) (cách chạy).
 
 ---
 

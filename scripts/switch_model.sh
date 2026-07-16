@@ -1,67 +1,80 @@
 #!/bin/bash
-# ==============================================================================
-# SENTINEL Model Switcher Script
-# Tự động thay đổi model trong .env và restart container llm
-# ==============================================================================
 
-ENV_FILE=".env"
-GEMMA_MODEL="gemma-2-9b-it-Q6_K.gguf"
-LLAMA_MODEL="Meta-Llama-3-8B-Instruct-Q5_K_M.gguf"
+# Thư mục chứa các model tải về
+MODELS_DIR="/home/binhchuoiz/text-generation-webui/user_data/models"
 
-if [ ! -f "$ENV_FILE" ]; then
-    echo "[!] ERROR: Không tìm thấy file .env ở thư mục hiện tại!"
-    exit 1
-fi
-
-show_usage() {
-    echo "Sử dụng: $0 [gemma | llama | <tên_file_model.gguf>]"
-    echo "  gemma: Switch sang Google Gemma 2 9B IT (Agent suy luận mặc định)"
-    echo "  llama: Switch sang Meta Llama 3 8B Instruct (AI Trọng tài đánh giá)"
-}
-
+# Kiểm tra nếu không truyền tham số
 if [ -z "$1" ]; then
-    show_usage
+    echo "=========================================="
+    echo "🔧 CÔNG CỤ CHUYỂN ĐỔI MODEL LLM SENTINEL"
+    echo "=========================================="
+    echo "Sử dụng: ./scripts/switch_model.sh <số_thứ_tự_hoặc_tên_file>"
+    echo ""
+    echo "📦 Các model đang có sẵn trong thư mục của bạn:"
+    ls -1 "$MODELS_DIR" | grep -E "\.gguf$" | cat -n
+    echo ""
+    echo "💡 Ví dụ chạy: ./scripts/switch_model.sh 2"
     exit 1
 fi
 
-TARGET_MODEL=""
-if [ "$1" == "gemma" ]; then
-    TARGET_MODEL="$GEMMA_MODEL"
-elif [ "$1" == "llama" ]; then
-    TARGET_MODEL="$LLAMA_MODEL"
-else
-    TARGET_MODEL="$1"
-fi
+MODEL_TARGET="$1"
 
-echo "[*] Đang chuyển đổi LLM sang model: $TARGET_MODEL..."
-
-# Thay thế dòng LLM_MODEL_FILE trong .env bằng regex
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # MacOS syntax
-    sed -i '' "s/LLM_MODEL_FILE=.*/LLM_MODEL_FILE=$TARGET_MODEL/g" "$ENV_FILE"
-else
-    # Linux syntax
-    sed -i "s/LLM_MODEL_FILE=.*/LLM_MODEL_FILE=$TARGET_MODEL/g" "$ENV_FILE"
-fi
-
-echo "[+] Đã cập nhật file .env thành công."
-echo "[*] Đang khởi động lại container sentinel_llm..."
-
-docker-compose up -d llm
-
-echo "[*] Chờ container llm chuyển sang trạng thái healthy..."
-while true; do
-    STATUS=$(docker inspect --format='{{json .State.Health.Status}}' sentinel_llm 2>/dev/null)
-    if [ "$STATUS" == "\"healthy\"" ]; then
-        echo -e "\n[+] Container sentinel_llm đã ONLINE và HEALTHY!"
-        break
-    elif [ "$STATUS" == "\"unhealthy\"" ]; then
-        echo -e "\n[!] ERROR: Container sentinel_llm gặp lỗi khi load model!"
+# Kiểm tra nếu tham số truyền vào là 1 con số (chọn từ menu)
+if [[ "$MODEL_TARGET" =~ ^[0-9]+$ ]]; then
+    MODEL_FILE=$(ls -1 "$MODELS_DIR" | grep -E "\.gguf$" | sed -n "${MODEL_TARGET}p")
+    if [ -z "$MODEL_FILE" ]; then
+        echo "[!] LỖI: Không tìm thấy model ở số thứ tự: $MODEL_TARGET"
         exit 1
-    else
-        echo -n "."
-        sleep 3
     fi
-done
+else
+    # Nếu truyền tên file trực tiếp
+    MODEL_FILE="$MODEL_TARGET"
+    if [ ! -f "$MODELS_DIR/$MODEL_FILE" ]; then
+        echo "[!] LỖI: Không tồn tại file: $MODELS_DIR/$MODEL_FILE"
+        exit 1
+    fi
+fi
 
-echo "[+] Done! Hệ thống đã được cấu hình với model: $TARGET_MODEL."
+echo "[*] Đang cấu hình chuyển sang model: $MODEL_FILE"
+
+# Cập nhật file .env (thay thế dòng LLM_MODEL_FILE)
+if grep -q "^LLM_MODEL_FILE=" .env; then
+    sed -i "s|^LLM_MODEL_FILE=.*|LLM_MODEL_FILE=$MODEL_FILE|g" .env
+else
+    echo "LLM_MODEL_FILE=$MODEL_FILE" >> .env
+fi
+
+# Tự động điều chỉnh Context Size để chống tràn VRAM (OOM) cho các model 13B (không có GQA)
+if [[ "$MODEL_FILE" == *"13B"* ]]; then
+    CTX_SIZE=8192
+else
+    CTX_SIZE=16384
+fi
+
+if grep -q "^LLAMA_ARG_CTX_SIZE=" .env; then
+    sed -i "s|^LLAMA_ARG_CTX_SIZE=.*|LLAMA_ARG_CTX_SIZE=$CTX_SIZE|g" .env
+else
+    echo "LLAMA_ARG_CTX_SIZE=$CTX_SIZE" >> .env
+fi
+
+echo "[*] Đang gửi lệnh khởi động lại container sentinel_llm..."
+# Dùng docker-compose up -d để recreate container llm với biến môi trường mới
+export LLM_MODEL_FILE="$MODEL_FILE"
+docker-compose up -d --force-recreate llm
+
+echo "------------------------------------------"
+echo "[+] Đã cấu hình sang model: $MODEL_FILE"
+echo "[*] Đang đợi model nạp lên VRAM (khoảng 15-30 giây)..."
+
+# Đợi server báo healthy qua healthcheck
+for i in {1..30}; do
+    LOADED_MODEL=$(curl -s http://localhost:5000/v1/models | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+    if [ ! -z "$LOADED_MODEL" ]; then
+        echo "------------------------------------------"
+        echo "🚀 HOÀN TẤT! Model đang chạy TRÊN VRAM ngay lúc này là:"
+        echo "   👉 $LOADED_MODEL"
+        echo "------------------------------------------"
+        break
+    fi
+    sleep 2
+done

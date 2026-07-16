@@ -305,7 +305,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         col_btn1, col_btn2 = st.columns([1, 4])
         with col_btn1:
             if on_whitelist:
-                # IP chưa được Whitelist
+                # Nếu có truyền callback, hiển thị nút Whitelist
                 if is_l3_manager:
                     if st.button(
                         f"🛡️ Whitelist IP: {cleaned_target}",
@@ -321,14 +321,6 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
                         disabled=True,
                         help="💡 Yêu cầu vai trò L3 Manager để whitelist IP này.",
                     )
-            else:
-                # IP đã được Whitelist rồi
-                st.button(
-                    f"✅ Đã Whitelist IP: {cleaned_target}",
-                    key=f"wl_btn_done_{cleaned_target}_{timestamp}_{card_id}",
-                    disabled=True,
-                    help="💡 IP này đã nằm trong danh sách đặc cách (Whitelist).",
-                )
         with col_btn2:
             if on_block and action != "BLOCK_IP":
                 if is_l3_manager:

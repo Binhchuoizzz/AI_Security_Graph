@@ -759,6 +759,7 @@ def main_dashboard():
                 </div>""",
                 unsafe_allow_html=True,
             )
+        else:
             # Chia thành 3 Tier
             alerts_t1 = []
             alerts_t2 = []
@@ -776,9 +777,9 @@ def main_dashboard():
 
             t1_tab, t2_tab, t3_tab = st.tabs(
                 [
-                    f"🟢 Tier-1 Filter ({len(alerts_t1)})",
-                    f"⚡ Tier-2 · Cổng ML ({len(alerts_t2)})",
-                    f"🧠 Tier-2 · LLM ({len(alerts_t3)})",
+                    "🟢 Tier 1 (Filter)",
+                    "⚡ Tier 2 (ML)",
+                    "🧠 Tier 3 (LLM)",
                 ]
             )
 
@@ -803,6 +804,8 @@ def main_dashboard():
                     render_alert_card(
                         alert,
                         is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
+                        on_whitelist=handle_whitelist_approval,
+                        on_block=handle_block_approval,
                         card_id=f"{tab_key}_{start_idx + idx}",
                     )
 
@@ -833,10 +836,13 @@ def main_dashboard():
                             st.rerun()
 
             with t1_tab:
+                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t1)}**")
                 _render_alerts_list(alerts_t1, "t1")
             with t2_tab:
+                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2)}**")
                 _render_alerts_list(alerts_t2, "t2")
             with t3_tab:
+                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t3)}**")
                 _render_alerts_list(alerts_t3, "t3")
 
     with tab2:
@@ -859,9 +865,9 @@ def main_dashboard():
 
             tab_t1, tab_t2, tab_t3 = st.tabs(
                 [
-                    f"🟢 Tier-1 Filter ({len(pending_t1)})",
-                    f"⚡ Tier-2 · Cổng ML ({len(pending_t2)})",
-                    f"🧠 Tier-2 · LLM ({len(pending_t3)})",
+                    "🟢 Tier 1 (Filter)",
+                    "⚡ Tier 2 (ML)",
+                    "🧠 Tier 3 (LLM)",
                 ]
             )
 
@@ -990,10 +996,13 @@ def main_dashboard():
                             st.rerun()
 
             with tab_t1:
+                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t1)}**")
                 _render_pending_list(pending_t1, "hitl_page_t1")
             with tab_t2:
+                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t2)}**")
                 _render_pending_list(pending_t2, "hitl_page_t2")
             with tab_t3:
+                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t3)}**")
                 _render_pending_list(pending_t3, "hitl_page_t3")
 
         st.markdown("---")

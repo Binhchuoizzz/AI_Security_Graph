@@ -112,7 +112,28 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
-  dynamic_rules: []
+  dynamic_rules:
+  - created_at: '2026-07-16T21:58:13'
+    field: Source IP
+    pattern: 209.147.138.38
+    reason: IP 209.147.138.38 đã thực hiện 10 lần kết nối HTTPS đến cổng 443 trong
+      một khoảng thời gian ngắn. Mặc dù cổng 443 là cổng tiêu chuẩn cho HTTPS, nhưng
+      số lượng kết nối đột ngột và liên tục đến cổng này từ một địa chỉ IP duy nhất
+      là dấu hiệu đáng ngờ. Điều này có thể là một dấu hiệu cho thấy kẻ tấn công đang
+      cố gắng sử dụng cổng 443 để thực hiện các hoạt động C2 (Command and Control)
+      bằng cách ẩn hoạt động của chúng trong lưu lượng HTTPS hợp pháp. Việc sử dụng
+      cổng 443 bất thường có thể là một kỹ thuật để né tránh các hệ thống giám sát
+      và bộ lọc mạng. Do đó, để ngăn chặn hoạt động C2 tiềm ẩn, nên chặn IP 209.147.138.38.
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-16T21:59:12'
+    field: Source IP
+    pattern: 10.200.11.121
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.96%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
   golden_baseline:
     enabled: true
     path: config/golden_baseline.json

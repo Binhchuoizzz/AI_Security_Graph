@@ -286,13 +286,11 @@ def fetch_and_build(
             )
             df.columns = df.columns.str.strip()
 
-            # Chỉ lọc các cột quan tâm (khớp cột linh hoạt)
-            available_cols = [c for c in FEATURE_COLS if c in df.columns]
             if "Label" not in df.columns:
                 print(f"     [WARN] No 'Label' column in {filename}, skipping.")
                 continue
             df = df[df["Label"] != "Label"]  # loại bỏ các hàng tiêu đề thừa
-            df_filtered = df[available_cols].copy()
+            df_filtered = df.copy()
 
             # Chuẩn hóa chuỗi nhãn
             df_filtered["Label"] = df_filtered["Label"].str.strip()  # pyright: ignore[reportAttributeAccessIssue]
@@ -300,8 +298,12 @@ def fetch_and_build(
             # Chỉ giữ các nhãn có trong LABEL_MAP
             valid_labels = list(LABEL_MAP.keys())
             df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]  # pyright: ignore[reportAttributeAccessIssue]
+            
+            # Downsample early to prevent OOM
+            df_filtered = df_filtered.groupby("Label").head(10000)
+            
             all_data.append(df_filtered)
-            print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm.")
+            print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm (sau downsample).")
         except Exception as e:
             print(f"[!] Lỗi khi xử lý file {filename}: {e}")
 
@@ -324,8 +326,7 @@ def fetch_and_build(
                 chunk["Label"] = chunk["Label"].astype(str).str.strip()
                 atk = chunk[chunk["Label"] == LOIC_HTTP_LABEL]
                 if len(atk):
-                    cols = [c for c in FEATURE_COLS if c in atk.columns]
-                    collected.append(atk[cols].copy())
+                    collected.append(atk.copy())
                 if sum(len(c) for c in collected) >= cap:
                     break
             if collected:
@@ -440,47 +441,56 @@ def fetch_and_build(
             else:
                 timestamp = "2018-02-14T10:00:00Z"
 
+            log = row.to_dict()
+            for k, v in log.items():
+                if pd.isna(v): log[k] = 0
+            log.update({
+                "timestamp": timestamp,
+                "src_ip": src_ip,
+                "dst_ip": dst_ip,
+                "src_port": src_port,
+                "dst_port": dst_port,
+                "protocol": safe_int(row.get("Protocol", 6)),
+                "flow_duration_us": safe_int(row.get("Flow Duration", 0)),
+                "fwd_packets": safe_int(row.get("Tot Fwd Pkts", 0)),
+                "bwd_packets": safe_int(row.get("Tot Bwd Pkts", 0)),
+                "fwd_bytes": safe_int(row.get("TotLen Fwd Pkts", 0)),
+                "bwd_bytes": safe_int(row.get("TotLen Bwd Pkts", 0)),
+                "fwd_seg_size_min": safe_int(row.get("Fwd Seg Size Min", 0)),
+                "init_fwd_win_byts": safe_int(row.get("Init Fwd Win Byts", 0)),
+                "init_bwd_win_byts": safe_int(row.get("Init Bwd Win Byts", 0)),
+                "bwd_pkt_len_min": safe_int(row.get("Bwd Pkt Len Min", 0)),
+                "flow_pkts_s": safe_float(row.get("Flow Pkts/s", 0.0)),
+                "psh_flag_cnt": safe_int(row.get("PSH Flag Cnt", 0)),
+                "service": _infer_service(dst_port),
+            })
+            log.pop("Label", None)
+            log.pop("Timestamp", None)
+            log.pop("Flow ID", None)
+            log.pop("Src IP", None)
+            log.pop("Dst IP", None)
+            log.pop("Src Port", None)
+
             sample = {
                 "id": f"GT-{gt_counter:03d}",
                 "description": f"{label} attack sample from CSE-CIC-IDS2018",
-                "logs": [
-                    {
-                        "timestamp": timestamp,
-                        "src_ip": src_ip,
-                        "dst_ip": dst_ip,
-                        "src_port": src_port,
-                        "dst_port": dst_port,
-                        "protocol": safe_int(row.get("Protocol", 6)),
-                        "flow_duration_us": safe_int(row.get("Flow Duration", 0)),
-                        "fwd_packets": safe_int(row.get("Tot Fwd Pkts", 0)),
-                        "bwd_packets": safe_int(row.get("Tot Bwd Pkts", 0)),
-                        "fwd_bytes": safe_int(row.get("TotLen Fwd Pkts", 0)),
-                        "bwd_bytes": safe_int(row.get("TotLen Bwd Pkts", 0)),
-                        "fwd_seg_size_min": safe_int(row.get("Fwd Seg Size Min", 0)),
-                        "init_fwd_win_byts": safe_int(row.get("Init Fwd Win Byts", 0)),
-                        "init_bwd_win_byts": safe_int(row.get("Init Bwd Win Byts", 0)),
-                        "bwd_pkt_len_min": safe_int(row.get("Bwd Pkt Len Min", 0)),
-                        "psh_flag_cnt": safe_int(row.get("PSH Flag Cnt", 0)),
-                        "flow_pkts_s": safe_float(row.get("Flow Pkts/s", 0.0)),
-                        "service": _infer_service(dst_port),
-                    }
-                ],
+                "logs": [log],
                 "expected_mitre_technique": (
                     mapping["sub"] if mapping["sub"] else mapping["mitre"]
                 ),
                 "expected_action": mapping["action"],
                 "expected_severity": mapping["severity"],
                 "labeling_notes": f"Auto-mapped from CSE-CIC-IDS2018 label '{label}'.",
-            }
-            # Thêm tầng mạng thô để tương thích với simulate_traffic.py
-            sample["input"] = {
-                "network_layer": sample["logs"][0].copy(),
-                "application_layer": {
-                    "service": _infer_service(dst_port),
-                    "payload_snippet": None,
-                    "user_agent": None,
-                },
-                "cicids_label": label,
+                # Thêm tầng mạng thô để tương thích với simulate_traffic.py
+                "input": {
+                    "network_layer": log.copy(),
+                    "application_layer": {
+                        "service": _infer_service(dst_port),
+                        "payload_snippet": None,
+                        "user_agent": None,
+                    },
+                    "cicids_label": label,
+                }
             }
             samples.append(sample)
             gt_counter += 1

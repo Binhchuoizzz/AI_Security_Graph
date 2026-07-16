@@ -46,7 +46,7 @@ def _whitelisted_ips() -> frozenset:
     if mtime == _wl_cache["mtime"]:
         return _wl_cache["ips"]
     try:
-        import yaml
+        import yaml  # type: ignore
 
         with open(CONFIG_YAML_PATH) as f:
             cfg = yaml.safe_load(f) or {}
@@ -208,7 +208,7 @@ def _redis_url() -> str:
     if url:
         return url
     try:
-        import yaml
+        import yaml  # type: ignore
 
         with open(CONFIG_YAML_PATH) as f:
             return (yaml.safe_load(f) or {}).get("redis", {}).get("url", "redis://localhost:6379/0")
@@ -226,8 +226,8 @@ def _add_to_blacklist(ip: str, ttl: int = 3600) -> None:
         redis.Redis.from_url(_redis_url(), socket_connect_timeout=0.5).setex(
             f"blacklist:{ip}", ttl, "1"
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to add to Redis blacklist: {e}")
 
 
 def _remove_from_blacklist(ip: str) -> None:
@@ -236,8 +236,8 @@ def _remove_from_blacklist(ip: str) -> None:
         import redis  # type: ignore
 
         redis.Redis.from_url(_redis_url(), socket_connect_timeout=0.5).delete(f"blacklist:{ip}")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to remove from Redis blacklist: {e}")
 
 
 def unblock_ip(ip: str):

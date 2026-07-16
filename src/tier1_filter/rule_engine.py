@@ -618,8 +618,10 @@ class RuleEngine:
             for alias in aliases:
                 if alias in log_entry:
                     try:
-                        val = float(log_entry[alias])
-                        break
+                        parsed = float(log_entry[alias])
+                        if not math.isinf(parsed) and not math.isnan(parsed):
+                            val = parsed
+                            break
                     except (ValueError, TypeError):
                         pass
             if val is not None:

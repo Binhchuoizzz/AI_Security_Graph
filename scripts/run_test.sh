@@ -93,9 +93,9 @@ fi
 echo "▶ [5/5] ĐẨY LUỒNG GỘP → Dashboard (CICIDS + DAPT + Zero-day + Adversarial)…"
 if [ "$PUSH" = "small" ]; then
   UNIFIED_STREAM_BATCH="${UNIFIED_STREAM_BATCH:-50}" UNIFIED_STREAM_DELAY="${UNIFIED_STREAM_DELAY:-0.1}" \
-    "$PY" scripts/demo.py
+    "$PY" scripts/push_datatest.py
 else
-  "$PY" scripts/demo.py
+  "$PY" scripts/push_datatest.py
 fi
 
 echo ""

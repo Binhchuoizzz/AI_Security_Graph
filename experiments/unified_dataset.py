@@ -58,24 +58,33 @@ def _is_threat(action: str) -> bool:
 
 def map_cicids(nl: dict) -> dict:
     """network_layer (ground_truth) -> schema CICIDS mà RuleEngine mong đợi."""
-    return {
-        "Source IP": nl.get("src_ip", "0.0.0.0"),
-        "Destination IP": nl.get("dst_ip", "0.0.0.0"),
-        "Destination Port": nl.get("dst_port", 0),
-        "Protocol": nl.get("protocol", 6),
-        "Flow Duration": nl.get("flow_duration_us", 0),
-        "Total Fwd Packets": nl.get("fwd_packets", 0),
-        "Total Backward Packets": nl.get("bwd_packets", 0),
-        "Total Length of Fwd Packets": nl.get("fwd_bytes", 0),
-        "Total Length of Bwd Packets": nl.get("bwd_bytes", 0),
-        "Flow Pkts/s": nl.get("flow_pkts_s", 0.0),
-        "Fwd Seg Size Min": nl.get("fwd_seg_size_min", 0),
-        "Init Fwd Win Byts": nl.get("init_fwd_win_byts", 0),
-        "Init Bwd Win Byts": nl.get("init_bwd_win_byts", 0),
-        "Bwd Pkt Len Min": nl.get("bwd_pkt_len_min", 0),
-        "PSH Flag Cnt": nl.get("psh_flag_cnt", 0),
-        "service": nl.get("service", ""),
+    # Trả về toàn bộ các key trong nl, đảm bảo tính đồng bộ với ML pipeline
+    res = nl.copy()
+    
+    # Chuẩn hoá các key cũ nếu có (dành cho ground_truth.json cũ)
+    mapping = {
+        "src_ip": "Source IP",
+        "dst_ip": "Destination IP",
+        "dst_port": "Destination Port",
+        "protocol": "Protocol",
+        "flow_duration_us": "Flow Duration",
+        "fwd_packets": "Total Fwd Packets",
+        "bwd_packets": "Total Backward Packets",
+        "fwd_bytes": "Total Length of Fwd Packets",
+        "bwd_bytes": "Total Length of Bwd Packets",
+        "flow_pkts_s": "Flow Pkts/s",
+        "fwd_seg_size_min": "Fwd Seg Size Min",
+        "init_fwd_win_byts": "Init Fwd Win Byts",
+        "init_bwd_win_byts": "Init Bwd Win Byts",
+        "bwd_pkt_len_min": "Bwd Pkt Len Min",
+        "psh_flag_cnt": "PSH Flag Cnt"
     }
+    
+    for old_k, new_k in mapping.items():
+        if old_k in res and new_k not in res:
+            res[new_k] = res.pop(old_k)
+
+    return res
 
 
 def static_only_action(engine: RuleEngine, log: dict) -> str:
@@ -479,24 +488,25 @@ def build_stream():
         df_cic.rename(columns=lambda x: x.strip(), inplace=True)
         for i, (_, row) in enumerate(df_cic.iterrows()):
             is_attack = str(row.get("Label", "")).strip().lower() != "benign"
-            log = {
+            log = row.to_dict()
+            # Fill NaNs with 0
+            for k, v in log.items():
+                if pd.isna(v):
+                    log[k] = 0
+            # Overlay specific fields we want to override
+            log.update({
                 "Source IP": f"192.168.2.{i % 254}",
                 "Destination IP": "10.0.0.1",
                 "Destination Port": 80 if is_attack else _safe_int(row.get("Dst Port", 443)),
                 "Protocol": 6,
-                "Flow Duration": _safe_int(row.get("Flow Duration")),
-                "Total Fwd Packets": _safe_int(row.get("Tot Fwd Pkts")),
-                "Total Backward Packets": _safe_int(row.get("Tot Bwd Pkts")),
-                "Total Length of Fwd Packets": _safe_int(row.get("TotLen Fwd Pkts")),
-                "Total Length of Bwd Packets": _safe_int(row.get("TotLen Bwd Pkts")),
-                "Flow Pkts/s": _safe_float(row.get("Flow Pkts/s")),
-                "Fwd Seg Size Min": _safe_int(row.get("Fwd Seg Size Min")),
-                "Init Fwd Win Byts": _safe_int(row.get("Init Fwd Win Byts")),
-                "Init Bwd Win Byts": _safe_int(row.get("Init Bwd Win Byts")),
-                "Bwd Pkt Len Min": _safe_int(row.get("Bwd Pkt Len Min")),
-                "PSH Flag Cnt": _safe_int(row.get("PSH Flag Cnt")),
                 "service": "HTTP",
-            }
+            })
+            log.pop("Label", None)
+            log.pop("Timestamp", None)
+            log.pop("Flow ID", None)
+            log.pop("Src IP", None)
+            log.pop("Dst IP", None)
+            log.pop("Src Port", None)
             ev = {
                 "source": "cicids_max",
                 "log": log,

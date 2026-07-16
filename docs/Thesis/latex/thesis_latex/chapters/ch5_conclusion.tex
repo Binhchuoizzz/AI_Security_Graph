@@ -42,6 +42,15 @@ The fourth axis is \textit{an elastic cognitive worker pool}. Tier-2 throughput 
 
 Fronting a stateless dashboard tier with a load balancer and placing an ingestion-side rate limiter ahead of the broker to absorb volumetric floods complete the picture. Taken together, these five axes chart a concrete migration from a validated single-host research prototype to a fault-tolerant, horizontally scalable deployment, addressing the saturation and single-GPU limitations named above, without altering the two-tier cognitive architecture that this thesis validates.
 
+Particularly, to ready the system for enterprise-scale deployment at organizations like FPT Software, the following four radical optimization directions are proposed:
+\begin{itemize}
+    \item \textbf{Complete Microservice Decoupling:} Instead of Tier-1 and Tier-2 sharing a single Python process (which is bottlenecked by the Global Interpreter Lock - GIL), Tier-2 will be extracted into an independent service communicating with Tier-1 entirely via a Message Broker. This allows Tier-2 to scale out across multiple physical servers limitlessly.
+    \item \textbf{Tier-1 Performance Optimization via Golang/Rust:} Rewriting the \texttt{RuleEngine} component of Tier-1 using compiled systems programming languages (such as Golang or Rust) instead of Python to eliminate JSON deserialization overhead and maximize the throughput of Z-Score and WAF Regex calculations, enabling the system to smoothly handle millions of events per second.
+    \item \textbf{Adopting Apache Kafka for Persistence:} Replacing Redis Streams with Apache Kafka. While Redis stores data in RAM, posing an Out-of-Memory (OOM) risk if Tier-2 is congested, Kafka writes data to disk sequentially. This ensures that no matter how massive the network traffic burst is, it is safely buffered without crashing the firewall.
+    \item \textbf{Utilizing vLLM / TGI for Continuous Batching:} Replacing \texttt{llama.cpp} with \texttt{vLLM} or \texttt{Text Generation Inference (TGI)}. Overcoming the round-robin processing bottleneck of \texttt{llama.cpp}, the PagedAttention technique of \texttt{vLLM} allows batching dozens of network log queries to be processed simultaneously on the GPU in a single clock cycle, multiplying the response speed of Tier-2.
+    \item \textbf{Raw Log to APT Inference:} Instead of relying on simulated dataset labels (e.g., \texttt{apt\_phase} from DAPT2020), the Production system will automatically record any IP with a high Z-Score or minor rule violations at Tier-1 into the Threat Memory alongside its timestamp. When an IP accumulates sufficient violations spanning across 2-3 days, the system will automatically trigger an APT Emergent flag and force an ESCALATE action to the AI agent for comprehensive analysis.
+\end{itemize}
+
 \vspace{1cm}
 \begin{flushright}
     \textit{Closing a modest endeavor, yet opening profound aspirations in the pursuit of securing the digital realm through the power of Agentic AI.}
