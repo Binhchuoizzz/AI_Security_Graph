@@ -47,10 +47,10 @@ You MUST respond in pure JSON format matching this exact schema:
 {{
   "action": "BLOCK_IP" | "ALERT" | "LOG" | "AWAIT_HITL",
   "confidence": <float between 0.0 and 1.0>,
-  "mitre_technique": "<ID - Name của kỹ thuật NGUY HIỂM NHẤT trong chuỗi tấn công (lấy từ RAG context). VD: nếu có cả Reconnaissance và Initial Access, hãy chọn Initial Access làm đại diện. Nếu KHÔNG khớp, ghi 'N/A'>",
-  "attack_method": "<Ngắn gọn (tiếng Việt): họ tấn công + thủ đoạn cụ thể, ví dụ 'Brute-force SSH bằng password spraying' hoặc 'Log-substrate prompt injection qua delimiter smuggling'. Nếu chưa chắc, ghi phỏng đoán khả dĩ nhất>",
+  "mitre_technique": "<ID - Name của kỹ thuật NGUY HIỂM NHẤT trong chuỗi tấn công (lấy từ RAG context). VD: nếu có cả Reconnaissance và Initial Access, hãy chọn Initial Access làm đại diện. Nếu không có kỹ thuật nào khớp 100%, hãy TỰ SUY LUẬN kỹ thuật gần đúng nhất dựa trên hành vi bất thường, hoặc ghi 'N/A'>",
+  "attack_method": "<Ngắn gọn (tiếng Việt): họ tấn công + thủ đoạn cụ thể, ví dụ 'Brute-force SSH bằng password spraying' hoặc 'Log-substrate prompt injection qua delimiter smuggling'. Nếu log là các dạng tấn công mới (Zero-day) hoặc không có nhãn rõ ràng, hãy TỰ SUY LUẬN bản chất cuộc tấn công dựa trên payload/lưu lượng mạng.>",
   "nist_control": "<Phase/Control - Name from NIST SP 800-61r2 context, or N/A>",
-  "reasoning": "<Phân tích CHI TIẾT bằng tiếng Việt (4-6 câu) theo 4 phần: (1) BẰNG CHỨNG — đặc trưng CỤ THỂ quan sát được; (2) CHUỖI TẤN CÔNG (THEO THỜI GIAN) — Liệt kê RÕ RÀNG tiến trình thời gian của hacker (VD: 'Bước 1: Quét cổng 80/443 (Reconnaissance). Bước 2: Dò mật khẩu SSH cổng 22 (Initial Access). Bước 3: Gửi payload độc hại (Execution)'); (3) KỸ THUẬT — ID+tên MITRE nguy hiểm nhất và VÌ SAO chọn nó làm đại diện; (4) HÀNH ĐỘNG — vì sao chọn action này.>",
+  "reasoning": "<Phân tích CHI TIẾT bằng tiếng Việt (4-6 câu) theo 4 phần: (1) BẰNG CHỨNG — đặc trưng CỤ THỂ quan sát được; (2) CHUỖI TẤN CÔNG (THEO THỜI GIAN) — Liệt kê RÕ RÀNG tiến trình thời gian dựa trên các log truyền vào. LƯU Ý: Nếu 10 log đều chỉ phản ánh MỘT hành vi duy nhất (VD: gửi nhiều gói tin), thì CHỈ GHI 1 BƯỚC. TUYỆT ĐỐI KHÔNG ẢO TƯỞNG (hallucinate) ra các bước như 'khởi tạo kết nối' hay 'gửi dữ liệu' nếu log không thể hiện rõ điều đó; (3) KỸ THUẬT — ID+tên MITRE (hoặc kỹ thuật tự suy luận) nguy hiểm nhất và VÌ SAO chọn nó làm đại diện; (4) HÀNH ĐỘNG — vì sao chọn action này.>",
   "extracted_iocs": [
     {{"ioc_type": "ip", "value": "192.168.1.1", "severity": "high"}},
     {{"ioc_type": "cve", "value": "CVE-2014-0160", "severity": "critical"}}
