@@ -35,19 +35,26 @@ print(f"[*] Loading dataset from {DATA_FILE}...")
 df = pd.read_csv(DATA_FILE)
 
 y = df["Target"].values
-exclude = [
-    "Dst Port",
-    "Protocol",
-    "Timestamp",
-    "Flow ID",
-    "Src IP",
-    "Src Port",
-    "Dst IP",
-    "Stage",
-    "Label",
-    "Target",
-]
-features = [c for c in df.columns if c not in exclude]
+# Define mapping from offline dataset to online streaming names
+rename_map = {
+    "Flow Duration": "Flow Duration",
+    "Tot Fwd Pkts": "Total Fwd Packets",
+    "Tot Bwd Pkts": "Total Backward Packets",
+    "TotLen Fwd Pkts": "Total Length of Fwd Packets",
+    "TotLen Bwd Pkts": "Total Length of Bwd Packets",
+    "Flow Pkts/s": "Flow Pkts/s",
+    "Fwd Seg Size Min": "Fwd Seg Size Min",
+    "Init Fwd Win Byts": "Init Fwd Win Byts",
+    "Init Bwd Win Byts": "Init Bwd Win Byts",
+    "Bwd Pkt Len Min": "Bwd Pkt Len Min",
+    "PSH Flag Cnt": "PSH Flag Cnt"
+}
+
+# Only use these 11 features for training so the model matches online data exactly
+features = list(rename_map.values())
+df = df.rename(columns=rename_map)
+df = df[features + ["Target"]]
+
 
 # Ensure all features are strictly numeric and handle Infinity/NaN
 for c in features:

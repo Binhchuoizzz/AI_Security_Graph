@@ -754,11 +754,11 @@ def node_ml_triage(state: SentinelState) -> dict:
     # thì phải đổi cả detect ở src/ui/app.py + components.py (đang match "Cổng ML").
     if confidence_attack >= CONF_THRESHOLD:
         action = "BLOCK_IP"
-        reasoning = f"Phát hiện tấn công bởi Cổng ML Tier-2 (Decision Tree). Độ tin cậy: {confidence_attack:.2%}"
+        reasoning = f"Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
         confidence = float(confidence_attack)
     elif confidence_benign >= CONF_THRESHOLD:
         action = "LOG"
-        reasoning = f"Xác nhận an toàn bởi Cổng ML Tier-2 (Decision Tree). Độ tin cậy: {confidence_benign:.2%}"
+        reasoning = f"Xác nhận an toàn bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"
         confidence = float(confidence_benign)
     else:
         logger.info(
@@ -778,7 +778,7 @@ def node_ml_triage(state: SentinelState) -> dict:
         "cycle_count": state.cycle_count + 1,
         # Marker MÁY-ĐỌC cho biết phán quyết do Cổng ML (không phải LLM) — run_ablation
         # đếm ML_Bypass_Rate bằng field này thay vì grep chuỗi văn xuôi (dễ gãy khi đổi lời).
-        "ml_model": "DecisionTree",
+        "ml_model": "LightGBM",
     }
 
     # Audit trail cho hành động của ML (Bypass LLM)
@@ -800,7 +800,7 @@ def node_ml_triage(state: SentinelState) -> dict:
         "metadata": {
             # SỰ THẬT model: ml_lab/tier_2_model.pkl là DecisionTreeClassifier (+ scaler)
             # — KHÔNG phải XGBoost (train_and_compare so sánh 5 thuật toán, cây thắng).
-            "ml_model": "DecisionTree",
+            "ml_model": "LightGBM",
             "confidence_attack": float(confidence_attack),
             "confidence_benign": float(confidence_benign),
         },
@@ -811,7 +811,7 @@ def node_ml_triage(state: SentinelState) -> dict:
 
     return {
         "decisions": [decision_entry],
-        "narrative_summary": f"Cổng ML Tier-2 (Decision Tree) determined: {action} with {confidence:.2%} confidence",
+        "narrative_summary": f"Cổng ML Tier-2 (LightGBM) determined: {action} with {confidence:.2%} confidence",
         "cycle_count": state.cycle_count + 1,
         "_ml_bypass": True,  # Cờ hiệu để định tuyến bỏ qua RAG/LLM
         "_ml_bypass_action": action,
