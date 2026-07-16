@@ -325,5 +325,14 @@ if __name__ == "__main__":
     ap.add_argument(
         "--out", type=str, default=None, help="Đường dẫn JSON đầu ra (mặc định results/)"
     )
+    ap.add_argument(
+        "--no-isolation",
+        action="store_true",
+        help="TẮT cách ly trạng thái (mặc định BẬT: eval không để lại audit/reputation/"
+        "luật động/blacklist — tránh phép đo tự làm nhiễm hệ thống, xem _eval_isolation.py)",
+    )
     args = ap.parse_args()
-    run(limit=args.limit, workers=args.workers, out=args.out)
+    from experiments._eval_isolation import isolated_state
+
+    with isolated_state(enabled=not args.no_isolation):
+        run(limit=args.limit, workers=args.workers, out=args.out)
