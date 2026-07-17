@@ -222,7 +222,7 @@ def render_demo_overview(
     nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
     c4.metric("Giảm tải nhiễu", nr_str)
     c5.metric("IP rủi ro cao", f"{len(high_risk)}")
-    c6.metric("Phê duyệt Tier-2", f"{len(pending_rules)}")
+    c6.metric("Phê duyệt Tier-2 (ML+LLM)", f"{len(pending_rules)}")
     c7.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
 
     st.markdown("---")
@@ -271,7 +271,7 @@ def render_demo_overview(
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
         e1, e2 = st.columns(2)
         e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
-        e2.metric("Suy luận Tier-2 (LLM)", "≈5.7 s", "62.7% escalate")
+        e2.metric("Suy luận Tier-2 (ML+LLM)", "≈5.7 s", "62.7% escalate")
         e3, e4 = st.columns(2)
         e3.metric("Lọc rác Welford", "> 99%", "Welford > 3.5σ")
         e4.metric("APT recall", "1.00", "DAPT2020")
@@ -309,7 +309,7 @@ def render_demo_overview(
 
     # ---------- Vòng phản hồi Hai tầng: Tier-1 chặn ↔ Tier-2 dạy ----------
     st.markdown("---")
-    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ Tier-2 dạy ngược)")
+    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ Tier-2 (ML+LLM) dạy ngược)")
     fb_left, fb_right = st.columns(2)
 
     with fb_left:
@@ -665,7 +665,7 @@ def main_dashboard():
         [
             "🎬 Tổng quan Demo",
             "📊 Nhật ký SIEM & Audit Trail",
-            "🧑‍💻 Phê duyệt Luật Block (Tier-2 HITL)",
+            "🧑‍💻 Phê duyệt Luật Block (Tier-2 ML+LLM)",
             "🎯 Giám sát APT & Threat Intel",
             "🔒 Quản lý Blocklist & Whitelist",
             "🔍 Lỗ hổng & Tri thức Graph",

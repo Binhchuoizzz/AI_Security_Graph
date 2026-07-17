@@ -416,7 +416,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #ff4d4f;">{total_alerts}</div>'
-        f'    <div class="kpi-label">Tổng Cảnh báo (T1+T2+T3)</div>'
+        f'    <div class="kpi-label">Tổng Cảnh báo (T1+T2)</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #d4b106;">{pending_llm_count}</div>'
@@ -428,7 +428,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'
-        f'    <div class="kpi-label">Phê duyệt (Tier-2 HITL)</div>'
+        f'    <div class="kpi-label">Phê duyệt (Tier-2 ML+LLM)</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #13c2c2;">{active_rules}</div>'
