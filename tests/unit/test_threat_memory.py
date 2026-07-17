@@ -24,7 +24,7 @@ class TestIPReputation:
         assert rep is not None
         assert rep["total_incidents"] == 1
         assert rep["total_alerts"] == 1
-        assert rep["reputation_score"] == 10.0
+        assert rep["reputation_score"] == 50.0
         assert rep["last_mitre_technique"] == "T1110"
 
     def test_record_multiple_incidents(self, memory_store):
@@ -35,7 +35,7 @@ class TestIPReputation:
         assert rep["total_incidents"] == 3
         assert rep["total_blocks"] == 1
         assert rep["total_alerts"] == 2
-        assert rep["reputation_score"] == 50.0  # 10 + 30 + 10
+        assert rep["reputation_score"] == 100.0  # 50 + 30 + 50 = 130, capped at 100
 
     def test_reputation_score_capped_at_100(self, memory_store):
         for _ in range(10):

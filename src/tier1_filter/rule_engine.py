@@ -712,10 +712,10 @@ class RuleEngine:
                     f"{self.reputation_block_threshold}) → chặn tự động"
                 )
             elif rep_score >= self.reputation_hitl_threshold:
-                rep_action = "AWAIT_HITL"
+                rep_action = "ESCALATE"
                 reasons.append(
                     f"IP có tiền sử đáng ngờ (điểm danh tiếng {rep_score:.0f} ≥ "
-                    f"{self.reputation_hitl_threshold}) → chờ phân tích (HITL)"
+                    f"{self.reputation_hitl_threshold}) → đẩy lên Tier-2 (ML/LLM)"
                 )
 
         # --- Đánh giá & Phân luồng Action (Tier 1 Action Differentiation) ---
@@ -770,17 +770,17 @@ class RuleEngine:
                 # DoS/DDoS: volumetric → alert không block (có thể distributed)
                 log_entry["tier1_action"] = "ALERT"
             elif dest_port_val not in self.sensitive_ports and dest_port_val not in [80, 443, 8080]:
-                # Lateral movement / Infiltration: unusual port, moderate score → HITL
-                log_entry["tier1_action"] = "AWAIT_HITL"
+                # Lateral movement / Infiltration: unusual port, moderate score → ESCALATE
+                log_entry["tier1_action"] = "ESCALATE"
             else:
                 log_entry["tier1_action"] = "ESCALATE"
         else:
             log_entry["tier1_action"] = "DROP" if not reasons else "LOG"
 
-        # Sàn HITL theo tiền sử: IP đáng ngờ (reputation >= ngưỡng HITL) mà gói hiện tại
-        # chưa đủ mạnh -> NÂNG lên AWAIT_HITL cho analyst xem, thay vì lặng lẽ DROP/LOG.
-        if rep_action == "AWAIT_HITL" and log_entry["tier1_action"] in ("DROP", "LOG"):
-            log_entry["tier1_action"] = "AWAIT_HITL"
+        # Sàn Escalate theo tiền sử: IP đáng ngờ (reputation >= ngưỡng HITL) mà gói hiện tại
+        # chưa đủ mạnh -> NÂNG lên ESCALATE cho Tier-2 xem, thay vì lặng lẽ DROP/LOG.
+        if rep_action == "ESCALATE" and log_entry["tier1_action"] in ("DROP", "LOG"):
+            log_entry["tier1_action"] = "ESCALATE"
 
         # --- Tầng 0.6: Cập nhật RunningStats CHỈ với dữ liệu được coi là benign (DROP hoặc LOG) ---
         # Điều này chống Baseline Poisoning (tấn công Slow-Rate baseline drift)

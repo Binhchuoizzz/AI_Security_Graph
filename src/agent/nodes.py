@@ -318,38 +318,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     }
     audit_logger.log_event(audit_event)
 
-    # Record incident vào Long-Term Threat Memory
-    if target != "UNKNOWN_TARGET" and action in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
-        threat_memory.record_incident(
-            ip=target, action=action, mitre_technique=validated_decision.get("mitre_technique", "")
-        )
-        apt_check = threat_memory.check_apt_pattern(target)
-        # Chuỗi APT đa-ngày EMERGENT (threat_events — tích lũy từ luồng gộp online)
-        apt_chain = threat_memory.check_apt_chain(target)
-        if apt_check and apt_check["is_apt_candidate"]:
-            logger.warning(
-                f"[APT DETECTION] IP {target} flagged as APT candidate: "
-                f"{apt_check['total_incidents']} incidents over {apt_check['days_active']} days"
-            )
-            threat_memory.record_apt_indicator(
-                indicator_type="persistent_ip",
-                indicator_value=target,
-                confidence=confidence,
-                related_ips=target,
-                mitre_chain=validated_decision.get("mitre_technique", ""),
-            )
-        elif apt_chain.get("is_apt"):
-            logger.warning(
-                f"[APT DETECTION] IP {target} part of multi-day APT chain: "
-                f"{apt_chain['chain_length']} days, phases={apt_chain.get('phases_seen', '')}"
-            )
-            threat_memory.record_apt_indicator(
-                indicator_type="multi_day_chain",
-                indicator_value=target,
-                confidence=confidence,
-                related_ips=target,
-                mitre_chain=str(apt_chain.get("phases_seen", ""))[:120],
-            )
+    # Record incident logic moved to node_action_executor & node_human_in_the_loop
 
     return {
         "decisions": [decision_entry],
@@ -519,7 +488,45 @@ _URI_ATTACK_TOKENS = (
 )
 
 
+def _handle_threat_memory_incident(
+    target: str, action: str, mitre_technique: str, confidence: float
+):
+    """Helper để ghi nhận incident và kiểm tra APT."""
+    if target == "UNKNOWN_TARGET" or action not in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
+        return
+
+    threat_memory.record_incident(ip=target, action=action, mitre_technique=mitre_technique)
+    apt_check = threat_memory.check_apt_pattern(target)
+    apt_chain = threat_memory.check_apt_chain(target)
+
+    if apt_check and apt_check["is_apt_candidate"]:
+        logger.warning(
+            f"[APT DETECTION] IP {target} flagged as APT candidate: "
+            f"{apt_check['total_incidents']} incidents over {apt_check['days_active']} days"
+        )
+        threat_memory.record_apt_indicator(
+            indicator_type="persistent_ip",
+            indicator_value=target,
+            confidence=confidence,
+            related_ips=target,
+            mitre_chain=mitre_technique,
+        )
+    elif apt_chain.get("is_apt"):
+        logger.warning(
+            f"[APT DETECTION] IP {target} part of multi-day APT chain: "
+            f"{apt_chain['chain_length']} days, phases={apt_chain.get('phases_seen', '')}"
+        )
+        threat_memory.record_apt_indicator(
+            indicator_type="multi_day_chain",
+            indicator_value=target,
+            confidence=confidence,
+            related_ips=target,
+            mitre_chain=str(apt_chain.get("phases_seen", ""))[:120],
+        )
+
+
 def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
+    # ... existing code ...
     """
     Trích một CHỮ KÝ HÀNH VI an toàn từ log gây ra BLOCK để Tier-1 có thể bắt
     nhanh một IP KHÁC dùng CÙNG kỹ thuật (không chỉ nhớ đúng IP cũ).
@@ -589,14 +596,45 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
         state.current_batch_logs, str(latest_decision.get("target", ""))
     )
 
+    target = latest_decision.get("target", "UNKNOWN_TARGET")
+    mitre_tech = latest_decision.get("mitre_technique", "")
+    confidence = latest_decision.get("confidence", 0.0)
+
+    # Nếu action là ALERT, kiểm tra trước khi leo thang (Escalate)
+    if action == "ALERT":
+        _handle_threat_memory_incident(target, action, mitre_tech, confidence)
+        rep = threat_memory.get_ip_reputation(target)
+        if rep and rep.get("reputation_score", 0) >= 100:
+            logger.warning(
+                f"[*] Escalate ALERT -> BLOCK_IP for {target} (Reputation: {rep.get('reputation_score')})"
+            )
+            action = "BLOCK_IP"
+            formatted_reasoning += f" [HỆ THỐNG LEO THANG: Đã chặn tự động do điểm rủi ro IP vượt ngưỡng nguy hiểm ({rep.get('reputation_score'):.0f} >= 100)]"
+
+            # Update the latest decision to BLOCK_IP so downstream logic (if any) knows
+            latest_decision["action"] = action
+        else:
+            raise_alert(
+                target,
+                formatted_reasoning,
+                raw_log=raw_log_json,
+            )
+
     if action == "BLOCK_IP":
+        # Record incident for BLOCK_IP (if it was escalated, it's already recorded as ALERT above,
+        # but calling it again with BLOCK_IP will add the BLOCK_IP score. To avoid double counting,
+        # only record if it was originally BLOCK_IP)
+        if latest_decision.get("action") == "BLOCK_IP" and "Leo thang" not in formatted_reasoning:
+            _handle_threat_memory_incident(target, action, mitre_tech, confidence)
+
         block_ip(
-            latest_decision.get("target", "UNKNOWN_IP"),
+            target,
             formatted_reasoning,
             raw_log=raw_log_json,
         )
 
-        rule_pattern = latest_decision.get("target", "UNKNOWN_IP")
+        rule_pattern = target
+        rule_source = "ml_triage" if getattr(state, "_ml_bypass", False) else "langgraph_agent"
 
         # (1) Luật theo IP — "nhớ mặt" kẻ tấn công (chạy qua FeedbackValidator ngầm định)
         FeedbackListener().receive_new_rule(
@@ -604,6 +642,8 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
             rule_pattern,
             score=100,
             reason=raw_reasoning,
+            source=rule_source,
+            status="ACTIVE",
         )
 
         # (2) Luật theo CHỮ KÝ HÀNH VI — "nhớ ngón đòn": trích chữ ký công cụ/URI từ
@@ -625,20 +665,14 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
                     b_field,
                     b_pattern,
                     score=b_score,
-                    source="langgraph_agent_behavioral",
+                    source=f"{rule_source}_behavioral",
                     reason=f"Behavioral signature learned from {rule_pattern}: {raw_reasoning}",
+                    status="ACTIVE",
                 )
                 logger.info(
                     f"--- LEARNED TECHNIQUE: {b_field}~'{b_pattern}' (score {b_score}) "
                     f"from {rule_pattern} ---"
                 )
-
-    elif action == "ALERT":
-        raise_alert(
-            latest_decision.get("target", "UNKNOWN_TARGET"),
-            formatted_reasoning,
-            raw_log=raw_log_json,
-        )
 
     return {}
 
@@ -662,6 +696,9 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2f}] {raw_reasoning}"
 
     logger.warning(f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}")
+
+    target = latest_decision.get("target", "UNKNOWN_TARGET")
+    _handle_threat_memory_incident(target, "AWAIT_HITL", mitre, conf)
 
     from src.response.executor import _log_to_db
 
@@ -771,20 +808,25 @@ def node_ml_triage(state: SentinelState) -> dict:
     confidence_benign = proba[0]
     confidence_attack = proba[1]
 
-    CONF_THRESHOLD = 0.90
+    CONF_THRESHOLD_BLOCK = 0.90
+    CONF_THRESHOLD_ALERT = 0.70
     action = None
     reasoning = None
     confidence = 0.0
 
     # Chuỗi "Cổng ML Tier-2" là MARKER để UI phân loại nguồn phán quyết — đổi chữ này
     # thì phải đổi cả detect ở src/ui/app.py + components.py (đang match "Cổng ML").
-    if confidence_attack >= CONF_THRESHOLD:
+    if confidence_attack >= CONF_THRESHOLD_BLOCK:
         action = "BLOCK_IP"
         reasoning = (
             f"Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
         )
         confidence = float(confidence_attack)
-    elif confidence_benign >= CONF_THRESHOLD:
+    elif confidence_attack >= CONF_THRESHOLD_ALERT:
+        action = "ALERT"
+        reasoning = f"Cảnh báo rủi ro cao bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
+        confidence = float(confidence_attack)
+    elif confidence_benign >= CONF_THRESHOLD_BLOCK:
         action = "LOG"
         reasoning = (
             f"Xác nhận an toàn bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"

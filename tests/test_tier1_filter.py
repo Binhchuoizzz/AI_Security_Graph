@@ -254,14 +254,14 @@ class TestReputationEnforcement:
         assert result["tier1_action"] == "BLOCK_IP"
 
     def test_reputation_hitl_mid_band(self):
-        """Reputation 55 (50–69) trên gói LÀNH -> AWAIT_HITL (alert + HITL)."""
+        """Reputation 55 (50–69) trên gói LÀNH -> ESCALATE (đẩy lên Tier 2)."""
         result = self._engine(55.0).evaluate(self._benign("203.0.113.7"))
-        assert result["tier1_action"] == "AWAIT_HITL"
+        assert result["tier1_action"] == "ESCALATE"
 
     def test_reputation_hitl_at_threshold(self):
-        """Đúng ngưỡng 50 -> AWAIT_HITL."""
+        """Đúng ngưỡng 50 -> ESCALATE."""
         result = self._engine(50.0).evaluate(self._benign("203.0.113.8"))
-        assert result["tier1_action"] == "AWAIT_HITL"
+        assert result["tier1_action"] == "ESCALATE"
 
     def test_reputation_below_threshold_no_effect(self):
         """Reputation 40 (<50) -> không ảnh hưởng, gói lành vẫn DROP."""

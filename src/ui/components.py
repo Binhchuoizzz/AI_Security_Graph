@@ -405,7 +405,7 @@ def render_ioc_table(iocs):
 
 
 def render_metrics_header(
-    total_alerts,
+    all_alerts,
     pending_rules,
     active_rules,
     total_raw_logs=0,
@@ -424,10 +424,26 @@ def render_metrics_header(
     báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier 1 thì lấy từ
     config/pipeline_stats.json (raw_logs_total vs số escalate), ĐỪNG suy từ số này.
     """
+    total_alerts = len(all_alerts) if isinstance(all_alerts, list) else 0
+
     if noise_reduction is None:
         noise_reduction = 0.0
         if total_raw_logs > 0:
             noise_reduction = ((total_raw_logs - total_alerts) / total_raw_logs) * 100
+
+    # Phân loại alerts để làm Phễu (Funnel)
+    t1_count = 0
+    ml_count = 0
+    llm_count = 0
+    if isinstance(all_alerts, list):
+        for alert in all_alerts:
+            r = alert.get("reason", "")
+            if "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
+                t1_count += 1
+            elif "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r:
+                ml_count += 1
+            else:
+                llm_count += 1
 
     # Xác định màu sắc cho live_fpr (dưới 10% xanh lá, dưới 25% vàng, ngược lại đỏ)
     fpr_color = "#52c41a"  # green
@@ -439,24 +455,24 @@ def render_metrics_header(
     html_kpi = (
         f'<div class="kpi-container">'
         f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #177ddc;">{total_raw_logs}</div>'
+        f'    <div class="kpi-val" style="color: #8c8c8c;">{total_raw_logs}</div>'
         f'    <div class="kpi-label">Logs thô đầu vào</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #ff4d4f;">{total_alerts}</div>'
-        f'    <div class="kpi-label">Tổng Cảnh báo (T1+T2)</div>'
+        f'    <div class="kpi-val" style="color: #fa541c;">{t1_count}</div>'
+        f'    <div class="kpi-label">Chặn tại Tier-1 🛡️</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #d4b106;">{pending_llm_count}</div>'
-        f'    <div class="kpi-label">Đang chờ LLM ⏳</div>'
+        f'    <div class="kpi-val" style="color: #1890ff;">{ml_count}</div>'
+        f'    <div class="kpi-label">Chặn tại Cổng ML ⚡</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #52c41a;">{noise_reduction:.1f}%</div>'
-        f'    <div class="kpi-label">Giảm tải Analyst (thô→cảnh báo)</div>'
+        f'    <div class="kpi-val" style="color: #722ed1;">{llm_count}</div>'
+        f'    <div class="kpi-label">Phân tích sâu LLM 🧠</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'
-        f'    <div class="kpi-label">Phê duyệt (Tier-2 ML+LLM)</div>'
+        f'    <div class="kpi-label">Phê duyệt (HITL)</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #13c2c2;">{active_rules}</div>'
@@ -464,7 +480,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: {fpr_color};">{live_fpr:.1f}%</div>'
-        f'    <div class="kpi-label">Tỷ lệ cảnh báo sai (Live FPR)</div>'
+        f'    <div class="kpi-label">Tỷ lệ False Positive</div>'
         f"  </div>"
         f"</div>"
     )

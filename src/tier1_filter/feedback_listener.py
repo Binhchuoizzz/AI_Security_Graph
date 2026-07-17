@@ -101,6 +101,7 @@ class FeedbackListener:
         score: int = 50,
         source: str = "langgraph_agent",
         reason: str = "",
+        status: str = "PENDING_APPROVAL",
     ) -> dict:
         """
         Nhận luật mới từ Agent và persist vào config.
@@ -111,6 +112,7 @@ class FeedbackListener:
             score: Điểm risk score cộng thêm khi match (mặc định 50)
             source: Nguồn sinh rule (để audit trail)
             reason: Lý do tạo rule (LLM reasoning)
+            status: Trạng thái của luật (mặc định PENDING_APPROVAL)
 
         Returns:
             dict chứa thông tin rule + status
@@ -141,7 +143,7 @@ class FeedbackListener:
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "source": source,
             "reason": reason,
-            "status": "PENDING_APPROVAL",  # Trạng thái chờ kiểm duyệt
+            "status": status,
         }
 
         # Persist vào YAML

@@ -449,9 +449,16 @@ def main_dashboard():
         # ghi chú benign/quản trị, không phải sự cố cần phân loại → tránh bộ lọc rỗng).
         action_filter = st.selectbox(
             "Phân loại Hành động",
-            options=["Tất cả", "BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "QUARANTINE", "WHITELIST"],
+            options=["Tất cả", "BLOCK_IP", "ALERT", "LOG", "QUARANTINE", "WHITELIST"],
             index=0,
             key="action_filter_sb",
+        )
+
+        mitre_filter = st.selectbox(
+            "Kỹ thuật MITRE",
+            options=["Tất cả", "T1059.004", "T1190", "T1595", "T1071", "N/A"],
+            index=0,
+            key="mitre_filter_sb",
         )
 
         # Tìm kiếm theo IP Mục tiêu
@@ -600,7 +607,7 @@ def main_dashboard():
     st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
 
     # Lấy toàn bộ dữ liệu để lọc và phân trang (tối đa 2000 dòng lịch sử)
-    all_alerts = get_audit_trail(limit=2000)
+    all_alerts = [a for a in get_audit_trail(limit=2000) if a.get("action") != "AWAIT_HITL"]
     active_rules = feedback_mgr.get_active_dynamic_rules()
     pending_rules = feedback_mgr.get_pending_rules()
     whitelisted_ips = feedback_mgr.get_whitelisted_ips()
@@ -615,6 +622,14 @@ def main_dashboard():
 
     if active_search_ip:
         filtered_alerts = [a for a in filtered_alerts if active_search_ip in a.get("target", "")]
+
+    if mitre_filter != "Tất cả":
+        filtered_alerts = [
+            a
+            for a in filtered_alerts
+            if mitre_filter in str(a.get("mitre_technique", ""))
+            or mitre_filter in str(a.get("reason", ""))
+        ]
 
     # Tính toán Live FPR dựa trên các rule được Duyệt (ACTIVE) vs Bác bỏ (REJECTED) bởi con người
     all_rules = feedback_mgr.get_all_dynamic_rules()
@@ -696,12 +711,37 @@ def main_dashboard():
                     col_chart1, col_chart2 = st.columns(2)
                     with col_chart1:
                         st.markdown("##### 📈 Xu hướng Sự cố theo Thời gian (Timeline)")
+
+                        def assign_tier(r):
+                            r_str = str(r)
+                            if (
+                                "Tier 1" in r_str
+                                or "Tier-1" in r_str
+                                or "whitelist" in r_str.lower()
+                            ):
+                                return "Tier-1 Filter"
+                            elif (
+                                "Cổng ML" in r_str
+                                or "ML Tier 2" in r_str
+                                or "Decision Tree" in r_str
+                            ):
+                                return "Cổng ML"
+                            else:
+                                return "LLM Agent"
+
+                        df_alerts["Nguồn"] = df_alerts["reason"].apply(assign_tier)
                         trend_df = (
-                            df_alerts.groupby("hour").size().to_frame(name="Số lượng").reset_index()
+                            df_alerts.groupby(["hour", "Nguồn"]).size().reset_index(name="Số lượng")
                         )
                         trend_df = trend_df.sort_values("hour")
-                        st.area_chart(
-                            trend_df.set_index("hour"), y="Số lượng", height=200, width="stretch"
+
+                        st.bar_chart(
+                            trend_df,
+                            x="hour",
+                            y="Số lượng",
+                            color="Nguồn",
+                            height=200,
+                            width="stretch",
                         )
                     with col_chart2:
                         st.markdown("##### 📊 Phân bổ Cảnh báo theo Hành động (Distribution)")
@@ -853,30 +893,10 @@ def main_dashboard():
                 _render_alerts_list(alerts_t2_llm, "t3")
 
     with tab2:
-        st.subheader("Phê duyệt Luật Tường lửa (Dynamic Rules)")
+        st.subheader("Phê duyệt Phân tích từ LLM (AWAIT_HITL)")
         if not pending_rules:
-            st.info("Không có luật nào đang chờ phê duyệt.")
+            st.info("Không có sự cố nào đang chờ phê duyệt.")
         else:
-            pending_t1 = []
-            pending_t2_ml = []
-            pending_t2_llm = []
-            for r in pending_rules:
-                reason = str(r.get("reason", ""))
-                # Marker như trên: "Cổng ML"/"ML Tier 2"(cũ)/"Decision Tree" — không dùng "ML" trần.
-                if "Tier 1" in reason or "Tier-1" in reason or "whitelist" in reason.lower():
-                    pending_t1.append(r)
-                elif "Cổng ML" in reason or "ML Tier 2" in reason or "Decision Tree" in reason:
-                    pending_t2_ml.append(r)
-                else:
-                    pending_t2_llm.append(r)
-
-            tab_t1, tab_t2_ml, tab_t2_llm = st.tabs(
-                [
-                    "🟢 Tier-1 Filter",
-                    "⚡ Tier-2 · Cổng ML",
-                    "🧠 Tier-2 · LLM",
-                ]
-            )
 
             def _render_pending_list(rules_list, page_key):
                 if not rules_list:
@@ -905,12 +925,16 @@ def main_dashboard():
 
                     src = rule.get("source", "")
                     if "langgraph_agent_hitl" in src:
-                        hitl_type = "🤔 AWAIT_HITL (Tier-2 LLM cần con người phân tích thêm)"
-                        hitl_color = "#faad14"
+                        hitl_type = "🧠 AWAIT_HITL (Tier-2 LLM cần con người phân tích thêm)"
+                        hitl_color = "#722ed1"
+                    elif "ml_triage" in src:
+                        hitl_type = "⚡ AWAIT_HITL (Cổng ML đề xuất xem xét)"
+                        hitl_color = "#1890ff"
                     elif "tier1_rule_engine" in src:
-                        hitl_type = "👀 AWAIT_HITL (Tier-1 Rule Engine cảnh báo, chờ duyệt)"
+                        hitl_type = "🛡️ AWAIT_HITL (Tier-1 Rule Engine cảnh báo, chờ duyệt)"
                         hitl_color = "#faad14"
                     elif "langgraph_agent" in src:
+                        # Dành cho các luật BLOCK_IP cũ còn sót lại trong config
                         hitl_type = "🛑 BLOCK_IP (Hệ thống đề xuất chặn, chờ duyệt)"
                         hitl_color = "#ff4d4f"
                     else:
@@ -1004,18 +1028,11 @@ def main_dashboard():
                             st.session_state[page_key] = cur + 1
                             st.rerun()
 
-            with tab_t1:
-                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t1)}**")
-                _render_pending_list(pending_t1, "hitl_page_t1")
-            with tab_t2_ml:
-                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t2_ml)}**")
-                _render_pending_list(pending_t2_ml, "hitl_page_t2")
-            with tab_t2_llm:
-                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t2_llm)}**")
-                _render_pending_list(pending_t2_llm, "hitl_page_t3")
+            st.caption(f"Tổng số sự cố chờ duyệt: **{len(pending_rules)}**")
+            _render_pending_list(pending_rules, "hitl_page_all")
 
         st.markdown("---")
-        st.subheader("Luật Đang Hoạt Động (Active Rules)")
+        st.subheader("Lịch sử Thao tác HITL (Đã áp dụng)")
         if not active_rules:
             st.info("Không có luật nào đang hoạt động.")
         else:
@@ -1366,11 +1383,15 @@ def main_dashboard():
                     # Phân loại HITL/Nguồn
                     src = rule.get("source", "")
                     if "langgraph_agent_hitl" in src:
-                        phan_loai = "🤔 AWAIT_HITL"
+                        phan_loai = "🧠 LLM Agent (Chờ duyệt)"
+                    elif "ml_triage" in src:
+                        phan_loai = "⚡ Cổng ML (Chờ duyệt)"
+                    elif "tier1_rule_engine" in src:
+                        phan_loai = "🛡️ Tier-1 (Chờ duyệt)"
                     elif "langgraph_agent" in src:
-                        phan_loai = "🛑 BLOCK_IP (AI)"
+                        phan_loai = "🧠 LLM Agent (AI Block)"
                     else:
-                        phan_loai = "🔧 MANUAL"
+                        phan_loai = f"🔧 MANUAL ({src})"
 
                     block_rows.append(
                         {
@@ -1846,13 +1867,14 @@ def main_dashboard():
                 'edge [color="#888888", fontcolor="#888888", fontsize=10, fontname="sans-serif"]; '
                 'SOC [label="SENTINEL_SOC", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"]; '
                 'T1 [label="Tier-1 Welford Filter", fillcolor="#14c2c2", color="#14c2c2"]; '
+                'ML [label="Tier-2 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
                 'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'LLM [label="Tier-2 LLM Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '
                 'MEM [label="Threat Memory (APT)", fillcolor="#1d39c4", color="#1d39c4"]; '
-                'SOC -> T1 [label="ingest"]; T1 -> GR [label="escalate"]; '
-                'GR -> RAG [label="ground"]; RAG -> LLM [label="reason"]; '
-                'LLM -> MEM [label="correlate"]; }'
+                'SOC -> T1 [label="ingest"]; T1 -> ML [label="escalate"]; '
+                'ML -> GR [label="bypass"]; GR -> RAG [label="ground"]; '
+                'RAG -> LLM [label="reason"]; LLM -> MEM [label="correlate"]; }'
             )
             st.graphviz_chart(arch_dot, width="stretch")
 

@@ -400,43 +400,6 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                         del ip_buffers[_src_ip]
                                         del ip_last_updated[_src_ip]
 
-                            elif action == "AWAIT_HITL":
-                                # Đẩy sang hàng đợi HITL để Streamlit dashboard hiển thị
-                                print(f"[*] routing AWAIT_HITL (Infiltration) -> {ESCALATED_QUEUE}")
-                                r.rpush(ESCALATED_QUEUE, json.dumps(evaluated_log))
-                                # Ghi trực tiếp vào DB để hiển thị trên Dashboard SIEM
-                                src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
-                                    "src_ip", ""
-                                )
-                                if src_ip:
-                                    from src.response.executor import _log_to_db
-                                    from src.tier1_filter.feedback_listener import FeedbackListener
-
-                                    _wl_reasons = [
-                                        str(x) for x in (evaluated_log.get("tier1_reasons") or [])
-                                    ]
-                                    _wl_summary = (
-                                        " · ".join(_wl_reasons[:2])
-                                        if _wl_reasons
-                                        else "Yêu cầu HITL"
-                                    )
-                                    _hitl_reason = f"Tier-1 chặn sơ bộ và yêu cầu phân tích HITL: {_wl_summary}"
-                                    _log_to_db(
-                                        "AWAIT_HITL",
-                                        src_ip,
-                                        _hitl_reason,
-                                        raw_log=json.dumps(_strip_dataset_labels(evaluated_log)),
-                                    )
-
-                                    # Đẩy luật sang tab Phê duyệt (Tier-1 PENDING)
-                                    FeedbackListener().receive_new_rule(
-                                        field="Source IP",
-                                        pattern=src_ip,
-                                        score=60,
-                                        source="tier1_rule_engine",
-                                        reason=_hitl_reason,
-                                    )
-
                             elif action == "BLOCK_IP":
                                 # Đẩy IP vào blacklist của Redis với TTL 1 giờ
                                 src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
