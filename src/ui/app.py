@@ -731,7 +731,7 @@ def main_dashboard():
 
                         df_alerts["Nguồn"] = df_alerts["reason"].apply(assign_tier)
                         trend_df = (
-                            df_alerts.groupby(["hour", "Nguồn"]).size().reset_index(name="Số lượng")
+                            df_alerts.groupby(["hour", "Nguồn"]).size().reset_index(name="Số lượng")  # type: ignore[call-overload]
                         )
                         trend_df = trend_df.sort_values("hour")
 
