@@ -140,7 +140,7 @@ tier1:
     reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
     score: 100
     source: langgraph_agent
-    status: PENDING_APPROVAL
+    status: REJECTED
   - created_at: '2026-07-17T10:10:30'
     field: Source IP
     pattern: 10.200.3.148
@@ -523,6 +523,230 @@ tier1:
     field: Source IP
     pattern: 10.200.8.188
     reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.60%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:17:20'
+    field: Source IP
+    pattern: 10.200.10.228
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.96%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:17:22'
+    field: Source IP
+    pattern: 10.200.12.183
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.86%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:17:39'
+    field: Source IP
+    pattern: 10.200.17.151
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.97%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:17:40'
+    field: Source IP
+    pattern: 10.200.3.26
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.91%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:17:41'
+    field: Source IP
+    pattern: 10.200.7.182
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.71%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:17:58'
+    field: Source IP
+    pattern: 10.200.7.225
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.68%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:15'
+    field: Source IP
+    pattern: 10.200.6.239
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.96%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:16'
+    field: Source IP
+    pattern: 10.200.4.48
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.86%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:18'
+    field: Source IP
+    pattern: 10.200.13.32
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.68%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:19'
+    field: Source IP
+    pattern: 10.200.1.94
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.91%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:20'
+    field: Source IP
+    pattern: 10.200.2.235
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.69%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:36'
+    field: Source IP
+    pattern: 10.200.10.203
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.68%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:37'
+    field: Source IP
+    pattern: 10.200.14.242
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 98.48%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:39'
+    field: Source IP
+    pattern: 10.200.7.102
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.86%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:40'
+    field: Source IP
+    pattern: 10.200.11.184
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.68%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:41'
+    field: Source IP
+    pattern: 10.200.8.200
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.90%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:18:57'
+    field: Source IP
+    pattern: 10.200.11.191
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.64%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:14'
+    field: Source IP
+    pattern: 10.200.12.141
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 96.81%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:15'
+    field: Source IP
+    pattern: 10.200.19.50
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.95%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:17'
+    field: Source IP
+    pattern: 10.200.8.212
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.86%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:18'
+    field: Source IP
+    pattern: 10.200.6.170
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 96.49%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:20'
+    field: Source IP
+    pattern: 10.200.4.225
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:21'
+    field: Source IP
+    pattern: 10.200.7.118
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.93%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:19:36'
+    field: Source IP
+    pattern: 10.200.18.229
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.64%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:08'
+    field: Source IP
+    pattern: 10.200.14.210
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 98.83%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:10'
+    field: Source IP
+    pattern: 10.200.4.144
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.86%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:11'
+    field: Source IP
+    pattern: 10.200.7.150
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.64%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:12'
+    field: Source IP
+    pattern: 10.200.2.203
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 98.66%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:14'
+    field: Source IP
+    pattern: 10.200.6.146
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:15'
+    field: Source IP
+    pattern: 10.200.8.177
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.96%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:17'
+    field: Source IP
+    pattern: 10.200.20.236
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.86%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:20:18'
+    field: Source IP
+    pattern: 10.200.5.166
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.75%'
     score: 100
     source: langgraph_agent
     status: PENDING_APPROVAL

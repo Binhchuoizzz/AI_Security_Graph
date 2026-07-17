@@ -222,12 +222,20 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
     # Phân nguồn phán quyết: Tier-1 (rule) / Tier-2 Cổng ML / Tier-2 LLM.
     # LƯU Ý detect theo MARKER đặc thù, KHÔNG dùng chữ "Tier-2"/"ML" trần — vì chuỗi
     # Tier-2 giờ xuất hiện ở cả nhánh LLM. Giữ "ML Tier 2" để nhận bản ghi CŨ trong DB.
-    is_tier1 = "Tier-1" in raw_reason or "whitelist" in raw_reason.lower()
-    is_ml_gate = (
-        "Cổng ML" in raw_reason or "ML Tier 2" in raw_reason or "Decision Tree" in raw_reason
-    )
+    reason_text = raw_reason
+    is_tier1 = "Tier-1" in reason_text or "whitelist" in reason_text.lower()
+    is_ml_tier = any(k in reason_text for k in ("Cổng ML", "ML Tier 2", "Decision Tree"))
+    is_manual = "Chặn thủ công" in reason_text or "MANUAL" in reason_text.upper()
 
-    if is_tier1:
+    if is_manual:
+        tier_badge = (
+            '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#1890ff;'
+            "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
+            'border-radius:4px;margin-left:8px;">🔧 Chặn thủ công (Manual)</span>'
+        )
+        reasoning_title = "🔧 Ghi chú chặn thủ công:"
+        mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>N/A (Chặn thủ công)</code>"
+    elif is_tier1:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(82, 196, 26, 0.2);color:#95de64;'
             "border:1px solid rgba(82, 196, 26, 0.4);font-size:0.75rem;padding:2px 8px;"
@@ -235,7 +243,7 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         )
         reasoning_title = "⚡ Lập luận tĩnh (Tier-1 Rule/Filter):"
         mitre_section_text = "🎯 Ánh xạ: Phân tích ban đầu từ Log thô"
-    elif is_ml_gate:
+    elif is_ml_tier:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.2);color:#faad14;'
             "border:1px solid rgba(250, 173, 20, 0.4);font-size:0.75rem;padding:2px 8px;"
