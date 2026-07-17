@@ -883,16 +883,40 @@ def main_dashboard():
                             st.rerun()
 
             with t1_tab:
-                tier1_blocks_data = _get_tier1_blocks(show=200)
+                tier1_blocks_data = _get_tier1_blocks(show=1000)
+
+                # Áp dụng bộ lọc
+                if action_filter not in ["Tất cả", "BLOCK_IP"]:
+                    tier1_blocks_data = []
+                if active_search_ip:
+                    tier1_blocks_data = [
+                        blk for blk in tier1_blocks_data if active_search_ip in blk.get("ip", "")
+                    ]
+
+                # Phân trang
+                page_key_blocks = "current_page_t1_blocks"
+                if page_key_blocks not in st.session_state:
+                    st.session_state[page_key_blocks] = 1
+
+                total_pages_blocks = max(1, math.ceil(len(tier1_blocks_data) / page_size))
+                if st.session_state[page_key_blocks] > total_pages_blocks:
+                    st.session_state[page_key_blocks] = total_pages_blocks
+
+                start_idx = (st.session_state[page_key_blocks] - 1) * page_size
+                end_idx = start_idx + page_size
+                paged_blocks = tier1_blocks_data[start_idx:end_idx]
+
                 # ── Phần 1: Block tức thời (Redis ring buffer) ──
                 st.markdown(f"**🛡️ Chặn tức thời Tier-1 (Redis):** {len(tier1_blocks_data)} IP")
                 st.caption(
                     "_(đọc từ ring buffer `config/tier1_blocks.json` — TTL 1h, không cần LLM)_"
                 )
                 if not tier1_blocks_data:
-                    st.info("Chưa có IP nào bị Tier-1 chặn tức thời trong phiên này.")
+                    st.info(
+                        "Chưa có IP nào bị Tier-1 chặn tức thời trong phiên này hoặc không khớp bộ lọc."
+                    )
                 else:
-                    for blk in tier1_blocks_data:
+                    for blk in paged_blocks:
                         ip = html.escape(str(blk.get("ip", "N/A")))
                         score = blk.get("score", 0)
                         count = blk.get("count", 1)
@@ -934,6 +958,32 @@ def main_dashboard():
                             "".join(line.strip() for line in card_html.split("\n")),
                             unsafe_allow_html=True,
                         )
+
+                    # Hiển thị nút chuyển trang cho Block tức thời
+                    if total_pages_blocks > 1:
+                        st.write("")
+                        col_prev, col_page, col_next = st.columns([1, 2, 1])
+                        with col_prev:
+                            if st.button(
+                                "⬅️ Trang trước",
+                                disabled=(st.session_state[page_key_blocks] == 1),
+                                key="prev_t1_blocks",
+                            ):
+                                st.session_state[page_key_blocks] -= 1
+                                st.rerun()
+                        with col_page:
+                            st.markdown(
+                                f"<div style='text-align:center;padding-top:5px;font-weight:bold;'>Trang {st.session_state[page_key_blocks]} / {total_pages_blocks}</div>",
+                                unsafe_allow_html=True,
+                            )
+                        with col_next:
+                            if st.button(
+                                "Trang sau ➡️",
+                                disabled=(st.session_state[page_key_blocks] == total_pages_blocks),
+                                key="next_t1_blocks",
+                            ):
+                                st.session_state[page_key_blocks] += 1
+                                st.rerun()
 
                 # ── Phần 2: Alert/Block từ Audit Trail Tier-1 ──
                 st.markdown("---")
