@@ -681,7 +681,7 @@ def main_dashboard():
         [
             "🎬 Tổng quan Demo",
             "📊 Nhật ký SIEM & Audit Trail",
-            "🧑‍💻 Phê duyệt Luật Block (Tier-2 ML+LLM)",
+            "🧑‍💻 Phê duyệt HITL (LLM)",
             "🎯 Giám sát APT & Threat Intel",
             "🔒 Quản lý Blocklist & Whitelist",
             "🔍 Lỗ hổng & Tri thức Graph",
@@ -1028,7 +1028,11 @@ def main_dashboard():
                             st.session_state[page_key] = cur + 1
                             st.rerun()
 
-            llm_pending_rules = [r for r in pending_rules if r.get("source") == "langgraph_agent"]
+            llm_pending_rules = [
+                r
+                for r in pending_rules
+                if r.get("source", "") in ("langgraph_agent", "langgraph_agent_hitl")
+            ]
             st.caption(f"Tổng số sự cố chờ duyệt: **{len(llm_pending_rules)}**")
             _render_pending_list(llm_pending_rules, "hitl_page_all")
 
