@@ -112,7 +112,119 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
-  dynamic_rules: []
+  dynamic_rules:
+  - created_at: '2026-07-17T10:10:00'
+    field: Source IP
+    pattern: 209.147.138.38
+    reason: Chặn thủ công từ tab Nhật ký SIEM bởi manager
+    score: 100
+    source: manual_manager
+    status: REJECTED
+  - created_at: '2026-07-17T10:10:10'
+    field: Source IP
+    pattern: 10.200.7.9
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:10:27'
+    field: Source IP
+    pattern: 10.200.17.173
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:10:29'
+    field: Source IP
+    pattern: 10.200.5.252
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:10:30'
+    field: Source IP
+    pattern: 10.200.3.148
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:10:31'
+    field: Source IP
+    pattern: 10.200.4.251
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:10:33'
+    field: Source IP
+    pattern: 10.200.3.2
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:11:05'
+    field: Source IP
+    pattern: 10.200.9.34
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:11:23'
+    field: Source IP
+    pattern: 10.200.18.142
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:11:39'
+    field: Source IP
+    pattern: 10.200.4.67
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:11:40'
+    field: Source IP
+    pattern: 10.200.20.246
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:11:41'
+    field: Source IP
+    pattern: 10.200.16.117
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:11:43'
+    field: Source IP
+    pattern: 10.200.6.221
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:12:18'
+    field: Source IP
+    pattern: 10.200.7.179
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:12:19'
+    field: Source IP
+    pattern: 10.200.20.115
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
+  - created_at: '2026-07-17T10:12:21'
+    field: Source IP
+    pattern: 10.200.15.183
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: langgraph_agent
+    status: PENDING_APPROVAL
   golden_baseline:
     enabled: true
     path: config/golden_baseline.json
@@ -136,3 +248,4 @@ tier1:
   - 127.0.0.1
   - 10.0.0.99
   - 192.168.1.254
+  - 209.147.138.38

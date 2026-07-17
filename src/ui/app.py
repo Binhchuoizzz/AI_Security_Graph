@@ -430,9 +430,9 @@ def render_demo_overview(
 
 
 def main_dashboard():
-    # Tự động refresh trang mỗi 3000ms (3 giây)
+    # Tự động refresh trang mỗi 1000ms (1 giây)
     # Giúp dashboard tự cập nhật log mới theo thời gian thực (SIEM style)
-    count = st_autorefresh(interval=3000, limit=10000, key="siem_dashboard_refresh")
+    count = st_autorefresh(interval=1000, limit=10000, key="siem_dashboard_refresh")
 
     # Sidebar
     with st.sidebar:
