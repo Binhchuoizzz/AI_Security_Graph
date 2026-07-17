@@ -220,7 +220,7 @@ def render_demo_overview(
     c2.metric("Tổng Cảnh báo (T1+T2)", f"{escalated:,}")
     c3.metric("Đang chờ LLM ⏳", f"{pending_llm}")
     nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
-    c4.metric("Giảm tải nhiễu", nr_str)
+    c4.metric("Giảm tải (thô→cảnh báo)", nr_str)
     c5.metric("IP rủi ro cao", f"{len(high_risk)}")
     c6.metric("Phê duyệt Tier-2 (ML+LLM)", f"{len(pending_rules)}")
     c7.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
@@ -276,8 +276,8 @@ def render_demo_overview(
         e3.metric("Lọc rác Welford", "> 99%", "Welford > 3.5σ")
         e4.metric("APT recall", "1.00", "DAPT2020")
         e5, e6 = st.columns(2)
-        e5.metric("ML Tier 2 F1", "1.000", "Siêu nhẹ (0.000s)")
-        e6.metric("Chặn mã hoá-bypass", "100%", "rào chắn tĩnh 50%")
+        e5.metric("Tier-2 ML F1-score", "1.000", "Siêu nhẹ (0.000s)")
+        e6.metric("Chặn mã hóa-bypass", "100%", "Rào chắn tĩnh 50%")
         st.caption(
             "Mann-Whitney U: p = 2.8×10⁻¹⁷ · McNemar (Tier-1 vs Đầy đủ): p = 1.0 · Audit HMAC: 100%."
         )
