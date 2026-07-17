@@ -2,11 +2,16 @@
 # =============================================================================
 # SENTINEL — CHẠY FULL DEMO BẰNG **MỘT LỆNH**
 # =============================================================================
-# Dựng TOÀN BỘ hệ thống thật rồi đẩy LUỒNG GỘP (CICIDS + DAPT2020 + Zero-day +
-# Adversarial) chảy qua pipeline đầy đủ → Dashboard điền dần.
+# Dựng hạ tầng + UI rồi đẩy LUỒNG GỘP (CICIDS + DAPT2020 + Zero-day + Adversarial)
+# chảy qua pipeline đầy đủ → Dashboard điền dần.
 #
-#   ./scripts/run_demo.sh              # full: hạ tầng + subscriber + UI + đẩy luồng
-#   ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng (subscriber + UI), KHÔNG đẩy
+# ⚠️ Script này KHÔNG tự reset. Hãy TỰ chạy reset_all TRƯỚC (dọn DB + luật động trong
+#    system_settings.yaml + bật đúng 1 subscriber), rồi mới chạy script này:
+#        python scripts/reset_all.py   &&   ./scripts/run_demo.sh
+#    (Nếu subscriber chưa chạy, script sẽ dừng và nhắc bạn chạy reset_all.)
+#
+#   ./scripts/run_demo.sh              # đẩy luồng (yêu cầu subscriber đã chạy sẵn)
+#   ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng + UI, KHÔNG đẩy
 #   ./scripts/run_demo.sh --small      # đẩy tập nhỏ (demo nhanh, ít chờ LLM)
 #   SENTINEL_LITE=0 ./scripts/run_demo.sh   # baseline nặng: Gemma 2 9B, ctx 16384, 2 parallel
 #
@@ -67,15 +72,15 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
-echo "▶ [3/5] Reset SẠCH + bật ĐÚNG 1 subscriber (Tier-1 Welford + Tier-2 LangGraph)…"
-$PY scripts/reset_all.py
-
-echo "   • chờ subscriber nạp xong RAG/embeddings…"
-for i in $(seq 1 40); do
-  if grep -q "Starting Tier 1 Subscriber Loop" "$SUB_LOG" 2>/dev/null; then echo "   ✓ subscriber sẵn sàng"; break; fi
-  [ "$i" -eq 40 ] && { echo "   ! subscriber chưa báo sẵn sàng (vẫn tiếp tục — Redis đệm luồng)"; break; }
-  sleep 2
-done
+echo "▶ [3/5] Kiểm tra subscriber (script này KHÔNG tự reset — bạn tự chạy reset_all khi cần)…"
+if pgrep -f "main.py --mode server" >/dev/null 2>&1; then
+  echo "   ✓ subscriber đang chạy — dùng TRẠNG THÁI HIỆN TẠI (không dọn DB/luật động)."
+else
+  echo "   ✗ CHƯA có subscriber đang chạy. Hãy chạy TRƯỚC:"
+  echo "       $PY scripts/reset_all.py"
+  echo "     (reset_all: dọn DB + luật động trong system_settings.yaml + bật đúng 1 subscriber)"
+  exit 1
+fi
 
 echo "▶ [4/5] Dashboard Streamlit → http://localhost:8501"
 if pgrep -f "streamlit run" >/dev/null 2>&1; then
