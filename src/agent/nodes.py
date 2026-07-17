@@ -771,7 +771,7 @@ def node_ml_triage(state: SentinelState) -> dict:
     confidence_benign = proba[0]
     confidence_attack = proba[1]
 
-    CONF_THRESHOLD = 0.95
+    CONF_THRESHOLD = 0.90
     action = None
     reasoning = None
     confidence = 0.0
