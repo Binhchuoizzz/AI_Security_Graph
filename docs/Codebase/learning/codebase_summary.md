@@ -4,7 +4,7 @@ Bám **luồng runtime 9 chặng** trong [Sơ đồ Luồng Hệ thống](https:
 
 **Bản đồ:** 4 nguồn → Redis **①** → subscriber **②** → Tier-1 (7 lớp, O(1)) **③** → 6 action **④** → *(chỉ ESCALATE)* LangGraph 6 node **⑤** → Audit HMAC **⑥** → 4 kho **⑦** → feedback hot-reload về Tier-1 **⑧** · Dashboard HITL **⑨**. Guardrails (5 lớp) bọc xuyên suốt.
 
-**Trạng thái:** `pytest 267` · `E2E 22/22` · LangGraph 6 node · golden baseline **BẬT mặc định (base benign duy nhất)**. **5D:** F1 **0.61** (P.95/R.45), Tier-2 escalate recall **1.00 (594/594)**, zero-day 7/7, APT 3/3 · độ trễ **−82.97%** · adversarial Tier-2 **100%**/guardrail 50% · LLM-Judge **3.9/5** · audit HMAC tamper-evident. Vận hành: [RUN_PROJECT.md](../guides/RUN_PROJECT.md); demo 1 lệnh `scripts/run_demo.sh`.
+**Trạng thái:** `pytest 280+` · LangGraph 5 node (Cổng ML dời sang Tier-1) · golden baseline **BẬT mặc định**. **5D (dataset regenerate 2026-07-16, chạy lại phần không-LLM):** Tier-1 gate F1 **0.4991** (P.758/R.372), **Cổng ML** F1 0.757 standalone / **bypass LLM 74.1%** F1(bypass) 0.984 (Config G) · **kháng né-tránh ML 100%** (Inf/cực-đoan) · APT 3/3, zero-day 12/15 · độ trễ **−82.97%** (cũ, cần đo lại) · adversarial Tier-2 **100%** · LLM-Judge **3.9/5** (cũ) · audit HMAC. ⚠️ Số cần-LLM (ablation B–F, reasoning) CHƯA rerun trên data mới. Vận hành: [RUN_PROJECT.md](../guides/RUN_PROJECT.md); demo `scripts/run_demo.sh` (tự chạy `reset_all.py` trước).
 
 > **Vì sao "đẩy nghìn log mà Dashboard hiện dần":** Tier-1 lọc ~88–99% ở wire-speed; chỉ ESCALATE mới gọi Gemma-2-9B (~15–25s/lô, subscriber đơn luồng chặn đồng bộ). Là **đánh đổi có chủ đích**, không phải bug. Số benchmark lấy từ luồng **OFFLINE tất định** (`evaluate_unified_stream.py`), không phải từ demo.
 

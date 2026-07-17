@@ -300,17 +300,20 @@ def render_demo_overview(
         e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
         e2.metric("Suy luận Tier-2 (LLM)", "≈5.7 s", "62.7% escalate")
         e3, e4 = st.columns(2)
-        e3.metric("Lọc rác Welford", "> 99%", "Welford > 3.5σ")
-        e4.metric("APT recall", "1.00", "DAPT2020")
+        # Cổng ML giảm tải LLM: trên phần Tier-1 ESCALATE, Cổng ML tự quyết 74.1% (Config G,
+        # ablation_mlgate) -> chỉ ~26% ca thực sự cần LLM. Số THẬT, sinh không cần LLM.
+        e3.metric("Cổng ML giảm tải LLM", "74.1%", "F1(bypass) 0.984")
+        e4.metric("APT recall", "1.00", "DAPT2020 · 3/3")
         e5, e6 = st.columns(2)
         # F1 = 0.967 là số THẬT của LightGBM trên tập test 20k giữ-lại (ml_lab/training_report.md,
         # Test F1 0.9666). KHÔNG dùng "1.000" — không mô hình nào phân loại hoàn hảo; 1.000 là
         # điểm trên một tập con tầm thường, không phải F1 tổng quát hoá (vi phạm trung thực).
         e5.metric("Cổng ML (Tier-1) F1-score", "0.967", "LightGBM · test 20k")
-        e6.metric("Chặn mã hóa-bypass", "100%", "4/4 payload · rào tĩnh 50%")
+        e6.metric("Kháng né-tránh Cổng ML", "100%", "Inf/cực-đoan · evasion")
         st.caption(
             "Nguồn: unified_stream (APT 3/3, zero-day 12/15) · training_report (ML F1 0.9666) · "
-            "adversarial_pipeline (4/4 RESISTED) · latency_benchmark (−82.97%). Audit HMAC: 100%."
+            "ml_gate (bypass 74.1%, F1 0.984, evasion-resistance 100%) · adversarial_pipeline "
+            "(4/4 RESISTED) · latency_benchmark (−82.97%). Audit HMAC: 100%."
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")

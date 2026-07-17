@@ -61,6 +61,25 @@ def test_stream_merges_real_sources_interleaved():
         seen_day[ip] = day
 
 
+def test_stream_data_hygiene_no_missing_ip_no_nonfinite():
+    """Bất biến VỆ SINH DATA (đầu vào cho Tier-1 + Cổng ML): mọi event luồng gộp phải có
+    Source IP, và KHÔNG feature số nào là Inf/NaN (đặc sản CSV CICIDS) lọt qua map — nếu lọt,
+    StandardScaler của Cổng ML sẽ raise và Tier-1 Welford tính sai."""
+    import math
+
+    warmup, main, _apt, _n = build_stream()
+    checked = 0
+    for ev in list(warmup) + list(main):
+        log = ev["log"]
+        ip = log.get("Source IP") or log.get("src_ip")
+        assert ip, f"event nguồn={ev.get('source')} thiếu Source IP"
+        for k, v in log.items():
+            if isinstance(v, float):
+                assert math.isfinite(v), f"feature {k}={v} là Inf/NaN (nguồn={ev.get('source')})"
+        checked += 1
+    assert checked > 1000, "luồng gộp quá ít event — build_stream có thể hỏng"
+
+
 def test_apt_detection_is_emergent_not_preseeded():
     """Trên bộ nhớ SẠCH: 1 sự kiện ngày-1 CHƯA phải APT; chỉ khi có sự kiện
     ngày khác cho cùng IP thì check_apt_chain mới BẬT (nổi lên dần)."""

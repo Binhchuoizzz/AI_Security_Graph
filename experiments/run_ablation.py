@@ -11,7 +11,9 @@ liệu đã trích trong luận văn); đây thuần là tổ chức lại code 
                    trên 300 mẫu phân tầng.           -> results/ablation_bcde_results.json
   --mode balanced  6 cấu hình A–F trên tập CÂN BẰNG 150/150 (benign thật để gate Welford
                    có cơ hội DROP true-negative).    -> results/ablation_balanced_results.json
-  --mode all       Chạy lần lượt af -> bcde -> balanced.
+  --mode mlgate    Config G — GIẢM TẢI LLM bằng Cổng ML (KHÔNG cần LLM). Đo bypass-rate +
+                   F1 Cổng ML trên phần escalate.    -> results/ablation_mlgate_results.json
+  --mode all       Chạy lần lượt af -> bcde -> balanced -> mlgate.
 
 Gate Welford tính MỘT lần/mẫu, dùng chung C/D/E/F => escalation set giống hệt nhau nên
 hiệu số D-C, E-D cô lập đúng đóng góp từng tầng RAG. Verdict B-E = action THÔ do LLM trả
@@ -45,6 +47,7 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 OUT_AF = os.path.join(RESULTS_DIR, "ablation_results.json")
 OUT_BCDE = os.path.join(RESULTS_DIR, "ablation_bcde_results.json")
 OUT_BALANCED = os.path.join(RESULTS_DIR, "ablation_balanced_results.json")
+OUT_MLGATE = os.path.join(RESULTS_DIR, "ablation_mlgate_results.json")
 
 ATTACK_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"}
 VALID_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "DROP", "ESCALATE"}
@@ -603,11 +606,88 @@ def run_balanced(out=None):
         print(f"{c:>3} | {f1:>6.4f} | {prec:>6.4f} | {rec:>6.4f} | {esc:>5.1f} | {lat:>7.3f}")
 
 
+def run_mlgate(limit=None, out=None):
+    """Config G — GIẢM TẢI LLM bằng Cổng ML (chiều Performance/Efficiency, KHÔNG cần LLM).
+
+    Mô phỏng đường thật: Tier-1 gate quyết event nào ESCALATE (đáng lẽ gọi LLM); cho phần
+    escalate đó qua Cổng ML. ML tự quyết -> BYPASS = tiết kiệm 1 lượt LLM. Đo:
+      - ml_bypass_rate = (escalate được ML giải quyết) / (tổng escalate)
+      - F1/P/R của Cổng ML trên phần bypass
+      - độ trễ TIẾT KIỆM: không-ML mọi escalate tốn ~LLM_MS; có-ML phần bypass chỉ tốn ~ML_MS
+    Số LLM_MS/ML_MS là tham chiếu (từ latency_benchmark) chỉ để CHIẾU mức tiết kiệm — không
+    phải phép đo latency mới.
+    """
+    from src.tier1_filter.ml_gateway import MLGateway
+
+    dataset = stratified(load_ground_truth(), limit) if limit else load_ground_truth()
+    out_path = out or OUT_MLGATE
+    engine = _fresh_engine()
+    _synthetic_warmup(engine)
+    gw = MLGateway()
+    if not gw.pipeline:
+        print("[-] Không nạp được Cổng ML — bỏ mode mlgate.")
+        return
+    LLM_MS = 5000.0  # ~1 lượt LLM (tham chiếu latency_benchmark)
+    ML_MS = 0.3  # ~1 lượt Cổng ML
+
+    n = n_escalated = n_bypass = 0
+    yt, yp = [], []
+    print(f"[*] Chạy Config G (ML offload) trên {len(dataset)} mẫu (không gọi LLM)…")
+    for sample in dataset:
+        logs = sample.get("logs", [])
+        is_attack = 1 if sample["expected_action"] in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
+        engine.session_baseline.reset_window()
+        needs_llm, _ = run_gate(logs, engine)
+        n += 1
+        if not needs_llm:
+            continue
+        n_escalated += 1
+        for log in logs:
+            a, _r, _c, _s = gw.evaluate_detailed(log)
+            if a is not None:
+                n_bypass += 1
+                yt.append(is_attack)
+                yp.append(1 if a in ("BLOCK_IP", "ALERT") else 0)
+                break
+
+    bypass_rate = n_bypass / n_escalated if n_escalated else 0.0
+    f1 = float(f1_score(yt, yp, zero_division=0)) if yt else 0.0
+    prec = float(precision_score(yt, yp, zero_division=0)) if yt else 0.0
+    rec = float(recall_score(yt, yp, zero_division=0)) if yt else 0.0
+    t_no_ml = n_escalated * LLM_MS
+    t_ml = n_bypass * ML_MS + (n_escalated - n_bypass) * LLM_MS
+    saved_pct = (1 - t_ml / t_no_ml) * 100 if t_no_ml else 0.0
+
+    result = {
+        "dataset_size": n,
+        "n_escalated_would_call_llm": n_escalated,
+        "n_ml_bypass": n_bypass,
+        "ml_bypass_rate": round(bypass_rate, 4),
+        "ml_f1_on_bypass": round(f1, 4),
+        "ml_precision_on_bypass": round(prec, 4),
+        "ml_recall_on_bypass": round(rec, 4),
+        "projected_llm_calls_saved": n_bypass,
+        "projected_latency_saved_pct": round(saved_pct, 2),
+        "ref_llm_ms": LLM_MS,
+        "ref_ml_ms": ML_MS,
+        "note": "Config G đo GIẢM TẢI LLM của Cổng ML; latency là CHIẾU từ tham chiếu, không đo mới.",
+    }
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    print(
+        f"[+] Config G: escalate={n_escalated} | ML bypass={n_bypass} "
+        f"({bypass_rate:.1%}) | F1(bypass)={f1:.4f} P={prec:.4f} R={rec:.4f} | "
+        f"tiết kiệm LLM≈{saved_pct:.1f}%\n[+] JSON: {out_path}"
+    )
+    return result
+
+
 if __name__ == "__main__":
     import argparse
 
-    ap = argparse.ArgumentParser(description="Ablation Study hợp nhất (A–F)")
-    ap.add_argument("--mode", choices=["af", "bcde", "balanced", "all"], default="all")
+    ap = argparse.ArgumentParser(description="Ablation Study hợp nhất (A–F + G ML offload)")
+    ap.add_argument("--mode", choices=["af", "bcde", "balanced", "mlgate", "all"], default="all")
     ap.add_argument("--limit", type=int, default=None, help="Giới hạn số mẫu (af/bcde)")
     ap.add_argument("--out", type=str, default=None, help="Ghi đè path output (chỉ khi 1 mode)")
     args = ap.parse_args()
@@ -621,3 +701,5 @@ if __name__ == "__main__":
         run_bcde(limit=args.limit or 300, out=args.out)
     if args.mode in ("balanced", "all"):
         run_balanced(out=args.out)
+    if args.mode in ("mlgate", "all"):
+        run_mlgate(limit=args.limit, out=args.out if args.mode == "mlgate" else None)
