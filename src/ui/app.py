@@ -883,8 +883,59 @@ def main_dashboard():
                             st.rerun()
 
             with t1_tab:
-                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t1)}**")
-                _render_alerts_list(alerts_t1, "t1")
+                tier1_blocks_data = _get_tier1_blocks(show=200)
+                st.caption(
+                    f"Tổng số IP đã bị chặn tại Tier-1: **{len(tier1_blocks_data)}** "
+                    f"_(đọc từ ring buffer `config/tier1_blocks.json` — Tier-1 chặn tức thời qua Redis TTL 1h)_"
+                )
+                if not tier1_blocks_data:
+                    st.info(
+                        "Chưa có IP nào bị Tier-1 chặn trong phiên này. "
+                        "Tier-1 chặn IP tức thời qua Redis blacklist (TTL 1h) và ghi vào `config/tier1_blocks.json`."
+                    )
+                else:
+                    for blk in tier1_blocks_data:
+                        ip = html.escape(str(blk.get("ip", "N/A")))
+                        score = blk.get("score", 0)
+                        count = blk.get("count", 1)
+                        ts = html.escape(str(blk.get("ts", "")))[:19]
+                        reasons = blk.get("reasons", [])
+                        reasons_html = (
+                            "".join(
+                                f'<li style="margin-bottom:3px;">{html.escape(str(r))}</li>'
+                                for r in reasons
+                            )
+                            or '<li style="color:#8c8c8c;">Không có chi tiết lý do.</li>'
+                        )
+
+                        card_html = (
+                            '<div class="soc-card severity-critical" style="border-left:4px solid #ff4d4f;">'
+                            '  <div class="soc-card-header">'
+                            '    <h4 class="soc-card-title">🛑 [BLOCK] ĐÃ CHẶN TẠI TIER-1</h4>'
+                            '    <span class="soc-badge" style="background:rgba(255,77,79,0.2);color:#ff7875;'
+                            "border:1px solid rgba(255,77,79,0.4);font-size:0.75rem;padding:2px 8px;"
+                            'border-radius:4px;margin-left:8px;">🛡️ Tier-1 Block · Redis TTL 1h</span>'
+                            f'    <span class="soc-timestamp">{ts}</span>'
+                            "  </div>"
+                            '  <div class="soc-detail-row">'
+                            '    <span class="soc-label">IP bị chặn:</span>'
+                            f'    <span class="soc-value-code" style="color:#ff7875;">{ip}</span>'
+                            f'    <span style="color:#8c8c8c;font-size:0.8rem;margin-left:12px;">Bị chặn {count} lần · Điểm rủi ro: <b style="color:#ff4d4f;">{score}</b></span>'
+                            "  </div>"
+                            '  <div class="soc-reasoning-box" style="margin-top:8px;">'
+                            '    <div class="soc-reasoning-title">⚡ Lý do Tier-1 chặn (Rule Engine):</div>'
+                            f'    <ul style="margin:6px 0 0 18px;font-size:0.85rem;color:#d9d9d9;">{reasons_html}</ul>'
+                            "  </div>"
+                            '  <div class="soc-detail-row" style="margin-top:8px;">'
+                            '    <span class="soc-badge" style="background:rgba(255,77,79,0.15);color:#ff7875;'
+                            'border:1px solid rgba(255,77,79,0.35);">🛑 CHẶN NGAY · Không cần LLM · Tự động hot-reload xuống Tier-1</span>'
+                            "  </div>"
+                            "</div>"
+                        )
+                        st.markdown(
+                            "".join(line.strip() for line in card_html.split("\n")),
+                            unsafe_allow_html=True,
+                        )
             with t2_ml_tab:
                 st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2_ml)}**")
                 _render_alerts_list(alerts_t2_ml, "t2")
