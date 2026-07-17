@@ -7,7 +7,7 @@ Kiến trúc SENTINEL V2 bao gồm 3 lớp lọc chính, đi từ siêu nhẹ đ
 | Tầng | Công Nghệ | Vai Trò | Độ Trễ (Latency) |
 |---|---|---|---|
 | **Tier-1** | Static Rules & Heuristics | Lọc thô, WAF Signatures, chống DDoS, chặn IP khét tiếng. | Rất thấp (~1ms) |
-| **Tier-2 Cổng ML** | LightGBM / Decision Tree | Phát hiện tấn công tinh vi (DAPT) dựa trên Data Drift và Packet Lengths. | Thấp (~10-20ms) |
+| **Tier-1.5 Cổng ML** | LightGBM / Decision Tree | Phát hiện tấn công tinh vi (DAPT) dựa trên Data Drift và Packet Lengths. | Thấp (~10-20ms) |
 | **Tier-2 LLM Agent** | Gemma-2 (LangGraph) | Phân tích ngữ cảnh, MITRE ATT&CK, tấn công đa bước & Prompt Injection. | Cao (1-3s) |
 
 ---
@@ -31,7 +31,7 @@ Mỗi kiện dữ liệu (Request/Session) sẽ được cộng điểm rủi ro
 
 ---
 
-## ⚡ 2. TIER-2 CỔNG ML: Lớp Lọc Máy Học Siêu Nhẹ
+## ⚡ 2. TIER-1.5 CỔNG ML: Lớp Lọc Máy Học Siêu Nhẹ
 **Nhiệm vụ:** Phễu lọc trung gian (Middle-box), phát hiện các mẫu tấn công mạng phức tạp mà Tier-1 (Luật tĩnh) bỏ sót, bảo vệ LLM khỏi bị quá tải (Giảm tải nhiễu).
 
 ### Điều kiện lọc:
@@ -39,7 +39,7 @@ Mỗi kiện dữ liệu (Request/Session) sẽ được cộng điểm rủi ro
 - Đưa qua mô hình học máy dạng cây (LightGBM/Decision Tree) siêu nhẹ.
 
 ### Quyết định (Action):
-- **Phát hiện Malign (Độc hại):** Ra lệnh `BLOCK_IP` ngay lập tức, tự động ghi chú "Phát hiện tấn công bởi Cổng ML Tier-2".
+- **Phát hiện Malign (Độc hại):** Ra lệnh `BLOCK_IP` ngay lập tức, tự động ghi chú "Phát hiện tấn công bởi Cổng ML Tier-1.5".
 - **Phát hiện Benign (Bình thường) / Cần ngữ cảnh:** Nếu Cổng ML không chắc chắn nhưng Tier-1 đã chấm điểm cao -> Đẩy (`ESCALATE`) lên LLM Agent phân tích tiếp.
 
 ---
@@ -64,6 +64,6 @@ Mỗi kiện dữ liệu (Request/Session) sẽ được cộng điểm rủi ro
 Sentinel không chỉ là màng lọc 1 chiều mà là một vòng lặp liên tục cải thiện hiệu suất:
 
 1. **Can Thiệp Thủ Công (Manual Override):** Con người (L3 Manager) bấm chặn/whitelist IP trên UI. Quyết định thủ công được duyệt ngay lập tức (Trạng thái: ACTIVE) và áp đặt thẳng xuống Firewall.
-2. **Chờ Duyệt (Pending Rules):** Khi Tier-2 (ML hoặc LLM) chặn 1 IP, hệ thống sẽ đề xuất tạo luật PENDING ở tab Phê duyệt.
-3. **Tier-2 Dạy Tier-1:** Sau khi một luật PENDING được con người duyệt thành ACTIVE, Tier-1 cập nhật bộ nhớ. Lần sau IP đó quay lại, Tier-1 sẽ **tự động chặn ở rìa mạng** mà không tốn công gọi ML/LLM nữa, giúp tiết kiệm tài nguyên khổng lồ.
+2. **Chờ Duyệt (Pending Rules):** Khi Tier-1.5 (ML) hoặc Tier-2 (LLM) chặn 1 IP, hệ thống sẽ đề xuất tạo luật PENDING ở tab Phê duyệt.
+3. **Tier-1.5/2 Dạy Tier-1:** Sau khi một luật PENDING được con người duyệt thành ACTIVE, Tier-1 cập nhật bộ nhớ. Lần sau IP đó quay lại, Tier-1 sẽ **tự động chặn ở rìa mạng** mà không tốn công gọi ML/LLM nữa, giúp tiết kiệm tài nguyên khổng lồ.
 4. **Loại Trừ Xung Đột:** Nếu một IP đang bị chặn (Block) nhưng con người cho vào Whitelist, luật chặn sẽ bị vô hiệu hóa (Rejected) tự động để nhường quyền ưu tiên tuyệt đối cho Whitelist.

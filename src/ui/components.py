@@ -152,19 +152,16 @@ def render_alert_card(
 
     # Lấy toàn bộ nội dung trong [MITRE: ...] bằng cách split hoặc regex không tham lam
     # Vì mitre_technique có thể chứa [Tự suy luận] (ngoặc vuông lồng nhau), regex sẽ hơi khác
-    mitre_match = re.search(
-        r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", raw_reason, re.IGNORECASE
-    )
+    mitre_match = re.search(r"\[MITRE:\s*((?:[^\[\]]|\[[^\[\]]*\])*)\]", raw_reason, re.IGNORECASE)
     if mitre_match:
         mitre_tech = mitre_match.group(1).strip()
-        # Đảm bảo xoá ngoặc vuông thừa ở cuối nếu regex chưa bắt hết
-        if mitre_tech.endswith("]"):
-            mitre_tech = mitre_tech[:-1].strip()
     elif t_match := re.search(r"(T\d{4}(?:\.\d{3})?)", raw_reason):
         mitre_tech = t_match.group(1)
 
     conf_match = re.search(
-        r"(?:Confidence|Độ\s+tin\s+cậy):\s*([01]?\.\d+|1(?:\.0)?|\d+%)", raw_reason, re.IGNORECASE
+        r"(?:Confidence|Độ\s+tin\s+cậy):\s*([01]?\.\d+|1(?:\.0)?|\d+(?:\.\d+)?%)",
+        raw_reason,
+        re.IGNORECASE,
     )
     if conf_match:
         try:
@@ -186,7 +183,7 @@ def render_alert_card(
     css_class = "severity-info"
     icon = "ℹ️"
 
-    if action == "BLOCK_IP" or action == "QUARANTINE":
+    if action == "BLOCK_IP":
         severity_level = "CRITICAL"
         css_class = "severity-critical"
         icon = "🛑"
@@ -202,10 +199,10 @@ def render_alert_card(
     # Việt hóa hành động
     action_translations = {
         "BLOCK_IP": "CHẶN IP (BLOCK)",
-        "QUARANTINE": "CÁCH LY (QUARANTINE)",
         "ALERT": "CẢNH BÁO (ALERT)",
-        "AWAIT_HITL": "ĐỀ XUẤT CHẶN (AWAIT_HITL)",
+        "AWAIT_HITL": "CHỜ DUYỆT (HITL)",
         "LOG": "GHI LOG (LOG)",
+        "WHITELIST": "BỎ QUA (WHITELIST)",
     }
     action_display = action_translations.get(action, action)
 
@@ -215,25 +212,34 @@ def render_alert_card(
     if is_self_inferred:
         inference_badge = '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 Tự Suy Đoán</span>'
 
-    # Làm sạch chuỗi lý do phân tích (loại bỏ các thẻ tag [MITRE...] để hiển thị text sạch)
+    # Làm sạch chuỗi lý do phân tích (loại bỏ các thẻ tag để hiển thị text sạch)
     clean_reason = html_lib.escape(raw_reason)
     clean_reason = re.sub(
-        r"\[MITRE:\s*(.*?)(?:\]\s*\[Độ tin cậy|\]\s*$)", "", clean_reason, flags=re.IGNORECASE
+        r"\[MITRE:(?:[^\[\]]|\[[^\[\]]*\])*\]", "", clean_reason, flags=re.IGNORECASE
     )
-    clean_reason = re.sub(r"\[MITRE:.*?\]", "", clean_reason, flags=re.IGNORECASE)  # fallback
-    clean_reason = re.sub(r"\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]", "", clean_reason).strip()
+    clean_reason = re.sub(
+        r"\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]", "", clean_reason, flags=re.IGNORECASE
+    ).strip()
 
-    # Xoá ngoặc vuông đóng lẻ tẻ do regex không tham lam để lại
+    # Xoá ngoặc vuông đóng lẻ tẻ nếu còn sót
     if clean_reason.startswith("]"):
         clean_reason = clean_reason[1:].strip()
 
-    # Phân nguồn phán quyết: Tier-1 (rule) / Tier-2 Cổng ML / Tier-2 LLM.
-    # LƯU Ý detect theo MARKER đặc thù, KHÔNG dùng chữ "Tier-2"/"ML" trần — vì chuỗi
-    # Tier-2 giờ xuất hiện ở cả nhánh LLM. Giữ "ML Tier 2" để nhận bản ghi CŨ trong DB.
+    # Phân nguồn phán quyết: Tier-1 (rule) / Tier-1.5 Cổng ML / Tier-2 LLM.
     reason_text = raw_reason
-    is_tier1 = "Tier-1" in reason_text or "whitelist" in reason_text.lower()
-    is_ml_tier = any(k in reason_text for k in ("Cổng ML", "ML Tier 2", "Decision Tree"))
     is_manual = "Chặn thủ công" in reason_text or "MANUAL" in reason_text.upper()
+    is_llm = reason_text.startswith("[MITRE:")
+    is_ml_tier = (
+        not is_manual
+        and not is_llm
+        and any(k in reason_text for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Tier-1.5"))
+    )
+    is_tier1 = (
+        not is_manual
+        and not is_llm
+        and not is_ml_tier
+        and ("Tier-1" in reason_text or "whitelist" in reason_text.lower())
+    )
 
     if is_manual:
         tier_badge = (
@@ -255,9 +261,9 @@ def render_alert_card(
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.2);color:#faad14;'
             "border:1px solid rgba(250, 173, 20, 0.4);font-size:0.75rem;padding:2px 8px;"
-            'border-radius:4px;margin-left:8px;">⚡ Tier-2 · Cổng ML</span>'
+            'border-radius:4px;margin-left:8px;">⚡ Tier-1.5 · Cổng ML</span>'
         )
-        reasoning_title = "⚡ Lập luận của Cổng ML Tier-2 (Decision Tree):"
+        reasoning_title = "⚡ Lập luận của Cổng ML Tier-1.5 (LightGBM):"
         mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
             mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận tự động)"
@@ -412,13 +418,14 @@ def render_metrics_header(
     live_fpr=0.0,
     noise_reduction=None,
     pending_llm_count=0,
+    t1_blocks=None,
 ):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
 
     noise_reduction = (log thô − cảnh báo gửi analyst) / log thô.
 
     ĐỌC CHO ĐÚNG: đây là mức giảm tải mà ANALYST cảm nhận, KHÔNG phải tỉ lệ lọc của
-    Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Tier-2 GỘP
+    Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Tier-1.5/2 GỘP
     nhiều log escalate thành 1 phán quyết. Ví dụ đo thật 2026-07-15 trên luồng gộp:
     4796 thô -> Tier 1 escalate 2034 (tức Tier 1 chỉ lọc 57.6%) -> gộp thành 218 cảnh
     báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier 1 thì lấy từ
@@ -438,12 +445,22 @@ def render_metrics_header(
     if isinstance(all_alerts, list):
         for alert in all_alerts:
             r = alert.get("reason", "")
-            if "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
-                t1_count += 1
-            elif "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r:
-                ml_count += 1
-            else:
-                llm_count += 1
+            action = alert.get("action", "")
+            is_manual = "Chặn thủ công" in r or "MANUAL" in r.upper()
+            is_llm = r.startswith("[MITRE:")
+            is_ml = (
+                not is_manual
+                and not is_llm
+                and any(k in r for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Tier-1.5"))
+            )
+
+            if action == "BLOCK_IP":
+                if is_ml:
+                    ml_count += 1
+                elif is_llm:
+                    llm_count += 1
+    if isinstance(t1_blocks, list):
+        t1_count = len(t1_blocks)
 
     # Xác định màu sắc cho live_fpr (dưới 10% xanh lá, dưới 25% vàng, ngược lại đỏ)
     fpr_color = "#52c41a"  # green
@@ -451,6 +468,8 @@ def render_metrics_header(
         fpr_color = "#ff4d4f"  # red
     elif live_fpr > 10.0:
         fpr_color = "#faad14"  # orange/yellow
+
+    nr_str = f"{noise_reduction:.1f}%" if noise_reduction is not None else "0.0%"
 
     html_kpi = (
         f'<div class="kpi-container">'
@@ -460,7 +479,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #fa541c;">{t1_count}</div>'
-        f'    <div class="kpi-label">Chặn tại Tier-1 🛡️</div>'
+        f'    <div class="kpi-label">Chặn tại Tier-1 🛡️<br/><span style="font-size: 0.85em; font-weight: normal; color: #a0a0a0;">(Lọc rác {nr_str})</span></div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #1890ff;">{ml_count}</div>'
@@ -468,7 +487,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #722ed1;">{llm_count}</div>'
-        f'    <div class="kpi-label">Phân tích sâu LLM 🧠</div>'
+        f'    <div class="kpi-label">Chặn ở LLM 🧠</div>'
         f"  </div>"
         f'  <div class="kpi-card">'
         f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'

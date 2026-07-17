@@ -14,7 +14,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 import html
 import json
-import time
 from datetime import datetime
 
 import streamlit as st  # type: ignore
@@ -26,6 +25,32 @@ from src.response.executor import (
     get_audit_trail_for_ip,
     verify_audit_trail_integrity,
 )
+
+
+# ---------------------------------------------------------------------------
+# Caching DB / I/O để tối ưu hiệu năng (Anti-Lag)
+# ---------------------------------------------------------------------------
+@st.cache_data(ttl=2)
+def cached_get_audit_trail(limit=50):
+    return get_audit_trail(limit)
+
+
+@st.cache_data(ttl=2)
+def cached_get_audit_trail_for_ip(ip, limit=50):
+    return get_audit_trail_for_ip(ip, limit)
+
+
+@st.cache_data(ttl=2)
+def cached_get_tier1_blocks(show=12):
+    return _get_tier1_blocks(show)
+
+
+@st.cache_data(ttl=5)
+def cached_get_all_threat_events():
+    return threat_memory.get_all_threat_events()
+
+
+# ---------------------------------------------------------------------------
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.ui.auth import logout, require_auth
 from src.ui.components import (
@@ -92,9 +117,11 @@ def handle_whitelist_approval(ip: str):
     ok = feedback_mgr.add_to_whitelist(ip)
     st.session_state[f"whitelisted_{ip}"] = ok
     if ok:
-        from src.response.executor import unblock_ip
+        from src.response.executor import _log_to_db, unblock_ip
 
         unblock_ip(ip)
+        _log_to_db("LOG", ip, "Whitelist thủ công qua nút bấm SIEM (Tier-1 Rule)")
+        st.cache_data.clear()
         st.toast(f"✅ Đã whitelist {ip}", icon="✅")
     else:
         st.toast(
@@ -102,7 +129,6 @@ def handle_whitelist_approval(ip: str):
             "*, any, hoặc CIDR < /16). IP host cụ thể đều được phép.",
             icon="⚠️",
         )
-    time.sleep(0.5)
     st.rerun()
 
 
@@ -119,12 +145,13 @@ def handle_block_approval(ip: str):
     feedback_mgr.approve_rule(ip, "Source IP")
 
     # Ghi audit log
-    from src.response.executor import block_ip
+    from src.response.executor import _add_to_blacklist, _log_to_db
 
-    block_ip(ip, "Chặn thủ công qua nút bấm SIEM")
+    _add_to_blacklist(ip)
+    _log_to_db("LOG", ip, "Chặn thủ công qua nút bấm SIEM (Tier-1 Rule)")
 
+    st.cache_data.clear()
     st.toast(f"🛑 Đã block {ip} thành công", icon="🛑")
-    time.sleep(0.5)
     st.rerun()
 
 
@@ -184,7 +211,7 @@ def render_demo_overview(
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
-        "Welford $O(1)$ → **Tier-2** (Cổng ML → tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
+        "Welford $O(1)$ → **Tier-1.5** (Cổng ML) → **Tier-2** tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
         "**Dual-RAG** (MITRE ATT&CK / NIST SP 800-61r2) phía sau rào chắn mật mã, có **HITL** giám sát.*"
     )
 
@@ -209,7 +236,7 @@ def render_demo_overview(
     except Exception:
         integ_valid = True
 
-    escalated = len(all_alerts)
+    escalated = sum(1 for a in all_alerts if a.get("action") in ("BLOCK_IP",))
     # Không bịa số khi chưa đo được: 99.6 hardcode cũ khiến demo trống vẫn khoe 99.6%.
     nr = noise_reduction
 
@@ -217,12 +244,12 @@ def render_demo_overview(
     st.markdown("### 📊 Chỉ số Vận hành Thời gian thực")
     c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
     c1.metric("Logs thô đầu vào", f"{raw_logs_count:,}")
-    c2.metric("Tổng Cảnh báo (T1+T2)", f"{escalated:,}")
+    c2.metric("Tổng IP Bị Chặn", f"{escalated:,}")
     c3.metric("Đang chờ LLM ⏳", f"{pending_llm}")
     nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
     c4.metric("Giảm tải (thô→cảnh báo)", nr_str)
     c5.metric("IP rủi ro cao", f"{len(high_risk)}")
-    c6.metric("Phê duyệt Tier-2 (ML+LLM)", f"{len(pending_rules)}")
+    c6.metric("Phê duyệt Tier-1.5+2 (ML+LLM)", f"{len(pending_rules)}")
     c7.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
 
     st.markdown("---")
@@ -271,12 +298,12 @@ def render_demo_overview(
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
         e1, e2 = st.columns(2)
         e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
-        e2.metric("Suy luận Tier-2 (ML+LLM)", "≈5.7 s", "62.7% escalate")
+        e2.metric("Suy luận Tier-1.5+2 (ML+LLM)", "≈5.7 s", "62.7% escalate")
         e3, e4 = st.columns(2)
         e3.metric("Lọc rác Welford", "> 99%", "Welford > 3.5σ")
         e4.metric("APT recall", "1.00", "DAPT2020")
         e5, e6 = st.columns(2)
-        e5.metric("Tier-2 ML F1-score", "1.000", "Siêu nhẹ (0.000s)")
+        e5.metric("Tier-1.5 ML F1-score", "1.000", "Siêu nhẹ (0.001s)")
         e6.metric("Chặn mã hóa-bypass", "100%", "Rào chắn tĩnh 50%")
         st.caption(
             "Mann-Whitney U: p = 2.8×10⁻¹⁷ · McNemar (Tier-1 vs Đầy đủ): p = 1.0 · Audit HMAC: 100%."
@@ -309,12 +336,12 @@ def render_demo_overview(
 
     # ---------- Vòng phản hồi Hai tầng: Tier-1 chặn ↔ Tier-2 dạy ----------
     st.markdown("---")
-    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ Tier-2 (ML+LLM) dạy ngược)")
+    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ Tier-1.5+2 dạy ngược)")
     fb_left, fb_right = st.columns(2)
 
     with fb_left:
         st.markdown("#### 🛡️ Tier-1 đã chặn (tốc độ đường truyền · KHÔNG cần LLM)")
-        t1_blocks = _get_tier1_blocks()
+        t1_blocks = cached_get_tier1_blocks()
         if t1_blocks:
             st.dataframe(
                 pd.DataFrame(
@@ -346,7 +373,7 @@ def render_demo_overview(
             )
 
     with fb_right:
-        st.markdown("#### 🔄 Tier-2 đã dạy Tier-1 (luật học được · lâu dài)")
+        st.markdown("#### 🔄 Tier-1.5+2 đã dạy Tier-1 (luật học được · lâu dài)")
         # ACTIVE (luật đã duyệt, đang chặn) hiển thị TRƯỚC để không bị ẩn khi nhiều PENDING
         loop_rules = list(active_rules or []) + list(pending_rules or [])
         if loop_rules:
@@ -369,7 +396,7 @@ def render_demo_overview(
                 hide_index=True,
             )
             st.caption(
-                f"Mỗi phán quyết BLOCK/HITL từ Tier-2 (ML, LLM) và Tier-1 sinh **1 luật** "
+                f"Mỗi phán quyết BLOCK/HITL từ Tier-1.5 (ML), Tier-2 (LLM) và Tier-1 sinh **1 luật** "
                 f"({len(pending_rules or [])} chờ duyệt · {len(active_rules or [])} đang chặn). "
                 "Analyst DUYỆT (HITL) → luật **ACTIVE** → Tier-1 tự động CHẶN ngay lần sau. "
                 "Khác với block Redis (TTL 1h), luật đã duyệt **KHÔNG hết hạn** — đây là lý do số "
@@ -377,15 +404,12 @@ def render_demo_overview(
             )
         else:
             st.info(
-                "Chưa có luật nào Tier-2 dạy cho Tier-1. Chạy luồng có escalate để LLM sinh luật."
+                "Chưa có luật nào Tier-1.5/2 dạy cho Tier-1. Chạy luồng có escalate để hệ thống sinh luật."
             )
 
-    # ---------- Tier-2 (Cổng ML + LLM) đã CHẶN — phán quyết ghi vào Audit Trail ----------
-    st.markdown("---")
-    st.markdown("### 🧠 Tier-2 (Cổng ML + LLM Agent) đã CHẶN (ghi chép Audit Trail)")
-    _t2_blocks = [
-        a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP", "QUARANTINE")
-    ]
+    # ---------- Tier-1.5 (Cổng ML) + Tier-2 (LLM) đã CHẶN — phán quyết ghi vào Audit Trail ----------
+    st.markdown("### 🧠 Tier-1.5 (Cổng ML) & Tier-2 (LLM) đã CHẶN (ghi chép Audit Trail)")
+    _t2_blocks = [a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP",)]
     if _t2_blocks:
         st.dataframe(
             pd.DataFrame(
@@ -411,14 +435,14 @@ def render_demo_overview(
             hide_index=True,
         )
         st.caption(
-            f"**{len(_t2_blocks)}** quyết định CHẶN do Tier-2 (và thao tác thủ công của "
+            f"**{len(_t2_blocks)}** quyết định CHẶN do Tier-1.5, Tier-2 (và thao tác thủ công của "
             "Analyst) ghi vào Audit Trail HMAC-SHA256. Khác với *Tier-1 đã chặn* (chữ ký tốc độ "
             "cao, TTL 1h ở Redis): đây là phán quyết **có suy luận MITRE/NIST** của LLM sau khi "
             "leo thang. IP đã whitelist KHÔNG bao giờ xuất hiện ở đây (đã miễn trừ)."
         )
     else:
         st.info(
-            "Chưa có quyết định CHẶN nào từ Tier-2. Chạy luồng có escalate (adversarial/APT) để "
+            "Chưa có quyết định CHẶN nào từ Tier-1.5 hoặc Tier-2. Chạy luồng có escalate (adversarial/APT) để "
             "LLM phán quyết và ghi vào Audit Trail."
         )
 
@@ -430,9 +454,8 @@ def render_demo_overview(
 
 
 def main_dashboard():
-    # Tự động refresh trang mỗi 1000ms (1 giây)
-    # Giúp dashboard tự cập nhật log mới theo thời gian thực (SIEM style)
-    count = st_autorefresh(interval=1000, limit=10000, key="siem_dashboard_refresh")
+    # Auto-refresh UI mỗi 3000ms để tránh giật lag khi tải nhiều data
+    count = st_autorefresh(interval=3000, limit=10000, key="siem_dashboard_refresh")
 
     # Sidebar
     with st.sidebar:
@@ -449,7 +472,7 @@ def main_dashboard():
         # ghi chú benign/quản trị, không phải sự cố cần phân loại → tránh bộ lọc rỗng).
         action_filter = st.selectbox(
             "Phân loại Hành động",
-            options=["Tất cả", "BLOCK_IP", "ALERT", "LOG", "QUARANTINE", "WHITELIST"],
+            options=["Tất cả", "BLOCK_IP", "ALERT", "LOG", "WHITELIST"],
             index=0,
             key="action_filter_sb",
         )
@@ -538,8 +561,20 @@ def main_dashboard():
                 except Exception:
                     pass
 
+                # 8. Xoá Redis blacklist (do UI chạy cùng node nên có thể reach được)
+                try:
+                    import redis
+
+                    from src.response.executor import _redis_url
+
+                    r = redis.Redis.from_url(_redis_url(), socket_connect_timeout=1.0)
+                    for key in r.scan_iter("blacklist:*"):
+                        r.delete(key)
+                except Exception:
+                    pass
+
+                st.cache_data.clear()
                 st.success("Đã reset toàn bộ dữ liệu hệ thống về trạng thái ban đầu!")
-                time.sleep(0.7)
                 st.rerun()
             except Exception as e:
                 st.error(f"Lỗi khi reset: {e}")
@@ -559,13 +594,40 @@ def main_dashboard():
         st.markdown("---")
         st.markdown("### 📟 Live System Console Logs")
 
-        # Lấy 10 log mới nhất để hiển thị kiểu terminal nhấp nháy
-        console_logs = get_audit_trail(limit=10)
-        if not console_logs:
+        # Lấy 10 log mới nhất từ Audit (Tier-1.5, Tier-2, Manual) và kết hợp với Tier-1 Blocks
+        console_logs = cached_get_audit_trail(limit=10)
+        combined_logs = list(console_logs)
+
+        try:
+            _t1_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "config",
+                "tier1_blocks.json",
+            )
+            with open(_t1_path) as f:
+                raw_t1 = json.load(f)
+            for b in raw_t1[-10:]:  # Lấy 10 cái cuối (mới nhất)
+                if isinstance(b, dict):
+                    combined_logs.append(
+                        {
+                            "timestamp": b.get("timestamp", ""),
+                            "action": "BLOCK_TIER1",
+                            "target": b.get("ip", "N/A"),
+                        }
+                    )
+        except Exception:
+            pass
+
+        # Sắp xếp theo timestamp giảm dần và lấy 10 cái mới nhất
+        combined_logs = sorted(
+            combined_logs, key=lambda x: str(x.get("timestamp", "")), reverse=True
+        )[:10]
+
+        if not combined_logs:
             console_html = '<div class="console-box"><div class="console-line blink">> Waiting for system events...</div></div>'
         else:
             console_lines = []
-            for log in reversed(console_logs):
+            for log in reversed(combined_logs):
                 t_str = log.get("timestamp", "").split(" ")[-1]  # Lấy phần HH:MM:SS
                 act = log.get("action", "LOG")
                 tgt = log.get("target", "N/A")
@@ -606,8 +668,8 @@ def main_dashboard():
 
     st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
 
-    # Lấy toàn bộ dữ liệu để lọc và phân trang (tối đa 2000 dòng lịch sử)
-    all_alerts = [a for a in get_audit_trail(limit=2000) if a.get("action") != "AWAIT_HITL"]
+    # Render KPI
+    all_alerts = [a for a in cached_get_audit_trail(limit=2000) if a.get("action") != "AWAIT_HITL"]
     active_rules = feedback_mgr.get_active_dynamic_rules()
     pending_rules = feedback_mgr.get_pending_rules()
     whitelisted_ips = feedback_mgr.get_whitelisted_ips()
@@ -667,6 +729,8 @@ def main_dashboard():
     else:
         noise_reduction = None  # raw chưa hợp lệ -> header dùng fallback an toàn
 
+    t1_blocks_list = cached_get_tier1_blocks()
+
     render_metrics_header(
         all_alerts,
         len(pending_rules),
@@ -675,6 +739,7 @@ def main_dashboard():
         live_fpr,
         noise_reduction,
         pending_llm_count=pending_llm_count,
+        t1_blocks=t1_blocks_list,
     )
 
     tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
@@ -715,17 +780,18 @@ def main_dashboard():
                         def assign_tier(r):
                             r_str = str(r)
                             if (
+                                "Cổng ML" in r_str
+                                or "ML Tier 2" in r_str
+                                or "Decision Tree" in r_str
+                                or "Tier-1.5" in r_str
+                            ):
+                                return "Cổng ML"
+                            elif (
                                 "Tier 1" in r_str
                                 or "Tier-1" in r_str
                                 or "whitelist" in r_str.lower()
                             ):
                                 return "Tier-1 Filter"
-                            elif (
-                                "Cổng ML" in r_str
-                                or "ML Tier 2" in r_str
-                                or "Decision Tree" in r_str
-                            ):
-                                return "Cổng ML"
                             else:
                                 return "LLM Agent"
 
@@ -809,17 +875,17 @@ def main_dashboard():
                 r = alert.get("reason", "")
                 # Detect theo MARKER: "Cổng ML" (mới) / "ML Tier 2" (bản ghi cũ trong DB)
                 # / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM giờ cũng ghi Tier-2.
-                if "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
-                    alerts_t1.append(alert)
-                elif "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r:
+                if "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r or "Tier-1.5" in r:
                     alerts_t2_ml.append(alert)
+                elif "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
+                    alerts_t1.append(alert)
                 else:
                     alerts_t2_llm.append(alert)
 
             t1_tab, t2_ml_tab, t2_llm_tab = st.tabs(
                 [
                     "🟢 Tier-1 Filter",
-                    "⚡ Tier-2 · Cổng ML",
+                    "⚡ Tier-1.5 · Cổng ML",
                     "🧠 Tier-2 · LLM",
                 ]
             )
@@ -1039,7 +1105,6 @@ def main_dashboard():
                         hitl_type = "🛡️ AWAIT_HITL (Tier-1 Rule Engine cảnh báo, chờ duyệt)"
                         hitl_color = "#faad14"
                     elif "langgraph_agent" in src:
-                        # Dành cho các luật BLOCK_IP cũ còn sót lại trong config
                         hitl_type = "🛑 BLOCK_IP (Hệ thống đề xuất chặn, chờ duyệt)"
                         hitl_color = "#ff4d4f"
                     else:
@@ -1061,6 +1126,25 @@ def main_dashboard():
                         st.write(f"**Trường dữ liệu:** {rule.get('field')}")
                         st.write(f"**Lý do:** {rule.get('reason')}")
 
+                        # Lấy raw log để minh chứng
+                        target_pattern = str(rule.get("pattern", ""))
+                        ip_audits = cached_get_audit_trail_for_ip(target_pattern, limit=10)
+                        # Ưu tiên lấy log có reason khớp (phòng khi 1 IP có nhiều log)
+                        matched_audit = next(
+                            (
+                                a
+                                for a in ip_audits
+                                if a.get("raw_log")
+                                and str(rule.get("reason", "")) in a.get("reason", "")
+                            ),
+                            None,
+                        )
+                        if not matched_audit:  # Fallback lấy cái mới nhất có raw_log
+                            matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
+                        if matched_audit and matched_audit.get("raw_log"):
+                            with st.expander("🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng)"):
+                                st.code(matched_audit.get("raw_log"), language="json")
+
                         if st.session_state.get("role") == "L3_Manager":
                             col1, col2 = st.columns([1, 1])
                             with col1:
@@ -1077,6 +1161,10 @@ def main_dashboard():
                                     feedback_mgr.approve_rule(
                                         rule.get("pattern"), rule.get("field")
                                     )
+                                    st.cache_data.clear()
+                                    st.success(
+                                        f"✅ Đã DUYỆT thành công luật chặn cho {rule.get('pattern')}"
+                                    )
                                     # Ghi audit khi DUYỆT luật (đồng bộ: duyệt block cũng để lại
                                     # 1 bản ghi như duyệt whitelist). Luật Source IP -> BLOCK_IP.
                                     from src.response.executor import _log_to_db
@@ -1085,7 +1173,7 @@ def main_dashboard():
                                     _log_to_db(
                                         _act,
                                         str(rule.get("pattern")),
-                                        f"Luật được DUYỆT (HITL) bởi "
+                                        f"[Tier-1 Filter] Luật được DUYỆT (HITL) bởi "
                                         f"{st.session_state.get('username')}: {rule.get('reason')}",
                                     )
                                     if _was_wl:
@@ -1093,21 +1181,26 @@ def main_dashboard():
                                             f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist vì "
                                             "chuyển sang CHẶN (block ↔ whitelist loại trừ lẫn nhau)."
                                         )
-                                    st.success(f"Đã duyệt luật {rule.get('pattern')}")
-                                    time.sleep(0.5)
                                     st.rerun()
                             with col2:
                                 if st.button(
                                     "❌ Từ chối", key=f"rej_{rule.get('pattern')}_{page_key}"
                                 ):
                                     feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
+                                    st.cache_data.clear()
                                     # Xóa khỏi Redis blacklist (trường hợp LLM đã block tạm thời)
                                     if rule.get("field") == "Source IP":
                                         from src.response.executor import unblock_ip
 
                                         unblock_ip(str(rule.get("pattern")))
+                                    from src.response.executor import _log_to_db
+
+                                    _log_to_db(
+                                        "LOG",
+                                        str(rule.get("pattern")),
+                                        f"[Tier-1 Filter] Luật bị TỪ CHỐI (HITL) bởi {st.session_state.get('username')}: {rule.get('reason')}",
+                                    )
                                     st.warning(f"Đã từ chối luật {rule.get('pattern')}")
-                                    time.sleep(0.5)
                                     st.rerun()
                         else:
                             st.warning("Bạn không có quyền L3_Manager để phê duyệt.")
@@ -1161,11 +1254,36 @@ def main_dashboard():
                     st.write(f"**Lý do:** {rule.get('reason')}")
                     st.write(f"**Tạo lúc:** {rule.get('created_at')}")
 
+                    # Lấy raw log để minh chứng
+                    target_pattern = str(rule.get("pattern", ""))
+                    ip_audits = cached_get_audit_trail_for_ip(target_pattern, limit=10)
+                    matched_audit = next(
+                        (
+                            a
+                            for a in ip_audits
+                            if a.get("raw_log")
+                            and str(rule.get("reason", "")) in a.get("reason", "")
+                        ),
+                        None,
+                    )
+                    if not matched_audit:
+                        matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
+                    if matched_audit and matched_audit.get("raw_log"):
+                        with st.expander("🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng)"):
+                            st.code(matched_audit.get("raw_log"), language="json")
+
                     if st.session_state.get("role") == "L3_Manager":
                         if st.button("🔄 Vô hiệu hóa / Hoàn tác", key=f"rev_{rule.get('pattern')}"):
                             feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
+                            st.cache_data.clear()
+                            from src.response.executor import _log_to_db
+
+                            _log_to_db(
+                                "LOG",
+                                str(rule.get("pattern")),
+                                f"[Tier-1 Filter] Luật bị HOÀN TÁC (HITL) bởi {st.session_state.get('username')}: {rule.get('reason')}",
+                            )
                             st.warning(f"Đã hoàn tác và vô hiệu hóa luật {rule.get('pattern')}")
-                            time.sleep(0.5)
                             st.rerun()
 
     with tab3:
@@ -1247,7 +1365,7 @@ def main_dashboard():
                 # 1. Truy vấn thông tin danh tiếng từ threat_memory
                 ip_rep = threat_memory.get_ip_reputation(selected_ip)
                 # 2. Truy vấn lịch sử cảnh báo của IP này từ audit_trail
-                ip_history = get_audit_trail_for_ip(selected_ip, limit=50)
+                ip_history = cached_get_audit_trail_for_ip(selected_ip, limit=50)
                 # 3. Truy vấn threat events của IP này từ threat_memory
                 ip_events = threat_memory.get_threat_events_for_ip(selected_ip)
 
@@ -1259,7 +1377,7 @@ def main_dashboard():
                 # Hiển thị kết quả điều tra
                 st.markdown(f"#### 🔍 Kết quả điều tra đối tượng cho IP: `{selected_ip}`")
 
-                # Render hồ sơ danh tiếng & lý do bị cảnh báo bằng giao diện premium
+                # Render hồ sơ danh tiếng & lý do bằng giao diện premium
                 latest_reason = "Không có lý do chi tiết từ AI Agent."
                 if ip_history:
                     # Lấy lý do từ cảnh báo mới nhất
@@ -1353,14 +1471,13 @@ def main_dashboard():
                         reason = record.get("reason")
 
                         # Việt hóa action
-                        act_translations = {
+                        action_badges = {
                             "BLOCK_IP": "🛑 CHẶN IP (BLOCK)",
-                            "QUARANTINE": "☣️ CÁCH LY (QUARANTINE)",
                             "ALERT": "⚠️ CẢNH BÁO (ALERT)",
-                            "AWAIT_HITL": "🧑‍💻 CHỜ PHÊ DUYỆT (HITL)",
-                            "LOG": "ℹ GHI LOG (LOG)",
+                            "LOG": "📝 GHI LOG (LOG)",
+                            "WHITELIST": "✅ BỎ QUA (WHITELIST)",
                         }
-                        act_disp = act_translations.get(act, act)
+                        act_disp = action_badges.get(act, act)
 
                         # Tạo expander cho mỗi alert
                         with st.expander(f"{time_str} - {act_disp}", expanded=(i == 0)):
@@ -1407,7 +1524,7 @@ def main_dashboard():
         # Chặn TỨC THỜI của Tier-1 (WAF/injection/cổng nhạy cảm) -> Redis blacklist TTL 1h.
         # Dashboard container KHÔNG reach được Redis nên đọc qua file tier1_blocks.json
         # (subscriber ghi). Trước đây tab này bỏ sót -> hiển thị nhầm "0 đang chặn".
-        tier1_temp_blocks = _get_tier1_blocks(show=25)
+        tier1_temp_blocks = cached_get_tier1_blocks(show=25)
         tier1_temp_count = len(tier1_temp_blocks)
 
         st.markdown(
@@ -1452,6 +1569,7 @@ def main_dashboard():
                         if is_l3:
                             if st.button("❌ Gỡ khỏi Whitelist", key=f"rmwl_t4_top_{ip}"):
                                 feedback_mgr.remove_from_whitelist(ip)
+                                st.cache_data.clear()
 
                                 # Khôi phục trạng thái ACTIVE nếu có lịch sử bị chặn
                                 all_rules_now = feedback_mgr.get_all_dynamic_rules()
@@ -1465,10 +1583,9 @@ def main_dashboard():
                                 _log_to_db(
                                     "LOG",
                                     ip,
-                                    f"IP removed from Whitelist by {st.session_state.get('username')}",
+                                    f"[Tier-1 Filter] Admin {st.session_state.get('username')} gỡ IP khỏi Whitelist",
                                 )
                                 st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
-                                time.sleep(0.5)
                                 st.rerun()
 
             st.markdown("### 🛑 Luật chặn Vĩnh viễn & Lịch sử (Dynamic Rules)")
@@ -1567,7 +1684,7 @@ def main_dashboard():
                         st.write(f"**Thời gian:** `{target_rule.get('created_at')}`")
 
                         # Điều tra lịch sử IP từ audit_trail
-                        ip_audit = get_audit_trail_for_ip(selected_block_ip, limit=10)
+                        ip_audit = cached_get_audit_trail_for_ip(selected_block_ip, limit=10)
                         if ip_audit:
                             st.write("**Lịch sử hành vi trong hệ thống (SIEM Logs):**")
                             for _idx, record in enumerate(ip_audit):
@@ -1588,6 +1705,7 @@ def main_dashboard():
                                     ):
                                         # Set status thành REJECTED
                                         feedback_mgr.reject_rule(selected_block_ip, "Source IP")
+                                        st.cache_data.clear()
                                         # Xóa khỏi Redis blacklist
                                         from src.response.executor import _log_to_db, unblock_ip
 
@@ -1596,12 +1714,11 @@ def main_dashboard():
                                         _log_to_db(
                                             "LOG",
                                             selected_block_ip,
-                                            f"Manual unblock by Administrator ({st.session_state.get('username')})",
+                                            f"[Tier-1 Filter] Admin {st.session_state.get('username')} gỡ chặn IP (Hoàn tác)",
                                         )
                                         st.success(
                                             f"Đã hoàn tác và gỡ chặn cho IP {selected_block_ip}"
                                         )
-                                        time.sleep(0.5)
                                         st.rerun()
                                 elif status_val == "REJECTED":
                                     if st.button(
@@ -1613,12 +1730,13 @@ def main_dashboard():
                                             selected_block_ip in feedback_mgr.get_whitelisted_ips()
                                         )
                                         feedback_mgr.approve_rule(selected_block_ip, "Source IP")
+                                        st.cache_data.clear()
                                         from src.response.executor import _log_to_db
 
                                         _log_to_db(
                                             "BLOCK_IP",
                                             selected_block_ip,
-                                            f"Manual re-block by Administrator ({st.session_state.get('username')})",
+                                            f"[Tier-1 Filter] Admin {st.session_state.get('username')} tái kích hoạt chặn IP",
                                         )
                                         if _was_wl:
                                             st.warning(
@@ -1628,7 +1746,6 @@ def main_dashboard():
                                         st.success(
                                             f"Đã tái kích hoạt luật chặn cho IP {selected_block_ip}"
                                         )
-                                        time.sleep(0.5)
                                         st.rerun()
                             with col_b2:
                                 # Whitelist IP trực tiếp
@@ -1643,13 +1760,14 @@ def main_dashboard():
                                         ok = feedback_mgr.add_to_whitelist(selected_block_ip)
                                         if ok:
                                             feedback_mgr.reject_rule(selected_block_ip, "Source IP")
+                                            st.cache_data.clear()
                                             from src.response.executor import _log_to_db, unblock_ip
 
                                             unblock_ip(selected_block_ip)
                                             _log_to_db(
                                                 "LOG",
                                                 selected_block_ip,
-                                                f"IP whitelisted and block rule removed by Administrator ({st.session_state.get('username')})",
+                                                f"[Tier-1 Filter] Admin {st.session_state.get('username')} đưa thẳng IP vào Whitelist",
                                             )
                                             st.success(
                                                 f"Đã đưa IP {selected_block_ip} vào Whitelist!"
@@ -1660,7 +1778,6 @@ def main_dashboard():
                                                 "CHẶN dải quá rộng (wildcard 0.0.0.0/0, *, any, hoặc "
                                                 "CIDR < /16). Block rule GIỮ NGUYÊN."
                                             )
-                                        time.sleep(0.5)
                                         st.rerun()
                         else:
                             st.warning("💡 Yêu cầu vai trò L3 Manager để thay đổi trạng thái chặn.")
@@ -1715,14 +1832,16 @@ def main_dashboard():
                         # Ghi audit log
                         from src.response.executor import block_ip
 
-                        block_ip(manual_block_ip, f"Chặn thủ công: {manual_block_reason}")
+                        block_ip(
+                            manual_block_ip,
+                            f"[Tier-1 Filter] Admin {st.session_state.get('username')} chặn thủ công: {manual_block_reason}",
+                        )
 
                         if _was_wl:
                             st.warning(
                                 f"⚠️ {manual_block_ip} đã được GỠ khỏi Whitelist vì chuyển sang CHẶN."
                             )
                         st.success(f"Đã kích hoạt chặn IP {manual_block_ip} thành công!")
-                        time.sleep(0.5)
                         st.rerun()
 
             # Form Whitelist thủ công
@@ -1752,10 +1871,9 @@ def main_dashboard():
                             _log_to_db(
                                 "LOG",
                                 manual_wl_ip,
-                                f"IP added to Whitelist manually by {st.session_state.get('username')}",
+                                f"[Tier-1 Filter] Admin {st.session_state.get('username')} thêm IP vào Whitelist thủ công",
                             )
                             st.success(f"Đã thêm IP {manual_wl_ip} vào Whitelist thành công!")
-                            time.sleep(0.5)
                             st.rerun()
                         else:
                             st.error(
@@ -1783,7 +1901,6 @@ def main_dashboard():
                         run_vulnerability_scan()
                         build_knowledge_graph()
                         st.success("✅ Quét lỗ hổng và cập nhật Knowledge Graph Neo4j thành công!")
-                        time.sleep(0.5)
                         st.rerun()
                     except Exception as e:
                         st.error(f"Lỗi khi chạy quét lỗ hổng: {e}")
@@ -1978,7 +2095,7 @@ def main_dashboard():
                 'edge [color="#888888", fontcolor="#888888", fontsize=10, fontname="sans-serif"]; '
                 'SOC [label="SENTINEL_SOC", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"]; '
                 'T1 [label="Tier-1 Welford Filter", fillcolor="#14c2c2", color="#14c2c2"]; '
-                'ML [label="Tier-2 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
+                'ML [label="Tier-1.5 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
                 'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'LLM [label="Tier-2 LLM Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '

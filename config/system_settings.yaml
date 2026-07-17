@@ -112,7 +112,15 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
-  dynamic_rules: []
+  dynamic_rules:
+  - created_at: '2026-07-17T15:51:09'
+    field: Source IP
+    is_hitl_approved: true
+    pattern: 203.0.113.99
+    reason: Demo block IP
+    score: 100
+    source: manual_demo
+    status: ACTIVE
   golden_baseline:
     enabled: true
     path: config/golden_baseline.json
@@ -136,3 +144,4 @@ tier1:
   - 127.0.0.1
   - 10.0.0.99
   - 192.168.1.254
+  - 192.168.100.77

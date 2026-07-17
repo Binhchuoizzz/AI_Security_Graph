@@ -16,9 +16,7 @@ from src.agent.nodes import (
     node_guardrails,
     node_human_in_the_loop,
     node_llm_triage,
-    node_ml_triage,
     node_rag_context,
-    route_after_ml_triage,
     route_after_triage,
     route_triage_decision,
 )
@@ -34,7 +32,6 @@ def create_agent_workflow() -> CompiledStateGraph:
 
     # 2. Thêm các Trạm xử lý (Nodes)
     workflow.add_node("guardrails", node_guardrails)
-    workflow.add_node("ml_triage", node_ml_triage)
     workflow.add_node("rag_context", node_rag_context)
     workflow.add_node("llm_triage", node_llm_triage)
     workflow.add_node("attack_mapper", node_attack_mapper)
@@ -46,14 +43,7 @@ def create_agent_workflow() -> CompiledStateGraph:
     workflow.set_entry_point("guardrails")
 
     # Guardrails xong -> RAG Context
-    workflow.add_edge("guardrails", "ml_triage")
-
-    # Cổng ML của Tier-2: đủ tự tin -> Early Exit (bỏ RAG/LLM), không thì fallback sang LLM
-    workflow.add_conditional_edges(
-        "ml_triage",
-        route_after_ml_triage,
-        {"map": "attack_mapper", "end_cycle": END, "rag_context": "rag_context"},
-    )
+    workflow.add_edge("guardrails", "rag_context")
 
     # RAG lấy xong -> Gửi cho LLM Triage
     workflow.add_edge("rag_context", "llm_triage")

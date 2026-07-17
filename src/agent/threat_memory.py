@@ -163,9 +163,8 @@ class ThreatMemoryStore:
         mitre_technique = output_sanitizer.sanitize(mitre_technique)
         now = datetime.now(timezone.utc).isoformat()
         score_delta = {
-            "BLOCK_IP": 30.0,
-            "QUARANTINE": 25.0,
-            "ALERT": 50.0,
+            "BLOCK_IP": 50.0,
+            "ALERT": 10.0,
             "AWAIT_HITL": 5.0,
             "LOG": 1.0,
         }.get(action, 0.0)

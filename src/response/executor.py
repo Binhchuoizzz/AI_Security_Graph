@@ -69,9 +69,7 @@ class ActionValidator:
 
     # WHITELIST: bản ghi audit cho truy cập được đặc cách cho qua (không phải hành động
     # phản ứng, chỉ để ghi nhận + hiển thị thẻ riêng trên UI).
-    ALLOWED_ACTIONS = frozenset(
-        {"BLOCK_IP", "QUARANTINE", "ALERT", "LOG", "AWAIT_HITL", "WHITELIST"}
-    )
+    ALLOWED_ACTIONS = frozenset({"BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL", "WHITELIST"})
 
     # Các mẫu nguy hiểm trong trường target/reason (command injection)
     DANGEROUS_PATTERNS = re.compile(
@@ -292,12 +290,6 @@ def block_ip(ip: str, reason: str, raw_log: str = ""):
     _log_to_db("BLOCK_IP", safe_ip, reason, raw_log)
     # TRÍ NHỚ: đưa vào blacklist để Tier-1 chặn thẳng lần sau (Tier-2 không phải xử lại).
     _add_to_blacklist(safe_ip)
-
-
-def quarantine_host(host: str, reason: str, raw_log: str = ""):
-    safe_host = _validator.sanitize_target(host)
-    logger.warning(f" [EDR MOCK] QUARANTINE HOST: {safe_host} | Lý do: {reason}")
-    _log_to_db("QUARANTINE", safe_host, reason, raw_log)
 
 
 def raise_alert(msg: str, reason: str, raw_log: str = ""):

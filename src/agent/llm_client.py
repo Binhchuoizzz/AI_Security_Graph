@@ -20,7 +20,10 @@ try:
 except ImportError:
     raise ImportError("Thiếu thư viện yêu cầu: hãy chạy pip install openai")
 
+from typing import Literal
+
 import yaml  # type: ignore
+from pydantic import BaseModel, Field, ValidationError
 
 from src.agent import token_monitor
 
@@ -52,6 +55,24 @@ DEFAULT_MODEL = os.getenv(
     "LLM_MODEL_FILE",
     _config.get("llm", {}).get("model", "gemma-2-9b-it-Q6_K.gguf"),
 )
+
+
+class IOCModel(BaseModel):
+    ioc_type: str = Field(..., description="Loại IOC, vd: ip, cve, url")
+    value: str = Field(..., description="Giá trị của IOC")
+    severity: str = Field(..., description="Mức độ nghiêm trọng của IOC")
+
+
+class LLMDecision(BaseModel):
+    action: Literal["BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"] = Field(
+        ..., description="Hành động phân loại"
+    )
+    confidence: float = Field(..., description="Độ tin cậy từ 0.0 đến 1.0")
+    mitre_technique: str = Field(..., description="Tên kỹ thuật MITRE")
+    attack_method: str = Field(..., description="Phương thức tấn công")
+    nist_control: str = Field(..., description="Kiểm soát NIST")
+    reasoning: str = Field(..., description="Lập luận phân tích")
+    extracted_iocs: list[IOCModel] | None = Field(default=[], description="Các IOC trích xuất được")
 
 
 class LLMClient:
@@ -164,43 +185,54 @@ class LLMClient:
         """
         # Loại bỏ các khung markdown (fences) nếu có
         clean = re.sub(r"```json|```", "", raw).strip()
+        parsed_dict = None
         try:
-            return json.loads(clean)
+            parsed_dict = json.loads(clean)
         except json.JSONDecodeError:
             logger.warning(f"JSON Decode failed, attempting regex fallback. Raw: {raw[:100]}...")
             # Dự phòng: trích xuất khối JSON bằng biểu thức chính quy (regex)
             match = re.search(r"\{.*\}", clean, re.DOTALL)
             if match:
                 try:
-                    return json.loads(match.group())
+                    parsed_dict = json.loads(match.group())
                 except json.JSONDecodeError:
                     pass
 
-            # Cứu vãn từng TRƯỜNG từ JSON bị CẮT CỤT (thường do max_tokens) hoặc lệch định
-            # dạng — thay vì mất trắng cả reasoning (đây là nguyên nhân #1 của thẻ hiển thị
-            # "No reasoning provided / tin cậy 0%").
-            salvaged = self._salvage_fields(clean)
-            if salvaged.get("action") or salvaged.get("reasoning"):
-                salvaged.setdefault("action", "AWAIT_HITL")
-                salvaged.setdefault("confidence", 0.0)
-                salvaged["error"] = "parse_salvaged"
-                logger.warning("JSON parse failed nhưng đã vớt được trường qua regex.")
-                return salvaged
+        if parsed_dict is not None:
+            try:
+                # Ép kiểu và kiểm duyệt qua Pydantic
+                validated = LLMDecision(**parsed_dict)
+                return validated.model_dump()
+            except ValidationError as ve:
+                logger.warning(f"Pydantic Validation failed: {ve}")
+                # Nếu Pydantic báo lỗi cấu trúc (vd: missing reasoning, sai enum), chuyển xuống salvage
 
-            # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash. GẮN reasoning
-            # TRUNG THỰC để analyst hiểu (không để trống thành "No reasoning provided").
-            logger.error("All JSON parse attempts failed. Using safe default.")
-            return {
-                "action": "AWAIT_HITL",
-                "confidence": 0.0,
-                "reasoning": (
-                    "⚠️ Không đọc được phản hồi LLM (JSON parse lỗi — thường do output bị cắt "
-                    "cụt theo max_tokens hoặc sai định dạng). Tự động leo thang AWAIT_HITL để "
-                    "người xác minh; Tier-1 (xác định) vẫn bảo vệ độc lập."
-                ),
-                "error": "parse_failed",
-                "raw": raw[:200],
-            }
+        # Nếu không có parsed_dict (JSON hỏng hoàn toàn) hoặc Pydantic fail
+        # Cứu vãn từng TRƯỜNG từ JSON bị CẮT CỤT (thường do max_tokens) hoặc lệch định
+        # dạng — thay vì mất trắng cả reasoning (đây là nguyên nhân #1 của thẻ hiển thị
+        # "No reasoning provided / tin cậy 0%").
+        salvaged = self._salvage_fields(clean)
+        if salvaged.get("action") or salvaged.get("reasoning"):
+            salvaged.setdefault("action", "AWAIT_HITL")
+            salvaged.setdefault("confidence", 0.0)
+            salvaged["error"] = "parse_salvaged"
+            logger.warning("JSON parse failed nhưng đã vớt được trường qua regex.")
+            return salvaged
+
+        # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash. GẮN reasoning
+        # TRUNG THỰC để analyst hiểu (không để trống thành "No reasoning provided").
+        logger.error("All JSON parse attempts failed. Using safe default.")
+        return {
+            "action": "AWAIT_HITL",
+            "confidence": 0.0,
+            "reasoning": (
+                "⚠️ Không đọc được phản hồi LLM (JSON parse lỗi — thường do output bị cắt "
+                "cụt theo max_tokens hoặc sai định dạng). Tự động leo thang AWAIT_HITL để "
+                "người xác minh; Tier-1 (xác định) vẫn bảo vệ độc lập."
+            ),
+            "error": "parse_failed",
+            "raw": raw[:200],
+        }
 
     def _salvage_fields(self, text: str) -> dict:
         """Vớt action/confidence/reasoning/mitre_technique từ output LLM hỏng hoặc bị cắt cụt

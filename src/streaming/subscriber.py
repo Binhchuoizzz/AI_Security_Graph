@@ -32,6 +32,10 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.agent.threat_memory import ThreatMemoryStore
+from src.guardrails.state_monitor import audit_logger
+from src.response.executor import block_ip, raise_alert
+from src.tier1_filter.feedback_listener import FeedbackListener
+from src.tier1_filter.ml_gateway import MLGateway
 from src.tier1_filter.rule_engine import RuleEngine
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
@@ -137,6 +141,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
 
     # Ngưỡng (Threshold) được load từ system_settings.yaml (hiện tại: 15)
     engine = RuleEngine()
+    ml_gateway = MLGateway()
     print(f"[*] Tier 1 Firewall Armed (Threshold={engine.risk_threshold}).")
     print(f"[*] Subscribed and listening on multiple streams via group '{GROUP_NAME}': {QUEUES}...")
 
@@ -213,7 +218,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
     # kẹt 64/64 suốt lượt chạy 4.796 sự kiện). Đổi sang không giới hạn vì:
     #   1) Vòng đọc Tier-1 không bao giờ được phép đứng (Dashboard/stats phải sống);
     #   2) Redis stream (maxlen 10k/queue) mới là buffer bền thật sự phía trước;
-    #   3) Cổng ML của Tier-2 hấp thụ phần lớn lô nên backlog thực tế nhỏ.
+    #   3) Cổng ML của Tier-1.5 hấp thụ phần lớn lô nên backlog thực tế nhỏ.
     # RỦI RO CHẤP NHẬN: backlog nằm trong RAM tiến trình — quy mô demo (nghìn lô nhỏ)
     # là an toàn; hướng sản xuất (Kafka persistent) đã ghi ở thesis ch5. Có cảnh báo
     # HIGH-WATER bên dưới để backlog phình là thấy ngay trong log.
@@ -349,6 +354,63 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                 _src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
                                     "src_ip", "UNKNOWN"
                                 )
+
+                                # ── TIER-1.5 ML GATEWAY ──
+                                ml_action, ml_reasoning, ml_conf = ml_gateway.evaluate(raw_log)
+                                if ml_action:
+                                    # ML tự tin ra quyết định -> Chặn/Báo ngay mà KHÔNG cần LLM
+                                    if ml_action == "BLOCK_IP":
+                                        block_ip(
+                                            _src_ip,
+                                            ml_reasoning or "",
+                                            raw_log=json.dumps(evaluated_log),
+                                        )
+                                        tier1_dropped_total += 1
+                                        FeedbackListener().receive_new_rule(
+                                            "Source IP",
+                                            _src_ip,
+                                            score=100,
+                                            reason=ml_reasoning or "",
+                                            source="ml_triage",
+                                            status="ACTIVE",
+                                        )
+                                    elif ml_action == "ALERT":
+                                        raise_alert(
+                                            _src_ip,
+                                            ml_reasoning or "",
+                                            raw_log=json.dumps(evaluated_log),
+                                        )
+
+                                    audit_event = {
+                                        "event_type": "ML_TRIAGE_DECISION",
+                                        "source_ip": _src_ip,
+                                        "tier1_score": evaluated_log.get("tier1_score", 0.0),
+                                        "tier1_action": "ESCALATE",
+                                        "agent_decision": ml_action,
+                                        "agent_reasoning": ml_reasoning,
+                                        "mitre_technique": "UNKNOWN",
+                                        "latency_ms": 1,
+                                    }
+                                    audit_logger.log_event(audit_event)
+
+                                    evaluated_log["tier1_action"] = ml_action
+                                    evaluated_log["tier1_reasons"] = (
+                                        evaluated_log.get("tier1_reasons") or []
+                                    ) + [ml_reasoning]
+                                    if ml_action in ("BLOCK_IP", "WHITELIST_DROP"):
+                                        tier1_recent_blocks.append(evaluated_log)
+
+                                    try:
+                                        import mlflow
+
+                                        if mlflow.active_run():
+                                            mlflow.log_metric("ML_Triage_Bypass", 1)
+                                            mlflow.log_metric("ML_Triage_Confidence", ml_conf)
+                                    except Exception:
+                                        pass
+
+                                    r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                    continue  # Bỏ qua vòng đẩy lên queue LLM
 
                                 # CƠ CHẾ SUPPRESSION (ỨC CHẾ SPAM LLM)
                                 _suppressed = False

@@ -119,6 +119,22 @@ _RAW_TO_CANONICAL = {
 }
 
 
+_WAF_PATTERNS = {
+    "SQL Injection (SQLi)": re.compile(
+        r"(?i)(union\s+select|select\s+.*?\s+from|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+)"
+    ),
+    "Cross-Site Scripting (XSS)": re.compile(
+        r"(?i)(<script\b|javascript:|onload\s*=|onerror\s*=|<img\b|<svg\b)"
+    ),
+    "Path Traversal / LFI": re.compile(
+        r"(?i)(\.\./\.\./|\.\.\\\.\.\\|/etc/passwd|/windows/win\.ini|boot\.ini)"
+    ),
+    "Command Injection": re.compile(
+        r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\))"
+    ),
+}
+
+
 def load_config() -> dict[str, Any]:
     try:
         if os.path.exists(CONFIG_PATH):
@@ -357,8 +373,18 @@ class RuleEngine:
         self.z_threshold = tier1_config.get("z_threshold", 3.5)
 
         all_rules = tier1_config.get("dynamic_rules", [])
-        self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
-        self.whitelist_ips = tier1_config.get("whitelist_ips", [])
+        self.dynamic_ip_blocks = set()
+        self.dynamic_behavioral_rules = []
+        for r in all_rules:
+            if r.get("status", "ACTIVE") == "ACTIVE":
+                field = r.get("field")
+                pattern = r.get("pattern")
+                if field == "Source IP" and pattern:
+                    self.dynamic_ip_blocks.add(str(pattern))
+                else:
+                    self.dynamic_behavioral_rules.append((field, pattern, r.get("score", 50)))
+
+        self.whitelist_ips = set(tier1_config.get("whitelist_ips", []))
 
         # --- Reputation-based enforcement (tiền sử IP từ Threat Memory) ---
         # IP đã có "hồ sơ đen": điểm danh tiếng >= block_threshold -> Tier-1 CHẶN NGAY
@@ -476,20 +502,7 @@ class RuleEngine:
         Bộ lọc Signature WAF siêu nhẹ để phát hiện nhanh các dấu hiệu SQLi, XSS, Path Traversal
         ngay tại Tier-1 nhằm bảo vệ Tier-2 khỏi bị nghẽn (Resource Starvation).
         """
-        waf_patterns = {
-            "SQL Injection (SQLi)": re.compile(
-                r"(?i)(union\s+select|select\s+.*?\s+from|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+)"
-            ),
-            "Cross-Site Scripting (XSS)": re.compile(
-                r"(?i)(<script\b|javascript:|onload\s*=|onerror\s*=|<img\b|<svg\b)"
-            ),
-            "Path Traversal / LFI": re.compile(
-                r"(?i)(\.\./\.\./|\.\.\\\.\.\\|/etc/passwd|/windows/win\.ini|boot\.ini)"
-            ),
-            "Command Injection": re.compile(
-                r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\))"
-            ),
-        }
+        # _WAF_PATTERNS is compiled at module level for ultra-fast matching
         target_fields = [
             "payload",
             "uri",
@@ -503,7 +516,7 @@ class RuleEngine:
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
             if val and isinstance(val, str):
-                for attack_type, pattern in waf_patterns.items():
+                for attack_type, pattern in _WAF_PATTERNS.items():
                     if pattern.search(val):
                         return f"WAF: Phát hiện {attack_type} trong '{field}'"
         return None
@@ -676,20 +689,20 @@ class RuleEngine:
         # dynamic_ip_block: luật Source-IP ĐÃ được Analyst DUYỆT (HITL) khớp CHÍNH XÁC ->
         # Tier-1 TỰ CHẶN ngay lần tái phạm, KHÔNG cần leo thang Tier-2 (đây là "Tier-1 học được").
         dynamic_ip_block = False
-        for rule in self.dynamic_rules:
-            rule_field = rule.get("field")
-            rule_pattern = rule.get("pattern")
-            rule_score = rule.get("score", 50)
+
+        # O(1) lookup cho luật chặn IP
+        if source_ip in self.dynamic_ip_blocks:
+            dynamic_ip_block = True
+            reasons.append(f"Luật động [từ Tác tử]: Source IP='{source_ip}'")
+            score += 100
+
+        # Kiểm tra luật hành vi
+        for rule_field, rule_pattern, rule_score in self.dynamic_behavioral_rules:
             if rule_field and rule_pattern:
                 field_value = str(log_entry.get(rule_field, ""))
                 if rule_pattern in field_value:
                     score += rule_score
                     reasons.append(f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'")
-                    # Chỉ auto-block khi là luật Source-IP và khớp CHÍNH XÁC (tránh '198.51.100.15'
-                    # khớp nhầm '198.51.100.150' do so khớp substring ở scoring). self.dynamic_rules
-                    # chỉ chứa luật status=ACTIVE nên đây chắc chắn là IP người đã duyệt chặn.
-                    if rule_field == "Source IP" and rule_pattern == field_value:
-                        dynamic_ip_block = True
 
         # --- Tầng 3: Session Baseline ---
         source_ip = log_entry.get("Source IP", "unknown")
@@ -715,7 +728,7 @@ class RuleEngine:
                 rep_action = "ESCALATE"
                 reasons.append(
                     f"IP có tiền sử đáng ngờ (điểm danh tiếng {rep_score:.0f} ≥ "
-                    f"{self.reputation_hitl_threshold}) → đẩy lên Tier-2 (ML/LLM)"
+                    f"{self.reputation_hitl_threshold}) → đẩy lên Tier-1.5 (ML) / Tier-2 (LLM)"
                 )
 
         # --- Đánh giá & Phân luồng Action (Tier 1 Action Differentiation) ---
@@ -802,7 +815,7 @@ class RuleEngine:
         self.risk_threshold = tier1_config.get("risk_threshold", self.risk_threshold)
         self.sensitive_ports = tier1_config.get("sensitive_ports", self.sensitive_ports)
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", self.max_fwd_packets)
-        self.whitelist_ips = tier1_config.get("whitelist_ips", self.whitelist_ips)
+        self.whitelist_ips = set(tier1_config.get("whitelist_ips", []))
         self.reputation_enforcement = tier1_config.get(
             "reputation_enforcement", self.reputation_enforcement
         )
@@ -814,7 +827,16 @@ class RuleEngine:
         )
 
         all_rules = tier1_config.get("dynamic_rules", [])
-        self.dynamic_rules = [r for r in all_rules if r.get("status", "ACTIVE") == "ACTIVE"]
+        self.dynamic_ip_blocks = set()
+        self.dynamic_behavioral_rules = []
+        for r in all_rules:
+            if r.get("status", "ACTIVE") == "ACTIVE":
+                field = r.get("field")
+                pattern = r.get("pattern")
+                if field == "Source IP" and pattern:
+                    self.dynamic_ip_blocks.add(str(pattern))
+                else:
+                    self.dynamic_behavioral_rules.append((field, pattern, r.get("score", 50)))
 
         # Hot-reload injection & jailbreak patterns
         self.config = config
