@@ -209,7 +209,13 @@ class FeedbackListener:
         except Exception:
             return []
 
-    def update_rule_status(self, pattern: str, new_status: str, field: str | None = None) -> bool:
+    def update_rule_status(
+        self,
+        pattern: str,
+        new_status: str,
+        field: str | None = None,
+        is_hitl_approved: bool = False,
+    ) -> bool:
         """Cập nhật trạng thái của rule (ACTIVE hoặc REJECTED)."""
         try:
             with _lock:
@@ -224,6 +230,8 @@ class FeedbackListener:
                         match = match and rule.get("field") == field
                     if match:
                         rule["status"] = new_status
+                        if is_hitl_approved:
+                            rule["is_hitl_approved"] = True
                         updated = True
 
                 if updated:
@@ -237,7 +245,7 @@ class FeedbackListener:
             return False
 
     def approve_rule(self, pattern: str, field: str | None = None) -> bool:
-        ok = self.update_rule_status(pattern, "ACTIVE", field)
+        ok = self.update_rule_status(pattern, "ACTIVE", field, is_hitl_approved=True)
         # ĐỒNG BỘ block ↔ whitelist (LOẠI TRỪ LẪN NHAU · "hành động sau cùng thắng"):
         # kích hoạt CHẶN một Source IP thì phải GỠ nó khỏi whitelist. Nếu không, whitelist
         # (ưu tiên CAO NHẤT ở Tier-1) sẽ khiến luật chặn vừa duyệt trở nên VÔ HIỆU — IP nằm

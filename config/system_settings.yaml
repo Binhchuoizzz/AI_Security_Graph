@@ -127,6 +127,163 @@ tier1:
     score: 100
     source: langgraph_agent
     status: ACTIVE
+  - created_at: '2026-07-17T11:55:40'
+    field: Source IP
+    pattern: 10.200.7.9
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:55:46'
+    field: Source IP
+    pattern: 10.200.17.173
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:56:06'
+    field: Source IP
+    pattern: 10.200.5.252
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:56:09'
+    field: Source IP
+    pattern: 10.200.3.148
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:56:10'
+    field: Source IP
+    pattern: 10.200.4.251
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:56:17'
+    field: Source IP
+    pattern: 10.200.3.2
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:56:37'
+    field: Source IP
+    pattern: 209.147.138.211
+    reason: IP 209.147.138.211 đã thực hiện 10 lần kết nối HTTPS đến cổng 443 trong
+      một khoảng thời gian ngắn. Mặc dù cổng 443 là cổng tiêu chuẩn cho HTTPS, nhưng
+      số lượng kết nối đột ngột và liên tục đến cổng này từ một địa chỉ IP duy nhất
+      là dấu hiệu đáng ngờ. Việc sử dụng cổng 443 bất thường có thể là một dấu hiệu
+      cho thấy kẻ tấn công đang cố gắng tránh được các biện pháp bảo mật thông thường.
+      Do đó, để ngăn chặn khả năng tấn công C2, tôi đề xuất chặn IP này.
+    score: 100
+    source: langgraph_agent
+    status: ACTIVE
+  - created_at: '2026-07-17T11:56:56'
+    field: Source IP
+    pattern: 10.200.9.34
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:57:15'
+    field: Source IP
+    pattern: 10.200.18.142
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:57:36'
+    field: Source IP
+    pattern: 10.200.4.67
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:58:19'
+    field: Source IP
+    pattern: 10.200.20.246
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:58:28'
+    field: Source IP
+    pattern: 10.200.16.117
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:58:34'
+    field: Source IP
+    pattern: 10.200.6.221
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.64%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T11:59:08'
+    field: Source IP
+    pattern: 192.168.3.34
+    reason: IP 192.168.3.34 đã thực hiện 10 lần kết nối HTTPS đến cổng 443 trong một
+      khoảng thời gian ngắn. Mặc dù cổng 443 là cổng tiêu chuẩn cho HTTPS, nhưng số
+      lượng kết nối đột ngột và liên tục đến cổng này từ một địa chỉ IP duy nhất là
+      dấu hiệu đáng ngờ. Việc sử dụng cổng 443 bất thường có thể là một dấu hiệu cho
+      thấy kẻ tấn công đang cố gắng tránh được các biện pháp bảo mật thông thường.
+      Do đó, để ngăn chặn khả năng tấn công C2, tôi đề xuất chặn IP này.
+    score: 100
+    source: langgraph_agent
+    status: ACTIVE
+  - created_at: '2026-07-17T11:59:55'
+    field: Source IP
+    pattern: 10.200.7.179
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 90.77%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T12:00:16'
+    field: Source IP
+    pattern: 10.200.20.115
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T12:00:17'
+    field: Source IP
+    pattern: 10.200.15.183
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T12:00:42'
+    field: Source IP
+    pattern: 10.200.3.66
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T12:00:44'
+    field: Source IP
+    pattern: 10.200.14.11
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 99.84%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T12:01:08'
+    field: Source IP
+    pattern: 10.200.16.86
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 91.85%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
+  - created_at: '2026-07-17T12:01:26'
+    field: Source IP
+    pattern: 10.200.11.219
+    reason: 'Phát hiện tấn công bởi Cổng ML Tier-2 (LightGBM). Độ tin cậy: 92.23%'
+    score: 100
+    source: ml_triage
+    status: ACTIVE
   golden_baseline:
     enabled: true
     path: config/golden_baseline.json

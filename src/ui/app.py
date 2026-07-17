@@ -1028,16 +1028,18 @@ def main_dashboard():
                             st.session_state[page_key] = cur + 1
                             st.rerun()
 
-            st.caption(f"Tổng số sự cố chờ duyệt: **{len(pending_rules)}**")
-            _render_pending_list(pending_rules, "hitl_page_all")
+            llm_pending_rules = [r for r in pending_rules if r.get("source") == "langgraph_agent"]
+            st.caption(f"Tổng số sự cố chờ duyệt: **{len(llm_pending_rules)}**")
+            _render_pending_list(llm_pending_rules, "hitl_page_all")
 
         st.markdown("---")
         st.subheader("Lịch sử Thao tác HITL (Đã áp dụng)")
-        if not active_rules:
+        hitl_active_rules = [r for r in active_rules if r.get("is_hitl_approved") is True]
+        if not hitl_active_rules:
             st.info("Không có luật nào đang hoạt động.")
         else:
             for rule in sorted(
-                active_rules,
+                hitl_active_rules,
                 key=lambda r: (r.get("score") or 0, str(r.get("created_at") or "")),
                 reverse=True,
             ):
