@@ -668,7 +668,7 @@ def main_dashboard():
         noise_reduction = None  # raw chưa hợp lệ -> header dùng fallback an toàn
 
     render_metrics_header(
-        len(all_alerts),
+        all_alerts,
         len(pending_rules),
         len(active_rules),
         raw_logs_count,
