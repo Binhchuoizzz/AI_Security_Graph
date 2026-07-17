@@ -896,10 +896,12 @@ def main_dashboard():
                     sev_icon, sev_label = _rule_severity(rule.get("score"))
                     created = str(rule.get("created_at") or "—")[:19].replace("T", " ")
 
-                    # Phân loại rõ loại HITL dựa vào nguồn
                     src = rule.get("source", "")
                     if "langgraph_agent_hitl" in src:
-                        hitl_type = "🤔 AWAIT_HITL (Hệ thống cần con người phân tích thêm)"
+                        hitl_type = "🤔 AWAIT_HITL (Tier-2 LLM cần con người phân tích thêm)"
+                        hitl_color = "#faad14"
+                    elif "tier1_rule_engine" in src:
+                        hitl_type = "👀 AWAIT_HITL (Tier-1 Rule Engine cảnh báo, chờ duyệt)"
                         hitl_color = "#faad14"
                     elif "langgraph_agent" in src:
                         hitl_type = "🛑 BLOCK_IP (Hệ thống đề xuất chặn, chờ duyệt)"

@@ -410,6 +410,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                 )
                                 if src_ip:
                                     from src.response.executor import _log_to_db
+                                    from src.tier1_filter.feedback_listener import FeedbackListener
 
                                     _wl_reasons = [
                                         str(x) for x in (evaluated_log.get("tier1_reasons") or [])
@@ -419,11 +420,21 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                         if _wl_reasons
                                         else "Yêu cầu HITL"
                                     )
+                                    _hitl_reason = f"Tier-1 chặn sơ bộ và yêu cầu phân tích HITL: {_wl_summary}"
                                     _log_to_db(
                                         "AWAIT_HITL",
                                         src_ip,
-                                        f"Tier-1 chặn sơ bộ và yêu cầu phân tích HITL: {_wl_summary}",
+                                        _hitl_reason,
                                         raw_log=json.dumps(_strip_dataset_labels(evaluated_log)),
+                                    )
+
+                                    # Đẩy luật sang tab Phê duyệt (Tier-1 PENDING)
+                                    FeedbackListener().receive_new_rule(
+                                        field="Source IP",
+                                        pattern=src_ip,
+                                        score=60,
+                                        source="tier1_rule_engine",
+                                        reason=_hitl_reason,
                                     )
 
                             elif action == "BLOCK_IP":
