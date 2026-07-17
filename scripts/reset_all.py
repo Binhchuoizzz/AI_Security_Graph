@@ -125,6 +125,16 @@ def clear_data(dry_run: bool = False) -> None:
     # --- SQLite ---
     for db, tbls in db_tables.items():
         try:
+            if os.path.exists(db) and not os.access(db, os.W_OK):
+                os.remove(db)
+        except OSError:
+            pass
+        try:
+            if os.path.exists(db):
+                os.chmod(db, 0o666)  # noqa: S103
+        except OSError:
+            pass
+        try:
             with sqlite3.connect(db) as c:
                 for t in tbls:
                     try:
@@ -138,10 +148,23 @@ def clear_data(dry_run: bool = False) -> None:
 
     # --- config JSON (counter + Tier-1 blocks) ---
     try:
-        with open(os.path.join(ROOT, "config", "pipeline_stats.json"), "w") as f:
-            json.dump({"raw_logs_total": 0, "tier1_dropped_total": 0}, f)
-        with open(os.path.join(ROOT, "config", "tier1_blocks.json"), "w") as f:
-            json.dump([], f)
+
+        def _reset_json(filename, default_data):
+            path = os.path.join(ROOT, "config", filename)
+            if os.path.exists(path) and not os.access(path, os.W_OK):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            with open(path, "w") as f:
+                json.dump(default_data, f)
+            try:
+                os.chmod(path, 0o666)  # noqa: S103
+            except OSError:
+                pass
+
+        _reset_json("pipeline_stats.json", {"raw_logs_total": 0, "tier1_dropped_total": 0})
+        _reset_json("tier1_blocks.json", [])
         print("      -> reset pipeline_stats.json + tier1_blocks.json")
     except Exception as e:  # noqa: BLE001
         print(f"      [!] lỗi reset config JSON: {e}")

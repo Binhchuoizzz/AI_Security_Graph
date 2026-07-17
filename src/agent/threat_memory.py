@@ -52,9 +52,23 @@ class ThreatMemoryStore:
         self.db_path = db_path
         self._init_db()
 
+    def _ensure_db_writable(self):
+        """Đảm bảo file DB có thể ghi được bởi cả host (uid 1000) và container (uid 999)."""
+        try:
+            if os.path.exists(self.db_path) and not os.access(self.db_path, os.W_OK):
+                os.remove(self.db_path)
+        except OSError:
+            pass
+        try:
+            if os.path.exists(self.db_path):
+                os.chmod(self.db_path, 0o666)  # noqa: S103
+        except OSError:
+            pass
+
     def _init_db(self):
         """Khởi tạo cấu trúc bảng (schema) nếu chưa tồn tại."""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+        self._ensure_db_writable()
         with sqlite3.connect(self.db_path) as conn:
             c = conn.cursor()
 

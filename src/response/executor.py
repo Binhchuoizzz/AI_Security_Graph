@@ -114,9 +114,24 @@ class ActionValidator:
 _validator = ActionValidator()
 
 
+def _ensure_db_writable(db_path: str):
+    """Đảm bảo file DB có thể ghi được bởi cả host (uid 1000) và container (uid 999)."""
+    try:
+        if os.path.exists(db_path) and not os.access(db_path, os.W_OK):
+            os.remove(db_path)
+    except OSError:
+        pass
+    try:
+        if os.path.exists(db_path):
+            os.chmod(db_path, 0o666)  # noqa: S103
+    except OSError:
+        pass
+
+
 def _init_db():
     """Khởi tạo cơ sở dữ liệu SQLite cho audit trail và login locks nếu chưa tồn tại."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    _ensure_db_writable(DB_PATH)
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
         # Tạo bảng audit_trail
