@@ -57,7 +57,15 @@ def _derive_tier1_attack_type(reasons: list[str]) -> str:
     return " + ".join(labels)
 
 
-def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=None, card_id=""):
+def render_alert_card(
+    alert,
+    is_l3_manager=False,
+    on_whitelist=None,
+    on_block=None,
+    card_id="",
+    is_whitelisted=False,
+    is_blocked=False,
+):
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
     try:
@@ -315,7 +323,13 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
             if on_whitelist:
                 # Nếu có truyền callback, hiển thị nút Whitelist
                 if is_l3_manager:
-                    if st.button(
+                    if is_whitelisted:
+                        st.button(
+                            f"✅ Đã Whitelist: {cleaned_target}",
+                            key=f"wl_btn_done_{cleaned_target}_{timestamp}_{card_id}",
+                            disabled=True,
+                        )
+                    elif st.button(
                         f"🛡️ Whitelist IP: {cleaned_target}",
                         key=f"wl_btn_{cleaned_target}_{timestamp}_{card_id}",
                     ):
@@ -332,7 +346,13 @@ def render_alert_card(alert, is_l3_manager=False, on_whitelist=None, on_block=No
         with col_btn2:
             if on_block and action != "BLOCK_IP":
                 if is_l3_manager:
-                    if st.button(
+                    if is_blocked:
+                        st.button(
+                            f"✅ Đã Block: {cleaned_target}",
+                            key=f"blk_btn_done_{cleaned_target}_{timestamp}_{card_id}",
+                            disabled=True,
+                        )
+                    elif st.button(
                         f"🛑 Block IP: {cleaned_target}",
                         key=f"blk_btn_{cleaned_target}_{timestamp}_{card_id}",
                     ):

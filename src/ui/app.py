@@ -369,9 +369,9 @@ def render_demo_overview(
                 hide_index=True,
             )
             st.caption(
-                f"Mỗi phán quyết BLOCK của LLM sinh **1 luật** cho Tier-1 học "
+                f"Mỗi phán quyết BLOCK/HITL từ Tier-2 (ML, LLM) và Tier-1 sinh **1 luật** "
                 f"({len(pending_rules or [])} chờ duyệt · {len(active_rules or [])} đang chặn). "
-                "Analyst DUYỆT (HITL) → luật **ACTIVE** → Tier-1 chặn ngay ở tốc độ cao lần sau. "
+                "Analyst DUYỆT (HITL) → luật **ACTIVE** → Tier-1 tự động CHẶN ngay lần sau. "
                 "Khác với block Redis (TTL 1h), luật đã duyệt **KHÔNG hết hạn** — đây là lý do số "
                 "'luật chờ duyệt' có thể nhiều hơn số 'đang chặn tức thời'."
             )
@@ -604,6 +604,7 @@ def main_dashboard():
     active_rules = feedback_mgr.get_active_dynamic_rules()
     pending_rules = feedback_mgr.get_pending_rules()
     whitelisted_ips = feedback_mgr.get_whitelisted_ips()
+    blocked_ips = {r.get("pattern") for r in active_rules if r.get("pattern")}
 
     # Tính toán bộ lọc sự cố
     filtered_alerts = all_alerts
@@ -801,12 +802,18 @@ def main_dashboard():
 
                 # Hiển thị các Alert Cards cho trang hiện tại
                 for idx, alert in enumerate(page_alerts):
+                    target_ip = alert.get("target", "").strip()
+                    is_wl = target_ip in whitelisted_ips
+                    is_bl = target_ip in blocked_ips
+
                     render_alert_card(
                         alert,
                         is_l3_manager=(st.session_state.get("role") == "L3_Manager"),
                         on_whitelist=handle_whitelist_approval,
                         on_block=handle_block_approval,
                         card_id=f"{tab_key}_{start_idx + idx}",
+                        is_whitelisted=is_wl,
+                        is_blocked=is_bl,
                     )
 
                 # Điều hướng trang
