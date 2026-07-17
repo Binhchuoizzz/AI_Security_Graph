@@ -762,8 +762,8 @@ def main_dashboard():
         else:
             # Chia thành 3 Tier
             alerts_t1 = []
-            alerts_t2 = []
-            alerts_t3 = []
+            alerts_t2_ml = []
+            alerts_t2_llm = []
             for alert in filtered_alerts:
                 r = alert.get("reason", "")
                 # Detect theo MARKER: "Cổng ML" (mới) / "ML Tier 2" (bản ghi cũ trong DB)
@@ -771,11 +771,11 @@ def main_dashboard():
                 if "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
                     alerts_t1.append(alert)
                 elif "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r:
-                    alerts_t2.append(alert)
+                    alerts_t2_ml.append(alert)
                 else:
-                    alerts_t3.append(alert)
+                    alerts_t2_llm.append(alert)
 
-            t1_tab, t2_tab, t3_tab = st.tabs(
+            t1_tab, t2_ml_tab, t2_llm_tab = st.tabs(
                 [
                     "🟢 Tier-1 Filter",
                     "⚡ Tier-2 · Cổng ML",
@@ -838,12 +838,12 @@ def main_dashboard():
             with t1_tab:
                 st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t1)}**")
                 _render_alerts_list(alerts_t1, "t1")
-            with t2_tab:
-                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2)}**")
-                _render_alerts_list(alerts_t2, "t2")
-            with t3_tab:
-                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t3)}**")
-                _render_alerts_list(alerts_t3, "t3")
+            with t2_ml_tab:
+                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2_ml)}**")
+                _render_alerts_list(alerts_t2_ml, "t2")
+            with t2_llm_tab:
+                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2_llm)}**")
+                _render_alerts_list(alerts_t2_llm, "t3")
 
     with tab2:
         st.subheader("Phê duyệt Luật Tường lửa (Dynamic Rules)")
@@ -851,19 +851,19 @@ def main_dashboard():
             st.info("Không có luật nào đang chờ phê duyệt.")
         else:
             pending_t1 = []
-            pending_t2 = []
-            pending_t3 = []
+            pending_t2_ml = []
+            pending_t2_llm = []
             for r in pending_rules:
                 reason = str(r.get("reason", ""))
                 # Marker như trên: "Cổng ML"/"ML Tier 2"(cũ)/"Decision Tree" — không dùng "ML" trần.
                 if "Tier 1" in reason or "Tier-1" in reason or "whitelist" in reason.lower():
                     pending_t1.append(r)
                 elif "Cổng ML" in reason or "ML Tier 2" in reason or "Decision Tree" in reason:
-                    pending_t2.append(r)
+                    pending_t2_ml.append(r)
                 else:
-                    pending_t3.append(r)
+                    pending_t2_llm.append(r)
 
-            tab_t1, tab_t2, tab_t3 = st.tabs(
+            tab_t1, tab_t2_ml, tab_t2_llm = st.tabs(
                 [
                     "🟢 Tier-1 Filter",
                     "⚡ Tier-2 · Cổng ML",
@@ -998,12 +998,12 @@ def main_dashboard():
             with tab_t1:
                 st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t1)}**")
                 _render_pending_list(pending_t1, "hitl_page_t1")
-            with tab_t2:
-                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t2)}**")
-                _render_pending_list(pending_t2, "hitl_page_t2")
-            with tab_t3:
-                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t3)}**")
-                _render_pending_list(pending_t3, "hitl_page_t3")
+            with tab_t2_ml:
+                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t2_ml)}**")
+                _render_pending_list(pending_t2_ml, "hitl_page_t2")
+            with tab_t2_llm:
+                st.caption(f"Tổng số luật chờ duyệt: **{len(pending_t2_llm)}**")
+                _render_pending_list(pending_t2_llm, "hitl_page_t3")
 
         st.markdown("---")
         st.subheader("Luật Đang Hoạt Động (Active Rules)")
