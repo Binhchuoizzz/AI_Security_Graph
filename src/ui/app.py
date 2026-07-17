@@ -884,15 +884,13 @@ def main_dashboard():
 
             with t1_tab:
                 tier1_blocks_data = _get_tier1_blocks(show=200)
+                # ── Phần 1: Block tức thời (Redis ring buffer) ──
+                st.markdown(f"**🛡️ Chặn tức thời Tier-1 (Redis):** {len(tier1_blocks_data)} IP")
                 st.caption(
-                    f"Tổng số IP đã bị chặn tại Tier-1: **{len(tier1_blocks_data)}** "
-                    f"_(đọc từ ring buffer `config/tier1_blocks.json` — Tier-1 chặn tức thời qua Redis TTL 1h)_"
+                    "_(đọc từ ring buffer `config/tier1_blocks.json` — TTL 1h, không cần LLM)_"
                 )
                 if not tier1_blocks_data:
-                    st.info(
-                        "Chưa có IP nào bị Tier-1 chặn trong phiên này. "
-                        "Tier-1 chặn IP tức thời qua Redis blacklist (TTL 1h) và ghi vào `config/tier1_blocks.json`."
-                    )
+                    st.info("Chưa có IP nào bị Tier-1 chặn tức thời trong phiên này.")
                 else:
                     for blk in tier1_blocks_data:
                         ip = html.escape(str(blk.get("ip", "N/A")))
@@ -936,6 +934,12 @@ def main_dashboard():
                             "".join(line.strip() for line in card_html.split("\n")),
                             unsafe_allow_html=True,
                         )
+
+                # ── Phần 2: Alert/Block từ Audit Trail Tier-1 ──
+                st.markdown("---")
+                st.markdown(f"**📋 Nhật ký Tier-1 từ Audit Trail:** {len(alerts_t1)} sự cố")
+                st.caption("_(ALERT / BLOCK được Tier-1 ghi vào audit trail)_")
+                _render_alerts_list(alerts_t1, "t1")
             with t2_ml_tab:
                 st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2_ml)}**")
                 _render_alerts_list(alerts_t2_ml, "t2")
