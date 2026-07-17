@@ -39,7 +39,9 @@ jobs:
       run: |
         # Audit project dependencies, ignoring pip itself (tooling, not project dep)
         # CVE-2025-3000 is ignored as torch.jit.script is not utilized in SENTINEL (transitive dependency of sentence-transformers)
-        pip-audit --desc --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357 --ignore-vuln CVE-2025-3000
+        # PYSEC-2026-597 is nltk without a fix, PYSEC-2026-196 is pip which is updated by action runner itself.
+        pip-audit --desc --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357 --ignore-vuln CVE-2025-3000 --ignore-vuln PYSEC-2026-597 --ignore-vuln PYSEC-2026-196
+
 
 
   secrets-scan:

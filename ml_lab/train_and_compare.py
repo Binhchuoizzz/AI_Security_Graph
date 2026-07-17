@@ -225,7 +225,7 @@ plt.show()
 
 # Plot Confusion Matrices
 fig, axes = plt.subplots(1, 5, figsize=(25, 4))
-for ax, (name, cm) in zip(axes, confusion_matrices.items()):
+for ax, (name, cm) in zip(axes, confusion_matrices.items(), strict=False):
     sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax, cbar=False)
     ax.set_title(name)
     ax.set_xlabel("Predicted")
