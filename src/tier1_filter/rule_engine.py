@@ -728,7 +728,7 @@ class RuleEngine:
                 rep_action = "ESCALATE"
                 reasons.append(
                     f"IP có tiền sử đáng ngờ (điểm danh tiếng {rep_score:.0f} ≥ "
-                    f"{self.reputation_hitl_threshold}) → đẩy lên Tier-1.5 (ML) / Tier-2 (LLM)"
+                    f"{self.reputation_hitl_threshold}) → đẩy lên Cổng ML (Tier-1) / LLM (Tier-2)"
                 )
 
         # --- Đánh giá & Phân luồng Action (Tier 1 Action Differentiation) ---

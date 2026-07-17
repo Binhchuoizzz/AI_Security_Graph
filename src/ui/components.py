@@ -225,14 +225,16 @@ def render_alert_card(
     if clean_reason.startswith("]"):
         clean_reason = clean_reason[1:].strip()
 
-    # Phân nguồn phán quyết: Tier-1 (rule) / Tier-1.5 Cổng ML / Tier-2 LLM.
+    # Phân nguồn phán quyết: Tier-1 (rule) / Tier-1 · Cổng ML / Tier-2 LLM.
     reason_text = raw_reason
     is_manual = "Chặn thủ công" in reason_text or "MANUAL" in reason_text.upper()
     is_llm = reason_text.startswith("[MITRE:")
     is_ml_tier = (
         not is_manual
         and not is_llm
-        and any(k in reason_text for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Tier-1.5"))
+        and any(
+            k in reason_text for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Cổng ML Tier-1")
+        )
     )
     is_tier1 = (
         not is_manual
@@ -261,9 +263,9 @@ def render_alert_card(
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.2);color:#faad14;'
             "border:1px solid rgba(250, 173, 20, 0.4);font-size:0.75rem;padding:2px 8px;"
-            'border-radius:4px;margin-left:8px;">⚡ Tier-1.5 · Cổng ML</span>'
+            'border-radius:4px;margin-left:8px;">⚡ Tier-1 · Cổng ML</span>'
         )
-        reasoning_title = "⚡ Lập luận của Cổng ML Tier-1.5 (LightGBM):"
+        reasoning_title = "⚡ Lập luận của Cổng ML Tier-1 (LightGBM):"
         mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
             mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận tự động)"
@@ -425,7 +427,7 @@ def render_metrics_header(
     noise_reduction = (log thô − cảnh báo gửi analyst) / log thô.
 
     ĐỌC CHO ĐÚNG: đây là mức giảm tải mà ANALYST cảm nhận, KHÔNG phải tỉ lệ lọc của
-    Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Tier-1.5/2 GỘP
+    Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Cổng ML + LLM GỘP
     nhiều log escalate thành 1 phán quyết. Ví dụ đo thật 2026-07-15 trên luồng gộp:
     4796 thô -> Tier 1 escalate 2034 (tức Tier 1 chỉ lọc 57.6%) -> gộp thành 218 cảnh
     báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier 1 thì lấy từ
@@ -451,7 +453,7 @@ def render_metrics_header(
             is_ml = (
                 not is_manual
                 and not is_llm
-                and any(k in r for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Tier-1.5"))
+                and any(k in r for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Cổng ML Tier-1"))
             )
 
             if action == "BLOCK_IP":

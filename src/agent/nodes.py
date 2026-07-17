@@ -15,7 +15,7 @@ from src.agent.attack_mapper import (
 )
 from src.agent.llm_client import llm_client
 from src.agent.prompts import build_triage_prompt
-from src.agent.semantic_cache import semantic_cache
+from src.agent.response_cache import response_cache
 from src.agent.state import SentinelState
 from src.agent.threat_memory import threat_memory
 from src.guardrails import (
@@ -209,13 +209,13 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
 
     decision_json = {}
-    cached_decision = semantic_cache.get(raw_logs_str)
+    cached_decision = response_cache.get(raw_logs_str)
     if cached_decision:
         validated_decision = cached_decision
         decision_json = cached_decision
         raw_response = '{"status": "from_cache"}'
         latency_sec = 0.001
-        logger.info("[NODE LLM] Trả về quyết định từ Semantic Cache (Bypass LLM)")
+        logger.info("[NODE LLM] Trả về quyết định từ Response Cache khớp-chính-xác (Bypass LLM)")
     else:
         start_time = time.time()
         # Suy biến có kiểm soát (graceful degradation): nếu LLM cục bộ chết/không kết nối
@@ -252,7 +252,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
 
         # Ghi vào Cache nếu hợp lệ
         if validated_decision.get("action") != "AWAIT_HITL":
-            semantic_cache.set(raw_logs_str, validated_decision)
+            response_cache.set(raw_logs_str, validated_decision)
 
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
@@ -275,13 +275,18 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     except Exception as e:
         logger.warning(f"MLflow tracking failed: {e}")
 
+    # Target để THỰC THI (block/alert) LUÔN lấy từ Source IP của batch HIỆN TẠI, KHÔNG
+    # lấy từ extracted_iocs của quyết định: khi Response Cache HIT trên một IP KHÁC có
+    # cùng vân log (cùng payload/flow), IOC trong cache là IP CŨ -> nếu dùng làm target
+    # sẽ CHẶN NHẦM IP cũ. IOC chỉ là metadata làm giàu, không phải mục tiêu thực thi.
     target = "UNKNOWN_TARGET"
-    if new_iocs and isinstance(new_iocs, list) and len(new_iocs) > 0:
-        target = new_iocs[0].get("value", "UNKNOWN_TARGET")
-
-    if target == "UNKNOWN_TARGET" and state.current_batch_logs:
+    if state.current_batch_logs:
         log_entry = state.current_batch_logs[0]
-        target = log_entry.get("Source IP") or log_entry.get("src_ip", "UNKNOWN_TARGET")
+        target = log_entry.get("Source IP") or log_entry.get("src_ip") or "UNKNOWN_TARGET"
+
+    # Chỉ log lớp-ứng-dụng THUẦN payload (không có Source IP flow) mới rơi về IOC trích xuất.
+    if target == "UNKNOWN_TARGET" and new_iocs and isinstance(new_iocs, list) and len(new_iocs) > 0:
+        target = new_iocs[0].get("value", "UNKNOWN_TARGET")
 
     decision_entry = {
         "action": action,

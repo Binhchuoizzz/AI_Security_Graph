@@ -211,7 +211,7 @@ def render_demo_overview(
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
-        "Welford $O(1)$ → **Tier-1.5** (Cổng ML) → **Tier-2** tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
+        "Welford $O(1)$ + **Cổng ML** (cùng Tier-1) → **Tier-2** tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
         "**Dual-RAG** (MITRE ATT&CK / NIST SP 800-61r2) phía sau rào chắn mật mã, có **HITL** giám sát.*"
     )
 
@@ -249,7 +249,7 @@ def render_demo_overview(
     nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
     c4.metric("Giảm tải (thô→cảnh báo)", nr_str)
     c5.metric("IP rủi ro cao", f"{len(high_risk)}")
-    c6.metric("Phê duyệt Tier-1.5+2 (ML+LLM)", f"{len(pending_rules)}")
+    c6.metric("Phê duyệt luật (ML + LLM)", f"{len(pending_rules)}")
     c7.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
 
     st.markdown("---")
@@ -298,15 +298,19 @@ def render_demo_overview(
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
         e1, e2 = st.columns(2)
         e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
-        e2.metric("Suy luận Tier-1.5+2 (ML+LLM)", "≈5.7 s", "62.7% escalate")
+        e2.metric("Suy luận Tier-2 (LLM)", "≈5.7 s", "62.7% escalate")
         e3, e4 = st.columns(2)
         e3.metric("Lọc rác Welford", "> 99%", "Welford > 3.5σ")
         e4.metric("APT recall", "1.00", "DAPT2020")
         e5, e6 = st.columns(2)
-        e5.metric("Tier-1.5 ML F1-score", "1.000", "Siêu nhẹ (0.001s)")
-        e6.metric("Chặn mã hóa-bypass", "100%", "Rào chắn tĩnh 50%")
+        # F1 = 0.967 là số THẬT của LightGBM trên tập test 20k giữ-lại (ml_lab/training_report.md,
+        # Test F1 0.9666). KHÔNG dùng "1.000" — không mô hình nào phân loại hoàn hảo; 1.000 là
+        # điểm trên một tập con tầm thường, không phải F1 tổng quát hoá (vi phạm trung thực).
+        e5.metric("Cổng ML (Tier-1) F1-score", "0.967", "LightGBM · test 20k")
+        e6.metric("Chặn mã hóa-bypass", "100%", "4/4 payload · rào tĩnh 50%")
         st.caption(
-            "Mann-Whitney U: p = 2.8×10⁻¹⁷ · McNemar (Tier-1 vs Đầy đủ): p = 1.0 · Audit HMAC: 100%."
+            "Nguồn: unified_stream (APT 3/3, zero-day 12/15) · training_report (ML F1 0.9666) · "
+            "adversarial_pipeline (4/4 RESISTED) · latency_benchmark (−82.97%). Audit HMAC: 100%."
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")
@@ -336,7 +340,7 @@ def render_demo_overview(
 
     # ---------- Vòng phản hồi Hai tầng: Tier-1 chặn ↔ Tier-2 dạy ----------
     st.markdown("---")
-    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ Tier-1.5+2 dạy ngược)")
+    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ ML/LLM dạy ngược)")
     fb_left, fb_right = st.columns(2)
 
     with fb_left:
@@ -373,7 +377,7 @@ def render_demo_overview(
             )
 
     with fb_right:
-        st.markdown("#### 🔄 Tier-1.5+2 đã dạy Tier-1 (luật học được · lâu dài)")
+        st.markdown("#### 🔄 ML (Tier-1) & LLM (Tier-2) đã dạy Tier-1 (luật học được · lâu dài)")
         # ACTIVE (luật đã duyệt, đang chặn) hiển thị TRƯỚC để không bị ẩn khi nhiều PENDING
         loop_rules = list(active_rules or []) + list(pending_rules or [])
         if loop_rules:
@@ -396,7 +400,7 @@ def render_demo_overview(
                 hide_index=True,
             )
             st.caption(
-                f"Mỗi phán quyết BLOCK/HITL từ Tier-1.5 (ML), Tier-2 (LLM) và Tier-1 sinh **1 luật** "
+                f"Mỗi phán quyết BLOCK/HITL từ Cổng ML (Tier-1), LLM (Tier-2) và luật Tier-1 sinh **1 luật** "
                 f"({len(pending_rules or [])} chờ duyệt · {len(active_rules or [])} đang chặn). "
                 "Analyst DUYỆT (HITL) → luật **ACTIVE** → Tier-1 tự động CHẶN ngay lần sau. "
                 "Khác với block Redis (TTL 1h), luật đã duyệt **KHÔNG hết hạn** — đây là lý do số "
@@ -404,11 +408,11 @@ def render_demo_overview(
             )
         else:
             st.info(
-                "Chưa có luật nào Tier-1.5/2 dạy cho Tier-1. Chạy luồng có escalate để hệ thống sinh luật."
+                "Chưa có luật nào ML/LLM dạy cho Tier-1. Chạy luồng có escalate để hệ thống sinh luật."
             )
 
-    # ---------- Tier-1.5 (Cổng ML) + Tier-2 (LLM) đã CHẶN — phán quyết ghi vào Audit Trail ----------
-    st.markdown("### 🧠 Tier-1.5 (Cổng ML) & Tier-2 (LLM) đã CHẶN (ghi chép Audit Trail)")
+    # ---------- Cổng ML (Tier-1) + LLM (Tier-2) đã CHẶN — phán quyết ghi vào Audit Trail ----------
+    st.markdown("### 🧠 Cổng ML (Tier-1) & LLM (Tier-2) đã CHẶN (ghi chép Audit Trail)")
     _t2_blocks = [a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP",)]
     if _t2_blocks:
         st.dataframe(
@@ -435,14 +439,14 @@ def render_demo_overview(
             hide_index=True,
         )
         st.caption(
-            f"**{len(_t2_blocks)}** quyết định CHẶN do Tier-1.5, Tier-2 (và thao tác thủ công của "
+            f"**{len(_t2_blocks)}** quyết định CHẶN do Cổng ML (Tier-1), LLM (Tier-2) (và thao tác thủ công của "
             "Analyst) ghi vào Audit Trail HMAC-SHA256. Khác với *Tier-1 đã chặn* (chữ ký tốc độ "
             "cao, TTL 1h ở Redis): đây là phán quyết **có suy luận MITRE/NIST** của LLM sau khi "
             "leo thang. IP đã whitelist KHÔNG bao giờ xuất hiện ở đây (đã miễn trừ)."
         )
     else:
         st.info(
-            "Chưa có quyết định CHẶN nào từ Tier-1.5 hoặc Tier-2. Chạy luồng có escalate (adversarial/APT) để "
+            "Chưa có quyết định CHẶN nào từ Cổng ML (Tier-1) hoặc LLM (Tier-2). Chạy luồng có escalate (adversarial/APT) để "
             "LLM phán quyết và ghi vào Audit Trail."
         )
 
@@ -594,7 +598,7 @@ def main_dashboard():
         st.markdown("---")
         st.markdown("### 📟 Live System Console Logs")
 
-        # Lấy 10 log mới nhất từ Audit (Tier-1.5, Tier-2, Manual) và kết hợp với Tier-1 Blocks
+        # Lấy 10 log mới nhất từ Audit (Cổng ML, LLM, Manual) và kết hợp với Tier-1 Blocks
         console_logs = cached_get_audit_trail(limit=10)
         combined_logs = list(console_logs)
 
@@ -783,7 +787,7 @@ def main_dashboard():
                                 "Cổng ML" in r_str
                                 or "ML Tier 2" in r_str
                                 or "Decision Tree" in r_str
-                                or "Tier-1.5" in r_str
+                                or "Cổng ML Tier-1" in r_str
                             ):
                                 return "Cổng ML"
                             elif (
@@ -875,7 +879,12 @@ def main_dashboard():
                 r = alert.get("reason", "")
                 # Detect theo MARKER: "Cổng ML" (mới) / "ML Tier 2" (bản ghi cũ trong DB)
                 # / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM giờ cũng ghi Tier-2.
-                if "Cổng ML" in r or "ML Tier 2" in r or "Decision Tree" in r or "Tier-1.5" in r:
+                if (
+                    "Cổng ML" in r
+                    or "ML Tier 2" in r
+                    or "Decision Tree" in r
+                    or "Cổng ML Tier-1" in r
+                ):
                     alerts_t2_ml.append(alert)
                 elif "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
                     alerts_t1.append(alert)
@@ -885,7 +894,7 @@ def main_dashboard():
             t1_tab, t2_ml_tab, t2_llm_tab = st.tabs(
                 [
                     "🟢 Tier-1 Filter",
-                    "⚡ Tier-1.5 · Cổng ML",
+                    "⚡ Tier-1 · Cổng ML",
                     "🧠 Tier-2 · LLM",
                 ]
             )
@@ -2095,7 +2104,7 @@ def main_dashboard():
                 'edge [color="#888888", fontcolor="#888888", fontsize=10, fontname="sans-serif"]; '
                 'SOC [label="SENTINEL_SOC", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"]; '
                 'T1 [label="Tier-1 Welford Filter", fillcolor="#14c2c2", color="#14c2c2"]; '
-                'ML [label="Tier-1.5 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
+                'ML [label="Tier-1 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
                 'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'LLM [label="Tier-2 LLM Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '

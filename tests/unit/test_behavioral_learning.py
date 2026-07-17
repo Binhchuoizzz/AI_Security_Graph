@@ -64,10 +64,10 @@ def test_tier1_aliases_cover_application_fields():
 def _engine_with_behavioral_rule():
     e = RuleEngine()
     # Mô phỏng luật hành vi ĐÃ được HITL duyệt (ACTIVE) — inject trực tiếp,
-    # KHÔNG ghi vào config thật.
-    e.dynamic_rules = [
-        {"field": "User-Agent", "pattern": "sqlmap", "score": 50, "status": "ACTIVE"}
-    ]
+    # KHÔNG ghi vào config thật. Sau refactor: luật KHÔNG-phải-Source-IP nằm ở
+    # dynamic_behavioral_rules (list tuple field/pattern/score); luật Source IP
+    # nằm ở dynamic_ip_blocks (set) để tra O(1).
+    e.dynamic_behavioral_rules = [("User-Agent", "sqlmap", 50)]
     return e
 
 

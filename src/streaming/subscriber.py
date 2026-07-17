@@ -218,7 +218,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
     # kẹt 64/64 suốt lượt chạy 4.796 sự kiện). Đổi sang không giới hạn vì:
     #   1) Vòng đọc Tier-1 không bao giờ được phép đứng (Dashboard/stats phải sống);
     #   2) Redis stream (maxlen 10k/queue) mới là buffer bền thật sự phía trước;
-    #   3) Cổng ML của Tier-1.5 hấp thụ phần lớn lô nên backlog thực tế nhỏ.
+    #   3) Cổng ML của Tier-1 hấp thụ phần lớn lô nên backlog thực tế nhỏ.
     # RỦI RO CHẤP NHẬN: backlog nằm trong RAM tiến trình — quy mô demo (nghìn lô nhỏ)
     # là an toàn; hướng sản xuất (Kafka persistent) đã ghi ở thesis ch5. Có cảnh báo
     # HIGH-WATER bên dưới để backlog phình là thấy ngay trong log.
@@ -355,7 +355,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     "src_ip", "UNKNOWN"
                                 )
 
-                                # ── TIER-1.5 ML GATEWAY ──
+                                # ── TIER-1 ML GATEWAY (CỔNG ML) ──
                                 ml_action, ml_reasoning, ml_conf = ml_gateway.evaluate(raw_log)
                                 if ml_action:
                                     # ML tự tin ra quyết định -> Chặn/Báo ngay mà KHÔNG cần LLM

@@ -64,14 +64,18 @@ class IOCModel(BaseModel):
 
 
 class LLMDecision(BaseModel):
+    # CHỈ `action` bắt buộc — đây là quyết định lõi và Literal ép ĐÚNG enum (giá trị lạ ->
+    # ValidationError -> tuồn xuống salvage/fallback an toàn). Các trường làm giàu để
+    # OPTIONAL + default: LLM cục bộ đôi khi bỏ sót mitre/nist nhưng action+reasoning vẫn
+    # hợp lệ — KHÔNG hạ cấp cả quyết định rõ ràng xuống "parse_salvaged" chỉ vì thiếu enrich.
     action: Literal["BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"] = Field(
         ..., description="Hành động phân loại"
     )
-    confidence: float = Field(..., description="Độ tin cậy từ 0.0 đến 1.0")
-    mitre_technique: str = Field(..., description="Tên kỹ thuật MITRE")
-    attack_method: str = Field(..., description="Phương thức tấn công")
-    nist_control: str = Field(..., description="Kiểm soát NIST")
-    reasoning: str = Field(..., description="Lập luận phân tích")
+    confidence: float = Field(default=0.0, description="Độ tin cậy từ 0.0 đến 1.0")
+    mitre_technique: str = Field(default="N/A", description="Tên kỹ thuật MITRE")
+    attack_method: str = Field(default="N/A", description="Phương thức tấn công")
+    nist_control: str = Field(default="N/A", description="Kiểm soát NIST")
+    reasoning: str = Field(default="", description="Lập luận phân tích")
     extracted_iocs: list[IOCModel] | None = Field(default=[], description="Các IOC trích xuất được")
 
 

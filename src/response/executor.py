@@ -113,17 +113,22 @@ _validator = ActionValidator()
 
 
 def _ensure_db_writable(db_path: str):
-    """Đảm bảo file DB có thể ghi được bởi cả host (uid 1000) và container (uid 999)."""
+    """Nới quyền file DB để ghi được bởi cả host (uid 1000) lẫn container (uid 999).
+
+    KHÔNG bao giờ XOÁ file DB ở đây: đây là đường chạy runtime (_init_db) — xoá thầm lặng
+    audit_trail.db sẽ mất toàn bộ lịch sử kiểm toán đã ký HMAC. Chỉ chmod; nếu vẫn không
+    ghi được thì CẢNH BÁO to để người vận hành xử lý (việc reset chủ đích nằm ở reset_all.py)."""
+    if not os.path.exists(db_path):
+        return
     try:
-        if os.path.exists(db_path) and not os.access(db_path, os.W_OK):
-            os.remove(db_path)
+        os.chmod(db_path, 0o666)  # noqa: S103
     except OSError:
         pass
-    try:
-        if os.path.exists(db_path):
-            os.chmod(db_path, 0o666)  # noqa: S103
-    except OSError:
-        pass
+    if not os.access(db_path, os.W_OK):
+        logger.warning(
+            f"[DB] {db_path} KHÔNG ghi được (uid mismatch host/container?). KHÔNG tự xoá để "
+            f"bảo toàn audit trail — chạy 'python scripts/reset_all.py' nếu muốn reset chủ đích."
+        )
 
 
 def _init_db():

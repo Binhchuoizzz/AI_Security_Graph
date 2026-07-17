@@ -16,7 +16,6 @@ from src.response.executor import (
     get_login_attempts,
     increment_login_attempts,
     lock_user,
-    quarantine_host,
     raise_alert,
     reset_login_attempts,
     verify_audit_trail_integrity,
@@ -37,7 +36,8 @@ def isolated_audit_db(tmp_path, monkeypatch):
 
 def test_action_validator_allowed_actions():
     assert ActionValidator.validate_action("BLOCK_IP") is True
-    assert ActionValidator.validate_action("QUARANTINE") is True
+    # QUARANTINE đã bị gỡ khỏi kiến trúc Two-Tier (không còn mock EDR) -> KHÔNG hợp lệ nữa.
+    assert ActionValidator.validate_action("QUARANTINE") is False
     assert ActionValidator.validate_action("INVALID_ACTION") is False
 
 
@@ -64,21 +64,17 @@ def test_action_validator_sanitize_reason():
 
 def test_logging_actions_to_db():
     block_ip("10.0.0.5", "Malicious activity")
-    quarantine_host("host-xyz", "Compromised credential")
     raise_alert("High memory usage", "Possible DoS")
 
     trail = get_audit_trail(limit=10)
-    assert len(trail) == 3
+    assert len(trail) == 2
 
     # Order is DESC, so raise_alert is first
     assert trail[0]["action"] == "ALERT"
     assert trail[0]["target"] == "High memory usage"
 
-    assert trail[1]["action"] == "QUARANTINE"
-    assert trail[1]["target"] == "host-xyz"
-
-    assert trail[2]["action"] == "BLOCK_IP"
-    assert trail[2]["target"] == "10.0.0.5"
+    assert trail[1]["action"] == "BLOCK_IP"
+    assert trail[1]["target"] == "10.0.0.5"
 
 
 def test_get_audit_trail_for_ip():

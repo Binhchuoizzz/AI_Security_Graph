@@ -53,17 +53,22 @@ class ThreatMemoryStore:
         self._init_db()
 
     def _ensure_db_writable(self):
-        """Đảm bảo file DB có thể ghi được bởi cả host (uid 1000) và container (uid 999)."""
+        """Nới quyền file DB để ghi được bởi cả host (uid 1000) lẫn container (uid 999).
+
+        KHÔNG XOÁ file ở đây (đường runtime): threat_memory.db giữ tiền sử IP + chuỗi APT
+        đa-ngày — xoá thầm sẽ mất bằng chứng emergent. Chỉ chmod; không được thì cảnh báo.
+        Reset chủ đích: scripts/reset_all.py."""
+        if not os.path.exists(self.db_path):
+            return
         try:
-            if os.path.exists(self.db_path) and not os.access(self.db_path, os.W_OK):
-                os.remove(self.db_path)
+            os.chmod(self.db_path, 0o666)  # noqa: S103
         except OSError:
             pass
-        try:
-            if os.path.exists(self.db_path):
-                os.chmod(self.db_path, 0o666)  # noqa: S103
-        except OSError:
-            pass
+        if not os.access(self.db_path, os.W_OK):
+            logger.warning(
+                f"[ThreatMemory] {self.db_path} KHÔNG ghi được — KHÔNG tự xoá để giữ tiền sử "
+                f"APT; chạy 'python scripts/reset_all.py' nếu muốn reset."
+            )
 
     def _init_db(self):
         """Khởi tạo cấu trúc bảng (schema) nếu chưa tồn tại."""

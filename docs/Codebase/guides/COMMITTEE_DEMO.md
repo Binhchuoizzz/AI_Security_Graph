@@ -2,13 +2,13 @@
 
 > Bản trình diễn cuối cùng trước hội đồng: **một lệnh duy nhất** đẩy **toàn bộ 4 nguồn dữ liệu
 > thật** (CICIDS + DAPT2020 + Zero-day + Adversarial) chảy qua **toàn bộ hệ thống thật**
-> (Tier-1 Filter/Welford → Tier-1.5: Cổng ML → LLM cục bộ → HITL → Dashboard). Không cần chạy 4
+> (Tier-1 (Welford + Cổng ML) → Tier-2 LLM cục bộ → HITL → Dashboard). Không cần chạy 4
 > lệnh rời rạc như trước.
 >
 > Thiết lập môi trường chi tiết: [RUN_PROJECT.md](RUN_PROJECT.md) · Từng luồng cô lập:
 > [DEMO_FLOWS.md](DEMO_FLOWS.md).
 >
-> **Thông điệp cốt lõi (1 câu):** *Tier-1 lọc rẻ (O(1)) phần lớn lưu lượng; Tier-1.5: Cổng ML phân loại nhanh (early-exit); Tier-2: LLM cục bộ air-gapped xử lý ca phức tạp — **giảm 82.97% độ trễ** (đo trên dataset trước 2026-07-16 — cần đo lại sau khi đổi ground_truth) mà vẫn phát hiện APT đa ngày, zero-day*
+> **Thông điệp cốt lõi (1 câu):** *Tier-1 lọc rẻ (O(1)) phần lớn lưu lượng; Cổng ML (thuộc Tier-1) phân loại nhanh (early-exit); Tier-2: LLM cục bộ air-gapped xử lý ca phức tạp — **giảm 82.97% độ trễ** (đo trên dataset trước 2026-07-16 — cần đo lại sau khi đổi ground_truth) mà vẫn phát hiện APT đa ngày, zero-day*
 > không nhãn, và kháng tấn công đối kháng, có con người giám sát (HITL) + nhật ký ký HMAC.*
 
 ---
