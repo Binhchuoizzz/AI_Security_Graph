@@ -60,9 +60,14 @@ Ensure the JSON is perfectly valid and contains no markdown formatting (like ```
 """
 
 
+# Cache RAM cho few-shot feedback: tránh đọc + parse YAML từ đĩa MỖI call LLM (hot-path
+# Tier-2). Chỉ đọc lại khi mtime của system_settings.yaml đổi (giống hot-reload rule_engine).
+_FEEDBACK_CACHE: dict = {"mtime": None, "value": ""}
+
+
 def load_few_shot_feedback_context() -> str:
     """
-    Đọc các dynamic_rules từ system_settings.yaml để sinh context few-shot.
+    Đọc các dynamic_rules từ system_settings.yaml để sinh context few-shot (có cache mtime).
     ACTIVE rules -> Mẫu tấn công được con người phê duyệt chặn.
     REJECTED rules -> Mẫu cảnh báo sai (False Positive) bị con người từ chối.
     """
@@ -76,12 +81,23 @@ def load_few_shot_feedback_context() -> str:
     if not os.path.exists(config_path):
         return ""
 
+    # Cache theo mtime: chỉ parse lại khi file config thực sự đổi.
+    try:
+        mtime = os.path.getmtime(config_path)
+    except OSError:
+        return _FEEDBACK_CACHE["value"]
+    if _FEEDBACK_CACHE["mtime"] == mtime:
+        return _FEEDBACK_CACHE["value"]
+
+    result = ""
     try:
         with open(config_path) as f:
             config = yaml.safe_load(f)
 
         rules = config.get("tier1", {}).get("dynamic_rules", [])
         if not rules:
+            _FEEDBACK_CACHE["mtime"] = mtime
+            _FEEDBACK_CACHE["value"] = ""
             return ""
 
         approved_examples = []
@@ -113,25 +129,33 @@ def load_few_shot_feedback_context() -> str:
             context_parts.extend(rejected_examples[:5])  # Giới hạn tối đa 5 ví dụ
 
         if context_parts:
-            return "\n=== ACTIVE LEARNING: HUMAN FEEDBACK & HISTORICAL DECISIONS ===\n" + "\n".join(
-                context_parts
+            result = (
+                "\n=== ACTIVE LEARNING: HUMAN FEEDBACK & HISTORICAL DECISIONS ===\n"
+                + "\n".join(context_parts)
             )
     except Exception:
-        pass
-    return ""
+        result = ""
+
+    _FEEDBACK_CACHE["mtime"] = mtime
+    _FEEDBACK_CACHE["value"] = result
+    return result
 
 
 def build_triage_prompt(log_data: str, rag_context: str) -> list[dict]:
     """
     Xây dựng mảng tin nhắn (messages array) cho OpenAI client.
+
+    System prompt giữ CỐ ĐỊNH (TRIAGE_SYSTEM_PROMPT) làm prefix để llama.cpp tái dùng
+    KV-cache qua nhiều call; feedback few-shot (biến động theo luật động) được đưa vào ĐẦU
+    user message thay vì nối vào system prompt (tránh phá prefix cache mỗi khi luật đổi).
     """
     feedback_context = load_few_shot_feedback_context()
-    system_prompt = TRIAGE_SYSTEM_PROMPT
-    if feedback_context:
-        system_prompt += "\n" + feedback_context
 
-    user_message = f"""
-Please analyze the following network event:
+    user_sections = []
+    if feedback_context:
+        user_sections.append(feedback_context.strip())
+    user_sections.append(
+        f"""Please analyze the following network event:
 
 {RAG_START_TAG}
 {rag_context}
@@ -139,11 +163,11 @@ Please analyze the following network event:
 
 {LOG_START_TAG}
 {log_data}
-{LOG_END_TAG}
-"""
+{LOG_END_TAG}"""
+    )
     return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message},
+        {"role": "system", "content": TRIAGE_SYSTEM_PROMPT},
+        {"role": "user", "content": "\n\n".join(user_sections)},
     ]
 
 

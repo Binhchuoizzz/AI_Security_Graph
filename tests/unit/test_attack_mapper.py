@@ -114,8 +114,9 @@ class _FakeRetriever:
         return {"mitre_results": self._results}
 
 
-def test_rrf_path_uses_top_candidate_when_llm_absent(monkeypatch):
-    """attack_type lạ -> RRF top candidate, không LLM -> resolved (graceful fallback)."""
+def test_rrf_path_attaches_top_candidate_as_hint_but_low_confidence(monkeypatch):
+    """attack_type lạ + KHÔNG có xác nhận LLM -> đính top-RRF làm GỢI Ý nhưng low_confidence
+    (lá chắn node ép AWAIT_HITL cho ca không khớp rõ). Mặc định KHÔNG gọi LLM lần 2 (tốc độ)."""
     monkeypatch.setattr(
         "src.agent.attack_mapper._load_kb_index",
         lambda: {"T1110": {"id": "T1110", "name": "Brute Force", "tactic": "Credential Access"}},
@@ -127,10 +128,10 @@ def test_rrf_path_uses_top_candidate_when_llm_absent(monkeypatch):
         retriever=fake,
         llm=None,
     )
-    assert mapping.mitre_technique_id == "T1110"
+    assert mapping.mitre_technique_id == "T1110"  # candidate vẫn đính làm gợi ý cho analyst
     assert mapping.mitre_tactic == "Credential Access"
     assert mapping.mitre_tactic_id == "TA0006"
-    assert mapping.mapping_status == "resolved"
+    assert mapping.mapping_status == "low_confidence"  # không LLM xác nhận -> HITL
     assert set(mapping.model_dump().keys()) == SCHEMA_KEYS
 
 

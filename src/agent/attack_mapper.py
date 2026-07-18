@@ -30,6 +30,7 @@ LƯU Ý TRUNG THỰC (no-fabrication):
     và ghi chú rõ giới hạn.
 """
 
+import functools
 import json
 import logging
 import os
@@ -51,6 +52,25 @@ LOW_CONFIDENCE_THRESHOLD = 0.5
 
 FRAMEWORK_ATTACK = "MITRE ATT&CK Enterprise"
 FRAMEWORK_ATLAS = "MITRE ATLAS"
+
+
+@functools.lru_cache(maxsize=1)
+def _llm_select_enabled() -> bool:
+    """Có gọi LLM lần 2 (chọn MITRE trong ứng viên RRF) cho ca MƠ HỒ không.
+
+    Mặc định TẮT (tối ưu tốc độ): ca không phải web-attack curated và triage KHÔNG nêu
+    technique-id -> KHÔNG tốn thêm 1 inference LLM để đoán. Đính top-RRF làm GỢI Ý nhưng để
+    low_confidence -> lá chắn node_attack_mapper ép AWAIT_HITL (log không khớp rõ -> người
+    duyệt). Bật lại bằng config `tier2.attack_mapper.llm_select: true` (phục vụ ablation)."""
+    try:
+        import yaml  # type: ignore
+
+        p = os.path.join(_BASE_DIR, "config", "system_settings.yaml")
+        with open(p) as f:
+            cfg = yaml.safe_load(f) or {}
+        return bool(cfg.get("tier2", {}).get("attack_mapper", {}).get("llm_select", False))
+    except Exception:
+        return False
 
 
 # ==============================================================================
@@ -514,10 +534,11 @@ def _from_rrf(inp: AttackMapperInput, retriever: Any, llm: Any) -> MitreMapping:
         chosen = next(c for c in candidates if c["id"] == chosen_id)
         mapping_conf, status = 0.75, "resolved"
     else:
-        chosen = candidates[0]  # fallback top-RRF
-        mapping_conf, status = (
-            (0.60, "resolved") if chosen["rrf_score"] > 0 else (0.40, "low_confidence")
-        )
+        # KHÔNG có xác nhận LLM -> đính top-RRF làm GỢI Ý cho analyst nhưng để low_confidence:
+        # lá chắn node_attack_mapper ép AWAIT_HITL (log không khớp CHẮC -> người duyệt), thay vì
+        # auto-act trên một match RRF mờ (khớp yêu cầu "không match rõ -> HITL").
+        chosen = candidates[0]
+        mapping_conf, status = 0.40, "low_confidence"
 
     tactic, tactic_id = normalize_tactic(chosen["tactic"])
     tid = chosen["id"]
@@ -586,6 +607,7 @@ def map_attack(
     inp: AttackMapperInput,
     retriever: Any = None,
     llm: Any = None,
+    use_llm_select: bool | None = None,
 ) -> MitreMapping:
     """
     Ánh xạ một kết quả phân loại sang MITRE ATT&CK có cấu trúc.
@@ -594,6 +616,9 @@ def map_attack(
         inp: AttackMapperInput (attack_type/confidence/payload/features).
         retriever: DualRetriever (tái dùng singleton). None -> bỏ đường RRF.
         llm: llm_client. None -> bỏ bước LLM chọn (vẫn dùng top-RRF/curated).
+        use_llm_select: có gọi LLM lần 2 chọn MITRE cho ca mơ hồ không. None -> đọc
+            config `tier2.attack_mapper.llm_select` (mặc định TẮT); True/False -> ép rõ
+            (test/ablation).
 
     Returns:
         MitreMapping — schema LUÔN hợp lệ (pydantic validate khi khởi tạo).
@@ -606,5 +631,8 @@ def map_attack(
     anchored = _from_triage_anchor(inp)
     if anchored is not None:
         return anchored
-    # 3) Đường suy luận: RRF + LLM (graceful) khi triage mơ hồ / attack_type lạ.
-    return _from_rrf(inp, retriever, llm)
+    # 3) Đường suy luận RRF. Mặc định KHÔNG gọi LLM lần 2 (tốc độ): ca mơ hồ đằng nào cũng
+    #    ra AWAIT_HITL nên không cần thêm 1 inference để đoán technique.
+    if use_llm_select is None:
+        use_llm_select = _llm_select_enabled()
+    return _from_rrf(inp, retriever, llm if use_llm_select else None)
