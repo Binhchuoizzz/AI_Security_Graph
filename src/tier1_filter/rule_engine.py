@@ -364,8 +364,9 @@ class RuleEngine:
         tier1_config = config.get("tier1", {})
 
         self.risk_threshold = tier1_config.get("risk_threshold", 15)
-        self.sensitive_ports = tier1_config.get(
-            "sensitive_ports", [21, 22, 23, 3389, 445, 1433, 3306]
+        # set() -> kiểm tra thành viên O(1) (dùng 3 lần/log trong hot-path evaluate).
+        self.sensitive_ports = set(
+            tier1_config.get("sensitive_ports", [21, 22, 23, 3389, 445, 1433, 3306])
         )
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", 1000)
         # Ngưỡng Z-score cho phát hiện dị biệt thống kê Welford (zero-day). Mặc định
@@ -398,6 +399,8 @@ class RuleEngine:
         # tránh truy vấn SQLite cho MỖI log; IP lặp lại chỉ tốn O(1) trong burst.
         self._rep_cache: dict[str, tuple[float, float]] = {}
         self._rep_cache_ttl = tier1_config.get("reputation_cache_ttl", 5.0)
+        # Chặn rò RAM: khi cache đầy (nhiều IP khác nhau) sẽ dọn các mục đã hết hạn.
+        self._rep_cache_max = tier1_config.get("reputation_cache_max", 10000)
 
         # Theo dõi file modification time để hot-reload
         self.last_config_mtime = os.path.getmtime(CONFIG_PATH) if os.path.exists(CONFIG_PATH) else 0
@@ -413,13 +416,14 @@ class RuleEngine:
             eviction_interval=baseline_config.get("eviction_interval", 100),
         )
 
-        # Compile prompt injection & jailbreak patterns từ config
+        # Prompt injection & jailbreak: các mẫu là CHUỖI THUẦN (không có metachar regex).
+        # Trước đây compile thành regex `re.escape(p)` -> mỗi log quét tới 19 mẫu × 8 field
+        # bằng regex engine. Giờ so khớp SUBSTRING không phân biệt hoa/thường (nhanh hơn
+        # nhiều, kết quả & text lý do y hệt vì mẫu vốn là literal). Giữ list gốc để hiện
+        # lý do, thêm list lowercase để so khớp O(1) mỗi mẫu.
         self.config = config
         guardrails_config = config.get("guardrails", {})
-        injection_pats = guardrails_config.get("injection_patterns", [])
-        jailbreak_pats = guardrails_config.get("jailbreak_patterns", [])
-        self.injection_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in injection_pats]
-        self.jailbreak_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in jailbreak_pats]
+        self._set_signature_patterns(guardrails_config)
 
         # Unsupervised Anomaly Detection (Zero-Day statistical profiling trên các core features có corr cao)
         self.global_stats: dict[str, RunningStats] = {
@@ -497,6 +501,16 @@ class RuleEngine:
                     except (ValueError, TypeError):
                         pass
 
+    def _set_signature_patterns(self, guardrails_config: dict) -> None:
+        """Nạp mẫu prompt-injection/jailbreak (chuỗi thuần) + bản lowercase để so khớp
+        substring nhanh. Dùng chung cho __init__ và reload_dynamic_rules (DRY)."""
+        injection_pats = guardrails_config.get("injection_patterns", [])
+        jailbreak_pats = guardrails_config.get("jailbreak_patterns", [])
+        self.injection_patterns = [p for p in injection_pats if isinstance(p, str) and p]
+        self.jailbreak_patterns = [p for p in jailbreak_pats if isinstance(p, str) and p]
+        self._injection_patterns_lc = [p.lower() for p in self.injection_patterns]
+        self._jailbreak_patterns_lc = [p.lower() for p in self.jailbreak_patterns]
+
     def _check_waf_signatures(self, log_entry: dict) -> str | None:
         """
         Bộ lọc Signature WAF siêu nhẹ để phát hiện nhanh các dấu hiệu SQLi, XSS, Path Traversal
@@ -538,14 +552,19 @@ class RuleEngine:
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
             if val and isinstance(val, str):
-                # 1. Prompt Injection Patterns
-                for pattern in self.injection_patterns:
-                    if pattern.search(val):
-                        return f"Prompt Injection Pattern: Phát hiện '{pattern.pattern}' trong '{field}'"
+                val_lc = val.lower()
+                # 1. Prompt Injection Patterns (substring, không phân biệt hoa/thường)
+                for raw, low in zip(
+                    self.injection_patterns, self._injection_patterns_lc, strict=False
+                ):
+                    if low in val_lc:
+                        return f"Prompt Injection Pattern: Phát hiện '{raw}' trong '{field}'"
                 # 2. Jailbreak Patterns
-                for pattern in self.jailbreak_patterns:
-                    if pattern.search(val):
-                        return f"Jailbreak Pattern: Phát hiện '{pattern.pattern}' trong '{field}'"
+                for raw, low in zip(
+                    self.jailbreak_patterns, self._jailbreak_patterns_lc, strict=False
+                ):
+                    if low in val_lc:
+                        return f"Jailbreak Pattern: Phát hiện '{raw}' trong '{field}'"
         return None
 
     def _get_reputation_score(self, ip: str) -> float:
@@ -569,6 +588,9 @@ class RuleEngine:
                 score = float(rep.get("reputation_score", 0.0) or 0.0)
         except Exception:
             score = 0.0
+        if len(self._rep_cache) >= self._rep_cache_max and ip not in self._rep_cache:
+            # Dọn các mục đã hết hạn trước khi thêm mới (chống rò RAM trên chạy dài).
+            self._rep_cache = {k: v for k, v in self._rep_cache.items() if v[1] > now}
         self._rep_cache[ip] = (score, now + self._rep_cache_ttl)
         return score
 
@@ -611,12 +633,14 @@ class RuleEngine:
 
         # --- Tầng 0.1: WAF Signature Check (Chống LLM Starvation) ---
         waf_reason = self._check_waf_signatures(log_entry)
+        has_waf_match = bool(waf_reason)
         if waf_reason:
             score += 50
             reasons.append(waf_reason)
 
         # --- Tầng 0.2: Prompt Injection / Jailbreak Signature Check ---
         injection_reason = self._check_injection_signatures(log_entry)
+        has_injection_match = bool(injection_reason)
         if injection_reason:
             score += 50
             reasons.append(injection_reason)
@@ -761,11 +785,9 @@ class RuleEngine:
             except (ValueError, TypeError):
                 pass
 
-            # Phát hiện tấn công web rõ ràng (SQLi/XSS/Command Inj) -> Chặn luôn để bảo vệ LLM
-            has_waf_match = any("WAF:" in r for r in reasons)
-            has_injection_match = any(
-                "Prompt Injection Pattern:" in r or "Jailbreak Pattern:" in r for r in reasons
-            )
+            # has_waf_match / has_injection_match đã được ghi ngay lúc check (Tầng 0.1/0.2)
+            # -> tấn công web rõ ràng (SQLi/XSS/Command Inj) bị chặn luôn để bảo vệ LLM,
+            # không cần quét lại danh sách reasons (nhanh hơn + không phụ thuộc text lý do).
 
             if dynamic_ip_block:
                 # IP đã được Analyst DUYỆT chặn (HITL -> luật ACTIVE): Tier-1 TỰ CHẶN ngay,
@@ -813,7 +835,7 @@ class RuleEngine:
         tier1_config = config.get("tier1", {})
 
         self.risk_threshold = tier1_config.get("risk_threshold", self.risk_threshold)
-        self.sensitive_ports = tier1_config.get("sensitive_ports", self.sensitive_ports)
+        self.sensitive_ports = set(tier1_config.get("sensitive_ports", self.sensitive_ports))
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", self.max_fwd_packets)
         self.whitelist_ips = set(tier1_config.get("whitelist_ips", []))
         self.reputation_enforcement = tier1_config.get(
@@ -838,13 +860,9 @@ class RuleEngine:
                 else:
                     self.dynamic_behavioral_rules.append((field, pattern, r.get("score", 50)))
 
-        # Hot-reload injection & jailbreak patterns
+        # Hot-reload injection & jailbreak patterns (substring — xem _set_signature_patterns)
         self.config = config
-        guardrails_config = config.get("guardrails", {})
-        injection_pats = guardrails_config.get("injection_patterns", [])
-        jailbreak_pats = guardrails_config.get("jailbreak_patterns", [])
-        self.injection_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in injection_pats]
-        self.jailbreak_patterns = [re.compile(re.escape(p), re.IGNORECASE) for p in jailbreak_pats]
+        self._set_signature_patterns(config.get("guardrails", {}))
 
         # Hot-reload SessionBaseline parameters without wiping profiles cache
         baseline_config = tier1_config.get("session_baseline", {})
