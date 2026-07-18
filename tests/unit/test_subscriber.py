@@ -53,7 +53,7 @@ class TestBlacklistMemory:
 class TestStripDatasetLabels:
     def test_removes_every_dataset_label_key(self):
         """Mọi khóa trong strip-set phải biến mất; trường hệ thống phải GIỮ."""
-        log = {k: "leak" for k in _DATASET_LABEL_KEYS}
+        log: dict[str, object] = {k: "leak" for k in _DATASET_LABEL_KEYS}
         log.update(
             {
                 "Source IP": "1.2.3.4",
@@ -112,7 +112,7 @@ def test_online_enrich_labels_fully_covered_by_strip_set():
     from experiments.unified_dataset import enrich
 
     PROVENANCE_OK = {"dataset_source", "unified_source"}  # nguồn gốc, không phải đáp án
-    sample_events = [
+    sample_events: list[dict] = [
         {
             "source": "cicids",
             "log": {"Destination Port": 80},

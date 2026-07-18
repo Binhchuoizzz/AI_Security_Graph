@@ -18,7 +18,7 @@ class TestRuleEngine:
     def setup_method(self):
         self.engine = RuleEngine()
         self.engine.session_baseline = SessionBaseline()
-        self.engine.dynamic_rules = []  # Isolate from Feedback Loop runtime state
+        self.engine.dynamic_behavioral_rules = []  # Isolate from Feedback Loop runtime state
         # Cô lập khỏi Threat Memory runtime: các test dưới đây kiểm tra logic chữ ký/cổng/
         # baseline, KHÔNG phải reputation. Tắt để kết quả không phụ thuộc DB thật.
         self.engine.reputation_enforcement = False
@@ -69,7 +69,7 @@ class TestRuleEngine:
         """IP whitelist: CHO QUA (WHITELIST_DROP) NHƯNG vẫn được phân tích đầy đủ để analyst
         quan sát — action bị ép cho qua, còn score/reasons vẫn phản ánh hành vi (cổng 22 nhạy
         cảm + dung lượng cao) thay vì bị nuốt lặng ở Tầng 0."""
-        self.engine.whitelist_ips = ["10.0.0.99"]
+        self.engine.whitelist_ips = {"10.0.0.99"}
         log = {
             "Source IP": "10.0.0.99",
             "Destination Port": 22,
@@ -231,7 +231,7 @@ class TestReputationEnforcement:
     def _engine(self, rep_score: float):
         engine = RuleEngine()
         engine.session_baseline = SessionBaseline()
-        engine.dynamic_rules = []
+        engine.dynamic_behavioral_rules = []
         engine.reputation_enforcement = True
         engine.reputation_block_threshold = 70
         engine.reputation_hitl_threshold = 50
@@ -271,7 +271,7 @@ class TestReputationEnforcement:
     def test_reputation_whitelist_exempt(self):
         """IP reputation cao nhưng nằm Whitelist -> vẫn cho qua (WHITELIST_DROP), miễn trừ reputation."""
         engine = self._engine(90.0)
-        engine.whitelist_ips = ["203.0.113.10"]
+        engine.whitelist_ips = {"203.0.113.10"}
         result = engine.evaluate(self._benign("203.0.113.10"))
         assert result["tier1_action"] == "WHITELIST_DROP"
 

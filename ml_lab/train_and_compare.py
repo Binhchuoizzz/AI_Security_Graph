@@ -76,7 +76,7 @@ X = df[features].values
 feature_names = features
 
 print(f"Dataset Shape: {X.shape}")
-print(f"Target Distribution: {np.bincount(y)} (0: Benign, 1: Attack)")
+print(f"Target Distribution: {np.bincount(y)} (0: Benign, 1: Attack)")  # pyright: ignore[reportArgumentType]
 
 # Plot Target Distribution
 plt.figure(figsize=(6, 4))
@@ -137,16 +137,16 @@ for name, model in models.items():
 
     # Validation
     y_val_pred = model_obj.predict(X_val_scaled)
-    val_f1 = f1_score(y_val, y_val_pred, zero_division=0)
+    val_f1 = f1_score(y_val, y_val_pred, zero_division=0)  # pyright: ignore[reportArgumentType]
 
     # Test
     start_time = time.time()
     y_test_pred = model_obj.predict(X_test_scaled)
     inference_time = (time.time() - start_time) / len(X_test_scaled)
 
-    f1 = f1_score(y_test, y_test_pred, zero_division=0)
-    prec = precision_score(y_test, y_test_pred, zero_division=0)
-    rec = recall_score(y_test, y_test_pred, zero_division=0)
+    f1 = f1_score(y_test, y_test_pred, zero_division=0)  # pyright: ignore[reportArgumentType]
+    prec = precision_score(y_test, y_test_pred, zero_division=0)  # pyright: ignore[reportArgumentType]
+    rec = recall_score(y_test, y_test_pred, zero_division=0)  # pyright: ignore[reportArgumentType]
 
     cm = confusion_matrix(y_test, y_test_pred)
     confusion_matrices[name] = cm
@@ -157,10 +157,10 @@ for name, model in models.items():
     results.append(
         {
             "Model": name,
-            "Val F1 (In-Dist)": round(val_f1, 4),
-            "Test F1": round(f1, 4),
-            "Test Precision": round(prec, 4),
-            "Test Recall": round(rec, 4),
+            "Val F1 (In-Dist)": round(float(val_f1), 4),
+            "Test F1": round(float(f1), 4),
+            "Test Precision": round(float(prec), 4),
+            "Test Recall": round(float(rec), 4),
             "Test FPR": round(fpr, 4),
             "Train Time (s)": round(train_time, 2),
             "Inference (ms/sample)": round(inference_time * 1000, 6),

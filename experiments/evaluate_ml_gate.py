@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import time
+from typing import Any
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -134,7 +135,9 @@ def evaluate_evasion_resistance(gw: MLGateway, events: list) -> dict:
     """Với mỗi mẫu TẤN CÔNG mà ML vốn bắt được, thử 3 kiểu né-tránh. 'Kháng được' =
     ML KHÔNG bị lừa thành benign/LOG (vẫn BLOCK/ALERT, HOẶC abstain->escalate LLM)."""
     modes = ["inf_single", "extreme_single", "extreme_broad"]
-    stats = {m: {"attempts": 0, "resisted": 0, "flipped_benign": 0} for m in modes}
+    stats: dict[str, dict[str, Any]] = {
+        m: {"attempts": 0, "resisted": 0, "flipped_benign": 0} for m in modes
+    }
     base_caught = 0
     for ev in events:
         if not _is_threat(ev) or not _has_flow_features(ev):

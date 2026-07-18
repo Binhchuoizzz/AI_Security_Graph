@@ -48,7 +48,9 @@ def test_derive_returns_valid_field_for_feedback_validator():
 
     fv = FeedbackValidator()
     for log in [{"user_agent": "sqlmap/1.6"}, {"uri": "x UNION SELECT y"}]:
-        field, pattern, score = _derive_behavioral_rule(log)
+        rule = _derive_behavioral_rule(log)
+        assert rule is not None, f"Không suy ra được luật hành vi từ log: {log}"
+        field, pattern, score = rule
         is_valid, errors = fv.validate_rule(field, pattern, score)
         assert is_valid, f"Behavioral rule bị FeedbackValidator từ chối: {errors}"
 

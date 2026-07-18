@@ -300,7 +300,7 @@ def fetch_and_build(
             df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]  # pyright: ignore[reportAttributeAccessIssue]
 
             # Downsample early to prevent OOM
-            df_filtered = df_filtered.groupby("Label").head(10000)
+            df_filtered = df_filtered.groupby("Label").head(10000)  # pyright: ignore[reportAttributeAccessIssue]
 
             all_data.append(df_filtered)
             print(f"     Tìm thấy {len(df_filtered)} mẫu thuộc danh sách cần tìm (sau downsample).")

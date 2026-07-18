@@ -81,6 +81,7 @@ def test_record_usage_updates_stats():
     token_monitor.record_usage(SimpleNamespace(prompt_tokens=100, completion_tokens=20))
     token_monitor.record_usage(SimpleNamespace(prompt_tokens=300, completion_tokens=40))
     stats = token_monitor.get_stats()
+    assert stats is not None
     assert stats["calls"] == 2
     assert stats["prompt_tokens_mean"] == 200.0  # (100+300)/2
     assert stats["prompt_tokens_max"] == 300

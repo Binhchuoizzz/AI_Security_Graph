@@ -360,15 +360,15 @@ def run_af(limit=None, out=None):
 
         ml_bypass_rate = (ml_bypassed_count / total_f) * 100 if total_f > 0 else 0.0
 
-        mlflow.log_metric("Config_A_F1", f1_a)
-        mlflow.log_metric("Config_A_Precision", prec_a)
-        mlflow.log_metric("Config_A_Recall", rec_a)
-        mlflow.log_metric("Config_A_FPR", fpr_a)
+        mlflow.log_metric("Config_A_F1", float(f1_a))
+        mlflow.log_metric("Config_A_Precision", float(prec_a))
+        mlflow.log_metric("Config_A_Recall", float(rec_a))
+        mlflow.log_metric("Config_A_FPR", float(fpr_a))
         mlflow.log_metric("MTTD_Proxy_Tier1_sec", float(np.mean(results["Config_A"]["latencies"])))
-        mlflow.log_metric("Config_F_F1", f1_f)
-        mlflow.log_metric("Config_F_Precision", prec_f)
-        mlflow.log_metric("Config_F_Recall", rec_f)
-        mlflow.log_metric("Config_F_FPR", fpr_f)
+        mlflow.log_metric("Config_F_F1", float(f1_f))
+        mlflow.log_metric("Config_F_Precision", float(prec_f))
+        mlflow.log_metric("Config_F_Recall", float(rec_f))
+        mlflow.log_metric("Config_F_FPR", float(fpr_f))
         mlflow.log_metric("MTTR_Proxy_Tier2_sec", float(np.mean(results["Config_F"]["latencies"])))
         mlflow.log_metric("HITL_Escalation_Rate_pct", hitl_ratio)
         mlflow.log_metric("RAG_Cache_Hit_Rate_pct", cache_hit_rate)
@@ -651,9 +651,9 @@ def run_mlgate(limit=None, out=None):
                 break
 
     bypass_rate = n_bypass / n_escalated if n_escalated else 0.0
-    f1 = float(f1_score(yt, yp, zero_division=0)) if yt else 0.0
-    prec = float(precision_score(yt, yp, zero_division=0)) if yt else 0.0
-    rec = float(recall_score(yt, yp, zero_division=0)) if yt else 0.0
+    f1 = float(f1_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
+    prec = float(precision_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
+    rec = float(recall_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
     t_no_ml = n_escalated * LLM_MS
     t_ml = n_bypass * ML_MS + (n_escalated - n_bypass) * LLM_MS
     saved_pct = (1 - t_ml / t_no_ml) * 100 if t_no_ml else 0.0

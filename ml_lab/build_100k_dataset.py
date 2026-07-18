@@ -90,7 +90,7 @@ def main():
     df_dapt = map_dapt_to_cicids(df_dapt)
 
     # DAPT labels are in 'Label' column. Normal is Benign.
-    df_dapt["Target"] = df_dapt.get("Label", df_dapt.get("label", pd.Series(dtype=str))).apply(
+    df_dapt["Target"] = df_dapt.get("Label", df_dapt.get("label", pd.Series(dtype=str))).apply(  # pyright: ignore[reportOptionalMemberAccess]
         lambda x: 0 if str(x).strip().lower() in ["normal", "benign"] else 1
     )
 
@@ -126,7 +126,7 @@ def main():
     # 3. Generate Zero-day anomalies (3k rows)
     # We take benign flows and mutate them heavily
     print("[*] Generating Zero-Day Anomalies...")
-    df_benign = df_cic_subset[df_cic_subset["Target"] == 0].sample(n=3000, replace=True).copy()
+    df_benign = df_cic_subset[df_cic_subset["Target"] == 0].sample(n=3000, replace=True).copy()  # pyright: ignore[reportAttributeAccessIssue]
     # Mutate numerical features
     df_benign["Flow Duration"] = df_benign["Flow Duration"] * np.random.uniform(
         10, 100, size=len(df_benign)
@@ -141,11 +141,11 @@ def main():
     print("[*] Generating Adversarial Examples...")
     df_adv = df_cic_subset[df_cic_subset["Target"] == 1]
     if len(df_adv) > 0:
-        df_adv = df_adv.sample(n=2000, replace=True).copy()
+        df_adv = df_adv.sample(n=2000, replace=True).copy()  # pyright: ignore[reportAttributeAccessIssue]
         # Mask attack metrics to look like benign (Adversarial Evasion)
         df_benign_stats = df_cic_subset[df_cic_subset["Target"] == 0].mean()
         for col in features:
-            df_adv[col] = df_adv[col] * 0.5 + df_benign_stats[col] * 0.5
+            df_adv[col] = df_adv[col] * 0.5 + df_benign_stats[col] * 0.5  # pyright: ignore[reportIndexIssue]
         df_adv["Target"] = 1
     else:
         df_adv = pd.DataFrame()

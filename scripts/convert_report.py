@@ -47,7 +47,7 @@ def parse_markdown_to_docx(md_path, docx_path):
 
     # Style defaults
     style = doc.styles["Normal"]
-    font = style.font  # pyright: ignore[reportAttributeAccessIssue]
+    font = style.font  # pyright: ignore[reportAttributeAccessIssue]  # pyrefly: ignore[missing-attribute]
     font.name = "Arial"
     font.size = Pt(11)
 
