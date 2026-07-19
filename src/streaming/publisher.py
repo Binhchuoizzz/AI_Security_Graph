@@ -1,12 +1,11 @@
 """
 Data Publisher — stream CSV THÔ lên Redis (production-scale ingestion).
 
-Vai trò trong bộ BA PUBLISHER (không trùng nhau):
+Vai trò trong bộ HAI PUBLISHER (không trùng nhau):
   - src/streaming/publisher.py (file này): đọc CSV thô CHUNKED (chunksize=500,
     file hàng triệu dòng/GB không nạp hết RAM), backpressure + chống Redis OOM.
     Dùng cho LOAD TEST / chứng minh tầng ingestion; KHÔNG mang nhãn ground-truth
     hay metadata APT.
-  - scripts/simulate_traffic.py: replay ground_truth.json (có nhãn, demo dashboard).
   - scripts/demo.py + push_datatest.py (dựng bởi scripts/build_demo.py /
     build_datatest.py): phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
     metadata APT (demo end-to-end APT emergent — khuyến nghị cho demo luồng gộp).
@@ -16,6 +15,7 @@ import hashlib
 import json
 import os
 import random
+import re
 import time
 
 import numpy as np  # type: ignore
@@ -37,6 +37,15 @@ REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://
 QUEUE_NAME = _config.get("redis", {}).get("queue_name", "queue_waf")
 BATCH_DELAY_SECONDS = float(_config.get("redis", {}).get("publisher_delay_seconds", 0.5))
 MAX_QUEUE_SIZE = 10000  # Giới hạn hàng đợi để chống nghẽn và ngăn Redis OOM
+
+
+def _redact_redis_url(url: str) -> str:
+    """Ẩn mật khẩu trong REDIS_URL trước khi in/log (redis://:pass@host -> redis://:***@host).
+
+    Mật khẩu Redis CHỈ được sống trong .env — không bao giờ để rò ra stdout/journald.
+    """
+    return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
+
 
 # Ánh xạ cột tiêu chuẩn để đồng bộ các tập dữ liệu khác nhau (CSE-CIC-IDS2018 & DAPT2020)
 COLUMN_MAPPING = {
@@ -105,7 +114,7 @@ def stream_logs_to_redis(csv_path: str):
 
     Bao gồm kiểm soát nghẽn (backpressure) và giới hạn băng thông ở mức batch để tránh crash do Redis OOM.
     """
-    print(f"[*] Connecting to Redis: {REDIS_URL}")
+    print(f"[*] Connecting to Redis: {_redact_redis_url(REDIS_URL)}")
     try:
         r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
         r.ping()

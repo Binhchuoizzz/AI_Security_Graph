@@ -11,6 +11,12 @@ from datetime import datetime
 import pandas as pd  # type: ignore
 import streamlit as st  # type: ignore
 
+# Marker chuỗi để nhận diện phán quyết đến từ CỔNG ML Tier-1 (dùng CHUNG cho components.py
+# và app.py để phân loại nguồn NHẤT QUÁN — 1 nguồn chân lý, tránh drift giữa các nơi).
+# "Cổng ML" đã bao "Cổng ML Tier-1 (LightGBM)" (substring) nên không cần liệt kê riêng;
+# "ML Tier 2" / "Decision Tree" là nhãn LỊCH SỬ cho các bản ghi CŨ còn trong DB (phòng thủ).
+ML_GATE_MARKERS = ("Cổng ML", "ML Tier 2", "Decision Tree")
+
 
 def is_valid_ip(ip_str: str) -> bool:
     """Kiểm tra chuỗi IP hợp lệ (IPv4 hoặc IPv6)."""
@@ -229,13 +235,7 @@ def render_alert_card(
     reason_text = raw_reason
     is_manual = "Chặn thủ công" in reason_text or "MANUAL" in reason_text.upper()
     is_llm = reason_text.startswith("[MITRE:")
-    is_ml_tier = (
-        not is_manual
-        and not is_llm
-        and any(
-            k in reason_text for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Cổng ML Tier-1")
-        )
-    )
+    is_ml_tier = not is_manual and not is_llm and any(k in reason_text for k in ML_GATE_MARKERS)
     is_tier1 = (
         not is_manual
         and not is_llm
@@ -450,11 +450,7 @@ def render_metrics_header(
             action = alert.get("action", "")
             is_manual = "Chặn thủ công" in r or "MANUAL" in r.upper()
             is_llm = r.startswith("[MITRE:")
-            is_ml = (
-                not is_manual
-                and not is_llm
-                and any(k in r for k in ("Cổng ML", "ML Tier 2", "Decision Tree", "Cổng ML Tier-1"))
-            )
+            is_ml = not is_manual and not is_llm and any(k in r for k in ML_GATE_MARKERS)
 
             if action == "BLOCK_IP":
                 if is_ml:

@@ -35,6 +35,32 @@ LOCK_PATH = CONFIG_PATH + ".lock"
 # Whitelist mặc định khi reset demo (loopback + scanner nội bộ + gateway).
 DEFAULT_WHITELIST_IPS = ["127.0.0.1", "10.0.0.99", "192.168.1.254"]
 
+# Cache RAM cho system_settings.yaml (đọc-only), khử theo MTIME. Dashboard gọi các getter
+# (get_active/pending/all_dynamic_rules, get_whitelisted_ips) 8-12 LẦN mỗi lượt auto-refresh
+# 3s -> trước đây parse YAML lặp lại từng lần. Ghi (approve/reject/whitelist) dùng os.replace
+# ĐỔI mtime nên lần đọc kế tự nạp lại; _save_config_atomically còn CHỦ ĐỘNG xoá cache để
+# chắc chắn nhất quán trong cùng tiến trình. Cùng khuôn mẫu executor._whitelisted_ips.
+_CONFIG_CACHE: dict = {"mtime": None, "data": None}
+
+
+def _load_config_cached() -> dict:
+    """Trả về dict config đã parse (cache theo mtime). CHỈ dùng cho ĐƯỜNG ĐỌC của getter —
+    đường GHI vẫn tự đọc lại tươi từ đĩa BÊN TRONG _lock để tránh mọi tương tranh."""
+    try:
+        mtime = os.path.getmtime(CONFIG_PATH)
+    except OSError:
+        return _CONFIG_CACHE["data"] or {}
+    if _CONFIG_CACHE["mtime"] == mtime and _CONFIG_CACHE["data"] is not None:
+        return _CONFIG_CACHE["data"]
+    try:
+        with open(CONFIG_PATH) as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        return _CONFIG_CACHE["data"] or {}
+    _CONFIG_CACHE["mtime"] = mtime
+    _CONFIG_CACHE["data"] = data
+    return data
+
 
 def _ensure_lock_writable():
     """Đảm bảo file .lock GHI được bởi cả host (uid 1000) lẫn container (uid 999).
@@ -76,6 +102,9 @@ def _save_config_atomically(config: dict):
         # hữu mỗi lần ghi nên phải 0666 để tự chữa lành cross-UID.
         os.chmod(temp_path, 0o666)  # noqa: S103  (cross-UID Docker: host↔container cùng ghi)
         os.replace(temp_path, CONFIG_PATH)
+        # Khử cache đọc NGAY sau khi ghi: bảo đảm getter kế tiếp trong CÙNG tiến trình thấy
+        # dữ liệu mới, không phụ thuộc độ phân giải mtime của filesystem.
+        _CONFIG_CACHE["mtime"] = None
     except Exception as e:
         if os.path.exists(temp_path):
             try:
@@ -192,9 +221,7 @@ class FeedbackListener:
     def get_active_dynamic_rules(self) -> list:
         """Đọc danh sách dynamic rules hiện đang ACTIVE từ config."""
         try:
-            with open(CONFIG_PATH) as f:
-                config = yaml.safe_load(f)
-            rules = config.get("tier1", {}).get("dynamic_rules", [])
+            rules = _load_config_cached().get("tier1", {}).get("dynamic_rules", [])
             return [r for r in rules if r.get("status", "ACTIVE") == "ACTIVE"]
         except Exception:
             return []
@@ -202,9 +229,7 @@ class FeedbackListener:
     def get_pending_rules(self) -> list:
         """Lấy danh sách các rule đang chờ phê duyệt."""
         try:
-            with open(CONFIG_PATH) as f:
-                config = yaml.safe_load(f)
-            rules = config.get("tier1", {}).get("dynamic_rules", [])
+            rules = _load_config_cached().get("tier1", {}).get("dynamic_rules", [])
             return [r for r in rules if r.get("status") == "PENDING_APPROVAL"]
         except Exception:
             return []
@@ -357,17 +382,14 @@ class FeedbackListener:
     def get_whitelisted_ips(self) -> list:
         """Lấy danh sách các IP đang được Whitelist."""
         try:
-            with open(CONFIG_PATH) as f:
-                config = yaml.safe_load(f)
-            return config.get("tier1", {}).get("whitelist_ips", [])
+            # list(...) trả BẢN SAO -> caller không thể lỡ tay mutate list nằm trong cache.
+            return list(_load_config_cached().get("tier1", {}).get("whitelist_ips", []) or [])
         except Exception:
             return []
 
     def get_all_dynamic_rules(self) -> list:
         """Đọc toàn bộ danh sách dynamic rules từ config (gồm cả ACTIVE, PENDING_APPROVAL, REJECTED)."""
         try:
-            with open(CONFIG_PATH) as f:
-                config = yaml.safe_load(f)
-            return config.get("tier1", {}).get("dynamic_rules", [])
+            return list(_load_config_cached().get("tier1", {}).get("dynamic_rules", []) or [])
         except Exception:
             return []

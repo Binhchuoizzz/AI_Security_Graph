@@ -115,6 +115,12 @@ class AuditLogger:
             conn = sqlite3.connect(self.db_path)
             try:
                 cursor = conn.cursor()
+                # synchronous=NORMAL: bỏ 1 fsync/commit -> ghi nhanh hơn khi nhiều worker
+                # Tier-2 log song song (serialize qua _db_lock). Mức KẾT NỐI (không ghi file
+                # header) nên AN TOÀN cả khi DB mở read-only (container). KHÔNG bật WAL: WAL
+                # đổi header + bắt reader ghi -shm -> crash cross-UID Docker (container uid 999
+                # không ghi được logs/guardrails_audit.db).
+                cursor.execute("PRAGMA synchronous=NORMAL")
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS audit_log (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,6 +152,7 @@ class AuditLogger:
             conn = sqlite3.connect(self.db_path)
             try:
                 cursor = conn.cursor()
+                cursor.execute("PRAGMA synchronous=NORMAL")  # mức kết nối, không WAL (xem _init_db)
                 cursor.execute(
                     """
                     INSERT INTO audit_log (

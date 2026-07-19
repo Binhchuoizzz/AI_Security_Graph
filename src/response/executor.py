@@ -137,6 +137,9 @@ def _init_db():
     _ensure_db_writable(DB_PATH)
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
+        # KHÔNG bật WAL: WAL đổi header DB + bắt READER ghi -wal/-shm -> crash cross-UID Docker
+        # (Dashboard container uid 999 mở read-only). Giữ rollback-journal mặc định (reader
+        # chờ writer qua timeout=5s, không crash). Tối ưu an toàn còn lại: index bên dưới.
         # Tạo bảng audit_trail
         c.execute("""
             CREATE TABLE IF NOT EXISTS audit_trail (
@@ -167,6 +170,11 @@ def _init_db():
         # QUYẾT ĐỊNH (action/target/reason); raw_log là ngữ cảnh đầu vào đính kèm.
         if "raw_log" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN raw_log TEXT")
+
+        # CHỈ MỤC target: get_audit_trail_for_ip() lọc WHERE target=? (UI gọi nhiều lần mỗi
+        # lượt refresh — mỗi luật chờ duyệt, mỗi lần điều tra IP). Không index -> quét toàn
+        # bảng O(n); có index -> O(log n). Sổ cái audit phình dần nên đây là win rõ rệt.
+        c.execute("CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_trail(target)")
 
         conn.commit()
 
@@ -295,6 +303,15 @@ def block_ip(ip: str, reason: str, raw_log: str = ""):
     _log_to_db("BLOCK_IP", safe_ip, reason, raw_log)
     # TRÍ NHỚ: đưa vào blacklist để Tier-1 chặn thẳng lần sau (Tier-2 không phải xử lại).
     _add_to_blacklist(safe_ip)
+    # KHO KNOWN-BAD BỀN (reputation=100): Tier-1 chặn on-sight VĨNH VIỄN cho tới khi Analyst
+    # gỡ — thay cho việc tạo 1 dynamic-rule YAML mỗi IP (chống phình config + nghẽn). Bọc lỗi:
+    # thất bại ghi bộ nhớ dài hạn KHÔNG được làm hỏng luồng chặn.
+    try:
+        from src.agent.threat_memory import threat_memory
+
+        threat_memory.mark_ip_blocked(safe_ip)
+    except Exception as e:
+        logger.warning(f"[BLOCK] mark_ip_blocked lỗi cho {safe_ip}: {e}")
 
 
 def raise_alert(msg: str, reason: str, raw_log: str = ""):

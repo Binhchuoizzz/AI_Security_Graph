@@ -52,6 +52,17 @@ class ThreatMemoryStore:
         self.db_path = db_path
         self._init_db()
 
+    def _connect(self) -> sqlite3.Connection:
+        """Mở kết nối SQLite với synchronous=NORMAL — bỏ bớt fsync/commit → ghi nhanh hơn khi
+        nạp hàng nghìn sự kiện APT (ingest_dapt_chains) + ghi danh tiếng mỗi phán quyết. Mức
+        KẾT NỐI (không đụng header file) nên AN TOÀN cả khi mở read-only (container). Đánh đổi:
+        dưới rollback-journal, rủi ro rất nhỏ mất/hỏng giao dịch cuối khi MẤT ĐIỆN đột ngột —
+        chấp nhận được vì threat_memory là dữ liệu nghiên cứu TÁI TẠO được, không phải sổ cái
+        HMAC. KHÔNG bật WAL (xung khắc cross-UID Docker)."""
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA synchronous=NORMAL")
+        return conn
+
     def _ensure_db_writable(self):
         """Nới quyền file DB để ghi được bởi cả host (uid 1000) lẫn container (uid 999).
 
@@ -74,9 +85,12 @@ class ThreatMemoryStore:
         """Khởi tạo cấu trúc bảng (schema) nếu chưa tồn tại."""
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
         self._ensure_db_writable()
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             c = conn.cursor()
 
+            # KHÔNG bật WAL: WAL đổi header + bắt READER ghi -shm -> crash cross-UID Docker
+            # (Dashboard container mở read-only). Giữ rollback-journal. Tối ưu an toàn: index
+            # bên dưới + synchronous=NORMAL (mức kết nối, trong _connect()).
             # Bảng 1: IP Reputation — theo dõi hành vi IP dài hạn
             c.execute("""
                 CREATE TABLE IF NOT EXISTS ip_reputation (
@@ -151,6 +165,13 @@ class ThreatMemoryStore:
                     (now_str, now_str, now_str),
                 )
 
+            # CHỈ MỤC threat_events: check_apt_chain(src_ip) chạy 2 LẦN mỗi sự kiện APT ngay
+            # trong VÒNG ĐỌC HOT của subscriber (before/after) và get_threat_events_for_ip
+            # lọc src_ip OR dst_ip. Không index -> mỗi lần quét toàn bảng O(n); trên cả luồng
+            # thành O(n²). Index đưa về O(log n) — win LỚN nhất của DB khi demo chuỗi APT.
+            c.execute("CREATE INDEX IF NOT EXISTS idx_threat_events_src ON threat_events(src_ip)")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_threat_events_dst ON threat_events(dst_ip)")
+
             conn.commit()
         logger.info(f"[THREAT MEMORY] Initialized at {self.db_path}")
 
@@ -174,7 +195,7 @@ class ThreatMemoryStore:
             "LOG": 1.0,
         }.get(action, 0.0)
 
-        with _write_lock, sqlite3.connect(self.db_path) as conn:
+        with _write_lock, self._connect() as conn:
             c = conn.cursor()
 
             # Thêm mới hoặc cập nhật danh tiếng IP (Upsert)
@@ -220,9 +241,41 @@ class ThreatMemoryStore:
 
             conn.commit()
 
+    def mark_ip_blocked(self, ip: str, mitre_technique: str = "") -> None:
+        """Đánh dấu IP là KNOWN-BAD DỨT KHOÁT: đặt reputation_score = 100 (>= ngưỡng block 70
+        của Tier-1) để LẦN SAU Tier-1 CHẶN NGAY on-sight, **VĨNH VIỄN** cho tới khi Analyst gỡ
+        (unblock_ip reset về 0 / whitelist miễn trừ enforcement).
+
+        Đây là kho "nhớ mặt" BỀN + SCALABLE thay cho việc tạo 1 dynamic-rule YAML mỗi IP
+        (nguyên nhân phình config + nghẽn khi đẩy nhiều log). SQLite -> cả host lẫn container
+        Dashboard đọc được; rule_engine đã có sẵn đường kiểm reputation (có cache TTL)."""
+        ip = output_sanitizer.sanitize(ip)
+        mitre_technique = output_sanitizer.sanitize(mitre_technique)
+        if not ip or ip == "unknown":
+            return
+        now = datetime.now(timezone.utc).isoformat()
+        with _write_lock, self._connect() as conn:
+            c = conn.cursor()
+            c.execute("SELECT ip FROM ip_reputation WHERE ip = ?", (ip,))
+            if c.fetchone():
+                c.execute(
+                    "UPDATE ip_reputation SET reputation_score = 100.0, "
+                    "total_blocks = total_blocks + 1, total_incidents = total_incidents + 1, "
+                    "last_seen = ?, last_mitre_technique = ? WHERE ip = ?",
+                    (now, mitre_technique, ip),
+                )
+            else:
+                c.execute(
+                    "INSERT INTO ip_reputation (ip, total_incidents, total_blocks, total_alerts, "
+                    "first_seen, last_seen, reputation_score, last_mitre_technique) "
+                    "VALUES (?, 1, 1, 0, ?, ?, 100.0, ?)",
+                    (ip, now, now, mitre_technique),
+                )
+            conn.commit()
+
     def get_ip_reputation(self, ip: str) -> dict | None:
         """Lấy thông tin reputation của IP."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
             c.execute("SELECT * FROM ip_reputation WHERE ip = ?", (ip,))
@@ -234,7 +287,7 @@ class ThreatMemoryStore:
     def get_high_risk_ips(self, min_score: float = 50.0, limit: int = 20) -> list[dict]:
         """Lấy danh sách IPs có reputation score cao (nguy hiểm)."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 conn.row_factory = sqlite3.Row
                 c = conn.cursor()
                 c.execute(
@@ -257,7 +310,7 @@ class ThreatMemoryStore:
         Chạy định kỳ (ví dụ: mỗi ngày) để tránh dữ liệu cũ (stale data).
         """
         cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             c = conn.cursor()
             c.execute(
                 """
@@ -275,7 +328,7 @@ class ThreatMemoryStore:
     def reset_ip_reputation(self, ip: str) -> None:
         """Reset reputation score của IP về 0 (ví dụ khi admin gỡ chặn / whitelist)."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 c = conn.cursor()
                 c.execute("UPDATE ip_reputation SET reputation_score = 0.0 WHERE ip = ?", (ip,))
                 conn.commit()
@@ -302,7 +355,7 @@ class ThreatMemoryStore:
         added_by = output_sanitizer.sanitize(added_by)
         now = datetime.now(timezone.utc).isoformat()
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 c = conn.cursor()
                 c.execute(
                     """
@@ -319,7 +372,7 @@ class ThreatMemoryStore:
 
     def remove_known_entity(self, entity_value: str):
         """Vô hiệu hóa entity (soft delete)."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             c = conn.cursor()
             c.execute(
                 "UPDATE known_entities SET is_active = 0 WHERE entity_value = ?", (entity_value,)
@@ -331,7 +384,7 @@ class ThreatMemoryStore:
         Kiểm tra xem IP/tool có phải entity hợp pháp nội bộ không.
         Trả về dict nếu match, None nếu không.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
             c.execute(
@@ -349,7 +402,7 @@ class ThreatMemoryStore:
     def get_all_known_entities(self) -> list[dict]:
         """Lấy toàn bộ known entities đang active."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 conn.row_factory = sqlite3.Row
                 c = conn.cursor()
                 c.execute("SELECT * FROM known_entities WHERE is_active = 1 ORDER BY added_at DESC")
@@ -379,7 +432,7 @@ class ThreatMemoryStore:
         label = output_sanitizer.sanitize(label)
         timestamp = output_sanitizer.sanitize(timestamp)
         now = datetime.now(timezone.utc).isoformat()
-        with _write_lock, sqlite3.connect(self.db_path) as conn:
+        with _write_lock, self._connect() as conn:
             c = conn.cursor()
             c.execute(
                 """
@@ -398,7 +451,7 @@ class ThreatMemoryStore:
 
         Một IP được đánh dấu là APT nếu xuất hiện trong các sự kiện thuộc ít nhất 2 ngày khác nhau.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             cursor = conn.execute(
                 """SELECT COUNT(DISTINCT apt_day), MAX(apt_day), GROUP_CONCAT(DISTINCT apt_phase)
                    FROM threat_events
@@ -495,7 +548,7 @@ class ThreatMemoryStore:
         related_ips = output_sanitizer.sanitize(related_ips)
         mitre_chain = output_sanitizer.sanitize(mitre_chain)
         now = datetime.now(timezone.utc).isoformat()
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             c = conn.cursor()
             # Kiểm tra xem đã tồn tại chưa
             c.execute(
@@ -606,7 +659,7 @@ class ThreatMemoryStore:
             "apt_indicators": 0,
         }
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 c = conn.cursor()
                 c.execute("SELECT COUNT(*) FROM ip_reputation")
                 total_ips = c.fetchone()[0]
@@ -629,7 +682,7 @@ class ThreatMemoryStore:
     def get_all_threat_events(self, limit: int = 50) -> list[dict]:
         """Lấy toàn bộ threat events cho UI."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connect() as conn:
                 conn.row_factory = sqlite3.Row
                 c = conn.cursor()
                 c.execute(
@@ -643,7 +696,7 @@ class ThreatMemoryStore:
 
     def get_threat_events_for_ip(self, ip: str, limit: int = 50) -> list[dict]:
         """Lấy threat events liên quan đến IP cụ thể (IP nguồn hoặc IP đích)."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connect() as conn:
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
             c.execute(

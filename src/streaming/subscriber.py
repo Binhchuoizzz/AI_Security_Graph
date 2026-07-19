@@ -17,6 +17,7 @@ chuỗi APT lên Agent. Traffic thường không có metadata APT nên đường
 import json
 import os
 import queue
+import re
 import sys
 import threading
 import time
@@ -69,6 +70,8 @@ _DATASET_LABEL_KEYS = frozenset(
         "apt_label",
         "apt_timestamp",
         "apt_is_attack",
+        "apt_mitre_ttp",  # TTP THẬT của DAPT2020 = nhãn -> LOẠI khỏi prompt LLM (chống lộ đáp
+        # án ở luồng chung/benchmark). Tín hiệu demo có chủ đích đi qua `message` (demo_signals).
         "zd_id",
         "zd_name",
         "zd_mitre",
@@ -79,6 +82,14 @@ _DATASET_LABEL_KEYS = frozenset(
 def _strip_dataset_labels(log: dict) -> dict:
     """Bản sao log KHÔNG còn nhãn dataset — an toàn để đưa vào prompt LLM."""
     return {k: v for k, v in log.items() if k not in _DATASET_LABEL_KEYS}
+
+
+def _redact_redis_url(url: str) -> str:
+    """Ẩn mật khẩu trong REDIS_URL trước khi in/log (redis://:pass@host -> redis://:***@host).
+
+    Mật khẩu Redis CHỈ được sống trong .env — không bao giờ để rò ra stdout/journald.
+    """
+    return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
 
 
 def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bool) -> str:
@@ -111,7 +122,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
         thì). >=2 => chạy nhiều lô SONG SONG, tận dụng các slot llama.cpp (-np). =0 => gọi
         đồng bộ trong vòng đọc (hành vi CŨ, giữ để tương thích/kiểm thử).
     """
-    print(f"[*] Connecting Subscriber to Redis: {REDIS_URL}")
+    print(f"[*] Connecting Subscriber to Redis: {_redact_redis_url(REDIS_URL)}")
     try:
         r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
         r.ping()
@@ -470,6 +481,12 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                 if src_ip:
                                     print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
                                     r.setex(f"blacklist:{src_ip}", 3600, "1")
+                                    # KHO KNOWN-BAD BỀN: Tier-1 signature-block cũng nhớ VĨNH VIỄN
+                                    # (reputation=100) -> lần sau chặn on-sight, không chỉ 1h TTL.
+                                    try:
+                                        memory.mark_ip_blocked(src_ip)
+                                    except Exception as _e:
+                                        print(f"[!] mark_ip_blocked lỗi {src_ip}: {_e}")
                                     # Lưu block Tier-1 (kèm lý do) cho Dashboard đọc qua file
                                     tier1_recent_blocks.append(
                                         {
