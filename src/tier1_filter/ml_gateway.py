@@ -211,7 +211,7 @@ class MLGateway:
         reasoning = None
         confidence = 0.0
 
-        # Lưu ý: "Cổng ML" là marker để UI bắt được (từ component.py)
+        # Lưu ý: "Cổng ML" là marker để UI bắt được (từ components.py)
         if confidence_attack >= self.conf_threshold_block:
             action = "BLOCK_IP"
             reasoning = f"Phát hiện tấn công bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
