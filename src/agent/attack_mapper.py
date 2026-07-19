@@ -50,6 +50,14 @@ KB_PATH = os.path.join(_BASE_DIR, "knowledge_base", "mitre_attack.json")
 #  không theo confidence — xem ghi chú thiết kế ở đó.)
 LOW_CONFIDENCE_THRESHOLD = 0.5
 
+# Kỹ thuật "QUÁ TỔNG QUÁT": chỉ dựa vào MỘT tín hiệu yếu (một cổng lạ) mà KHÔNG có bằng
+# chứng bổ trợ (payload/message app-layer) thì KHÔNG đủ chắc để tự-hành-động (auto-BLOCK).
+# Điển hình: T1571 (Non-Standard Port / C2). LLM hay "chốt" T1571 cho mọi flow cổng cao dù
+# đó có thể chỉ là dịch vụ hợp lệ trên cổng ephemeral. Khi neo vào các id này mà THIẾU
+# corroboration -> hạ về low_confidence -> lá chắn node_attack_mapper ép AWAIT_HITL NHƯNG
+# vẫn GIỮ technique dự đoán trong reasoning (đúng "vẫn dự đoán + trả HITL"). Mở rộng khi cần.
+OVERLY_GENERIC_TECHNIQUES: frozenset[str] = frozenset({"T1571"})
+
 FRAMEWORK_ATTACK = "MITRE ATT&CK Enterprise"
 FRAMEWORK_ATLAS = "MITRE ATLAS"
 
@@ -301,7 +309,9 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "sql injection",
             "sql-injection",
             "union select",
+            "select * from",
             "or 1=1",
+            "and 1=1",
             "' or '1'='1",
             "sqlmap",
         ),
@@ -313,7 +323,10 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "cross-site scripting",
             "cross site scripting",
             "<script",
+            "<svg",
             "onerror=",
+            "onload=",
+            "onmouseover=",
             "javascript:",
         ),
     ),
@@ -583,6 +596,17 @@ def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
         name = tid
         tactic, tactic_id = ("Unknown", "")
         conf = 0.60
+
+    # LÁ CHẮN "quá tổng quát": nếu neo vào kỹ thuật chỉ-dựa-cổng (T1571...) mà KHÔNG có
+    # bằng chứng bổ trợ app-layer (payload/message) -> hạ về low_confidence để buộc con
+    # người xác minh (cổng lạ này có thực sự là C2 hay chỉ là dịch vụ hợp lệ?). Vẫn giữ
+    # technique dự đoán -> "dự đoán + AWAIT_HITL".
+    parent_id = tid.split(".")[0]
+    if (tid in OVERLY_GENERIC_TECHNIQUES or parent_id in OVERLY_GENERIC_TECHNIQUES) and not (
+        inp.payload or ""
+    ).strip():
+        conf = min(conf, 0.40)
+
     sub_id = tid if "." in tid else None
     return MitreMapping(
         attack_type=inp.attack_type.strip()[:120] or tid,

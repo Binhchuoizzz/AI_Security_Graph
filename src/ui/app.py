@@ -50,10 +50,16 @@ def cached_get_all_threat_events():
     return threat_memory.get_all_threat_events()
 
 
+@st.cache_data(ttl=5)
+def cached_get_high_risk_ips(min_score=1.0):
+    return threat_memory.get_high_risk_ips(min_score=min_score)
+
+
 # ---------------------------------------------------------------------------
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.ui.auth import logout, require_auth
 from src.ui.components import (
+    ML_GATE_MARKERS,
     is_valid_ip,
     render_alert_card,
     render_apt_events_table,
@@ -217,7 +223,9 @@ def render_demo_overview(
 
     # ---------- Thu thập dữ liệu (an toàn) ----------
     try:
-        apt_events = threat_memory.get_all_threat_events() or []
+        # Qua cache (ttl=5): st.tabs render MỌI tab mỗi lượt refresh 3s nên các query này
+        # nổ bất kể tab đang xem — cache gộp lại 1 lần đọc DB thay vì nhiều lần/refresh.
+        apt_events = cached_get_all_threat_events() or []
     except Exception:
         apt_events = []
     apt_ips = sorted({s for e in apt_events if (s := e.get("src_ip"))})
@@ -225,9 +233,7 @@ def render_demo_overview(
         # ĐỒNG BỘ WHITELIST: bỏ IP đã whitelist khỏi đếm "IP rủi ro cao" (đã miễn trừ).
         _wl_demo = set(feedback_mgr.get_whitelisted_ips() or [])
         high_risk = [
-            r
-            for r in (threat_memory.get_high_risk_ips(min_score=1.0) or [])
-            if r["ip"] not in _wl_demo
+            r for r in (cached_get_high_risk_ips(min_score=1.0) or []) if r["ip"] not in _wl_demo
         ]
     except Exception:
         high_risk = []
@@ -300,20 +306,20 @@ def render_demo_overview(
         e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
         e2.metric("Suy luận Tier-2 (LLM)", "≈5.7 s", "62.7% escalate")
         e3, e4 = st.columns(2)
-        # Cổng ML giảm tải LLM: trên phần Tier-1 ESCALATE, Cổng ML tự quyết 74.1% (Config G,
-        # ablation_mlgate) -> chỉ ~26% ca thực sự cần LLM. Số THẬT, sinh không cần LLM.
-        e3.metric("Cổng ML giảm tải LLM", "74.1%", "F1(bypass) 0.984")
+        # Cổng ML giảm tải LLM: trên ground_truth 1250 (15 lớp CICIDS THẬT), Config G tự quyết
+        # 85.1% (ablation_mlgate, model 1M) -> ~15% ca cần LLM; F1(bypass) 0.991. Số THẬT, không LLM.
+        e3.metric("Cổng ML giảm tải LLM", "85.1%", "F1(bypass) 0.991")
         e4.metric("APT recall", "1.00", "DAPT2020 · 3/3")
         e5, e6 = st.columns(2)
-        # F1 = 0.967 là số THẬT của LightGBM trên tập test 20k giữ-lại (ml_lab/training_report.md,
-        # Test F1 0.9666). KHÔNG dùng "1.000" — không mô hình nào phân loại hoàn hảo; 1.000 là
-        # điểm trên một tập con tầm thường, không phải F1 tổng quát hoá (vi phạm trung thực).
-        e5.metric("Cổng ML (Tier-1) F1-score", "0.967", "LightGBM · test 20k")
-        e6.metric("Kháng né-tránh Cổng ML", "100%", "Inf/cực-đoan · evasion")
+        # F1 = 0.936 là số THẬT của Cổng ML trên BENCHMARK gộp 15-lớp cân bằng (datatest 2514:
+        # đủ 14 loại tấn công + benign + DAPT + zero-day + adversarial). Thấp hơn 0.980 cũ vì
+        # benchmark MỚI khó hơn (đa dạng đều tay, gồm Infiltration/Bot). Model test-190k vẫn 0.9635.
+        e5.metric("Cổng ML (Tier-1) F1-score", "0.936", "benchmark gộp 2.5k")
+        e6.metric("Kháng né-tránh Cổng ML", "99.93%", "Inf/cực-đoan · evasion")
         st.caption(
-            "Nguồn: unified_stream (APT 3/3, zero-day 12/15) · training_report (ML F1 0.9666) · "
-            "ml_gate (bypass 74.1%, F1 0.984, evasion-resistance 100%) · adversarial_pipeline "
-            "(4/4 RESISTED) · latency_benchmark (−82.97%). Audit HMAC: 100%."
+            "Nguồn: unified_stream (APT 3/3, zero-day 12/15) · training_report (ML test-190k F1 0.9635, "
+            "1M mẫu) · ml_gate (benchmark 2.5k: F1 0.936 · P 0.975 · R 0.900 · evasion-resistance 99.93%) · "
+            "ablation_mlgate (giảm tải 85.1%, F1(bypass) 0.991) · latency_benchmark (Tier-1 ~0.38ms). Audit HMAC: 100%."
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")
@@ -426,10 +432,7 @@ def render_demo_overview(
                         "Hành động": a.get("action", ""),
                         "IP / Host": a.get("target", ""),
                         "Quyết định bởi": "Cổng ML ⚡"
-                        if any(
-                            k in str(a.get("reason", ""))
-                            for k in ("Cổng ML", "ML Tier 2", "Decision Tree")
-                        )
+                        if any(k in str(a.get("reason", "")) for k in ML_GATE_MARKERS)
                         else "LLM 🧠",
                         "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
                         "Lý do": (str(a.get("reason", "")) or "—")[:110],
@@ -786,12 +789,7 @@ def main_dashboard():
 
                         def assign_tier(r):
                             r_str = str(r)
-                            if (
-                                "Cổng ML" in r_str
-                                or "ML Tier 2" in r_str
-                                or "Decision Tree" in r_str
-                                or "Cổng ML Tier-1" in r_str
-                            ):
+                            if any(k in r_str for k in ML_GATE_MARKERS):
                                 return "Cổng ML"
                             elif (
                                 "Tier 1" in r_str
@@ -880,14 +878,10 @@ def main_dashboard():
             alerts_t2_llm = []
             for alert in filtered_alerts:
                 r = alert.get("reason", "")
-                # Detect theo MARKER: "Cổng ML" (mới) / "ML Tier 2" (bản ghi cũ trong DB)
-                # / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM giờ cũng ghi Tier-2.
-                if (
-                    "Cổng ML" in r
-                    or "ML Tier 2" in r
-                    or "Decision Tree" in r
-                    or "Cổng ML Tier-1" in r
-                ):
+                # Detect theo MARKER dùng chung ML_GATE_MARKERS: "Cổng ML" (mới) / "ML Tier 2"
+                # (bản ghi CŨ trong DB) / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM
+                # giờ cũng ghi Tier-2.
+                if any(k in r for k in ML_GATE_MARKERS):
                     alerts_t2_ml.append(alert)
                 elif "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
                     alerts_t1.append(alert)
@@ -961,7 +955,9 @@ def main_dashboard():
                             st.rerun()
 
             with t1_tab:
-                tier1_blocks_data = _get_tier1_blocks(show=1000)
+                # Qua cache (ttl=2): trước đây gọi thẳng _get_tier1_blocks(1000) -> đọc + khử
+                # trùng TOÀN BỘ file tier1_blocks.json mỗi lượt refresh (nặng nhất trong UI).
+                tier1_blocks_data = cached_get_tier1_blocks(show=1000)
 
                 # Áp dụng bộ lọc
                 if action_filter not in ["Tất cả", "BLOCK_IP"]:
@@ -1188,6 +1184,10 @@ def main_dashboard():
                                         f"[Tier-1 Filter] Luật được DUYỆT (HITL) bởi "
                                         f"{st.session_state.get('username')}: {rule.get('reason')}",
                                     )
+                                    if _act == "BLOCK_IP":
+                                        # Đưa vào kho known-bad (reputation=100) -> Tier-1 chặn
+                                        # on-sight NGAY + hiện ở Threat Intel, đồng bộ với auto-block.
+                                        threat_memory.mark_ip_blocked(str(rule.get("pattern")))
                                     if _was_wl:
                                         st.warning(
                                             f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist vì "
@@ -1313,7 +1313,7 @@ def main_dashboard():
         # Whitelist trong Audit Trail.
         _wl_set = set(feedback_mgr.get_whitelisted_ips() or [])
         high_risk_ips = [
-            r for r in threat_memory.get_high_risk_ips(min_score=1.0) if r["ip"] not in _wl_set
+            r for r in cached_get_high_risk_ips(min_score=1.0) if r["ip"] not in _wl_set
         ]
         high_risk_data = [[r["ip"], r["reputation_score"]] for r in high_risk_ips]
 
@@ -1323,7 +1323,7 @@ def main_dashboard():
         st.markdown("---")
 
         # Lấy và hiển thị chuỗi sự kiện APT (DAPT2020), đồng thời nhận IP được click chọn (nếu có)
-        apt_events = threat_memory.get_all_threat_events()
+        apt_events = cached_get_all_threat_events()
         selected_apt_ip = render_apt_events_table(apt_events)
 
         # Quản lý đồng bộ IP được chọn qua click bảng và hộp điều tra selectbox
@@ -1853,6 +1853,9 @@ def main_dashboard():
                             st.warning(
                                 f"⚠️ {manual_block_ip} đã được GỠ khỏi Whitelist vì chuyển sang CHẶN."
                             )
+                        # ĐỒNG BỘ MỌI TAB: xoá cache để blocklist/threat-intel/audit/overview
+                        # cùng thấy IP vừa chặn ngay (không lệch giữa các tab).
+                        st.cache_data.clear()
                         st.success(f"Đã kích hoạt chặn IP {manual_block_ip} thành công!")
                         st.rerun()
 
@@ -1885,6 +1888,8 @@ def main_dashboard():
                                 manual_wl_ip,
                                 f"[Tier-1 Filter] Admin {st.session_state.get('username')} thêm IP vào Whitelist thủ công",
                             )
+                            # ĐỒNG BỘ MỌI TAB: xoá cache để whitelist/threat-intel/audit cùng cập nhật ngay.
+                            st.cache_data.clear()
                             st.success(f"Đã thêm IP {manual_wl_ip} vào Whitelist thành công!")
                             st.rerun()
                         else:

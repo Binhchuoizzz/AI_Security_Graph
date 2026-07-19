@@ -65,6 +65,64 @@ class ExactMatchResponseCache:
             self.cache[key] = {"ts": time.time(), "result": llm_decision}
             logger.debug(f"[ResponseCache] SET - Lưu kết quả cho dấu vân {key[:8]}")
 
+    # ── LỚP 2: Cache theo ĐẶC TRƯNG (feature fingerprint) ────────────────────────
+    # Exact-match ở trên chỉ HIT khi chuỗi log GIỐNG HỆT. Nhưng luồng gộp có RẤT NHIỀU
+    # log gần-trùng về BẢN CHẤT (vd ~400 DAPT nền benign: cùng cổng 443, không payload,
+    # khác mỗi IP/timestamp) — exact-match bỏ lỡ hết -> mỗi cái tốn 1 lần gọi LLM (5.7s),
+    # phình backlog. Lớp này băm theo ĐẶC TRƯNG NỔI BẬT (service/cổng/protocol/tier1/dấu
+    # vân payload) — KHÔNG gồm IP/timestamp — nên flow cùng bản chất GỘP về 1 lần gọi LLM.
+    # An toàn IP: mục tiêu THỰC THI (block) LUÔN lấy từ Source IP của batch hiện tại trong
+    # node_llm_triage, KHÔNG từ verdict cache -> gộp không gây chặn nhầm IP.
+    _WELL_KNOWN_PORTS = frozenset({21, 22, 23, 25, 53, 80, 110, 139, 143, 443, 445, 3389, 8080})
+
+    def _port_token(self, val) -> str:
+        """Cổng well-known -> giữ nguyên số (định danh dịch vụ); cổng ephemeral cao -> gộp
+        về 'hi' (mọi cổng lạ đều 'phi chuẩn' như nhau); còn lại -> '0'."""
+        try:
+            p = int(float(val or 0))
+        except (TypeError, ValueError):
+            p = 0
+        if p in self._WELL_KNOWN_PORTS:
+            return str(p)
+        return "hi" if p >= 1024 else "0"
+
+    def feature_fingerprint(self, log: dict) -> str:
+        """Chuỗi đặc trưng chuẩn hoá cho một log escalate (nền của khoá cache lớp-2)."""
+        reasons = log.get("tier1_reasons") or []
+        if isinstance(reasons, list):
+            reasons = "|".join(sorted(str(r) for r in reasons))
+        else:
+            reasons = str(reasons)
+        app = (
+            (str(log.get("message", "")) + str(log.get("payload", "")) + str(log.get("uri", "")))
+            .strip()
+            .lower()
+        )
+        app_fp = (
+            hashlib.md5(app.encode("utf-8"), usedforsecurity=False).hexdigest()[:12] if app else ""
+        )
+        parts = [
+            str(log.get("service") or log.get("Service") or ""),
+            self._port_token(log.get("Destination Port") or log.get("dst_port")),
+            str(log.get("Protocol") or log.get("protocol") or ""),
+            str(log.get("tier1_action") or ""),
+            reasons,
+            app_fp,
+        ]
+        return "ftr:" + "§".join(parts)
+
+    def get_by_features(self, log: dict) -> dict | None:
+        """Tra cache theo đặc trưng (dùng lại LRU/TTL của get())."""
+        if not log:
+            return None
+        return self.get(self.feature_fingerprint(log))
+
+    def set_by_features(self, log: dict, llm_decision: dict):
+        """Lưu verdict theo đặc trưng (dùng lại eviction/TTL của set())."""
+        if not log or not llm_decision:
+            return
+        self.set(self.feature_fingerprint(log), llm_decision)
+
 
 # Singleton instance
 response_cache = ExactMatchResponseCache()

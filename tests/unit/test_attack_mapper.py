@@ -198,3 +198,68 @@ def test_no_anchor_when_no_technique_id_falls_to_rrf(monkeypatch):
         AttackMapperInput(attack_type="weird scan no id", confidence=0.8), retriever=fake, llm=None
     )
     assert mapping.mitre_technique_id == "T1046"  # đến từ RRF, không phải anchor
+
+
+# ── REGRESSION: lá chắn "quá tổng quát" T1571 + chữ ký payload THẬT của dự án ──────
+def test_generic_t1571_port_only_is_downgraded_to_hitl():
+    """T1571 (Non-Standard Port) chỉ dựa cổng lạ, KHÔNG payload -> low_confidence để
+    node_attack_mapper ép AWAIT_HITL (dự đoán + chờ người). Chống đơn-văn-hoá T1571."""
+    from src.agent.attack_mapper import _from_triage_anchor
+
+    m = _from_triage_anchor(
+        AttackMapperInput(attack_type="T1571 - Non-Standard Port", confidence=0.75, payload="")
+    )
+    assert m is not None
+    assert m.mitre_technique_id == "T1571"  # VẪN giữ dự đoán
+    assert m.mapping_status == "low_confidence"  # nhưng buộc người xác minh
+    assert m.mapping_confidence <= 0.4
+
+
+def test_generic_t1571_with_payload_stays_resolved():
+    """T1571 CÓ bằng chứng app-layer (payload) -> giữ resolved (chặn bình thường)."""
+    from src.agent.attack_mapper import _from_triage_anchor
+
+    m = _from_triage_anchor(
+        AttackMapperInput(
+            attack_type="T1571 - Non-Standard Port",
+            confidence=0.8,
+            payload="beacon GET /c2 HTTP/1.1 evil-host",
+        )
+    )
+    assert m.mitre_technique_id == "T1571"
+    assert m.mapping_status == "resolved"
+
+
+def test_non_generic_technique_port_only_unaffected():
+    """Kỹ thuật KHÁC (không thuộc denylist) không bị hạ dù thiếu payload."""
+    from src.agent.attack_mapper import _from_triage_anchor
+
+    m = _from_triage_anchor(
+        AttackMapperInput(attack_type="T1190 - Exploit Public-Facing", confidence=0.8, payload="")
+    )
+    assert m.mitre_technique_id == "T1190"
+    assert m.mapping_status == "resolved"
+
+
+def test_real_project_payload_signatures_map_correctly():
+    """Chữ ký payload THẬT trong dự án (ADV_SPECS) được đường XÁC ĐỊNH nhận đúng."""
+    assert (
+        map_attack(
+            AttackMapperInput(payload="SELECT * FROM users WHERE username = %s AND 1=1")
+        ).mitre_technique_id
+        == "T1190"
+    )  # SQLi tautology 'and 1=1'
+    assert (
+        map_attack(AttackMapperInput(payload="<svg/onload=alert(1)>")).mitre_technique_id
+        == "T1059.007"
+    )  # XSS event-handler
+    assert (
+        map_attack(AttackMapperInput(payload="../../../../../../../etc/shadow")).mitre_technique_id
+        == "T1083"
+    )  # path traversal
+
+
+def test_benign_text_does_not_false_map():
+    """Văn bản lành (kể cả chứa 'select') KHÔNG bị gán nhầm kỹ thuật web."""
+    assert normalize_attack_type("daily report select summary") == ""
+    assert normalize_attack_type("user logged in normally") == ""

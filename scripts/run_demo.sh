@@ -5,14 +5,16 @@
 # Dựng hạ tầng + UI rồi đẩy LUỒNG GỘP (CICIDS + DAPT2020 + Zero-day + Adversarial)
 # chảy qua pipeline đầy đủ → Dashboard điền dần.
 #
-# ⚠️ Script này KHÔNG tự reset. Hãy TỰ chạy reset_all TRƯỚC (dọn DB + luật động trong
-#    system_settings.yaml + bật đúng 1 subscriber), rồi mới chạy script này:
-#        python scripts/reset_all.py   &&   ./scripts/run_demo.sh
-#    (Nếu subscriber chưa chạy, script sẽ dừng và nhắc bạn chạy reset_all.)
+# ⚠️ Mặc định script KHÔNG tự reset (giữ trạng thái hiện tại để tái lập). Muốn demo SẠCH
+#    (dọn danh tiếng + chuỗi APT + luật động cũ), dùng cờ --fresh (tự chạy reset_all).
+#    Hoặc tự chạy trước: python scripts/reset_all.py && ./scripts/run_demo.sh
+#    (Nếu subscriber chưa chạy và không có --fresh, script dừng và nhắc bạn chạy reset_all.)
 #
 #   ./scripts/run_demo.sh              # đẩy luồng (yêu cầu subscriber đã chạy sẵn)
+#   ./scripts/run_demo.sh --fresh      # RESET sạch (reputation+APT+luật) rồi đẩy — demo trong sạch
 #   ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng + UI, KHÔNG đẩy
 #   ./scripts/run_demo.sh --small      # đẩy tập nhỏ (demo nhanh, ít chờ LLM)
+#   ./scripts/run_demo.sh --fresh --small   # kết hợp được: reset sạch + đẩy tập nhỏ
 #   SENTINEL_LITE=0 ./scripts/run_demo.sh   # baseline nặng: Gemma 2 9B, ctx 16384, 2 parallel
 #
 # Mặc định script chạy ở chế độ LOW-VRAM cho máy RAM 32GB / GPU VRAM thấp:
@@ -36,10 +38,14 @@ SUB_LOG="logs/subscriber.log"
 mkdir -p logs
 
 PUSH="full"
-case "${1:-}" in
-  --no-push) PUSH="none" ;;
-  --small)   PUSH="small" ;;
-esac
+FRESH="0"
+for arg in "$@"; do
+  case "$arg" in
+    --no-push) PUSH="none" ;;
+    --small)   PUSH="small" ;;
+    --fresh)   FRESH="1" ;;   # tự chạy reset_all trước (demo SẠCH: dọn reputation+APT+luật)
+  esac
+done
 
 # Profile phần cứng mặc định cho máy hiện tại: nhẹ hơn để tránh OOM VRAM/RAM.
 if [ "${SENTINEL_LITE:-1}" = "1" ]; then
@@ -72,11 +78,17 @@ for i in $(seq 1 60); do
   sleep 3
 done
 
-echo "▶ [3/5] Kiểm tra subscriber (script này KHÔNG tự reset — bạn tự chạy reset_all khi cần)…"
+if [ "$FRESH" = "1" ]; then
+  echo "▶ [3/5] --fresh: reset_all (dọn reputation + APT + luật động + blacklist + stream, bật lại đúng 1 subscriber)…"
+  "$PY" scripts/reset_all.py
+  echo "   ✓ đã reset về trạng thái SẠCH — APT/danh tiếng sẽ dựng LẠI từ đầu trong lần đẩy này."
+else
+  echo "▶ [3/5] Kiểm tra subscriber (KHÔNG tự reset — dùng --fresh để dọn sạch, hoặc tự chạy reset_all)…"
+fi
 if pgrep -f "main.py --mode server" >/dev/null 2>&1; then
   echo "   ✓ subscriber đang chạy — dùng TRẠNG THÁI HIỆN TẠI (không dọn DB/luật động)."
 else
-  echo "   ✗ CHƯA có subscriber đang chạy. Hãy chạy TRƯỚC:"
+  echo "   ✗ CHƯA có subscriber đang chạy. Hãy chạy TRƯỚC (hoặc dùng --fresh để tự reset+bật):"
   echo "       $PY scripts/reset_all.py"
   echo "     (reset_all: dọn DB + luật động trong system_settings.yaml + bật đúng 1 subscriber)"
   exit 1

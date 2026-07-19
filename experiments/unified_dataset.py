@@ -61,6 +61,34 @@ def _is_threat(action: str) -> bool:
     return action in THREAT_ACTIONS
 
 
+# Số dòng tối đa quét MỖI file CICIDS raw khi lấy mẫu đa-ngày (giữ RAM bị chặn; đủ để
+# bắt các cụm tấn công + benign của ngày đó). Xử lý từng ngày một -> đỉnh RAM ~1 ngày.
+RAW_DAY_SCAN_ROWS = 250_000
+
+# Cổng well-known -> tên dịch vụ THẬT (tín hiệu luồng trung thực, thay cho gán cứng "HTTP").
+_PORT_SERVICE = {
+    21: "FTP",
+    22: "SSH",
+    23: "TELNET",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    143: "IMAP",
+    443: "HTTPS",
+    445: "SMB",
+    3389: "RDP",
+    8080: "HTTP",
+}
+
+
+def _infer_service_from_port(port) -> str:
+    """Suy dịch vụ TỪ CỔNG THẬT (honest flow signal). Cổng lạ -> PORT_<n> (để Tier-2 thấy
+    đúng là cổng phi chuẩn, không nguỵ trang thành HTTP)."""
+    p = _safe_int(port)
+    return _PORT_SERVICE.get(p, f"PORT_{p}")
+
+
 def map_cicids(nl: dict) -> dict:
     """network_layer (ground_truth) -> schema CICIDS mà RuleEngine mong đợi."""
     # Trả về toàn bộ các key trong nl, đảm bảo tính đồng bộ với ML pipeline
@@ -293,7 +321,7 @@ ADV_SPECS = [
 ]
 
 
-def _build_zerodays(samples, tkey):
+def _build_zerodays(samples, tkey, repeat: int = 1):
     """Sinh zero-day REAL-DERIVED từ flow benign THẬT.
 
     Nền mỗi mẫu là một flow benign THẬT trong ground_truth, chọn các flow "static-clean"
@@ -301,6 +329,10 @@ def _build_zerodays(samples, tkey):
     chắn bỏ sót. Chỉ ĐÚNG MỘT feature Welford bị đặt lên cực trị (outlier signature-less);
     mọi feature flow KHÁC giữ NGUYÊN giá trị thật. Chỉ IP (truy vết nội bộ + đích ngoài
     cho narrative) là được đặt lại — IP không ảnh hưởng tới Z-score nên không làm sai lệch.
+
+    repeat: mỗi spec áp lên NHIỀU nền benign THẬT khác nhau (cycle qua pool) + IP nguồn
+    RIÊNG -> nhân số lượng probe cho demo tải lớn. KHÔNG bịa flow: nền 100% thật, chỉ đẩy
+    1 feature outlier tài liệu hoá + đổi IP (replay signature-less từ nhiều nguồn).
     """
     SENSITIVE = {21, 22, 23, 53, 139, 445, 3389}
     pool = []
@@ -317,28 +349,32 @@ def _build_zerodays(samples, tkey):
         pool.append(nl)
 
     out = []
-    for i, (zid, name, feat, val, dst, mitre, day) in enumerate(ZD_SPECS):
-        if pool:
-            base_nl = pool[(i * 37) % len(pool)]  # rải đều nền benign, tất định
-        else:
-            base_nl = {"dst_port": 443, "fwd_packets": 40, "service": "HTTPS"}
-        log = map_cicids(base_nl)  # flow benign THẬT làm nền
-        log[feat] = val  # đẩy ĐÚNG 1 feature lên cực trị
-        log["Source IP"] = f"10.0.0.{220 + i}"  # host nội bộ (truy vết)
-        log["Destination IP"] = dst  # đích ngoài (narrative exfil/C2)
-        log["user_agent"] = f"zero-day-probe/{zid}"
-        out.append(
-            {
-                "id": zid,
-                "name": f"Zero-Day {name}",
-                "mitre": mitre,
-                "source": "zeroday",
-                "base_feature": feat,
-                "day": day,
-                "t": tkey(day),
-                "log": log,
-            }
-        )
+    n = 0
+    for r in range(max(1, repeat)):
+        for i, (zid, name, feat, val, dst, mitre, day) in enumerate(ZD_SPECS):
+            if pool:
+                base_nl = pool[(n * 37 + r * 13) % len(pool)]  # rải đều nền benign, tất định
+            else:
+                base_nl = {"dst_port": 443, "fwd_packets": 40, "service": "HTTPS"}
+            log = map_cicids(base_nl)  # flow benign THẬT làm nền
+            log[feat] = val  # đẩy ĐÚNG 1 feature lên cực trị
+            uid = zid if repeat == 1 else f"{zid}-{r:03d}"
+            log["Source IP"] = f"10.{r % 250}.{(i * 7) % 250}.{(220 + i) % 254}"  # nguồn riêng
+            log["Destination IP"] = dst  # đích ngoài (narrative exfil/C2)
+            log["user_agent"] = f"zero-day-probe/{uid}"
+            out.append(
+                {
+                    "id": uid,
+                    "name": f"Zero-Day {name}",
+                    "mitre": mitre,
+                    "source": "zeroday",
+                    "base_feature": feat,
+                    "day": day,
+                    "t": tkey(day),
+                    "log": log,
+                }
+            )
+            n += 1
     return out
 
 
@@ -375,8 +411,19 @@ def _build_adversarials(tkey):
     return out
 
 
-def build_stream():
+def build_stream(
+    cicids_max_rows: int = 20000,
+    cicids_max_days: tuple[str, ...] = ("Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",),
+    dapt_max_rows: int = 5000,
+    zeroday_repeat: int = 1,
+):
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
+
+    Tham số (MẶC ĐỊNH = hành vi cũ → datatest/eval KHÔNG đổi trừ khi caller override):
+      cicids_max_rows: tổng dòng CICIDS raw nạp (chia đều cho các ngày) — nguồn KHỐI LƯỢNG.
+      cicids_max_days: danh sách file ngày CICIDS THẬT để trích tấn công đa dạng + benign.
+      dapt_max_rows:   số dòng DAPT day1 raw.
+      zeroday_repeat:  nhân số zero-day real-derived (xem `_build_zerodays`).
 
     Tất cả sự kiện đều là DATA THẬT (CICIDS từ ground_truth, DAPT từ chains). Zero-day
     là biến thể REAL-DERIVED: nền là flow benign THẬT trong ground_truth, chỉ đẩy ĐÚNG
@@ -450,6 +497,7 @@ def build_stream():
                     "ip": ip,
                     "dst_ip": e.get("dst_ip", ""),
                     "phase": phase,
+                    "mitre_ttp": e.get("mitre_ttp", ""),  # TTP THẬT của DAPT2020 (đừng vứt đi)
                     "day": day,
                     "label": label,
                     "timestamp": e.get("timestamp", ""),
@@ -466,54 +514,65 @@ def build_stream():
 
     apt_truth = {ip for ip, days in apt_attack_days.items() if len(days) >= 2}
 
-    # --- Zero-day: REAL-DERIVED (nền = flow benign THẬT, đẩy 1 feature Welford lên
-    #     cực trị), RẢI nhiều ngày (2..5), NHIỀU loại outlier — xem `_build_zerodays`.
-    #     Cổng cho phép + fwd thấp + không signature => luật TĨNH bỏ sót; nhưng lệch
-    #     baseline cực mạnh => Welford Z-score bắt. warmup prefix đảm bảo baseline đã ấm.
-    main.extend(_build_zerodays(samples, tkey))
-
-    # --- Inject Adversarial ---
-    main.extend(_build_adversarials(tkey))
-
-    # --- MAX DỮ LIỆU THÔ TỪ RAW (KHÁC TẬP TRAIN) ---
+    # --- MAX DỮ LIỆU THÔ TỪ RAW: ĐA-NGÀY CICIDS (nguồn KHỐI LƯỢNG + đa dạng tấn công) ---
     import os
 
     import pandas as pd
 
-    print("LOADING UNSEEN RAW DATA FOR DEMO...")
+    print(f"LOADING RAW CICIDS ({len(cicids_max_days)} ngày, ~{cicids_max_rows} dòng)...")
 
-    # 1. Load CICIDS2018 unseen data (skip first 80000 rows used in train)
-    cic_path = os.path.join(
-        ROOT, "data", "raw", "cicids2018", "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv"
-    )
-    if os.path.exists(cic_path):
-        df_cic = pd.read_csv(
-            cic_path, skiprows=list(range(1, 80001)), nrows=20000, low_memory=False
-        )
+    cic_dir = os.path.join(ROOT, "data", "raw", "cicids2018")
+    n_days = max(1, len(cicids_max_days))
+    per_day = max(1, cicids_max_rows // n_days)
+    per_atk = max(1, int(per_day * 0.25))  # ~25% tấn công / 75% benign (nhiều benign để drop)
+    per_ben = max(1, per_day - per_atk)
+    _POP = ("Label", "Timestamp", "Flow ID", "Src IP", "Dst IP", "Src Port")
+
+    for d_idx, day_file in enumerate(cicids_max_days):
+        cic_path = os.path.join(cic_dir, day_file)
+        if not os.path.exists(cic_path):
+            continue
+        try:
+            df_cic = pd.read_csv(
+                cic_path, nrows=RAW_DAY_SCAN_ROWS, low_memory=False, on_bad_lines="skip"
+            )
+        except Exception as _e:  # 1 file lỗi KHÔNG được giết cả build
+            print(f"  [!] Bỏ qua {day_file}: {_e}")
+            continue
         df_cic.rename(columns=lambda x: x.strip(), inplace=True)
-        for i, (_, row) in enumerate(df_cic.iterrows()):
+        if "Label" not in df_cic.columns:
+            continue
+        df_cic = df_cic[df_cic["Label"].astype(str).str.strip() != "Label"]  # bỏ header lặp
+        _lab = df_cic["Label"].astype(str).str.strip().str.lower()  # pyright: ignore[reportAttributeAccessIssue]
+        atk_df = df_cic.loc[_lab != "benign"]
+        ben_df = df_cic.loc[_lab == "benign"]
+        if len(atk_df) > per_atk:
+            atk_df = atk_df.sample(per_atk, random_state=42)  # pyright: ignore[reportAttributeAccessIssue]
+        if len(ben_df) > per_ben:
+            ben_df = ben_df.sample(per_ben, random_state=42)  # pyright: ignore[reportAttributeAccessIssue]
+        rows = (
+            pd.concat([atk_df, ben_df])  # pyright: ignore[reportCallIssue,reportArgumentType]
+            if (len(atk_df) or len(ben_df))
+            else df_cic.head(0)
+        )
+        for i, (_, row) in enumerate(rows.iterrows()):
             is_attack = str(row.get("Label", "")).strip().lower() != "benign"
             log = row.to_dict()
-            # Fill NaNs with 0
             for k, v in log.items():
                 if pd.isna(v):
                     log[k] = 0
-            # Overlay specific fields we want to override
+            port = _safe_int(row.get("Dst Port", 0))
             log.update(
                 {
-                    "Source IP": f"192.168.2.{i % 254}",
+                    "Source IP": f"192.168.{10 + (d_idx % 40)}.{i % 254}",
                     "Destination IP": "10.0.0.1",
-                    "Destination Port": 80 if is_attack else _safe_int(row.get("Dst Port", 443)),
-                    "Protocol": 6,
-                    "service": "HTTP",
+                    "Destination Port": port if port else (80 if is_attack else 443),
+                    "Protocol": _safe_int(row.get("Protocol", 6)) or 6,
+                    "service": _infer_service_from_port(port),  # TÍN HIỆU LUỒNG THẬT (từ cổng)
                 }
             )
-            log.pop("Label", None)
-            log.pop("Timestamp", None)
-            log.pop("Flow ID", None)
-            log.pop("Src IP", None)
-            log.pop("Dst IP", None)
-            log.pop("Src Port", None)
+            for _k in _POP:
+                log.pop(_k, None)
             ev = {
                 "source": "cicids_max",
                 "log": log,
@@ -521,33 +580,39 @@ def build_stream():
                 "label": "Attack" if is_attack else "Benign",
                 "t": tkey(1 + i % 5),
             }
-            # Ground_truth mới CÂN BẰNG (chỉ 50 benign) không đủ WARMUP_N=150 —
-            # Welford cần >= warmup_count(100)/key mới bật Z-score. Bù warmup bằng
-            # benign THẬT unseen của cicids_max (không phải sinh thêm dữ liệu).
+            # Bù warmup bằng benign THẬT (Welford cần baseline ấm trước khi bật Z-score).
             if not is_attack and len(warmup) < WARMUP_N:
                 ev.pop("t", None)
                 warmup.append(ev)
             else:
                 main.append(ev)
 
-    # 2. Load DAPT2020 unseen data (skip first 15000 rows used in train)
-    dapt_path = os.path.join(ROOT, "data", "raw", "dapt2020", "day1.csv")
-    if os.path.exists(dapt_path):
-        df_dapt = pd.read_csv(
-            dapt_path, skiprows=list(range(1, 15001)), nrows=5000, low_memory=False
-        )
+    # --- DAPT2020 raw: day2..day5 (CÓ tấn công THẬT: Network/Web scan, Dir/Account
+    #     Bruteforce, SQLi, Command Injection, Data Exfiltration). day1 toàn "Normal" -> BỎ. ---
+    DAPT_DAYS = ("day2.csv", "day3.csv", "day4.csv", "day5.csv")
+    dapt_dir = os.path.join(ROOT, "data", "raw", "dapt2020")
+    dapt_per_day = max(1, dapt_max_rows // len(DAPT_DAYS))
+    for dd_idx, dfile in enumerate(DAPT_DAYS):
+        dpath = os.path.join(dapt_dir, dfile)
+        if not os.path.exists(dpath):
+            continue
+        try:
+            df_dapt = pd.read_csv(dpath, low_memory=False, on_bad_lines="skip")
+        except Exception as _e:
+            print(f"  [!] Bỏ qua DAPT {dfile}: {_e}")
+            continue
         df_dapt.rename(columns=lambda x: x.strip(), inplace=True)
+        if len(df_dapt) > dapt_per_day:
+            df_dapt = df_dapt.sample(dapt_per_day, random_state=42)
         for i, (_, row) in enumerate(df_dapt.iterrows()):
             label = str(row.get("Label", row.get("label", ""))).strip().lower()
             is_attack = label not in ["normal", "benign"]
             log = {
-                "Source IP": f"192.168.3.{i % 254}",
+                "Source IP": f"192.168.{40 + dd_idx}.{i % 254}",
                 "Destination IP": "10.0.0.1",
                 "Destination Port": 80 if is_attack else 443,
                 "Protocol": 6,
-                "Flow Duration": _safe_int(
-                    row.get("Flow Duration", row.get("Flow Bytes/s", 0))
-                ),  # Approximation mapping if needed
+                "Flow Duration": _safe_int(row.get("Flow Duration", row.get("Flow Bytes/s", 0))),
                 "Total Fwd Packets": _safe_int(row.get("Total Fwd Packet")),
                 "Total Backward Packets": _safe_int(row.get("Total Bwd packets")),
                 "Total Length of Fwd Packets": _safe_int(row.get("Total Length of Fwd Packet")),
@@ -568,6 +633,14 @@ def build_stream():
                 "t": tkey(1 + i % 5),
             }
             main.append(ev)
+
+    # --- Zero-day: REAL-DERIVED (nền benign THẬT + 1 feature outlier), nhân theo
+    #     zeroday_repeat (IP riêng) cho tải demo. Cổng cho phép + fwd thấp + không signature
+    #     => luật TĨNH bỏ sót; lệch baseline mạnh => Welford Z-score bắt. Xem `_build_zerodays`.
+    main.extend(_build_zerodays(samples, tkey, repeat=zeroday_repeat))
+
+    # --- Inject Adversarial (4 payload OWASP THẬT) ---
+    main.extend(_build_adversarials(tkey))
 
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)
@@ -597,10 +670,16 @@ def determine_queue(log: dict) -> str:
     return "queue_firewall"
 
 
-def enrich(ev: dict) -> dict:
+def enrich(ev: dict, demo_signals: bool = False) -> dict:
     """Gắn metadata theo nguồn vào log để subscriber/agent/dashboard dùng được.
 
     Toàn bộ đi trong MỘT blob JSON dưới field 'log' (đúng giao ước publisher).
+
+    demo_signals: CHỈ bật cho luồng TRÌNH DIỄN (build_demo.py). Khi bật, DAPT tấn công
+    được đính ngữ cảnh threat-intel THẬT (giai đoạn + MITRE TTP có sẵn trong dataset
+    DAPT2020) vào field `message` để Tier-2 ánh xạ ĐÚNG kỹ thuật ĐA DẠNG (T1046/T1087/
+    T1083/T1190/T1068...) thay vì đoán T1571 từ mỗi số cổng. TẮT cho benchmark
+    (build_datatest.py) -> KHÔNG rò nhãn vào số thực nghiệm (datatest.json giữ nguyên).
     """
     log = dict(ev["log"])
     log["dataset_source"] = "unified_stream"
@@ -613,6 +692,15 @@ def enrich(ev: dict) -> dict:
         log["apt_label"] = ev.get("label", "")
         log["apt_is_attack"] = bool(ev.get("is_attack"))
         log["apt_timestamp"] = ev.get("timestamp", "")
+        log["apt_mitre_ttp"] = ev.get("mitre_ttp", "")  # TTP THẬT (hiển thị tab Threat Intel)
+        # DEMO ONLY: threat-intel THẬT của DAPT2020 làm ngữ cảnh phát hiện. `message` sống
+        # sót qua rule_engine (engine chỉ ghi đè tier1_reasons) và được node_rag_context đọc
+        # vào truy vấn RAG -> LLM ánh xạ đúng TTP. Nội dung 100% từ dataset (không tự chế).
+        if demo_signals and bool(ev.get("is_attack")) and ev.get("mitre_ttp"):
+            log["message"] = (
+                f"[Threat-Intel DAPT2020] Giai đoạn tấn công: {ev.get('phase', '')}; "
+                f"kỹ thuật MITRE ATT&CK ghi nhận: {ev.get('mitre_ttp', '')}."
+            )
     elif ev["source"] == "zeroday":
         log["zd_id"] = ev.get("id")
         log["zd_mitre"] = ev.get("mitre")

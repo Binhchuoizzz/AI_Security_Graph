@@ -302,9 +302,11 @@ def run_af(limit=None, out=None):
                     reasoning_output["decisions"] = decisions
                     if decisions:
                         action = decisions[-1].get("action", "UNKNOWN")
-                        # Đếm bằng field máy-đọc `ml_model` do node_ml_triage gắn — bản cũ
-                        # grep "XGBoost" trong reasoning LUÔN ra 0 vì reasoning thật ghi
-                        # "Decision Tree" (model thật là DecisionTreeClassifier).
+                        # DI SẢN kiến trúc CŨ: field `ml_model` từng do một node ML-triage
+                        # bên trong agent gắn. Sau khi Cổng ML DỜI về Tier-1/subscriber, agent
+                        # (`agent_app`) KHÔNG còn node ML nào -> field này không bao giờ được
+                        # gắn, nên counter này LUÔN = 0 trong Config F. Phép đo giảm-tải Cổng ML
+                        # THẬT nằm ở `--mode mlgate` (Config G). Giữ lại để tương thích shape output.
                         if decisions[-1].get("ml_model"):
                             ml_bypassed_count += 1
                         results["Config_F"]["actions"].append(action)

@@ -18,6 +18,9 @@ docs/Template/proposalmau.txt
 knowledge_base/faiss_index/*.index
 knowledge_base/faiss_index/*_metadata.json
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 *.log
 .gemini/
 *.pid
@@ -64,6 +67,8 @@ docs/proposal_latex/compile_*.log
 
 # Dynamically generated scan results
 data/trivy-results.json
+# demo.json ~100k sự kiện (~100MB) — TÁI TẠO được bằng `python scripts/build_demo.py`, không track.
+data/demo.json
 
 
 

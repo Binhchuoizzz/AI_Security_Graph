@@ -24,7 +24,7 @@
 Sau khi setup (§1) 1 lần, mỗi lần demo:
 
 ```bash
-./scripts/run_demo.sh              # containers → subscriber → UI → đẩy 10.000 sự kiện (4 nguồn)
+./scripts/run_demo.sh --fresh      # containers → reset sạch → subscriber → UI → đẩy ~100.000 sự kiện (4 nguồn)
 ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng   |   --small: đẩy nhanh (demo ngắn)
 # GPU VRAM thấp: `SENTINEL_LITE=1 ./scripts/run_demo.sh` (Llama 3 8B, ctx 8192, 1 parallel, Neo4j tắt)
 ```

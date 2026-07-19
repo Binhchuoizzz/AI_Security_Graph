@@ -38,10 +38,13 @@ docker-compose down
 > bật đúng 1 subscriber (Tier-1 + Tier-2) → Dashboard → **đẩy luồng gộp 4 nguồn** vào UI.
 
 ```bash
-./scripts/run_demo.sh              # FULL: dựng tất cả + đẩy 10.000 sự kiện (data/demo_10k.json) vào Dashboard
+./scripts/run_demo.sh --fresh      # FULL + reset SẠCH: đẩy ~100.000 sự kiện (data/demo.json) vào Dashboard
+# ./scripts/run_demo.sh            # như trên nhưng GIỮ trạng thái hiện tại (không reset)
 # ./scripts/run_demo.sh --no-push  # chỉ dựng hạ tầng (subscriber + UI), tự đẩy sau
 # ./scripts/run_demo.sh --small    # tương tự chạy full, dùng cho test nhanh
 ```
+
+`data/demo.json` (~100k sự kiện, ~167MB) KHÔNG track trong git — tái tạo bằng `python scripts/build_demo.py`.
 
 > Xong → mở **http://localhost:8501** (đăng nhập **`manager`**). Dashboard điền dần theo tốc
 > độ LLM (đúng thiết kế SOC). Muốn chạy TỪNG BƯỚC bằng tay (giải thích rõ) → xem §0–§1 dưới.
@@ -79,7 +82,7 @@ Hệ thống được thiết kế với 2 kịch bản chạy song song để p
 ./scripts/run_demo.sh
 ```
 
-**Lệnh này làm gì:** Tự động dựng toàn bộ hạ tầng (Redis, MLflow, Dashboard, LLM) và phát **10.000 sự kiện thật** (`data/demo_10k.json`) lướt qua toàn bộ pipeline:
+**Lệnh này làm gì:** Tự động dựng toàn bộ hạ tầng (Redis, MLflow, Dashboard, LLM) và phát **~100.000 sự kiện thật** (`data/demo.json`) lướt qua toàn bộ pipeline:
 
 | Nguồn | Số sự kiện | Chứng minh năng lực |
 | :--- | ---: | :--- |

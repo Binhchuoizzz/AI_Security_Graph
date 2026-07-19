@@ -484,7 +484,8 @@ def fetch_and_build(
                 "expected_action": mapping["action"],
                 "expected_severity": mapping["severity"],
                 "labeling_notes": f"Auto-mapped from CSE-CIC-IDS2018 label '{label}'.",
-                # Thêm tầng mạng thô để tương thích với simulate_traffic.py
+                # Tầng mạng thô (input.network_layer) cho luồng gộp online:
+                # experiments/unified_dataset.py::map_cicids đọc field này khi dựng stream.
                 "input": {
                     "network_layer": log.copy(),
                     "application_layer": {

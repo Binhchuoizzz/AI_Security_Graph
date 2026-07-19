@@ -209,13 +209,18 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
 
     decision_json = {}
+    _feature_log = state.current_batch_logs[0] if state.current_batch_logs else {}
     cached_decision = response_cache.get(raw_logs_str)
+    if not cached_decision:
+        # Lớp 2 — gộp theo ĐẶC TRƯNG: các flow cùng bản chất (khác mỗi IP/timestamp, vd
+        # hàng trăm DAPT nền benign) dùng chung 1 verdict -> KHÔNG tốn 1 call LLM mỗi cái.
+        cached_decision = response_cache.get_by_features(_feature_log)
     if cached_decision:
         validated_decision = cached_decision
         decision_json = cached_decision
         raw_response = '{"status": "from_cache"}'
         latency_sec = 0.001
-        logger.info("[NODE LLM] Trả về quyết định từ Response Cache khớp-chính-xác (Bypass LLM)")
+        logger.info("[NODE LLM] Trả về quyết định từ Response Cache (Bypass LLM)")
     else:
         start_time = time.time()
         # Suy biến có kiểm soát (graceful degradation): nếu LLM cục bộ chết/không kết nối
@@ -250,9 +255,11 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
             validated_decision, tier1_flagged_attack
         )
 
-        # Ghi vào Cache nếu hợp lệ
+        # Ghi vào Cache nếu hợp lệ (KHÔNG cache AWAIT_HITL: mỗi ca cần người xem luôn tươi
+        # -> giữ đủ HITL hiển thị). Ghi cả exact-match lẫn feature-cache (gộp flow tương lai).
         if validated_decision.get("action") != "AWAIT_HITL":
             response_cache.set(raw_logs_str, validated_decision)
+            response_cache.set_by_features(_feature_log, validated_decision)
 
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
@@ -560,7 +567,6 @@ def _handle_threat_memory_incident(
 
 
 def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
-    # ... existing code ...
     """
     Trích một CHỮ KÝ HÀNH VI an toàn từ log gây ra BLOCK để Tier-1 có thể bắt
     nhanh một IP KHÁC dùng CÙNG kỹ thuật (không chỉ nhớ đúng IP cũ).
