@@ -112,12 +112,19 @@ fi
 
 echo "▶ [5/5] ĐẨY LUỒNG GỘP → Dashboard (CICIDS + DAPT + Zero-day + Adversarial)…"
 if [ "$PUSH" = "small" ]; then
-  # BUG CŨ: --small chỉ đổi BATCH/DELAY mà KHÔNG đặt UNIFIED_STREAM_LIMIT, nên vẫn đẩy
-  # ĐỦ ~100k sự kiện — trái hẳn mô tả "đẩy tập nhỏ, ít chờ LLM". Hậu quả: buổi demo bị
-  # giới hạn thời gian vẫn phải chờ hàng giờ cho LLM rút hết hàng đợi.
-  # Nay giới hạn THẬT (mặc định 5.000 sự kiện, ghi đè bằng UNIFIED_STREAM_LIMIT).
-  echo "   (--small: giới hạn ${UNIFIED_STREAM_LIMIT:-5000} sự kiện đầu để demo nhanh)"
-  UNIFIED_STREAM_LIMIT="${UNIFIED_STREAM_LIMIT:-5000}" \
+  # --small dùng TẬP CON PHÂN TẦNG data/demo_small.json (KHÔNG phải "5.000 sự kiện đầu").
+  # LÝ DO: luồng đầy đủ sắp theo THỜI GIAN THẬT nên chuỗi APT đa-ngày chỉ hoàn tất quanh
+  # vị trí #46.000–#63.000 -> cắt 5.000 đầu thì panel "Chiến dịch APT" LUÔN TRỐNG (mất một
+  # kết quả headline của luận văn). Tập con giữ TRỌN các IP APT đa-ngày + đủ 16 lớp tấn
+  # công + zero-day + adversarial + nền benign, và giữ NGUYÊN thứ tự gốc. Dữ liệu vẫn là
+  # bản ghi THẬT lấy nguyên văn từ demo.json (chỉ chọn lọc, không sinh mới).
+  SMALL_FILE="data/demo_small.json"
+  if [ ! -f "$SMALL_FILE" ]; then
+    echo "   (--small: chưa có $SMALL_FILE — dựng từ data/demo.json…)"
+    "$PY" scripts/build_demo_small.py
+  fi
+  echo "   (--small: đẩy $SMALL_FILE — đủ 4 nguồn + chuỗi APT, ~5.000 sự kiện)"
+  UNIFIED_STREAM_FILE="$SMALL_FILE" \
   UNIFIED_STREAM_BATCH="${UNIFIED_STREAM_BATCH:-50}" UNIFIED_STREAM_DELAY="${UNIFIED_STREAM_DELAY:-0.1}" \
     "$PY" scripts/demo.py
 else

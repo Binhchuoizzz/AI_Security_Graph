@@ -639,14 +639,20 @@ class GuardrailsPipeline:
         scorer = EntropyScorer()
         high_priority_logs = []
         for log in sanitized_logs:
+            # Phải khớp danh sách ở TemplateMiner.add_log_dict: thiếu "message" thì bằng
+            # chứng tầng ứng dụng (payload WAF của SENTINEL nằm ở trường này) không bao giờ
+            # được tính là log entropy cao -> mất luôn cơ hội giữ nguyên văn.
             key_fields = [
                 "Source IP",
                 "Destination Port",
                 "Protocol",
                 "Total Fwd Packets",
                 "Flow Duration",
+                "service",
                 "payload",
                 "uri",
+                "message",
+                "User-Agent",
             ]
             parts = [f"{f}={log.get(f)}" for f in key_fields if log.get(f) is not None]
             log_str = " ".join(parts) if parts else str(log)

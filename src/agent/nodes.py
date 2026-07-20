@@ -38,6 +38,41 @@ logger = logging.getLogger(__name__)
 # Khởi tạo Retriever (Singleton)
 retriever = DualRetriever(use_cache=True)
 
+# Số ký tự payload thô tối đa đưa vào TRUY VẤN RAG (không ảnh hưởng prompt gửi LLM — LLM
+# vẫn nhận log đầy đủ). Giữ nhỏ để từ vựng payload không lấn át nhãn phát hiện của Tier-1
+# khi truy xuất MITRE (xem chú thích chi tiết ở node_rag_context).
+PAYLOAD_QUERY_CHARS = 120
+
+# Nhãn phát hiện của Tier-1 là TIẾNG VIỆT ("WAF: Phát hiện SQL Injection (SQLi) trong
+# 'message'"), còn kho MITRE/NIST là TIẾNG ANH và embedder all-MiniLM-L6-v2 thiên tiếng
+# Anh -> nhãn gần như KHÔNG đóng góp tín hiệu truy xuất, để payload lấn át (đo thật: SQLi
+# ra T1110.x/T1555 thay vì T1190). Ánh xạ sang cụm từ CHUẨN tiếng Anh đúng từ vựng MITRE
+# để truy vấn neo vào kỹ thuật, không neo vào từ ngữ trong payload.
+_ATTACK_TERMS: tuple[tuple[str, str], ...] = (
+    ("sql injection", "SQL injection exploit public-facing application web vulnerability"),
+    ("sqli", "SQL injection exploit public-facing application web vulnerability"),
+    ("cross-site scripting", "cross-site scripting XSS drive-by compromise web client exploit"),
+    ("xss", "cross-site scripting XSS drive-by compromise web client exploit"),
+    ("path traversal", "path traversal local file inclusion exploit public-facing application"),
+    ("lfi", "path traversal local file inclusion exploit public-facing application"),
+    ("command injection", "command and scripting interpreter command injection exploit"),
+    ("brute", "brute force password guessing valid accounts remote services"),
+    ("quét cổng", "network service discovery port scanning reconnaissance"),
+    ("port scan", "network service discovery port scanning reconnaissance"),
+    ("cổng nhạy cảm", "remote services SSH RDP SMB valid accounts lateral movement"),
+)
+
+
+def _canonical_attack_terms(reasons: list) -> list[str]:
+    """Suy cụm từ MITRE tiếng Anh từ các lý do phát hiện (tiếng Việt) của Tier-1."""
+    joined = " ".join(str(r) for r in reasons).lower()
+    out: list[str] = []
+    for needle, terms in _ATTACK_TERMS:
+        if needle in joined and terms not in out:
+            out.append(terms)
+    return out
+
+
 # Khởi tạo Guardrails / DecisionValidator (Singleton)
 guardrails_pipeline = GuardrailsPipeline()
 decision_validator = DecisionValidator()
@@ -96,10 +131,18 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
     if state.current_batch_logs:
         first_log = state.current_batch_logs[0]
         parts = []
-        # 1. Web/app attacks: nội dung payload/message (nếu có)
-        msg = (str(first_log.get("message", "")) + " " + str(first_log.get("payload", ""))).strip()
-        if msg:
-            parts.append(msg)
+        # 1. TÍN HIỆU PHÂN LOẠI của Tier-1 đứng ĐẦU (vd "WAF: Phát hiện SQL Injection").
+        #    BUG ĐÃ SỬA: trước đây payload THÔ đứng đầu và chiếm hết ngân sách 300 ký tự.
+        #    Payload tấn công chứa những từ như 'password'/'cookie'/'admin' kéo truy xuất
+        #    ngữ nghĩa sang nhóm ĐÁNH CẮP THÔNG TIN ĐĂNG NHẬP: đo thật với một payload SQLi
+        #    (`SELECT password FROM users`) RAG trả về T1539/T1110.004/T1555 và KHÔNG hề có
+        #    T1190 — bỏ chữ 'password' ra thì T1190 lên hạng 1. RAG sai ngữ cảnh -> LLM
+        #    (đúng như prompt dặn) từ chối map kỹ thuật -> AWAIT_HITL -> LLM KHÔNG BAO GIỜ
+        #    chặn được. Đặt nhãn phát hiện lên trước để truy vấn neo vào NGỮ NGHĨA tấn công.
+        _reasons = (first_log.get("tier1_reasons") or [])[:3]
+        parts.extend(_canonical_attack_terms(_reasons))  # cụm chuẩn tiếng Anh TRƯỚC
+        for reason in _reasons:
+            parts.append(str(reason))
         # 2. Flow-based attacks (CICIDS): không có payload -> dựng query từ
         #    metadata flow THẬT (service/port/protocol) để RAG map đúng MITRE.
         svc = first_log.get("service") or first_log.get("Service")
@@ -111,10 +154,11 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
         uri = first_log.get("uri") or first_log.get("URI")
         if uri:
             parts.append(f"uri {uri}")
-        # 3. Bối cảnh phát hiện của Tier-1 (lý do escalate: brute force, port scan,
-        #    volumetric, WAF/injection...) — tín hiệu mạnh để truy xuất kỹ thuật phù hợp.
-        for reason in (first_log.get("tier1_reasons") or [])[:3]:
-            parts.append(str(reason))
+        # 3. Payload/message THÔ đứng CUỐI và bị CẮT NGẮN: vẫn giữ tín hiệu từ vựng của
+        #    cuộc tấn công (UNION SELECT, <script>…) nhưng KHÔNG cho nó lấn át truy vấn.
+        msg = (str(first_log.get("message", "")) + " " + str(first_log.get("payload", ""))).strip()
+        if msg:
+            parts.append(msg[:PAYLOAD_QUERY_CHARS])
         query_text = " ".join(parts).strip()
 
     if not query_text:

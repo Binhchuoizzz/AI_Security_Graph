@@ -122,3 +122,6 @@ data/demo_outputs/
 data/bandit-results.json
 data/test_mutual_exclusive.py
 data/test_status.py
+
+# Luồng demo ngắn (sinh lại bằng scripts/build_demo_small.py)
+data/demo_small.json

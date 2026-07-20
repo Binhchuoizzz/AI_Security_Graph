@@ -14,6 +14,11 @@ from src.guardrails.constants import normalize_log_keys
 
 logger = logging.getLogger(__name__)
 
+# Trần ký tự cho MỖI trường bằng chứng (message/payload/uri…) khi đưa vào Drain. Đủ dài để
+# giữ chuỗi tấn công (UNION SELECT…, <script>…), đủ ngắn để một payload khổng lồ không phá
+# ngân sách ngữ cảnh. TokenBudgetManager vẫn cắt tỉa lần cuối ở tầng trên.
+EVIDENCE_FIELD_CHARS = 300
+
 
 # Lazy config loader to avoid circular dependency
 def load_config():
@@ -109,14 +114,33 @@ class LogTemplateMiner:
         """Thêm log dạng dict, chuẩn hóa keys trước khi trích xuất."""
         normalized = normalize_log_keys(log_entry)
 
+        # BUG ĐÃ SỬA (nghiêm trọng): danh sách này TRƯỚC ĐÂY chỉ có 5 trường mạng, KHÔNG có
+        # message/payload/uri — tức là mọi BẰNG CHỨNG TẦNG ỨNG DỤNG bị vứt bỏ trước khi tới
+        # LLM. Một tấn công SQLi rõ ràng đến Tier-2 chỉ còn "Source IP=… Destination Port=80",
+        # nên LLM KHÔNG THỂ nhận ra (đo thật: cấp payload thì LLM cho 0.93/BLOCK, còn qua
+        # pipeline chỉ 0.45/AWAIT_HITL). Đây là lý do LLM gần như không bao giờ chặn được các
+        # lớp tấn công web (SQLi/XSS/LFI/command injection).
+        # AN TOÀN: payload vẫn được prompt_filter làm sạch và bọc trong <<<DATA_BEGIN…>>> kèm
+        # cảnh báo injection — phòng thủ nằm ở ĐÓNG GÓI, không phải ở việc xoá bằng chứng.
         key_fields = [
             "Source IP",
             "Destination Port",
             "Protocol",
             "Total Fwd Packets",
             "Flow Duration",
+            "service",
+            "uri",
+            "message",
+            "payload",
+            "User-Agent",
         ]
-        parts = [f"{f}={normalized.get(f)}" for f in key_fields if normalized.get(f) is not None]
+        parts = []
+        for f in key_fields:
+            v = normalized.get(f)
+            if v is None or v == "":
+                continue
+            # Cắt trần từng trường nội dung để 1 payload dài không thổi bay ngân sách token.
+            parts.append(f"{f}={str(v)[:EVIDENCE_FIELD_CHARS]}")
         log_str = " ".join(parts) if parts else str(normalized)
 
         timestamp = normalized.get("Timestamp", normalized.get("Flow Duration"))

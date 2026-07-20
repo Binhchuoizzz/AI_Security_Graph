@@ -15,7 +15,9 @@ sys.path.append(ROOT)
 # determine_queue dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
 from experiments.unified_dataset import determine_queue  # noqa: E402
 
-DATA_FILE = os.path.join(ROOT, "data", "demo.json")
+# Cho phép chỉ định file luồng khác (demo ngắn dùng data/demo_small.json — tập con PHÂN
+# TẦNG đủ 4 nguồn + chuỗi APT đa-ngày; xem scripts/build_demo_small.py).
+DATA_FILE = os.getenv("UNIFIED_STREAM_FILE") or os.path.join(ROOT, "data", "demo.json")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 BATCH_SIZE = int(os.getenv("UNIFIED_STREAM_BATCH", "50"))
 BATCH_DELAY = float(os.getenv("UNIFIED_STREAM_DELAY", "0.3"))
