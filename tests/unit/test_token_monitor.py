@@ -26,28 +26,44 @@ from src.agent import token_monitor  # noqa: E402
 def isolate_state(tmp_path, monkeypatch):
     """Cô lập STATS_PATH + reset _state trước mỗi test (không đụng file thật)."""
     monkeypatch.setattr(token_monitor, "STATS_PATH", str(tmp_path / "stats.json"))
-    monkeypatch.setattr(
-        token_monitor,
-        "_state",
-        {
-            "calls": 0,
-            "prompt_sum": 0,
-            "prompt_max": 0,
-            "completion_sum": 0,
-            "overflow_warnings": 0,
-            "recent_prompt": [],
-        },
-    )
+    # Dùng _new_state() (nguồn schema duy nhất) — KHÔNG chép tay các khoá, nếu không
+    # mỗi lần module thêm khoá là toàn bộ test vỡ bằng KeyError.
+    monkeypatch.setattr(token_monitor, "_state", token_monitor._new_state())
     yield
 
 
-def test_estimate_tokens_chars_over_3_5():
-    # 1 message, content 35 ký tự -> 35/3.5 = 10 token
-    msgs = [{"role": "user", "content": "x" * 35}]
+def test_estimate_tokens_uses_default_ratio_before_calibration():
+    # Chưa có mẫu thật -> dùng hằng khởi điểm _CHARS_PER_TOKEN (4.0): 40/4.0 = 10 token
+    msgs = [{"role": "user", "content": "x" * 40}]
     assert token_monitor.estimate_tokens(msgs) == 10
-    # Nhiều message cộng dồn
-    msgs2 = [{"role": "system", "content": "a" * 7}, {"role": "user", "content": "b" * 7}]
-    assert token_monitor.estimate_tokens(msgs2) == 4  # 14/3.5
+    # Nhiều message cộng dồn: 16/4.0 = 4
+    msgs2 = [{"role": "system", "content": "a" * 8}, {"role": "user", "content": "b" * 8}]
+    assert token_monitor.estimate_tokens(msgs2) == 4
+
+
+def test_estimate_self_calibrates_to_real_token_ratio():
+    """CONTEXT GUARD phải bám tokenizer THẬT, không bám hằng số đoán trước.
+
+    Bug thật đã gặp trong demo 100k: hằng 3.5 char/token thổi phồng ước lượng >21% nên
+    báo động 'sát trần' 33/34 call, dù prompt thật (max 5.909) chưa từng chạm ngưỡng
+    6.923 và server còn 16.384 ctx. Sau hiệu chuẩn, ước lượng phải khớp số thật.
+    """
+
+    class _Usage:
+        prompt_tokens = 1000
+        completion_tokens = 10
+
+    msgs = [{"role": "user", "content": "x" * 4200}]  # 4200 ký tự <-> 1000 token => 4.2
+    for _ in range(token_monitor._MIN_CALIB_SAMPLES + 5):
+        token_monitor.preflight_check(msgs, max_output_tokens=256)
+        token_monitor.record_usage(_Usage())
+
+    stats = token_monitor.get_stats()  # đọc từ STATS_PATH đã _persist()
+    assert stats is not None, "preflight/record_usage phải đã ghi được STATS_PATH"
+    assert stats["chars_per_token_calibrated"] is True
+    assert token_monitor._ratio() == pytest.approx(4.2, abs=0.05)
+    # Ước lượng nay khớp token THẬT (sai số < 2%), hết báo động giả.
+    assert token_monitor.estimate_tokens(msgs) == pytest.approx(1000, rel=0.02)
 
 
 def test_estimate_tokens_empty():

@@ -36,29 +36,67 @@ except Exception:
 # n_ctx mục tiêu của app (server llama.cpp đặt 16384 nên còn headroom an toàn).
 N_CTX = int(_cfg.get("llm", {}).get("max_context_tokens", 8192))
 WARN_RATIO = 0.90  # cảnh báo khi prompt vượt 90% ngân sách input
-_CHARS_PER_TOKEN = 3.5  # ước lượng bảo thủ (Gemma/Llama ~3.5–4 char/token)
+# Ước lượng KHỞI ĐIỂM khi chưa có số đo thật. 3.5 char/token quá bảo thủ với nội dung
+# thật của SENTINEL (log/JSON nhiều chữ số + dấu câu): đo trên demo 100k cho thấy tỉ lệ
+# thật > 4.2 -> ước lượng thổi phồng > 21%, khiến CONTEXT GUARD báo động GIẢ gần như mọi
+# call (33/34) dù prompt thật (max 5.909) chưa bao giờ chạm ngưỡng 6.923. Nay chỉ dùng
+# hằng này lúc chưa có mẫu, sau đó TỰ HIỆU CHUẨN theo prompt_tokens THẬT (xem _ratio()).
+_CHARS_PER_TOKEN = 4.0
+_MIN_CALIB_SAMPLES = 20  # đủ mẫu mới tin tỉ lệ đo được
 
 _lock = threading.Lock()
-_state = {
-    "calls": 0,
-    "prompt_sum": 0,
-    "prompt_max": 0,
-    "completion_sum": 0,
-    "overflow_warnings": 0,
-    "recent_prompt": [],  # giữ tối đa 500 mẫu gần nhất để tính p95
-}
+
+
+def _new_state() -> dict:
+    """Trạng thái rỗng — NGUỒN DUY NHẤT của schema `_state`.
+
+    Test cũng phải dùng hàm này để reset (thay vì chép tay dict): trước đây fixture
+    chép cứng các khoá nên mỗi lần thêm khoá mới là test vỡ hàng loạt bằng KeyError.
+    """
+    return {
+        "calls": 0,
+        "prompt_sum": 0,
+        "prompt_max": 0,
+        "completion_sum": 0,
+        "overflow_warnings": 0,
+        "recent_prompt": [],  # giữ tối đa 500 mẫu gần nhất để tính p95
+        # Hiệu chuẩn: tổng ký tự đã gửi và tổng token THẬT tương ứng.
+        "calib_chars": 0,
+        "calib_tokens": 0,
+    }
+
+
+_state = _new_state()
+
+
+def _ratio() -> float:
+    """Số ký tự trên mỗi token — ĐO THẬT nếu đủ mẫu, nếu chưa thì dùng hằng khởi điểm.
+
+    Tự hiệu chuẩn để CONTEXT GUARD phản ánh đúng tokenizer đang chạy (Gemma vs Llama
+    cho tỉ lệ khác nhau), thay vì báo động giả bằng một hằng số đoán trước.
+    """
+    tok = _state["calib_tokens"]
+    if tok >= _MIN_CALIB_SAMPLES and _state["calib_chars"] > 0:
+        return max(1.0, _state["calib_chars"] / tok)
+    return _CHARS_PER_TOKEN
 
 
 def estimate_tokens(messages) -> int:
-    """Ước lượng số token của list messages (chars / 3.5)."""
+    """Ước lượng số token của list messages (chars / tỉ lệ đã hiệu chuẩn)."""
     chars = sum(len(str(m.get("content", ""))) for m in messages)
-    return int(chars / _CHARS_PER_TOKEN)
+    return int(chars / _ratio())
 
 
 def preflight_check(messages, max_output_tokens: int) -> int:
     """Kiểm tra TRƯỚC khi gọi LLM. Trả về ước lượng token input; log WARNING nếu sát trần."""
-    est = estimate_tokens(messages)
+    chars = sum(len(str(m.get("content", ""))) for m in messages)
+    est = int(chars / _ratio())
     input_budget = max(N_CTX - max_output_tokens, 1)
+    # Góp mẫu hiệu chuẩn: mỗi preflight_check ứng với ĐÚNG một record_usage sau đó, nên
+    # tỉ lệ giữa TỔNG ký tự và TỔNG token thật hội tụ đúng dù không ghép được từng cặp
+    # (nhiều worker chạy song song).
+    with _lock:
+        _state["calib_chars"] += chars
     if est > WARN_RATIO * input_budget:
         # _persist() PHẢI nằm trong lock: record_usage() ở worker khác cũng persist()
         # dưới lock — nếu preflight persist NGOÀI lock thì hai thread cùng ghi STATS_PATH
@@ -87,6 +125,7 @@ def record_usage(usage) -> None:
         _state["prompt_sum"] += pt
         _state["completion_sum"] += ct
         _state["prompt_max"] = max(_state["prompt_max"], pt)
+        _state["calib_tokens"] += pt  # mẫu THẬT để _ratio() tự hiệu chuẩn
         _state["recent_prompt"].append(pt)
         if len(_state["recent_prompt"]) > 500:
             _state["recent_prompt"] = _state["recent_prompt"][-500:]
@@ -107,6 +146,10 @@ def _persist() -> None:
         "overflow_warnings": _state["overflow_warnings"],
         "utilization_pct_p95": round(100 * p95 / N_CTX, 1) if N_CTX else 0.0,
         "utilization_pct_max": round(100 * _state["prompt_max"] / N_CTX, 1) if N_CTX else 0.0,
+        # Tỉ lệ ký tự/token ĐANG dùng cho CONTEXT GUARD: đo thật khi đủ mẫu, nếu không
+        # thì là hằng khởi điểm. Phơi ra để kiểm chứng được cảnh báo có chính xác không.
+        "chars_per_token": round(_ratio(), 2),
+        "chars_per_token_calibrated": _state["calib_tokens"] >= _MIN_CALIB_SAMPLES,
     }
     try:
         with open(STATS_PATH, "w") as f:
