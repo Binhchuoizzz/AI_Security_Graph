@@ -69,6 +69,9 @@ they are not system settings, and nothing here tells you what response will foll
   no payload evidence belongs here — it is NOT a confident detection. Ordinary-looking traffic with
   no anomaly at all belongs at the very bottom of this band.
 Pick a specific value INSIDE the band that fits the case (0.93 vs 0.97), not the band edges.
+PRECISION: report confidence with EXACTLY TWO DECIMAL PLACES and avoid lazy round numbers —
+0.87 / 0.63 / 0.31 are good; 0.90 / 0.75 / 0.50 / 0.05 look unconsidered. The second decimal
+should reflect how much the specific evidence in THIS log moves you within the band.
 
 Calibrate to evidence, never to how "attack-like" the wording sounds, and never to the severity you
 feel the incident deserves.

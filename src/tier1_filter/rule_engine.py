@@ -132,6 +132,95 @@ _WAF_PATTERNS = {
     "Command Injection": re.compile(
         r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\))"
     ),
+    # ── BỔ SUNG: các họ tấn công phổ biến trước đây KHÔNG có chữ ký nào bắt ──
+    # Audit ma trận năng lực (experiments/audit_tier_capability.py) cho thấy Log4Shell và
+    # web shell bị Tier-1 **DROP THẲNG** — không chặn, thậm chí không leo thang. Chú ý
+    # `${jndi:...}` KHÔNG khớp mẫu Command Injection vì mẫu đó chỉ bắt `$(...)`, không bắt
+    # `${...}`.
+    "Log4Shell / JNDI Injection": re.compile(
+        # Bắt cả dạng né tránh chèn ${::-x} giữa các ký tự (CVE-2021-44228).
+        r"(?i)(\$\{jndi:\s*(ldaps?|rmi|dns|iiop|corba|nis|nds|http)s?:|\$\{[^}]*\$\{[^}]*jndi)"
+    ),
+    "Web Shell / Code Execution": re.compile(
+        r"(?i)(<\?php\b|<%\s*eval\b|\b(system|shell_exec|passthru|proc_open|popen)\s*\("
+        r"|\beval\s*\(\s*(base64_decode|\$_(get|post|request))|\b__import__\s*\(\s*['\"]os)"
+    ),
+    "XXE Injection": re.compile(r"(?i)(<!ENTITY\b|<!DOCTYPE[^>]*\bSYSTEM\b|SYSTEM\s+[\"']file://)"),
+    "SSTI (Template Injection)": re.compile(
+        # Chỉ bắt biểu thức RÕ RÀNG độc hại để tránh báo giả trên template hợp lệ.
+        r"(?i)(\{\{\s*\d+\s*[*+/-]\s*\d+\s*\}\}|\{\{[^}]*(__class__|__globals__|self\.|config\.items)"
+        r"|\$\{\s*\d+\s*[*+]\s*\d+\s*\})"
+    ),
+    "SSRF / Cloud Metadata": re.compile(
+        # 169.254.169.254 = endpoint metadata của AWS/GCP/Azure — mục tiêu SSRF kinh điển.
+        r"(?i)(169\.254\.169\.254|/latest/meta-data|metadata\.google\.internal"
+        r"|\b(gopher|dict|file)://|127\.0\.0\.1:\d{2,5}/(admin|internal))"
+    ),
+    "NoSQL Injection": re.compile(
+        r"(?i)(\[\$(ne|gt|lt|gte|lte|regex|where|exists)\]|\"\$(ne|gt|where|regex)\"\s*:|\$where\s*:)"
+    ),
+    "LDAP Injection": re.compile(r"(?i)(\)\(\|?\(?(uid|cn|objectclass)=\*|\*\)\(\||\(\&\(\|)"),
+    "CRLF / Response Splitting": re.compile(
+        r"(?i)(%0d%0a|%0a%0d|\\r\\n)(set-cookie|location|content-length|http/1\.)"
+    ),
+    "Insecure Deserialization": re.compile(
+        # rO0AB = Java serialized (base64); O:<n>:" = PHP object; \x80\x04 = pickle proto 4.
+        r"(?i)(rO0AB[A-Za-z0-9+/]|\bO:\d+:\"[A-Za-z_]|__reduce__|pickle\.loads\s*\()"
+    ),
+    "Prototype Pollution": re.compile(r"(__proto__|constructor\s*\[\s*[\"']prototype)"),
+    "Sensitive File Access": re.compile(
+        r"(?i)(/\.git/(config|HEAD)|/\.env\b|/wp-config\.php|/\.aws/credentials"
+        r"|/\.ssh/id_(rsa|ed25519)|web\.config\b|/phpinfo\.php)"
+    ),
+    "Reverse Shell": re.compile(
+        r"(?i)(bash\s+-i\s*>&\s*/dev/tcp/|nc\s+(-e|-c)\s|/dev/tcp/\d|mkfifo\s+/tmp/"
+        r"|python\s+-c\s+['\"]?import\s+socket)"
+    ),
+    "Encoded PowerShell": re.compile(
+        r"(?i)(powershell(\.exe)?\s+.*-(enc|encodedcommand|e)\b|IEX\s*\(\s*New-Object\s+Net\.WebClient"
+        r"|DownloadString\s*\(|-nop\s+-w\s+hidden)"
+    ),
+    "Scanner / Attack Tooling": re.compile(
+        r"(?i)\b(sqlmap|nikto|nmap\s+scripting|acunetix|nessus|dirbuster|gobuster|wpscan"
+        r"|masscan|hydra|metasploit|burpsuite|havij)\b"
+    ),
+    "SQLi nâng cao (blind/stacked/OS)": re.compile(
+        r"(?i)(\b(sleep|benchmark|pg_sleep)\s*\(\s*\d|waitfor\s+delay\b|xp_cmdshell"
+        r"|;\s*(drop|truncate|alter)\s+table|\bload_file\s*\(|\binto\s+outfile\b|0x[0-9a-f]{16,})"
+    ),
+    "XSS nâng cao (khung/thuộc tính)": re.compile(
+        r"(?i)(<iframe\b|<object\b|<embed\b|srcdoc\s*=|data:text/html|<body[^>]*\bon\w+\s*="
+        r"|\bon(mouse\w+|focus|click|toggle|animationstart)\s*=|document\.(cookie|write)\s*\()"
+    ),
+    "Mã hoá né tránh (encoding evasion)": re.compile(
+        # %2e%2e%2f = ../ ; %252e = double-encode ; . = unicode escape.
+        r"(?i)(%2e%2e[/%5c]|%252e%252e|%c0%ae|\\u00(2e|2f|5c)|&#x?0*(2e|2f|3c|3e);)"
+    ),
+    "Web shell qua tệp tải lên": re.compile(
+        r"(?i)\.(php[3-8]?|phtml|phar|jsp[xw]?|asp[x]?|cshtml)(\.(jpg|png|gif|txt|zip))?\b\s*"
+        r"(HTTP|Content-|filename)"
+    ),
+    "JWT / xác thực yếu": re.compile(
+        r"(?i)(\"alg\"\s*:\s*\"none\"|eyJhbGciOiJub25lIg|\balg=none\b)"
+    ),
+    "GraphQL lạm dụng": re.compile(r"(?i)(__schema\s*\{|__typename.*__schema|IntrospectionQuery)"),
+    "Living-off-the-land (LOLBin)": re.compile(
+        r"(?i)(certutil(\.exe)?\s+.*-urlcache|bitsadmin\s+/transfer|regsvr32\s+.*/i:https?:"
+        r"|mshta\s+https?:|rundll32\s+.*javascript:|wmic\s+process\s+call\s+create)"
+    ),
+    "Đánh cắp thông tin xác thực (AD)": re.compile(
+        r"(?i)(mimikatz|sekurlsa::|lsadump::|kerberoast|\bDRSUAPI\b|DCSync|ntds\.dit"
+        r"|\bsecretsdump\b|Invoke-Mimikatz)"
+    ),
+    "Ransomware / phá huỷ": re.compile(
+        r"(?i)(vssadmin(\.exe)?\s+delete\s+shadows|wbadmin\s+delete\s+catalog"
+        r"|bcdedit\s+.*recoveryenabled\s+no|cipher\s+/w:|wevtutil\s+cl\s)"
+    ),
+    "Đào tiền mã hoá": re.compile(r"(?i)(stratum\+(tcp|ssl)://|\bxmrig\b|minerd\b|coinhive)"),
+    "Rò rỉ ra dịch vụ ngoài": re.compile(
+        r"(?i)(discord(app)?\.com/api/webhooks|pastebin\.com/api|hastebin\.com/documents"
+        r"|\btransfer\.sh\b|requestbin|burpcollaborator\.net|\.oastify\.com|interact\.sh)"
+    ),
 }
 
 
