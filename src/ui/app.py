@@ -391,6 +391,36 @@ def render_demo_overview(
                 height=248,
                 hide_index=True,
             )
+
+            # AUDIT TẬN GỐC: cho phép soi LOG THÔ ĐẦY ĐỦ của đúng IP đã bị Tier-1 chặn.
+            # Trước đây bảng chỉ có ip/score/reasons -> không truy được bản ghi nào gây ra
+            # lệnh chặn. Sidecar tier1_blocks.json nay kèm raw_log (xem subscriber.py).
+            _with_raw = [b for b in t1_blocks if b.get("raw_log")]
+            if _with_raw:
+                _opts = {
+                    f"{b['ip']}  (điểm {b.get('score', 0)} · {(b.get('ts') or '')[-8:]})": b
+                    for b in _with_raw
+                }
+                _pick = st.selectbox(
+                    "🔍 Soi LOG THÔ ĐẦY ĐỦ của IP bị Tier-1 chặn",
+                    list(_opts.keys()),
+                    key="t1_block_raw_pick",
+                )
+                _b = _opts[_pick]
+                with st.expander(f"🔍 LOG THÔ ĐẦY ĐỦ — {_b['ip']}", expanded=False):
+                    st.caption(
+                        "Toàn bộ bản ghi đã đưa vào Tier-1 (không cắt trường), kèm `tier1_score` "
+                        "và `tier1_reasons` — đúng thứ luật đã nhìn thấy khi quyết định CHẶN. "
+                        "Chỉ loại nhãn/đáp án của bộ dữ liệu (chống lộ nhãn)."
+                    )
+                    st.markdown(f"**Lý do chặn:** {' · '.join(_b.get('reasons') or []) or '—'}")
+                    st.json(_b["raw_log"])
+            else:
+                st.caption(
+                    "ℹ️ Các bản ghi chặn hiện có được tạo TRƯỚC khi bật đính kèm log thô — "
+                    "chạy lại demo để có dữ liệu soi tận gốc."
+                )
+
             st.caption(
                 "Tấn công RÕ RÀNG (chữ ký WAF/injection, cổng nhạy cảm, quét cổng) bị chặn "
                 "TỨC THỜI bằng luật xác định — không tốn LLM. **Số lần** = tổng số lần IP đó bị "
@@ -1177,7 +1207,7 @@ def main_dashboard():
                         if not matched_audit:  # Fallback lấy cái mới nhất có raw_log
                             matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
                         if matched_audit and matched_audit.get("raw_log"):
-                            with st.expander("🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng)"):
+                            with st.expander("🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng)"):
                                 st.code(matched_audit.get("raw_log"), language="json")
 
                         if st.session_state.get("role") == "L3_Manager":
@@ -1308,7 +1338,7 @@ def main_dashboard():
                     if not matched_audit:
                         matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
                     if matched_audit and matched_audit.get("raw_log"):
-                        with st.expander("🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng)"):
+                        with st.expander("🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng)"):
                             st.code(matched_audit.get("raw_log"), language="json")
 
                     if st.session_state.get("role") == "L3_Manager":

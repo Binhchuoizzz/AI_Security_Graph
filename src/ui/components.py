@@ -380,13 +380,16 @@ def render_alert_card(
 
     # Tạo tiêu đề động cho Expander chứa Log thô
     mitre_display_title = mitre_tech if mitre_tech != "N/A" else "Không xác định"
-    expander_title = f"🔍 Xem LOG THÔ ĐẶC TRƯNG (Minh chứng cho {mitre_display_title})"
+    expander_title = f"🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng cho {mitre_display_title})"
 
     with st.expander(expander_title, expanded=False):
+        # Mô tả cũ ("log đặc trưng tiêu biểu … chỉ lưu log đại diện để tiết kiệm DB") là SAI:
+        # audit_trail lưu TRỌN bản ghi đã đưa vào Tier-1 (đo thật: 106 trường, gồm đủ đặc
+        # trưng luồng CICIDS + tier1_reasons + tier1_score). Nói đúng để còn audit tận gốc.
         st.caption(
-            "ℹ️ Đây là **log đặc trưng tiêu biểu** nhất được rút trích ra từ toàn bộ quá trình "
-            f"của IP {cleaned_target}. Hệ thống chỉ lưu log đại diện này làm bằng chứng kỹ thuật gốc "
-            "nhằm tiết kiệm DB. Đã LOẠI nhãn/đáp án chống lộ nhãn (Label Leakage)."
+            f"ℹ️ **Toàn bộ log thô** đã được đưa vào Tier-1 cho IP {cleaned_target} — đúng thứ "
+            "hệ thống nhìn thấy khi ra quyết định, không cắt bớt trường nào. Chỉ LOẠI nhãn/đáp "
+            "án của bộ dữ liệu để chống lộ nhãn (Label Leakage)."
         )
         raw_log_str = alert.get("raw_log") if isinstance(alert, dict) else None
         if raw_log_str:

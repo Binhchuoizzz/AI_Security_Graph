@@ -507,6 +507,12 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                                 for x in (evaluated_log.get("tier1_reasons") or [])
                                             ],
                                             "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+                                            # LOG THÔ ĐẦY ĐỦ để analyst audit tận gốc "cái gì
+                                            # đã bị chặn". Trước đây sidecar chỉ có ip/score/
+                                            # reasons -> nhìn bảng Tier-1 KHÔNG thể truy ra bản
+                                            # ghi nào gây ra lệnh chặn. Vẫn _strip_dataset_labels
+                                            # để không lộ nhãn đáp án của bộ dữ liệu.
+                                            "raw_log": _strip_dataset_labels(evaluated_log),
                                         }
                                     )
                                     if len(tier1_recent_blocks) > 200:
