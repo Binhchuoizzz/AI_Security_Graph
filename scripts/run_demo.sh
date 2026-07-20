@@ -112,6 +112,12 @@ fi
 
 echo "▶ [5/5] ĐẨY LUỒNG GỘP → Dashboard (CICIDS + DAPT + Zero-day + Adversarial)…"
 if [ "$PUSH" = "small" ]; then
+  # BUG CŨ: --small chỉ đổi BATCH/DELAY mà KHÔNG đặt UNIFIED_STREAM_LIMIT, nên vẫn đẩy
+  # ĐỦ ~100k sự kiện — trái hẳn mô tả "đẩy tập nhỏ, ít chờ LLM". Hậu quả: buổi demo bị
+  # giới hạn thời gian vẫn phải chờ hàng giờ cho LLM rút hết hàng đợi.
+  # Nay giới hạn THẬT (mặc định 5.000 sự kiện, ghi đè bằng UNIFIED_STREAM_LIMIT).
+  echo "   (--small: giới hạn ${UNIFIED_STREAM_LIMIT:-5000} sự kiện đầu để demo nhanh)"
+  UNIFIED_STREAM_LIMIT="${UNIFIED_STREAM_LIMIT:-5000}" \
   UNIFIED_STREAM_BATCH="${UNIFIED_STREAM_BATCH:-50}" UNIFIED_STREAM_DELAY="${UNIFIED_STREAM_DELAY:-0.1}" \
     "$PY" scripts/demo.py
 else
