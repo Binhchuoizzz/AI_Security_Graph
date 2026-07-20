@@ -26,12 +26,32 @@
 Sau khi setup (§1) 1 lần, mỗi lần demo:
 
 ```bash
-./scripts/run_demo.sh --fresh      # containers → reset sạch → subscriber → UI → đẩy ~100.000 sự kiện (4 nguồn)
-./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng   |   --small: đẩy nhanh (demo ngắn)
-# GPU VRAM thấp: `SENTINEL_LITE=1 ./scripts/run_demo.sh` (Llama 3 8B, ctx 8192, 1 parallel, Neo4j tắt)
+./scripts/run_demo.sh --fresh --small   # ⭐ KHUYẾN NGHỊ khi bảo vệ: ~5.000 sự kiện, đủ 4 nguồn, xong nhanh
+./scripts/run_demo.sh --fresh           # bản đầy đủ: reset sạch → đẩy ~100.000 sự kiện (4 nguồn)
+./scripts/run_demo.sh --no-push         # chỉ dựng hạ tầng (containers + subscriber + UI)
+# Model: mặc định SENTINEL_LITE=1 (Llama 3 8B, ctx 8192, 1 parallel, Neo4j tắt — máy VRAM thấp).
+# Dùng ĐÚNG model luận văn (Gemma-2-9B-IT Q6_K, ctx 16384): SENTINEL_LITE=0 ./scripts/run_demo.sh --fresh --small
 ```
 
-Mở `http://localhost:8501` (đăng nhập `manager`). Tier-1 lọc phần lớn ở wire-speed; ca ESCALATE qua **Cổng ML** (~0.35ms) chặn 83.8%, chỉ ca ML bỏ ngỏ mới trôi qua LLM → **Dashboard điền dần** (đúng thiết kế SOC — LLM là nút cổ chai chủ đích, KHÔNG phải bug). Tắt: `pkill -f "main.py --mode server"; docker-compose stop`.
+> ⚠️ **`SENTINEL_LITE` quyết định model:** nếu container LLM đang chạy Gemma mà bạn gọi lệnh mặc định (`LITE=1`), docker-compose sẽ **tạo lại container và đổi sang Llama 3 8B** — sai model luận văn. Kiểm tra: `docker inspect sentinel_llm --format '{{range .Config.Env}}{{println .}}{{end}}' | grep MODEL`.
+
+**`--small` KHÔNG phải "5.000 sự kiện đầu"** mà là **tập con phân tầng** `data/demo_small.json` (tự dựng nếu thiếu, hoặc `scripts/build_demo_small.py`): lấy **nguyên văn** từ `data/demo.json` (không sinh dữ liệu mới) và giữ nguyên thứ tự thời gian gốc, đảm bảo **mọi panel Dashboard đều có dữ liệu thật**:
+
+| Nguồn trong 5.000 sự kiện | Số lượng | Panel được nuôi |
+|---|---|---|
+| CICIDS2018 (`cicids_max` + `cicids`) | ~4.376 | Tier-1 chặn · Cổng ML · **16 lớp tấn công** · cột MITRE |
+| DAPT2020 (`dapt` + `dapt_max`) | ~438 | **Chiến dịch APT — giữ TRỌN 3 IP đa-ngày** |
+| Zero-day (real-derived) | 182 | Phát hiện không cần chữ ký (Welford) |
+| Adversarial (OWASP) | 4 | Kháng injection/jailbreak |
+| **Tấn công / benign** | **751 (15%) / 4.249** | Giảm tải Tier-1 thật |
+
+> Vì sao cần tập con: luồng đầy đủ sắp theo **thời gian thật**, chuỗi APT đa-ngày chỉ hoàn tất quanh vị trí **#46.000–#63.000** → cắt 5.000 sự kiện đầu thì panel APT **luôn trống**.
+
+Mở `http://localhost:8501` (đăng nhập `manager`). Tier-1 lọc phần lớn ở wire-speed; ca ESCALATE qua **Cổng ML** (~0.35ms) tự quyết phần lớn, chỉ ca ML bỏ ngỏ mới trôi qua LLM → **Dashboard điền dần** (đúng thiết kế SOC — LLM là nút cổ chai chủ đích, KHÔNG phải bug).
+
+**Đo thật trên luồng 100k** (offline, không gọi LLM): Tier-1 `DROP 27,3%` + `BLOCK_IP 17,0%` ở tốc độ đường truyền · Cổng ML tự quyết **94,7%** số ca leo thang · **chỉ 2,93% luồng thực sự tới LLM**. LLM ~**9,6 s/quyết định** ⇒ bản 100k cần **~5,5 giờ** rút hết hàng đợi (lý do nên dùng `--small` khi bảo vệ).
+
+Tắt: `pkill -f "main.py --mode server"; docker-compose stop`.
 
 ---
 
