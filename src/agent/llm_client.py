@@ -79,6 +79,47 @@ class LLMDecision(BaseModel):
     extracted_iocs: list[IOCModel] | None = Field(default=[], description="Các IOC trích xuất được")
 
 
+# ── JSON SCHEMA cho quyết định triage ────────────────────────────────────────────────────────
+# Ép server llama.cpp XUẤT JSON HỢP LỆ (constrained decoding) — dứt điểm cảnh "JSON parse lỗi /
+# output bị cắt cụt" do gemma-2-9b tuồn prose ("**Analysis:** ...") thay vì JSON. Vì đi thẳng vào
+# field, model cũng BÁM chỉ dẫn "reasoning viết bằng TIẾNG VIỆT" của prompt tốt hơn (hết trường
+# "Lý do" tiếng Anh). Server này KHÔNG tôn trọng response_format={"type":"json_object"} nhưng CÓ
+# tôn trọng {"type":"json_schema", ...} (đã kiểm thực tế). Thứ tự field khớp prompt để giữ hành vi.
+DECISION_JSON_SCHEMA: dict[str, Any] = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "sentinel_decision",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"],
+                },
+                "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                "mitre_technique": {"type": "string"},
+                "attack_method": {"type": "string"},
+                "nist_control": {"type": "string"},
+                "reasoning": {"type": "string"},
+                "extracted_iocs": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "ioc_type": {"type": "string"},
+                            "value": {"type": "string"},
+                            "severity": {"type": "string"},
+                        },
+                        "required": ["ioc_type", "value", "severity"],
+                    },
+                },
+            },
+            "required": ["action", "confidence", "reasoning"],
+        },
+    },
+}
+
+
 class LLMClient:
     def __init__(self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 300):
         """

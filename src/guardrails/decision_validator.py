@@ -131,6 +131,9 @@ class DecisionValidator:
                 )
                 validated["action"] = "ALERT"
                 action = "ALERT"
+                # Cờ để lớp remap-theo-confidence (nodes.py) KHÔNG đẩy NGƯỢC ALERT->BLOCK,
+                # phá lá chắn hạ tầng khi confidence>=ngưỡng block.
+                validated["_critical_shield"] = True
 
         # 4. Làm sạch trường giải trình và thông tin (Reasoning Sanitization)
         # Ngăn chặn các cuộc tấn công tiêm nhiễm hiển thị (XSS/SSRF qua UI)

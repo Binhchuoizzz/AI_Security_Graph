@@ -69,7 +69,10 @@ class ActionValidator:
 
     # WHITELIST: bản ghi audit cho truy cập được đặc cách cho qua (không phải hành động
     # phản ứng, chỉ để ghi nhận + hiển thị thẻ riêng trên UI).
-    ALLOWED_ACTIONS = frozenset({"BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL", "WHITELIST"})
+    # DROP = hành động lành tính đầu-cuối của chính sách 4 dải (log sạch/C<0.40) — thêm vào
+    # allowlist để nếu có audit-log DROP thì KHÔNG bị nhận nhầm là "sandbox escape". "LOG" giữ
+    # cho các nút thao tác thủ công trên UI (whitelist/block tay).
+    ALLOWED_ACTIONS = frozenset({"BLOCK_IP", "ALERT", "DROP", "LOG", "AWAIT_HITL", "WHITELIST"})
 
     # Các mẫu nguy hiểm trong trường target/reason (command injection)
     DANGEROUS_PATTERNS = re.compile(
@@ -314,9 +317,57 @@ def block_ip(ip: str, reason: str, raw_log: str = ""):
         logger.warning(f"[BLOCK] mark_ip_blocked lỗi cho {safe_ip}: {e}")
 
 
-def raise_alert(msg: str, reason: str, raw_log: str = ""):
+def raise_alert(msg: str, reason: str, raw_log: str = "") -> str:
+    """Ghi CẢNH BÁO — CHOKE-POINT chung cho cả Cổng ML (Tier-1) và LLM (Tier-2).
+
+    Chính sách REPEAT-OFFENDER (thống nhất): một IP ĐÃ từng ALERT trước đó (hoặc đã là
+    known-bad, reputation>=100) mà nay lại ALERT tiếp -> **tự động BLOCK** thay vì chỉ báo.
+    IP đã whitelist được MIỄN TRỪ (không bao giờ auto-block).
+
+    Trả về action THẬT đã thực thi: "ALERT" (lần đầu) hoặc "BLOCK_IP" (tái phạm)."""
+    ip = _validator.sanitize_target(msg)
+
+    # Whitelist: miễn trừ leo thang — chỉ ghi ALERT.
+    if ip in _whitelisted_ips():
+        logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
+        _log_to_db("ALERT", msg, reason, raw_log)
+        return "ALERT"
+
+    prior_alerts = 0
+    prior_score = 0.0
+    try:
+        from src.agent.threat_memory import threat_memory
+
+        rep = threat_memory.get_ip_reputation(ip)
+        if rep:
+            prior_alerts = int(rep.get("total_alerts", 0) or 0)
+            prior_score = float(rep.get("reputation_score", 0.0) or 0.0)
+    except Exception as e:
+        logger.warning(f"[ALERT] get_ip_reputation lỗi cho {ip}: {e}")
+
+    # Tái phạm (đã ALERT >=1 lần) hoặc known-bad -> leo thang BLOCK ngay.
+    if prior_alerts >= 1 or prior_score >= 100.0:
+        logger.warning(
+            f" [SIEM MOCK] ALERT->BLOCK (tái phạm): {ip} đã cảnh báo {prior_alerts} lần "
+            f"(score={prior_score:.0f}) -> tự động CHẶN."
+        )
+        block_ip(
+            ip,
+            f"Tái phạm: IP đã bị CẢNH BÁO {prior_alerts} lần trước đó -> tự động CHẶN. {reason}",
+            raw_log,
+        )
+        return "BLOCK_IP"
+
+    # Lần đầu: ghi CẢNH BÁO + tăng total_alerts để lần sau đếm được (repeat-offender).
     logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
     _log_to_db("ALERT", msg, reason, raw_log)
+    try:
+        from src.agent.threat_memory import threat_memory
+
+        threat_memory.record_incident(ip=ip, action="ALERT")
+    except Exception as e:
+        logger.warning(f"[ALERT] record_incident lỗi cho {ip}: {e}")
+    return "ALERT"
 
 
 def get_audit_trail(limit=50):

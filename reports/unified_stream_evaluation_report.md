@@ -2,7 +2,7 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-07-19T14:09:10
+> **Sinh lúc:** 2026-07-20T00:10:01
 
 ---
 

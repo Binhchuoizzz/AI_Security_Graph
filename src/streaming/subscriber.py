@@ -386,11 +386,21 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                             status="ACTIVE",
                                         )
                                     elif ml_action == "ALERT":
-                                        raise_alert(
-                                            _src_ip,
-                                            ml_reasoning or "",
-                                            raw_log=json.dumps(evaluated_log),
+                                        # raise_alert tự leo thang -> BLOCK nếu IP đã ALERT trước
+                                        # đó (repeat-offender). Lấy action THẬT để hiển thị/đếm.
+                                        ml_action = (
+                                            raise_alert(
+                                                _src_ip,
+                                                ml_reasoning or "",
+                                                raw_log=json.dumps(evaluated_log),
+                                            )
+                                            or "ALERT"
                                         )
+                                        if ml_action == "BLOCK_IP":
+                                            tier1_dropped_total += 1
+                                    elif ml_action == "DROP":
+                                        # Log sạch do Cổng ML xác nhận -> noise reduction THẬT.
+                                        tier1_dropped_total += 1
 
                                     audit_event = {
                                         "event_type": "ML_TRIAGE_DECISION",

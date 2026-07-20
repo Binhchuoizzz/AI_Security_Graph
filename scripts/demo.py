@@ -19,6 +19,8 @@ DATA_FILE = os.path.join(ROOT, "data", "demo.json")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 BATCH_SIZE = int(os.getenv("UNIFIED_STREAM_BATCH", "50"))
 BATCH_DELAY = float(os.getenv("UNIFIED_STREAM_DELAY", "0.3"))
+# Giới hạn số event đẩy (demo NGẮN để soi UI). 0 = đẩy hết (mặc định, giữ nguyên hành vi cũ).
+STREAM_LIMIT = int(os.getenv("UNIFIED_STREAM_LIMIT", "0"))
 MAX_QUEUE_SIZE = 10_000
 # Backpressure: các stream subscriber đang đọc + file thống kê THẬT (subscriber ghi).
 QUEUES = ("queue_firewall", "queue_waf", "queue_sysmon")
@@ -103,6 +105,12 @@ def main():
 
     with open(DATA_FILE) as f:
         events = json.load(f)
+
+    if STREAM_LIMIT > 0:
+        events = events[:STREAM_LIMIT]
+        print(
+            f"[*] UNIFIED_STREAM_LIMIT={STREAM_LIMIT} -> demo NGẮN, chỉ đẩy {len(events)} event đầu."
+        )
 
     print(f"[*] Loaded {len(events)} events from {DATA_FILE}")
 

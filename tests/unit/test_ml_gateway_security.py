@@ -48,7 +48,8 @@ def test_clean_input_does_not_trigger_defenses(gateway, clean_flow):
     assert sec["clamped"] == 0
     assert sec["ood_abstain"] is False
     # Flow thật đủ đặc trưng -> ML vẫn ra quyết định (không bị phòng thủ chặn nhầm).
-    assert action in ("BLOCK_IP", "ALERT", "LOG") or conf == 0.0
+    # 4 dải mới: BLOCK_IP / ALERT / DROP (log sạch); ESCALATE trả None.
+    assert action in ("BLOCK_IP", "ALERT", "DROP", None) or conf == 0.0
 
 
 def test_infinity_is_sanitized_not_crash(gateway, clean_flow):
@@ -58,8 +59,8 @@ def test_infinity_is_sanitized_not_crash(gateway, clean_flow):
     action, _reason, _conf, sec = gateway.evaluate_detailed(evil)
     assert sec["sanitized"] >= 1
     assert sec["reason"] != "scale_error"  # không vỡ ở bước scale
-    # Kết quả vẫn hợp lệ (một action hoặc abstain), KHÔNG ném exception.
-    assert action in ("BLOCK_IP", "ALERT", "LOG", None)
+    # Kết quả vẫn hợp lệ (một action hoặc abstain=None), KHÔNG ném exception.
+    assert action in ("BLOCK_IP", "ALERT", "DROP", None)
 
 
 def test_nan_is_sanitized(gateway, clean_flow):

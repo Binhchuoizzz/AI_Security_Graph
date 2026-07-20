@@ -35,11 +35,12 @@ from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.agent.llm_client import llm_client  # noqa: E402
+from src.agent.llm_client import DECISION_JSON_SCHEMA, llm_client  # noqa: E402
 from src.agent.nodes import retriever  # noqa: E402
 from src.agent.prompts import build_triage_prompt  # noqa: E402
 from src.agent.state import SentinelState  # noqa: E402
 from src.agent.workflow import agent_app  # noqa: E402
+from src.guardrails import decision_policy  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine, RunningStats  # noqa: E402
 
 GROUND_TRUTH_PATH = os.path.join(os.path.dirname(__file__), "ground_truth.json")
@@ -174,11 +175,28 @@ def llm_action(logs, rag_context):
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_context)
     t0 = time.time()
     try:
-        raw = llm_client.invoke(messages=messages, temperature=0.1)
+        # ĐỒNG BỘ với Config F: ép JSON hợp lệ (json_schema) + reasoning tiếng Việt, max_tokens rộng.
+        raw = llm_client.invoke(
+            messages=messages,
+            temperature=0.1,
+            response_format=DECISION_JSON_SCHEMA,
+            max_tokens=1536,
+        )
         decision = llm_client.parse_llm_response(raw)
-        action = str(decision.get("action", "AWAIT_HITL")).upper().strip()
-        if action not in VALID_ACTIONS:
-            action = "AWAIT_HITL"
+        raw_action = str(decision.get("action", "AWAIT_HITL")).upper().strip()
+        if raw_action not in VALID_ACTIONS:
+            raw_action = "AWAIT_HITL"
+        # ĐỒNG BỘ CHÍNH SÁCH ĐỘ-TIN-CẬY (giống Config F / hệ triển khai): confidence LÁI action.
+        # LLM cho là đe doạ (BLOCK_IP/ALERT) -> classify_llm theo confidence (>=0.85 BLOCK ·
+        # 0.65-0.85 ALERT · <0.65 AWAIT_HITL). DROP/LOG (sạch) & AWAIT_HITL giữ nguyên.
+        try:
+            conf = float(decision.get("confidence", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            conf = 0.0
+        if raw_action in ("BLOCK_IP", "ALERT"):
+            action = decision_policy.classify_llm(is_threat=True, confidence=conf)
+        else:
+            action = raw_action
     except Exception as e:
         print(f"   [LLM ERROR] {e}")
         action = "AWAIT_HITL"

@@ -13,7 +13,7 @@ from src.agent.attack_mapper import (
     AttackMapperInput,
     map_attack,
 )
-from src.agent.llm_client import llm_client
+from src.agent.llm_client import DECISION_JSON_SCHEMA, llm_client
 from src.agent.prompts import build_triage_prompt
 from src.agent.response_cache import response_cache
 from src.agent.state import SentinelState
@@ -24,6 +24,7 @@ from src.guardrails import (
     GuardrailsPipeline,
     audit_logger,
     context_overflow_guard,
+    decision_policy,
     loop_detector,
     output_sanitizer,
 )
@@ -227,7 +228,14 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         # được (connection refused, timeout sau retry), KHÔNG để vỡ đồ thị — trả chuỗi rỗng
         # để parse_llm_response cho AWAIT_HITL an toàn. Tier-1 (xác định) vẫn bảo vệ độc lập.
         try:
-            raw_response = llm_client.invoke(messages=messages, temperature=0.1)
+            # response_format=json_schema -> server ép JSON hợp lệ (hết "parse lỗi"/prose) và
+            # reasoning bám tiếng Việt; max_tokens rộng để JSON reasoning dài KHÔNG bị cắt cụt.
+            raw_response = llm_client.invoke(
+                messages=messages,
+                temperature=0.1,
+                response_format=DECISION_JSON_SCHEMA,
+                max_tokens=1536,
+            )
         except Exception as e:
             logger.error(
                 f"[LLM UNAVAILABLE] Tier-2 (LLM) call thất bại ({e}). Suy biến an toàn -> AWAIT_HITL; "
@@ -263,6 +271,18 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
 
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
+
+    # ── CHÍNH SÁCH ĐỘ-TIN-CẬY THỐNG NHẤT (chung Cổng ML + LLM) ────────────────────
+    # Confidence LÁI action thay vì để LLM tự chọn (sửa lỗi "0.75 + T1571 chung chung -> BLOCK").
+    #   LLM cho là ĐE DOẠ (BLOCK_IP/ALERT) -> map theo ngưỡng: >=0.85 BLOCK · 0.65–0.85 ALERT ·
+    #     <0.65 AWAIT_HITL (không chắc -> người).  DROP/LOG (sạch) và AWAIT_HITL (LLM tự thấy
+    #   không chắc) GIỮ NGUYÊN. Chạy SAU validate + enforce_tier_consensus + shield (vẫn ưu tiên).
+    # QUAN TRỌNG: nếu shield critical-asset đã hạ BLOCK->ALERT thì KHÔNG remap (tránh đẩy ngược
+    # ALERT->BLOCK, phá bảo vệ hạ tầng).
+    if action in ("BLOCK_IP", "ALERT") and not validated_decision.get("_critical_shield"):
+        action = decision_policy.classify_llm(is_threat=True, confidence=float(confidence or 0.0))
+        validated_decision["action"] = action
+
     # Khi LLM trả JSON hỏng, parse_llm_response suy biến an toàn về AWAIT_HITL và KHÔNG có
     # khoá 'reasoning'. Mặc định cũ ("No reasoning provided.") khiến Dashboard trông như
     # agent im lặng/hỏng, trong khi thực tế là: agent ĐÃ chạy, LLM ĐÃ trả lời, nhưng câu
@@ -529,14 +549,12 @@ _URI_ATTACK_TOKENS = (
 )
 
 
-def _handle_threat_memory_incident(
-    target: str, action: str, mitre_technique: str, confidence: float
-):
-    """Helper để ghi nhận incident và kiểm tra APT."""
-    if target == "UNKNOWN_TARGET" or action not in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
+def _check_apt_signal(target: str, mitre_technique: str, confidence: float):
+    """Kiểm tra tín hiệu APT (persistent-IP / multi-day chain) và ghi indicator.
+    KHÔNG record_incident ở đây — nơi gọi đã ghi (raise_alert / _handle_threat_memory_incident)
+    nên tránh đếm TRÙNG total_alerts (điều kiện repeat-offender phụ thuộc số này)."""
+    if target == "UNKNOWN_TARGET":
         return
-
-    threat_memory.record_incident(ip=target, action=action, mitre_technique=mitre_technique)
     apt_check = threat_memory.check_apt_pattern(target)
     apt_chain = threat_memory.check_apt_chain(target)
 
@@ -564,6 +582,18 @@ def _handle_threat_memory_incident(
             related_ips=target,
             mitre_chain=str(apt_chain.get("phases_seen", ""))[:120],
         )
+
+
+def _handle_threat_memory_incident(
+    target: str, action: str, mitre_technique: str, confidence: float
+):
+    """Ghi incident (tăng reputation/total_*) rồi kiểm tra APT. Dùng cho BLOCK_IP/AWAIT_HITL.
+    Lưu ý: nhánh ALERT KHÔNG dùng hàm này nữa — raise_alert là choke-point ghi ALERT +
+    tự leo thang repeat-offender (tránh đếm trùng total_alerts)."""
+    if target == "UNKNOWN_TARGET" or action not in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
+        return
+    threat_memory.record_incident(ip=target, action=action, mitre_technique=mitre_technique)
+    _check_apt_signal(target, mitre_technique, confidence)
 
 
 def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
@@ -640,38 +670,32 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     mitre_tech = latest_decision.get("mitre_technique", "")
     confidence = latest_decision.get("confidence", 0.0)
 
-    # Nếu action là ALERT, kiểm tra trước khi leo thang (Escalate)
-    if action == "ALERT":
-        _handle_threat_memory_incident(target, action, mitre_tech, confidence)
-        rep = threat_memory.get_ip_reputation(target)
-        if rep and rep.get("reputation_score", 0) >= 100:
-            logger.warning(
-                f"[*] Escalate ALERT -> BLOCK_IP for {target} (Reputation: {rep.get('reputation_score')})"
-            )
-            action = "BLOCK_IP"
-            formatted_reasoning += f" [HỆ THỐNG LEO THANG: Đã chặn tự động do điểm rủi ro IP vượt ngưỡng nguy hiểm ({rep.get('reputation_score'):.0f} >= 100)]"
+    # Cờ: block ĐÃ thực thi bên trong raise_alert (repeat-offender) -> KHÔNG chặn lại ở dưới.
+    _alert_escalated_block = False
 
-            # Update the latest decision to BLOCK_IP so downstream logic (if any) knows
-            latest_decision["action"] = action
-        else:
-            raise_alert(
+    # ALERT: raise_alert là CHOKE-POINT THỐNG NHẤT (chung với Cổng ML) — ghi ALERT, và nếu IP
+    # TÁI PHẠM (đã cảnh báo trước) / known-bad thì TỰ leo thang -> BLOCK ngay bên trong.
+    if action == "ALERT":
+        result_action = raise_alert(target, formatted_reasoning, raw_log=raw_log_json)
+        # Tín hiệu APT (persistent-IP / multi-day) — đọc incident vừa ghi, KHÔNG record trùng.
+        _check_apt_signal(target, mitre_tech, confidence)
+        if result_action == "BLOCK_IP":
+            logger.warning(f"[*] Escalate ALERT -> BLOCK_IP for {target} (tái phạm cảnh báo)")
+            action = "BLOCK_IP"
+            latest_decision["action"] = "BLOCK_IP"
+            formatted_reasoning += " [HỆ THỐNG LEO THANG: IP tái phạm cảnh báo -> tự động CHẶN]"
+            _alert_escalated_block = True
+
+    if action == "BLOCK_IP":
+        # Ghi incident cho BLOCK_IP TRỰC TIẾP từ LLM. Nếu do leo thang ALERT thì raise_alert đã
+        # xử lý reputation/incident -> KHÔNG ghi lại (tránh đếm trùng).
+        if not _alert_escalated_block:
+            _handle_threat_memory_incident(target, action, mitre_tech, confidence)
+            block_ip(
                 target,
                 formatted_reasoning,
                 raw_log=raw_log_json,
             )
-
-    if action == "BLOCK_IP":
-        # Record incident for BLOCK_IP (if it was escalated, it's already recorded as ALERT above,
-        # but calling it again with BLOCK_IP will add the BLOCK_IP score. To avoid double counting,
-        # only record if it was originally BLOCK_IP)
-        if latest_decision.get("action") == "BLOCK_IP" and "Leo thang" not in formatted_reasoning:
-            _handle_threat_memory_incident(target, action, mitre_tech, confidence)
-
-        block_ip(
-            target,
-            formatted_reasoning,
-            raw_log=raw_log_json,
-        )
 
         rule_pattern = target
         rule_source = "ml_triage" if getattr(state, "_ml_bypass", False) else "langgraph_agent"

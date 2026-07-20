@@ -303,23 +303,34 @@ def render_demo_overview(
         st.markdown("### 🏆 Kết quả Thực nghiệm (Luận văn)")
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
         e1, e2 = st.columns(2)
-        e1.metric("Độ trễ Tier-1", "0.6 ms", "−99.9% vs LLM")
-        e2.metric("Suy luận Tier-2 (LLM)", "≈5.7 s", "62.7% escalate")
+        # ĐO THẬT từ latency_benchmark.json (n=100): 83 sự kiện đi đường nhanh Tier-1
+        # (không gọi LLM) có TB 0.025 ms; 17 ca gọi LLM có TB 26.92 s. Số cũ "0.6 ms /
+        # ≈5.7 s / 62.7% escalate" KHÔNG khớp bất kỳ file kết quả nào -> đã thay.
+        e1.metric("Độ trễ Tier-1 (luật)", "0.025 ms", "đường nhanh · n=83/100")
+        e2.metric("Giảm độ trễ đầu-cuối", "−82.97%", "4.58 s vs 26.88 s LLM-only")
         e3, e4 = st.columns(2)
-        # Cổng ML giảm tải LLM: trên ground_truth 1250 (15 lớp CICIDS THẬT), Config G tự quyết
-        # 85.1% (ablation_mlgate, model 1M) -> ~15% ca cần LLM; F1(bypass) 0.991. Số THẬT, không LLM.
-        e3.metric("Cổng ML giảm tải LLM", "85.1%", "F1(bypass) 0.991")
+        # Chính sách 4 dải (C>=0.85 BLOCK · 0.65-0.85 ESCALATE · 0.40-0.65 ALERT · <0.40 PASS).
+        # Giảm tải LLM: ground_truth 1250, Config G tự quyết 83.8% (ablation_mlgate) -> F1(bypass) 0.9739.
+        e3.metric("Cổng ML giảm tải LLM", "83.8%", "F1(bypass) 0.9739")
         e4.metric("APT recall", "1.00", "DAPT2020 · 3/3")
         e5, e6 = st.columns(2)
-        # F1 = 0.936 là số THẬT của Cổng ML trên BENCHMARK gộp 15-lớp cân bằng (datatest 2514:
-        # đủ 14 loại tấn công + benign + DAPT + zero-day + adversarial). Thấp hơn 0.980 cũ vì
-        # benchmark MỚI khó hơn (đa dạng đều tay, gồm Infiltration/Bot). Model test-190k vẫn 0.9635.
-        e5.metric("Cổng ML (Tier-1) F1-score", "0.936", "benchmark gộp 2.5k")
-        e6.metric("Kháng né-tránh Cổng ML", "99.93%", "Inf/cực-đoan · evasion")
+        # HEADLINE = độ chính xác auto-BLOCK (hành động DỨT KHOÁT, không thể đảo, dải C>=0.85).
+        # ĐÃ KIỂM CHỨNG: evaluate_ml_gate.py nay xuất `by_action` ra ml_gate_results.json ->
+        # BLOCK_IP: tp=962, fp=0 => precision 1.0 (trước đây số này chỉ nằm trong báo cáo viết
+        # tay, không tái lập được). F1 gộp 0.8248 thấp hơn vì tính CẢ dải ALERT-0.40
+        # (tp=74/fp=104, precision 0.4157) là "dự đoán tấn công" — ALERT là cảnh báo
+        # low-priority KHÔNG chặn, nên không mâu thuẫn; model held-out 190k vẫn F1 0.9635.
+        e5.metric("Cổng ML — auto-BLOCK chính xác", "100%", "962 chặn · 0 chặn nhầm")
+        e6.metric("Kháng né-tránh Cổng ML", "99.58%", "Inf/cực-đoan · evasion")
         st.caption(
-            "Nguồn: unified_stream (APT 3/3, zero-day 12/15) · training_report (ML test-190k F1 0.9635, "
-            "1M mẫu) · ml_gate (benchmark 2.5k: F1 0.936 · P 0.975 · R 0.900 · evasion-resistance 99.93%) · "
-            "ablation_mlgate (giảm tải 85.1%, F1(bypass) 0.991) · latency_benchmark (Tier-1 ~0.38ms). Audit HMAC: 100%."
+            "Nguồn (mọi số truy được về `experiments/results/*.json`): **ml_gate** — datatest "
+            "3.204 mẫu/4 luồng: auto-BLOCK precision **100%** (962 chặn, **0** FP, `by_action`), "
+            "evasion **99.58%**, độ trễ **0.38 ms**, F1 gộp-tính-cả-ALERT 0.825 (P .909/R .755) "
+            "do dải ALERT-0.40 low-priority · **ablation_mlgate** — giảm tải **83.8%** (761/908 ca), "
+            "F1(bypass) 0.9739, precision khi tự quyết 98.82% · **unified_stream** — APT 3/3, "
+            "zero-day 12/15, F1 Tier-1-luật 0.531 · **latency_benchmark** — −82.97% (4.58 s vs "
+            "26.88 s), Tier-1 0.025 ms · **training_report** — LightGBM test-190k held-out F1 "
+            "0.9635 (1M mẫu) · **adversarial** — kháng 12/12. Audit HMAC: 100%."
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")
@@ -872,9 +883,10 @@ def main_dashboard():
                 unsafe_allow_html=True,
             )
         else:
-            # Chia thành 3 Tier
-            alerts_t1 = []
-            alerts_t2_ml = []
+            # Chia theo 3 CHẶNG QUYẾT ĐỊNH của kiến trúc HAI tầng (không phải "3 tier"):
+            # Tier-1 luật · Tier-1 Cổng ML · Tier-2 LLM. Cổng ML nằm TRONG Tier-1.
+            alerts_t1_rule = []
+            alerts_t1_mlgate = []
             alerts_t2_llm = []
             for alert in filtered_alerts:
                 r = alert.get("reason", "")
@@ -882,17 +894,17 @@ def main_dashboard():
                 # (bản ghi CŨ trong DB) / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM
                 # giờ cũng ghi Tier-2.
                 if any(k in r for k in ML_GATE_MARKERS):
-                    alerts_t2_ml.append(alert)
+                    alerts_t1_mlgate.append(alert)
                 elif "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
-                    alerts_t1.append(alert)
+                    alerts_t1_rule.append(alert)
                 else:
                     alerts_t2_llm.append(alert)
 
-            t1_tab, t2_ml_tab, t2_llm_tab = st.tabs(
+            t1_tab, ml_gate_tab, t2_llm_tab = st.tabs(
                 [
-                    "🟢 Tier-1 Filter",
-                    "⚡ Tier-1 · Cổng ML",
-                    "🧠 Tier-2 · LLM",
+                    "🟢 Tier-1 · Luật (Welford + chữ ký)",
+                    "⚡ Tier-1 · Cổng ML (LightGBM)",
+                    "🧠 Tier-2 · Tác tử LLM (LangGraph)",
                 ]
             )
 
@@ -1061,12 +1073,17 @@ def main_dashboard():
 
                 # ── Phần 2: Alert/Block từ Audit Trail Tier-1 ──
                 st.markdown("---")
-                st.markdown(f"**📋 Nhật ký Tier-1 từ Audit Trail:** {len(alerts_t1)} sự cố")
-                st.caption("_(ALERT / BLOCK được Tier-1 ghi vào audit trail)_")
-                _render_alerts_list(alerts_t1, "t1")
-            with t2_ml_tab:
-                st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2_ml)}**")
-                _render_alerts_list(alerts_t2_ml, "t2")
+                st.markdown(
+                    f"**📋 Nhật ký Tier-1 (luật) từ Audit Trail:** {len(alerts_t1_rule)} sự cố"
+                )
+                st.caption("_(ALERT / BLOCK được luật Tier-1 ghi vào audit trail)_")
+                _render_alerts_list(alerts_t1_rule, "t1")
+            with ml_gate_tab:
+                st.caption(
+                    f"Tổng số sự cố hiển thị: **{len(alerts_t1_mlgate)}** — phán quyết của "
+                    "**Cổng ML (LightGBM, thuộc Tier-1)**, quyết ở tốc độ đường truyền, KHÔNG gọi LLM."
+                )
+                _render_alerts_list(alerts_t1_mlgate, "t2")
             with t2_llm_tab:
                 st.caption(f"Tổng số sự cố hiển thị: **{len(alerts_t2_llm)}**")
                 _render_alerts_list(alerts_t2_llm, "t3")

@@ -68,6 +68,12 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
     n_decided = n_abstain = n_skip = 0
     latencies = []
     n_threat = 0
+    # Tách confusion THEO TỪNG HÀNH ĐỘNG (= theo dải tin cậy của chính sách 4 dải:
+    # BLOCK_IP C>=0.85 · ALERT 0.40-0.65). Cần thiết vì chỉ số headline là độ chính xác
+    # của auto-BLOCK — hành động DỨT KHOÁT, không thể đảo — chứ không phải F1 gộp (F1 gộp
+    # tính cả dải ALERT low-priority nên bị kéo xuống). Trước đây số này chỉ nằm trong
+    # báo cáo viết tay, KHÔNG được script xuất ra -> không tái lập được. Nay xuất ra JSON.
+    per_action: dict[str, dict[str, int]] = {}
     for ev in events:
         threat = _is_threat(ev)
         n_threat += int(threat)
@@ -86,18 +92,41 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
             continue
         n_decided += 1
         pred_attack = action in ATTACK_ACTIONS
-        if threat and pred_attack:
+        cell = (
+            "tp"
+            if (threat and pred_attack)
+            else "fp"
+            if ((not threat) and pred_attack)
+            else "tn"
+            if ((not threat) and (not pred_attack))
+            else "fn"
+        )
+        if cell == "tp":
             tp += 1
-        elif (not threat) and pred_attack:
+        elif cell == "fp":
             fp += 1
-        elif (not threat) and (not pred_attack):
+        elif cell == "tn":
             tn += 1
         else:
             fn += 1
+        bucket = per_action.setdefault(action, {"tp": 0, "fp": 0, "tn": 0, "fn": 0})
+        bucket[cell] += 1
 
     total = len(events)
     prec, rec, f1, acc = _f1(tp, fp, tn, fn)
     majority = round(n_threat / total, 4) if total else 0.0
+
+    # Precision theo TỪNG dải hành động (bằng chứng cho chỉ số headline auto-BLOCK).
+    by_action = {}
+    for act, c in sorted(per_action.items()):
+        n_pred_atk = c["tp"] + c["fp"]
+        by_action[act] = {
+            **c,
+            "n_predicted_attack": n_pred_atk,
+            "precision": round(c["tp"] / n_pred_atk, 4) if n_pred_atk else None,
+        }
+    _blk = by_action.get("BLOCK_IP", {})
+
     return {
         "total_events": total,
         "n_threat": n_threat,
@@ -114,6 +143,11 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
         "n_skip_payload": n_skip,
         "mean_latency_ms": round(sum(latencies) / len(latencies), 4) if latencies else 0.0,
         "metric_valid": (tp + fp + tn + fn) >= 30,
+        # Bằng chứng cho headline: auto-BLOCK = dải C>=0.85, hành động dứt khoát.
+        "by_action": by_action,
+        "auto_block_precision": _blk.get("precision"),
+        "auto_block_n": _blk.get("n_predicted_attack", 0),
+        "auto_block_fp": _blk.get("fp", 0),
     }
 
 

@@ -48,17 +48,20 @@ for arg in "$@"; do
 done
 
 # Profile phần cứng mặc định cho máy hiện tại: nhẹ hơn để tránh OOM VRAM/RAM.
+# THROUGHPUT: dải điểm mới (Cổng ML chặn/alert/drop phần lớn ở Tier-1, chỉ 0.65–0.85 escalate)
+# đã CẮT MẠNH tải LLM -> backlog nhỏ. Tăng AGENT_WORKERS (chỉ thread, KHÔNG tốn thêm VRAM) để
+# pipeline phần RAG/guardrails chồng lên thời gian chờ LLM; GIỮ N_PARALLEL để không phình VRAM.
 if [ "${SENTINEL_LITE:-1}" = "1" ]; then
   : "${LLM_MODEL_FILE:=Meta-Llama-3-8B-Instruct-Q5_K_M.gguf}"
   : "${LLAMA_ARG_CTX_SIZE:=8192}"
   : "${LLAMA_ARG_N_PARALLEL:=1}"
-  : "${SENTINEL_AGENT_WORKERS:=1}"
+  : "${SENTINEL_AGENT_WORKERS:=2}"
   : "${SENTINEL_ENABLE_NEO4J:=0}"
 else
   : "${LLM_MODEL_FILE:=gemma-2-9b-it-Q6_K.gguf}"
   : "${LLAMA_ARG_CTX_SIZE:=16384}"
   : "${LLAMA_ARG_N_PARALLEL:=2}"
-  : "${SENTINEL_AGENT_WORKERS:=2}"
+  : "${SENTINEL_AGENT_WORKERS:=4}"
   : "${SENTINEL_ENABLE_NEO4J:=1}"
 fi
 export LLM_MODEL_FILE LLAMA_ARG_CTX_SIZE LLAMA_ARG_N_PARALLEL SENTINEL_AGENT_WORKERS SENTINEL_ENABLE_NEO4J

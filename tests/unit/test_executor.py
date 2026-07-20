@@ -24,13 +24,17 @@ from src.response.executor import (
 
 @pytest.fixture(autouse=True)
 def isolated_audit_db(tmp_path, monkeypatch):
-    """CÔ LẬP audit DB vào file TẠM — tuyệt đối KHÔNG đụng config/audit_trail.db
-    production (trước đây fixture xóa thẳng bảng trên DB thật -> chạy pytest là
-    trắng audit demo). Mọi hàm executor đọc DB_PATH module-global tại call-time
-    nên monkeypatch là đủ."""
+    """CÔ LẬP audit DB VÀ threat_memory DB vào file TẠM — tuyệt đối KHÔNG đụng
+    config/audit_trail.db & config/threat_memory.db production. raise_alert/block_ip
+    lazy-import singleton `threat_memory` MỖI lần gọi nên monkeypatch module-attr là đủ."""
     test_db = str(tmp_path / "audit_test.db")
     monkeypatch.setattr(executor, "DB_PATH", test_db)
     executor._init_db()
+
+    import src.agent.threat_memory as tm_mod
+
+    fresh_tm = tm_mod.ThreatMemoryStore(db_path=str(tmp_path / "threat_memory_test.db"))
+    monkeypatch.setattr(tm_mod, "threat_memory", fresh_tm)
     yield
 
 
@@ -106,6 +110,47 @@ def test_audit_trail_integrity_verification():
     is_valid, msg = verify_audit_trail_integrity()
     assert is_valid is False
     assert "giả mạo" in msg.lower() or "tamper" in msg.lower() or "chèn" in msg.lower()
+
+
+def test_raise_alert_first_time_returns_alert():
+    """Lần đầu một IP bị CẢNH BÁO -> action='ALERT', ghi audit ALERT + tăng total_alerts."""
+    action = raise_alert("203.0.113.7", "Anomaly rủi ro trung bình")
+    assert action == "ALERT"
+    trail = get_audit_trail(limit=5)
+    assert trail[0]["action"] == "ALERT"
+    assert trail[0]["target"] == "203.0.113.7"
+
+    import src.agent.threat_memory as tm_mod
+
+    rep = tm_mod.threat_memory.get_ip_reputation("203.0.113.7")
+    assert rep is not None and rep["total_alerts"] == 1
+
+
+def test_raise_alert_repeat_offender_escalates_to_block():
+    """IP đã ALERT 1 lần -> lần ALERT thứ 2 TỰ LEO THANG thành BLOCK_IP (repeat-offender)."""
+    ip = "203.0.113.8"
+    first = raise_alert(ip, "Cảnh báo lần 1")
+    assert first == "ALERT"
+
+    second = raise_alert(ip, "Cảnh báo lần 2 — cùng IP")
+    assert second == "BLOCK_IP"
+
+    # Audit gần nhất phải là BLOCK_IP cho đúng IP; reputation đẩy lên known-bad (=100).
+    trail = get_audit_trail_for_ip(ip, limit=5)
+    assert trail[0]["action"] == "BLOCK_IP"
+
+    import src.agent.threat_memory as tm_mod
+
+    rep = tm_mod.threat_memory.get_ip_reputation(ip)
+    assert rep is not None and rep["reputation_score"] >= 100.0
+
+
+def test_raise_alert_whitelisted_ip_never_escalates(monkeypatch):
+    """IP whitelist: dù đã cảnh báo trước vẫn CHỈ ALERT, KHÔNG bao giờ auto-block."""
+    ip = "10.0.0.99"
+    monkeypatch.setattr(executor, "_whitelisted_ips", lambda: frozenset({ip}))
+    assert raise_alert(ip, "lần 1") == "ALERT"
+    assert raise_alert(ip, "lần 2") == "ALERT"
 
 
 def test_login_attempts_and_lockout():

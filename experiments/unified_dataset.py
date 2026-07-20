@@ -416,6 +416,7 @@ def build_stream(
     cicids_max_days: tuple[str, ...] = ("Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",),
     dapt_max_rows: int = 5000,
     zeroday_repeat: int = 1,
+    cicids_attack_ratio: float = 0.25,
 ):
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
@@ -424,6 +425,9 @@ def build_stream(
       cicids_max_days: danh sách file ngày CICIDS THẬT để trích tấn công đa dạng + benign.
       dapt_max_rows:   số dòng DAPT day1 raw.
       zeroday_repeat:  nhân số zero-day real-derived (xem `_build_zerodays`).
+      cicids_attack_ratio: tỉ lệ dòng TẤN CÔNG lấy mỗi ngày CICIDS (phần còn lại là benign).
+        Mặc định 0.25 = hành vi cũ. Hạ xuống -> nền benign dày hơn, GIẢM số ca leo thang
+        (và do đó giảm tải LLM) trong khi vẫn giữ ĐỦ 15 lớp tấn công THẬT để UI đa dạng.
 
     Tất cả sự kiện đều là DATA THẬT (CICIDS từ ground_truth, DAPT từ chains). Zero-day
     là biến thể REAL-DERIVED: nền là flow benign THẬT trong ground_truth, chỉ đẩy ĐÚNG
@@ -524,7 +528,7 @@ def build_stream(
     cic_dir = os.path.join(ROOT, "data", "raw", "cicids2018")
     n_days = max(1, len(cicids_max_days))
     per_day = max(1, cicids_max_rows // n_days)
-    per_atk = max(1, int(per_day * 0.25))  # ~25% tấn công / 75% benign (nhiều benign để drop)
+    per_atk = max(1, int(per_day * cicids_attack_ratio))  # còn lại là benign (nền để drop)
     per_ben = max(1, per_day - per_atk)
     _POP = ("Label", "Timestamp", "Flow ID", "Src IP", "Dst IP", "Src Port")
 

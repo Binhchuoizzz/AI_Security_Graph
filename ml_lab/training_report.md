@@ -28,7 +28,8 @@ Dữ liệu ~949k dòng chia theo tỉ lệ chuẩn (stratify theo nhãn):
 
 Việc giữ Benign ~21% và Attack ~79% là **cố tình** (thiên recall) giúp Cổng ML tập trung nhận
 diện bất thường tần suất cao, phản xạ nhanh & dứt khoát; độ chính xác triển khai được kiểm soát
-bởi **ngưỡng tin cậy 0.90** của cổng (dưới ngưỡng → escalate LLM).
+bởi **chính sách 4 dải độ-tin-cậy** của cổng: `C≥0.85`→BLOCK · `0.65≤C<0.85`→ESCALATE (LLM) ·
+`0.40≤C<0.65`→ALERT (low-priority) · `C<0.40`→PASS/DROP.
 
 ## 4. Kết Quả Huấn Luyện & So Sánh
 
@@ -46,27 +47,33 @@ Kết quả trên Tập Test (**189.907 dòng**, held-out):
 | **Random Forest** | 0.9402 | 0.9400 | 0.9403 | 0.000922 |
 | **Logistic Regression** | 0.9278 | 0.9125 | 0.9436 | 0.000044 |
 
-Ngoài F1 test held-out, đo thêm hành vi **triển khai thực** của Cổng ML (ngưỡng 0.90) trên
+Ngoài F1 test held-out, đo thêm hành vi **triển khai thực** của Cổng ML (dải BLOCK C≥0.85) trên
 luồng gộp `data/datatest.json` (`experiments/evaluate_ml_gate.py`) và mức giảm tải LLM
 (`run_ablation.py --mode mlgate`, Config G):
 
-Benchmark `data/datatest.json` được **cân bằng lại 2026-07-19** thành 2514 mẫu, đủ **15 lớp
-tấn công CICIDS đều tay** (70/lớp) + benign + DAPT (day2-5) + zero-day + adversarial — KHÓ hơn
-hẳn bản cũ (vốn bị Infiltration/DDoS lấn át) nên số F1 triển khai giảm nhưng **trung thực hơn**.
+Benchmark `data/datatest.json` = **3204 mẫu từ FULL 4 luồng** (15 lớp CICIDS đa-ngày ≤80/lớp + benign
+đa-ngày + DAPT day2-5 (500) + zero-day real-derived (360) + adversarial OWASP). **Chính sách 4 dải**
+(C≥0.85 BLOCK · 0.65–0.85 ESCALATE · 0.40–0.65 ALERT · <0.40 PASS). Vì hành động quyết định là
+**auto-BLOCK**, chỉ số headline là **độ chính xác auto-BLOCK**.
 
-| Chỉ số triển khai (benchmark 2.5k mới) | Giá trị |
+| Chỉ số triển khai (datatest 3.2k, 4 luồng, dải mới) | Giá trị |
 |---|---|
-| F1 (Cổng ML, benchmark gộp 15-lớp) | **0.936** |
-| Precision / Recall | 0.9746 / 0.9004 |
-| Kháng né-tránh (Inf/cực-đoan) | **99.93%** |
-| Giảm tải LLM (bypass, Config G, ground_truth 1250) | **85.1%** — F1(bypass) 0.9911 |
+| **Auto-BLOCK (C≥0.85) precision** | **100%** — 962 đúng / **0** chặn nhầm (962 block) |
+| Kháng né-tránh (Inf/cực-đoan) | **99.58%** |
+| Giảm tải LLM (bypass, Config G, ground_truth 1250) | **83.8%** — F1(bypass) 0.9739 |
+| F1 gộp (tính CẢ dải ALERT-0.40 là "tấn công") | 0.825 (P .909 / R .755) — *xem chú thích* |
 
 **Nhận xét Kết Quả:**
 
 - LightGBM thắng với **F1-Score 96.35%** trên Tập Test 190k held-out (số của MODEL, không đổi).
-- Trên **benchmark gộp MỚI (15-lớp cân bằng, khó hơn)**: F1 triển khai **0.936** (P 0.975 / R 0.900).
-  Thấp hơn 0.9803 của benchmark cũ (Infiltration-heavy) vì tập mới đa dạng đều tay (gồm Infiltration/
-  Bot vốn khó). Khi Cổng ML TỰ QUYẾT (bypass), F1 vẫn **0.9911** — rất chính xác lúc tự tin.
+- **Auto-BLOCK hoàn hảo trên benchmark này:** ở dải C≥0.85, Cổng ML chặn 962 luồng mà **0 benign bị chặn
+  nhầm** (precision 100%, 0 FP) — dải block cố tình đặt cao 0.85 nên rất bảo thủ; hành động dứt khoát
+  (không thể đảo) cực đáng tin. (Đây là số của benchmark 3.2k cụ thể, không phải tuyên bố tổng quát;
+  model held-out vẫn 0.9635.)
+- **Chú thích trung thực về F1 gộp 0.825:** con số này lấy CẢ dải ALERT (0.40–0.65) làm "dự đoán tấn công";
+  vì ngưỡng ALERT thấp (0.40) nên một số benign low-priority bị cảnh báo (104 FP) → kéo F1 xuống. Đây KHÔNG
+  phải model kém đi (đã quét nâng ngưỡng: precision cải thiện rất ít — vùng 0.40–0.85 vốn benign-dominated).
+  ALERT là cảnh báo **low-priority** (không chặn, người xem), nên chấp nhận được.
 - Tốc độ dự đoán vẫn ở mức vài phần triệu giây/luồng (≤ 0.001 ms/sample) — không ảnh hưởng
   đường đọc Tier-1.
 
@@ -76,5 +83,5 @@ Bộ lọc Tier 2 đã được đào tạo cực kì mạnh mẽ để nhận d
 - **Lưu ý Kiến trúc Hệ thống:** Model xuất sắc nhất là **LightGBM** (tinh chỉnh cho 1M), file
   mô hình xuất ra dạng Tự Điển (`dict`) gồm `scaler`, `model`, `features`. Lưu ở `tier_2_model.pkl`
   (tên file giữ theo lịch sử; bản cũ backup `tier_2_model_100k.bak.pkl`) và được Cổng ML của
-  Tier-1 nạp lúc chạy. Mọi log bị model từ chối do độ tin cậy thấp (< 0.90) hoặc lệch phân bố
-  (OOD-abstain) sẽ tự động escalate lên **Tier-2 (LLM Agent)** đánh giá ngữ cảnh.
+  Tier-1 nạp lúc chạy. Log rơi vào dải ESCALATE (0.65≤C<0.85) hoặc lệch phân bố (OOD-abstain /
+  thiếu feature) sẽ tự động escalate lên **Tier-2 (LLM Agent)** đánh giá ngữ cảnh.

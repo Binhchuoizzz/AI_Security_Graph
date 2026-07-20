@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from src.guardrails import decision_policy
+
 logger = logging.getLogger(__name__)
 
 # Model được fit trên DataFrame có tên cột; ở runtime ta truyền ndarray (nhanh hơn, không
@@ -46,13 +48,17 @@ class MLGateway:
     Tier-1 ML Gateway (Cổng ML)
     Dời từ Tier-2 sang Tier-1 để giải quyết bài toán Head-of-Line (HOL) Blocking.
     Đánh giá nhanh feature số học bằng LightGBM + StandardScaler (76 features).
-    Chỉ trả về quyết định khi tự tin > 90% VÀ input vượt qua lớp bảo mật chống né-tránh.
+    Quyết định theo 4 DẢI (C = độ tin cậy tấn công): C>=0.85 BLOCK · 0.65–0.85 ESCALATE(LLM) ·
+    0.40–0.65 ALERT · <0.40 PASS/DROP — VÀ input phải vượt qua lớp bảo mật chống né-tránh
+    (low-coverage / OOD-abstain / clamp) nếu không sẽ escalate LLM.
     """
 
     def __init__(self):
         self.pipeline = self._load_pipeline()
-        self.conf_threshold_block = 0.90
-        self.conf_threshold_alert = 0.70
+        # Ngưỡng lấy từ chính sách THỐNG NHẤT (chung với LLM) — 1 nguồn sự thật.
+        # (giữ 2 thuộc tính này để hiển thị/tương thích; quyết định thực tế dùng classify_ml 4 dải).
+        self.conf_threshold_block = decision_policy.ML_BLOCK_CONF
+        self.conf_threshold_alert = decision_policy.ML_ALERT_CONF
         # Cache mean_/scale_ dạng ndarray để sanitize/OOD nhanh (đọc 1 lần).
         self._mean = None
         self._scale = None
@@ -211,18 +217,23 @@ class MLGateway:
         reasoning = None
         confidence = 0.0
 
-        # Lưu ý: "Cổng ML" là marker để UI bắt được (từ components.py)
-        if confidence_attack >= self.conf_threshold_block:
+        # Cổng ML — 4 DẢI theo chính sách (C = confidence_attack):
+        #   C>=0.85 BLOCK · 0.65–0.85 ESCALATE(LLM) · 0.40–0.65 ALERT · <0.40 PASS/DROP.
+        # Lưu ý: "Cổng ML" là marker để UI bắt được (từ components.py).
+        verdict = decision_policy.classify_ml(confidence_attack)
+        if verdict == "BLOCK_IP":
             action = "BLOCK_IP"
             reasoning = f"Phát hiện tấn công bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
             confidence = confidence_attack
-        elif confidence_attack >= self.conf_threshold_alert:
+        elif verdict == "ALERT":
             action = "ALERT"
-            reasoning = f"Cảnh báo rủi cao bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
+            reasoning = f"Cảnh báo rủi ro (low-priority) bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
             confidence = confidence_attack
-        elif confidence_benign >= self.conf_threshold_block:
-            action = "LOG"
-            reasoning = f"Xác nhận an toàn bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"
+        elif verdict == "DROP":
+            # C < 0.40 -> PASS/audit log: dừng ngay ở Tier-1, KHÔNG tốn LLM (noise reduction thật).
+            action = "DROP"
+            reasoning = f"Xác nhận an toàn (PASS) bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"
             confidence = confidence_benign
+        # verdict == "ESCALATE" (0.65–0.85): giữ action=None -> đẩy LLM phân tích sâu.
 
         return action, reasoning, confidence, sec

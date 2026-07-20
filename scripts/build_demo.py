@@ -27,13 +27,21 @@ DEMO_DAYS = (
 
 def main():
     print("[*] Generating ~100k unified stream for DEMO (data THẬT, đa-ngày CICIDS)...")
-    # CICIDS ~84k (đa dạng 14 loại + nhiều benign), DAPT ~12k, zero-day ~3k (real-derived),
-    # adversarial 4 (OWASP THẬT). Lấy TẤT CẢ event trong stream (không lấy mẫu con).
+    # PHÂN BỔ demo ~100k, ưu tiên NỀN BENIGN DÀY (giống SOC thật: đại đa số log là vô hại)
+    # để Tier-1 drop phần lớn và GIẢM TẢI LLM, nhưng vẫn giữ ĐỦ tín hiệu cho MỌI panel UI:
+    #   - cicids_max ~91k, tỉ lệ tấn công 6% (thay vì 25%): vẫn phủ ĐỦ 15 lớp tấn công THẬT
+    #     (mỗi ngày lấy mẫu ngẫu nhiên từ pool tấn công của ngày đó) -> cột MITRE + Tier-1
+    #     block vẫn đa dạng, nhưng KHÔNG còn khối lượng DoS/DDoS lặp làm ngập LLM.
+    #   - dapt_max 6k (giảm từ 12k): đây chỉ là nguồn KHỐI LƯỢNG; panel APT KHÔNG phụ thuộc
+    #     nguồn này mà lấy từ `dapt` (chuỗi DAPT2020 THẬT) -> cắt an toàn, không mất APT.
+    #   - zero-day 60 x 15 spec = 900 probe (đủ để panel zero-day có số, giảm từ 3000).
+    #   - adversarial 4 (OWASP THẬT) giữ nguyên.
     warmup, main_stream, apt_truth, n_chains = build_stream(
-        cicids_max_rows=120_000,  # per-ngày cao hơn để bù ngày thiếu benign -> CICIDS ~88k
+        cicids_max_rows=125_000,  # yêu cầu cao hơn để bù ngày thiếu benign -> CICIDS ~91k
         cicids_max_days=DEMO_DAYS,
-        dapt_max_rows=12_000,  # day2..day5 (có tấn công THẬT) -> ~12k DAPT
-        zeroday_repeat=200,  # 200 x 15 spec = ~3000 probe zero-day (nền benign THẬT, IP riêng)
+        cicids_attack_ratio=0.06,  # nền benign dày (94%) -> ít ca leo thang hơn hẳn
+        dapt_max_rows=6_000,  # nguồn khối lượng DAPT; chuỗi APT lấy từ `dapt` nên vẫn nguyên
+        zeroday_repeat=60,  # 60 x 15 spec = ~900 probe zero-day (nền benign THẬT, IP riêng)
     )
     stream = warmup + main_stream  # warmup giữ prefix; main đã sort theo thời gian
 

@@ -140,8 +140,12 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     print("  SENTINEL — TIER-2 ESCALATION ADJUDICATION ACCURACY (chất lượng LLM)")
     print("=" * 72)
     escalated = collect_escalated()
-    if limit:
-        escalated = escalated[:limit]
+    if limit and limit < len(escalated):
+        # Mẫu STRIDED đều trên TOÀN tập escalate (KHÔNG phải first-N): escalated gom
+        # theo nguồn nên first-N sẽ lệch về nguồn đầu. Bước đều giữ tỉ lệ 4 nguồn →
+        # ước lượng đại diện, tất định (reproducible), không bịa dữ liệu.
+        stride = len(escalated) / limit
+        escalated = [escalated[int(i * stride)] for i in range(limit)]
     n = len(escalated)
     print(f"[*] Sự kiện Tier-1 ESCALATE: {n} (chạy qua Tier-2 thật, workers={workers})")
     if n == 0:
