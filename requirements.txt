@@ -25,6 +25,17 @@ pandas>=2.2.3
 numpy>=1.26.4
 
 # ==========================================
+# 3b. CỔNG ML TIER-1 (LightGBM + StandardScaler)
+# ==========================================
+# BẮT BUỘC cho runtime: `ml_lab/tier_2_model.pkl` được pickle từ sklearn + LightGBM.
+# THIẾU 2 gói này thì pickle.load ném ModuleNotFoundError -> MLGateway._load_pipeline
+# trả None -> Cổng ML TẮT ÂM THẦM (mọi ca leo thang dồn hết lên LLM) mà không có lỗi
+# nào nổi lên. Đây chính là nguyên nhân CI đỏ liên tục từ 2026-07-17.
+# Ghim phiên bản vì tương thích pickle nhạy với version của sklearn/LightGBM.
+scikit-learn==1.7.2
+lightgbm==4.6.0
+
+# ==========================================
 # 4. USER INTERFACE (Giao diện HITL)
 # ==========================================
 streamlit>=1.54.0

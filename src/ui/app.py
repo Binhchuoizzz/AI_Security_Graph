@@ -21,6 +21,7 @@ from streamlit_autorefresh import st_autorefresh  # type: ignore
 
 from src.agent.threat_memory import threat_memory
 from src.response.executor import (
+    count_audit_alerts,
     get_audit_trail,
     get_audit_trail_for_ip,
     verify_audit_trail_integrity,
@@ -33,6 +34,12 @@ from src.response.executor import (
 @st.cache_data(ttl=2)
 def cached_get_audit_trail(limit=50):
     return get_audit_trail(limit)
+
+
+@st.cache_data(ttl=2)
+def cached_count_audit_alerts():
+    """Tổng số cảnh báo THẬT (COUNT(*), không bị trần limit) — dùng cho tỷ lệ giảm tải."""
+    return count_audit_alerts()
 
 
 @st.cache_data(ttl=2)
@@ -721,9 +728,9 @@ def main_dashboard():
     total_reviewed = approved_rules_count + rejected_rules_count
     live_fpr = (rejected_rules_count / total_reviewed) * 100 if total_reviewed > 0 else 0.0
 
-    # Số liệu THẬT (không ước lượng): đọc counter do subscriber ghi vào Redis khi
-    # xử lý log thô qua Tier-1. raw_logs_total = tổng log đã phân tích; tier1_dropped
-    # = số bị Tier-1 lọc bỏ -> Noise Reduction = dropped/raw (đo trực tiếp, không bịa).
+    # Số liệu THẬT (không ước lượng): đọc counter do subscriber ghi ra
+    # config/pipeline_stats.json khi xử lý log thô qua Tier-1.
+    # raw_logs_total = tổng log đã phân tích; pending_llm_queue = backlog Tier-2.
     raw_logs_count = 0
     noise_reduction = None
     try:
@@ -742,11 +749,14 @@ def main_dashboard():
         pending_llm_count = 0
         pass
 
-    # MỘT nguồn sự thật: Tỷ lệ giảm tải = (log thô − cảnh báo escalated) / log thô.
-    # Buộc raw, escalated và noise-reduction luôn NHẤT QUÁN với nhau (tránh việc 3 con
-    # số đến từ 3 counter khác nhau rồi mâu thuẫn, ví dụ 550 thô nhưng 434 escalated).
-    if raw_logs_count > len(all_alerts):
-        noise_reduction = ((raw_logs_count - len(all_alerts)) / raw_logs_count) * 100
+    # MỘT nguồn sự thật: Tỷ lệ giảm tải = (log thô − TỔNG cảnh báo) / log thô.
+    # BUG ĐÃ SỬA: trước đây dùng len(all_alerts), mà all_alerts = get_audit_trail(limit=2000)
+    # bị chặn cứng 2000 dòng. Khi luồng vượt 2000 cảnh báo, len() BÃO HOÀ nên tỷ lệ tự
+    # phồng lên (100k log thô -> luôn ~98%) BẤT KỂ số cảnh báo thật. Nay đếm bằng
+    # COUNT(*) trên audit_trail (cached_count_audit_alerts) -> đúng ở mọi quy mô.
+    total_alerts = cached_count_audit_alerts()
+    if raw_logs_count > total_alerts:
+        noise_reduction = ((raw_logs_count - total_alerts) / raw_logs_count) * 100
     else:
         noise_reduction = None  # raw chưa hợp lệ -> header dùng fallback an toàn
 

@@ -42,6 +42,23 @@ MEMORY_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "
 _write_lock = threading.Lock()
 
 
+def _parse_utc(ts: str) -> datetime | None:
+    """Đọc timestamp ISO về datetime AWARE-UTC, chịu được dữ liệu CŨ dạng naive.
+
+    TẠI SAO CẦN: mọi timestamp mới đều aware-UTC, nhưng DB đã tồn tại từ trước có thể
+    còn dòng naive (bản cũ ghi bằng datetime.now()). Phép trừ `aware - naive` ném
+    TypeError -> làm hỏng cả nhánh phát hiện ứng viên APT. Ở đây coi giá trị naive là
+    UTC (đúng với ý định ghi ban đầu) thay vì để nổ.
+    """
+    if not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts)
+    except (TypeError, ValueError):
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
 class ThreatMemoryStore:
     """
     Bộ nhớ dài hạn bền vững (Persistent Long-Term Memory) cho SENTINEL Agent.
@@ -153,7 +170,11 @@ class ThreatMemoryStore:
             # Nạp các thực thể đã biết mặc định nếu bảng trống
             c.execute("SELECT COUNT(*) FROM known_entities")
             if c.fetchone()[0] == 0:
-                now_str = datetime.now().isoformat()
+                # PHẢI aware-UTC cho khớp MỌI timestamp khác của file này (8 chỗ dùng
+                # datetime.now(timezone.utc)). Dùng datetime.now() naive ở đây khiến
+                # known_entities.added_at lệch +7h so với phần còn lại, và so sánh chuỗi
+                # ISO với cutoff aware mất tin cậy (chuỗi naive không có hậu tố '+00:00').
+                now_str = datetime.now(timezone.utc).isoformat()
                 c.execute(
                     """
                     INSERT INTO known_entities (entity_type, entity_value, description, added_by, added_at, is_active)
@@ -526,9 +547,12 @@ class ThreatMemoryStore:
                 "ip": ip,
                 "is_apt_candidate": True,
                 "total_incidents": reputation["total_incidents"],
+                # _parse_utc: dữ liệu cũ có thể naive -> `aware - naive` ném TypeError.
                 "days_active": (
-                    datetime.now(timezone.utc) - datetime.fromisoformat(reputation["first_seen"])
-                ).days,
+                    (datetime.now(timezone.utc) - _first_seen).days
+                    if (_first_seen := _parse_utc(reputation["first_seen"]))
+                    else 0
+                ),
                 "reputation_score": reputation["reputation_score"],
                 "last_mitre": reputation.get("last_mitre_technique", ""),
             }

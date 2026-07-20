@@ -22,8 +22,25 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
 
 _MODEL_PATH = os.path.join(ROOT, "ml_lab", "tier_2_model.pkl")
+
+
+def _gateway_is_usable() -> bool:
+    """Điều kiện THẬT của các test này: Cổng ML có pipeline DÙNG ĐƯỢC.
+
+    TẠI SAO KHÔNG CHỈ CHECK os.path.exists: file model có thể tồn tại nhưng KHÔNG giải
+    mã được (thiếu scikit-learn/lightgbm -> pickle.load ném ModuleNotFoundError). Khi đó
+    _load_pipeline trả None và evaluate_detailed thoát sớm với sanitized=0/ood=0.0, làm
+    các test dưới fail bằng thông báo khó hiểu ('assert 0 >= 1') thay vì skip rõ ràng —
+    đúng cách CI đã đỏ suốt từ 2026-07-17.
+    """
+    if not os.path.exists(_MODEL_PATH):
+        return False
+    return MLGateway().pipeline is not None
+
+
 pytestmark = pytest.mark.skipif(
-    not os.path.exists(_MODEL_PATH), reason="ml_lab/tier_2_model.pkl không có (binary gitignore)"
+    not _gateway_is_usable(),
+    reason="Cổng ML không dùng được (thiếu ml_lab/tier_2_model.pkl hoặc thiếu scikit-learn/lightgbm)",
 )
 
 

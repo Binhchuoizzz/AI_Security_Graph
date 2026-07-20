@@ -161,13 +161,23 @@ def run(n_events: int = 100):
         print("         or set LLM_API_BASE=http://127.0.0.1:8080/v1")
         print("       Then re-run this script.")
 
-        # Lưu kết quả bỏ qua (skip)
-        Path("experiments/results").mkdir(exist_ok=True)
-        json.dump(
-            {"status": "SKIPPED", "reason": "LLM server not available"},
-            open("experiments/results/latency_benchmark.json", "w"),
-            indent=2,
-        )
+        # Lưu kết quả bỏ qua (skip) — KHÔNG được xoá mất số đo THẬT đã có.
+        # BUG CŨ: ghi đè thẳng latency_benchmark.json bằng {"status": "SKIPPED"} nên chỉ
+        # cần lỡ chạy script lúc LLM chưa bật là MẤT TRẮNG kết quả đã đo (số này đang được
+        # UI và luận văn trích dẫn). Nay giữ kết quả cũ dưới `previous_result`, và dùng
+        # context manager để file luôn được đóng/flush.
+        Path("experiments/results").mkdir(parents=True, exist_ok=True)
+        out_path = Path("experiments/results/latency_benchmark.json")
+        payload: dict = {"status": "SKIPPED", "reason": "LLM server not available"}
+        if out_path.exists():
+            try:
+                prev = json.loads(out_path.read_text())
+                if prev.get("status") != "SKIPPED":
+                    payload["previous_result"] = prev
+            except (OSError, json.JSONDecodeError):
+                pass  # file hỏng/không đọc được -> cứ ghi marker skip
+        with open(out_path, "w") as f:
+            json.dump(payload, f, indent=2)
         return False
 
     print(f"Loading {n_events} test events...")

@@ -5,6 +5,7 @@ Bộ làm sạch đầu ra (Output Sanitizer): Phòng thủ rò rỉ dữ liệu
 import base64
 import logging
 import re
+from typing import ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,10 @@ class OutputSanitizer:
     Chống Data Exfiltration và bypass bằng Obfuscation/Invisible Characters.
     """
 
-    # Patterns nguy hiểm trong output
-    DANGEROUS_PATTERNS = [
+    # Patterns nguy hiểm trong output. ClassVar: hằng CHỈ-ĐỌC dùng chung cho mọi instance
+    # (chỉ được duyệt trong _strip_dangerous) — đánh dấu rõ để không ai vô tình mutate
+    # list dùng chung, và để type-checker không coi đây là field của instance.
+    DANGEROUS_PATTERNS: ClassVar[list[tuple[str, str]]] = [
         # Markdown image (exfil vector chính - hỗ trợ khoảng trắng tùy chọn)
         (r"!\[[^\]]*\]\s*\([^\)]+\)", "[IMG_STRIPPED]"),
         # Markdown links to external domains (hỗ trợ khoảng trắng tùy chọn)

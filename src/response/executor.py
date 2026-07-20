@@ -393,6 +393,31 @@ def get_audit_trail(limit=50):
         return []
 
 
+def count_audit_alerts(exclude_actions: tuple[str, ...] = ("AWAIT_HITL",)) -> int:
+    """Đếm TỔNG số cảnh báo trong audit trail (KHÔNG giới hạn số dòng).
+
+    TẠI SAO CẦN RIÊNG: dashboard tính "giảm tải" bằng len(get_audit_trail(limit=2000)).
+    Khi luồng vượt 2000 cảnh báo, len() BÃO HOÀ ở 2000 nên tỷ lệ giảm tải tự phồng lên
+    (vd 100k log thô -> luôn ~98%) BẤT KỂ thực tế. Đếm bằng COUNT(*) cho số đúng mà
+    không phải nạp toàn bộ hàng về RAM.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            if exclude_actions:
+                placeholders = ",".join("?" * len(exclude_actions))
+                c.execute(
+                    f"SELECT COUNT(*) FROM audit_trail WHERE action NOT IN ({placeholders})",  # noqa: S608
+                    exclude_actions,
+                )
+            else:
+                c.execute("SELECT COUNT(*) FROM audit_trail")
+            row = c.fetchone()
+        return int(row[0]) if row else 0
+    except Exception:
+        return 0
+
+
 def get_audit_trail_for_ip(ip: str, limit=100):
     try:
         with sqlite3.connect(DB_PATH) as conn:

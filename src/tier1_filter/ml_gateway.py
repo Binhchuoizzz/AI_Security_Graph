@@ -69,19 +69,33 @@ class MLGateway:
                 self._scale = np.asarray(sc.scale_, dtype=float)
 
     def _load_pipeline(self) -> dict[str, Any] | None:
+        # Dựng đường dẫn NGOÀI try để nhánh except luôn có biến này khi ghi log.
+        model_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "ml_lab",
+            "tier_2_model.pkl",
+        )
         try:
-            model_path = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "ml_lab",
-                "tier_2_model.pkl",
-            )
             if not os.path.exists(model_path):
                 logger.warning(f"[TIER-1 ML GATE] Không tìm thấy model tại {model_path}")
                 return None
             with open(model_path, "rb") as f:
                 return pickle.load(f)
+        except ModuleNotFoundError as e:
+            # Nguyên nhân THƯỜNG GẶP NHẤT: thiếu scikit-learn/lightgbm (model được pickle
+            # từ 2 thư viện này). Trước đây chỉ log 1 dòng chung chung nên Cổng ML TẮT ÂM
+            # THẦM: hệ vẫn chạy nhưng MỌI ca leo thang dồn lên LLM, không ai biết vì sao.
+            logger.critical(
+                f"[TIER-1 ML GATE] TẮT — thiếu thư viện để giải mã model: {e}. "
+                f"Cài đặt: pip install -r requirements.txt (cần scikit-learn + lightgbm). "
+                f"HỆ QUẢ: KHÔNG có giảm tải ML, mọi ca leo thang sẽ gọi LLM."
+            )
+            return None
         except Exception as e:
-            logger.error(f"[TIER-1 ML GATE] Lỗi load mô hình: {e}")
+            logger.critical(
+                f"[TIER-1 ML GATE] TẮT — lỗi load mô hình {model_path}: {type(e).__name__}: {e}. "
+                f"HỆ QUẢ: KHÔNG có giảm tải ML, mọi ca leo thang sẽ gọi LLM."
+            )
             return None
 
     def _build_raw_vector(self, log: dict, features: list) -> tuple[np.ndarray, int, int]:

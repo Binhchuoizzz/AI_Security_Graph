@@ -226,6 +226,7 @@ def test_generic_t1571_with_payload_stays_resolved():
             payload="beacon GET /c2 HTTP/1.1 evil-host",
         )
     )
+    assert m is not None, "_from_triage_anchor phải nhận diện được neo T1571"
     assert m.mitre_technique_id == "T1571"
     assert m.mapping_status == "resolved"
 
@@ -237,6 +238,7 @@ def test_non_generic_technique_port_only_unaffected():
     m = _from_triage_anchor(
         AttackMapperInput(attack_type="T1190 - Exploit Public-Facing", confidence=0.8, payload="")
     )
+    assert m is not None, "_from_triage_anchor phải nhận diện được neo T1190"
     assert m.mitre_technique_id == "T1190"
     assert m.mapping_status == "resolved"
 

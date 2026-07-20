@@ -47,7 +47,11 @@ def _count_subscribers() -> int:
     'main.py --mode server' -> bị đếm nhầm. Ta xác thực /proc/<pid>/cmdline: argv[0]
     phải là python interpreter (loại zsh/bash/pgrep) và args phải có main.py --mode server.
     """
-    out = subprocess.run(["pgrep", "-f", SUBSCRIBER_PATTERN], capture_output=True, text=True)
+    # check=False CỐ Ý: pgrep trả mã 1 khi KHÔNG khớp tiến trình nào — đó là trạng thái
+    # hợp lệ (đã sạch), không phải lỗi; check=True sẽ ném CalledProcessError oan.
+    out = subprocess.run(
+        ["pgrep", "-f", SUBSCRIBER_PATTERN], capture_output=True, text=True, check=False
+    )
     count = 0
     for pid in out.stdout.split():
         try:
@@ -73,13 +77,14 @@ def stop_subscribers(dry_run: bool = False) -> None:
     if n == 0:
         print("      (không có tiến trình nào để dừng)")
         return
-    subprocess.run(["pkill", "-f", SUBSCRIBER_PATTERN], capture_output=True)
+    # check=False CỐ Ý: pkill trả mã 1 khi không còn tiến trình nào để giết (đã dừng xong).
+    subprocess.run(["pkill", "-f", SUBSCRIBER_PATTERN], capture_output=True, check=False)
     for _ in range(12):  # chờ tối đa 6s cho SIGTERM
         time.sleep(0.5)
         if _count_subscribers() == 0:
             break
     if _count_subscribers():  # cứng đầu -> SIGKILL
-        subprocess.run(["pkill", "-9", "-f", SUBSCRIBER_PATTERN], capture_output=True)
+        subprocess.run(["pkill", "-9", "-f", SUBSCRIBER_PATTERN], capture_output=True, check=False)
         time.sleep(1)
     print(f"      -> còn lại: {_count_subscribers()} (kỳ vọng 0)")
 
