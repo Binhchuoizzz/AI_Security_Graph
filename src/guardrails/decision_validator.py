@@ -119,7 +119,15 @@ class DecisionValidator:
                                 is_critical = True
                                 break
                     except ValueError:
-                        pass
+                        # Subnet trong CẤU HÌNH sai định dạng -> subnet đó KHÔNG còn được
+                        # lá chắn bảo vệ. Im lặng ở đây rất nguy hiểm: một typo trong
+                        # config khiến SENTINEL có thể TỰ CHẶN hạ tầng trọng yếu của
+                        # chính mình (self-DoS) mà không ai biết. Phải báo động.
+                        logger.error(
+                            f"[DecisionValidator] Subnet hạ tầng trọng yếu SAI ĐỊNH DẠNG "
+                            f"trong cấu hình: {subnet_str!r} — subnet này KHÔNG được bảo vệ. "
+                            f"Hãy sửa `critical_infra_subnets`."
+                        )
             else:
                 # Nếu không thể parse, kiểm tra chuỗi tĩnh thông dụng
                 if target.lower() in ["localhost", "127.0.0.1", "::1", "10.0.0.99"]:
