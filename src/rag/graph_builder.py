@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from datetime import datetime, timezone
 
 from neo4j import GraphDatabase  # type: ignore
 from neo4j.exceptions import ServiceUnavailable  # type: ignore
@@ -142,8 +143,27 @@ class KnowledgeGraphBuilder:
             logger.info(f"Knowledge Graph updated (SAST). Total nodes: {count}")
 
     def _mock_build(self):
-        """Cơ chế giả lập (mock) khi Neo4j ngoại tuyến hoặc thiếu demo."""
-        logger.info("Generating mock Knowledge Graph output (Neo4j unreachable)")
+        """Ghi lại SỰ THẬT rằng không dựng được đồ thị vì Neo4j ngoại tuyến.
+
+        KHÔNG BỊA SỐ. Bản trước ghi cứng `{"nodes": 450, "edges": 1200}` kèm nhãn
+        "Mocked Successfully" — hai con số đó không đến từ bất kỳ phép đếm nào. File nằm
+        trong data/ nên bất kỳ ai (hoặc bất kỳ đoạn code nào về sau) nhặt lên đều sẽ
+        tưởng là kết quả đo thật. Đây là bẫy trích dẫn số giả vào luận văn.
+        """
+        logger.warning(
+            "[KG] KHÔNG dựng được đồ thị tri thức — Neo4j ngoại tuyến. "
+            "Ghi trạng thái 'unavailable' (KHÔNG có số liệu để báo cáo)."
+        )
         os.makedirs("data/demo_outputs", exist_ok=True)
         with open("data/demo_outputs/knowledge_graph.json", "w") as f:
-            f.write('{"nodes": 450, "edges": 1200, "status": "Mocked Successfully"}')
+            json.dump(
+                {
+                    "status": "unavailable",
+                    "reason": "Neo4j unreachable — no graph was built",
+                    "nodes": None,
+                    "edges": None,
+                    "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                },
+                f,
+                indent=1,
+            )

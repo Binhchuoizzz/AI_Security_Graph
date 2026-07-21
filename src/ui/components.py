@@ -176,7 +176,10 @@ def render_alert_card(
                 confidence = val_str
             else:
                 val = float(val_str)
-                confidence = f"{val * 100:.0f}%"
+                # 2 chữ số thập phân, ĐỒNG NHẤT với Cổng ML và với chuỗi reason mới
+                # (đã ghi sẵn dạng "40.00%"). Trước đây làm tròn về số nguyên nên bản
+                # ghi cũ/định dạng float hiển thị "95%" còn bản ghi mới "95.00%".
+                confidence = f"{val * 100:.2f}%"
         except ValueError:
             pass
 
@@ -422,7 +425,6 @@ def render_metrics_header(
     total_raw_logs=0,
     live_fpr=0.0,
     noise_reduction=None,
-    pending_llm_count=0,
     t1_blocks=None,
 ):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.

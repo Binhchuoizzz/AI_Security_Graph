@@ -320,6 +320,207 @@ ADV_SPECS = [
     ),
 ]
 
+# ==============================================================================
+# GRAY-ZONE PROBES — vùng xám mà LỚP TĨNH bỏ sót, chỉ tầng NHẬN THỨC phán được
+# ==============================================================================
+# ĐỘNG CƠ: đo trên demo cho thấy 98%+ sự kiện là NetFlow thuần (không payload), nên tầng
+# LLM gần như chỉ nhận ca port-lạ rồi hoãn (AWAIT_HITL). Payload web LỘ LIỄU thì bị 29 họ
+# chữ ký Tier-1 chặn ngay, KHÔNG tới LLM. Khoảng trống thật là các hành vi mà con người
+# (và LLM) nhận ra là tấn công nhưng KHỚP-MẪU-CÚ-PHÁP không bắt được: chúng mô tả hành vi
+# bằng NGỮ NGHĨA (beaconing, exfil, lateral) chứ không bằng token đặc biệt.
+#
+# CÔNG THỨC (đã kiểm chứng qua đường THẬT Tier-1→ML→LLM, không đoán):
+#   port LẠ (không 80/443/8080/cổng-nhạy-cảm)  +  MỘT flow-feature cực trị (Z-score bắt)
+#   +  message NGỮ NGHĨA không khớp chữ ký  →  Tier-1 ESCALATE → ML abstain → LLM phán.
+# Đã đo: 2/2 mẫu mồi cho LLM BLOCK ở confidence 0.93 và 0.99, tên MITRE đúng (T1046, T1041).
+#
+# ⚠️ TRUNG THỰC — đây là ĐẦU VÀO thử nghiệm DO TÁC GIẢ BIÊN SOẠN (nhất quán với khai báo ở
+# Chương 5: "Bộ đối kháng do tác giả biên soạn, không thích ứng"). Chúng gắn nhãn nguồn
+# RIÊNG `grayzone` (KHÔNG trộn vào CICIDS/DAPT thật) và chỉ dùng để MINH HOẠ năng lực tầng
+# nhận thức trong demo — KHÔNG được dùng để tính bất kỳ "tỉ lệ chặn" nào trong luận văn.
+# Mỗi mẫu: (id, tên, cổng lạ, đặc-trưng-cực-trị {field: value}, message ngữ nghĩa, mitre).
+GRAYZONE_SPECS = [
+    (
+        "GZ-01",
+        "C2 beacon cổng phi chuẩn",
+        4444,
+        {"Total Length of Bwd Packets": 30_000_000},
+        "sustained low-rate outbound check-ins to a fixed external host, uniform 60s cadence, tiny encrypted responses",
+        "T1571 Non-Standard Port",
+    ),
+    (
+        "GZ-02",
+        "Exfil khối lượng lớn ra ngoài",
+        9001,
+        {"Total Length of Bwd Packets": 80_000_000},
+        "bulk transfer of an archive named customer_pii_export to an unrecognized external endpoint",
+        "T1041 Exfiltration Over C2 Channel",
+    ),
+    (
+        "GZ-03",
+        "Lateral WinRM tới nhiều host",
+        5985,
+        {"Total Fwd Packets": 260},
+        "remote command execution over WinRM fanning out to several internal hosts in sequence",
+        "T1021.006 Remote Services: Windows Remote Management",
+    ),
+    (
+        "GZ-04",
+        "Data staging trước exfil",
+        8444,
+        {"Total Length of Bwd Packets": 45_000_000},
+        "large volume of employee_records copied to an internal staging host prior to exfiltration",
+        "T1074 Data Staged",
+    ),
+    (
+        "GZ-05",
+        "Reverse tunnel cổng cao",
+        7443,
+        {"Total Fwd Packets": 240},
+        "persistent encrypted tunnel carrying interactive shell traffic to an external relay",
+        "T1572 Protocol Tunneling",
+    ),
+    (
+        "GZ-06",
+        "Trinh sát dịch vụ nội bộ",
+        9200,
+        {"Total Fwd Packets": 300},
+        "systematic probing of internal service ports across the subnet from a single source",
+        "T1046 Network Service Discovery",
+    ),
+    (
+        "GZ-07",
+        "Tải công cụ từ ngoài vào",
+        6667,
+        {"Total Length of Bwd Packets": 12_000_000},
+        "download of an unfamiliar executable payload from an external host over an IRC-style port",
+        "T1105 Ingress Tool Transfer",
+    ),
+    (
+        "GZ-08",
+        "Beacon DNS-over-nonstandard",
+        5353,
+        {"Total Fwd Packets": 220},
+        "high frequency of small lookups encoding data into subdomain labels toward one resolver",
+        "T1071.004 Application Layer Protocol: DNS",
+    ),
+    (
+        "GZ-09",
+        "Exfil chậm rời rạc",
+        8081,
+        {"Total Length of Bwd Packets": 20_000_000},
+        "slow trickle of outbound chunks to an external bucket, spread to stay under volume alarms",
+        "T1030 Data Transfer Size Limits",
+    ),
+    (
+        "GZ-10",
+        "Lateral SMB relay",
+        4445,
+        {"Total Fwd Packets": 250},
+        "authentication relay attempts moving laterally between file servers on an odd port",
+        "T1021.002 Remote Services: SMB/Windows Admin Shares",
+    ),
+    (
+        "GZ-11",
+        "C2 giả lưu lượng web",
+        8888,
+        {"Total Length of Bwd Packets": 35_000_000},
+        "long-lived connection mimicking web traffic but with periodic command-and-control polling",
+        "T1071.001 Application Layer Protocol: Web Protocols",
+    ),
+    (
+        "GZ-12",
+        "Thu thập trước nén",
+        9443,
+        {"Total Fwd Packets": 280},
+        "recursive read of home directories collecting documents before an archive is assembled",
+        "T1119 Automated Collection",
+    ),
+    (
+        "GZ-13",
+        "Exfil qua cloud storage",
+        8090,
+        {"Total Length of Bwd Packets": 60_000_000},
+        "upload of a compressed database dump to a third-party storage service not used by the org",
+        "T1567.002 Exfiltration to Cloud Storage",
+    ),
+    (
+        "GZ-14",
+        "Persistence qua dịch vụ từ xa",
+        5986,
+        {"Total Fwd Packets": 230},
+        "creation of a scheduled remote task on multiple hosts via an administrative protocol",
+        "T1053 Scheduled Task/Job",
+    ),
+    (
+        "GZ-15",
+        "Beacon jitter ngẫu nhiên",
+        6697,
+        {"Total Length of Bwd Packets": 25_000_000},
+        "irregular-interval check-ins with randomized jitter to evade periodicity detection",
+        "T1571 Non-Standard Port",
+    ),
+    (
+        "GZ-16",
+        "Lateral qua RDP phi chuẩn",
+        13389,
+        {"Total Fwd Packets": 270},
+        "remote desktop session opened to an internal host on a relocated RDP port",
+        "T1021.001 Remote Services: Remote Desktop Protocol",
+    ),
+    (
+        "GZ-17",
+        "Rò rỉ credential ra ngoài",
+        8443,
+        {"Total Length of Bwd Packets": 15_000_000},
+        "outbound transfer of a file whose contents resemble a harvested credential store",
+        "T1552 Unsecured Credentials",
+    ),
+    (
+        "GZ-18",
+        "Trinh sát tài khoản miền",
+        9389,
+        {"Total Fwd Packets": 310},
+        "repeated directory queries enumerating privileged domain accounts from one workstation",
+        "T1087.002 Account Discovery: Domain Account",
+    ),
+]
+
+
+def _build_grayzone(tkey):
+    """Sinh các sự kiện GRAY-ZONE (xem GRAYZONE_SPECS). Nhãn nguồn RIÊNG 'grayzone'."""
+    out = []
+    for i, (gid, name, port, extreme, msg, mitre) in enumerate(GRAYZONE_SPECS):
+        day = 2 + (i % 4)
+        log = {
+            "Source IP": f"203.0.113.{130 + i}",  # dải TÀI LIỆU (RFC 5737), không đụng thật
+            "Destination IP": "198.51.100.20",
+            "Destination Port": port,
+            "Protocol": 6,
+            "service": f"PORT_{port}",
+            "message": msg,  # ngữ nghĩa — KHÔNG khớp chữ ký cú pháp
+            # nền flow "hợp lệ nhìn qua" + ĐÚNG MỘT feature cực trị để Z-score ESCALATE
+            "Total Fwd Packets": 40,
+            "Flow Duration": 30_000_000,
+            "Flow Pkts/s": 8.0,
+            "Total Length of Bwd Packets": 60_000,
+            **extreme,
+        }
+        out.append(
+            {
+                "id": gid,
+                "name": f"Gray-zone {name}",
+                "mitre": mitre,
+                "source": "grayzone",
+                "day": day,
+                "t": tkey(day),
+                "log": log,
+                "expected_threat": True,
+                "label": "Attack",
+            }
+        )
+    return out
+
 
 def _build_zerodays(samples, tkey, repeat: int = 1):
     """Sinh zero-day REAL-DERIVED từ flow benign THẬT.
@@ -417,6 +618,7 @@ def build_stream(
     dapt_max_rows: int = 5000,
     zeroday_repeat: int = 1,
     cicids_attack_ratio: float = 0.25,
+    include_grayzone: bool = False,
 ):
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
@@ -646,6 +848,13 @@ def build_stream(
     # --- Inject Adversarial (4 payload OWASP THẬT) ---
     main.extend(_build_adversarials(tkey))
 
+    # --- Inject Gray-zone (vùng xám: LLM chặn bằng năng lực, xem GRAYZONE_SPECS) ---
+    # CHỈ cho DEMO. Grayzone là mẫu BIÊN SOẠN — tuyệt đối KHÔNG để lọt vào datatest/
+    # benchmark (build_datatest gọi build_stream mặc định include_grayzone=False), nếu
+    # không nó sẽ làm bẩn số thực nghiệm bằng đầu vào không phải dữ liệu thật.
+    if include_grayzone:
+        main.extend(_build_grayzone(tkey))
+
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)
 
@@ -713,6 +922,13 @@ def enrich(ev: dict, demo_signals: bool = False) -> dict:
         # payload OWASP LLM Top-10 để thử Guardrails/Tier-2 khi escalate
         log["adv_id"] = ev["log"].get("gt_id", "")
         log["adv_source"] = "owasp_llm_top10"
+    elif ev["source"] == "grayzone":
+        # Vùng xám BIÊN SOẠN: gắn nhãn ground-truth = Attack để chấm audit đúng, kèm id
+        # để lọc ra khỏi mọi phép tính "tỉ lệ" (chỉ dùng minh hoạ demo, không benchmark).
+        log["gz_id"] = ev.get("id")
+        log["gz_mitre"] = ev.get("mitre")
+        log["gt_label"] = "Attack"
+        log["expected_threat"] = True
     else:  # cicids / cicids_max / dapt_max: flow có nhãn ground-truth phẳng
         log["gt_label"] = ev.get("label", "")
         log["expected_threat"] = bool(ev.get("expected_threat"))

@@ -15,11 +15,14 @@ import pytest
 from src.agent.attack_mapper import (
     FRAMEWORK_ATLAS,
     FRAMEWORK_ATTACK,
+    UNVERIFIED_NAME_SUFFIX,
     AttackMapperInput,
     MitreMapping,
     build_mitre_url,
+    canonical_technique_name,
     map_attack,
     normalize_attack_type,
+    verify_technique_label,
 )
 
 SCHEMA_KEYS = set(MitreMapping.model_fields.keys())
@@ -265,3 +268,72 @@ def test_benign_text_does_not_false_map():
     """Văn bản lành (kể cả chứa 'select') KHÔNG bị gán nhầm kỹ thuật web."""
     assert normalize_attack_type("daily report select summary") == ""
     assert normalize_attack_type("user logged in normally") == ""
+
+
+# ==============================================================================
+# ĐỐI CHIẾU TÊN KỸ THUẬT — hồi quy lỗi "đúng ID, sai tên"
+# ==============================================================================
+def test_wrong_technique_name_from_llm_is_corrected():
+    """LLM gán T1087 nhãn 'Network Service Discovery' (thực ra là T1046) -> ép tên chuẩn.
+
+    Đây là lỗi THẬT quan sát được trên dashboard: regex chỉ kiểm technique-id nên nhãn
+    free-text của LLM đi thẳng ra UI mà không ai đối chiếu.
+    """
+    label, verified = verify_technique_label("T1087", "T1087 - Network Service Discovery")
+    assert verified is True
+    assert label == "T1087 - Account Discovery"
+    assert "Network Service Discovery" not in label
+
+
+def test_correct_name_is_preserved():
+    """Nhãn ĐÚNG (kể cả khác cách viết/thiếu id) vẫn ra tên chuẩn, không báo động sai."""
+    assert verify_technique_label("T1046", "Network Service Discovery") == (
+        "T1046 - Network Service Discovery",
+        True,
+    )
+    assert verify_technique_label("T1190", "Exploit Public-Facing Application") == (
+        "T1190 - Exploit Public-Facing Application",
+        True,
+    )
+
+
+def test_parent_technique_name_derived_from_kb_convention():
+    """Id CHA vắng mặt trong KB nhưng suy được từ quy ước 'Cha: Con' của chính KB."""
+    assert canonical_technique_name("T1110") == "Brute Force"
+    assert canonical_technique_name("T1059") == "Command and Scripting Interpreter"
+
+
+def test_unknown_id_is_flagged_not_fabricated():
+    """KB không phủ -> KHÔNG bịa tên, KHÔNG im lặng: giữ nhãn LLM + cờ chưa đối chiếu."""
+    assert canonical_technique_name("T1499") is None
+    label, verified = verify_technique_label("T1499", "T1499 - Endpoint Denial of Service")
+    assert verified is False
+    assert UNVERIFIED_NAME_SUFFIX in label
+
+
+# ==============================================================================
+# HỒI QUY: _parse_json_object — llm_select từng KHÔNG BAO GIỜ chạy được
+# ==============================================================================
+def test_parse_json_object_handles_select_schema():
+    """Phản hồi chọn-MITRE có schema RIÊNG (technique_id), KHÔNG phải DECISION schema.
+
+    Bug thật: _llm_select dùng parse_llm_response (đòi field `action`) nên MỌI phản hồi
+    hợp lệ đều bị reject -> llm_select luôn rơi về low_confidence, tính năng chết âm thầm.
+    """
+    from src.agent.attack_mapper import _parse_json_object
+
+    # dict thô
+    assert _parse_json_object({"technique_id": "T1046"})["technique_id"] == "T1046"
+    # JSON string thuần
+    assert (
+        _parse_json_object('{"technique_id": "T1041", "mapping_confidence": 0.9}')["technique_id"]
+        == "T1041"
+    )
+    # JSON bọc trong văn bản/markdown
+    assert (
+        _parse_json_object('Kết quả:\n```json\n{"technique_id": "T1571"}\n```')["technique_id"]
+        == "T1571"
+    )
+    # rác -> dict rỗng, KHÔNG ném lỗi
+    assert _parse_json_object("không phải json") == {}
+    assert _parse_json_object(None) == {}

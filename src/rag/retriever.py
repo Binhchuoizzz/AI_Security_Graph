@@ -99,8 +99,19 @@ class DualRetriever:
         bm25_path = os.path.join(INDEX_DIR, f"{index_name}_bm25.pkl")
         metadata_path = os.path.join(INDEX_DIR, f"{index_name}_metadata.json")
 
-        if not os.path.exists(faiss_path) or not os.path.exists(bm25_path):
-            logger.warning(f"Indexes not found for {source_key}. Run: python -m src.rag.embedder")
+        # Thiếu BẤT KỲ file nào trong bộ ba đều phải dừng nạp nguồn này. Trước đây
+        # metadata_path KHÔNG được kiểm -> nếu chỉ thiếu mỗi metadata thì hàm đi tiếp
+        # tới open() bên dưới và ném FileNotFoundError làm chết cả DualRetriever.
+        missing = [p for p in (faiss_path, bm25_path, metadata_path) if not os.path.exists(p)]
+        if missing:
+            # CRITICAL chứ không phải WARNING: RAG tắt âm thầm nghĩa là LLM mất toàn bộ
+            # ngữ cảnh MITRE/NIST mà vẫn chạy — đúng kiểu suy biến im lặng đã từng khiến
+            # Cổng ML chết mà không ai biết. Phải hét lên trong log.
+            logger.critical(
+                f"[RAG] NGUỒN '{source_key}' BỊ TẮT — thiếu index: {', '.join(missing)}. "
+                f"Tier-2 sẽ suy luận KHÔNG có ngữ cảnh {source_key}. "
+                f"Khắc phục: .venv/bin/python -m src.rag.embedder"
+            )
             return
 
         self.faiss_indexes[source_key] = self.faiss.read_index(faiss_path)
@@ -118,11 +129,17 @@ class DualRetriever:
         index = self.faiss_indexes[source_key]
         scores, indices = index.search(query_embedding, fetch_k)
 
+        # RRF cần THỨ HẠNG TRONG DANH SÁCH TRẢ VỀ. Tài liệu bị lọc dưới ngưỡng không nằm
+        # trong danh sách đó, nên hạng phải DỒN LẠI (giống _sparse_search) chứ không giữ
+        # vị trí gốc của enumerate — nếu không, nhánh dense bị phạt hạng một cách vô lý so
+        # với nhánh sparse và điểm RRF của hai nhánh không còn cùng thang.
         results = {}
-        for rank, (score, idx) in enumerate(zip(scores[0], indices[0], strict=False)):
+        rank = 1
+        for score, idx in zip(scores[0], indices[0], strict=False):
             if idx == -1 or float(score) < MIN_SCORE_THRESHOLD:
                 continue
-            results[idx] = {"score": float(score), "rank": rank + 1}
+            results[idx] = {"score": float(score), "rank": rank}
+            rank += 1
         return results
 
     def _sparse_search(self, tokenized_query: list[str], source_key: str, fetch_k: int) -> dict:

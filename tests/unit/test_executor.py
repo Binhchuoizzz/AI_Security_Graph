@@ -177,3 +177,46 @@ def test_login_attempts_and_lockout():
     attempts, lockout = get_login_attempts(username)
     assert attempts == 0
     assert lockout == 0.0
+
+
+# ==============================================================================
+# TÁI PHẠM — chỉ CẢNH BÁO ĐỦ MẠNH mới được tích luỹ thành lệnh chặn
+# ==============================================================================
+def test_weak_alert_does_not_feed_repeat_offender_counter():
+    """Cảnh báo YẾU (dải ALERT của Cổng ML, 0.40–0.65) KHÔNG bao giờ tự leo thang thành chặn.
+
+    HỒI QUY LỖI THẬT: đo trên demo 5.000 sự kiện, dải ALERT yếu chỉ chính xác 5,21%; nạp
+    vào luật tái phạm khiến 10 IP LÀNH TÍNH bị chặn và KHÔNG bắt đúng ca nào (0/10).
+    """
+    ip = "203.0.113.90"
+    assert raise_alert(ip, "ML yếu lần 1", confidence=0.45) == "ALERT"
+    assert raise_alert(ip, "ML yếu lần 2", confidence=0.50) == "ALERT"
+    assert raise_alert(ip, "ML yếu lần 3", confidence=0.62) == "ALERT"
+
+    import src.agent.threat_memory as tm_mod
+
+    rep = tm_mod.threat_memory.get_ip_reputation(ip)
+    # Không có cảnh báo nào được tính -> không có IP nào bị chặn oan.
+    assert rep is None or int(rep["total_alerts"]) == 0
+
+
+def test_strong_alert_still_escalates_on_repeat():
+    """Cảnh báo MẠNH (>= 0.65, gồm mọi ALERT của LLM) VẪN leo thang — không làm hỏng tính năng."""
+    ip = "203.0.113.91"
+    assert raise_alert(ip, "mạnh lần 1", confidence=0.70) == "ALERT"
+    assert raise_alert(ip, "mạnh lần 2", confidence=0.80) == "BLOCK_IP"
+
+
+def test_unknown_confidence_preserves_legacy_behaviour():
+    """confidence=None (caller chưa cập nhật) -> giữ nguyên hành vi cũ, không đổi ngầm."""
+    ip = "203.0.113.92"
+    assert raise_alert(ip, "không rõ độ tin cậy lần 1") == "ALERT"
+    assert raise_alert(ip, "không rõ độ tin cậy lần 2") == "BLOCK_IP"
+
+
+def test_weak_alert_still_recorded_in_audit_trail():
+    """Cảnh báo yếu VẪN phải vào audit trail — không tính tái phạm ≠ giấu khỏi analyst."""
+    ip = "203.0.113.93"
+    raise_alert(ip, "cảnh báo yếu cần analyst thấy", confidence=0.42)
+    trail = get_audit_trail_for_ip(ip, limit=5)
+    assert trail and trail[0]["action"] == "ALERT"

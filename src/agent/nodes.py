@@ -11,7 +11,9 @@ import mlflow  # type: ignore
 
 from src.agent.attack_mapper import (
     AttackMapperInput,
+    build_mitre_url,
     map_attack,
+    verify_technique_label,
 )
 from src.agent.llm_client import DECISION_JSON_SCHEMA, llm_client
 from src.agent.prompts import build_triage_prompt
@@ -501,23 +503,36 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # Ưu tiên technique CỤ THỂ của LLM cho hiển thị (badge == reasoning); fallback mapper
     # khi LLM để N/A / không nêu technique-id hợp lệ. Enrichment tactic/url/response vẫn
     # luôn lấy từ mapper (có cấu trúc, verify được).
+    _name_verified = True
     if _llm_tech_m and _llm_tech_raw.upper() != "N/A":
-        _final_tech = _llm_tech_raw
         _final_tech_id = _llm_tech_m.group(1).upper()
+        # ĐỐI CHIẾU TÊN: id của LLM được giữ, nhưng TÊN phải khớp nguồn sự thật cục bộ.
+        # Trước đây nhãn free-text của LLM đi thẳng ra dashboard nên lọt các ca "đúng id,
+        # sai tên" (T1087 gắn nhãn "Network Service Discovery" — thực ra là T1046).
+        _final_tech, _name_verified = verify_technique_label(_final_tech_id, _llm_tech_raw)
     else:
         _final_tech = f"{mapping.mitre_technique_id} - {mapping.mitre_technique}".strip(" -")
         _final_tech_id = mapping.mitre_technique_id
+
+    # URL phải trỏ ĐÚNG technique đang hiển thị: khi badge lấy id của LLM (khác id mapper),
+    # dùng lại mitre_url của mapper sẽ link sang một kỹ thuật KHÁC.
+    _final_url = (
+        mapping.mitre_url
+        if _final_tech_id == mapping.mitre_technique_id
+        else build_mitre_url(_final_tech_id)
+    )
 
     # Bồi đắp các trường có cấu trúc vào quyết định (free-text được thay bằng chuẩn hoá).
     decision.update(
         {
             "mitre_technique": _final_tech,
+            "mitre_technique_name_verified": _name_verified,
             "mitre_tactic": mapping.mitre_tactic,
             "mitre_tactic_id": mapping.mitre_tactic_id,
             "mitre_technique_id": _final_tech_id,
             "mitre_subtechnique": mapping.mitre_subtechnique or "",
             "mitre_subtechnique_id": mapping.mitre_subtechnique_id or "",
-            "mitre_url": mapping.mitre_url,
+            "mitre_url": _final_url,
             "mapping_confidence": mapping.mapping_confidence,
             "mapping_status": mapping.mapping_status,
             "recommended_response": mapping.recommended_response,
@@ -720,7 +735,12 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     # ALERT: raise_alert là CHOKE-POINT THỐNG NHẤT (chung với Cổng ML) — ghi ALERT, và nếu IP
     # TÁI PHẠM (đã cảnh báo trước) / known-bad thì TỰ leo thang -> BLOCK ngay bên trong.
     if action == "ALERT":
-        result_action = raise_alert(target, formatted_reasoning, raw_log=raw_log_json)
+        # ALERT của LLM theo classify_llm LUÔN nằm dải [0.65, 0.85) nên vẫn được tính vào
+        # bộ đếm tái phạm; truyền tường minh để chính sách nằm ở MỘT chỗ (decision_policy)
+        # thay vì phụ thuộc ngầm vào việc dải nào gọi hàm này.
+        result_action = raise_alert(
+            target, formatted_reasoning, raw_log=raw_log_json, confidence=float(confidence or 0.0)
+        )
         # Tín hiệu APT (persistent-IP / multi-day) — đọc incident vừa ghi, KHÔNG record trùng.
         _check_apt_signal(target, mitre_tech, confidence)
         if result_action == "BLOCK_IP":

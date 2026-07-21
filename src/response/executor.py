@@ -17,6 +17,8 @@ import sqlite3
 import threading
 from datetime import datetime
 
+from src.guardrails.decision_policy import REPEAT_OFFENDER_MIN_CONF
+
 logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "audit_trail.db")
@@ -317,12 +319,18 @@ def block_ip(ip: str, reason: str, raw_log: str = ""):
         logger.warning(f"[BLOCK] mark_ip_blocked lỗi cho {safe_ip}: {e}")
 
 
-def raise_alert(msg: str, reason: str, raw_log: str = "") -> str:
+def raise_alert(msg: str, reason: str, raw_log: str = "", confidence: float | None = None) -> str:
     """Ghi CẢNH BÁO — CHOKE-POINT chung cho cả Cổng ML (Tier-1) và LLM (Tier-2).
 
-    Chính sách REPEAT-OFFENDER (thống nhất): một IP ĐÃ từng ALERT trước đó (hoặc đã là
-    known-bad, reputation>=100) mà nay lại ALERT tiếp -> **tự động BLOCK** thay vì chỉ báo.
-    IP đã whitelist được MIỄN TRỪ (không bao giờ auto-block).
+    Chính sách REPEAT-OFFENDER (thống nhất): một IP ĐÃ từng cảnh báo ĐỦ MẠNH trước đó (hoặc
+    đã là known-bad, reputation>=100) mà nay lại ALERT tiếp -> **tự động BLOCK** thay vì chỉ
+    báo. IP đã whitelist được MIỄN TRỪ (không bao giờ auto-block).
+
+    `confidence`: độ tin cậy của CHÍNH cảnh báo này. Cảnh báo YẾU (< REPEAT_OFFENDER_MIN_CONF)
+    vẫn được ghi vào audit trail bình thường NHƯNG **không tính vào bộ đếm tái phạm** — vì đo
+    thật cho thấy dải ALERT yếu của Cổng ML chỉ chính xác 5,21%, nạp vào luật tái phạm thì
+    biến nhiễu thành lệnh chặn (0/10 đúng). None = không rõ -> giữ hành vi cũ (vẫn tính), để
+    caller chưa cập nhật không bị âm thầm đổi ngữ nghĩa.
 
     Trả về action THẬT đã thực thi: "ALERT" (lần đầu) hoặc "BLOCK_IP" (tái phạm)."""
     ip = _validator.sanitize_target(msg)
@@ -358,9 +366,17 @@ def raise_alert(msg: str, reason: str, raw_log: str = "") -> str:
         )
         return "BLOCK_IP"
 
-    # Lần đầu: ghi CẢNH BÁO + tăng total_alerts để lần sau đếm được (repeat-offender).
+    # Lần đầu: ghi CẢNH BÁO. Chỉ cảnh báo ĐỦ MẠNH mới tăng total_alerts (bộ đếm tái phạm) —
+    # cảnh báo yếu vẫn vào audit trail để analyst thấy, nhưng KHÔNG được phép tự tích luỹ
+    # thành một lệnh chặn ở lần sau.
     logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
     _log_to_db("ALERT", msg, reason, raw_log)
+    if confidence is not None and confidence < REPEAT_OFFENDER_MIN_CONF:
+        logger.info(
+            f"[ALERT] {ip}: độ tin cậy {confidence:.2f} < {REPEAT_OFFENDER_MIN_CONF:.2f} "
+            f"-> KHÔNG tính vào bộ đếm tái phạm (tránh nhiễu tự leo thang thành chặn)."
+        )
+        return "ALERT"
     try:
         from src.agent.threat_memory import threat_memory
 

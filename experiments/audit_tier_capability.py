@@ -14,6 +14,7 @@ import argparse
 import json
 import os
 import sys
+from typing import Any
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -220,7 +221,11 @@ def main() -> None:
     if gw.pipeline is None:
         print("[!] CẢNH BÁO: Cổng ML KHÔNG nạp được model — kết quả sẽ không phản ánh đúng.")
 
-    agent_app = state_cls = loop_detector = None
+    # Any: ba thứ này nạp ĐỘNG (chỉ import khi bật LLM) nên type checker không thể suy ra
+    # kiểu; khai báo rõ thay vì để nó suy thành NoneType rồi báo lỗi ở chỗ dùng.
+    agent_app: Any = None
+    state_cls: Any = None
+    loop_detector: Any = None
     if not args.no_llm:
         from src.agent.state import SentinelState as state_cls  # noqa: N813
         from src.agent.workflow import agent_app

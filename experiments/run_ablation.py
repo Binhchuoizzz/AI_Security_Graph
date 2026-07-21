@@ -29,12 +29,14 @@ import json
 import os
 import sys
 import time
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from experiments.action_scoring import score_actions  # noqa: E402
 from src.agent.llm_client import DECISION_JSON_SCHEMA, llm_client  # noqa: E402
 from src.agent.nodes import retriever  # noqa: E402
 from src.agent.prompts import build_triage_prompt  # noqa: E402
@@ -239,8 +241,10 @@ def run_af(limit=None, out=None):
     dataset = stratified(load_ground_truth(), limit) if limit else load_ground_truth()
     out_path = out or OUT_AF
 
-    results = {
-        "Config_A": {"y_true": [], "y_pred": [], "latencies": []},
+    # dict[str, Any]: chứa CẢ các khối config (dict) LẪN các khối tổng hợp thêm sau
+    # (expected_actions: list, action_scores: dict) — không đồng nhất kiểu theo thiết kế.
+    results: dict[str, Any] = {
+        "Config_A": {"y_true": [], "y_pred": [], "latencies": [], "actions": []},
         "Config_F": {
             "y_true": [],
             "y_pred": [],
@@ -258,6 +262,9 @@ def run_af(limit=None, out=None):
         mlflow.log_param("config_a", "Rule-only (No LLM)")
         mlflow.log_param("config_f", "Full SENTINEL 2-Tier")
 
+        # Hành động KỲ VỌNG của từng mẫu — dùng chung cho A và F khi chấm theo hành động.
+        expected_actions: list[str] = []
+
         print(f"[*] Chay Ablation Study (A vs F) tren {len(dataset)} mau...")
         rule_engine = _fresh_engine()
         _synthetic_warmup(rule_engine)
@@ -272,15 +279,23 @@ def run_af(limit=None, out=None):
             # --- Config A: chỉ luật cứng ---
             start_time_a = time.time()
             pred_a = 0
+            # GIỮ LẠI hành động THẬT của Tier-1 (không chỉ cờ nhị phân) để chấm theo hành
+            # động. Với A, `ESCALATE` nghĩa là "cần tầng sau" mà tầng sau bị TẮT -> pipeline
+            # CHƯA phân giải; score_actions tính riêng, không coi là phát hiện.
+            action_a = "LOG"
             for log in logs:
                 result = rule_engine.evaluate(log)
-                if result.get("tier1_action") in ["BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"]:
+                _act = result.get("tier1_action")
+                if _act in ["BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"]:
                     pred_a = 1
+                    action_a = _act
                     break
             latency_a = time.time() - start_time_a
             results["Config_A"]["y_true"].append(is_attack)
             results["Config_A"]["y_pred"].append(pred_a)
             results["Config_A"]["latencies"].append(latency_a)
+            results["Config_A"]["actions"].append(action_a)
+            expected_actions.append(sample["expected_action"])
 
             # --- Config F: SENTINEL 2 tầng đầy đủ ---
             start_time_f = time.time()
@@ -350,10 +365,40 @@ def run_af(limit=None, out=None):
                 f"Pred A: {pred_a} ({latency_a:.3f}s) | Pred F: {pred_f} ({latency_f:.3f}s)"
             )
 
+        # ── CHẤM THEO HÀNH ĐỘNG (thước đo CHÍNH) ────────────────────────────────────
+        action_scores = {
+            "Config_A": score_actions(expected_actions, results["Config_A"]["actions"]),
+            "Config_F": score_actions(expected_actions, results["Config_F"]["actions"]),
+        }
+        results["expected_actions"] = expected_actions
+        results["action_scores"] = action_scores
+
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "w") as f:
             json.dump(results, f, indent=2)
         print(f"\n[+] Da luu ket qua vao {out_path}")
+
+        print("\n" + "=" * 78)
+        print("CHẤM THEO HÀNH ĐỘNG CUỐI CÙNG (thước đo CHÍNH — phân biệt được cấu hình)")
+        print("=" * 78)
+        print(f"{'':>10} {'khớp HĐ':>9} {'tự quyết':>9} {'hoãn HITL':>10} {'chưa g.quyết':>13}")
+        for cfg, sc in action_scores.items():
+            if not sc.get("n"):
+                continue
+            print(
+                f"{cfg:>10} {sc['action_accuracy']:>9.4f} {sc['autonomy_rate']:>9.4f} "
+                f"{sc['defer_rate']:>10.4f} {sc['unresolved_rate']:>13.4f}"
+            )
+            mlflow.log_metric(f"{cfg}_ActionAccuracy", float(sc["action_accuracy"]))
+            mlflow.log_metric(f"{cfg}_AutonomyRate", float(sc["autonomy_rate"]))
+            if sc["autonomous_precision"] is not None:
+                mlflow.log_metric(f"{cfg}_AutonomousPrecision", float(sc["autonomous_precision"]))
+        _ap_a = action_scores["Config_A"].get("autonomous_precision")
+        _ap_f = action_scores["Config_F"].get("autonomous_precision")
+        print(
+            f"\n  Độ chính xác KHI TỰ QUYẾT:  A={_ap_a}  F={_ap_f}"
+            "\n  (khi hệ dám tự hành động thì nó có đáng tin không — câu hỏi vận hành thật)"
+        )
 
         ya_t, ya_p = results["Config_A"]["y_true"], results["Config_A"]["y_pred"]
         yf_t, yf_p = results["Config_F"]["y_true"], results["Config_F"]["y_pred"]
@@ -423,7 +468,11 @@ def run_bcde(limit=300, out=None):
     rule_engine = _fresh_engine()
     _synthetic_warmup(rule_engine)
 
-    R = {c: {"y_true": [], "y_pred": [], "latencies": [], "escalated": []} for c in "BCDE"}
+    R: dict[str, Any] = {
+        c: {"y_true": [], "y_pred": [], "latencies": [], "escalated": [], "actions": []}
+        for c in "BCDE"
+    }
+    expected_actions: list[str] = []
 
     for idx, sample in enumerate(dataset):
         is_attack = 1 if sample["expected_action"] in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
@@ -434,6 +483,9 @@ def run_bcde(limit=300, out=None):
         tier1_pred = 1 if tier1_verdict in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
         query = build_rag_query(logs)
 
+        # Mặc định: gate KHÔNG escalate -> C/D/E dừng ở phán quyết Tier-1. Khởi tạo ở đây
+        # để biến luôn bound dù đi nhánh nào (an toàn kiểu + ý nghĩa rõ khi chấm hành động).
+        a_c = a_d = a_e = tier1_verdict
         a_b, l_b = llm_action(logs, "")  # B — Pure LLM
         if needs_llm:  # C — Welford + LLM (no RAG)
             a_c, l_c = llm_action(logs, "")
@@ -451,26 +503,44 @@ def run_bcde(limit=300, out=None):
         else:
             l_e, p_e = 0.0006, tier1_pred
 
-        for c, pred, lat in (
-            ("B", to_pred(a_b), l_b),
-            ("C", p_c, l_c),
-            ("D", p_d, l_d),
-            ("E", p_e, l_e),
+        # Hành động THẬT của từng config. Khi gate KHÔNG escalate, C/D/E dừng ở phán
+        # quyết Tier-1 nên hành động là `tier1_verdict` — ghi đúng như vậy để chấm theo
+        # hành động phản ánh ĐÚNG thứ pipeline thực sự làm.
+        expected_actions.append(sample["expected_action"])
+        for c, pred, lat, act in (
+            ("B", to_pred(a_b), l_b, a_b),
+            ("C", p_c, l_c, a_c if needs_llm else tier1_verdict),
+            ("D", p_d, l_d, a_d if needs_llm else tier1_verdict),
+            ("E", p_e, l_e, a_e if needs_llm else tier1_verdict),
         ):
             R[c]["y_true"].append(is_attack)
             R[c]["y_pred"].append(pred)
             R[c]["latencies"].append(lat)
             R[c]["escalated"].append(1 if (c == "B" or needs_llm) else 0)
+            R[c]["actions"].append(act)
 
         print(
             f"[{idx + 1}/{len(dataset)}] {sample['id']} | true={is_attack} esc={int(needs_llm)} "
             f"| B={to_pred(a_b)} C={p_c} D={p_d} E={p_e}"
         )
 
+    R["expected_actions"] = expected_actions
+    R["action_scores"] = {c: score_actions(expected_actions, R[c]["actions"]) for c in "BCDE"}
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(R, f, indent=2)
     print(f"\n[+] Saved -> {out_path}\n")
+
+    print("CHẤM THEO HÀNH ĐỘNG (thước đo CHÍNH):")
+    print(f"  {'':>3} {'khớp HĐ':>9} {'tự quyết':>9} {'hoãn':>8} {'chưa g.quyết':>13}")
+    for c in "BCDE":
+        sc = R["action_scores"][c]
+        print(
+            f"  {c:>3} {sc['action_accuracy']:>9.4f} {sc['autonomy_rate']:>9.4f} "
+            f"{sc['defer_rate']:>8.4f} {sc['unresolved_rate']:>13.4f}"
+        )
+    print()
 
     for c in "BCDE":
         yt, yp = R[c]["y_true"], R[c]["y_pred"]
@@ -523,7 +593,11 @@ def run_balanced(out=None):
         rule_engine.evaluate(dict(log))
     print("[+] Warmup complete.")
 
-    R = {c: {"y_true": [], "y_pred": [], "latencies": [], "escalated": []} for c in "ABCDEF"}
+    R: dict[str, Any] = {
+        c: {"y_true": [], "y_pred": [], "latencies": [], "escalated": [], "actions": []}
+        for c in "ABCDEF"
+    }
+    expected_actions: list[str] = []
 
     for idx, sample in enumerate(dataset):
         is_attack = 1 if sample["expected_action"] in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
@@ -533,14 +607,12 @@ def run_balanced(out=None):
         # --- A: Tier-1 rule-only ---
         t0 = time.time()
         pred_a = 0
+        action_a = "LOG"  # giữ hành động THẬT của Tier-1 để chấm theo hành động
         for log in logs:
-            if rule_engine.evaluate(log).get("tier1_action") in (
-                "BLOCK_IP",
-                "ALERT",
-                "AWAIT_HITL",
-                "ESCALATE",
-            ):
+            _act = rule_engine.evaluate(log).get("tier1_action")
+            if _act in ("BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"):
                 pred_a = 1
+                action_a = _act
                 break
         lat_a = time.time() - t0
 
@@ -549,6 +621,8 @@ def run_balanced(out=None):
         tier1_pred = 1 if tier1_verdict in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
         query = build_rag_query(logs)
 
+        # Mặc định như trên: không escalate -> C/D/E giữ phán quyết Tier-1.
+        a_c = a_d = a_e = tier1_verdict
         a_b, l_b = llm_action(logs, "")  # B — Pure LLM
         p_b = to_pred(a_b)
 
@@ -566,10 +640,12 @@ def run_balanced(out=None):
         # --- F: SENTINEL đầy đủ (agent_app + Consensus Guard) ---
         t0 = time.time()
         pred_f = 0
+        action_f = tier1_verdict  # mặc định: gate không escalate -> dừng ở phán quyết Tier-1
         if needs_llm:
             from src.guardrails import loop_detector
 
             loop_detector.reset()
+            action_f = "ERROR"  # nếu agent ném lỗi thì đây là sự thật, không phải "LOG"
             try:
                 final_state = agent_app.invoke(
                     SentinelState(
@@ -579,41 +655,54 @@ def run_balanced(out=None):
                     )
                 )
                 decisions = final_state.get("decisions", [])
-                if decisions and decisions[-1].get("action") in (
-                    "BLOCK_IP",
-                    "ALERT",
-                    "AWAIT_HITL",
-                    "ESCALATE",
-                ):
-                    pred_f = 1
+                if decisions:
+                    action_f = decisions[-1].get("action", "UNKNOWN")
+                    if action_f in ("BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"):
+                        pred_f = 1
             except Exception as e:
                 print(f"   [F ERROR] {sample['id']}: {e}")
         else:
             pred_f = tier1_pred
         lat_f = time.time() - t0
 
-        for c, pred, lat, esc in (
-            ("A", pred_a, lat_a, 0),
-            ("B", p_b, l_b, 1),
-            ("C", p_c, l_c, 1 if needs_llm else 0),
-            ("D", p_d, l_d, 1 if needs_llm else 0),
-            ("E", p_e, l_e, 1 if needs_llm else 0),
-            ("F", pred_f, lat_f, 1 if needs_llm else 0),
+        expected_actions.append(sample["expected_action"])
+        for c, pred, lat, esc, act in (
+            ("A", pred_a, lat_a, 0, action_a),
+            ("B", p_b, l_b, 1, a_b),
+            ("C", p_c, l_c, 1 if needs_llm else 0, a_c if needs_llm else tier1_verdict),
+            ("D", p_d, l_d, 1 if needs_llm else 0, a_d if needs_llm else tier1_verdict),
+            ("E", p_e, l_e, 1 if needs_llm else 0, a_e if needs_llm else tier1_verdict),
+            ("F", pred_f, lat_f, 1 if needs_llm else 0, action_f),
         ):
             R[c]["y_true"].append(is_attack)
             R[c]["y_pred"].append(pred)
             R[c]["latencies"].append(lat)
             R[c]["escalated"].append(esc)
+            R[c]["actions"].append(act)
 
         print(
             f"[{idx + 1}/{len(dataset)}] {sample['id']} true={is_attack} esc={int(needs_llm)} "
             f"| A={pred_a} B={p_b} C={p_c} D={p_d} E={p_e} F={pred_f}"
         )
 
+    R["expected_actions"] = expected_actions
+    R["action_scores"] = {c: score_actions(expected_actions, R[c]["actions"]) for c in "ABCDEF"}
+
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(R, f, indent=2)
     print(f"\n[+] Saved -> {out_path}\n")
+
+    print("CHẤM THEO HÀNH ĐỘNG (thước đo CHÍNH — tập CÂN BẰNG):")
+    print(f"  {'Cfg':>3} {'khớp HĐ':>9} {'tự quyết':>9} {'đúng|tự quyết':>14} {'hoãn':>8}")
+    for c in "ABCDEF":
+        sc = R["action_scores"][c]
+        _ap = sc["autonomous_precision"]
+        print(
+            f"  {c:>3} {sc['action_accuracy']:>9.4f} {sc['autonomy_rate']:>9.4f} "
+            f"{(f'{_ap:.4f}' if _ap is not None else '—'):>14} {sc['defer_rate']:>8.4f}"
+        )
+    print()
 
     print(f"{'Cfg':>3} | {'F1':>6} | {'Prec':>6} | {'Rec':>6} | {'Esc%':>5} | {'Lat(s)':>7}")
     for c in "ABCDEF":

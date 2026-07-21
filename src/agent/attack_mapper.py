@@ -41,6 +41,29 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_json_object(raw: Any) -> dict:
+    """Parse phản hồi LLM về một dict JSON, chịu lỗi (KHÔNG dùng schema triage).
+
+    Dùng cho _llm_select — phản hồi chọn-MITRE có schema riêng, không phải DECISION schema.
+    Bóc khối JSON đầu tiên nếu mô hình bọc thêm văn bản/markdown quanh nó.
+    """
+    if isinstance(raw, dict):
+        return raw
+    if not isinstance(raw, str):
+        return {}
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except (ValueError, TypeError):
+                return {}
+        return {}
+
+
 # === Đường dẫn KB tái dùng (không tạo store mới) ===
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KB_PATH = os.path.join(_BASE_DIR, "knowledge_base", "mitre_attack.json")
@@ -416,6 +439,74 @@ def _response_for(key: str, tactic: str) -> str:
     return TACTIC_RESPONSE.get(tactic, DEFAULT_RESPONSE)
 
 
+# ==============================================================================
+# ĐỐI CHIẾU TÊN KỸ THUẬT (chống "đúng ID, sai tên")
+# ==============================================================================
+# LLM hay ghép một technique-id ĐÚNG với một cái tên của kỹ thuật KHÁC — quan sát thật:
+# "T1087 - Network Service Discovery" (T1087 = Account Discovery; Network Service Discovery
+# là T1046). ID vào được vì regex chỉ bắt Txxxx, còn TÊN thì trước đây không ai kiểm.
+# Lớp này ép tên về nguồn sự thật cục bộ, và khi KB không phủ thì NÓI THẲNG là chưa đối
+# chiếu được thay vì đưa tên do LLM đặt ra như thể đó là sự thật.
+UNVERIFIED_NAME_SUFFIX = "(tên chưa đối chiếu được với KB)"
+
+
+@functools.lru_cache(maxsize=1)
+def _canonical_names() -> dict[str, str]:
+    """id -> tên chính thức. BA nguồn, đều là dữ liệu ĐÃ CÓ trong repo (không bịa):
+
+    1. `knowledge_base/mitre_attack.json` (299 kỹ thuật) — nguồn chính.
+    2. Tên kỹ thuật CHA suy ra từ quy ước đặt tên "Cha: Con" của chính KB (vd
+       "Brute Force: Password Spraying" => T1110 = "Brute Force"). KB thiếu 37 id cha;
+       cách này khôi phục được 3 cái xuất hiện nhiều nhất (T1059/T1110/T1505), 34 cái
+       còn lại CỐ Ý bỏ trống — thà báo "chưa đối chiếu" còn hơn đoán tên.
+    3. `WEB_ATTACK_MAP` — bảng người soạn, đã verify (gồm cả ATLAS AML.T0051).
+    """
+    names: dict[str, str] = {}
+    for tid, rec in _load_kb_index().items():
+        if n := str(rec.get("name", "")).strip():
+            names[tid] = n
+    for tid, n in list(names.items()):
+        parent, _, _ = tid.partition(".")
+        if parent and parent not in names and ":" in n:
+            names[parent] = n.split(":", 1)[0].strip()
+    for e in WEB_ATTACK_MAP.values():
+        names.setdefault(str(e["technique_id"]), str(e["technique"]))
+    return names
+
+
+def canonical_technique_name(technique_id: str) -> str | None:
+    """Tên chính thức của một technique-id, hoặc None nếu KB không phủ (KHÔNG đoán)."""
+    return _canonical_names().get((technique_id or "").strip().upper())
+
+
+def verify_technique_label(technique_id: str, llm_label: str) -> tuple[str, bool]:
+    """Đối chiếu nhãn free-text của LLM với tên chính thức của technique-id.
+
+    Returns:
+        (nhãn hiển thị, đã_đối_chiếu_được). Nếu id có trong nguồn sự thật thì nhãn LUÔN
+        được dựng lại thành "<id> - <tên chuẩn>" (kể cả khi LLM đặt đúng, để định dạng
+        đồng nhất). Nếu không, giữ nhãn LLM nhưng gắn hậu tố cảnh báo.
+    """
+    tid = (technique_id or "").strip().upper()
+    raw = (llm_label or "").strip()
+    official = canonical_technique_name(tid)
+    if official is None:
+        return (f"{tid} - {raw}" if raw and tid not in raw else raw or tid) + (
+            f" {UNVERIFIED_NAME_SUFFIX}" if tid else ""
+        ), False
+    # So khớp lỏng: bỏ id/dấu câu để không báo động vì khác cách viết ("T1190 — Exploit
+    # Public-Facing Application" vs "Exploit Public-Facing Application").
+    said = re.sub(r"[^a-z0-9 ]+", " ", raw.replace(tid, "").lower())
+    said = " ".join(said.split())
+    want = " ".join(re.sub(r"[^a-z0-9 ]+", " ", official.lower()).split())
+    if said and want not in said and said not in want:
+        logger.warning(
+            f"[attack_mapper] TÊN KỸ THUẬT SAI từ LLM: {tid} được gán nhãn '{raw}' "
+            f"nhưng tên chính thức là '{official}' — đã ép về tên chuẩn."
+        )
+    return f"{tid} - {official}", True
+
+
 _KB_INDEX: dict[str, dict] | None = None
 
 
@@ -460,6 +551,9 @@ def _unresolved(inp: AttackMapperInput, free_text: str = "") -> MitreMapping:
     # Cố trích technique id (Txxxx[.yyy]) từ free-text nếu có.
     m = re.search(r"\bT\d{4}(?:\.\d{3})?\b", tech)
     tech_id = m.group(0) if m else ""
+    # Trích được id mà KB có phủ -> lấy TÊN CHUẨN thay vì giữ free-text của LLM.
+    if tech_id and (official := canonical_technique_name(tech_id)):
+        tech = official
     return MitreMapping(
         attack_type=inp.attack_type or tech,
         confidence=inp.confidence,
@@ -510,7 +604,12 @@ def _llm_select(inp: AttackMapperInput, candidates: list[dict], llm: Any) -> str
     except Exception as e:  # graceful degradation — khớp triết lý node_llm_triage
         logger.warning(f"[attack_mapper] LLM chọn ứng viên thất bại ({e}); dùng top-RRF.")
         return None
-    parsed = llm.parse_llm_response(raw) if hasattr(llm, "parse_llm_response") else {}
+    # KHÔNG dùng llm.parse_llm_response ở đây: hàm đó validate theo schema của TRIAGE
+    # (bắt buộc có field `action`), trong khi phản hồi chọn-MITRE có schema RIÊNG
+    # (`technique_id` + `mapping_confidence`). Dùng nhầm parser khiến MỌI lần llm_select
+    # đều fail-validate rồi rơi về low_confidence — tức tính năng này CHƯA BAO GIỜ chạy
+    # được (nó mặc định off nên bug ẩn). Parse JSON độc lập, chịu lỗi.
+    parsed = _parse_json_object(raw)
     chosen = str(parsed.get("technique_id", "")).strip()
     return chosen if chosen in valid_ids else None
 

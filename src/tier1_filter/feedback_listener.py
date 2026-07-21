@@ -179,12 +179,12 @@ class FeedbackListener:
         try:
             with _lock:
                 with open(CONFIG_PATH) as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
 
                 if "tier1" not in config:
                     config["tier1"] = {}
                 if "dynamic_rules" not in config["tier1"]:
-                    config["tier1"]["dynamic_rules"] = []
+                    config.setdefault("tier1", {})["dynamic_rules"] = []
 
                 # Kiểm tra trùng lặp trước khi thêm (check cả field và pattern)
                 existing_rules = {
@@ -245,7 +245,7 @@ class FeedbackListener:
         try:
             with _lock:
                 with open(CONFIG_PATH) as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
 
                 rules = config.get("tier1", {}).get("dynamic_rules", [])
                 updated = False
@@ -292,8 +292,8 @@ class FeedbackListener:
             _ensure_lock_writable()  # phòng lock cũ do UID khác chiếm (Docker cross-UID)
             with _lock:
                 with open(CONFIG_PATH) as f:
-                    config = yaml.safe_load(f)
-                config["tier1"]["dynamic_rules"] = []
+                    config = yaml.safe_load(f) or {}
+                config.setdefault("tier1", {})["dynamic_rules"] = []
                 _save_config_atomically(config)
             self.feedback_log = []
             logger.info("[Feedback] All dynamic rules cleared.")
@@ -312,7 +312,7 @@ class FeedbackListener:
             _ensure_lock_writable()
             with _lock:
                 with open(CONFIG_PATH) as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
                 config.setdefault("tier1", {})["whitelist_ips"] = list(DEFAULT_WHITELIST_IPS)
                 _save_config_atomically(config)
             logger.info("[Feedback] Whitelist reset to defaults.")
@@ -332,7 +332,7 @@ class FeedbackListener:
         try:
             with _lock:
                 with open(CONFIG_PATH) as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
 
                 if "tier1" not in config:
                     config["tier1"] = {}
@@ -366,7 +366,7 @@ class FeedbackListener:
         try:
             with _lock:
                 with open(CONFIG_PATH) as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
 
                 whitelist = config.get("tier1", {}).get("whitelist_ips", [])
                 if ip in whitelist:

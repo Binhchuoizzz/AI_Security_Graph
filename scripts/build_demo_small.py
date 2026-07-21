@@ -68,6 +68,11 @@ def main() -> None:
     keep.update(adv)
     print(f"[+] Adversarial (OWASP thật): {len(adv)}")
 
+    # --- 2b. Gray-zone: lấy TOÀN BỘ (minh hoạ LLM chặn bằng năng lực) ------- #
+    gz = [i for i, e in enumerate(events) if e.get("unified_source") == "grayzone"]
+    keep.update(gz)
+    print(f"[+] Gray-zone (biên soạn, LLM-block): {len(gz)}")
+
     # --- 3. Zero-day ------------------------------------------------------- #
     zd = [i for i, e in enumerate(events) if e.get("unified_source") == "zeroday"]
     zd_take = zd[:: max(1, len(zd) // N_ZERODAY)][:N_ZERODAY]  # rải đều, không lấy cụm đầu

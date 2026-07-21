@@ -106,10 +106,25 @@ _KEY_ALIASES = {
 # Ánh xạ các trường mạng thô sang các nhóm tính năng phục vụ Z-score tracking
 _RAW_TO_CANONICAL = {
     "Flow Duration": ["Flow Duration", "flow_duration_us", "flow_duration_ms"],
-    "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets"],
-    "Total Length of Fwd Packets": ["Total Length of Fwd Packets", "fwd_bytes", "Total Fwd Bytes"],
-    "Total Backward Packets": ["Total Backward Packets", "bwd_packets", "Total Bwd Packets"],
-    "Total Length of Bwd Packets": ["Total Length of Bwd Packets", "bwd_bytes", "Total Bwd Bytes"],
+    "Total Fwd Packets": ["Total Fwd Packets", "fwd_packets", "Tot Fwd Pkts"],
+    "Total Length of Fwd Packets": [
+        "Total Length of Fwd Packets",
+        "fwd_bytes",
+        "Total Fwd Bytes",
+        "TotLen Fwd Pkts",
+    ],
+    "Total Backward Packets": [
+        "Total Backward Packets",
+        "bwd_packets",
+        "Total Bwd Packets",
+        "Tot Bwd Pkts",
+    ],
+    "Total Length of Bwd Packets": [
+        "Total Length of Bwd Packets",
+        "bwd_bytes",
+        "Total Bwd Bytes",
+        "TotLen Bwd Pkts",
+    ],
     "Fwd Seg Size Min": ["Fwd Seg Size Min", "fwd_seg_size_min"],
     "Init Fwd Win Byts": ["Init Fwd Win Byts", "init_fwd_win_byts"],
     "Init Bwd Win Byts": ["Init Bwd Win Byts", "init_bwd_win_byts"],
@@ -117,6 +132,55 @@ _RAW_TO_CANONICAL = {
     "PSH Flag Cnt": ["PSH Flag Cnt", "psh_flag_cnt"],
     "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"],
 }
+
+# ==============================================================================
+# BIẾN ĐỔI LOG CHO ĐẶC TRƯNG ĐUÔI DÀI
+# ==============================================================================
+# VẤN ĐỀ: Z-score giả định phân phối xấp xỉ Gauss. Đặc trưng lưu lượng mạng dạng
+# KHỐI LƯỢNG / THỜI LƯỢNG / TỐC ĐỘ thì lệch phải rất nặng (gần log-normal). Đo trên chính
+# golden baseline: `Flow Pkts/s` có sd/mean = 7.2 và `Total Length of Bwd Packets` = 7.3,
+# trong khi `Total Fwd Packets` chỉ 1.7. Áp CÙNG một ngưỡng Z>3.5 lên các đặc trưng lệch
+# thang nhau tới 4 lần khiến một số siêu nhạy (ca thật quan sát được: "lệch 11437 lần độ
+# lệch chuẩn") còn số khác gần như mù (tấn công 1 triệu gói/s chỉ ra Z≈5.6).
+#
+# CÁCH CHỌN (a-priori theo NGỮ NGHĨA, không tinh chỉnh theo kết quả): mọi đặc trưng
+# đếm/khối-lượng/thời-lượng/tốc-độ — không âm, không chặn trên, lệch phải — được đưa qua
+# log1p. Các trường CỜ (PSH Flag Cnt) và kích thước do GIAO THỨC thoả thuận (window size,
+# segment size min) giữ nguyên tuyến tính vì chúng bị chặn và không lệch đuôi.
+#
+# log1p (= ln(1+x)) chứ không phải log: miền giá trị gồm cả 0, và log1p(0) = 0 nên không
+# cần cộng epsilon tuỳ tiện.
+#
+# VÌ SAO KHÔNG log-hoá `Init Bwd Win Byts` và `Bwd Pkt Len Min` dù chúng vẫn có sd/mean cao
+# (5.5 và 7.8) sau khi dựng lại baseline: đo trên CICIDS thô cho thấy 48.9% và 79.3% giá trị
+# của chúng ≤ 0 (median của `Bwd Pkt Len Min` bằng ĐÚNG 0, và -1 là sentinel "không áp
+# dụng"). Đây là phân phối DỒN TẠI 0 (zero-inflated), KHÔNG phải đuôi dài — log-transform
+# không chữa được khối lượng điểm tại 0. Xử lý đúng cho chúng là mô hình hai phần
+# (có/không + độ lớn), nằm ngoài phạm vi luận văn; nêu ở Giới hạn.
+LOG_SCALE_FEATURES: frozenset[str] = frozenset(
+    {
+        "Flow Duration",
+        "Total Fwd Packets",
+        "Total Backward Packets",
+        "Total Length of Fwd Packets",
+        "Total Length of Bwd Packets",
+        "Flow Pkts/s",
+    }
+)
+# Ghi vào golden_baseline.json để bên nạp PHÁT HIỆN được file dựng ở không gian cũ.
+BASELINE_TRANSFORM_ID = "log1p-v1"
+
+
+def scale_feature(key: str, value: float) -> float:
+    """Đưa giá trị đặc trưng về KHÔNG GIAN thống kê dùng cho Welford/Z-score.
+
+    PHẢI dùng ở CẢ hai phía — lúc học baseline và lúc tính Z — nếu không hai bên khác
+    thang và mọi Z-score trở nên vô nghĩa. Giá trị âm (dữ liệu bẩn) giữ nguyên tuyến tính
+    vì log1p không xác định ở đó.
+    """
+    if key in LOG_SCALE_FEATURES and value > -1.0:
+        return math.log1p(value)
+    return value
 
 
 _WAF_PATTERNS = {
@@ -559,6 +623,18 @@ class RuleEngine:
         except (OSError, ValueError) as exc:
             print(f"[Tier-1] Không đọc được golden baseline ({exc}); bỏ qua.")
             return
+        # CHỐT AN TOÀN: baseline dựng ở thang TUYẾN TÍNH mà nạp vào code tính Z ở thang LOG
+        # (hoặc ngược lại) thì mọi Z-score đều sai — và sai IM LẶNG, không có triệu chứng gì
+        # ngoài việc số liệu trở nên vô nghĩa. Từ chối nạp thay vì suy biến âm thầm.
+        _file_tf = str(profile.get("transform", "")) if isinstance(profile, dict) else ""
+        if _file_tf != BASELINE_TRANSFORM_ID:
+            print(
+                f"[Tier-1] TỪ CHỐI golden baseline: file dựng ở thang '{_file_tf or 'tuyến tính (cũ)'}' "
+                f"nhưng code tính Z ở thang '{BASELINE_TRANSFORM_ID}'. Bỏ seed, dùng warmup online.\n"
+                f"         Khắc phục: .venv/bin/python experiments/build_golden_baseline.py"
+            )
+            return
+
         features = profile.get("features", {}) if isinstance(profile, dict) else {}
         seeded = 0
         for key, st in features.items():
@@ -585,10 +661,19 @@ class RuleEngine:
             for alias in aliases:
                 if alias in log_entry:
                     try:
-                        self.global_stats[key].push(float(log_entry[alias]))
-                        break
+                        parsed = float(log_entry[alias])
                     except (ValueError, TypeError):
-                        pass
+                        continue
+                    # LỌC Inf/NaN: CICIDS có `Flow Pkts/s = Inf` khi Flow Duration = 0.
+                    # Đường evaluate đã lọc từ trước, đường HỌC thì chưa — một giá trị Inh
+                    # lọt vào Welford làm mean/M2 thành NaN VĨNH VIỄN và giết luôn đặc trưng
+                    # đó (quan sát thật: golden baseline có Flow Pkts/s = nan).
+                    if math.isinf(parsed) or math.isnan(parsed):
+                        break
+                    # scale_feature: PHẢI khớp với phía tính Z (xem evaluate) — nếu
+                    # học ở thang này mà chấm ở thang kia thì Z-score vô nghĩa.
+                    self.global_stats[key].push(scale_feature(key, parsed))
+                    break
 
     def _set_signature_patterns(self, guardrails_config: dict) -> None:
         """Nạp mẫu prompt-injection/jailbreak (chuỗi thuần) + bản lowercase để so khớp
@@ -766,14 +851,22 @@ class RuleEngine:
 
                 # Bỏ qua nếu dữ liệu không biến động (std quá bé)
                 if std_val > 0.01:
-                    z_score = abs(val - mean_val) / std_val
+                    # Tính Z trong CÙNG không gian mà baseline đã học (xem scale_feature):
+                    # đặc trưng khối-lượng/thời-lượng/tốc-độ được log1p hoá để Z-score không
+                    # còn giả định sai về phân phối Gauss trên dữ liệu lệch đuôi.
+                    z_score = abs(scale_feature(key, val) - mean_val) / std_val
                     max_z_score = max(max_z_score, z_score)
                     if z_score > self.z_threshold:
                         # Điểm phạt tăng dần theo độ lệch, cap ở 40
                         penalty = min(int(z_score * 5), 40)
                         z_anomaly_score += penalty
+                        # Hiển thị giá trị THÔ (dễ đọc cho analyst) nhưng Z tính ở thang đã
+                        # biến đổi — nêu rõ để người audit không hiểu nhầm phép tính.
+                        _scaled_note = " · thang log" if key in LOG_SCALE_FEATURES else ""
                         z_anomaly_reasons.append(
-                            f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} lệch {z_score:.2f} lần độ lệch chuẩn (Z-Score > {self.z_threshold:.1f})"
+                            f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} "
+                            f"lệch {z_score:.2f} lần độ lệch chuẩn "
+                            f"(Z-Score > {self.z_threshold:.1f}{_scaled_note})"
                         )
 
         if z_anomaly_reasons:

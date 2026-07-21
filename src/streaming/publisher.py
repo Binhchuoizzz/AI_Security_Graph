@@ -24,6 +24,8 @@ import redis  # type: ignore
 import yaml  # type: ignore
 from dotenv import load_dotenv  # type: ignore
 
+from src.streaming.backpressure import consumer_group_lag
+
 load_dotenv()
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
@@ -137,12 +139,16 @@ def stream_logs_to_redis(csv_path: str):
             # Kiểm soát nghẽn: Kiểm tra kích thước hàng đợi trước khi xử lý chunk để tránh gọi Redis ở mỗi dòng
             wait_count = 0
             backpressure_threshold = int(MAX_QUEUE_SIZE * 0.9)
-            while r.xlen(QUEUE_NAME) > backpressure_threshold:  # type: ignore
+            # Đo bằng LAG của consumer-group, KHÔNG bằng xlen: xreadgroup+xack không xoá
+            # entry nên xlen dính ~maxlen vĩnh viễn => vòng lặp này sẽ treo mãi dù
+            # subscriber hoàn toàn khoẻ. Xem src/streaming/backpressure.py.
+            while consumer_group_lag(r, (QUEUE_NAME,)) > backpressure_threshold:
                 time.sleep(0.1)
                 wait_count += 1
                 if wait_count % 100 == 0:  # Mỗi 10 giây (100 * 0.1s)
                     print(
-                        f"[!] Backpressure: stream={r.xlen(QUEUE_NAME)} exceeds threshold {backpressure_threshold}. Consumer offline or slow?"
+                        f"[!] Backpressure: consumer lag={consumer_group_lag(r, (QUEUE_NAME,))} "
+                        f"exceeds threshold {backpressure_threshold}. Consumer offline or slow?"
                     )
 
             for index, row in chunk.iterrows():

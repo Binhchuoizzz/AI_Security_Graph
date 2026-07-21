@@ -566,7 +566,14 @@ class ThreatMemoryStore:
         related_ips: str = "",
         mitre_chain: str = "",
     ):
-        """Ghi nhận APT indicator cho correlation dài hạn."""
+        """Ghi nhận APT indicator cho correlation dài hạn.
+
+        LƯU Ý về `mitre_chain`: tên cột là di sản — nó chứa HAI loại giá trị khác nhau tuỳ
+        nơi gọi: (a) technique-id MITRE thật (nodes.py, đường quyết định LLM), hoặc
+        (b) nhãn giai đoạn kill-chain của DAPT2020 ("Establish Foothold"…) vốn KHÔNG phải
+        tên MITRE. Đừng hiển thị giá trị cột này như thể luôn là MITRE — xem
+        `get_threat_context` để biết cách gắn nhãn trung thực khi đưa vào prompt.
+        """
         indicator_type = output_sanitizer.sanitize(indicator_type)
         indicator_value = output_sanitizer.sanitize(indicator_value)
         related_ips = output_sanitizer.sanitize(related_ips)
@@ -658,9 +665,15 @@ class ThreatMemoryStore:
         # record_apt_event tích lũy dần; bản án bật khi đủ >=2 ngày tấn công).
         chain = self.check_apt_chain(source_ip)
         if chain.get("is_apt"):
+            # NÓI RÕ đây là nhãn GIAI ĐOẠN của bộ dữ liệu DAPT2020, KHÔNG phải tên kỹ
+            # thuật/tactic MITRE. Trước đây chỉ ghi "phases: Establish Foothold, ..." nên
+            # LLM tưởng là tên MITRE rồi dán ID lên, sinh ra cặp SAI kiểu
+            # "T1087 - Establish Foothold" trong reasoning người dùng đọc trên dashboard.
             parts.append(
                 f"  🔴 APT CHAIN (multi-day): {chain['chain_length']} distinct days, "
-                f"phases: {chain.get('phases_seen', 'N/A')} — severity "
+                f"kill-chain phases observed (DAPT2020 dataset phase labels — these are "
+                f"NOT MITRE technique or tactic names, do NOT pair them with a Txxxx ID): "
+                f"{chain.get('phases_seen', 'N/A')} — severity "
                 f"{chain.get('severity_escalation', 'HIGH')}. "
                 f"Treat as an ONGOING APT campaign, not an isolated event."
             )

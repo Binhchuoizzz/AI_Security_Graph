@@ -218,6 +218,29 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
         except Exception:
             pass
 
+    # ── SUY HAO DANH TIẾNG (decay) ─────────────────────────────────────────────────
+    # threat_memory.decay_reputation() ĐÃ tồn tại và có unit test, nhưng TRƯỚC ĐÂY KHÔNG
+    # NƠI NÀO trong code sản phẩm gọi nó — nên điểm xấu của một IP là VĨNH VIỄN trên thực
+    # tế, trái với tài liệu ("decay S·(1−λ)ᵗ → không chặn vĩnh viễn") và trái với câu trả
+    # lời Q12 đã soạn cho buổi bảo vệ. Nối vào đây để lời tuyên bố thành SỰ THẬT.
+    # Chỉ chạm IP im lặng >= 7 ngày nên KHÔNG ảnh hưởng số liệu của một lượt demo/benchmark.
+    # NHỊP THEO NGÀY, không theo giờ: điều kiện lọc là "im lặng >= 7 NGÀY" và hệ số 0.95
+    # rõ ràng được thiết kế cho nhịp ngày. Gọi mỗi giờ thì điểm phai NHANH GẤP 24 LẦN ý đồ
+    # (100 -> dưới ngưỡng chặn 70 chỉ sau ~7 giờ thay vì ~7 ngày) — tức tự nới lỏng phòng thủ.
+    _decay_interval_s = 86_400.0
+    _last_decay_at = [time.time()]
+
+    def _maybe_decay_reputation():
+        if time.time() - _last_decay_at[0] < _decay_interval_s:
+            return
+        _last_decay_at[0] = time.time()
+        try:
+            from src.agent.threat_memory import threat_memory
+
+            threat_memory.decay_reputation()
+        except Exception as _e:
+            print(f"[!] decay_reputation lỗi: {_e}")
+
     # ── Bộ worker Tier-2 (DECOUPLE LLM khỏi vòng đọc Redis) ─────────────────────────
     # on_batch_ready (agent) là phần CHẬM. Gọi ĐỒNG BỘ trong vòng đọc sẽ chặn việc nạp
     # Redis + cập nhật thống kê -> Dashboard "đơ". Thay vào đó đẩy lô escalate vào hàng
@@ -393,6 +416,10 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                                 _src_ip,
                                                 ml_reasoning or "",
                                                 raw_log=json.dumps(evaluated_log),
+                                                # ALERT của Cổng ML nằm dải YẾU (0.40–0.65):
+                                                # truyền độ tin cậy để KHÔNG bị tính vào bộ
+                                                # đếm tái phạm rồi tự leo thang thành chặn.
+                                                confidence=ml_conf,
                                             )
                                             or "ALERT"
                                         )
@@ -625,6 +652,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
             # Được gọi ở ĐÂY để dù không có log mới (idle), Dashboard vẫn thấy Queue giảm dần
             _flush_stats()
             _flush_tier1_blocks()
+            _maybe_decay_reputation()
 
         except KeyboardInterrupt:
             print("\n[*] Subscriber offline (Shutdown).")

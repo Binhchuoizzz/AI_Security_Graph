@@ -14,6 +14,7 @@ sys.path.append(ROOT)
 
 # determine_queue dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
 from experiments.unified_dataset import determine_queue  # noqa: E402
+from src.streaming.backpressure import consumer_group_lag  # noqa: E402
 
 # Cho phép chỉ định file luồng khác (demo ngắn dùng data/demo_small.json — tập con PHÂN
 # TẦNG đủ 4 nguồn + chuỗi APT đa-ngày; xem scripts/build_demo_small.py).
@@ -26,7 +27,6 @@ STREAM_LIMIT = int(os.getenv("UNIFIED_STREAM_LIMIT", "0"))
 MAX_QUEUE_SIZE = 10_000
 # Backpressure: các stream subscriber đang đọc + file thống kê THẬT (subscriber ghi).
 QUEUES = ("queue_firewall", "queue_waf", "queue_sysmon")
-GROUP_NAME = "sentinel_group"  # PHẢI khớp subscriber.py (đo lag của đúng consumer-group này)
 STATS_PATH = os.path.join(ROOT, "config", "pipeline_stats.json")
 # Trần backlog LLM (hàng đợi Tier-2 trong RAM). Vượt -> tạm dừng đẩy để không phình RAM.
 MAX_LLM_BACKLOG = int(os.getenv("UNIFIED_STREAM_MAX_LLM_BACKLOG", "2000"))
@@ -44,34 +44,6 @@ def _redact_redis_url(url: str) -> str:
     return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
 
 
-def _consumer_lag(redis_client) -> int:
-    """Độ trễ THẬT của consumer-group `sentinel_group`: số entry đã vào stream nhưng
-    subscriber CHƯA nhận (lag).
-
-    TẠI SAO KHÔNG DÙNG xlen: subscriber tiêu thụ bằng xreadgroup + xack, thao tác này
-    KHÔNG xoá entry khỏi stream nên `xlen` giữ nguyên (~maxlen) dù đã xử lý xong hết →
-    backpressure theo xlen sẽ dừng OAN vĩnh viễn. `lag` (Redis 7+) mới phản ánh đúng
-    'consumer tụt lại bao nhiêu'. Bọc lỗi để thiếu stream/redis chỉ coi như không tụt hậu."""
-    total = 0
-    for q in QUEUES:
-        try:
-            groups = redis_client.xinfo_groups(q)
-        except Exception:
-            continue  # stream chưa tồn tại / lỗi -> bỏ qua queue này
-        for g in groups:
-            if g.get("name") != GROUP_NAME:
-                continue
-            lag = g.get("lag")
-            if lag is None:
-                # Redis cũ / lag không xác định -> fallback: số entry đang chờ ack (pending).
-                try:
-                    lag = int((redis_client.xpending(q, GROUP_NAME) or {}).get("pending", 0))
-                except Exception:
-                    lag = 0
-            total += int(lag or 0)
-    return total
-
-
 def _wait_for_capacity(redis_client) -> None:
     """BACKPRESSURE — cho phép đẩy 'vô số' log AN TOÀN: producer TỰ chậm lại theo năng lực
     consumer, thay vì tràn Redis stream / phình RAM hàng đợi LLM.
@@ -81,7 +53,7 @@ def _wait_for_capacity(redis_client) -> None:
     Bọc lỗi toàn bộ để KHÔNG bao giờ làm hỏng luồng đẩy (thiếu file/redis coi như 'còn chỗ')."""
     warned = False
     for _ in range(3000):  # trần chờ ~10 phút/batch (đủ để Tier-2 tiêu hoá backlog)
-        lag = _consumer_lag(redis_client)
+        lag = consumer_group_lag(redis_client, QUEUES)
         backlog = 0
         try:
             with open(STATS_PATH) as f:

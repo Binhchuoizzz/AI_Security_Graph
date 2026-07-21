@@ -39,6 +39,15 @@ ML_ALERT_CONF: float = 0.40  # [0.40, 0.65) -> ALERT ; < 0.40 -> PASS/DROP
 LLM_BLOCK_CONF: float = 0.85  # >= -> BLOCK
 LLM_ALERT_CONF: float = 0.65  # [0.65, 0.85) -> ALERT ; < 0.65 -> AWAIT_HITL
 
+# Ngưỡng để một CẢNH BÁO được tính vào bộ đếm TÁI PHẠM (repeat-offender).
+# ĐO THẬT trên demo 5.000 sự kiện: dải ALERT yếu của Cổng ML (0.40–0.65) chỉ chính xác
+# 5,21%; nạp tín hiệu đó vào luật "ALERT trước đó -> tự BLOCK" đã biến nhiễu thành lệnh
+# chặn — luật tái phạm khi ấy đúng 0/10 (chặn nhầm 10 IP LÀNH TÍNH, không bắt được ca nào).
+# Nay chỉ cảnh báo ĐỦ MẠNH (>= ngưỡng này) mới được tính. Trùng biên ML_ESCALATE_CONF vì
+# đó chính là ranh giới "đáng hành động" của hệ: ALERT của LLM luôn >= 0.65 nên KHÔNG bị
+# ảnh hưởng; chỉ dải ALERT yếu của Cổng ML bị loại khỏi bộ đếm.
+REPEAT_OFFENDER_MIN_CONF: float = ML_ESCALATE_CONF
+
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 
 

@@ -42,6 +42,7 @@ def main():
         cicids_attack_ratio=0.06,  # nền benign dày (94%) -> ít ca leo thang hơn hẳn
         dapt_max_rows=6_000,  # nguồn khối lượng DAPT; chuỗi APT lấy từ `dapt` nên vẫn nguyên
         zeroday_repeat=60,  # 60 x 15 spec = ~900 probe zero-day (nền benign THẬT, IP riêng)
+        include_grayzone=True,  # CHỈ demo: mẫu vùng xám minh hoạ LLM chặn (KHÔNG vào benchmark)
     )
     stream = warmup + main_stream  # warmup giữ prefix; main đã sort theo thời gian
 

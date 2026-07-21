@@ -61,7 +61,9 @@ class SemanticCache:
         return hashlib.sha256(query_text.encode()).hexdigest()
 
     def _evict_expired(self):
-        """Xóa entries quá TTL."""
+        """Xóa entries quá TTL. GỌI KHI CACHE ĐẦY (trong put) — nếu chỉ dựa vào kiểm TTL
+        lúc get() thì entry hết hạn vẫn chiếm chỗ, và LRU sẽ đẩy ra entry CÒN HẠN thay vì
+        entry đã chết. Người gọi phải đang giữ self._lock."""
         now = time.time()
         expired_keys = [
             key
@@ -110,6 +112,11 @@ class SemanticCache:
                 self.cache[key] = {"result": result, "timestamp": time.time()}
                 return
 
+            # Cache đầy -> dọn entry HẾT HẠN trước đã, chỉ khi vẫn chật mới hy sinh
+            # entry còn hạn theo LRU.
+            if len(self.cache) >= self.max_size:
+                self._evict_expired()
+
             # Xóa phần tử cũ nhất (LRU) nếu cache đầy
             while len(self.cache) >= self.max_size:
                 self.cache.popitem(last=False)  # Xóa phần tử cũ nhất
@@ -134,6 +141,11 @@ class SemanticCache:
         }
 
     def clear(self):
-        """Reset cache. Dùng khi chạy experiment mới."""
-        self.cache.clear()
-        self.stats = {"hits": 0, "misses": 0, "evictions": 0}
+        """Reset cache. Dùng khi chạy experiment mới.
+
+        PHẢI giữ khoá như get/put: nhiều worker Tier-2 dùng chung cache, clear() không
+        khoá mà chạy xen giữa một put() đang popitem sẽ làm hỏng OrderedDict.
+        """
+        with self._lock:
+            self.cache.clear()
+            self.stats = {"hits": 0, "misses": 0, "evictions": 0}

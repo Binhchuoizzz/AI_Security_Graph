@@ -799,7 +799,6 @@ def main_dashboard():
         raw_logs_count,
         live_fpr,
         noise_reduction,
-        pending_llm_count=pending_llm_count,
         t1_blocks=t1_blocks_list,
     )
 
