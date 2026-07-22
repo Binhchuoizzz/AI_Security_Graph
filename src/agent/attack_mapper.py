@@ -162,31 +162,31 @@ TACTIC_ALIASES: dict[str, str] = {
     "command & control": "Command and Control",
 }
 
-# Phản hồi đề xuất theo TACTIC (rule-based, xác định). Viết tiếng Việt để khớp
-# quy ước trường reasoning hiển thị trên dashboard SOC.
+# Recommended response per TACTIC (rule-based, deterministic). Written in ENGLISH to stay
+# consistent with the English reasoning field shown on the SOC dashboard.
 TACTIC_RESPONSE: dict[str, str] = {
-    "Initial Access": "Chặn IP nguồn tại WAF/firewall, vá/cô lập endpoint bị khai thác, leo thang HITL để xác minh phạm vi.",
-    "Execution": "Chặn IP nguồn, cô lập hoặc kết thúc tiến trình đáng ngờ, thu thập artefact, leo thang HITL.",
-    "Persistence": "Cô lập host, gỡ cơ chế bám trụ (scheduled task/service/DLL), kiểm tra autoruns, leo thang HITL.",
-    "Privilege Escalation": "Cô lập host, thu hồi quyền leo thang, đối chiếu PAM audit, leo thang HITL.",
-    "Defense Evasion": "Cô lập host, bật lại biện pháp phòng vệ bị vô hiệu, truy lùng kỹ thuật né tránh.",
-    "Credential Access": "Buộc reset mật khẩu + thu hồi phiên, bật MFA, truy lùng lateral movement từ tài khoản.",
-    "Discovery": "Giám sát chặt host/dịch vụ bị dò, siết phân đoạn mạng, cảnh báo trinh sát nội bộ.",
-    "Lateral Movement": "Cô lập host nguồn và đích, siết phân đoạn đông-tây, thu hồi credential, leo thang HITL.",
-    "Collection": "Cô lập host, rà soát dữ liệu bị thu thập, leo thang HITL.",
-    "Exfiltration": "Cô lập host, chặn đích nhận dữ liệu/C2, rà soát DLP, leo thang HITL khẩn.",
-    "Command and Control": "Chặn đích C2, cô lập host beaconing, thu PCAP forensic, xoay vòng credential nghi lộ.",
-    "Impact": "Cô lập host, kích hoạt quy trình ứng cứu/khôi phục, leo thang HITL khẩn.",
-    "Reconnaissance": "Rate-limit/chặn IP dò quét tại firewall, bật chữ ký phát hiện port-scan, giám sát host bị quét.",
-    "Resource Development": "Theo dõi hạ tầng kẻ tấn công, chia sẻ IoC nội bộ, cảnh báo.",
+    "Initial Access": "Block the source IP at the WAF/firewall, patch/isolate the exploited endpoint, escalate to HITL to verify scope.",
+    "Execution": "Block the source IP, isolate or terminate the suspicious process, collect artefacts, escalate to HITL.",
+    "Persistence": "Isolate the host, remove persistence mechanisms (scheduled task/service/DLL), inspect autoruns, escalate to HITL.",
+    "Privilege Escalation": "Isolate the host, revoke escalated privileges, cross-check PAM audit logs, escalate to HITL.",
+    "Defense Evasion": "Isolate the host, re-enable the disabled defenses, hunt for the evasion technique.",
+    "Credential Access": "Force a password reset + revoke sessions, enforce MFA, hunt for lateral movement from the account.",
+    "Discovery": "Closely monitor the probed hosts/services, tighten network segmentation, alert on internal reconnaissance.",
+    "Lateral Movement": "Isolate the source and destination hosts, tighten east-west segmentation, revoke credentials, escalate to HITL.",
+    "Collection": "Isolate the host, review the collected data, escalate to HITL.",
+    "Exfiltration": "Isolate the host, block the data-receiving destination/C2, review DLP, urgently escalate to HITL.",
+    "Command and Control": "Block the C2 destination, isolate the beaconing host, capture forensic PCAP, rotate potentially compromised credentials.",
+    "Impact": "Isolate the host, trigger incident-response/recovery procedures, urgently escalate to HITL.",
+    "Reconnaissance": "Rate-limit/block the scanning IP at the firewall, enable port-scan detection signatures, monitor the scanned hosts.",
+    "Resource Development": "Track the attacker infrastructure, share IoCs internally, raise an alert.",
 }
-DEFAULT_RESPONSE = "Cảnh báo và leo thang HITL để phân tích thủ công."
+DEFAULT_RESPONSE = "Alert and escalate to HITL for manual analysis."
 
-# Phản hồi đặc thù theo loại tấn công (ưu tiên hơn TACTIC_RESPONSE khi có).
+# Attack-type-specific response (takes precedence over TACTIC_RESPONSE when present).
 SPECIAL_RESPONSE: dict[str, str] = {
     "prompt_injection": (
-        "Cách ly request, vô hiệu hoá (neutralize) chỉ thị tiêm nhiễm, KHÔNG thực thi "
-        "nội dung không tin cậy, leo thang HITL."
+        "Quarantine the request, neutralize the injected instructions, do NOT execute "
+        "untrusted content, escalate to HITL."
     ),
 }
 

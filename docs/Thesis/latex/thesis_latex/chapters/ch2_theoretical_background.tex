@@ -1,93 +1,23 @@
-\chapter{Theoretical Background and Literature Review}
+\chapter{Theoretical Background}
 \label{ch:theoretical_background}
 
-This chapter establishes the theoretical foundations for SENTINEL, beginning with the cognitive bottleneck in modern Security Operations Centers (SOCs), then covering local Large Language Models (LLMs) and quantization, state-graph Agentic AI, Retrieval-Augmented Generation (RAG), adversarial AI vulnerabilities, online statistical anomaly detection, and related agentic-security work.
+This chapter outlines the core technologies forming the SENTINEL architecture: Agentic AI, Retrieval-Augmented Generation (RAG), and Zero Trust principles.
 
-\section{SOCs and the Cognitive Bottleneck}
-Modern SOCs consolidate diverse telemetry (NGFW, EDR, IDS/IPS) into centralised SIEM platforms~\cite{siem2021} to identify threats and escalate incidents to analysts. However, the shift to cloud-native infrastructure has caused a vast expansion of log data~\cite{bigdata2019}, driving the \emph{alert-fatigue} crisis: Tier-1 analysts are routinely overwhelmed by thousands of daily alerts, mostly false positives, and continuous alert floods deplete attentional resources and systematically increase the probability of critical oversight~\cite{alertfatigue2022}. Compounding this, Advanced Persistent Threats (APTs) employ stealthy, prolonged tactics that stateless rule-based frameworks cannot correlate across long temporal horizons~\cite{apt_stealth2021}.
+\section{Agentic AI and LLM Quantization}
+Unlike traditional Runbook Automation tools that follow rigid, pre-defined scripts, Agentic AI systems possess the autonomy to analyze contexts, evaluate evidence, and make flexible decisions based on live data streams.
 
-\section{Local LLMs and the Mathematics of Quantization}
-Transformer-based LLMs offer promising automation: the self-attention mechanism weighs every token against all others in parallel~\cite{vaswani2017}, capturing the long-range dependencies needed to correlate events across an extended log stream. However, data-sovereignty requirements forbid transmitting sensitive telemetry to external cloud endpoints under zero-trust guidelines~\cite{nist80207}, mandating \emph{local} LLMs in air-gapped environments. Running multi-billion-parameter models locally is memory-bound: a 9B model such as \textit{Gemma-2-9B-IT} in FP16 needs $\approx\!18$\,GB of VRAM. Quantization re-maps the continuous high-precision weights onto a coarser grid of lower-bit integers, trading a controlled loss of precision for large memory savings~\cite{quantization2021}. Via GGUF and the Q6\_K standard in \texttt{llama.cpp}, the footprint drops to $\approx\!7$--$8$\,GB (over $50\%$ reduction) with near-lossless reasoning (Table~\ref{tab:quantization}), enabling inference on consumer hardware.
+However, running Large Language Models (LLMs) locally requires massive hardware resources. To make Agentic AI practically viable for enterprises, SENTINEL applies \textbf{Quantization} techniques. By reducing the precision of model weights from FP16 (16-bit) to the Q6\_K standard (approx. 6.6-bit) via the GGUF format, the VRAM requirement for the Gemma-9B model shrinks from $\approx 18$ GB to merely $\approx 7-8$ GB. This allows smooth inference on consumer-grade hardware with negligible cognitive degradation.
 
-\begin{table}[!htbp]
-    \centering
-    \caption{Quantization levels for the Gemma-2-9B model (approximate). (Source: Author)}
-    \label{tab:quantization}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\centering\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.20\textwidth}|}
-        \hline
-        \textbf{Format} & \textbf{Bits / weight} & \textbf{VRAM} & \textbf{Quality} \\
-        \hline
-        FP16 (baseline) & 16 & $\approx$18\,GB & Reference \\ \hline
-        \textbf{Q6\_K (this work)} & $\approx$6.6 & $\approx$7--8\,GB & Near-lossless \\ \hline
-        Q4\_K\_M & $\approx$4.5 & $\approx$5--6\,GB & Minor degradation \\ \hline
-    \end{tabular}
-\end{table}
+\section{Hybrid Retrieval-Augmented Generation (RAG)}
+LLMs are inherently prone to "hallucinations" -- generating plausible but fabricated information. To counteract this, RAG forces the LLM to ground its reasoning on an authoritative knowledge base (e.g., MITRE ATT\&CK) before responding.
+SENTINEL utilizes a \textbf{Hybrid Search} methodology that combines:
+\begin{itemize}
+    \item \textbf{Vector Search (Semantic Search - FAISS):} Captures semantic similarities in attack descriptions.
+    \item \textbf{Keyword Search (BM25):} Precisely matches technical identifiers and IP addresses.
+\end{itemize}
+The results from both methods are merged using Reciprocal Rank Fusion (RRF), yielding optimal retrieval accuracy.
 
-\section{Agentic AI and State-Graph Models}
-Automated security is shifting from rigid Runbook Automation (RBA) toward autonomous Agentic AI~\cite{soar2025}. RBA relies on static, pre-defined scripts for linear alert handling---efficient but structurally blind to zero-day conditions and polymorphic formats. Agentic systems exhibit cognitive autonomy (self-reflection, multi-step planning, adaptive routing), adjusting their analysis in response to intermediate findings. Such agents are modelled as stateful directed graphs functioning as finite state machines~\cite{langgraph2024}, where nodes are computational or cognitive actions and conditional edges enforce dynamic routing on parent outputs. Stateful orchestration lets agents retain working memory across events; although this paradigm also permits cyclic re-analysis within one event, SENTINEL deliberately adopts an \emph{acyclic} per-event traversal for determinism and auditability, persisting cross-event state in Threat Memory rather than looping.
+\section{Zero Trust Security and LLM Vulnerabilities}
+The Zero Trust principle strictly prohibits transmitting sensitive network telemetry outside the organizational perimeter. Consequently, the entire SENTINEL architecture must operate in an Air-gapped (fully local) environment.
 
-\section{Retrieval-Augmented Generation and Hybrid Search}
-The primary LLM limitation is factual hallucination, a severe risk of misconfiguration in automated SOCs. RAG counters it by conditioning each response on freshly retrieved passages from an authoritative corpus rather than parametric memory alone~\cite{rag2020}, narrowing the space for unsupported claims. Modern RAG uses a \emph{hybrid} strategy: dense vector search with embedding models (\texttt{all-MiniLM-L6-v2})~\cite{reimers2019sentence} and FAISS cosine similarity~\cite{faiss2019} captures semantic meaning even when keywords differ, while sparse BM25~\cite{bm25_2009} matches technical identifiers (CVE codes, IPs) via TF-IDF weighting. Reciprocal Rank Fusion~\cite{rrf2009} consolidates the two ranked lists into one high-precision result by balancing dense semantics against sparse keyword weight.
-
-\section{LLM Cognitive Vulnerabilities and Adversarial Vectors}
-Deploying LLMs as core reasoning engines introduces novel vulnerabilities. Because LLMs process natural language without a compile-time separation of code and data, they are vulnerable to instruction hijacking~\cite{promptinjection2023}. The most relevant vector is \emph{log-substrate prompt injection}~\cite{watchtower2026}: adversaries embed command payloads in telemetry fields (e.g.\ User-Agent), and when the LLM processes these logs it may execute the embedded instructions, bypassing controls. Recent work formalises these attacks into a four-class taxonomy~\cite{watchtower2026}: \textit{Direct Override} (S1) instructs the model to ignore prior directives; \textit{Persona Hijack} (S2) coerces an unrestricted persona; \textit{Context Manipulation} (S3) fabricates authorization metadata (e.g.\ ``pre-approved''); and \textit{Obfuscated Payload} (S4) hides instructions via Base64/hex/URL encoding or homoglyphs to evade regex filters. Because these fields are attacker-controlled yet structurally indistinguishable from legitimate evidence, a single-pass LLM cannot reliably separate data from instructions---directly motivating the layered guardrail design of Chapter~\ref{ch:system_design_implementation} (Table~\ref{tab:vulnerabilities_mitigations}).
-
-\begin{table}[!htbp]
-    \centering
-    \caption{LLM cognitive vulnerabilities and SENTINEL's mitigations. (Source: Author)}
-    \label{tab:vulnerabilities_mitigations}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.20\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
-        \hline
-        \textbf{Attack Vector} & \textbf{Threat Mechanism} & \textbf{Mitigation} \\
-        \hline
-        Direct Prompt Injection & Instruction-hijack payloads in inputs & Regex pattern filters, structural prompts \\ \hline
-        Log-Substrate Injection & Instructions in log fields (User-Agent) & Delimited Encapsulation w/ random tokens \\ \hline
-        Encoding Bypass & Base64/Hex/URL obfuscation & Multi-layer decoding \& normalisation \\ \hline
-        Delimiter Smuggling & Control markers terminating data scope & Delimiter sanitisation, token budget \\ \hline
-        Semantic Poisoning & Falsified docs in vector DB & SHA-256 checksum + provenance \\ \hline
-    \end{tabular}
-\end{table}
-
-\section{Online Statistical Anomaly Detection: Welford's Algorithm}
-\label{sec:welford}
-Because the quadratic complexity of attention prevents LLMs from analysing raw streams at wire-speed, an $O(1)$ pre-filter is required. Computing rolling baselines over continuous streams needs numerically stable online statistics such as Welford's algorithm~\cite{welford1962}, which tracks the running mean and variance without accumulating floating-point error:
-\begin{equation}
-    \label{eq:welford_mean}
-    \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k},
-\end{equation}
-\begin{equation}
-    \label{eq:welford_m2}
-    M_{2,k} = M_{2,k-1} + (x_k - \mu_{k-1})(x_k - \mu_k),
-\end{equation}
-\begin{equation}
-    \label{eq:welford_var}
-    \sigma_k^2 = \frac{M_{2,k}}{k-1}.
-\end{equation}
-Maintaining these with constant memory, the system computes a normalised Z-score per packet, rapidly eliminating benign traffic while preserving the event chains of low-and-slow attacks. To validate signature-less detection, a \emph{real-derived} zero-day paradigm isolates a genuine benign flow and drives a single statistic to its extreme boundary, forcing a large Z-score that mimics an unknown outlier and is escalated to Tier-2.
-
-\section{Related Work: Agentic AI for Security Operations}
-Automated threat detection evolved through several waves. Classical intrusion detection used machine learning (Random Forests, SVMs) or deep learning (LSTMs, CNNs)~\cite{mlids2016}; accurate but operating as unexplainable ``black boxes.'' LLMs then opened a broad research front across cybersecurity, as catalogued by recent systematic reviews~\cite{llmsec_survey2025}, motivating a shift toward systems that can explain and act on their findings. Closest to this thesis is a wave of agentic frameworks pairing LLM reasoning with retrieval: CyberRAG~\cite{cyberrag2025} orchestrates fine-tuned classifiers through an iterative retrieve-and-reason loop for web-attack labelling; LanG~\cite{lang2026} proposes a governance-aware LangGraph platform unifying correlation, LLM rule generation, and attack reconstruction with HITL checkpoints; Sahay et al.~\cite{splunkllm2026} couple an autoencoder and deep RL for triage with an LLM for threat hunting inside a SIEM; and multi-agent designs such as AutoBnB-RAG~\cite{autobnb2025} extend retrieval-augmented collaboration to incident response. On the adversarial side, Pandey and Bhujang~\cite{watchtower2026} formalise the log-substrate injection threat (the S1--S4 taxonomy) and demonstrate its effectiveness. These systems establish the value of agentic, retrieval-grounded automation, and most already incorporate a pre-filter and, in some cases, an input guardrail; where they address injection, they tend to rely on a \emph{learned} semantic classifier a novel payload may still evade.
-
-Against this backdrop, SENTINEL differs along three deliberate design axes rather than by a single missing feature. First, its Tier-1 gate is a training-free $O(1)$ Welford statistic (plus a learned \emph{LightGBM} gateway for the escalation band) rather than a pre-filter requiring continual retraining. Second, it replaces a learned injection classifier with \emph{deterministic}, structural isolation: Delimited Data Encapsulation, a tier-consensus guard, and an HMAC-chained audit trail. Third, in contrast to tool-calling agents with iterative loops, it adopts an acyclic, tool-free orchestration running entirely on one local quantised model, prioritising determinism, auditability, and data sovereignty. Table~\ref{tab:related_work} positions SENTINEL across the capabilities most relevant to a deployable, security-hardened SOC engine.
-
-\begin{table}[!htbp]
-    \centering \footnotesize \setlength{\tabcolsep}{4pt} \renewcommand{\arraystretch}{1.2}
-    \caption{Comparative analysis of SENTINEL against recent agentic-AI security frameworks ($\checkmark$ supported; $\sim$ partial; $\times$ absent; -- N/A). (Source: Author)}
-    \label{tab:related_work}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|*{5}{>{\centering\arraybackslash}p{0.10\textwidth}|}}
-        \hline
-        \textbf{Capability} & \textbf{SENTINEL} & \textbf{Cyber\-RAG} & \textbf{LanG} & \textbf{Splunk\-LLM} & \textbf{Watch\-tower} \\
-        \hline
-        Wire-speed $O(1)$ pre-filter & $\checkmark$ & $\times$ & $\times$ & $\sim$ & -- \\ \hline
-        Deterministic anti-injection guardrails & $\checkmark$ & $\times$ & $\sim$ & $\times$ & -- \\ \hline
-        Local / air-gapped inference & $\checkmark$ & $\sim$ & $\sim$ & $\times$ & -- \\ \hline
-        Multi-day APT correlation & $\checkmark$ & $\times$ & $\checkmark$ & $\sim$ & -- \\ \hline
-        Hybrid dense+sparse RAG (RRF) & $\checkmark$ & $\sim$ & $\times$ & $\times$ & -- \\ \hline
-        Tamper-evident HMAC audit & $\checkmark$ & $\times$ & $\sim$ & $\times$ & -- \\ \hline
-    \end{tabular}
-\end{table}
-
-SENTINEL is thus distinguished not by any single component but by their integration: a deterministic Tier-1 filter and learned gateway absorb the high-velocity majority at wire-speed, while a cognitively isolated Tier-2 agent reasons behind cryptographic guardrails, directly addressing the latency--security trade-off the surveyed frameworks leave open.
-
-\section{Chapter Summary}
-This chapter established SENTINEL's foundations: the SOC cognitive bottleneck, local-LLM quantization, stateful agent orchestration, hybrid RAG via RRF, the log-substrate injection taxonomy (S1--S4), and Welford's $O(1)$ algorithm for signature-less anomaly detection. A comparison against recent agentic-security frameworks positioned SENTINEL as the approach that unifies wire-speed statistical pre-filtering, deterministic anti-injection guardrails, local data sovereignty, and tamper-evident auditing. Chapter~\ref{ch:system_design_implementation} details the technical design.
+Furthermore, reading network logs with LLMs introduces a novel vulnerability: \textbf{Log-background Prompt Injection}. Attackers can deliberately inject deceptive control commands into the Payload (e.g., HTTP User-Agent). Without strict "Guardrails" to encapsulate the Payload (such as random tokens and delimiters), the LLM can be easily manipulated, effectively blinding or bypassing the automated SOC system.

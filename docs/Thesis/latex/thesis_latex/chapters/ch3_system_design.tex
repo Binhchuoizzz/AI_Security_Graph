@@ -1,129 +1,86 @@
-\chapter{System Design and Technical Implementation}
+\chapter{System Design and Implementation}
 \label{ch:system_design_implementation}
 
-This chapter details the architecture, mathematical formulations, and implementation of the SENTINEL two-tier cognitive security framework: a hybrid detection-and-response pipeline engineered to bridge the gap between wire-speed packet processing and resource-intensive LLM reasoning, while establishing cognitive guardrails that isolate the LLM from adversarial manipulation. It covers the system block diagram, the online statistical pre-filter, the ML gateway, the state-graph cognitive workflow, Dual-RAG retrieval, the Threat Memory schema, the guardrail pipeline, the HMAC audit log, the Streamlit UI, and the Docker deployment.
+This chapter presents the core architecture of SENTINEL. The two-tier design decisively resolves the performance bottlenecks associated with Generative AI in cybersecurity.
 
-\section{Overview of the Two-Tier Cognitive Architecture}
-To protect enterprise environments without prohibitive latency, SENTINEL splits the pipeline into two specialised tiers (Figure~\ref{fig:soc_ai_concept}). \textbf{Tier-1}, a stateless wire-speed layer, sits at the network boundary: it ingests high-velocity telemetry and either computes real-time statistical deviations via Welford's algorithm or applies regex signatures, dropping or logging benign events instantly. \textbf{Tier-2}, a stateful cognitive layer driven by an autonomous LangGraph agent~\cite{langgraph2024}, performs deep reasoning, retrieves grounding from the Dual-RAG engine, correlates against the SQLite Threat Memory, and issues structured mitigations. Between them, a learned \textbf{ML gateway} resolves the confident majority of escalations without an LLM call. This layout offloads the vast bulk of traffic before inference (quantified in Chapter~\ref{ch:experiments_evaluation}), reserving the LLM for the genuinely ambiguous minority.
+\section{Two-Tier Architecture Overview}
+SENTINEL segregates the processing pipeline into two specialized tiers (Figure~\ref{fig:soc_ai_concept}).
+\textbf{Tier-1:} Operates at high-speed network edges, utilizing Regex rules and the Welford algorithm for anomaly detection. A Machine Learning Gateway (LightGBM) classifies and resolves the majority of alerts, escalating only complex, ambiguous cases to Tier-2.
+\textbf{Tier-2:} A locally hosted Agentic AI (Gemma-9B) references a knowledge base (RAG) and Threat Memory to make structured mitigation decisions (Block, Alert, Drop, HITL).
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.66\textheight,keepaspectratio]{images/soc_ai_concept.png}
-    \caption{Holistic SENTINEL architecture: two-tier data flow and structural components. (Source: Author)}
+    \caption{SENTINEL Overall Architecture: two-tier data flow and components. (Source: Author)}
     \label{fig:soc_ai_concept}
 \end{figure}
 
-The runtime flow (Figure~\ref{fig:sentinel_flow}) begins when a flow log is captured. Tier-1 intercepts it: a WAF or injection signature yields a direct \texttt{BLOCK\_IP}, whitelisted traffic is dropped, otherwise statistics are updated and a Z-score computed. Benign logs are dropped or logged; logs whose risk exceeds the threshold escalate. Each escalation is first scored by the ML gateway, which resolves it outright when confident; only the residual reaches Tier-2, where it is compressed and nonce-encapsulated (Drain parser~\cite{he2017drain}), grounded \emph{unconditionally} against the Dual-RAG base (with a Semantic Cache) and Threat Memory, and adjudicated by the LLM-triage node into one structured verdict. The output is validated, sanitised, and written under HMAC chaining, executing a firewall block or routing to the Streamlit HITL dashboard.
+The operational flow (Figure~\ref{fig:sentinel_flow}) ensures transparency. Logs bypassing the Tier-1 filter are scored by the ML Gateway. Uncertain cases are securely enclosed within "Guardrails", enriched via RAG, and passed to the LLM for final adjudication.
 
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=0.95\textwidth,height=0.74\textheight,keepaspectratio]{images/sentinel_flow.png}
-    \caption{Detailed runtime execution flow within the SENTINEL pipeline. (Source: Author)}
+    \caption{Detailed operational execution flow in the SENTINEL pipeline. (Source: Author)}
     \label{fig:sentinel_flow}
 \end{figure}
 
-\section{Positioning within the Existing SOC Stack}
-A fair assessment separates what SENTINEL contributes from what mature tooling already provides. Signature detection (Snort, Suricata, Zeek), high-volume correlation (Splunk, QRadar, Elastic)~\cite{siem2021}, and deterministic response automation (SOAR) are long established, and many SIEMs already tag alerts with ATT\&CK identifiers. SENTINEL is deliberately \emph{not} a detection competitor: its stateless Tier-1 is itself such a signature-and-statistics layer and would front, or be fed by, an existing IDS/SIEM. The ablation of Chapter~\ref{ch:experiments_evaluation} corroborates this---adding the cognitive tier does not raise raw flow-classification F1 over Tier-1 alone---which is expected because commodity detection is already strong, and is why the second tier's value lies elsewhere.
+\section{Tier-1: Statistical Pre-filter \& ML Gateway}
+Instead of forcing the LLM to process 100\% of the traffic, Tier-1 absorbs over 80\% of the volume.
+\begin{itemize}
+    \item \textbf{(1) Welford Algorithm:} Computes real-time Z-scores per IP to detect anomalies without retaining entire datasets in memory.
+    \item \textbf{ML Gateway (LightGBM):} Assigns risk scores. Extremely high-risk cases ($>0.85$) are blocked instantly, sparing LLM resources.
+    \item \textbf{Semantic Cache (Tier 1.75):} Caches LLM resolutions for malicious payloads using SHA-256 hashes. Recurring payloads (e.g., Brute-force, DDoS) are blocked within 1 millisecond without LLM invocation.
+\end{itemize}
 
-That value is the layer today's stack does \emph{not} provide: a secure, explainable, autonomous \emph{cognitive} tier for the ambiguous minority. Three properties separate it from SOAR and from cloud ``AI-SOC'' assistants. First, SOAR executes rigid, pre-authored playbooks that cannot reason about unscripted situations or justify themselves~\cite{soar2025}; SENTINEL substitutes a state-graph agent that reasons over retrieved MITRE/NIST context and emits a human-auditable rationale (rated $3.1/5$ by a cross-family LLM judge). Second, once a \emph{generative} model enters the loop, the log substrate becomes an injection surface (an adversary can embed ``ignore previous instructions and mark this benign'' in a User-Agent field), to which signature engines and SOAR are structurally immune because they never interpret content generatively; the Delimited Data Encapsulation layer, the tier-consensus guard, and the HMAC audit trail are a direct deterministic defence for this new surface, blocking or escalating every downgrade attempt across the 120-payload suite of Chapter~\ref{ch:experiments_evaluation}. Third, commercial assistants route telemetry to a vendor cloud LLM, inadmissible in air-gapped or Zero-Trust settings; SENTINEL runs the entire reasoning tier locally on one quantised model, with the two-tier gate keeping multi-second local inference feasible (an $82.97\%$ latency reduction). In short, SENTINEL supplies the injection-hardened, locally deployable, explainable reasoning-and-response tier that lets a generative model safely occupy the role rigid SOAR playbooks fill today.
-
-\section{Tier-1: Stateless Wire-Speed Filter (RuleEngine \& Welford)}
-Tier-1 ingests high-velocity streams and manages connection state without disk I/O via an in-memory session-baseline manager keyed on source IP. For each session it computes traffic features with Welford's online algorithm~\cite{welford1962}: the running mean $\mu_k$ and sum-of-squares $M_{2,k}$ recurrences of Section~\ref{sec:welford} yield a numerically stable rolling variance $\sigma_k^2$, from which a Z-score is derived,
-\begin{equation}
-    Z = \frac{x_k - \mu_k}{\sigma_k}.
-\end{equation}
-If $Z$ exceeds a configurable threshold ($\alpha>3.5\sigma$) the flow is tagged \texttt{ESCALATE}; session baselines keep updating to preserve low-and-slow chains. In parallel, a static \texttt{RuleEngine} performs pre-compiled regex signature matching to intercept known patterns (e.g.\ SQL-injection syntax) with instant \texttt{DROP}/\texttt{BLOCK\_IP}. The implementation uses two classes: \texttt{RunningStats} (in-memory counts/mean/sum-of-squares, $O(1)$ updates) and \texttt{SessionBaseline} (a hash table with a TTL garbage-collector bounding memory).
-
-Two safeguards govern the baseline. First, the online update is \emph{verdict-gated}: a baseline advances only on a benign (\texttt{DROP}/\texttt{LOG}) verdict, so an already-flagged anomaly never contaminates the statistics it is measured against---directly countering slow-rate ``boiling-frog'' poisoning. Second, rather than cold-starting from a potentially tainted warmup, the engine can be seeded at initialisation from a \emph{golden baseline}: the Welford state ($n$, mean, sum-of-squares) is pre-computed offline over a verified-benign capture, so anomalies are measured against known-clean statistics from the first packet, after which the same conditional update continues.
-
-\section{ML Gateway: Learned Tier-1 Load Shedding}
-Because forwarding every Tier-1 escalation to a multi-second LLM is wasteful when many are resolvable statistically, a gradient-boosted \texttt{LightGBM} gateway is interposed between the rule engine and the cognitive tier. Trained offline on $\approx\!1$M labelled flows (held-out Test-F1 $=0.9635$), it scores each escalation's attack probability $C$ and applies the unified four-band confidence policy that also governs the LLM verdict: $C\!\ge\!0.85\rightarrow\texttt{BLOCK\_IP}$ (with a generated dynamic rule), $0.65\!\le\!C\!<\!0.85\rightarrow$ escalate to the LLM, $0.40\!\le\!C\!<\!0.65\rightarrow\texttt{ALERT}$ (auto-blocking on repeat offence), and $C\!<\!0.40\rightarrow\texttt{DROP}$. Inference costs $\approx\!0.35$\,ms, so the gateway resolves the confident majority at wire-speed and forwards only the uncertain band; empirically it offloads $83.8\%$ of escalations at $98.82\%$ precision (Chapter~\ref{ch:experiments_evaluation}), making the LLM a scarce, reserved resource rather than an unavoidable per-event cost. Sharing the single \texttt{decision\_policy} module between the ML and LLM stages keeps the confidence-to-action mapping consistent across both tiers.
-
-\section{Tier-2: LangGraph Stateful Cognitive Agent}
-The residual uncertain escalations enter the Tier-2 engine, a stateful Directed Acyclic Graph compiled by LangGraph~\cite{langgraph2024} and functioning as a finite state machine over a central \texttt{SentinelState} object. The graph chains a guardrails node (compression + delimited encapsulation), a RAG-context node, an LLM-triage node, and a conditional ATT\&CK-mapping node, terminating in an action executor or a human-in-the-loop handler. The RAG node retrieves grounding \emph{unconditionally} before triage. The triage node evaluates the batch with a locally quantised Gemma-2 model~\cite{gemma_2_2024} and emits one structured JSON verdict; any actionable verdict (\texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{AWAIT\_HITL}) is routed through the mapper, which anchors on the technique triage already grounded and structures it into a schema-validated MITRE record, while benign \texttt{LOG} verdicts terminate. Routing is deterministic and loop-free (Table~\ref{tab:agent_fsm_transitions}).
+\section{Tier-2: Agentic AI and State Flow (LangGraph)}
+The LLM is orchestrated via a "State Graph" (LangGraph), functioning as a finite state machine (Table~\ref{tab:agent_fsm_transitions}). This strictly limits AI hallucinations by enforcing rigid workflow milestones.
 
 \begin{table}[!htbp]
     \centering
-    \caption{State-transition matrix of the Tier-2 cognitive agent FSM. (Source: Author)}
+    \caption{State transition matrix of the Tier-2 cognitive agent. (Source: Author)}
     \label{tab:agent_fsm_transitions}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.20\textwidth}|>{\raggedright\arraybackslash}p{0.27\textwidth}|>{\raggedright\arraybackslash}p{0.18\textwidth}|>{\raggedright\arraybackslash}p{0.16\textwidth}|}
         \hline
         \textbf{State} & \textbf{Input / Condition} & \textbf{Next} & \textbf{Action} \\
         \hline
-        \texttt{GUARDRAILS} & Batch ingested & \texttt{RAG\_CONTEXT} & Compress \& nonce-wrap \\ \hline
-        \texttt{RAG\_CONTEXT} & Context retrieved & \texttt{LLM\_TRIAGE} & Append MITRE/NIST \\ \hline
-        \texttt{LLM\_TRIAGE} & action actionable & \texttt{ATTACK\_MAPPER} & Structure ATT\&CK record \\ \hline
-        \texttt{LLM\_TRIAGE} & action $\in$ \{\texttt{LOG},\texttt{DROP}\} & \texttt{END} & Close cycle \\ \hline
-        \texttt{ATTACK\_MAPPER} & \texttt{BLOCK\_IP}/\texttt{ALERT} & \texttt{ACTION\_EXEC} & Block / alert \\ \hline
-        \texttt{ATTACK\_MAPPER} & \texttt{AWAIT\_HITL} & \texttt{HITL} & Queue analyst \\ \hline
-        \texttt{ACTION\_EXEC}/\texttt{HITL} & Completed & \texttt{END} & Write HMAC record \\ \hline
+        \texttt{GUARDRAILS} & Receive batch & \texttt{RAG\_CONTEXT} & Compress \& wrap \\ \hline
+        \texttt{RAG\_CONTEXT} & Context retrieval & \texttt{LLM\_TRIAGE} & Add MITRE/NIST \\ \hline
+        \texttt{LLM\_TRIAGE} & Action decision & \texttt{ATTACK\_MAPPER} & MITRE mapping \\ \hline
+        \texttt{ATTACK\_MAPPER} & \texttt{BLOCK}/\texttt{ALERT} & \texttt{ACTION\_EXEC} & Block/Alert \\ \hline
+        \texttt{ATTACK\_MAPPER} & \texttt{AWAIT\_HITL} & \texttt{HITL} & Escalate to Analyst \\ \hline
     \end{tabular}
 \end{table}
 
-Grounding triage in retrieved MITRE/NIST documents constrains the LLM and mitigates hallucination. A deterministic \texttt{DecisionValidator} demotes any \texttt{BLOCK\_IP} below confidence $0.5$ to \texttt{AWAIT\_HITL} and overrides the LLM to \texttt{AWAIT\_HITL} whenever it contradicts a Tier-1 attack signal (the tier-consensus guard against semantic social engineering). At the edge of its knowledge---an escalation matching no known technique---two properties prevent blind spots: escalation is signature-independent (a Welford outlier reaches the reasoning tier even if no rule describes it), and the tier degrades gracefully (the model interprets the log's own features and grounds its wording on the closest retrieved context, with the faithfulness constraint discouraging fabrication). Where a semantic payload is present the mapper remains useful even for unseen variants; for content-free flow telemetry the technique attribution is unreliable, and in that regime the confidence threshold and consensus guard route the event to \texttt{AWAIT\_HITL}---a cautious human escalation rather than a confident but unfounded action. The \texttt{LLMClient} connects to a local llama.cpp service running Gemma-2 with \texttt{temperature=0.1}, a fixed seed, an 8{,}192-token window, and schema-constrained JSON decoding for near-deterministic, always-parseable verdicts.
-
-\section{Dual-RAG Mechanism and Semantic Memory}
-Dual-RAG grounds decisions by retrieving from two domain bases: MITRE ATT\&CK~\cite{strom2018mitre} (tactics/techniques) and NIST SP~800-61r2~\cite{nist80061} (incident playbooks). Rather than dense or sparse retrieval in isolation~\cite{rag2020}, it fuses both (Table~\ref{tab:search_comparison}).
+\section{Knowledge Retrieval (Dual-RAG) and Memory}
+To ensure highly specialized decisions, SENTINEL utilizes a hybrid RAG mechanism, fusing Vector search (semantic) and BM25 (keyword) via Reciprocal Rank Fusion (Table~\ref{tab:search_comparison}). The knowledge source comprises MITRE ATT\&CK and NIST frameworks.
 
 \begin{table}[!htbp]
     \centering
-    \caption{Retrieval paradigms in the hybrid search strategy. (Source: Author)}
+    \caption{Retrieval models in the hybrid search strategy (Dual-RAG). (Source: Author)}
     \label{tab:search_comparison}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.20\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|>{\raggedright\arraybackslash}p{0.31\textwidth}|}
         \hline
-        \textbf{Dimension} & \textbf{Dense (FAISS)} & \textbf{Sparse (BM25)} \\
+        \textbf{Dimension} & \textbf{Dense (FAISS / Vector)} & \textbf{Sparse (BM25 / Keyword)} \\
         \hline
-        Model & all-MiniLM-L6-v2, 384-dim~\cite{reimers2019sentence} & BM25 term weighting \\ \hline
-        Logic & Cosine similarity~\cite{faiss2019} & TF-IDF~\cite{bm25_2009} \\ \hline
-        Strength & Synonyms, concepts, semantics & Exact IDs (CVEs, IPs, ports) \\ \hline
-        Weakness & Weak on exact technical hashes & Blind to synonyms/context \\ \hline
+        Model & all-MiniLM-L6-v2 & BM25 Weights \\ \hline
+        Strengths & Understands semantics, concepts & Exact IDs (CVE, IP) \\ \hline
     \end{tabular}
 \end{table}
 
-Dense (FAISS) and sparse (BM25) scores are consolidated by Reciprocal Rank Fusion~\cite{rrf2009},
-\begin{equation}
-    R(d) = \sum_{m \in M} \frac{1}{k + r_m(d)},
-\end{equation}
-where $r_m(d)$ is the rank of $d$ in run $m$ and $k=60$; the top three fused passages ground the triage node. A Semantic Cache precedes retrieval, keying on the SHA-256 digest of the mined log template so recurring attack templates reuse a computed result (reducing per-query cost from hundreds of milliseconds to microseconds). It is an in-memory LRU (\texttt{OrderedDict}) bounded to 500 entries with an 1800-second TTL.
-
-\section{Threat Memory and APT Campaign Correlation}
-Stealthy actors split attack chains into low-severity events across long windows, bypassing stateless filters~\cite{apt_stealth2021}. SENTINEL adds a persistent Threat Memory (local SQLite) tracking historical alerts, entity reputations, and temporal sequences (Table~\ref{tab:threat_memory_schema}).
+\textbf{Threat Memory:} Used to correlate persistent attacks (APT) across time. IP reputation degrades over multiple days. If the score hits a critical threshold (100), the IP is automatically blocked at the network edge (Tier-1).
 
 \begin{table}[!htbp]
     \centering
-    \caption{Threat Memory database schema. (Source: Author)}
+    \caption{Threat Memory Database Schema. (Source: Author)}
     \label{tab:threat_memory_schema}
     \begin{tabular}{|>{\raggedright\arraybackslash}p{0.24\textwidth}|>{\raggedright\arraybackslash}p{0.34\textwidth}|>{\raggedright\arraybackslash}p{0.28\textwidth}|}
         \hline
-        \textbf{Table} & \textbf{Primary Fields} & \textbf{Purpose} \\
+        \textbf{Table} & \textbf{Primary Key} & \textbf{Purpose} \\
         \hline
-        \texttt{ip\_reputation} & \texttt{ip} (PK), \texttt{reputation\_score}, \texttt{total\_incidents}, \texttt{last\_seen}, \texttt{last\_mitre\_technique} & Long-term IP reputation (0--100), time-decayed. \\ \hline
-        \texttt{known\_entities} & \texttt{id} (PK), \texttt{entity\_type}, \texttt{entity\_value}, \texttt{is\_active} & Pre-seeds verified internal tools to suppress FPs. \\ \hline
-        \texttt{threat\_events} & \texttt{id} (PK), \texttt{src\_ip}, \texttt{apt\_phase}, \texttt{apt\_day}, \texttt{label}, \texttt{timestamp} & Records escalated events for multi-day APT correlation. \\ \hline
-        \texttt{apt\_indicators} & \texttt{id} (PK), \texttt{indicator\_value}, \texttt{confidence}, \texttt{mitre\_chain} & Confirmed APT indicators for campaign monitoring. \\ \hline
+        \texttt{ip\_reputation} & \texttt{ip} (PK), \texttt{reputation\_score} & Long-term IP reputation. \\ \hline
+        \texttt{threat\_events} & \texttt{id}, \texttt{src\_ip}, \texttt{label} & Multi-day APT correlation. \\ \hline
     \end{tabular}
 \end{table}
 
-An IP's reputation rises with alert severity up to a cap of 100; a periodic decay reduces the score of inactive IPs,
-\begin{equation}
-    S_{new} = S_{old} \times (1 - \lambda)^{t},
-\end{equation}
-with decay rate $\lambda$ and idle time $t$. An APT routine scans \texttt{threat\_events}: if one source IP triggers anomalies across $\ge\!2$ distinct days (optionally spanning kill-chain phases), the classification is elevated to an emergent multi-day campaign. These intervals and increments are computed by Python-side upsert/aggregation queries over SQLite, avoiding long-term state in the agent's working memory. Tier-1 also reads this reputation, so a historically hostile IP is blocked immediately without a further LLM call---closing the feedback loop.
-
-\section{AI Security Guardrails and Encapsulation}
-Because LLMs are vulnerable to instruction hijacking~\cite{promptinjection2023}, a multi-layered guardrail isolates the reasoning engine. The core defence is \emph{Delimited Data Encapsulation}: each session generates a cryptographically random hex token (e.g.\ \texttt{<|DATA\_8F3E|>}) via \texttt{secrets.token\_hex()}, wrapping the untrusted payload so any command tokens inside the boundaries are treated as passive data. Against token-DoS and context overflow, a Drain-based template miner~\cite{he2017drain} groups similar logs and strips random parameters within a 4{,}000-token budget (60\% templates, 40\% high-entropy outliers). An output-sanitisation filter enforces JSON-schema conformance and strips markdown-image, SVG, and hex-bypass vectors~\cite{owasp_llm2025} before any output reaches the database or dashboard.
-
-\section{Data Integrity and HMAC Protection}
-To secure the log database against tampering, SENTINEL chains each entry cryptographically~\cite{hmac1997}: for entry $i$,
-\begin{equation}
-    H_i = \text{HMAC-SHA256}(D_i \parallel H_{i-1}, K),
-\end{equation}
-where $D_i$ is the current payload, $H_{i-1}$ the previous hash, and $K$ a secret key. Altering a label or deleting an entry breaks the chain, which the dashboard flags immediately. The RAG vector store is likewise guarded by a SHA-256 checksum manager that verifies files before loading, blocking semantic poisoning. An \texttt{ActionValidator} enforces an allowlist of valid actions and rejects shell metacharacters in payload fields, preventing RCE during firewall orchestration.
-
-\section{Dashboard, Deployment, and Scalability}
-The Streamlit SOC dashboard reactively reads the backend database and files, integrating a real-time queue view (Tier-1 throughput, Tier-2 verdicts), a Threat-Memory analytics panel (APT propagation over IP timelines), an HMAC audit-integrity indicator (green = valid chain, red = tampered), and a HITL interface for approving or rejecting recommended blocks. Deployment is virtualised with a multi-stage \texttt{Dockerfile} (llama.cpp compiled with CUDA for GPU inference) orchestrated by \texttt{docker-compose.yml}, which shares log/database directories via persistent volumes so \texttt{threat\_memory.db} and the audit database survive container lifetimes.
-
-The two-tier design answers the throughput objection by treating the tiers as different scaling regimes. Tier-1 is a throughput problem, not a latency wall: each Welford update and regex match is $O(1)$ and per-IP state is independent, so the layer is embarrassingly parallel and shards by source-IP hash; each decision runs in well under a millisecond (the ML gateway adds $\approx\!0.35$\,ms), and a compiled or stream-processing implementation raises the per-core ceiling by orders of magnitude. The cognitive tier never sees the raw escalation count: Drain compression, the Semantic Cache, and reputation-based Tier-1 dropping collapse it to the number of \emph{genuinely novel} anomaly templates, adjudicated in batches ($\approx\!5.7$\,s per batch, one inference call for dozens of compressed escalations). Crucially, the cognitive tier sits \emph{off} the synchronous path: Tier-1 has already blocked or dropped unambiguous attacks at wire-speed, so a cognitive backlog delays enrichment, not protection. Under an all-novel adversarial flood the surge is itself a Tier-1 volumetric outlier that triggers coarse rate-limiting, and a saturated cognitive queue falls back to the deterministic Tier-1 verdict---security coverage is preserved, only enrichment degrades. Honestly, the present prototype implements the load-shedding ratio and caching but not yet an explicit backpressure controller; formalising that graceful-degradation policy, horizontal GPU scaling, and a periodically re-validated golden-baseline corpus are the path to production and are revisited in Chapter~\ref{ch:conclusion}.
-
-\section{Chapter Summary}
-This chapter established SENTINEL's design: wire-speed stateless filtration (Tier-1), a learned ML gateway that sheds the confident majority of escalations, and stateful cognitive reasoning (Tier-2), all wrapped in cryptographic and AI-specific guardrails that provide defence in depth---reducing, not eliminating, adversarial exposure, with robustness against an adaptive attacker a scoped property revisited in Chapter~\ref{ch:conclusion}. The Streamlit dashboard bridges automation with human oversight via the HITL queue, and the Docker setup ensures reproducible deployment. Chapter~\ref{ch:experiments_evaluation} presents the empirical evaluation of this architecture.
+\section{Prompt Injection Defense and Transparency}
+Every payload ingested by the LLM is wrapped in random cryptographic nonces (e.g., \texttt{<<<DATA\_8F3E...>>>}). This signals the LLM that the enclosed content is purely passive data, forbidding the execution of any hidden instructions. Finally, every verdict is hashed (HMAC-SHA256) into an audit chain; any retrospective tampering breaks the chain, triggering immediate Dashboard alerts.

@@ -1,0 +1,2285 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENTINEL — Slide Bảo vệ Luận văn Thạc sĩ | Viện Quản trị & Công nghệ FSB | Nguyễn Đức Bình - MSE13183</title>
+    <!-- Google Fonts optimized for Vietnamese typography (Be Vietnam Pro & Plus Jakarta Sans) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            /* High-Contrast Premium Light Theme (Default) */
+            --bg-main: #F1F5F9;
+            --bg-stage: #E2E8F0;
+            --bg-card: rgba(255, 255, 255, 0.97);
+            --bg-card-hover: #FFFFFF;
+            --border-glass: #CBD5E1;
+            --border-active: #2563EB;
+
+            --blue: #1D4ED8;
+            --blue-glow: rgba(29, 78, 216, 0.14);
+            --cyan: #0284C7;
+            --cyan-glow: rgba(2, 132, 199, 0.14);
+            --emerald: #047857;
+            --emerald-glow: rgba(4, 120, 87, 0.14);
+            --purple: #6D28D9;
+            --purple-glow: rgba(109, 40, 217, 0.14);
+            --amber: #B45309;
+            --rose: #BE123C;
+
+            --text-main: #0F172A;
+            --text-muted: #334155;
+            --text-dim: #64748B;
+
+            /* Typography */
+            --font-title: 'Be Vietnam Pro', 'Plus Jakarta Sans', sans-serif;
+            --font-body: 'Be Vietnam Pro', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --shadow-card: 0 12px 28px -6px rgba(15, 23, 42, 0.09), 0 8px 12px -6px rgba(15, 23, 42, 0.04);
+            --shadow-hover: 0 22px 40px -10px rgba(37, 99, 235, 0.18), 0 10px 15px -5px rgba(15, 23, 42, 0.08);
+        }
+
+        /* Dark Theme Toggle Class */
+        body.theme-dark {
+            --bg-main: #07090E;
+            --bg-stage: #0F172A;
+            --bg-card: rgba(15, 23, 42, 0.94);
+            --bg-card-hover: rgba(30, 41, 59, 0.98);
+            --border-glass: rgba(255, 255, 255, 0.14);
+            --border-active: #38BDF8;
+
+            --blue: #3B82F6;
+            --cyan: #06B6D4;
+            --emerald: #10B981;
+            --purple: #8B5CF6;
+            --amber: #F59E0B;
+            --rose: #F43F5E;
+
+            --text-main: #F8FAFC;
+            --text-muted: #E2E8F0;
+            --text-dim: #94A3B8;
+
+            --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.6);
+            --shadow-hover: 0 30px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Ambient Glowing Background Animations & Tech Grid Overlay */
+        .ambient-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            pointer-events: none;
+            background-image:
+                radial-gradient(rgba(37, 99, 235, 0.08) 1px, transparent 1px),
+                radial-gradient(rgba(2, 132, 199, 0.05) 1px, transparent 1px);
+            background-size: 36px 36px;
+            background-position: 0 0, 18px 18px;
+        }
+        body.theme-dark .ambient-bg {
+            background-image:
+                radial-gradient(rgba(56, 189, 248, 0.12) 1px, transparent 1px),
+                radial-gradient(rgba(129, 140, 248, 0.08) 1px, transparent 1px);
+        }
+
+        .glow-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(140px);
+            opacity: 0.28;
+            animation: floatOrb 25s infinite ease-in-out alternate;
+        }
+        .orb-1 { width: 750px; height: 750px; background: #38BDF8; top: -200px; left: -100px; }
+        .orb-2 { width: 850px; height: 850px; background: #818CF8; bottom: -250px; right: -100px; animation-delay: -7s; }
+        .orb-3 { width: 650px; height: 650px; background: #34D399; top: 25%; left: 35%; animation-delay: -14s; }
+
+        @keyframes floatOrb {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, 30px) scale(1.08); }
+            100% { transform: translate(-30px, -20px) scale(0.95); }
+        }
+
+        /* Header Control Bar */
+        header.app-header {
+            position: relative;
+            z-index: 50;
+            height: 64px;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s ease;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-badge {
+            background: linear-gradient(135deg, var(--blue), var(--cyan));
+            color: #FFFFFF;
+            font-weight: 800;
+            font-family: var(--font-title);
+            font-size: 15px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px var(--cyan-glow);
+        }
+        .brand-title {
+            font-family: var(--font-title);
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--text-main);
+            letter-spacing: -0.2px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slide-counter {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: rgba(0, 0, 0, 0.04);
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border-glass);
+        }
+        body.theme-dark .slide-counter { background: rgba(255, 255, 255, 0.05); }
+
+        .timer-display {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--cyan);
+            background: var(--cyan-glow);
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--cyan);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .ctrl-btn {
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-glass);
+            color: var(--text-main);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: var(--font-body);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+        body.theme-dark .ctrl-btn { background: rgba(255, 255, 255, 0.05); }
+        .ctrl-btn:hover {
+            background: var(--blue);
+            color: #FFFFFF;
+            border-color: var(--blue);
+            transform: translateY(-1px);
+        }
+        .ctrl-btn.active {
+            background: var(--cyan);
+            border-color: var(--cyan);
+            color: #FFFFFF;
+        }
+
+        /* Top Progress Bar */
+        .progress-bar-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(0, 0, 0, 0.06);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--blue), var(--cyan), var(--emerald));
+            transition: width 0.3s ease;
+        }
+
+        /* Slide Stage Container */
+        .slide-stage {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 36px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* Slide Container — Enhanced Glassmorphism & Cyber Accents */
+        .slide {
+            position: absolute;
+            width: 100%;
+            max-width: 1440px;
+            height: 100%;
+            max-height: 810px;
+            background: var(--bg-card);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--border-glass);
+            border-radius: 24px;
+            padding: 42px 58px;
+            display: flex;
+            flex-direction: column;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(60px) scale(0.96);
+            transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 0s 0.5s;
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+        }
+
+        /* Exiting slide (going backward) */
+        .slide.exit-left {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(-60px) scale(0.96);
+        }
+        .slide.exit-right {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(60px) scale(0.96);
+        }
+
+        /* Slide Background Watermark Pattern */
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: -120px;
+            right: -120px;
+            width: 380px;
+            height: 380px;
+            background: radial-gradient(circle, var(--blue-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .slide.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0) scale(1);
+            transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        visibility 0s 0s;
+        }
+
+        /* === STAGGER ENTRANCE ANIMATIONS FOR SLIDE CHILDREN === */
+        @keyframes slideUpFadeIn {
+            from { opacity: 0; transform: translateY(28px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleUpFadeIn {
+            from { opacity: 0; transform: scale(0.88); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes slideLeftFadeIn {
+            from { opacity: 0; transform: translateX(-24px); }
+            to   { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Elements start invisible, animate on slide.active */
+        .slide .slide-tag,
+        .slide .slide-title,
+        .slide .card,
+        .slide .agenda-card,
+        .slide .metric-box,
+        .slide .chart-bar-group,
+        .slide table,
+        .slide .arch-diagram,
+        .slide .grid-2,
+        .slide .grid-3,
+        .slide .grid-4,
+        .slide > p,
+        .slide > div > svg {
+            opacity: 0;
+        }
+
+        .slide.active .slide-tag {
+            animation: slideLeftFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
+        }
+        .slide.active .slide-title {
+            animation: slideUpFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+        }
+
+        /* Stagger grids and cards */
+        .slide.active .grid-2,
+        .slide.active .grid-3,
+        .slide.active .grid-4 {
+            animation: slideUpFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards;
+        }
+
+        .slide.active .card:nth-child(1),
+        .slide.active .agenda-card:nth-child(1) {
+            animation: scaleUpFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+        }
+        .slide.active .card:nth-child(2),
+        .slide.active .agenda-card:nth-child(2) {
+            animation: scaleUpFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.4s forwards;
+        }
+        .slide.active .card:nth-child(3),
+        .slide.active .agenda-card:nth-child(3) {
+            animation: scaleUpFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
+        }
+        .slide.active .card:nth-child(4),
+        .slide.active .agenda-card:nth-child(4) {
+            animation: scaleUpFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.6s forwards;
+        }
+
+        .slide.active .metric-box:nth-child(1) { animation: scaleUpFadeIn 0.4s ease 0.3s forwards; }
+        .slide.active .metric-box:nth-child(2) { animation: scaleUpFadeIn 0.4s ease 0.4s forwards; }
+        .slide.active .metric-box:nth-child(3) { animation: scaleUpFadeIn 0.4s ease 0.5s forwards; }
+        .slide.active .metric-box:nth-child(4) { animation: scaleUpFadeIn 0.4s ease 0.6s forwards; }
+
+        .slide.active table {
+            animation: slideUpFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.35s forwards;
+        }
+        .slide.active .chart-bar-group {
+            animation: slideUpFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.35s forwards;
+        }
+        .slide.active .arch-diagram {
+            animation: scaleUpFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards;
+        }
+        .slide.active > p {
+            animation: slideUpFadeIn 0.45s ease 0.3s forwards;
+        }
+        .slide.active > div > svg {
+            animation: slideUpFadeIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.2s forwards;
+        }
+
+        /* FULLSCREEN EDGE-TO-EDGE OVERRIDE */
+        :fullscreen body,
+        :-webkit-full-screen body,
+        body.is-fullscreen {
+            background: var(--bg-main);
+        }
+
+        :fullscreen header.app-header,
+        :-webkit-full-screen header.app-header,
+        body.is-fullscreen header.app-header,
+        :fullscreen footer.app-footer,
+        :-webkit-full-screen footer.app-footer,
+        body.is-fullscreen footer.app-footer {
+            display: none !important;
+        }
+
+        :fullscreen .slide-stage,
+        :-webkit-full-screen .slide-stage,
+        body.is-fullscreen .slide-stage {
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+        }
+
+        :fullscreen .slide,
+        :-webkit-full-screen .slide,
+        body.is-fullscreen .slide {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100vw !important;
+            max-height: 100vh !important;
+            border-radius: 0 !important;
+            border: none !important;
+            padding: 50px 88px !important;
+            box-shadow: none !important;
+            background: var(--bg-card);
+        }
+
+        /* === FULLSCREEN FONT SCALING — 20% bigger for projector === */
+        :fullscreen .slide-title,
+        :-webkit-full-screen .slide-title,
+        body.is-fullscreen .slide-title {
+            font-size: 42px !important;
+        }
+        :fullscreen .slide-tag,
+        :-webkit-full-screen .slide-tag,
+        body.is-fullscreen .slide-tag {
+            font-size: 17px !important;
+        }
+        :fullscreen .card-title,
+        :-webkit-full-screen .card-title,
+        body.is-fullscreen .card-title {
+            font-size: 20px !important;
+        }
+        :fullscreen .card-text,
+        :-webkit-full-screen .card-text,
+        body.is-fullscreen .card-text {
+            font-size: 17.5px !important;
+            line-height: 1.72 !important;
+        }
+        :fullscreen ul.styled-list li,
+        :-webkit-full-screen ul.styled-list li,
+        body.is-fullscreen ul.styled-list li {
+            font-size: 17.5px !important;
+            line-height: 1.72 !important;
+        }
+        :fullscreen .code-snippet,
+        :-webkit-full-screen .code-snippet,
+        body.is-fullscreen .code-snippet {
+            font-size: 17px !important;
+        }
+        :fullscreen .badge,
+        :-webkit-full-screen .badge,
+        body.is-fullscreen .badge {
+            font-size: 16px !important;
+        }
+        :fullscreen .metric-val,
+        :-webkit-full-screen .metric-val,
+        body.is-fullscreen .metric-val {
+            font-size: 44px !important;
+        }
+        :fullscreen .metric-lbl,
+        :-webkit-full-screen .metric-lbl,
+        body.is-fullscreen .metric-lbl {
+            font-size: 15px !important;
+        }
+        :fullscreen table,
+        :-webkit-full-screen table,
+        body.is-fullscreen table {
+            font-size: 17px !important;
+        }
+        :fullscreen .chart-bar-label,
+        :-webkit-full-screen .chart-bar-label,
+        body.is-fullscreen .chart-bar-label {
+            font-size: 17px !important;
+        }
+        :fullscreen .agenda-card .card-text,
+        :-webkit-full-screen .agenda-card .card-text,
+        body.is-fullscreen .agenda-card .card-text {
+            font-size: 17px !important;
+        }
+        :fullscreen .agenda-num,
+        :-webkit-full-screen .agenda-num,
+        body.is-fullscreen .agenda-num {
+            font-size: 30px !important;
+            width: 56px !important;
+            height: 56px !important;
+        }
+
+        /* Floating HUD in Fullscreen Mode */
+        .fullscreen-hud {
+            position: fixed;
+            top: 22px;
+            right: 28px;
+            z-index: 200;
+            display: none;
+            align-items: center;
+            gap: 14px;
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            padding: 9px 20px;
+            border-radius: 30px;
+            color: #F8FAFC;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            transition: opacity 0.3s ease;
+        }
+
+        :fullscreen .fullscreen-hud,
+        :-webkit-full-screen .fullscreen-hud,
+        body.is-fullscreen .fullscreen-hud {
+            display: flex;
+        }
+
+        .hud-btn {
+            background: rgba(255, 255, 255, 0.14);
+            border: none;
+            color: #FFFFFF;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .hud-btn:hover {
+            background: var(--blue);
+            transform: scale(1.1);
+        }
+
+        /* Slide Header Typography - Scaled Up for High Legibility */
+        .slide-tag {
+            font-family: var(--font-title);
+            font-size: 15px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            color: var(--blue);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            position: relative;
+            z-index: 2;
+        }
+        .slide-tag::before {
+            content: '';
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            background: var(--blue);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--blue);
+        }
+
+        .slide-title {
+            font-family: var(--font-title);
+            font-size: 34px;
+            font-weight: 800;
+            color: var(--text-main);
+            line-height: 1.3;
+            margin-bottom: 24px;
+            letter-spacing: -0.3px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            gap: 28px;
+            overflow-y: auto;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* Grid Layout Utilities */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; position: relative; z-index: 2; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; width: 100%; position: relative; z-index: 2; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; width: 100%; position: relative; z-index: 2; }
+
+        /* Ultra Modern Card Component - High Visibility & Micro-Animations */
+        .card {
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 26px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-card);
+            transition: all 0.25s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 2;
+        }
+        .card:hover {
+            border-color: var(--border-active);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-hover);
+        }
+        .card-cyan { border-top: 4px solid var(--cyan); }
+        .card-purple { border-top: 4px solid var(--purple); }
+        .card-emerald { border-top: 4px solid var(--emerald); }
+        .card-amber { border-top: 4px solid var(--amber); }
+        .card-blue { border-top: 4px solid var(--blue); }
+        .card-rose { border-top: 4px solid var(--rose); }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 14px;
+        }
+        .icon-cyan { background: var(--cyan-glow); color: var(--cyan); }
+        .icon-purple { background: var(--purple-glow); color: var(--purple); }
+        .icon-emerald { background: var(--emerald-glow); color: var(--emerald); }
+        .icon-amber { background: rgba(180, 83, 9, 0.12); color: var(--amber); }
+        .icon-blue { background: var(--blue-glow); color: var(--blue); }
+        .icon-rose { background: rgba(190, 18, 60, 0.12); color: var(--rose); }
+
+        .card-title {
+            font-family: var(--font-title);
+            font-size: 20.5px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: var(--text-main);
+            line-height: 1.35;
+        }
+        .card-text {
+            font-size: 16px;
+            color: var(--text-muted);
+            line-height: 1.68;
+            font-weight: 500;
+        }
+
+        /* Metric Box High-Visibility */
+        .metric-box {
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 22px;
+            text-align: center;
+            box-shadow: var(--shadow-card);
+            transition: transform 0.2s ease;
+        }
+        .metric-box:hover {
+            transform: translateY(-2px);
+        }
+        .metric-val {
+            font-family: var(--font-title);
+            font-size: 42px;
+            font-weight: 800;
+            color: var(--blue);
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+        .metric-val-green { color: var(--emerald); }
+        .metric-val-purple { color: var(--purple); }
+        .metric-lbl {
+            font-size: 15px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        /* Bullet List Styling - Scaled Up */
+        ul.styled-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 13px;
+        }
+        ul.styled-list li {
+            position: relative;
+            padding-left: 30px;
+            font-size: 16px;
+            color: var(--text-muted);
+            line-height: 1.68;
+            font-weight: 500;
+        }
+        ul.styled-list li::before {
+            content: "\f00c";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            top: 3px;
+            color: var(--blue);
+            font-size: 15px;
+        }
+        ul.styled-list li strong {
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        /* Code Snippet & High Contrast Boxes */
+        .code-snippet {
+            font-family: var(--font-mono);
+            font-size: 15px;
+            background: #0F172A;
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 18px;
+            color: #38BDF8;
+            line-height: 1.65;
+            overflow-x: auto;
+            font-weight: 500;
+        }
+
+        .badge {
+            display: inline-block;
+            font-family: var(--font-title);
+            font-size: 15px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-weight: 800;
+            margin-right: 6px;
+        }
+        .badge-cyan { background: var(--cyan-glow); color: var(--cyan); border: 1px solid var(--cyan); }
+        .badge-purple { background: var(--purple-glow); color: var(--purple); border: 1px solid var(--purple); }
+        .badge-emerald { background: var(--emerald-glow); color: var(--emerald); border: 1px solid var(--emerald); }
+        .badge-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid var(--blue); }
+
+        /* Flow Architecture Graphic */
+        .arch-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.03);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 22px;
+            margin-top: 10px;
+        }
+        body.theme-dark .arch-diagram { background: rgba(0, 0, 0, 0.3); }
+        .arch-node {
+            flex: 1;
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border-glass);
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: var(--shadow-card);
+        }
+        .arch-node-active {
+            border-color: var(--blue);
+            box-shadow: 0 0 15px var(--blue-glow);
+        }
+        .arch-arrow {
+            color: var(--text-dim);
+            font-size: 18px;
+        }
+
+        /* Visual Bar Chart SVG / CSS Component */
+        .chart-bar-group {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        .chart-bar-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .chart-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 15.5px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+        .chart-bar-track {
+            height: 14px;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        body.theme-dark .chart-bar-track { background: rgba(255, 255, 255, 0.08); }
+        .chart-bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 1s ease-out;
+        }
+
+        /* Agenda Section Cards */
+        .agenda-card {
+            background: var(--bg-card-hover);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 22px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            box-shadow: var(--shadow-card);
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+        .agenda-card:hover {
+            border-color: var(--blue);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+        .agenda-num {
+            font-family: var(--font-title);
+            font-size: 26px;
+            font-weight: 800;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        /* Presenter Notes Modal / Panel */
+        .notes-panel {
+            position: fixed;
+            bottom: 80px;
+            right: 32px;
+            width: 480px;
+            max-height: 460px;
+            background: var(--bg-card-hover);
+            backdrop-filter: blur(20px);
+            border: 2px solid var(--blue);
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+            border-radius: 18px;
+            padding: 24px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            transform: translateY(20px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .notes-panel.active {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+        .notes-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+        .notes-title {
+            font-family: var(--font-title);
+            font-size: 14.5px;
+            color: var(--blue);
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .notes-body {
+            font-size: 15px;
+            color: var(--text-muted);
+            line-height: 1.7;
+            overflow-y: auto;
+            white-space: pre-line;
+            font-weight: 500;
+        }
+        .notes-body strong {
+            color: var(--text-main);
+        }
+
+        /* Bottom Controls Footer */
+        footer.app-footer {
+            position: relative;
+            z-index: 50;
+            height: 60px;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .nav-btn {
+            background: rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-glass);
+            color: var(--text-main);
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 15px;
+            transition: all 0.2s ease;
+        }
+        body.theme-dark .nav-btn { background: rgba(255, 255, 255, 0.05); }
+        .nav-btn:hover {
+            background: var(--blue);
+            border-color: var(--blue);
+            color: #FFFFFF;
+            box-shadow: 0 4px 12px var(--blue-glow);
+        }
+
+        /* Slide Menu Overlay Drawer */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 90;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .drawer-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .slide-drawer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 430px;
+            height: 100%;
+            background: var(--bg-card-hover);
+            border-right: 1px solid var(--border-glass);
+            z-index: 95;
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(-100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 10px 0 30px rgba(0, 0, 0, 0.15);
+        }
+        .slide-drawer.active {
+            transform: translateX(0);
+        }
+        .drawer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+        .drawer-title {
+            font-family: var(--font-title);
+            font-weight: 800;
+            font-size: 19.5px;
+            color: var(--text-main);
+        }
+        .drawer-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .drawer-item {
+            padding: 12px 16px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid transparent;
+            cursor: pointer;
+            font-size: 15px;
+            color: var(--text-muted);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s ease;
+        }
+        .drawer-item:hover {
+            background: rgba(29, 78, 216, 0.08);
+            color: var(--blue);
+        }
+        .drawer-item.active {
+            background: var(--blue);
+            color: #FFFFFF;
+            font-weight: 700;
+        }
+        .drawer-item-num {
+            font-family: var(--font-mono);
+            font-size: 15px;
+            opacity: 0.8;
+            width: 22px;
+        }
+    </style>
+</head>
+<body class="theme-light">
+
+    <!-- Ambient Glowing Background & Cyber Grid -->
+    <div class="ambient-bg">
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
+    </div>
+
+    <!-- Floating Fullscreen HUD Control (Shows ONLY in Fullscreen) -->
+    <div class="fullscreen-hud" id="fullscreenHud">
+        <span>SLIDE <strong id="hudSlideNum" style="color:#38BDF8;">1</strong> / <span id="hudTotalNum">20</span></span>
+        <span style="opacity:0.4;">|</span>
+        <i class="fa-regular fa-clock" style="color:#38BDF8;"></i>
+        <span id="hudTimerText">00:00</span>
+        <span style="opacity:0.4;">|</span>
+        <button class="hud-btn" id="hudBtnPrev" title="Trở về slide trước"><i class="fa-solid fa-chevron-left"></i></button>
+        <button class="hud-btn" id="hudBtnNext" title="Sang slide tiếp"><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="hud-btn" id="hudBtnNotes" title="Kịch bản nói (N)"><i class="fa-solid fa-note-sticky"></i></button>
+        <button class="hud-btn" id="hudBtnExit" title="Thoát Fullscreen (ESC / F)"><i class="fa-solid fa-compress"></i></button>
+    </div>
+
+    <!-- Header Controls -->
+    <header class="app-header">
+        <div class="header-brand">
+            <div class="brand-badge">VIỆN QUẢN TRỊ & CÔNG NGHỆ FSB</div>
+            <div class="brand-title">Báo cáo Luận văn Thạc sĩ Kỹ thuật Phần mềm (MSE)</div>
+        </div>
+
+        <div class="header-controls">
+            <div class="timer-display" id="timerDisplay" title="Click để Reset/Pause Timer">
+                <i class="fa-regular fa-clock"></i>
+                <span id="timerText">00:00</span>
+            </div>
+
+            <div class="slide-counter">
+                SLIDE <span id="currentSlideNum" style="color: var(--blue); font-weight:800;">1</span> / <span id="totalSlideNum">20</span>
+            </div>
+
+            <button class="ctrl-btn" id="btnThemeToggle" title="Đổi Giao diện Sáng/Tối">
+                <i class="fa-solid fa-moon"></i> Theme
+            </button>
+
+            <button class="ctrl-btn" id="btnNotes">
+                <i class="fa-solid fa-note-sticky"></i> Kịch bản nói (N)
+            </button>
+
+            <button class="ctrl-btn" id="btnDrawer">
+                <i class="fa-solid fa-list-ul"></i> Mục lục (O)
+            </button>
+
+            <button class="ctrl-btn" id="btnFullscreen">
+                <i class="fa-solid fa-expand"></i> Fullscreen (F)
+            </button>
+        </div>
+
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+    </header>
+
+    <!-- Slide Stage -->
+    <main class="slide-stage">
+
+        <!-- SLIDE 1: TITLE -->
+        <section class="slide active" data-slide="1">
+            <div class="slide-tag">
+                Thạc sĩ Kỹ thuật Phần mềm (MSE) — Viện Quản trị & Công nghệ FSB
+            </div>
+            <h1 class="slide-title" style="font-size: 40px; margin-bottom: 18px; color: var(--blue); line-height: 1.25;">
+                SENTINEL: KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN & PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG DÙNG AI TÁC TỬ
+            </h1>
+            <p style="color: var(--cyan); font-family: var(--font-mono); font-size: 17px; font-weight:700; margin-bottom: 36px;">
+                A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI
+            </p>
+
+            <div class="grid-3" style="margin-top: auto;">
+                <div class="card card-blue">
+                    <div class="card-icon icon-blue"><i class="fa-solid fa-user-shield"></i></div>
+                    <div class="card-title">Tác giả Luận văn</div>
+                    <div class="card-text">
+                        <strong>Nguyễn Đức Bình</strong><br>
+                        <span style="color: var(--blue); font-weight:700; font-family:var(--font-mono);">MSSV: MSE13183</span><br>
+                        Học viên Cao học MSE (Kỹ thuật Phần mềm)<br>
+                        Viện Quản trị & Công nghệ FSB
+                    </div>
+                </div>
+
+                <div class="card card-purple">
+                    <div class="card-icon icon-purple"><i class="fa-solid fa-graduation-cap"></i></div>
+                    <div class="card-title">Giảng viên Hướng dẫn</div>
+                    <div class="card-text">
+                        <strong>TS. Bùi Văn Hiếu</strong><br>
+                        <strong>TS. Đặng Văn Hiếu</strong><br>
+                        Viện Quản trị & Công nghệ FSB
+                    </div>
+                </div>
+
+                <div class="card card-emerald">
+                    <div class="card-icon icon-emerald"><i class="fa-solid fa-microchip"></i></div>
+                    <div class="card-title">Môi trường Thực nghiệm</div>
+                    <div class="card-text">
+                        <strong>Local Air-gapped GPU</strong><br>
+                        NVIDIA RTX 4060 Ti 16GB<br>
+                        Mô hình Gemma-2-9B-IT Q6_K
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 2: DEDICATED ACKNOWLEDGEMENTS / LỜI CẢM ƠN (BEFORE TABLE OF CONTENTS!) -->
+        <section class="slide" data-slide="2">
+            <div class="slide-tag">Tri Ân & Lời Cảm Ơn</div>
+            <h2 class="slide-title">Lời Cảm Ơn Từ Tác Giả Luận Văn</h2>
+
+            <div class="card card-emerald" style="padding: 32px; background: rgba(4, 120, 87, 0.04); margin-bottom: 22px;">
+                <div class="card-icon icon-emerald" style="margin-bottom: 14px;"><i class="fa-solid fa-heart"></i></div>
+                <div class="card-title" style="font-size: 24px; color: var(--emerald); margin-bottom: 12px;">
+                    Kính Thưa Quý Thầy/Cô Trong Hội Đồng & Thầy Hướng Dẫn,
+                </div>
+                <p class="card-text" style="font-size: 16.5px; line-height: 1.75; color: var(--text-main);">
+                    Trước khi đi vào chi tiết nội dung nghiên cứu, em xin phép được gửi lời tri ân sâu sắc nhất tới <strong>TS. Bùi Văn Hiếu</strong> và <strong>TS. Đặng Văn Hiếu</strong> — những người Thầy đã định hướng, truyền cảm hứng khoa học và tận tình đồng hành cùng em trong suốt quá trình hoàn thiện đề tài Luận văn Thạc sĩ này.
+                </p>
+                <p class="card-text" style="font-size: 16px; line-height: 1.75; color: var(--text-muted); margin-top: 14px;">
+                    Đặc biệt, em xin bày tỏ lòng biết ơn vô hạn tới <strong>Gia đình</strong> — chỗ dựa tinh thần vững chắc nhất, luôn động viên, chia sẻ và hy sinh thầm lặng để em có thể toàn tâm toàn ý theo đuổi con đường học tập và hoàn thành nghiên cứu tại <strong>Viện Quản trị & Công nghệ FSB</strong>.
+                </p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card card-blue">
+                    <div class="card-title" style="font-size: 17.5px;"><i class="fa-solid fa-graduation-cap"></i> Cơ Sở Đào Tạo</div>
+                    <p class="card-text" style="font-size: 15.5px;">
+                        <strong>Viện Quản trị & Công nghệ FSB</strong> — Chương trình Thạc sĩ Kỹ thuật Phần mềm (MSE).
+                    </p>
+                </div>
+                <div class="card card-purple">
+                    <div class="card-title" style="font-size: 17.5px;"><i class="fa-solid fa-user-gear"></i> Học Viên Thực Hiện</div>
+                    <p class="card-text" style="font-size: 15.5px;">
+                        <strong>Nguyễn Đức Bình</strong> (MSSV: <strong>MSE13183</strong>) — Học viên Cao học MSE (Kỹ thuật Phần mềm).
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 3: DEDICATED TABLE OF CONTENTS / AGENDA SLIDE -->
+        <section class="slide" data-slide="3">
+            <div class="slide-tag">Mục Lục Báo Cáo</div>
+            <h2 class="slide-title">Cấu Trúc Nội Dung Báo Cáo Bảo Vệ (4 Phần Chính)</h2>
+
+            <div class="grid-2" style="gap: 20px;">
+                <div class="agenda-card" onclick="goToSlide(4)">
+                    <div class="agenda-num" style="background: var(--blue-glow); color: var(--blue);">01</div>
+                    <div>
+                        <div class="card-title" style="font-size: 19px; margin-bottom: 6px;">PHẦN I: ĐẶT VẤN ĐỀ & MỤC TIÊU NGHIÊN CỨU</div>
+                        <p class="card-text" style="font-size: 15px;">
+                            Thực trạng quá tải SOC (Alert Fatigue), Cạm bẫy khi ứng dụng ngây thơ LLM, 3 Câu hỏi nghiên cứu (RQ1–RQ3) và Ma trận khoảng trống khoa học.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="agenda-card" onclick="goToSlide(7)">
+                    <div class="agenda-num" style="background: var(--purple-glow); color: var(--purple);">02</div>
+                    <div>
+                        <div class="card-title" style="font-size: 19px; margin-bottom: 6px;">PHẦN II: KIẾN TRÚC NHẬN THỨC HAI TẦNG (SENTINEL)</div>
+                        <p class="card-text" style="font-size: 15px;">
+                            Chi tiết Tầng 1 Welford $O(1)$, Cổng ML LightGBM (0.35ms), Semantic Cache (1ms), Tác tử LangGraph FSM, Dual-RAG & Rào chắn bảo mật Nonce Encapsulation.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="agenda-card" onclick="goToSlide(14)">
+                    <div class="agenda-num" style="background: var(--emerald-glow); color: var(--emerald);">03</div>
+                    <div>
+                        <div class="card-title" style="font-size: 19px; margin-bottom: 6px;">PHẦN III: KẾT QUẢ THỰC NGHIỆM & ĐÁNH GIÁ 5D</div>
+                        <p class="card-text" style="font-size: 15px;">
+                            Kết quả đột phá (Offload 83.8%, Giảm 82.97% độ trễ), Ablation Study, Chấm điểm LLM-as-a-Judge, Demo Dashboard Streamlit & Giới hạn đo lường 5.3.1.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="agenda-card" onclick="goToSlide(19)">
+                    <div class="agenda-num" style="background: rgba(180, 83, 9, 0.12); color: var(--amber);">04</div>
+                    <div>
+                        <div class="card-title" style="font-size: 19px; margin-bottom: 6px;">PHẦN IV: KẾT LUẬN, LỘ TRÌNH & Q&A DISCUSSION</div>
+                        <p class="card-text" style="font-size: 15px;">
+                            Đóng góp lý thuyết & thực tiễn, Lộ trình đưa lên Production (Go/Rust, vLLM, Kafka), Tri ân Thầy Cô và Thảo luận câu hỏi của Hội đồng.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 4: PROBLEM STATEMENT -->
+        <section class="slide" data-slide="4">
+            <div class="slide-tag">Thực trạng & Đặt vấn đề</div>
+            <h2 class="slide-title">Nút Thắt Cổ Chai Trong Các Trung Tâm SOC Hiện Đại</h2>
+
+            <div class="grid-2" style="align-items: stretch;">
+                <div class="card card-amber">
+                    <div class="card-title" style="color: var(--amber);">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Thách thức SOC Truyền Thống
+                    </div>
+                    <ul class="styled-list" style="margin-top: 12px;">
+                        <li><strong>Hội chứng Alert Fatigue:</strong> >100.000 cảnh báo/ngày gây quá tải chuyên gia phân tích (Analyst).</li>
+                        <li><strong>Hạn chế Luật Tĩnh:</strong> Chữ ký WAF/IDS mù hoàn toàn trước các đợt tấn công Zero-Day và biến thể.</li>
+                        <li><strong>SOAR Cứng nhắc:</strong> Playbook cố định không có khả năng suy luận tình huống bất ngờ ngoài kịch bản.</li>
+                    </ul>
+                </div>
+
+                <div class="card card-rose">
+                    <div class="card-title" style="color: var(--rose);">
+                        <i class="fa-solid fa-bolt"></i> Cạm bẫy khi ứng dụng "Ngây Thơ" LLM
+                    </div>
+                    <ul class="styled-list" style="margin-top: 12px;">
+                        <li><strong>Độ trễ Không thể Mở rộng:</strong> Gọi LLM cho từng log tốn 4–6 giây/sự kiện, nghẽn 100% băng thông.</li>
+                        <li><strong>Rủi ro Prompt Injection:</strong> Payload chứa câu lệnh đối kháng chiếm quyền điều khiển LLM.</li>
+                        <li><strong>Ảo giác (Hallucination):</strong> LLM tự bịa ra căn cứ để BLOCK IP mà không đối chiếu tri thức chuẩn.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card card-blue" style="margin-top: 22px; background: rgba(29, 78, 216, 0.04);">
+                <div class="card-title" style="font-size: 18px; color: var(--blue);">
+                    <i class="fa-solid fa-lightbulb"></i> BÀI TOÁN TRUNG TÂM LUẬN VĂN
+                </div>
+                <p style="font-size: 16px; color: var(--text-muted); line-height: 1.68;">
+                    Làm thế nào để xây dựng một hệ thống SOC <strong>kết hợp tốc độ lọc siêu nhanh $O(1)$</strong> của luật/ML với <strong>khả năng suy luận ngữ cảnh sâu của LLM Tác tử</strong>, mà vẫn đảm bảo <strong>an toàn mật mã và chạy hoàn toàn Cục bộ (Local GPU)</strong>?
+                </p>
+            </div>
+        </section>
+
+        <!-- SLIDE 5: RESEARCH QUESTIONS & OBJECTIVES -->
+        <section class="slide" data-slide="5">
+            <div class="slide-tag">Mục tiêu Khoa học</div>
+            <h2 class="slide-title">Câu Hỏi & Mục Tiêu Nghiên Cứu (RQ1 - RQ3)</h2>
+
+            <div class="grid-3">
+                <div class="card card-blue">
+                    <div class="badge badge-blue">RQ1 — BĂNG THÔNG</div>
+                    <div class="card-title" style="margin-top: 12px;">Kinh Tế Học Tầng Lọc</div>
+                    <p class="card-text">
+                        Làm sao giảm tải <strong>>80% sự kiện</strong> ở tốc độ mili-giây mà không bỏ sót tín hiệu tấn công chậm-âm-thầm (APT)?
+                    </p>
+                    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-glass); font-size: 15.5px; color: var(--blue); font-weight: 700;">
+                        <i class="fa-solid fa-circle-check"></i> Welford Anomaly + ML Gateway LightGBM
+                    </div>
+                </div>
+
+                <div class="card card-purple">
+                    <div class="badge badge-purple">RQ2 — AN TOÀN & ĐỘ TRỄ</div>
+                    <div class="card-title" style="margin-top: 12px;">Phân Loại Nhận Thức</div>
+                    <p class="card-text">
+                        Làm sao để LLM suy luận an toàn, kháng Prompt Injection từ log thô và tối ưu hóa độ trễ phản hồi?
+                    </p>
+                    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-glass); font-size: 15.5px; color: var(--purple); font-weight: 700;">
+                        <i class="fa-solid fa-circle-check"></i> Nonce Encapsulation + Semantic Cache
+                    </div>
+                </div>
+
+                <div class="card card-emerald">
+                    <div class="badge badge-emerald">RQ3 — TRẠNG THÁI & CĂN CỨ</div>
+                    <div class="card-title" style="margin-top: 12px;">Trạng Thái Mang Lại Gì?</div>
+                    <p class="card-text">
+                        Bộ nhớ có trạng thái giúp phát hiện APT đa ngày và truy xuất tri thức MITRE/NIST chính xác ra sao?
+                    </p>
+                    <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-glass); font-size: 15.5px; color: var(--emerald); font-weight: 700;">
+                        <i class="fa-solid fa-circle-check"></i> Dual-RAG + SQLite Threat Memory
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 6: LITERATURE REVIEW & RESEARCH GAPS -->
+        <section class="slide" data-slide="6">
+            <div class="slide-tag">Tổng quan Nghiên cứu</div>
+            <h2 class="slide-title">Ma Trận So Sánh Các Hướng Nghiên Cứu Hiện Hữu</h2>
+
+            <div class="card card-blue" style="padding: 18px; margin-bottom: 16px;">
+                <table style="width: 100%; font-size: 15px; border-collapse: collapse; color: var(--text-muted);">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border-glass); color: var(--text-main); font-weight: 800;">
+                            <th style="text-align: left; padding: 10px;">Phương Pháp / Hệ Thống</th>
+                            <th style="text-align: center; padding: 10px;">Tốc Độ Lọc $O(1)$</th>
+                            <th style="text-align: center; padding: 10px;">Suy Luận Zero-Day</th>
+                            <th style="text-align: center; padding: 10px;">Kháng Prompt Injection</th>
+                            <th style="text-align: center; padding: 10px;">Giải Giải Thích MITRE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid var(--border-glass);">
+                            <td style="padding: 10px; font-weight: 700; color: var(--text-main);">WAF / IDS Truyền Thống (Rule-based)</td>
+                            <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> Rất Nhanh</td>
+                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> Mù Zero-Day</td>
+                            <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> An Toàn</td>
+                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> Không Có</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-glass);">
+                            <td style="padding: 10px; font-weight: 700; color: var(--text-main);">ML Anomaly Detection (Isolation Forest/XGB)</td>
+                            <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> Nhanh</td>
+                            <td style="text-align: center; color: var(--amber); font-weight: 800;"><i class="fa-solid fa-minus"></i> Khá</td>
+                            <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> An Toàn</td>
+                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> Hộp Đen (Blackbox)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-glass);">
+                            <td style="padding: 10px; font-weight: 700; color: var(--text-main);">Pure LLM Agent (Tích hợp Ngây Thơ)</td>
+                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> 26.9s (Nghẽn)</td>
+                            <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> Tốt</td>
+                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> Dễ Bị Tấn Công</td>
+                            <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> Tốt</td>
+                        </tr>
+                        <tr style="background: rgba(4, 120, 87, 0.06); font-weight: 800;">
+                            <td style="padding: 10px; color: var(--emerald);"><i class="fa-solid fa-star"></i> SENTINEL (Two-Tier Cognitive SOC)</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> 0.35ms (83.8%)</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> 12/15 Zero-Day</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> Nonce 100%</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> Dual-RAG RRF</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="card card-purple">
+                <div class="card-title" style="font-size: 16.5px; color: var(--purple);"><i class="fa-solid fa-bullseye"></i> Đóng Góp Khoảng Trống Nghiên Cứu (Research Gap)</div>
+                <p class="card-text" style="font-size: 15px;">
+                    SENTINEL là công trình đầu tiên kết hợp hài hòa toán học trực tuyến tất định $O(1)$ ở Tầng 1 với mô hình ngôn ngữ Tác tử phi tất định ở Tầng 2, giải quyết triệt để nút thắt cổ chai về độ trễ và rủi ro an ninh AI.
+                </p>
+            </div>
+        </section>
+
+        <!-- SLIDE 7: SYSTEM ARCHITECTURE OVERVIEW WITH VISUAL SVG DIAGRAM -->
+        <section class="slide" data-slide="7">
+            <div class="slide-tag">Tổng quan Kiến trúc</div>
+            <h2 class="slide-title">SENTINEL: Kiến Trúc Nhận Thức Hai Tầng (Two-Tier SOC)</h2>
+
+            <!-- Interactive SVG Pipeline Diagram -->
+            <div style="width: 100%; background: rgba(15, 23, 42, 0.03); border: 1px solid var(--border-glass); border-radius: 18px; padding: 20px; text-align: center;">
+                <svg viewBox="0 0 1100 240" style="width: 100%; height: auto; font-family: var(--font-body);">
+                    <defs>
+                        <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#2563EB"/>
+                            <stop offset="100%" stop-color="#1D4ED8"/>
+                        </linearGradient>
+                        <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#059669"/>
+                            <stop offset="100%" stop-color="#047857"/>
+                        </linearGradient>
+                        <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#7C3AED"/>
+                            <stop offset="100%" stop-color="#6D28D9"/>
+                        </linearGradient>
+                        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="4" result="blur" />
+                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                        </filter>
+                    </defs>
+
+                    <!-- Flow Connectors -->
+                    <path d="M 180 120 L 230 120" stroke="#94A3B8" stroke-width="3" stroke-dasharray="6,4" />
+                    <path d="M 410 120 L 460 120" stroke="#94A3B8" stroke-width="3" />
+                    <path d="M 640 120 L 690 120" stroke="#94A3B8" stroke-width="3" stroke-dasharray="6,4" />
+                    <path d="M 870 120 L 920 120" stroke="#94A3B8" stroke-width="3" />
+
+                    <!-- Node 1: Unified Stream -->
+                    <rect x="20" y="70" width="160" height="100" rx="14" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2" />
+                    <text x="100" y="105" text-anchor="middle" fill="#0F172A" font-weight="800" font-size="15">UNIFIED STREAM</text>
+                    <text x="100" y="130" text-anchor="middle" fill="#64748B" font-size="14">CIC-IDS2018 / DAPT</text>
+
+                    <!-- Node 2: Tier 1 Fast Path -->
+                    <rect x="230" y="60" width="180" height="120" rx="14" fill="url(#blueGrad)" filter="url(#glow)" />
+                    <text x="320" y="98" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="16">TIER 1 (FAST PATH)</text>
+                    <text x="320" y="123" text-anchor="middle" fill="#E0F2FE" font-weight="600" font-size="14">Welford Z-Score O(1)</text>
+                    <text x="320" y="148" text-anchor="middle" fill="#BAE6FD" font-size="13">Set Port Lookup</text>
+
+                    <!-- Node 3: ML Gateway -->
+                    <rect x="460" y="60" width="180" height="120" rx="14" fill="url(#emeraldGrad)" filter="url(#glow)" />
+                    <text x="550" y="98" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="16">ML GATEWAY</text>
+                    <text x="550" y="123" text-anchor="middle" fill="#D1FAE5" font-weight="600" font-size="14">LightGBM (0.35ms)</text>
+                    <text x="550" y="148" text-anchor="middle" fill="#A7F3D0" font-size="13">Offload 83.8%</text>
+
+                    <!-- Node 4: Tier 1.75 Semantic Cache -->
+                    <rect x="690" y="70" width="180" height="100" rx="14" fill="#FFFFFF" stroke="#7C3AED" stroke-width="2" />
+                    <text x="780" y="105" text-anchor="middle" fill="#6D28D9" font-weight="800" font-size="15">TIER 1.75 CACHE</text>
+                    <text x="780" y="130" text-anchor="middle" fill="#64748B" font-size="14">Drain SHA256 (1ms)</text>
+
+                    <!-- Node 5: Tier 2 Cognitive Agent -->
+                    <rect x="920" y="60" width="160" height="120" rx="14" fill="url(#purpleGrad)" filter="url(#glow)" />
+                    <text x="1000" y="98" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="16">TIER 2 AGENT</text>
+                    <text x="1000" y="123" text-anchor="middle" fill="#EDE9FE" font-weight="600" font-size="14">LangGraph FSM</text>
+                    <text x="1000" y="148" text-anchor="middle" fill="#DDD6FE" font-size="13">Gemma-2 + Dual RAG</text>
+                </svg>
+            </div>
+
+            <div class="grid-2" style="margin-top: 18px;">
+                <div class="card" style="background: rgba(29, 78, 216, 0.04);">
+                    <div class="card-title" style="font-size: 16.5px; color: var(--blue);">Triết lý Thiết kế Tầng 1 (Lọc Thô Chi Phí Thấp)</div>
+                    <p class="card-text" style="font-size: 15px;">
+                        Đảm nhận vai trò "Tấm lưới chắn tốc độ cao", xử lý 100% lưu lượng mạng ở tốc độ đường truyền mà không đụng tới GPU, loại bỏ ngay các truy cập lành tính hoặc tấn công dạng chữ ký thô.
+                    </p>
+                </div>
+                <div class="card" style="background: rgba(109, 40, 217, 0.04);">
+                    <div class="card-title" style="font-size: 16.5px; color: var(--purple);">Triết lý Thiết kế Tầng 2 (Bộ Não Thám Tử)</div>
+                    <p class="card-text" style="font-size: 15px;">
+                        Dành riêng sức mạnh suy luận của LLM cho thiểu số sự kiện thực sự mơ hồ hoặc nghi vấn zero-day, được bảo vệ bằng rào chắn mật mã và đối chiếu tri thức MITRE ATT&CK.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 8: TIER 1 DETAILED ENGINE -->
+        <section class="slide" data-slide="8">
+            <div class="slide-tag">Chi tiết Kỹ thuật — Tier 1</div>
+            <h2 class="slide-title">Bộ Lọc Tốc Độ Đường Truyền Phi Trạng Thái (RuleEngine & Welford)</h2>
+
+            <div class="grid-2">
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-square-root-variable"></i> Thuật Toán Trực Tuyến Welford $O(1)$</div>
+                    <p class="card-text" style="margin-bottom: 12px;">
+                        Tính toán trung bình $\mu_k$ và phương sai lăn $\sigma_k^2$ liên tục trong bộ nhớ mà không cần lưu lại lịch sử gói tin:
+                    </p>
+                    <div class="code-snippet">
+                        Z = (x_k - \mu_k) / \sigma_k
+                        # Ngưỡng kích hoạt: Z > 3.5σ -> ESCALATE TO ML / TIER 2
+                    </div>
+                    <ul class="styled-list" style="margin-top: 14px;">
+                        <li><strong>Cập nhật Khóa-theo-Phán-quyết:</strong> Chỉ cập nhật baseline với luồng benign, chống đầu độc "ếch luộc" (slow-boil poisoning).</li>
+                        <li><strong>Golden Baseline Seed:</strong> Khởi tạo trạng thái sạch từ trước, tránh hiện tượng rò rỉ khi khởi động lạnh.</li>
+                    </ul>
+                </div>
+
+                <div class="card card-emerald">
+                    <div class="card-title"><i class="fa-solid fa-shield-halved"></i> Tối Ưu Hóa Bộ Nhớ & Tra Cứu Cổng</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Tra cứu Cổng $O(1)$ Set:</strong> Thay vì chạy Regex đắt đỏ, RuleEngine dùng cấu trúc Set $O(1)$ để lọc nhanh các port nhạy cảm.</li>
+                        <li><strong>Bộ Đệm Bounded `_rep_cache`:</strong> Giới hạn dung lượng cache uy tín IP trong bộ nhớ, chống tràn RAM khi bị DDoS tấn công diện rộng.</li>
+                        <li><strong>Session Baseline TTL:</strong> Bảng băm tự dọn dẹp các session hết hạn, giữ chân RAM luôn ở ngưỡng an toàn.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 9: ML GATEWAY LIGHTGBM -->
+        <section class="slide" data-slide="9">
+            <div class="slide-tag">Chi tiết Kỹ thuật — Cổng ML</div>
+            <h2 class="slide-title">Cổng ML LightGBM: Giảm Tải Tầng 1 Bằng Học Máy</h2>
+
+            <div class="grid-2">
+                <div>
+                    <div class="card card-emerald" style="margin-bottom: 16px;">
+                        <div class="card-title"><i class="fa-solid fa-diagram-project"></i> Mô Hình & Chính Sách 4 Dải Độ Tin Cậy</div>
+                        <p class="card-text">
+                            Được huấn luyện trên <strong>~1 Triệu luồng</strong> (Test-F1 held-out = <strong>0.9635</strong>), đứng giữa RuleEngine và LLM để tự quyết các ca rõ ràng:
+                        </p>
+                        <ul class="styled-list" style="margin-top: 12px;">
+                            <li>$C \ge 0.85 \rightarrow$ <strong>BLOCK_IP</strong> (Tự động chặn tức thì)</li>
+                            <li>$0.65 \le C < 0.85 \rightarrow$ <strong>ESCALATE</strong> (Chuyển lên LLM Tier 2)</li>
+                            <li>$0.40 \le C < 0.65 \rightarrow$ <strong>ALERT</strong> (Cảnh báo giám sát)</li>
+                            <li>$C < 0.40 \rightarrow$ <strong>DROP</strong> (Bỏ qua luồng lành tính)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="grid-2" style="margin-bottom: 16px;">
+                        <div class="metric-box">
+                            <div class="metric-val metric-val-green">83.8%</div>
+                            <div class="metric-lbl">LLM Offload Rate</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-val">0.35ms</div>
+                            <div class="metric-lbl">Độ Trễ Suy Luận</div>
+                        </div>
+                    </div>
+
+                    <div class="card card-amber">
+                        <div class="card-title" style="color: var(--amber);"><i class="fa-solid fa-lock"></i> Cơ Chế Chống Né Tránh (Anti-Evasion)</div>
+                        <p class="card-text" style="font-size: 15px;">
+                            Đối phó với kỹ thuật nhiễu đối kháng (Adversarial Feature Perturbation):
+                        </p>
+                        <ul class="styled-list" style="margin-top: 8px;">
+                            <li><strong>Kẹp z-score tại $\pm 8\sigma$:</strong> Vô hiệu hóa các giá trị đầu vào dị biệt cực đoan do hacker tạo ra.</li>
+                            <li><strong>Tự động Abstain:</strong> Nếu >30% đặc trưng vượt quá $6\sigma$, mô hình tự bỏ qua và đẩy thẳng lên LLM phán xử.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 10: TIER 1.75 SEMANTIC CACHE -->
+        <section class="slide" data-slide="10">
+            <div class="slide-tag">Chi tiết Kỹ thuật — Tier 1.75</div>
+            <h2 class="slide-title">Semantic Cache: Bỏ Qua LLM Cho Các Tấn Công Lặp Lai</h2>
+
+            <div class="grid-2">
+                <div class="card card-purple">
+                    <div class="card-title"><i class="fa-solid fa-bolt-lightning"></i> Triết Lý Bỏ Qua Độ Trễ LLM</div>
+                    <p class="card-text">
+                        Khi bị tấn công DDoS hoặc Brute-Force, hàng nghìn log có cấu trúc tương tự nhau đổ về. Gọi LLM cho từng log lặp lại là lãng phí tài nguyên GPU nghiêm trọng.
+                    </p>
+                    <div class="arch-diagram" style="margin-top: 18px; padding: 16px;">
+                        <div style="font-size: 15.5px; font-family: var(--font-mono); color: var(--purple); font-weight: 700;">
+                            Payload -> Drain Parser -> SHA-256 Hash -> Cache Lookup (1ms)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-database"></i> Thông Số Vận Hành Semantic Cache</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Thuật toán Khai thác Drain:</strong> Rút gọn log thô thành mẫu chuẩn (template), loại bỏ các tham số ngẫu nhiên.</li>
+                        <li><strong>Cấu trúc LRU Cache:</strong> Lưu trữ trong bộ nhớ (`OrderedDict`) tối đa 500 mục với TTL 1800 giây.</li>
+                        <li><strong>Hiệu quả Thực tế:</strong> Giảm độ trễ phán quyết từ 4–6 giây xuống <strong>~1 mili-giây</strong> cho 100% các mẫu đã nhận diện.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 11: TIER 2 LANGGRAPH AGENT STATE MACHINE SVG -->
+        <section class="slide" data-slide="11">
+            <div class="slide-tag">Chi tiết Kỹ thuật — Tier 2</div>
+            <h2 class="slide-title">Tác Tử Nhận Thức LangGraph & Local LLM (Gemma-2-9B)</h2>
+
+            <!-- FSM Diagram SVG -->
+            <div style="width:100%; background: rgba(15, 23, 42, 0.03); border: 1px solid var(--border-glass); border-radius: 18px; padding: 16px; margin-bottom: 18px; text-align: center;">
+                <svg viewBox="0 0 1000 120" style="width: 100%; height: auto; font-family: var(--font-body);">
+                    <path d="M 170 60 L 220 60" stroke="#7C3AED" stroke-width="3" />
+                    <path d="M 390 60 L 440 60" stroke="#7C3AED" stroke-width="3" />
+                    <path d="M 610 60 L 660 60" stroke="#7C3AED" stroke-width="3" />
+                    <path d="M 830 60 L 880 60" stroke="#7C3AED" stroke-width="3" />
+
+                    <rect x="20" y="20" width="150" height="80" rx="12" fill="#7C3AED" />
+                    <text x="95" y="55" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">GUARDRAILS</text>
+                    <text x="95" y="75" text-anchor="middle" fill="#DDD6FE" font-size="13">Nonce & Whitelist</text>
+
+                    <rect x="240" y="20" width="150" height="80" rx="12" fill="#2563EB" />
+                    <text x="315" y="55" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">RAG CONTEXT</text>
+                    <text x="315" y="75" text-anchor="middle" fill="#BAE6FD" font-size="13">FAISS + BM25</text>
+
+                    <rect x="460" y="20" width="150" height="80" rx="12" fill="#6D28D9" />
+                    <text x="535" y="55" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">LLM TRIAGE</text>
+                    <text x="535" y="75" text-anchor="middle" fill="#EDE9FE" font-size="13">Gemma-2-9B</text>
+
+                    <rect x="680" y="20" width="150" height="80" rx="12" fill="#059669" />
+                    <text x="755" y="55" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">ATTACK MAPPER</text>
+                    <text x="755" y="75" text-anchor="middle" fill="#A7F3D0" font-size="13">MITRE ATT&CK TTP</text>
+
+                    <rect x="900" y="20" width="90" height="80" rx="12" fill="#0F172A" />
+                    <text x="945" y="55" text-anchor="middle" fill="#38BDF8" font-weight="800" font-size="15">DECISION</text>
+                    <text x="945" y="75" text-anchor="middle" fill="#94A3B8" font-size="12">BLOCK/HITL</text>
+                </svg>
+            </div>
+
+            <div class="grid-2">
+                <div class="card card-purple">
+                    <div class="card-title"><i class="fa-solid fa-diagram-next"></i> Đồ Thị Trạng Thái FSM LangGraph</div>
+                    <p class="card-text" style="font-size: 15px; margin-bottom: 10px;">
+                        Chạy mô hình `Gemma-2-9B-IT` cục bộ qua `llama.cpp` server (cửa sổ 8,192 tokens, temp=0.1):
+                    </p>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Pydantic Schema Decoding:</strong> Ép LLM xuất định dạng `LLMDecision` nghiêm ngặt.</li>
+                        <li><strong>Fault Tolerance (`_salvage_fields`):</strong> Dự phòng bằng Regex cứu dữ liệu nếu JSON bị lỗi, tự về `AWAIT_HITL` nếu thất bại.</li>
+                    </ul>
+                </div>
+
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-memory"></i> Tối Ưu Hóa Prompt KV-Caching</div>
+                    <p class="card-text" style="font-size: 15px;">
+                        Để giảm thời gian tạo token đầu tiên (TTFT):
+                    </p>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Static System Prompt:</strong> Giữ nguyên cố định System Prompt chứa hướng dẫn an ninh để `llama.cpp` cache KV.</li>
+                        <li><strong>Volatile User Feedback:</strong> Chuyển toàn bộ các thông tin thay đổi vào User Message, giúp tăng tốc độ phản hồi đáng kể.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 12: DUAL-RAG & THREAT MEMORY -->
+        <section class="slide" data-slide="12">
+            <div class="slide-tag">Tri thức & Trạng thái</div>
+            <h2 class="slide-title">Cơ Chế Dual-RAG & Bộ Nhớ Đe Dọa SQLite</h2>
+
+            <div class="grid-2">
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-layer-group"></i> Dual-RAG: Kết Hợp Dày & Thưa</div>
+                    <table style="width: 100%; font-size: 15px; border-collapse: collapse; margin-top: 10px; color: var(--text-muted);">
+                        <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-main);">
+                            <th style="text-align: left; padding: 8px;">Phương pháp</th>
+                            <th style="text-align: left; padding: 8px;">Thuật toán</th>
+                            <th style="text-align: left; padding: 8px;">Điểm mạnh</th>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-glass);">
+                            <td style="padding: 8px; font-weight:700;">Dày (Dense)</td>
+                            <td style="padding: 8px;">FAISS + MiniLM</td>
+                            <td style="padding: 8px;">Hiểu ngữ nghĩa, từ đồng nghĩa</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight:700;">Thưa (Sparse)</td>
+                            <td style="padding: 8px;">BM25 Score</td>
+                            <td style="padding: 8px;">Chính xác ID, CVE, Cổng, IP</td>
+                        </tr>
+                    </table>
+                    <p style="font-size: 15.5px; color: var(--blue); font-weight:700; margin-top: 12px;">
+                        $\rightarrow$ Dung hợp kết quả bằng Reciprocal Rank Fusion (RRF $k=60$).
+                    </p>
+                </div>
+
+                <div class="card card-emerald">
+                    <div class="card-title"><i class="fa-solid fa-database"></i> Bộ Nhớ Đe Dọa & Liên Kết APT</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Cấu hình SQLite:</strong> `synchronous=NORMAL` + Indexes. <strong>TUYỆT ĐỐI KHÔNG DÙNG WAL</strong> để tránh lỗi crash phân quyền cross-UID trong Docker.</li>
+                        <li><strong>Suy Giảm Uy Tín IP:</strong> Uy tín IP suy giảm theo thời gian $S_{new} = S_{old} \times (1-\lambda)^t$.</li>
+                        <li><strong>Block-on-Sight:</strong> IP có uy tín = 100 bị Tầng 1 chặn ngay lập tức mà không cần gọi LLM.</li>
+                        <li><strong>Hardcoded Whitelist:</strong> Các IP nội bộ hạ tầng (vd `10.0.0.99`) tuyệt đối không bị chặn.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 13: AI SECURITY & ISOLATION -->
+        <section class="slide" data-slide="13">
+            <div class="slide-tag">Bảo mật AI & Toàn vẹn</div>
+            <h2 class="slide-title">Rào Chắn Bảo Mật AI & Đóng Gói Dữ Liệu Phân Định</h2>
+
+            <div class="grid-2">
+                <div class="card card-rose">
+                    <div class="card-title" style="color: var(--rose);"><i class="fa-solid fa-shield-virus"></i> Đóng Gói Dữ Liệu Phân Định (Nonce)</div>
+                    <p class="card-text" style="font-size: 15px; margin-bottom: 10px;">
+                        Chống lại tấn công Prompt Injection từ Log Payload thô:
+                    </p>
+                    <div class="code-snippet" style="font-size: 15px; color: #F87171; background: #0F172A;">
+                        <<<DATA_HASH_a8f9e2...>>>
+                        [UNTRUSTED USER PAYLOAD HERE]
+                        <<<END_DATA_HASH...>>>
+                    </div>
+                    <p style="font-size: 15.5px; color: var(--text-muted); margin-top: 10px;">
+                        Mọi token lệnh bên trong ranh giới Nonce mật mã đều bị ép coi là dữ liệu thụ động, từ chối quyền thi hành lệnh đối kháng.
+                    </p>
+                </div>
+
+                <div class="card card-amber">
+                    <div class="card-title" style="color: var(--amber);"><i class="fa-solid fa-lock"></i> Chuỗi HMAC Audit & Guardrails</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Móc Xích Log HMAC-SHA256:</strong> Mỗi log được băm liên hoàn $H_i = \text{HMAC}(D_i \parallel H_{i-1}, K)$, phát hiện ngay lập tức nếu kẻ tấn công sửa xóa log.</li>
+                        <li><strong>Consensus Guardrail:</strong> Tự động ghi đè LLM về `AWAIT_HITL` nếu phán quyết hạ cấp mâu thuẫn tín hiệu rủi ro Tầng 1.</li>
+                        <li><strong>T1571 Guardrail:</strong> Các tấn công cổng chung chung (MITRE T1571) bắt buộc ép về `AWAIT_HITL` để tránh chặn nhầm.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 14: EXPERIMENTAL SETUP & DATASETS -->
+        <section class="slide" data-slide="14">
+            <div class="slide-tag">Thực nghiệm & Kiểm chứng</div>
+            <h2 class="slide-title">Môi Trường Thực Nghiệm & Tập Dữ Liệu Benchmark</h2>
+
+            <div class="grid-3">
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-server"></i> Phần Cứng Local</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>CPU:</strong> Intel Core i7-14700KF</li>
+                        <li><strong>RAM:</strong> 32 GB DDR5</li>
+                        <li><strong>GPU:</strong> NVIDIA RTX 4060 Ti 16GB</li>
+                        <li><strong>LLM Engine:</strong> llama.cpp (CUDA)</li>
+                    </ul>
+                </div>
+
+                <div class="card card-purple">
+                    <div class="card-title"><i class="fa-solid fa-database"></i> Dữ Liệu Thực Nghiệm</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>CSE-CIC-IDS2018:</strong> Brute Force, DoS, Web Attacks, SQLi, Botnet.</li>
+                        <li><strong>DAPT2020:</strong> Chuỗi tấn công APT đa ngày.</li>
+                        <li><strong>Tập datatest:</strong> 3,204 mẫu đánh giá Cổng ML.</li>
+                        <li><strong>Tập ground_truth:</strong> 1,250 mẫu cân bằng.</li>
+                    </ul>
+                </div>
+
+                <div class="card card-emerald">
+                    <div class="card-title"><i class="fa-solid fa-sliders"></i> Khung Đánh Giá 5D</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Accuracy:</strong> Precision, Recall, F1</li>
+                        <li><strong>Performance:</strong> Latency, Offload %</li>
+                        <li><strong>Security:</strong> Adversarial Resistance</li>
+                        <li><strong>Explainability:</strong> RAGAS Score</li>
+                        <li><strong>Integrity:</strong> HMAC Audit Chain</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 15: CORE EMPIRICAL RESULTS WITH LATENCY VISUAL CHART -->
+        <section class="slide" data-slide="15">
+            <div class="slide-tag">Kết quả Thực nghiệm</div>
+            <h2 class="slide-title">Các Con Số Kết Quả Thực Nghiệm Đột Phá (5D Metrics)</h2>
+
+            <div class="grid-4" style="margin-bottom: 20px;">
+                <div class="metric-box">
+                    <div class="metric-val metric-val-green">83.8%</div>
+                    <div class="metric-lbl">LLM Offload Rate</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-val">-82.97%</div>
+                    <div class="metric-lbl">Giảm Độ Trễ Trung Bình</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-val metric-val-purple">12 / 15</div>
+                    <div class="metric-lbl">Escalation Zero-Day</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-val">100%</div>
+                    <div class="metric-lbl">Kháng Adversarial Suite</div>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card card-blue">
+                    <div class="card-title" style="font-size: 17px;">Biểu Đồ So Sánh Độ Trễ Phán Quyết</div>
+
+                    <div class="chart-bar-group">
+                        <div class="chart-bar-item">
+                            <div class="chart-bar-label">
+                                <span>Pure LLM Architecture</span>
+                                <span style="color: var(--rose);">26.9 giây</span>
+                            </div>
+                            <div class="chart-bar-track">
+                                <div class="chart-bar-fill" style="width: 100%; background: var(--rose);"></div>
+                            </div>
+                        </div>
+
+                        <div class="chart-bar-item">
+                            <div class="chart-bar-label">
+                                <span>SENTINEL Two-Tier (Average)</span>
+                                <span style="color: var(--blue);">4.6 giây (-82.97%)</span>
+                            </div>
+                            <div class="chart-bar-track">
+                                <div class="chart-bar-fill" style="width: 17%; background: var(--blue);"></div>
+                            </div>
+                        </div>
+
+                        <div class="chart-bar-item">
+                            <div class="chart-bar-label">
+                                <span>Tier 1.75 Semantic Cache Hit</span>
+                                <span style="color: var(--purple);">1.0 ms</span>
+                            </div>
+                            <div class="chart-bar-track">
+                                <div class="chart-bar-fill" style="width: 3%; background: var(--purple);"></div>
+                            </div>
+                        </div>
+
+                        <div class="chart-bar-item">
+                            <div class="chart-bar-label">
+                                <span>ML Gateway LightGBM</span>
+                                <span style="color: var(--emerald);">0.35 ms</span>
+                            </div>
+                            <div class="chart-bar-track">
+                                <div class="chart-bar-fill" style="width: 2%; background: var(--emerald);"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card card-emerald">
+                    <div class="card-title" style="font-size: 17px;">Khả Năng Kháng Tấn Công Cổng ML</div>
+                    <p class="card-text" style="font-size: 15px;">
+                        Khi chịu tác động của các nhiễu đối kháng cực đoan (Extremes Perturbation), Cổng ML LightGBM vẫn duy trì <strong>99.58%</strong> phán quyết đúng nhờ lớp Anti-Evasion kẹp Z-score $\pm 8\sigma$.
+                    </p>
+                    <p style="font-size: 15px; color: var(--text-dim); margin-top: 14px;">
+                        *Kiểm định Mann-Whitney U xác nhận mức giảm độ trễ có ý nghĩa thống kê vượt trội ($p < 0.001$).
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 16: ABLATION & LLM-AS-A-JUDGE -->
+        <section class="slide" data-slide="16">
+            <div class="slide-tag">Phân tích Chuyên sâu</div>
+            <h2 class="slide-title">Nghiên Cứu Ablation & Đánh Giá LLM-as-a-Judge</h2>
+
+            <div class="grid-2">
+                <div class="card card-purple">
+                    <div class="card-title"><i class="fa-solid fa-vial"></i> Ablation Study Trên Dữ Liệu Cân Bằng</div>
+                    <table style="width: 100%; font-size: 15px; border-collapse: collapse; margin-top: 8px; color: var(--text-muted);">
+                        <tr style="border-bottom: 1px solid var(--border-glass); color: var(--text-main);">
+                            <th style="text-align: left; padding: 6px;">Cấu hình</th>
+                            <th style="text-align: center; padding: 6px;">F1</th>
+                            <th style="text-align: center; padding: 6px;">Prec.</th>
+                            <th style="text-align: center; padding: 6px;">Rec.</th>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border-glass);">
+                            <td style="padding: 6px;">Pure LLM Baseline</td>
+                            <td style="padding: 6px; text-align: center;">0.804</td>
+                            <td style="padding: 6px; text-align: center; color: var(--rose); font-weight:700;">0.673</td>
+                            <td style="padding: 6px; text-align: center;">1.000</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px; font-weight: 700; color: var(--blue);">SENTINEL (Full)</td>
+                            <td style="padding: 6px; text-align: center;">0.559</td>
+                            <td style="padding: 6px; text-align: center; font-weight: 800; color: var(--emerald);">0.861</td>
+                            <td style="padding: 6px; text-align: center;">0.413</td>
+                        </tr>
+                    </table>
+                    <p style="font-size: 15px; color: var(--text-muted); margin-top: 10px;">
+                        Pure LLM over-flag 73/80 luồng benign (báo giả 49%), trong khi SENTINEL ưu tiên <strong>Precision cao (86.1%)</strong> để triệt tiêu Alert Fatigue.
+                    </p>
+                </div>
+
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-user-check"></i> Chấm Điểm LLM-as-a-Judge (Llama-3-8B)</div>
+                    <p class="card-text" style="font-size: 15.5px; margin-bottom: 8px;">
+                        Đánh giá 908 đầu ra suy luận của Gemma-2-9B trên thang điểm 1–5:
+                    </p>
+                    <ul class="styled-list" style="font-size: 16px;">
+                        <li><strong>Faithfulness (Không bịa đặt):</strong> $3.30 \pm 0.55$</li>
+                        <li><strong>Answer Relevancy (Khớp hành động):</strong> $3.56 \pm 1.25$</li>
+                        <li><strong>Context Recall (Sử dụng RAG):</strong> $3.27 \pm 0.95$</li>
+                        <li><strong>Audit Completeness Rate:</strong> <strong style="color: var(--emerald);">100%</strong> tuân thủ JSON Schema</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 17: DASHBOARD & HITL DEMO -->
+        <section class="slide" data-slide="17">
+            <div class="slide-tag">Giao diện Vận hành</div>
+            <h2 class="slide-title">Dashboard SOC Streamlit & Vận Hành Con Người Trong Vòng Lặp (HITL)</h2>
+
+            <div class="grid-2">
+                <div>
+                    <div class="card card-blue" style="margin-bottom: 16px;">
+                        <div class="card-title"><i class="fa-solid fa-desktop"></i> Các Tính Năng Trên UI Streamlit</div>
+                        <ul class="styled-list">
+                            <li><strong>Real-time Telemetry Queue:</strong> Giám sát băng thông Tầng 1 và phán quyết Tầng 2 theo thời gian thực.</li>
+                            <li><strong>Threat Memory Analytics:</strong> Trực quan hóa chuỗi tấn công APT đa ngày theo Timeline IP.</li>
+                            <li><strong>HMAC Integrity Status:</strong> Đèn chỉ báo xanh (Toàn vẹn) / đỏ (Cảnh báo log bị can thiệp).</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card card-emerald">
+                        <div class="card-title"><i class="fa-solid fa-users-gear"></i> Hàng Đợi HITL (Human-in-the-Loop)</div>
+                        <p class="card-text" style="font-size: 15px;">
+                            Các sự kiện ở trạng thái `AWAIT_HITL` hoặc lệnh chặn tường lửa rủi ro cao sẽ được chuyển về hàng đợi phê duyệt của chuyên gia SOC.
+                        </p>
+                        <div class="code-snippet" style="margin-top: 12px; font-size: 15px; color: #34D399;">
+                            [ANALYST ACTION REQUIRED]
+                            Target IP: 192.168.1.105 | Threat: MITRE T1110 (Brute Force)
+                            Options: [ APPROVE BLOCK ]  [ REJECT & LOG ]
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 18: MEASUREMENT INSTRUMENT & LIMITATIONS -->
+        <section class="slide" data-slide="18">
+            <div class="slide-tag">Thảo luận Khoa học</div>
+            <h2 class="slide-title">Đánh Giá Công Cụ Đo Lường & Giới Hạn Của Nghiên Cứu</h2>
+
+            <div class="grid-2">
+                <div class="card card-amber">
+                    <div class="card-title" style="color: var(--amber);"><i class="fa-solid fa-magnifying-glass-chart"></i> Giới Hạn Bộ Dữ Liệu Tổng Hợp</div>
+                    <p class="card-text" style="font-size: 15px;">
+                        Được quy định tại <strong>Mục 5.3.1 trong Luận văn</strong>:
+                    </p>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Artifacts Trong Tập benchmark:</strong> Các tập CSE-CIC-IDS2018 chứa nhiễu nhân tạo, chưa phản ánh 100% độ phức tạp của mạng doanh nghiệp sống.</li>
+                        <li><strong>Overhead Trích Đặc Trưng:</strong> Quá trình tính toán đặc trưng mạng flow trước khi đưa vào Cổng ML tạo ra một độ trễ nhỏ cần tối ưu ở tầng phần cứng.</li>
+                    </ul>
+                </div>
+
+                <div class="card card-purple">
+                    <div class="card-title" style="color: var(--purple);"><i class="fa-solid fa-memory"></i> Giới Hạn Phần Cứng & VRAM GPU Cục Bộ</div>
+                    <ul class="styled-list" style="margin-top: 10px;">
+                        <li><strong>Cửa Sổ Ngữ Cảnh LLM:</strong> Chạy Gemma-2-9B trên GPU 16GB giới hạn cửa sổ ngữ cảnh ở 8,192 tokens.</li>
+                        <li><strong>Xử Lý Đơn Chu Kỳ (Single-Batch):</strong> `llama.cpp` xử lý tuần tự từng request thay vì continuous batching.</li>
+                        <li><strong>Bài Học Thực Tế:</strong> Cần rào chắn mật mã tất định ở Tầng 1 để bù đắp cho giới hạn tài nguyên tính toán cục bộ.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 19: CONCLUSION & ROADMAP -->
+        <section class="slide" data-slide="19">
+            <div class="slide-tag">Tổng kết Luận văn</div>
+            <h2 class="slide-title">Kết Luận, Đóng Góp Khoa Học & Lộ Trình Sản Xuất</h2>
+
+            <div class="grid-2">
+                <div class="card card-blue">
+                    <div class="card-title"><i class="fa-solid fa-award"></i> Đóng Góp Luận Văn</div>
+                    <ul class="styled-list">
+                        <li><strong>Khoa học:</strong> Đề xuất thành công kiến trúc bảo mật hai tầng kết hợp giữa toán học tất định và mô hình ngôn ngữ phi tất định. Mô hình cách ly mật mã Nonce Encapsulation an toàn.</li>
+                        <li><strong>Thực tiễn:</strong> Sản phẩm mã nguồn mở đóng gói Docker Compose hoàn chỉnh, chạy air-gapped thành công trên GPU phổ thông (RTX 4060 Ti).</li>
+                    </ul>
+                </div>
+
+                <div class="card card-purple">
+                    <div class="card-title"><i class="fa-solid fa-rocket"></i> Lộ Trình Tiến Lên Production</div>
+                    <ul class="styled-list">
+                        <li><strong>Viết lại Tầng 1 bằng Go/Rust:</strong> Loại bỏ overhead Python để xử lý hàng triệu events/giây.</li>
+                        <li><strong>Continuous Batching (vLLM / TGI):</strong> Thay `llama.cpp` bằng vLLM để phán xử hàng chục sự kiện mỗi chu kỳ GPU.</li>
+                        <li><strong>Message Broker Kafka:</strong> Thay thế Redis Streams bằng Kafka đĩa cứng cho doanh nghiệp lớn.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 20: DEDICATED THANK YOU & Q&A INVITATION SLIDE -->
+        <section class="slide" data-slide="20">
+            <div class="slide-tag">Hội Đồng Bảo Vệ Luận Văn Thạc Sĩ — Viện Quản trị & Công nghệ FSB</div>
+            <h2 class="slide-title" style="text-align: center; margin-bottom: 24px; color: var(--blue);">
+                LỜI CẢM ƠN CHÂN THÀNH & TRẢ LỜI CÂU HỎI Q&A
+            </h2>
+
+            <div class="card card-emerald" style="text-align: center; padding: 34px; background: rgba(4, 120, 87, 0.06); margin-bottom: 24px;">
+                <div class="card-icon icon-emerald" style="margin: 0 auto 14px auto; width: 60px; height: 60px; font-size: 28px;">
+                    <i class="fa-solid fa-heart"></i>
+                </div>
+                <h3 style="font-family: var(--font-title); font-size: 26px; font-weight: 800; color: var(--emerald); margin-bottom: 10px;">
+                    XIN CHÂN THÀNH CẢM ƠN QUÝ THẦY CÔ TRONG HỘI ĐỒNG!
+                </h3>
+                <p style="font-size: 16.5px; color: var(--text-muted); max-width: 920px; margin: 0 auto; line-height: 1.68;">
+                    Em xin gửi lời tri ân sâu sắc nhất tới <strong>TS. Bùi Văn Hiếu</strong> và <strong>TS. Đặng Văn Hiếu</strong> cùng các Thầy/Cô trong Hội đồng Bảo vệ Luận văn Thạc sĩ Viện Quản trị & Công nghệ FSB đã tận tình hướng dẫn và đóng góp ý kiến quý báu cho đề tài nghiên cứu này.
+                </p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card card-blue">
+                    <div class="card-title" style="font-size: 17.5px;"><i class="fa-solid fa-id-card"></i> Thông Tin Tác Giả & Đề Tài</div>
+                    <ul class="styled-list" style="margin-top: 6px;">
+                        <li><strong>Tác giả:</strong> Nguyễn Đức Bình (MSSV: <strong>MSE13183</strong>)</li>
+                        <li><strong>Đề tài:</strong> SENTINEL — Cognitive Two-Tier SOC Architecture</li>
+                        <li><strong>Chương trình:</strong> Thạc sĩ Kỹ thuật Phần mềm (MSE) — Viện FSB</li>
+                    </ul>
+                </div>
+
+                <div class="card card-purple">
+                    <div class="card-title" style="font-size: 17.5px;"><i class="fa-solid fa-comments"></i> Thảo Luận & Phản Biện Chuyên Môn</div>
+                    <p class="card-text" style="font-size: 15.5px;">
+                        Kính mời Quý Thầy/Cô trong Hội đồng đặt câu hỏi phản biện. Em xin phép được lắng nghe và giải trình các vấn đề chuyên môn.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Presenter Notes Floating Panel -->
+    <div class="notes-panel" id="notesPanel">
+        <div class="notes-header">
+            <div class="notes-title">
+                <i class="fa-solid fa-microphone"></i> LỜI THOẠI THUYẾT TRÌNH (SLIDE <span id="notesSlideNum">1</span>)
+            </div>
+            <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px;" id="btnCloseNotes">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="notes-body" id="notesContent">
+            Loading script...
+        </div>
+    </div>
+
+    <!-- Slide Drawer Overlay -->
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <div class="slide-drawer" id="slideDrawer">
+        <div class="drawer-header">
+            <div class="drawer-title">Mục Lục Báo Cáo (20 Slides)</div>
+            <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px;" id="btnCloseDrawer">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="drawer-list" id="drawerList"></div>
+    </div>
+
+    <!-- Bottom Controls Footer -->
+    <footer class="app-footer">
+        <div style="font-size: 15px; font-weight: 500; color: var(--text-dim); display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-keyboard"></i> Phím <strong>&larr; &rarr;</strong> / <strong>Space</strong> (Chuyển Slide) | <strong>N</strong> (Kịch bản nói) | <strong>O</strong> (Mục lục) | <strong>F</strong> (Fullscreen)
+        </div>
+
+        <div class="nav-btn-group">
+            <button class="nav-btn" id="btnPrev" title="Slide Trước"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="nav-btn" id="btnNext" title="Sang Slide Tiếp"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+    </footer>
+
+    <!-- JavaScript Presentation Controller -->
+    <script>
+        // Speaker Scripts for each slide (for 20-30 min presentation)
+        const speakerNotes = {
+            1: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG BẢO VỆ LUẬN VĂN THẠC SĨ,\n\nEm xin kính chào Quý Thầy Cô! Em tên là Nguyễn Đức Bình, Mã số học viên MSE13183, là học viên cao học chương trình Thạc sĩ Kỹ thuật Phần mềm — viết tắt là MSE — thuộc Viện Quản trị và Công nghệ FSB.\n\nHôm nay em rất vinh dự được đứng trước Hội đồng để trình bày đề tài luận văn Thạc sĩ của mình với nhan đề: "SENTINEL: Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI Tác tử". Tên tiếng Anh là "A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI".\n\nNghiên cứu này được thực hiện dưới sự hướng dẫn tận tình của hai Thầy: TS. Bùi Văn Hiếu và TS. Đặng Văn Hiếu. Toàn bộ hệ thống được xây dựng và kiểm chứng trên một máy trạm GPU cục bộ — cụ thể là NVIDIA RTX 4060 Ti 16GB — chạy mô hình ngôn ngữ lớn Gemma-2-9B-IT Q6_K hoàn toàn cách ly mạng (air-gapped), đảm bảo tính bảo mật và chủ quyền dữ liệu tuyệt đối.\n\nEm xin phép bắt đầu bài báo cáo ạ.`,
+
+            2: `LỜI CẢM ƠN TỪ TÁC GIẢ LUẬN VĂN:\n\nKính thưa Quý Thầy Cô, trước khi đi vào nội dung chuyên môn, em xin phép dành giây phút trang trọng nhất để bày tỏ lòng biết ơn sâu sắc.\n\nĐầu tiên, em xin trân trọng cảm ơn TS. Bùi Văn Hiếu và TS. Đặng Văn Hiếu — hai Thầy hướng dẫn đã luôn đồng hành, định hướng tư duy khoa học, chỉ bảo tận tình và truyền cảm hứng cho em trong suốt quá trình nghiên cứu. Chính những buổi trao đổi, phản biện sắc bén của hai Thầy đã giúp em liên tục hoàn thiện và nâng cao chất lượng đề tài.\n\nEm cũng xin gửi lời cảm ơn đến Viện Quản trị và Công nghệ FSB đã tạo điều kiện học tập và nghiên cứu tốt nhất cho chương trình Thạc sĩ Kỹ thuật Phần mềm.\n\nĐặc biệt, em muốn dành lời tri ân vô cùng đặc biệt tới Gia đình — là chỗ dựa tinh thần vững chắc nhất, là nguồn động viên thầm lặng nhưng vô giá, đã luôn đồng hành và hy sinh để em có thể toàn tâm toàn ý theo đuổi con đường học thuật và hoàn thành nghiên cứu này.\n\nEm xin phép chuyển sang phần nội dung chính ạ.`,
+
+            3: `TỔNG QUAN CẤU TRÚC BÁO CÁO:\n\nKính thưa Hội đồng, để thuận tiện cho việc theo dõi, em xin trình bày tổng quan cấu trúc bài báo cáo. Toàn bộ nội dung được chia thành 4 phần chính:\n\nPhần I — Đặt Vấn Đề và Mục Tiêu Nghiên Cứu: Em sẽ phân tích thực trạng quá tải cảnh báo tại các trung tâm SOC hiện đại, chỉ ra các cạm bẫy khi tích hợp ngây thơ LLM vào quy trình bảo mật, đồng thời trình bày 3 Câu hỏi nghiên cứu cốt lõi RQ1 đến RQ3 và ma trận khoảng trống khoa học mà luận văn này hướng tới lấp đầy.\n\nPhần II — Kiến Trúc Nhận Thức Hai Tầng SENTINEL: Đây là phần trọng tâm nhất, trình bày chi tiết từng thành phần kỹ thuật bao gồm Tầng 1 với bộ lọc Welford O(1), Cổng ML LightGBM với độ trễ chỉ 0.35 mili-giây, Tầng 1.75 Semantic Cache bypass LLM trong 1 mili-giây, và Tầng 2 với Tác tử LangGraph kết hợp Dual-RAG cùng rào chắn bảo mật Nonce Encapsulation.\n\nPhần III — Kết Quả Thực Nghiệm và Đánh Giá 5D: Em sẽ trình bày các kết quả đo lường định lượng bao gồm tỷ lệ giảm tải 83.8%, giảm 82.97% độ trễ, nghiên cứu Ablation, đánh giá chéo LLM-as-a-Judge và minh họa qua Dashboard Streamlit thực tế.\n\nPhần IV — Kết Luận, Lộ Trình Production và Thảo Luận Q&A: Tổng kết đóng góp khoa học, đề xuất lộ trình đưa sản phẩm lên môi trường sản xuất và phần mở cho Quý Thầy Cô đặt câu hỏi phản biện.\n\nEm xin bắt đầu với Phần I ạ.`,
+
+            4: `THỰC TRẠNG VÀ ĐẶT VẤN ĐỀ:\n\nKính thưa Hội đồng, trước khi nói về giải pháp, em muốn dành thời gian phân tích rõ bài toán mà luận văn này giải quyết.\n\nỞ cột bên trái, em trình bày ba thách thức lớn nhất của SOC truyền thống. Thứ nhất là Hội chứng Alert Fatigue — các báo cáo từ Gartner và SANS Institute chỉ ra rằng một trung tâm SOC quy mô trung bình phải xử lý hơn 100.000 cảnh báo mỗi ngày, dẫn đến tình trạng các chuyên gia phân tích quá tải và bỏ sót các mối đe dọa thực sự. Thứ hai, các hệ thống WAF/IDS dựa trên luật tĩnh hoàn toàn mù trước tấn công Zero-Day vì chúng chỉ nhận diện được các chữ ký đã biết trước. Thứ ba, các nền tảng SOAR với Playbook cố định không có khả năng suy luận tình huống ngoài kịch bản đã lập trình sẵn.\n\nỞ cột bên phải là các cạm bẫy nghiêm trọng khi tích hợp ngây thơ LLM. Gọi LLM cho 100% log tốn 4 đến 6 giây mỗi sự kiện — không thể mở rộng cho băng thông doanh nghiệp. Payload chứa câu lệnh đối kháng có thể chiếm quyền điều khiển LLM qua Prompt Injection. Và LLM có xu hướng tự bịa căn cứ — hiện tượng Hallucination — dẫn tới chặn nhầm IP lành tính.\n\nBài toán trung tâm là: Làm sao kết hợp được tốc độ lọc siêu nhanh O(1) của luật và Machine Learning, với khả năng suy luận ngữ cảnh sâu của LLM Tác tử, mà vẫn đảm bảo an toàn mật mã và chạy hoàn toàn cục bộ trên GPU cá nhân?`,
+
+            5: `CÂU HỎI VÀ MỤC TIÊU NGHIÊN CỨU:\n\nĐể giải quyết bài toán trên một cách hệ thống, luận văn đặt ra 3 câu hỏi nghiên cứu với các mục tiêu cụ thể:\n\nCâu hỏi RQ1 về Băng Thông — Kinh tế học Tầng Lọc: Làm sao thiết kế được tầng lọc tốc độ đường truyền có khả năng giảm tải hơn 80% sự kiện thô ở tốc độ mili-giây, mà vẫn đảm bảo không bỏ sót các tín hiệu tấn công chậm và âm thầm kiểu APT? Giải pháp của em là kết hợp thuật toán Welford Anomaly Detection với Cổng ML LightGBM.\n\nCâu hỏi RQ2 về An Toàn và Độ Trễ — Phân loại Nhận thức: Làm sao để LLM có thể suy luận an toàn trên dữ liệu log thô — vốn tiềm ẩn Prompt Injection — đồng thời tối ưu hóa thời gian phản hồi? Em giải quyết bằng cơ chế Nonce Encapsulation kết hợp Semantic Cache.\n\nCâu hỏi RQ3 về Trạng Thái và Căn Cứ: Việc duy trì bộ nhớ có trạng thái giúp hệ thống phát hiện tấn công APT kéo dài nhiều ngày và truy xuất tri thức chuẩn MITRE ATT&CK chính xác ra sao? Câu trả lời nằm ở kiến trúc Dual-RAG kết hợp SQLite Threat Memory.\n\nMỗi câu hỏi nghiên cứu sẽ được em chứng minh bằng số liệu thực nghiệm cụ thể trong Phần III.`,
+
+            6: `MA TRẬN SO SÁNH VÀ KHOẢNG TRỐNG KHOA HỌC:\n\nKính thưa Hội đồng, slide này trình bày ma trận so sánh các hướng nghiên cứu hiện hữu trên 4 tiêu chí then chốt mà em đã xác định.\n\nHàng đầu tiên — WAF/IDS truyền thống dựa trên luật: Tuy đạt tốc độ đường truyền rất nhanh và không bị Prompt Injection, nhưng hoàn toàn mù trước biến thể Zero-Day và không có khả năng giải thích theo chuẩn MITRE ATT&CK.\n\nHàng thứ hai — ML Anomaly Detection sử dụng Isolation Forest hoặc XGBoost: Phát hiện dị biệt tương đối nhanh nhưng vẫn là hộp đen Blackbox — không thể giải thích cho chuyên gia SOC tại sao một IP bị đánh dấu nguy hiểm.\n\nHàng thứ ba — Tích hợp Pure LLM Agent ngây thơ: Có khả năng suy luận Zero-Day và giải thích chuẩn MITRE tốt, nhưng độ trễ 26.9 giây mỗi sự kiện khiến hệ thống nghẽn hoàn toàn, và dễ bị tấn công Prompt Injection từ chính dữ liệu log đầu vào.\n\nHàng cuối cùng — SENTINEL — là hệ thống mà em đề xuất: đạt được cả 4 tiêu chí với Offload 83.8% tại 0.35ms, phát hiện 12 trên 15 loại Zero-Day, kháng Prompt Injection 100% nhờ Nonce, và giải thích đầy đủ qua Dual-RAG RRF.\n\nĐây chính là khoảng trống nghiên cứu mà SENTINEL lấp đầy: là công trình đầu tiên kết hợp hài hòa toán học tất định O(1) ở Tầng 1 với mô hình ngôn ngữ Tác tử phi tất định ở Tầng 2.`,
+
+            7: `TỔNG QUAN KIẾN TRÚC HAI TẦNG SENTINEL:\n\nKính thưa Hội đồng, đây là slide tổng quan kiến trúc — trái tim kỹ thuật của toàn bộ luận văn. Em xin Quý Thầy Cô nhìn vào sơ đồ pipeline ở phía trên.\n\nDữ liệu đầu vào từ Unified Stream — bao gồm cả CSE-CIC-IDS2018 và DAPT2020 — đi qua lần lượt 4 tầng xử lý:\n\nTầng 1 — Fast Path: Sử dụng thuật toán trực tuyến Welford O(1) tính Z-Score phương sai lăn và RuleEngine tra cứu cổng bằng cấu trúc Set O(1). Tầng này xử lý 100% lưu lượng mạng trên CPU ở tốc độ đường truyền mà không đụng tới GPU.\n\nTiếp theo là Cổng ML Gateway: Mô hình LightGBM được huấn luyện trên khoảng 1 triệu luồng, đứng giữa để tự quyết 83.8% các ca rõ ràng với độ trễ chỉ 0.35 mili-giây. Chỉ 16.2% sự kiện thực sự mơ hồ mới được chuyển lên tầng trên.\n\nTầng 1.75 — Semantic Cache: Sử dụng thuật toán Drain để rút gọn log thành template chuẩn, sau đó băm SHA-256. Các tấn công lặp lại như DDoS hoặc Brute-Force được nhận diện và trả về kết quả trong 1 mili-giây mà không cần gọi LLM.\n\nTầng 2 — Cognitive Agent: Tác tử đồ thị trạng thái LangGraph chạy mô hình Gemma-2-9B-IT cục bộ trên GPU, kết hợp Dual-RAG — FAISS cho ngữ nghĩa và BM25 cho định danh chính xác — để đưa ra quyết định hành động có cấu trúc và có căn cứ MITRE ATT&CK.\n\nTriết lý thiết kế: Tầng 1 đóng vai trò "tấm lưới chắn tốc độ cao" — loại bỏ phần lớn lưu lượng lành tính. Tầng 2 là "bộ não thám tử" — dành sức mạnh suy luận cho thiểu số sự kiện thực sự nguy hiểm.`,
+
+            8: `CHI TIẾT TẦNG 1 — WELFORD VÀ RULE ENGINE:\n\nKính thưa Hội đồng, em xin đi sâu vào chi tiết kỹ thuật Tầng 1.\n\nỞ cột trái, thuật toán trực tuyến Welford tính liên tục trung bình mu_k và phương sai sigma_k bình phương trong bộ nhớ mà hoàn toàn không cần lưu lại lịch sử gói tin — đạt độ phức tạp O(1) cả về thời gian lẫn không gian. Khi Z-Score vượt ngưỡng 3.5 sigma, sự kiện lập tức được đẩy lên Cổng ML hoặc Tầng 2 để phân tích sâu hơn.\n\nĐiểm đặc biệt quan trọng là cơ chế "Cập nhật Khóa-theo-Phán-quyết": hệ thống chỉ cho phép lưu lượng đã được phán quyết là Benign cập nhật vào baseline thống kê, nhờ đó chống lại hiệu quả kỹ thuật đầu độc "ếch luộc" — slow-boil poisoning — khi kẻ tấn công cố tình tăng dần cường độ để "dạy" cho hệ thống coi tín hiệu tấn công là bình thường. Ngoài ra, Golden Baseline Seed giúp khởi tạo trạng thái sạch ngay từ đầu, tránh rò rỉ khi khởi động lạnh.\n\nỞ cột phải, RuleEngine sử dụng cấu trúc Set O(1) để tra cứu nhanh các cổng nhạy cảm thay vì chạy Regex tốn tài nguyên. Bộ đệm Bounded _rep_cache giới hạn dung lượng cache uy tín IP để ngăn tràn RAM khi bị tấn công DDoS diện rộng. Bảng băm Session Baseline cũng có cơ chế TTL tự dọn dẹp các session hết hạn.`,
+
+            9: `CHI TIẾT CỔNG ML LIGHTGBM — BỘ LỌC TRÍ TUỆ:\n\nKính thưa Hội đồng, giữa RuleEngine và LLM, em thiết kế một lớp Cổng ML sử dụng mô hình LightGBM.\n\nMô hình được huấn luyện trên tập khoảng 1 triệu luồng mạng với F1-Score trên tập kiểm tra held-out đạt 0.9635. Cổng ML áp dụng chính sách 4 dải độ tin cậy rất rõ ràng:\n- Khi độ tin cậy C từ 0.85 trở lên: tự động BLOCK_IP — chặn tức thì không cần hỏi LLM.\n- Từ 0.65 đến 0.85: ESCALATE — chuyển lên LLM Tầng 2 để phân tích sâu.\n- Từ 0.40 đến 0.65: ALERT — cảnh báo giám sát nhưng chưa hành động.\n- Dưới 0.40: DROP — bỏ qua vì xác suất lành tính rất cao.\n\nKết quả thực tế cho thấy Cổng ML giải quyết được 83.8% số ca leo thang với độ trễ chỉ 0.35 mili-giây — nhanh hơn 77.000 lần so với gọi LLM trực tiếp.\n\nĐể đối phó với kỹ thuật nhiễu đối kháng Adversarial Feature Perturbation — khi hacker cố tình bơm giá trị cực đoan vào các đặc trưng mạng — hệ thống có hai lớp phòng thủ: Kẹp z-score tại cộng trừ 8 sigma để vô hiệu hóa đầu vào dị biệt cực đoan, và cơ chế tự động Abstain — nếu hơn 30% đặc trưng vượt quá 6 sigma, mô hình tự bỏ qua phán quyết và đẩy thẳng lên LLM.`,
+
+            10: `CHI TIẾT TẦNG 1.75 — SEMANTIC CACHE BYPASS LLM:\n\nKính thưa Hội đồng, Tầng 1.75 là lớp đệm chiến lược mà em thiết kế riêng để giải quyết một tình huống rất phổ biến trong thực tế.\n\nKhi hệ thống chịu đợt tấn công DDoS hoặc Brute-Force, hàng nghìn thậm chí hàng vạn log có cấu trúc gần như giống hệt nhau đổ về liên tục. Nếu gọi LLM cho từng log lặp lại, đó là sự lãng phí tài nguyên GPU nghiêm trọng và tạo ra nút thắt cổ chai không cần thiết.\n\nGiải pháp là Semantic Cache: Log thô đi qua bộ khai thác mẫu Drain — một thuật toán log parsing nổi tiếng — để rút gọn thành Template chuẩn hóa, sau đó băm SHA-256 và tra cứu trong LRU Cache.\n\nCấu hình vận hành: Cache lưu trữ tối đa 500 mục trong bộ nhớ OrderedDict với TTL 1.800 giây tức 30 phút. Khi cache hit, kết quả phán quyết được trả về ngay lập tức trong khoảng 1 mili-giây — giảm từ 4 đến 6 giây của LLM xuống gần bằng không.\n\nĐiều này có ý nghĩa cực kỳ lớn trong các tình huống tấn công quy mô lớn: hệ thống duy trì năng lực phản hồi ổn định mà không bị nghẽn GPU.`,
+
+            11: `CHI TIẾT TẦNG 2 — TÁC TỬ LANGGRAPH VÀ GEMMA-2-9B:\n\nKính thưa Hội đồng, Tầng 2 là lớp nhận thức cao nhất của SENTINEL. Em xin Quý Thầy Cô nhìn vào sơ đồ máy trạng thái FSM ở phía trên.\n\nLuồng xử lý đi qua 5 trạng thái tuần tự trong đồ thị LangGraph:\n1. GUARDRAILS: Kiểm tra whitelist IP nội bộ hạ tầng và áp dụng Nonce Encapsulation để bọc payload trước khi đưa vào prompt.\n2. RAG CONTEXT: Truy xuất tri thức MITRE ATT&CK bằng Dual-RAG — FAISS cho ngữ nghĩa, BM25 cho định danh chính xác, dung hợp bằng Reciprocal Rank Fusion k bằng 60.\n3. LLM TRIAGE: Mô hình Gemma-2-9B-IT chạy cục bộ qua llama.cpp server với cửa sổ 8.192 tokens, seed cố định và temperature 0.1 để đảm bảo tính tất định.\n4. ATTACK MAPPER: Gắn nhãn MITRE ATT&CK TTP cho mỗi phán quyết.\n5. DECISION: Đưa ra quyết định cuối cùng — BLOCK_IP, LOG hoặc AWAIT_HITL.\n\nĐiểm quan trọng về khả năng chịu lỗi: Đầu ra LLM được ép kiểu nghiêm ngặt bằng Pydantic LLMDecision Schema. Nếu JSON bị lỗi cú pháp, cơ chế dự phòng _salvage_fields bằng Regex sẽ cố gắng cứu dữ liệu. Nếu thất bại hoàn toàn, hệ thống mặc định trả về AWAIT_HITL — chờ con người phê duyệt — thay vì đưa ra quyết định rủi ro.\n\nVề tối ưu hiệu năng: System Prompt được giữ ổn định tĩnh để llama.cpp có thể KV-cache, trong khi các thông tin biến động như feedback được chuyển vào User Message, giúp giảm đáng kể thời gian tạo token đầu tiên TTFT.`,
+
+            12: `DUAL-RAG VÀ BỘ NHỚ ĐE DỌA SQLITE:\n\nKính thưa Hội đồng, slide này trình bày hai thành phần quan trọng giúp SENTINEL có "trí nhớ" và "tri thức".\n\nVề Dual-RAG: Em kết hợp hai phương pháp truy xuất bổ sung cho nhau. Dense Retrieval sử dụng FAISS với embedding MiniLM, hiểu được ngữ nghĩa và từ đồng nghĩa — ví dụ khi log nói "unauthorized access" thì tìm được tài liệu nói về "credential brute force". Sparse Retrieval sử dụng BM25 Score, chính xác tuyệt đối với các định danh như CVE-2021-44228, địa chỉ IP, số hiệu cổng. Kết quả từ hai nguồn được dung hợp bằng Reciprocal Rank Fusion với k bằng 60 để lấy được những tài liệu vừa khớp ngữ nghĩa vừa chính xác mã nhận dạng.\n\nVề Bộ nhớ Đe dọa SQLite: Đây là "bộ nhớ dài hạn" cho phép SENTINEL nhận diện chuỗi tấn công APT kéo dài nhiều ngày. Cấu hình sử dụng synchronous=NORMAL kết hợp Indexes. Em nhấn mạnh rằng tuyệt đối KHÔNG sử dụng WAL mode — vì nó tạo ra file -wal và -shm gây lỗi crash phân quyền cross-UID khi chạy trong Docker.\n\nĐiểm uy tín IP suy giảm theo thời gian theo công thức S_new bằng S_old nhân (1 trừ lambda) mũ t. Khi uy tín đạt ngưỡng 100, IP bị Tầng 1 chặn ngay lập tức theo cơ chế Block-on-Sight mà không cần gọi LLM. Đồng thời, các IP nội bộ hạ tầng như 10.0.0.99 được hardcoded whitelist tuyệt đối không bao giờ bị chặn.`,
+
+            13: `BẢO MẬT AI VÀ CHUỖI HMAC AUDIT:\n\nKính thưa Hội đồng, đây là phần mà em đặc biệt tâm đắc vì nó giải quyết trực tiếp câu hỏi RQ2 về an toàn AI.\n\nỞ cột trái — Đóng gói Dữ liệu Phân định bằng Nonce: Mọi payload log thô trước khi đưa vào prompt LLM đều được bọc trong cặp ký hiệu mật mã <<<DATA_HASH_a8f9e2...>>> và <<<END_DATA_HASH...>>>. Nonce này được sinh ngẫu nhiên cho mỗi lần gọi. Nhờ cơ chế này, ngay cả khi kẻ tấn công nhúng câu lệnh đối kháng như "Ignore all previous instructions" vào trong log payload, mọi token bên trong ranh giới Nonce đều bị ép coi là dữ liệu thụ động — từ chối hoàn toàn quyền thi hành lệnh. Kết quả kiểm chứng cho thấy kháng Prompt Injection đạt 100% trên toàn bộ bộ tấn công adversarial.\n\nỞ cột phải — Chuỗi HMAC Audit và Guardrails: Toàn bộ log quyết định được móc xích mật mã HMAC-SHA256 theo công thức H_i bằng HMAC của D_i nối H_i-1 với khóa K. Nếu bất kỳ ai sửa hoặc xóa một dòng log, chuỗi băm sẽ bị đứt và Dashboard hiển thị cảnh báo đỏ ngay lập tức.\n\nConsensus Guardrail tự động ghi đè phán quyết LLM về AWAIT_HITL nếu LLM cố hạ cấp mức độ nguy hiểm mâu thuẫn với tín hiệu rủi ro mà Tầng 1 đã phát hiện. T1571 Guardrail ép các tấn công dựa trên cổng chung chung về AWAIT_HITL để tránh chặn nhầm lưu lượng hợp lệ.`,
+
+            14: `MÔI TRƯỜNG THỰC NGHIỆM VÀ DỮ LIỆU BENCHMARK:\n\nKính thưa Hội đồng, em xin trình bày thiết lập thực nghiệm.\n\nVề phần cứng: Toàn bộ hệ thống chạy trên máy trạm cục bộ với CPU Intel Core i7-14700KF, 32 GB RAM DDR5 và GPU NVIDIA RTX 4060 Ti 16GB. LLM Engine sử dụng llama.cpp được biên dịch với hỗ trợ CUDA để tận dụng tối đa GPU.\n\nVề dữ liệu: Em sử dụng hai bộ dữ liệu chuẩn quốc tế. CSE-CIC-IDS2018 do Viện An ninh Mạng Canada phát hành, bao gồm 7 loại tấn công chính: Brute Force SSH và FTP, tấn công từ chối dịch vụ DoS và DDoS, Web Attacks bao gồm SQL Injection, XSS, và mạng Botnet. DAPT2020 cung cấp chuỗi tấn công APT kéo dài nhiều ngày để kiểm chứng khả năng phát hiện tấn công có trạng thái.\n\nNgoài ra, em xây dựng tập datatest riêng gồm 3.204 mẫu để đánh giá Cổng ML và tập ground_truth gồm 1.250 mẫu cân bằng để đánh giá toàn hệ thống.\n\nKhung đánh giá tuân thủ 5 chiều: Accuracy — Precision, Recall, F1; Performance — Latency và Offload tỷ lệ phần trăm; Security — khả năng kháng Adversarial; Explainability — điểm RAGAS đánh giá chất lượng suy luận; và Integrity — tính toàn vẹn chuỗi HMAC Audit.`,
+
+            15: `KẾT QUẢ THỰC NGHIỆM ĐỘT PHÁ — CÁC CON SỐ 5D:\n\nKính thưa Hội đồng, đây là slide kết quả quan trọng nhất. Em xin Quý Thầy Cô chú ý vào 4 con số đột phá ở hàng trên cùng.\n\nThứ nhất — Offload 83.8%: Cổng ML LightGBM giảm tải thành công 83.8% cuộc gọi tới LLM, giải phóng GPU cho các ca thực sự cần suy luận sâu.\n\nThứ hai — Giảm 82.97% Độ Trễ: Độ trễ trung bình phán quyết giảm từ 26.9 giây của Pure LLM Architecture xuống còn 4.6 giây cho SENTINEL. Kiểm định Mann-Whitney U xác nhận mức giảm này có ý nghĩa thống kê vượt trội với p nhỏ hơn 0.001.\n\nThứ ba — 12 trên 15 Zero-Day: Hệ thống escalate thành công 12 trong 15 loại mẫu tấn công dạng Zero-Day — tức là các mẫu chưa từng xuất hiện trong tập huấn luyện.\n\nThứ tư — 100% Kháng Adversarial: Toàn bộ bộ tấn công hạ cấp đối kháng đều bị chặn nhờ rào chắn đồng thuận tất định Consensus Guardrail và Nonce Encapsulation.\n\nBiểu đồ thanh ngang ở bên trái minh họa trực quan sự chênh lệch độ trễ: Pure LLM chiếm toàn bộ chiều dài thanh ở 26.9 giây, trong khi SENTINEL chỉ chiếm 17%, Semantic Cache Hit chỉ 1ms và ML Gateway chỉ 0.35ms.\n\nCổng ML duy trì 99.58% phán quyết đúng ngay cả khi chịu nhiễu đối kháng cực đoan nhờ lớp Anti-Evasion.`,
+
+            16: `NGHIÊN CỨU ABLATION VÀ ĐÁNH GIÁ LLM-AS-A-JUDGE:\n\nKính thưa Hội đồng, slide này trình bày hai kết quả phân tích chuyên sâu.\n\nỞ bên trái — Ablation Study trên tập dữ liệu cân bằng 1.250 mẫu: Pure LLM Baseline tuy đạt Recall hoàn hảo 1.000 nhưng Precision chỉ 67.3% — nghĩa là báo giả lên tới 49%. Cụ thể, Pure LLM đánh dấu nhầm 73 trong 80 luồng Benign là tấn công. Trong khi đó, SENTINEL Full đạt Precision 86.1% — giảm đáng kể tình trạng Alert Fatigue. F1 của SENTINEL thấp hơn không phải vì kém chính xác, mà vì hệ thống chủ động chuyển các ca mơ hồ sang AWAIT_HITL — tức là "thà hỏi con người còn hơn chặn nhầm".\n\nỞ bên phải — Đánh giá LLM-as-a-Judge: Em sử dụng mô hình trọng tài Llama-3-8B — khác họ hoàn toàn với Gemma-2-9B — để chấm điểm chéo 908 đầu ra suy luận trên thang 1 đến 5. Kết quả:\n- Faithfulness — Không bịa đặt: 3.30 cộng trừ 0.55\n- Answer Relevancy — Khớp hành động: 3.56 cộng trừ 1.25\n- Context Recall — Sử dụng RAG: 3.27 cộng trừ 0.95\n- Audit Completeness Rate — Tỷ lệ tuân thủ JSON Schema: đạt tuyệt đối 100%\n\nĐiều này khẳng định mô hình 9 tỷ tham số chạy cục bộ hoàn toàn đủ năng lực suy luận cho bài toán phân loại mối đe dọa mạng khi được hỗ trợ bởi kiến trúc Dual-RAG.`,
+
+            17: `DASHBOARD SOC STREAMLIT VÀ VẬN HÀNH HITL:\n\nKính thưa Hội đồng, ngoài thành phần backend, em cũng xây dựng giao diện Dashboard SOC trên nền tảng Streamlit để phục vụ vận hành thực tế.\n\nGiao diện cung cấp 3 tính năng chính:\n1. Real-time Telemetry Queue: Giám sát trực tiếp băng thông Tầng 1 — bao nhiêu phần trăm bị chặn, bao nhiêu được escalate — và theo dõi phán quyết Tầng 2 theo thời gian thực.\n2. Threat Memory Analytics: Trực quan hóa chuỗi tấn công APT đa ngày theo timeline IP, giúp chuyên gia nhìn thấy toàn cảnh chiến dịch tấn công thay vì từng sự kiện rời rạc.\n3. HMAC Integrity Status: Đèn chỉ báo xanh nghĩa là toàn vẹn, đỏ nghĩa là phát hiện log bị can thiệp — chỉ cần một bit thay đổi là chuỗi HMAC đứt ngay.\n\nĐặc biệt, hệ thống có hàng đợi HITL — Human-in-the-Loop — dành cho các sự kiện ở trạng thái AWAIT_HITL. Chuyên gia SOC sẽ nhìn thấy chi tiết IP mục tiêu, loại mối đe dọa MITRE, và có hai lựa chọn: APPROVE BLOCK để duyệt chặn, hoặc REJECT & LOG để từ chối và ghi nhận vào log kiểm toán.\n\nHệ thống quản lý tải bằng độ trễ consumer group lag của Redis Streams thay vì đo chiều dài queue, đảm bảo đồng bộ luồng ổn định cho hơn 100.000 events.`,
+
+            18: `ĐÁNH GIÁ CÔNG CỤ ĐO LƯỜNG VÀ GIỚI HẠN NGHIÊN CỨU:\n\nKính thưa Hội đồng, em xin chủ động trình bày các giới hạn của nghiên cứu — được ghi nhận tại Mục 5.3.1 trong Luận văn — vì em tin rằng sự minh bạch về giới hạn là phẩm chất cần có của một công trình khoa học nghiêm túc.\n\nVề Giới Hạn Dữ Liệu: Các tập benchmark CSE-CIC-IDS2018 tuy được sử dụng rộng rãi trong cộng đồng nghiên cứu quốc tế, nhưng vẫn chứa các điểm dị biệt nhân tạo — synthetic artifacts — do được tạo trong môi trường phòng thí nghiệm, chưa phản ánh đầy đủ 100% độ phức tạp và nhiễu của mạng doanh nghiệp vận hành thực tế. Ngoài ra, quá trình trích xuất đặc trưng flow mạng trước khi đưa vào Cổng ML tạo ra một overhead nhỏ cần được tối ưu thêm ở tầng phần cứng trong phiên bản production.\n\nVề Giới Hạn Phần Cứng: Với 16GB VRAM GPU cá nhân, cửa sổ ngữ cảnh LLM bị giới hạn ở 8.192 tokens. llama.cpp xử lý tuần tự từng request — single-batch — thay vì continuous batching như vLLM. Tuy nhiên, em muốn nhấn mạnh rằng đây chính là lý do khiến kiến trúc hai tầng tất định trở nên cần thiết: các rào chắn mật mã và Cổng ML ở Tầng 1 đã hoàn toàn bù đắp cho giới hạn tính toán của GPU cục bộ, cho phép hệ thống vận hành ổn định trên phần cứng phổ thông.`,
+
+            19: `KẾT LUẬN, ĐÓNG GÓP KHOA HỌC VÀ LỘ TRÌNH SẢN XUẤT:\n\nKính thưa Hội đồng, em xin tổng kết đóng góp của luận văn trên hai phương diện.\n\nVề đóng góp khoa học: Luận văn đề xuất thành công kiến trúc bảo mật hai tầng hoàn toàn mới, kết hợp giữa toán học tất định — Welford O(1), LightGBM — ở Tầng 1 và mô hình ngôn ngữ phi tất định — LangGraph, Gemma-2-9B — ở Tầng 2. Mô hình cách ly mật mã Nonce Encapsulation đảm bảo an toàn LLM trước Prompt Injection. Dual-RAG với RRF cung cấp căn cứ MITRE ATT&CK cho mọi phán quyết.\n\nVề đóng góp thực tiễn: Toàn bộ sản phẩm được đóng gói Docker Compose hoàn chỉnh, chạy air-gapped thành công trên GPU phổ thông RTX 4060 Ti — khẳng định tính khả thi cho các tổ chức không có ngân sách thuê Cloud GPU.\n\nLộ trình tiến lên Production bao gồm 3 hướng chính:\n1. Viết lại Tầng 1 bằng Go hoặc Rust: Loại bỏ hoàn toàn overhead GIL của Python để xử lý hàng triệu events mỗi giây.\n2. Chuyển sang vLLM hoặc TGI Continuous Batching: Thay thế llama.cpp để phán xử hàng chục sự kiện song song mỗi chu kỳ GPU.\n3. Message Broker Kafka: Thay thế Redis Streams bằng Kafka với lưu trữ đĩa cứng bền vững cho quy mô doanh nghiệp lớn.`,
+
+            20: `LỜI CẢM ƠN CHÂN THÀNH VÀ KÍNH MỜI HỘI ĐỒNG THẢO LUẬN:\n\nKính thưa Quý Thầy Cô trong Hội đồng Bảo vệ Luận văn Thạc sĩ,\n\nEm xin chân thành cảm ơn Quý Thầy Cô đã dành thời gian quý báu để lắng nghe bài báo cáo của em hôm nay. Em đặc biệt tri ân TS. Bùi Văn Hiếu và TS. Đặng Văn Hiếu — hai Thầy hướng dẫn đã luôn đồng hành, chỉ bảo và truyền cảm hứng cho em trong suốt hành trình nghiên cứu.\n\nEm cũng xin gửi lời cảm ơn đến Quý Thầy Cô trong Hội đồng Bảo vệ của Viện Quản trị và Công nghệ FSB vì những ý kiến phản biện sắc sảo — đó chính là cơ hội quý giá để em hoàn thiện hơn nữa công trình nghiên cứu này.\n\nTên đề tài: SENTINEL — Cognitive Two-Tier SOC Architecture.\nTác giả: Nguyễn Đức Bình — MSSV MSE13183.\nChương trình: Thạc sĩ Kỹ thuật Phần mềm (MSE) — Viện Quản trị và Công nghệ FSB.\n\nEm xin kính mời Quý Thầy Cô đặt câu hỏi phản biện. Em sẵn sàng lắng nghe và giải trình mọi vấn đề chuyên môn mà Hội đồng quan tâm ạ!\n\nEm xin trân trọng cảm ơn!`
+        };
+
+        // State Management
+        let currentSlide = 1;
+        const totalSlides = 20;
+        let isNotesOpen = false;
+        let isDrawerOpen = false;
+        let timerSeconds = 0;
+        let timerInterval = null;
+
+        // DOM Elements
+        const slides = document.querySelectorAll('.slide');
+        const currentSlideNumEl = document.getElementById('currentSlideNum');
+        const totalSlideNumEl = document.getElementById('totalSlideNum');
+        const progressBarEl = document.getElementById('progressBar');
+        const timerTextEl = document.getElementById('timerText');
+        const btnPrev = document.getElementById('btnPrev');
+        const btnNext = document.getElementById('btnNext');
+        const btnNotes = document.getElementById('btnNotes');
+        const btnDrawer = document.getElementById('btnDrawer');
+        const btnFullscreen = document.getElementById('btnFullscreen');
+        const btnThemeToggle = document.getElementById('btnThemeToggle');
+        const notesPanel = document.getElementById('notesPanel');
+        const notesSlideNumEl = document.getElementById('notesSlideNum');
+        const notesContentEl = document.getElementById('notesContent');
+        const btnCloseNotes = document.getElementById('btnCloseNotes');
+        const slideDrawer = document.getElementById('slideDrawer');
+        const drawerOverlay = document.getElementById('drawerOverlay');
+        const btnCloseDrawer = document.getElementById('btnCloseDrawer');
+        const drawerListEl = document.getElementById('drawerList');
+
+        // HUD Elements
+        const fullscreenHud = document.getElementById('fullscreenHud');
+        const hudSlideNumEl = document.getElementById('hudSlideNum');
+        const hudTotalNumEl = document.getElementById('hudTotalNum');
+        const hudTimerTextEl = document.getElementById('hudTimerText');
+        const hudBtnPrev = document.getElementById('hudBtnPrev');
+        const hudBtnNext = document.getElementById('hudBtnNext');
+        const hudBtnNotes = document.getElementById('hudBtnNotes');
+        const hudBtnExit = document.getElementById('hudBtnExit');
+
+        // Initialize Drawer Items
+        function initDrawer() {
+            drawerListEl.innerHTML = '';
+            slides.forEach((s, idx) => {
+                const num = idx + 1;
+                const title = s.querySelector('.slide-title').innerText.replace(/\n/g, ' ');
+                const item = document.createElement('div');
+                item.className = `drawer-item ${num === currentSlide ? 'active' : ''}`;
+                item.innerHTML = `<span class="drawer-item-num">${num}.</span> <span>${title}</span>`;
+                item.addEventListener('click', () => {
+                    goToSlide(num);
+                    closeDrawer();
+                });
+                drawerListEl.appendChild(item);
+            });
+        }
+
+        // Timer Control
+        function startTimer() {
+            if (timerInterval) return;
+            timerInterval = setInterval(() => {
+                timerSeconds++;
+                const mins = Math.floor(timerSeconds / 60).toString().padStart(2, '0');
+                const secs = (timerSeconds % 60).toString().padStart(2, '0');
+                timerTextEl.innerText = `${mins}:${secs}`;
+                hudTimerTextEl.innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        // Slide Navigation Logic with Directional Transitions
+        let slideDirection = 'next'; // 'next' or 'prev'
+
+        function updateSlideUI() {
+            slides.forEach(s => {
+                const sNum = parseInt(s.getAttribute('data-slide'));
+                // Remove all transition classes first
+                s.classList.remove('exit-left', 'exit-right');
+                if (sNum === currentSlide) {
+                    s.classList.add('active');
+                    // Reset child animations by forcing reflow
+                    const animatedEls = s.querySelectorAll('.slide-tag, .slide-title, .card, .agenda-card, .metric-box, .chart-bar-group, table, .arch-diagram, .grid-2, .grid-3, .grid-4');
+                    animatedEls.forEach(el => {
+                        el.style.animation = 'none';
+                        el.offsetHeight; // trigger reflow
+                        el.style.animation = '';
+                    });
+                } else {
+                    if (s.classList.contains('active')) {
+                        // Exiting slide — add directional exit class
+                        s.classList.remove('active');
+                        s.classList.add(slideDirection === 'next' ? 'exit-left' : 'exit-right');
+                    } else {
+                        s.classList.remove('active');
+                    }
+                }
+            });
+
+            currentSlideNumEl.innerText = currentSlide;
+            hudSlideNumEl.innerText = currentSlide;
+
+            const progressPct = ((currentSlide - 1) / (totalSlides - 1)) * 100;
+            progressBarEl.style.width = `${progressPct}%`;
+
+            // Update Presenter Notes
+            notesSlideNumEl.innerText = currentSlide;
+            notesContentEl.innerText = speakerNotes[currentSlide] || 'Không có lời thoại cho slide này.';
+
+            // Update Drawer Active Item
+            initDrawer();
+        }
+
+        function goToSlide(num) {
+            if (num < 1) num = 1;
+            if (num > totalSlides) num = totalSlides;
+            if (num === currentSlide) return;
+            slideDirection = num > currentSlide ? 'next' : 'prev';
+            currentSlide = num;
+            updateSlideUI();
+        }
+
+        function prevSlide() { goToSlide(currentSlide - 1); }
+        function nextSlide() { goToSlide(currentSlide + 1); }
+
+        // Theme Toggle (Light / Dark)
+        function toggleTheme() {
+            document.body.classList.toggle('theme-dark');
+            const isDark = document.body.classList.contains('theme-dark');
+            btnThemeToggle.innerHTML = isDark ? `<i class="fa-solid fa-sun"></i> Theme` : `<i class="fa-solid fa-moon"></i> Theme`;
+        }
+
+        // Modal & Drawer Controls
+        function toggleNotes() {
+            isNotesOpen = !isNotesOpen;
+            notesPanel.classList.toggle('active', isNotesOpen);
+            btnNotes.classList.toggle('active', isNotesOpen);
+        }
+
+        function openDrawer() {
+            isDrawerOpen = true;
+            slideDrawer.classList.add('active');
+            drawerOverlay.classList.add('active');
+        }
+
+        function closeDrawer() {
+            isDrawerOpen = false;
+            slideDrawer.classList.remove('active');
+            drawerOverlay.classList.remove('active');
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement && !document.body.classList.contains('is-fullscreen')) {
+                if (document.documentElement.requestFullscreen) {
+                    document.documentElement.requestFullscreen();
+                } else {
+                    document.body.classList.add('is-fullscreen');
+                }
+            } else {
+                if (document.exitFullscreen && document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    document.body.classList.remove('is-fullscreen');
+                }
+            }
+        }
+
+        // Fullscreen Event Listener
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                document.body.classList.add('is-fullscreen');
+            } else {
+                document.body.classList.remove('is-fullscreen');
+            }
+        });
+
+        // Event Listeners
+        btnPrev.addEventListener('click', prevSlide);
+        btnNext.addEventListener('click', nextSlide);
+        btnNotes.addEventListener('click', toggleNotes);
+        btnCloseNotes.addEventListener('click', toggleNotes);
+        btnDrawer.addEventListener('click', openDrawer);
+        btnCloseDrawer.addEventListener('click', closeDrawer);
+        drawerOverlay.addEventListener('click', closeDrawer);
+        btnFullscreen.addEventListener('click', toggleFullscreen);
+        btnThemeToggle.addEventListener('click', toggleTheme);
+
+        // HUD Listeners
+        hudBtnPrev.addEventListener('click', prevSlide);
+        hudBtnNext.addEventListener('click', nextSlide);
+        hudBtnNotes.addEventListener('click', toggleNotes);
+        hudBtnExit.addEventListener('click', toggleFullscreen);
+
+        // Keyboard Shortcuts Navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                goToSlide(1);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                goToSlide(totalSlides);
+            } else if (e.key === 'n' || e.key === 'N') {
+                toggleNotes();
+            } else if (e.key === 'o' || e.key === 'O') {
+                if (isDrawerOpen) closeDrawer(); else openDrawer();
+            } else if (e.key === 'f' || e.key === 'F') {
+                toggleFullscreen();
+            }
+        });
+
+        // Initialize App
+        totalSlideNumEl.innerText = totalSlides;
+        hudTotalNumEl.innerText = totalSlides;
+        initDrawer();
+        updateSlideUI();
+        startTimer();
+    </script>
+</body>
+</html>

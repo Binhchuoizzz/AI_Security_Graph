@@ -142,9 +142,11 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
         #    (đúng như prompt dặn) từ chối map kỹ thuật -> AWAIT_HITL -> LLM KHÔNG BAO GIỜ
         #    chặn được. Đặt nhãn phát hiện lên trước để truy vấn neo vào NGỮ NGHĨA tấn công.
         _reasons = (first_log.get("tier1_reasons") or [])[:3]
-        parts.extend(_canonical_attack_terms(_reasons))  # cụm chuẩn tiếng Anh TRƯỚC
-        for reason in _reasons:
-            parts.append(str(reason))
+        parts.extend(_canonical_attack_terms(_reasons))  # cụm chuẩn tiếng Anh (từ vựng KB)
+        # KHÔNG append chuỗi lý do THÔ (tiếng Việt) của Tier-1 vào truy vấn: KB MITRE/NIST và
+        # embedder all-MiniLM-L6-v2 đều thiên TIẾNG ANH -> chuỗi Việt gần như 0 tín hiệu truy
+        # xuất mà còn làm nhiễu embedding. Cụm chuẩn EN ở trên đã mang ngữ nghĩa tấn công;
+        # giữ truy vấn THUẦN ANH để neo đúng kỹ thuật (xem _ATTACK_TERMS + chú thích phía trên).
         # 2. Flow-based attacks (CICIDS): không có payload -> dựng query từ
         #    metadata flow THẬT (service/port/protocol) để RAG map đúng MITRE.
         svc = first_log.get("service") or first_log.get("Service")

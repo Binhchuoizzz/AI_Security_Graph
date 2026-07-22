@@ -1,0 +1,245 @@
+\chapter{Experiments and Evaluation}
+\label{ch:experiments_evaluation}
+
+This chapter presents the empirical evidence for the thesis, validating the research hypotheses through a five-dimensional framework (Accuracy, Performance, Security, Explainability, Integrity). It emphasises a layered ablation study and non-parametric statistical tests (McNemar, Mann--Whitney~U) to establish that the architectural choices are sound rather than incidental.
+
+\section{Experimental Environment and Datasets}
+Evaluations ran on a local testbed: an Intel Core i7-14700KF CPU, 32\,GB DDR5 RAM, and an NVIDIA RTX~4060~Ti 16\,GB GPU hosting the quantised \textit{Gemma-2-9B-IT} Q6\_K model. Two datasets are used: CSE-CIC-IDS2018~\cite{ids2018} (Brute Force, DoS, Web attacks) for classification, and DAPT2020~\cite{dapt2020} for multi-day APT correlation. A Unified Data Stream simulator merges and replays the logs chronologically to emulate a live SIEM. The rebalanced benchmark comprises a $1{,}250$-sample labelled \texttt{ground\_truth} (15 attack classes) for the ablation and a $3{,}204$-sample \texttt{datatest} (four sources) for the ML gateway. Table~\ref{tab:dataset_distribution} maps the principal attack families to top-level MITRE ATT\&CK techniques and default actions; it is a representative design reference, not an exhaustive per-label catalogue.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Representative mapping of principal CSE-CIC-IDS2018 attack families to MITRE ATT\&CK techniques and default actions. (Source: Author)}
+    \label{tab:dataset_distribution}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.34\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\raggedright\arraybackslash}p{0.22\textwidth}|}
+        \hline
+        \textbf{Attack Category (Label)} & \textbf{MITRE ATT\&CK} & \textbf{Default Action} & \textbf{Source CSV File} \\
+        \hline
+        Benign & None & \texttt{LOG} & Wednesday-14-02-2018 \\ \hline
+        SSH/FTP-BruteForce & T1110 & \texttt{BLOCK\_IP} & Thursday-22-02-2018 \\ \hline
+        DoS Hulk / Slowloris & T1499 & \texttt{ALERT} & Friday-16-02-2018 \\ \hline
+        DDOS HOIC / LOIC-UDP & T1499 & \texttt{ALERT} & Tuesday-20-02-2018 \\ \hline
+        Brute Force Web / XSS & T1110 / T1059 & \texttt{BLOCK\_IP} / \texttt{ALERT} & Friday-23-02-2018 \\ \hline
+        SQL Injection & T1190 & \texttt{ALERT} & Friday-23-02-2018 \\ \hline
+        Infiltration & T1078 & \texttt{AWAIT\_HITL} & Thursday-01-03-2018 \\ \hline
+        Bot & T1071 & \texttt{ALERT} & Friday-02-03-2018 \\ \hline
+    \end{tabular}
+\end{table}
+
+\section{5D Metrics and Ablation Design}
+The system is benchmarked on five dimensions: Accuracy (Precision, Recall, F1), Performance (latency, throughput), Security (adversarial robustness), Explainability (audit completeness, reasoning quality), and Integrity (HMAC validation). To isolate each component, six configurations are compared. \textbf{A} is the rule-only baseline (no LLM); \textbf{B} submits every log to the LLM (no gate, RAG, or guardrails); \textbf{C} inserts the Welford Tier-1 filter ahead of the LLM; \textbf{D} adds dense RAG (FAISS+MiniLM); \textbf{E} extends retrieval to hybrid dense+sparse (FAISS+BM25); and \textbf{F} is the full SENTINEL (Welford gate, ML gateway, LangGraph agent, Dual-RAG via RRF, and guardrails). A seventh view, \textbf{G}, measures the ML gateway's LLM offload in isolation.
+
+Two conventions keep the figures interpretable. \emph{Prediction convention}: a flow is a positive detection whenever the system does not silently discard it (any \texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{AWAIT\_HITL}, or \texttt{ESCALATE} verdict). \emph{Comparability}: binary F1 is only compared across configurations on the same class distribution. On the attack-heavy subset every configuration predicts positive on almost every sample, so its shared $\mathrm{F1}\!\approx\!0.967$ equals the base rate and is used only to isolate per-component \emph{latency}; the honest accuracy comparison is drawn on a class-balanced subset (Section~\ref{sec:balanced}), where rules ($0.559$) and the learned tiers ($0.80$--$0.83$) genuinely separate.
+
+\section{Classification Accuracy on the Unified Stream}
+The primary accuracy evaluation replays a single time-ordered merge of $150$ benign warm-up flows and $26{,}521$ main-stream events (CSE-CIC-IDS2018, DAPT2020 APT chains, and real-derived zero-day outliers) through a freshly initialised Threat Memory. Table~\ref{tab:classification} reports the Tier-1 gate's binary classification over the CIC-IDS-labelled portion.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Tier-1 binary classification on the Unified Stream (CIC-IDS-labelled events). (Source: Author)}
+    \label{tab:classification}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\ \hline
+        Precision & 0.924 \\ \hline
+        Recall (attack) & 0.373 \\ \hline
+        F1-score & 0.531 \\ \hline
+        Accuracy & 0.417 \\ \hline
+        TP / FP / TN / FN & 436 / 36 / 114 / 734 \\ \hline
+    \end{tabular}
+\end{table}
+
+The gate attains high precision ($0.924$) at moderate recall ($0.373$). This is deliberate: Tier-1 blocks only network-layer-unambiguous attacks and \emph{escalates} subtler signals downstream, trading raw recall for a low false-positive load and for the preservation of low-and-slow chains. The recovery of escalated cases is quantified by the ML-gateway, APT, zero-day, and ablation analyses that follow.
+
+\section{ML Gateway: Learned Tier-1 Load Shedding}
+\label{sec:mlgate}
+Between the rule engine and the cognitive tier, a gradient-boosted \texttt{LightGBM} gateway (trained on $\approx\!1$M flows, held-out Test-F1 $=0.9635$) scores every escalation and resolves the confident majority without an LLM call, using the unified four-band confidence policy ($\ge\!0.85$ block, $0.65$--$0.85$ escalate to the LLM, $0.40$--$0.65$ alert, $<\!0.40$ drop). Table~\ref{tab:mlgate} reports its behaviour.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{ML gateway (LightGBM) classification and LLM offload. Classification is on the $3{,}204$-sample \texttt{datatest}; offload (Config~G) is on the $1{,}250$-sample \texttt{ground\_truth}. (Source: Author)}
+    \label{tab:mlgate}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\ \hline
+        Classification F1 / Precision / Recall & 0.825 / 0.909 / 0.755 \\ \hline
+        Mean inference latency & 0.35\,ms \\ \hline
+        LLM offload (escalations resolved without LLM) & 83.8\% (761/908) \\ \hline
+        Precision on offloaded verdicts & 98.82\% \\ \hline
+        Evasion resistance (inf/extreme perturbation) & 99.58\% \\ \hline
+    \end{tabular}
+\end{table}
+
+The gateway resolves $83.8\%$ of escalations at $0.35$\,ms with $98.82\%$ precision, so only the residual $\approx\!16\%$ ever reaches the multi-second cognitive tier. This is the core efficiency contribution: it converts a system that would otherwise route every ambiguous event to the LLM into one where the language model is a scarce, reserved resource. Under adversarial feature perturbation (single- and multi-feature extremes) the gateway retains $99.58\%$ of its correct malicious verdicts, confirming that the learned boundary does not collapse under out-of-distribution inputs. This robust performance is secured by the anti-evasion layer that rigidly clamps extreme feature deviations to $\pm8\sigma$ and fills \texttt{NaN} values with the mean, neutralising gradient-based evasion attempts.
+
+\section{Tier-2 Escalation Adjudication}
+A complementary question is how the cognitive layer \emph{adjudicates} the events it receives. As a pessimistic bound, the ML gateway was bypassed and a strided sample of $800$ Tier-1-escalated events ($38$ true threats and $762$ benign flows that leaked through the gate) was replayed individually through the full Guardrails\,$\rightarrow$\,RAG\,$\rightarrow$\,LLM\,$\rightarrow$\,consensus pipeline. Table~\ref{tab:tier2adjudication} reports the outcome.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Tier-2 adjudication on $800$ escalated events (ML gateway bypassed; per-event full pipeline). (Source: Author)}
+    \label{tab:tier2adjudication}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\ \hline
+        Escalated events (threat / benign) & 800 (38 / 762) \\ \hline
+        Conditional threat recall & 1.00 (38/38) \\ \hline
+        Conditional benign specificity & 0.00 (0/762) \\ \hline
+        Adjudication accuracy ($=$ base rate) & 0.0475 \\ \hline
+        Agent reliability / parse failures & 1.00 / 0 \\ \hline
+        Action mix (\texttt{BLOCK\_IP} / \texttt{AWAIT\_HITL} / \texttt{ALERT}) & 353 / 445 / 2 \\ \hline
+    \end{tabular}
+\end{table}
+
+The agent flags every one of the $38$ threats (conditional recall $=1.00$) and, by design, never silently clears an escalated event (conditional specificity $=0.00$); the raw $0.0475$ accuracy therefore equals the threat base rate of this benign-dominated set and is a property of the population, not a discriminative capability. This is the honest, one-sided guarantee: no threat that reaches Tier-2 is discarded by it. Two improvements over the earlier prototype are visible: agent reliability is $1.00$ with \emph{zero} parse failures (a direct effect of schema-constrained JSON decoding), and the verdicts are now confidence-driven ($353$ auto-blocks at high confidence, mean confidence $0.772$) rather than the uniform deferral of the previous design. Crucially, this table is the \emph{worst case}: in deployment the ML gateway (Section~\ref{sec:mlgate}) resolves $83.8\%$ of these events first, so the cognitive tier sees a far cleaner, threat-enriched residue. The gateway supplies selectivity; the agent supplies the never-miss backstop.
+
+\section{Emergent Multi-Day APT Correlation (Foundational)}
+This is a \emph{secondary, foundational} result: it shows that the stateful Threat Memory \emph{enables} multi-day campaign correlation as an emergent by-product, evaluated as a proof-of-concept whose hardening is deferred to Chapter~\ref{ch:conclusion}. With the memory initialised empty, any campaign verdict must accumulate over the replay. All three ground-truth APT campaigns were detected (recall $=1.00$, Table~\ref{tab:apt}) at an average lag of $8.33$ events, confirming that low-and-slow chains surface from persistent memory even when each event is individually low-signal at Tier-1.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Emergent multi-stage APT detection on DAPT2020 chains (clean memory). (Source: Author)}
+    \label{tab:apt}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Metric} & \textbf{Value} \\ \hline
+        Ground-truth APT IPs in stream & 3 \\ \hline
+        Detected / Missed & 3 / 0 \\ \hline
+        Recall (Wilson 95\% CI) & 1.00 \;[0.44, 1.00] \\ \hline
+        Average detection lag & 8.33 events \\ \hline
+    \end{tabular}
+\end{table}
+
+Two checks bound the result. Because only three campaigns are present, the recall is reported with its Wilson $95\%$ interval $[0.44, 1.00]$ and read as indicative rather than precise. A negative control confirms the detector is not merely firing on any recurring address: of the four non-APT IPs that appear on two or more distinct days, none triggered an APT verdict (specificity $=1.00$). Correlation is deterministic---a source is flagged once it accumulates events on $\ge\!2$ distinct campaign days (\texttt{COUNT(DISTINCT day)}$\ge2$). The honest boundary is that recording here is keyed on the DAPT2020 annotation rather than the live verdict, so the experiment validates the correlation \emph{logic} in isolation; a larger corpus, verdict-gated recording, and technique/entity-keyed correlation are deferred to future work.
+
+\section{Signature-less (Zero-Day) Escalation via Welford Scoring}
+Signature-less anomaly flagging is a foundational capability the $O(1)$ Welford filter provides essentially for free: it \emph{escalates} statistically deviant flows rather than pronouncing a novel exploit itself. Across the $15$ real-derived zero-day classes (each formed by driving a single statistic of a genuine benign flow to an extreme boundary), the static signature engine caught none, whereas the online Welford Z-score filter flagged \textbf{12 of 15} as anomalies ($Z>3.5\sigma$) and escalated them for adjudication---the three misses being classes whose extreme feature is not among the seven Welford-tracked statistics.
+
+\subsection{Graded Detection Boundary}
+Because the headline outliers sit at extreme deviations ($Z\!\gg\!100\sigma$), a coarse catch count does not locate the sensitivity boundary. Sweeping a single Welford-tracked feature to a controlled $k\sigma$ deviation ($210$ probes per level: $30$ static-clean base flows $\times$ $7$ features) yields the curve in Table~\ref{tab:zeroday_graded}: below $3.5\sigma$ detection rests near the benign-tail floor, at the $3.5\sigma$ operating point it begins to rise, and by $4\sigma$ it saturates at $100\%$ and stays there. The effective boundary is thus $\approx\!4\sigma$, with the deployed $3.5\sigma$ threshold placed at the onset of the knee so incipient anomalies surface early; the real zero-day samples lie deep in the saturated regime, which is why the $12/15$ result is robust.
+
+\begin{table}[!htbp]
+    \centering \footnotesize \setlength{\tabcolsep}{6pt}
+    \caption{Graded zero-day detection boundary vs.\ injected single-feature deviation (Tier-1 only, $n=210$/level). (Source: Author)}
+    \label{tab:zeroday_graded}
+    \begin{tabular}{|c|c|c|}
+        \hline
+        \textbf{Deviation $k$ ($\sigma$)} & \textbf{Mean realised $Z$} & \textbf{Escalated $\rightarrow$ Tier-2} \\ \hline
+        2.0 & 2.69 & 10\% \\ \hline
+        3.0 & 3.31 & 10\% \\ \hline
+        \textbf{3.5 (op.)} & 3.74 & \textbf{10\%} \\ \hline
+        \textbf{4.0} & 4.19 & \textbf{100\%} \\ \hline
+        5.0 & 5.09 & 100\% \\ \hline
+        10.0 & 10.1 & 100\% \\ \hline
+    \end{tabular}
+\end{table}
+
+\section{Ablation: Two-Tier Latency Trade-off and Balanced Comparison}
+\label{sec:balanced}
+On the attack-heavy $\texttt{ground\_truth}$ subset ($93.6\%$ attack), Configurations~A and F yield identical binary verdicts ($\mathrm{F1}=0.967$, $\mathrm{P}=0.936$, $\mathrm{R}=1.000$; McNemar degenerate, $p=1.0$): the shared score is exactly the base rate and reflects the benchmark, not any single configuration. What differs is latency. Tier-1 with the ML gateway resolves an escalation in $0.35$\,ms, whereas the full cognitive path (Config~F) averages $5.4$\,s per escalated event; the Mann--Whitney~U test confirms this Tier-1/Tier-2 separation is highly significant ($p<0.001$), and against an LLM-on-everything baseline the two-tier design reduces mean latency by $82.97\%$ ($26.9$\,s $\rightarrow$ $4.6$\,s).
+
+Because the attack-heavy subset cannot expose false-positive behaviour, all six configurations were re-run on a \emph{balanced} subset ($150$ benign $+$ $150$ attack, Welford warmed on $150$ disjoint benign flows). Here the configurations genuinely separate (Table~\ref{tab:ablation_balanced}).
+
+\begin{table}[!htbp]
+    \centering \footnotesize \setlength{\tabcolsep}{4pt}
+    \caption{Controlled balanced ablation ($150$ benign $+$ $150$ attack). The pure-LLM baseline over-flags; the gated configurations (C--F) are verdict-identical. (Source: Author)}
+    \label{tab:ablation_balanced}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.36\textwidth}|c|c|c|c|c|}
+        \hline
+        \textbf{Configuration} & \textbf{F1} & \textbf{Prec.} & \textbf{Rec.} & \textbf{Escal.} & \textbf{Lat./ev.} \\ \hline
+        A --- Tier-1 only (no LLM) & 0.559 & 0.861 & 0.413 & --- & 0.04\,s \\ \hline
+        B --- Pure LLM (no gate/RAG/guard) & 0.804 & 0.673 & 1.000 & 100\% & 14.9\,s \\ \hline
+        C --- Welford gate $+$ LLM & 0.559 & 0.861 & 0.413 & 8.3\% & 1.21\,s \\ \hline
+        D --- C $+$ dense RAG (FAISS) & 0.559 & 0.861 & 0.413 & 8.3\% & 1.59\,s \\ \hline
+        E --- D $+$ hybrid RAG (BM25$+$RRF) & 0.559 & 0.861 & 0.413 & 8.3\% & 1.63\,s \\ \hline
+        \textbf{F --- Full SENTINEL} & \textbf{0.559} & \textbf{0.861} & \textbf{0.413} & \textbf{8.3\%} & \textbf{1.71\,s} \\ \hline
+    \end{tabular}
+\end{table}
+
+The contrast is informative. The pure-LLM baseline (B) attains the highest recall ($1.000$) and a nominally higher F1 ($0.804$), but only by flagging $73$ of the $80$ benign flows as malicious---its precision collapses to $0.673$, and McNemar against every gated configuration is decisive ($\approx\!63$ discordant verdicts in a single direction, $p<0.001$). The gate (C) reverses this: it resolves $\approx\!92\%$ of traffic at Tier-1, cutting false positives and mean latency by an order of magnitude ($14.9$\,s $\rightarrow$ $1.21$\,s) at the deliberate cost of recall---precision and throughput traded against recall exactly as the precision-favouring design intends. Adding retrieval (D, E) and guardrails (F) leaves the confusion matrix identical to C (zero discordant pairs), reaffirming that these components contribute grounding, reasoning quality, and security, not binary-classification gain. The pure-LLM baseline's higher F1 is an operational mirage: a $49\%$ benign false-positive rate is unusable under alert-fatigue constraints, and a $14.9$\,s cost on \emph{every} event cannot scale.
+
+\subsection{Welford Threshold Sensitivity}
+To rebut over-fitting of the $3.5\sigma$ threshold, $\tau$ was swept over $[2.0\sigma, 5.0\sigma]$ and Tier-1 re-evaluated (LLM-free) on the mixed stream (Table~\ref{tab:sensitivity}). Precision is effectively invariant ($0.915$--$0.925$) and zero-day recall is saturated ($12/15$) across the entire range, so $3.5\sigma$ is a tunable load dial, not a fragile sweet spot: tightening $\tau$ lowers the escalation and benign false-positive rates smoothly at the expense of recall. The deployed $3.5\sigma$---the classical three-sigma rule rounded up for conservatism---sits near the knee and reproduces the headline Tier-1 F1 of $0.531$.
+
+\begin{table}[!htbp]
+    \centering \footnotesize \setlength{\tabcolsep}{5pt}
+    \caption{Welford threshold sensitivity on the real mixed stream (Tier-1 only). (Source: Author)}
+    \label{tab:sensitivity}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline
+        \textbf{$\tau$ ($\sigma$)} & \textbf{F1} & \textbf{Prec.} & \textbf{Rec.} & \textbf{Benign FP} & \textbf{Escal.} & \textbf{Zero-day} \\ \hline
+        2.0 & 0.589 & 0.915 & 0.434 & 0.313 & 0.548 & 12/15 \\ \hline
+        3.0 & 0.572 & 0.917 & 0.415 & 0.293 & 0.533 & 12/15 \\ \hline
+        \textbf{3.5 (op.)} & \textbf{0.531} & \textbf{0.924} & \textbf{0.373} & \textbf{0.240} & \textbf{0.500} & \textbf{12/15} \\ \hline
+        4.0 & 0.516 & 0.925 & 0.358 & 0.227 & 0.489 & 12/15 \\ \hline
+        5.0 & 0.513 & 0.924 & 0.355 & 0.227 & 0.487 & 12/15 \\ \hline
+    \end{tabular}
+\end{table}
+
+\section{Adversarial Robustness (Security)}
+An author-curated, non-adaptive suite of $120$ payloads across five OWASP-aligned categories~\cite{owasp_llm2025} probes the semantic-downgrade threat model (each payload tries to coerce the agent into downgrading a flagged threat). Table~\ref{tab:robustness} reports the \emph{static guardrail layer} in isolation.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Static guardrail-layer block rate against the 120-payload suite. (Source: Author)}
+    \label{tab:robustness}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.42\textwidth}|c|c|c|}
+        \hline
+        \textbf{Attack category} & \textbf{Payloads} & \textbf{Blocked} & \textbf{Rate} \\ \hline
+        Encoding bypass (Base64/Hex/URL) & 45 & 45 & 100.0\% \\ \hline
+        Structural / delimiter attacks & 20 & 7 & 35.0\% \\ \hline
+        Semantic confusion & 20 & 0 & 0.0\% \\ \hline
+        Jailbreak / persona hijack & 20 & 2 & 10.0\% \\ \hline
+        RAG poisoning & 15 & 6 & 40.0\% \\ \hline
+        \textbf{Overall} & \textbf{120} & \textbf{60} & \textbf{50.0\%} \\ \hline
+    \end{tabular}
+\end{table}
+
+The static layer blocks $100\%$ of encoding bypasses but, as expected, is weaker against purely semantic manipulation ($50\%$ overall). Security does not rest on this regex layer: the residual semantic attacks are neutralised by the deterministic Tier-1/Tier-2 consensus guard of Chapter~\ref{ch:system_design_implementation}, which overrides any LLM downgrade of a Tier-1-flagged attack to \texttt{AWAIT\_HITL}. Because this guard is a fixed rule rather than a learned classifier, its guarantee holds by construction. Furthermore, the encapsulation employs an $O(1)$ substring match combined with a cryptographic nonce (e.g., \texttt{<<<DATA\_HASH...>>>}) to structurally deny the LLM execution over payload boundaries. Consequently, when the curated pipeline suite is fed straight into the cognitive layer, it resists $100\%$ ($12/12$, zero compromise). Two honest caveats bound this: the suite is non-adaptive and matched to the downgrade model, and the deterministic guarantee is deliberately narrow. Hardening against adaptive attacks and public injection benchmarks is future work; the value of a structural defence is that its assurance is analysable by design rather than contingent on a training set.
+
+\section{Integrity and Reasoning Quality (LLM-as-a-Judge)}
+Integrity was verified by simulating a log-tampering attack: the HMAC log-chaining verifier immediately detected the hash-chain break, and an audit-completeness check confirmed that $100\%$ of verdicts conform to the mandatory JSON schema. To assess reasoning quality without self-enhancement bias, a cross-family LLM-as-Judge protocol~\cite{zheng2023judge} was used: a Meta Llama-3-8B judge scored the $908$ escalated reasoning outputs of the Gemma-2-9B agent on four RAGAS-style dimensions~\cite{ragas2023} (Table~\ref{tab:ragas}).
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Cross-family LLM-as-Judge reasoning quality (Llama-3-8B judge, Gemma-2-9B agent, $n=908$, 1--5 scale). (Source: Author)}
+    \label{tab:ragas}
+    \begin{tabular}{|l|c|}
+        \hline
+        \textbf{Dimension} & \textbf{Mean $\pm$ SD} \\ \hline
+        Faithfulness (no hallucination) & $3.30 \pm 0.55$ \\ \hline
+        Answer Relevancy (action match) & $3.56 \pm 1.25$ \\ \hline
+        Context Recall (RAG usage) & $3.27 \pm 0.95$ \\ \hline
+        Context Precision (MITRE mapping) & $2.25 \pm 0.57$ \\ \hline
+        Audit Completeness Rate & $100\%$ \\ \hline
+        \textbf{Overall mean} & \textbf{3.1 / 5} \\ \hline
+    \end{tabular}
+\end{table}
+
+On this larger, harder benchmark the overall mean is $3.1/5$ with $100\%$ audit completeness. Faithfulness ($3.30$) and Answer Relevancy ($3.56$) indicate the agent's conclusions are generally grounded in the retrieved MITRE/NIST evidence and its actions match the detected threat, while Context Precision ($2.25$) is the weakest dimension---the hybrid retriever too often surfaces broadly related rather than pin-point techniques, a clear direction for re-ranking improvements. The scores are lower than an earlier small-$n$ run precisely because the benchmark is larger and more diverse; they are reported as the honest current headroom rather than a best case.
+
+\section{Operational Robustness}
+A locally hosted reasoning layer must be operationally dependable. Three controlled checks confirm this. \emph{Determinism}: with a fixed seed ($\texttt{llm.seed}=42$) the same escalated prompt yields an identical action in $5/5$ runs (\texttt{BLOCK\_IP}); only the raw JSON text varied (GPU batching), never the parsed decision. \emph{Graceful degradation}: forcing the LLM endpoint to fail mid-pipeline did not crash the graph; the empty response was caught and the verdict safely degraded to \texttt{AWAIT\_HITL}, while the deterministic Tier-1 layer kept filtering independently. \emph{Context budget}: under a stress sweep ($N\in[1,2000]$ logs), naive concatenation breaches the $n_{\text{ctx}}=8192$ window beyond $N\approx100$ logs ($10{,}251$ tokens, reaching $201{,}355$ at $N=2000$), whereas Drain template compression saturates near $80$ tokens regardless of volume, keeping every batch within the $4{,}000$-token budget by construction. Live token monitoring confirmed a peak utilisation of $60.5\%$ with zero overflow warnings.
+
+\section{Structured ATT\&CK Mapping}
+The mapper enriches each free-text technique into a schema-validated ATT\&CK record. Logical correctness is established by a deterministic $35$-test suite that resolves all ten canonical web-attack classes (SQLi, XSS, path traversal, LFI, RFI, SSRF, XXE, command injection, IDOR, prompt injection $\rightarrow$ MITRE ATLAS \texttt{AML.T0051}) with $100\%$ agreement, without the LLM. End-to-end, the layer exposes its domain of validity: on flow-only telemetry, technique exact-match is near zero because flow features are behaviourally ambiguous and labels are category-derived (an ill-posed task, not a mapper fault); on a $50$-payload web-attack benchmark---its designed domain---the deployed pipeline reaches $64.0\%$ technique and $57.5\%$ tactic exact-match, mapping signature-bearing attacks almost perfectly (prompt/command injection $100\%$) while residual error concentrates on signature-less logical variants (RFI, IDOR).
+
+\section{Summary of 5D Results}
+Table~\ref{tab:5d_summary} consolidates the findings, each mapped to the metric that operationalises it.
+
+\begin{table}[!htbp]
+    \centering
+    \caption{Consolidated results across the five evaluation dimensions. (Source: Author)}
+    \label{tab:5d_summary}
+    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.46\textwidth}|>{\raggedright\arraybackslash}p{0.25\textwidth}|}
+        \hline
+        \textbf{Dimension} & \textbf{Operational Metric} & \textbf{Result} \\ \hline
+        Accuracy & F1 on balanced data (rules $\rightarrow$ learned tier); ML gateway; APT recall; zero-day & $0.559 \rightarrow 0.80$--$0.83$; F1 $0.825$; $1.00$; $12/15$ \\ \hline
+        Performance & Tier-1$+$ML vs.\ Tier-2 latency; LLM offload; end-to-end reduction & $0.35$\,ms vs.\ $5.4$\,s; $83.8\%$; $-82.97\%$ \\ \hline
+        Security & Static guardrail block; full-pipeline resistance; ML evasion & $50\%$; $100\%$ (12/12); $99.58\%$ \\ \hline
+        Explainability & Cross-family LLM-as-Judge (overall; audit) & $3.1/5$; $100\%$ \\ \hline
+        Integrity & Audit completeness; HMAC tamper detection & $100\%$; detected \\ \hline
+    \end{tabular}
+\end{table}
+
+\section{Chapter Summary}
+This chapter evaluated SENTINEL across accuracy, performance, security, explainability, and integrity using standard datasets, controlled ablations, and non-parametric tests. Read on comparable (balanced) data, the evidence locates the architecture's value not in raw flow classification---where the deterministic tier and the learned gateway already lift F1 from $0.559$ to $0.80$--$0.83$---but in the properties a conventional stack lacks: an $83.8\%$ LLM offload and an $82.97\%$ latency reduction that render local LLM reasoning operationally feasible, robust resistance to log-substrate manipulation, transparent and auditable justifications, and a fully local, tamper-evident deployment. The emergent multi-day correlation and signature-less escalation are validated as honest, well-bounded foundational capabilities. Chapter~\ref{ch:conclusion} synthesises these findings against the research questions and charts future directions.
