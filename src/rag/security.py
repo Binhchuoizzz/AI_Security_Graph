@@ -24,7 +24,21 @@ def structural_sanitize(text: str, max_length: int = 1500) -> str:
     """
     from src.guardrails.rag_sanitizer import RAGSanitizer
 
-    return RAGSanitizer.sanitize_ingest(text, max_length)
+    cleaned = RAGSanitizer.sanitize_ingest(text, max_length)
+    return sanitize_rag_context(cleaned)
+
+
+def sanitize_rag_context(text: str) -> str:
+    """Phòng vệ rào chắn nâng cao cho RAG context: loại bỏ các cụm lệnh injection gián tiếp."""
+    injection_patterns = [
+        r"(?i)ignore\s+(previous|all)\s+instructions",
+        r"(?i)system\s+override",
+        r"(?i)disregard\s+all\s+rules",
+        r"(?i)you\s+are\s+now\s+dan",
+    ]
+    for pattern in injection_patterns:
+        text = re.sub(pattern, "[RAG_INJECTION_BLOCKED]", text)
+    return text
 
 
 def log_tokenizer(text: str) -> list[str]:

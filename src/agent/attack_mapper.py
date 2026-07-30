@@ -614,6 +614,47 @@ def _llm_select(inp: AttackMapperInput, candidates: list[dict], llm: Any) -> str
     return chosen if chosen in valid_ids else None
 
 
+def _prefer_subtechnique(candidates: list[dict]) -> list[dict]:
+    """Đưa KỸ THUẬT CON lên trước KỸ THUẬT CHA của chính nó trong danh sách ứng viên.
+
+    LỖI ĐÃ VÁ (đo 2026-07-29): khâu chọn lấy `candidates[0]`, nên khi cha và con cùng được
+    truy xuất thì luôn nhặt phải CHA — mất một cấp độ mịn mà bộ truy xuất đã tìm ra đúng.
+
+    Vì sao cha luôn thắng hạng, và vì sao đây KHÔNG phải lỗi của bộ truy xuất:
+      - ATT&CK viết mô tả kỹ thuật cha bằng cách LIỆT KÊ các con. Đo trên chính KB này: 47
+        cặp cha-con mà mô tả/chỉ báo của CHA chứa NGUYÊN CỤM tên CON. Cha vì thế khớp mọi
+        truy vấn của mọi con, và thắng nhờ độ phủ từ vựng rộng hơn — đúng như BM25/dense
+        được thiết kế để làm.
+      - Đo trực tiếp trên 15 mẫu CSIC nhãn T1595.003: con nằm HẠNG 2 ở 14/15 ca, cha T1595
+        hạng 1. Bộ truy xuất ĐÚNG; chỉ khâu chọn sai.
+
+    Vì sao ưu tiên con là ĐÚNG chứ không phải chỉnh cho vừa benchmark: kỹ thuật cha là một
+    PHẠM TRÙ, không phải một quy kết. Khi bằng chứng đã kéo được con ra NẰM CẠNH cha trong
+    cùng tập truy xuất, con vừa cụ thể hơn vừa được hậu thuẫn ngang bằng — nói "T1595 Active
+    Scanning" trong khi "T1595.003 Wordlist Scanning" đứng ngay hạng dưới thì kém thông tin
+    hơn cho analyst mà không đúng hơn chút nào.
+
+    CHỈ đổi thứ tự, KHÔNG thêm/bớt ứng viên: `_llm_select` vẫn thấy đủ tập cũ, và khi LLM
+    tắt thì `candidates[0]` giờ là con. Chỉ nâng con của ĐÚNG cha đang đứng đầu — không gom
+    mọi kỹ thuật con lên đầu bảng.
+    """
+    if len(candidates) < 2:
+        return candidates
+    top_id = str(candidates[0].get("id") or "")
+    if not top_id or "." in top_id:
+        return candidates  # hạng 1 đã là con -> không có gì để nâng
+    kids = [c for c in candidates[1:] if str(c.get("id") or "").startswith(f"{top_id}.")]
+    if not kids:
+        return candidates
+    rest = [c for c in candidates if c not in kids]
+    logger.info(
+        "[attack_mapper] Ưu tiên kỹ thuật con %s thay cho cha %s (cả hai đều được truy xuất).",
+        kids[0].get("id"),
+        top_id,
+    )
+    return kids + rest
+
+
 def _from_rrf(inp: AttackMapperInput, retriever: Any, llm: Any) -> MitreMapping:
     """Đường suy luận: RRF top-3 từ KB -> LLM chọn -> dựng mapping (graceful)."""
     if retriever is None:
@@ -641,6 +682,7 @@ def _from_rrf(inp: AttackMapperInput, retriever: Any, llm: Any) -> MitreMapping:
             }
         )
 
+    candidates = _prefer_subtechnique(candidates)
     chosen_id = _llm_select(inp, candidates, llm)
     if chosen_id:
         chosen = next(c for c in candidates if c["id"] == chosen_id)

@@ -117,9 +117,16 @@ class TestEndToEndSecurityLayer:
         assert payload_entropy > benign_entropy
 
     def test_overflow_guard_detects_overflow(self):
-        """ContextOverflowGuard phải phát hiện khi vượt ngân sách token."""
+        """ContextOverflowGuard phải phát hiện khi vượt ngân sách token.
+
+        Số token phải suy ra TỪ `max_context_tokens` đang cấu hình, không viết cứng. Bản cũ
+        cố định 7000+5000=12000 và ngầm giả định trần là 8192; khi trần đổi lên 16384 thì
+        12000 lọt trong ngân sách nên phép thử đỏ dù mã hoàn toàn đúng — phép thử hỏng chứ
+        không phải hệ thống hỏng.
+        """
         guard = ContextOverflowGuard()
-        result = guard.check(prompt_tokens=7000, log_tokens=5000)
+        over = guard.max_tokens + 1
+        result = guard.check(prompt_tokens=over // 2 + 1, log_tokens=over // 2)
         assert result["is_overflow"] is True
         assert result["action"] == "TRUNCATE_LOGS"
 

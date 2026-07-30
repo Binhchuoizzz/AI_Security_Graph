@@ -47,6 +47,7 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from experiments.metrics_core import calibration_report, confusion_report, wilson_ci  # noqa: E402
 from experiments.unified_dataset import ROOT, build_stream  # noqa: E402
 from src.agent.state import SentinelState  # noqa: E402
 from src.agent.workflow import agent_app  # noqa: E402
@@ -189,6 +190,12 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     # Mốc đối chứng BẮT BUỘC đọc kèm accuracy: một stub luôn hô "threat" đạt đúng
     # base rate. accuracy <= mốc này => chỉ số KHÔNG có năng lực phân biệt.
     majority_baseline = round(n_threat / n_scored, 4) if n_scored else 0.0
+    # MCC nói thẳng điều mà accuracy phải diễn giải vòng: hệ gắn cờ MỌI thứ -> MCC = 0.
+    # `zero_r_accuracy` là mốc ĐÚNG (bộ phân loại hằng tốt nhất) — trên tập áp đảo lành
+    # tính thì stub khôn nhất là hô "lành tính", đạt accuracy ~0,98 chứ không phải 0,02.
+    rep = confusion_report(tp, fp, tn, fn)
+    recall_ci = wilson_ci(tp, n_threat)
+    spec_ci = wilson_ci(tn, n_benign)
 
     action_dist = Counter(r["llm_action"] for r in scored)
     by_source = {}
@@ -206,25 +213,57 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     confs = [r["confidence"] for r in scored if r["flagged"]]
     mean_conf_flagged = round(sum(confs) / len(confs), 3) if confs else 0.0
 
+    # --- HIỆU CHUẨN ĐỘ TIN CẬY -------------------------------------------- #
+    # Toàn bộ chính sách 4 dải (BLOCK >=0,85 / ESCALATE / ALERT / DROP) đứng trên giả định
+    # rằng `confidence` của LLM CÓ Ý NGHĨA — mà giả định đó chưa từng được kiểm. Quét ngưỡng
+    # chỉ chứng minh "0,85 không phải cherry-pick"; nó không chứng minh "0,85 nghĩa là đúng
+    # 85% số lần". Ở đây kết cục ĐÚNG được định nghĩa theo chính việc gắn cờ: khi agent gắn
+    # cờ thì đúng nghĩa là sự kiện THẬT là đe doạ, khi agent hạ cấp thì đúng nghĩa là lành
+    # tính. Dữ liệu đã có sẵn (confidence lưu theo từng ca) nên phép đo này KHÔNG tốn thêm
+    # một lượt gọi LLM nào.
+    cal_conf = [r["confidence"] for r in scored]
+    cal_correct = [r["flagged"] == r["is_threat"] for r in scored]
+    calibration = calibration_report(cal_conf, cal_correct)
+
     summary = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "metric_valid": metric_valid,
         "n_escalated": n,
         "n_scored": n_scored,
-        "n_invoke_errors": n_err,
-        "agent_reliability": agent_reliability,
-        "invoke_error_distribution": err_dist,
         "n_threat": n_threat,
         "n_benign": n_benign,
         "accuracy": round(accuracy, 4),
         "majority_baseline": majority_baseline,
+        # MCC = 0 nói thẳng "gắn cờ mọi thứ = không có năng lực phân biệt", thay vì bắt
+        # người đọc tự đối chiếu accuracy với base rate rồi suy ra.
+        "mcc": rep["mcc"],
+        "balanced_accuracy": rep["balanced_accuracy"],
+        "zero_r_accuracy": rep["zero_r_accuracy"],
+        "accuracy_beats_baseline": rep["accuracy_beats_baseline"],
         "threat_recall": round(threat_recall, 4),
+        "threat_recall_ci95": list(recall_ci),
         "benign_specificity": round(benign_specificity, 4),
+        "benign_specificity_ci95": list(spec_ci),
         "confusion": {"tp": tp, "fn": fn, "tn": tn, "fp": fp},
         "llm_action_distribution": dict(action_dist),
         "mean_confidence_flagged": mean_conf_flagged,
-        "n_parse_fallback": n_parse_fail,
+        "confidence_calibration": calibration,
         "by_source": by_source,
+        # SỨC KHOẺ LƯỢT CHẠY — KHÔNG phải chỉ số kết quả. Ba số này chứng minh phép đo
+        # SẠCH (agent không sập, JSON phân giải được), chứ không nói gì về năng lực phát
+        # hiện. Trước đây `agent_reliability` (= 1 − tỉ lệ lỗi) nằm lẫn giữa MCC và recall
+        # nên bị đọc như một thành tích 1.00; thực chất nó chỉ khẳng định lượt đo hợp lệ —
+        # nếu nó KHÔNG bằng 1 thì mọi con số còn lại đều phải vứt, chứ không phải "kém hơn".
+        "run_health": {
+            "n_invoke_errors": n_err,
+            "agent_reliability": agent_reliability,
+            "invoke_error_distribution": err_dist,
+            "n_parse_fallback": n_parse_fail,
+            "note": (
+                "Cổng hợp lệ, KHÔNG phải chỉ số. n_invoke_errors > 0 hoặc agent_reliability "
+                "< 1 => lượt đo không sạch, không được trích số nào ở trên."
+            ),
+        },
     }
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
@@ -238,9 +277,11 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
 def _print(s: dict):
     print("\n" + "-" * 72)
     print(
-        f"  Escalate tới LLM      : {s['n_escalated']} (chấm được {s['n_scored']}, lỗi {s['n_invoke_errors']})"
+        f"  Escalate tới LLM      : {s['n_escalated']} (chấm được {s['n_scored']}, lỗi {s['run_health']['n_invoke_errors']})"
     )
-    print(f"  Độ tin cậy agent       : {s['agent_reliability']}  {s['invoke_error_distribution']}")
+    print(
+        f"  Độ tin cậy agent       : {s['run_health']['agent_reliability']}  {s['run_health']['invoke_error_distribution']}"
+    )
     print(f"  Tập chấm điểm          : threat {s['n_threat']} / benign {s['n_benign']}")
     print(
         f"  ĐỘ CHÍNH XÁC phán quyết: {s['accuracy']}  (đúng {s['confusion']['tp'] + s['confusion']['tn']}/{s['n_scored']})"
@@ -259,13 +300,33 @@ def _print(s: dict):
         f"  Ma trận (TP/FN/TN/FP)  : {s['confusion']['tp']}/{s['confusion']['fn']}/{s['confusion']['tn']}/{s['confusion']['fp']}"
     )
     print(f"  Phân bố action LLM     : {s['llm_action_distribution']}")
-    print(f"  Fallback parse (an toàn): {s['n_parse_fallback']}")
+    cal = s["confidence_calibration"]
+    print(
+        f"  HIỆU CHUẨN confidence  : ECE={cal['ece']}  Brier={cal['brier']}  "
+        f"lệch lớn nhất={cal['max_gap']}"
+    )
+    if cal["high_conf_n"]:
+        print(
+            f"    ↳ dải tự động BLOCK (>=0.85): nói chắc {cal['high_conf_mean_confidence']} "
+            f"nhưng đúng {cal['high_conf_accuracy']} "
+            f"(CI95 {cal['high_conf_accuracy_ci95']}, n={cal['high_conf_n']})"
+        )
+    _over = [b for b in cal["bins"] if b["overconfident"] and b["n"] >= 10]
+    if _over:
+        print(
+            f"    ↳ [!] {len(_over)} dải QUÁ TỰ TIN (nói chắc hơn thực lực): "
+            + ", ".join(
+                f"{b['range']} conf={b['mean_confidence']} acc={b['actual_accuracy']}"
+                for b in _over[:3]
+            )
+        )
+    print(f"  Fallback parse (an toàn): {s['run_health']['n_parse_fallback']}")
     print("-" * 72)
     if not s["metric_valid"]:
         print(
             f"\n  {'!' * 68}\n"
-            f"  [!] CHỈ SỐ KHÔNG HỢP LỆ — {s['n_invoke_errors']}/{s['n_escalated']} ca agent KHÔNG cho ra\n"
-            f"      phán quyết ({s['invoke_error_distribution']}). Ngưỡng cho phép: 5%.\n"
+            f"  [!] CHỈ SỐ KHÔNG HỢP LỆ — {s['run_health']['n_invoke_errors']}/{s['n_escalated']} ca agent KHÔNG cho ra\n"
+            f"      phán quyết ({s['run_health']['invoke_error_distribution']}). Ngưỡng cho phép: 5%.\n"
             f"      TUYỆT ĐỐI KHÔNG trích số của lần chạy này vào luận văn/báo cáo.\n"
             f"      Sửa nguyên nhân rồi chạy lại.\n"
             f"  {'!' * 68}\n"
@@ -285,13 +346,13 @@ def _write_report(s: dict):
     ]
     if not s["metric_valid"]:
         lines.append(
-            f"> 🚨 **CHỈ SỐ KHÔNG HỢP LỆ** — {s['n_invoke_errors']}/{s['n_escalated']} ca agent KHÔNG cho ra "
-            f"phán quyết ({s['invoke_error_distribution']}), vượt ngưỡng 5%. **Không trích số dưới đây** "
+            f"> 🚨 **CHỈ SỐ KHÔNG HỢP LỆ** — {s['run_health']['n_invoke_errors']}/{s['n_escalated']} ca agent KHÔNG cho ra "
+            f"phán quyết ({s['run_health']['invoke_error_distribution']}), vượt ngưỡng 5%. **Không trích số dưới đây** "
             f"vào luận văn; sửa nguyên nhân rồi chạy lại.\n"
         )
     lines += [
         f"- Sự kiện escalate tới LLM: **{s['n_escalated']}** — chấm được **{s['n_scored']}**, "
-        f"lỗi **{s['n_invoke_errors']}** (độ tin cậy agent **{s['agent_reliability']}**)",
+        f"lỗi **{s['run_health']['n_invoke_errors']}** (độ tin cậy agent **{s['run_health']['agent_reliability']}**)",
         f"- Tập chấm điểm: threat **{s['n_threat']}** / benign lọt **{s['n_benign']}**",
         f"- **Độ chính xác phán quyết: {s['accuracy']}** (đúng {c['tp'] + c['tn']}/{s['n_scored']})",
         f"  - Mốc đối chứng *luôn hô 'threat'*: **{s['majority_baseline']}** — accuracy chỉ có ý nghĩa "
@@ -300,7 +361,7 @@ def _write_report(s: dict):
         f"- Specificity trên benign (hạ cấp đúng): **{s['benign_specificity']}** ({c['tn']}/{s['n_benign']})",
         f"- Ma trận nhầm lẫn — TP/FN/TN/FP: **{c['tp']} / {c['fn']} / {c['tn']} / {c['fp']}**",
         f"- Confidence trung bình khi gắn cờ: {s['mean_confidence_flagged']}",
-        f"- Số ca dùng fallback parse an toàn (AWAIT_HITL): {s['n_parse_fallback']}\n",
+        f"- Số ca dùng fallback parse an toàn (AWAIT_HITL): {s['run_health']['n_parse_fallback']}\n",
         "## Phân bố hành động LLM\n",
         "| Action | Số ca |",
         "| :--- | :---: |",

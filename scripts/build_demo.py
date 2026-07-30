@@ -7,22 +7,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
 # enrich + build_stream dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
-from experiments.unified_dataset import build_stream, enrich
+from experiments.unified_dataset import BENCHMARK_DAYS, build_stream, enrich
 
-# 10 ngày CICIDS2018 THẬT — phủ ĐỦ 14 loại tấn công + benign khắp nơi (nguồn khối lượng
-# cho demo 100k). Mỗi ngày build_stream lấy ~25% tấn công / 75% benign (nhiều benign để drop).
-DEMO_DAYS = (
-    "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",  # Bot
-    "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",  # DoS Hulk / SlowHTTPTest
-    "Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv",  # DoS GoldenEye / Slowloris
-    "Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv",  # DDoS HOIC / LOIC-UDP
-    "Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # DDoS LOIC-HTTP (tên file gốc sai chính tả)
-    "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",  # SSH / FTP-BruteForce
-    "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",  # Infiltration
-    "Friday-23-02-2018_TrafficForML_CICFlowMeter.csv",  # Web BF / XSS / SQLi
-    "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",  # Web BF / XSS / SQLi
-    "Wednesday-28-02-2018_TrafficForML_CICFlowMeter.csv",  # benign-heavy
-)
+# 10 ngày CICIDS2018 THẬT — phủ ĐỦ 15 loại tấn công + benign khắp nơi (nguồn khối lượng cho
+# demo 100k). Mỗi ngày build_stream lấy ~25% tấn công / 75% benign (nhiều benign để drop).
+#
+# DÙNG CHUNG danh sách với benchmark thay vì chép tay: trước đây đúng danh sách này tồn tại
+# ở BA nơi (đây, build_datatest.py, và mặc định của build_stream), nên sửa một chỗ là hai
+# chỗ kia trôi lệch trong im lặng — demo và benchmark chạy trên hai nền dữ liệu khác nhau
+# mà không có gì báo.
+DEMO_DAYS = BENCHMARK_DAYS
 
 
 def main():
@@ -42,7 +36,15 @@ def main():
         cicids_attack_ratio=0.06,  # nền benign dày (94%) -> ít ca leo thang hơn hẳn
         dapt_max_rows=6_000,  # nguồn khối lượng DAPT; chuỗi APT lấy từ `dapt` nên vẫn nguyên
         zeroday_repeat=60,  # 60 x 15 spec = ~900 probe zero-day (nền benign THẬT, IP riêng)
-        include_grayzone=True,  # CHỈ demo: mẫu vùng xám minh hoạ LLM chặn (KHÔNG vào benchmark)
+        # CSIC 2010 — bằng chứng tầng ỨNG DỤNG THẬT, thay hai nguồn BIÊN SOẠN đã GỠ HẲN
+        # (`grayzone` 18 + `webattack` 69). Chúng từng là nguồn DUY NHẤT mang payload trong
+        # luồng, nên toàn bộ chỉ số "quy kết kỹ thuật" của đồ án đứng trên 69 mẫu do chính
+        # tác giả viết ra — cỡ mẫu quá nhỏ và tự ra đề tự chấm.
+        #
+        # 8.000 = toàn bộ `data/csic.json`. Trong luồng ~100k thì đây là ~8% sự kiện mang
+        # payload thật, đủ để nhóm chấm QUY KẾT có cỡ mẫu nghiêm túc mà không lấn át nền
+        # NetFlow (thứ phản ánh đúng hồ sơ tải của một SOC mạng).
+        csic_max=8_000,
     )
     stream = warmup + main_stream  # warmup giữ prefix; main đã sort theo thời gian
 

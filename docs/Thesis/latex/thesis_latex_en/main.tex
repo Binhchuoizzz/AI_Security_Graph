@@ -24,6 +24,8 @@
 \usepackage{cite}
 \usepackage{array}
 \usepackage{longtable}
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
 \usepackage{float}
 % --- Keep every table/figure inside the section that discusses it ---
 % placeins gives \FloatBarrier; we insert a barrier at the start of each section
@@ -172,11 +174,9 @@
 \vspace{0.5cm}
 
 \begin{singlespace}
-In the modern cybersecurity landscape, Security Operations Centers (SOCs) face mounting pressure to automate the triage and response of an ever-increasing volume of security alerts; yet every available solution entails a significant trade-off. Conventional automation tools operate through rigid, pre-scripted playbooks that can neither reason about ambiguous situations nor justify their decisions, whereas feeding raw logs directly to a Large Language Model (LLM) proves too slow for real-time operation, exposes the system to manipulation through the log content itself, and violates data-sovereignty requirements when deployed in the cloud. To overcome these limitations, this thesis proposes SENTINEL, a two-tier cognitive architecture for automated threat detection and response. The first tier is a fast, deterministic filter that instantly discards the majority of benign traffic and forwards only the genuinely suspicious minority to the second tier: a locally hosted artificial-intelligence agent that reasons over authoritative security knowledge sources (MITRE ATT\&CK techniques and NIST incident-response guidance) and operates behind multiple protective guardrails to withstand deception by malicious inputs.
+In the modern cybersecurity landscape, Security Operations Centers (SOCs) face acute alert fatigue as continuous telemetry volume far exceeds human analyst processing capacity. Traditional automation tools relying on static playbooks lack contextual reasoning, whereas feeding raw logs directly to Large Language Models (LLMs) suffers severe latency bottlenecks, prompt injection risks, and data sovereignty violations. This thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped. Tier 1 functions as a wire-speed filter to automatically discard baseline stream noise, while Tier 2 employs a stateful AI reasoning agent backed by MITRE ATT\&CK and NIST guidance to handle complex threats behind cryptographic guardrails.
 
-Evaluated on standard intrusion-detection datasets, SENTINEL demonstrates that AI-based reasoning can remain practically viable: by reserving this costly computation for the small fraction of alerts that genuinely warrant it, the system reduces average response latency by more than $80\%$ relative to an LLM-only approach. It further withstands content-based manipulation attacks, produces transparent and verifiable justifications for each decision, and runs entirely on local, consumer-grade hardware without transmitting any data off-site. Taken together, these findings affirm that pairing a high-speed deterministic filter with a secure, transparent, and locally deployed AI reasoning tier constitutes a practical and trustworthy approach to automating modern network defence.
-
-
+Empirical evaluation on benchmark intrusion datasets demonstrates SENTINEL's high efficiency. Tier 1 automatically offloads over 80\% of stream noise at sub-millisecond latency, reducing total system response latency to 211\,ms (an 11.6x speedup over the Single-Tier LLM baseline) with throughput exceeding 2,500 flows/s. Tier 2 achieves a 94.6\% technique mapping accuracy and an F1-score of 98.6\%. Delimited Nonce encapsulation neutralizes 100\% of prompt injection attacks, while HMAC-SHA256 hash-chaining guarantees audit trail non-repudiation, operating on a single 16\,GB GPU under optimal resource consumption. SENTINEL proves that a two-tier hybrid architecture provides a trustworthy and effective paradigm for modern SOC defense.
 \end{singlespace}
 
 % Acknowledgements Page
@@ -187,21 +187,38 @@ Evaluated on standard intrusion-detection datasets, SENTINEL demonstrates that A
 \end{center}
 \vspace{0.5cm}
 
-First and foremost, I would like to express my deepest and most sincere gratitude to my academic supervisors, Dr. Bui Van Hieu and Dr. Dang Van Hieu. Their precise scientific guidance, profound professional insight, and patient, dedicated mentorship throughout the course of this research have been the solid foundation upon which this thesis was brought to completion.
+\begin{singlespace}
+The completion of this Master's thesis and the achievement of the Master of Software Engineering degree represent a journey that would not have been possible without the invaluable support, encouragement, and guidance of numerous individuals and institutions.
 
-I am also profoundly grateful to the faculty and staff of the FSB School of Business and Technology, FPT University, who equipped me with an invaluable foundation of academic knowledge and cultivated a professional, modern learning and research environment, affording every possible support to students throughout the Master's programme.
+First and foremost, I wish to express my deepest, most sincere gratitude and profound respect to my academic supervisors, Dr. Bui Van Hieu and Dr. Dang Van Hieu. Through their profound scholarship, precise strategic orientation, and rigorous research ethics, they tirelessly devoted their time to guiding my critical thinking, offering sharp professional critiques, and inspiring my scientific curiosity throughout every phase of this research. Their invaluable mentorship has not only shaped this thesis into a rigorous academic work but also established an enduring foundation for my future career in cybersecurity and artificial intelligence engineering.
 
-My sincere appreciation likewise goes to the leadership and my colleagues at Department C12, the National Data Center, where I am currently employed. Their accommodation of my time, the practical working environment they provided, and their valuable professional exchanges were a continual source of motivation, enabling me to fulfil both my professional responsibilities and my academic pursuits.
+I am deeply grateful to the Board of Management, the leadership of the FSB School of Business and Technology, and the faculty members of FPT University. Their dedicated teaching equipped me with strong theoretical and practical knowledge, while providing a professional, modern, and supportive research environment throughout my Master's studies.
 
-Finally, and most importantly of all, I dedicate my heartfelt gratitude to my beloved family, especially my dear wife and our young child. Their silent sacrifices, patience, understanding, and unwavering moral support during the long months I devoted to intensive experimentation have been my greatest source of strength, steadying my every step on this journey toward the Master's degree.
+I extend my heartfelt thanks to the Leadership and my esteemed colleagues at Department C12, the National Data Center. Their trust, flexible accommodation of my schedule, and rich practical insights gained from real-world operations provided immense motivation and invaluable practical perspectives that directly informed the design, implementation, and empirical validation of the SENTINEL security system.
+
+Finally, and most cherished of all, I dedicate my deepest emotional gratitude to my beloved family, especially my dear wife and our young child. Their silent sacrifices, infinite patience, unwavering understanding, and constant encouragement during the countless late nights spent conducting intensive system evaluations served as my solid pillar of strength, enabling me to overcome all obstacles and successfully bring this work to fruition.
+
+While every effort has been made to conduct this research with utmost rigor and scientific dedication, limitations inevitably remain. I humbly welcome all constructive feedback and guidance from the thesis examination committee and fellow researchers to further refine and expand this work in the future.
+
+\end{singlespace}
 
 
 % Lists and Table of Contents
 \newpage
+\tableofcontents
+
+\newpage
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
+
 \newpage
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
+
 \newpage
+\cleardoublepage
 \addcontentsline{toc}{chapter}{List of Abbreviations}
 \begin{center}
     {\Large\textbf{List of Abbreviations}}
@@ -211,21 +228,25 @@ Finally, and most importantly of all, I dedicate my heartfelt gratitude to my be
 \begin{longtable}{lp{0.72\textwidth}}
 \textbf{Abbreviation} & \textbf{Full Description} \\
 \midrule
+AI & Artificial Intelligence \\
 APT & Advanced Persistent Threat \\
 CTI & Cyber Threat Intelligence \\
-DAPT & Dynamic/Delayed Advanced Persistent Threat \\
+DAPT & Dynamic Advanced Persistent Threat \\
 FAISS & Facebook AI Similarity Search \\
+FPR & False Positive Rate \\
 GGUF & GPT-Generated Unified Format \\
 HITL & Human-in-the-Loop \\
+HMAC & Hash-based Message Authentication Code \\
 LLM & Large Language Model \\
+MITRE ATT\&CK & MITRE Adversarial Tactics, Techniques, and Common Knowledge \\
+NIST & National Institute of Standards and Technology \\
 RAG & Retrieval-Augmented Generation \\
 RRF & Reciprocal Rank Fusion \\
 SIEM & Security Information and Event Management \\
+SOAR & Security Orchestration, Automation, and Response \\
 SOC & Security Operations Center \\
 \bottomrule
 \end{longtable}
-\newpage
-\tableofcontents
 
 % -----------------------------------------------------------------------------
 % MAIN BODY
@@ -254,17 +275,11 @@ SOC & Security Operations Center \\
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
 
-\bibitem{mlids2016}
-A. L. Buczak and E. Guven, ``A Survey of Data Mining and Machine Learning Methods for Cyber Security Intrusion Detection,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 18, no. 2, pp. 1153--1176, 2016.
-
 \bibitem{siem2021}
 G. González-Granadillo, S. González-Zarzosa, and R. Diaz, ``Security Information and Event Management (SIEM): Analysis, Trends, and Usage in Critical Infrastructures,'' \textit{Sensors}, vol. 21, no. 14, art. 4759, 2021.
 
 \bibitem{bigdata2019}
 R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterogeneous Data: A Survey,'' \textit{Journal of Big Data}, vol. 2, art. 3, 2015.
-
-\bibitem{apt_stealth2021}
-M. Alshamrani \textit{et al.}, ``A Survey on Advanced Persistent Threats: Techniques, Solutions, Challenges, and Research Opportunities,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 21, no. 2, pp. 1851--1877, 2019.
 
 \bibitem{alertfatigue2022}
 S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Security Operations Centres: Research Challenges and Opportunities,'' \textit{ACM Computing Surveys}, vol. 57, no. 9, art. 224, 2025.
@@ -340,12 +355,6 @@ S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kan
 
 \bibitem{ragas2023}
 S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \textit{arXiv preprint arXiv:2309.15217}, 2023.
-
-\bibitem{mcnemar1947}
-Q. McNemar, ``Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages,'' \textit{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
-
-\bibitem{mannwhitney1947}
-H. B. Mann and D. R. Whitney, ``On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other,'' \textit{Annals of Mathematical Statistics}, vol. 18, no. 1, pp. 50--60, 1947.
 
 \bibitem{hmac1997}
 H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.

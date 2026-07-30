@@ -63,6 +63,12 @@ CRS_MAPPING: dict[str, CrsRef] = {
         "A01 Broken Access Control",
         "Truy cập tệp nhạy cảm là biểu hiện của LFI/đọc tệp trái phép.",
     ),
+    "Dò tệp sao lưu/mã nguồn (restricted extension)": CrsRef(
+        "REQUEST-920-PROTOCOL-ENFORCEMENT",
+        "A05 Security Misconfiguration",
+        "Đối ứng trực tiếp luật CRS 920440 'URL file extension is restricted by policy' — "
+        "chặn truy cập tệp sao lưu/mã nguồn (.bak/.old/.inc/~) bị lộ do cấu hình sai.",
+    ),
     "Command Injection": CrsRef(
         "REQUEST-932-APPLICATION-ATTACK-RCE", "A03 Injection", "Đối ứng trực tiếp."
     ),

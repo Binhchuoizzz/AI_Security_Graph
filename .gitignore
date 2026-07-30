@@ -67,8 +67,28 @@ docs/proposal_latex/compile_*.log
 
 # Dynamically generated scan results
 data/trivy-results.json
+data/bandit-results.json
 # demo.json ~100k sự kiện (~100MB) — TÁI TẠO được bằng `python scripts/build_demo.py`, không track.
 data/demo.json
+
+# Nhãn sidecar của luồng demo — VÔ NGHĨA nếu không có tệp luồng đi kèm (mà tệp luồng đã bị
+# ignore ở trên). Nối bằng `gt_id` đúc theo CHỈ SỐ sự kiện, nên sidecar của lượt dựng này
+# không dùng được cho lượt dựng khác. Sinh lại cùng lúc với demo.json/demo_small.json.
+data/demo.labels.json
+data/demo_small.labels.json
+
+# CSIC 2010 đã chuẩn hoá — trung gian, dựng lại bằng `scripts/build_csic_dataset.py` từ
+# data/raw/ (đã ignore). Tệp ĐÍCH `data/datatest.json` vẫn được track.
+data/csic.json
+
+# Sao lưu cấu hình một lần trước mỗi đợt đo — dùng xong thì bỏ, không phải cấu hình thật.
+config/*.bak
+config/system_settings.yaml.pre-*
+
+# Vết chẩn đoán THÔ của các lượt chạy sống (tier2_trace ~10-20MB/lượt). Kết luận đã chắt
+# vào reports/runs/*/audit.json — track cái đó, không track vết thô.
+reports/runs/**/tier2_trace*.jsonl
+reports/runs/tier2_trace*.jsonl
 
 
 
@@ -125,3 +145,7 @@ data/test_status.py
 
 # Luồng demo ngắn (sinh lại bằng scripts/build_demo_small.py)
 data/demo_small.json
+
+# Mọi biến thể .env (.env.bak, .env.local...) — chứa bí mật, KHÔNG BAO GIỜ commit.
+.env.*
+!.env.example

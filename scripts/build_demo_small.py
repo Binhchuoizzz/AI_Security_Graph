@@ -34,6 +34,10 @@ OUT_FILE = os.path.join(ROOT, "data", "demo_small.json")
 
 PER_ATTACK_CLASS = 40  # mỗi lớp tấn công CICIDS lấy tối đa bấy nhiêu (đủ đa dạng MITRE)
 N_ZERODAY = 150  # probe zero-day (đủ để panel có số, không làm ngập LLM)
+# Bằng chứng tầng ứng dụng THẬT (CSIC 2010), thay cho 69 `webattack` + 18 `grayzone` tự soạn.
+# Lấy 600 để nhóm L7 đủ lớn cho thống kê mà không làm ngập hàng đợi LLM (~18% mang nhãn kỹ
+# thuật -> khoảng 100 mẫu chấm được quy kết, gấp nhiều lần con số cũ).
+N_CSIC = 600
 N_DAPT_EXTRA = 120  # sự kiện DAPT khác (nền chiến dịch, ngoài các IP APT đa-ngày)
 
 
@@ -68,10 +72,28 @@ def main() -> None:
     keep.update(adv)
     print(f"[+] Adversarial (OWASP thật): {len(adv)}")
 
-    # --- 2b. Gray-zone: lấy TOÀN BỘ (minh hoạ LLM chặn bằng năng lực) ------- #
-    gz = [i for i, e in enumerate(events) if e.get("unified_source") == "grayzone"]
-    keep.update(gz)
-    print(f"[+] Gray-zone (biên soạn, LLM-block): {len(gz)}")
+    # --- 2a. Bằng chứng tầng ỨNG DỤNG: CSIC 2010 THẬT ----------------------- #
+    # ĐÃ GỠ hai nhóm `webattack` (69) và `grayzone` (18) — payload do TÁC GIẢ TỰ SOẠN.
+    #
+    # CSIC nay là nguồn CHÍNH THỨC trong `unified_dataset.build_stream()`, nên nó đã nằm sẵn
+    # trong `data/demo.json` và đi qua `enrich()` như mọi nguồn khác. Bản trước nối tệp
+    # `data/csic.json` vào ĐÂY, tức là bỏ qua `enrich()` và nhét nhãn thẳng vào sự kiện —
+    # sai đường, và làm demo_small chứa những sự kiện KHÔNG có trong demo.json.
+    csic_all = [i for i, e in enumerate(events) if e.get("unified_source") == "csic"]
+    # Ưu tiên mẫu SUY ĐƯỢC mã kỹ thuật (nhóm chấm được QUY KẾT), rồi bù phần còn lại để
+    # giữ tỉ lệ tấn công/lành của chính bộ CSIC.
+    csic_tech = [i for i in csic_all if str(events[i].get("wa_mitre") or "").strip()]
+    csic_rest = [i for i in csic_all if i not in set(csic_tech)]
+    take = csic_tech[:N_CSIC]
+    if len(take) < N_CSIC and csic_rest:
+        step = max(1, len(csic_rest) // (N_CSIC - len(take)))
+        take += csic_rest[::step][: N_CSIC - len(take)]
+    keep.update(take)
+    print(
+        f"[+] CSIC 2010 (HTTP THẬT, thay 69 mẫu tự soạn): {len(take)} / {len(csic_all)} "
+        f"(trong đó {len([i for i in take if str(events[i].get('wa_mitre') or '').strip()])} "
+        f"suy được mã kỹ thuật)"
+    )
 
     # --- 3. Zero-day ------------------------------------------------------- #
     zd = [i for i, e in enumerate(events) if e.get("unified_source") == "zeroday"]
@@ -80,14 +102,23 @@ def main() -> None:
     print(f"[+] Zero-day: {len(zd_take)} / {len(zd)} (rải đều)")
 
     # --- 4. Tấn công CICIDS: phủ ĐỦ mọi lớp có nhãn ------------------------ #
+    # Khoá phân tầng là CẶP (nguồn, lớp), KHÔNG phải lớp đơn thuần. Lý do: nhiều nguồn
+    # dùng chung nhãn phẳng `gt_label='Attack'` (cicids_max, dapt_max, zeroday...), nên
+    # phân tầng theo lớp đơn dồn tất cả vào MỘT rổ bị chặn ở PER_ATTACK_CLASS — hệ quả đo
+    # được: phủ tấn công CICIDS tụt còn 30 mẫu trong khi zero-day chiếm chỗ. Tách theo cặp
+    # thì mỗi nguồn giữ nguyên hạn ngạch của mình.
     by_class = defaultdict(list)
     for i, e in enumerate(events):
         if _is_attack(e) and (lab := e.get("gt_label")):
-            by_class[lab].append(i)
+            by_class[(e.get("unified_source", ""), lab)].append(i)
     for idxs in by_class.values():
         step = max(1, len(idxs) // PER_ATTACK_CLASS)
         keep.update(idxs[::step][:PER_ATTACK_CLASS])
-    print(f"[+] Tấn công CICIDS: {len(by_class)} lớp, tối đa {PER_ATTACK_CLASS} mẫu/lớp")
+    n_cls = len({lab for _, lab in by_class})
+    print(
+        f"[+] Tấn công có nhãn: {len(by_class)} cặp (nguồn×lớp) / {n_cls} lớp, "
+        f"tối đa {PER_ATTACK_CLASS} mẫu mỗi cặp"
+    )
 
     # --- 5. DAPT khác (nền chiến dịch) ------------------------------------- #
     dapt_other = [
@@ -113,7 +144,15 @@ def main() -> None:
 
     # --- Báo cáo phân bổ THẬT để đối chiếu --------------------------------- #
     n_atk = sum(1 for e in subset if _is_attack(e))
+    src_ratio = 100 * sum(1 for e in events if _is_attack(e)) / len(events)
     print(f"\n[✓] Đã lưu {len(subset):,} sự kiện -> {OUT_FILE}")
+    # Tập nhỏ được PHÂN TẦNG cho phủ panel, nên tỉ lệ tấn công CAO HƠN luồng đầy đủ theo
+    # thiết kế. In cả hai cạnh nhau để không ai trích tỉ lệ của tập nhỏ như thể đó là hồ
+    # sơ tải thật của hệ thống — con số đại diện cho tải nằm ở luồng đầy đủ.
+    print(
+        f"    Tỉ lệ tấn công: tập nhỏ {100 * n_atk / len(subset):.1f}% "
+        f"vs luồng đầy đủ {src_ratio:.1f}% (cao hơn do PHÂN TẦNG, không phải hồ sơ tải)"
+    )
     print(f"    Nguồn : {dict(Counter(e.get('unified_source') for e in subset).most_common())}")
     print(
         f"    Tấn công {n_atk:,} ({100 * n_atk / len(subset):.1f}%) · benign {len(subset) - n_atk:,}"

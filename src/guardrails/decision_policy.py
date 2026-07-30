@@ -48,6 +48,34 @@ LLM_ALERT_CONF: float = 0.65  # [0.65, 0.85) -> ALERT ; < 0.65 -> AWAIT_HITL
 # ảnh hưởng; chỉ dải ALERT yếu của Cổng ML bị loại khỏi bộ đếm.
 REPEAT_OFFENDER_MIN_CONF: float = ML_ESCALATE_CONF
 
+# ── LÝ DO chuyển người xử lý (mã máy đọc được) ───────────────────────────────
+# VÌ SAO CẦN. Trước đây lý do một lô rơi vào AWAIT_HITL chỉ tồn tại dưới dạng tiền tố văn
+# xuôi trong `reasoning` ("[NEO BẰNG CHỨNG: ...]", "[CẢNH BÁO: ...]"). Muốn biết "hàng đợi
+# HITL gồm những gì" phải khớp chuỗi tiếng Việt — không thống kê được, không đưa vào luận
+# văn được, và analyst nhìn hàng đợi cũng không phân loại được việc nào cần làm trước.
+#
+# Bốn nhóm dưới đây KHÁC NHAU VỀ BẢN CHẤT và cần xử lý khác nhau:
+#   - `technique_not_in_rag`   : kho tri thức THIẾU kỹ thuật đó -> việc cần làm là BỔ SUNG KHO
+#   - `technique_unmappable`   : có tài liệu nhưng không khớp chắc -> analyst quyết
+#   - `low_confidence`         : bằng chứng yếu (thường là NetFlow thuần) -> cần thêm telemetry
+#   - `llm_output_unreadable`  : lỗi vận hành (JSON hỏng/LLM chết) -> việc của kỹ sư, không phải analyst
+HITL_REASONS: dict[str, str] = {
+    "technique_not_in_rag": "Kỹ thuật mô hình đề xuất KHÔNG có trong tài liệu đã truy xuất",
+    "technique_unmappable": "Không khớp chắc chắn kỹ thuật ATT&CK nào",
+    "low_confidence": "Độ tin cậy dưới ngưỡng tự quyết (< 0,65)",
+    "llm_abstained": "Mô hình tự nhận không đủ căn cứ",
+    "llm_output_unreadable": "Không đọc được phản hồi mô hình (JSON hỏng / LLM không phản hồi)",
+    "port_only_c2": "Chỉ có số cổng phi chuẩn làm bằng chứng, không có dấu hiệu C2 nào khác",
+    "social_engineering_suspected": "Nghi log bị chèn nội dung thuyết phục mô hình hạ cấp",
+    "tier1_hitl_threshold": "Tier-1 đạt ngưỡng cần người duyệt",
+}
+
+
+def hitl_reason_text(code: str) -> str:
+    """Diễn giải tiếng Việt của mã lý do; trả chính mã nếu chưa khai báo."""
+    return HITL_REASONS.get(code, code)
+
+
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 
 

@@ -504,6 +504,12 @@ def fetch_and_build(
     samples.extend(adversarial_samples)
     gt_counter += len(adversarial_samples)
 
+    # Thêm câu hỏi CÓ PAYLOAD THẬT (CSIC 2010) — phần DUY NHẤT của đề thi mà việc quy kết
+    # kỹ thuật là trả lời được về mặt bằng chứng. Xem docstring `_generate_csic_samples`.
+    csic_samples = _generate_csic_samples(gt_counter)
+    samples.extend(csic_samples)
+    gt_counter += len(csic_samples)
+
     if os.path.dirname(output_path):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
@@ -517,10 +523,18 @@ def fetch_and_build(
         print(f"  {label:<30} {count:>4} samples")
     print(f"  {'TOTAL':<30} {sum(dist.values()):>4} samples")
 
-    # Xác minh ngưỡng số lượng mẫu tối thiểu
+    # Xác minh ngưỡng số lượng mẫu tối thiểu.
+    # CHỈ áp cho lớp CICIDS — đó là phần được LẤY MẪU PHÂN TẦNG nên thiếu mẫu là dấu hiệu
+    # hỏng thật. Lớp CSIC đi theo phân bổ TỰ NHIÊN của bộ dữ liệu gốc (Path Traversal chỉ
+    # chiếm 194/25.065 bản ghi bất thường), ép nó đủ 20 mẫu là bóp méo phân bổ thật.
+    _csic_labels = {
+        str((s.get("input") or {}).get("cicids_label", ""))
+        for s in samples
+        if not (s.get("input") or {}).get("network_layer")
+    }
     fail = False
     for label, count in dist.items():
-        if label != "Adversarial" and count < min_per_label:
+        if label not in _csic_labels and label != "Adversarial" and count < min_per_label:
             print(f"[FAIL] Class '{label}' has only {count} samples — need ≥{min_per_label}")
             fail = True
     if not fail:
@@ -528,6 +542,104 @@ def fetch_and_build(
 
     # Đồng thời tạo tập kiểm thử đối địch riêng biệt
     _generate_adversarial_test_set()
+
+
+def _generate_csic_samples(
+    start_id: int, n_tech: int = 250, n_anom: int = 100, n_benign: int = 150
+) -> list:
+    """Thêm câu hỏi CÓ PAYLOAD THẬT (CSIC 2010) vào "đề thi".
+
+    VÌ SAO BẮT BUỘC. Toàn bộ 1.200 câu hỏi CICIDS của đề thi là NetFlow THUẦN: trường
+    `input.application_layer.payload_snippet` LUÔN là `None`. Nhưng đề vẫn hỏi
+    `expected_mitre_technique` và chấm — ví dụ 400 câu mang đáp án `T1499.002`. Bằng chứng
+    để suy ra kỹ thuật KHÔNG TỒN TẠI trong đầu vào, nên phần chấm QUY KẾT của đề cũ là một
+    câu hỏi không thể trả lời đúng bằng bất kỳ phương pháp nào — đó là lỗi của ĐỀ, không
+    phải của hệ thống.
+
+    CSIC 2010 bổ sung đúng lớp bằng chứng còn thiếu: request HTTP THẬT, có payload, có mã
+    ATT&CK suy ra được bằng bộ luật ĐỘC LẬP với chữ ký Tier-1 (`scripts/build_csic_dataset`).
+
+    KHÔNG đặt `input.network_layer`: `unified_dataset.build_stream()` quét trường đó để dựng
+    phần `cicids` của luồng, nên nếu đặt thì mỗi mẫu CSIC sẽ vào luồng HAI LẦN (một qua đây,
+    một qua `_build_csic`). Các script chấm đề đọc `logs`, không đọc `network_layer`.
+    """
+    path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "csic.json"
+    )
+    if not os.path.exists(path):
+        print(
+            f"[WARN] Không thấy {path} — bỏ qua phần CSIC. Chạy scripts/build_csic_dataset.py trước."
+        )
+        return []
+
+    with open(path, encoding="utf-8") as f:
+        rows = json.load(f)
+
+    tech, anom, benign = [], [], []
+    for r in rows:
+        lab = r.get("_label") or {}
+        if not lab.get("expected_threat"):
+            benign.append(r)
+        elif str(lab.get("wa_mitre") or "").strip():
+            tech.append(r)
+        else:
+            anom.append(r)
+
+    rng = random.Random(42)
+    rng.shuffle(tech)
+    rng.shuffle(anom)
+    rng.shuffle(benign)
+    chosen = tech[:n_tech] + anom[:n_anom] + benign[:n_benign]
+
+    samples = []
+    gt_counter = start_id
+    for r in chosen:
+        lab = r.get("_label") or {}
+        log = {k: v for k, v in r.items() if k != "_label"}
+        mitre = str(lab.get("wa_mitre") or "").strip()
+        is_attack = bool(lab.get("expected_threat"))
+        if mitre:
+            sev = "HIGH"
+        elif is_attack:
+            sev = "MEDIUM"
+        else:
+            sev = "INFO"
+        samples.append(
+            {
+                "id": f"GT-{gt_counter:03d}",
+                "description": f"CSIC 2010 HTTP request — {lab.get('gt_label', '')}",
+                "logs": [log],
+                # Mẫu bất thường KHÔNG suy được họ tấn công để TRỐNG mã kỹ thuật: vẫn chấm
+                # được PHÁT HIỆN, nhưng phải bị LOẠI khỏi phần chấm QUY KẾT. Thà trống còn
+                # hơn gán bừa một mã rồi lấy nó làm đáp án.
+                "expected_mitre_technique": mitre or None,
+                "expected_action": lab.get("wa_expected_action", "LOG"),
+                "expected_severity": sev,
+                "labeling_notes": (
+                    "CSIC 2010 chỉ gán nhãn normal/anomalous. Họ tấn công + mã ATT&CK do "
+                    "scripts/build_csic_dataset.py SUY RA bằng bộ luật viết độc lập với "
+                    "_WAF_PATTERNS của Tier-1 (tránh lập luận vòng tròn)."
+                ),
+                "input": {
+                    # CỐ Ý để trống — xem docstring.
+                    "network_layer": {},
+                    "application_layer": {
+                        "service": "HTTP",
+                        "payload_snippet": log.get("payload") or log.get("uri"),
+                        "user_agent": log.get("user_agent"),
+                    },
+                    "cicids_label": lab.get("gt_label", ""),
+                },
+            }
+        )
+        gt_counter += 1
+
+    n_t = sum(1 for s in samples if s["expected_mitre_technique"])
+    print(
+        f"[+] CSIC 2010: {len(samples)} câu hỏi CÓ PAYLOAD THẬT "
+        f"({n_t} chấm được QUY KẾT kỹ thuật, {len(samples) - n_t} chỉ chấm PHÁT HIỆN)"
+    )
+    return samples
 
 
 def _generate_adversarial_samples(start_id: int) -> list:

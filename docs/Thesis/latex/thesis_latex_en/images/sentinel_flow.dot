@@ -1,47 +1,83 @@
-// SENTINEL runtime execution flow (source of truth for Figure: sentinel_flow.png)
-// Render: dot -Tpng -Gdpi=200 sentinel_flow.dot -o sentinel_flow.png
+// SENTINEL - Two-Tier Execution Flowchart (Figure 1 - Large Font Size)
+// Render: dot -Tpng -Gdpi=300 sentinel_flow.dot -o sentinel_flow.png
+
 digraph sentinel_flow {
     rankdir=TB;
     bgcolor="white";
-    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12, margin="0.18,0.10"];
-    edge [fontname="Helvetica", fontsize=10, color="#444444"];
+    nodesep=0.55;
+    ranksep=0.6;
 
-    start    [label="Network Flow Ingested", shape=oval, fillcolor="#cfe8ff"];
-    rule     [label="TIER-1 Rule Engine\n(Whitelist | WAF & Injection signatures\n| Welford Z-Score, warmup 100)", fillcolor="#e8f5e9"];
-    sig      [label="Signature / Whitelist\nmatch?", shape=diamond, fillcolor="#fff3cd"];
-    fast     [label="Whitelist -> DROP\nWAF/SQLi/XSS -> BLOCK_IP", fillcolor="#f8d7da"];
-    score    [label="Risk score >= threshold?\n(static rules + Welford Z > 3.5 sigma)", shape=diamond, fillcolor="#fff3cd"];
-    benign   [label="DROP / LOG\n(write to decision log)", fillcolor="#e2e3e5"];
-    escalate [label="ESCALATE -> TIER-2", fillcolor="#cfe8ff"];
+    node [shape=box, style="rounded,filled", fontname="Arial Bold", fontsize=15, margin="0.25,0.18", penwidth=2.0];
+    edge [fontname="Arial Bold", fontsize=13, color="#1A252C", penwidth=1.8];
 
-    guard    [label="Guardrails\n(Drain template mining +\nnonce Delimited Encapsulation)", fillcolor="#e8f5e9"];
-    rag      [label="Dual-RAG retrieval (FAISS + BM25, RRF k=60)\nSemantic Cache + Threat Memory (APT chain)", fillcolor="#e8f5e9"];
-    triage   [label="LLM Triage\n(Gemma-2-9B-IT Q6_K, temp 0.1)\n-> single JSON verdict", fillcolor="#e8f5e9"];
-    valid    [label="DecisionValidator\n(BLOCK_IP needs conf >= 0.5;\nTier-1/Tier-2 consensus guard)", shape=diamond, fillcolor="#fff3cd"];
-    route    [label="Route by action", shape=diamond, fillcolor="#fff3cd"];
+    // Inputs
+    start    [label="Raw Network Telemetry Stream\n(NGFW, IDS/IPS, EDR -> Redis Stream)", shape=oval, fillcolor="#D6EAF8", color="#1B4F72", fontsize=16];
 
-    block    [label="BLOCK_IP / ALERT\n-> Action Executor (Firewall MOCK)\n+ PENDING rule for HITL", fillcolor="#f8d7da"];
-    hitl     [label="AWAIT_HITL\n-> Streamlit HITL queue", fillcolor="#ffe0b2"];
-    endlog   [label="LOG / DROP -> end cycle", fillcolor="#e2e3e5"];
+    // Tier 1 Group
+    subgraph cluster_tier1 {
+        label = "TIER 1: WIRE-SPEED FILTER & MACHINE LEARNING GATE";
+        style = "dashed,rounded";
+        color = "#1E8449";
+        bgcolor = "#EAFAF1";
+        fontname = "Arial Bold";
+        fontsize = 18;
+        fontcolor = "#145A32";
 
-    audit    [label="Write HMAC-chained audit record", fillcolor="#d1c4e9"];
-    done     [label="End Processing", shape=oval, fillcolor="#e2e3e5"];
+        t1_filter [label="Online Welford O(1) Statistical Filter\n(Online Z-Score Anomaly Calculation)", fillcolor="#A9DFBF", color="#1E8449"];
+        t1_cache  [label="Tier 1.75 Semantic Cache\n(RAM Payload Template Hash -> 1ms)", fillcolor="#A9DFBF", color="#1E8449"];
+        t1_mlgate [label="LightGBM Machine Learning Gate\n(Sub-0.35ms Inference, Anti-Evasion ±8σ)", fillcolor="#A9DFBF", color="#1E8449"];
+    }
 
-    start -> rule -> sig;
-    sig -> fast      [label="yes"];
-    sig -> score     [label="no"];
-    score -> benign  [label="no"];
-    score -> escalate[label="yes"];
+    t1_check  [label="Anomalous Event or\nRequires Inspection?", shape=diamond, fillcolor="#FCF3CF", color="#B7950B", fontsize=15];
+    t1_benign [label="Tier 1 Offload (> 80% Noise Shed)\n(Adjudication: LOG / Pass)", fillcolor="#D5D8DC", color="#4A235A", fontsize=15];
 
-    escalate -> guard -> rag -> triage -> valid -> route;
-    route -> block   [label="BLOCK_IP / ALERT"];
-    route -> hitl    [label="AWAIT_HITL"];
-    route -> endlog  [label="LOG / DROP"];
+    // Escalation
+    escalate  [label="ESCALATE ANOMALOUS TELEMETRY TO TIER 2", fillcolor="#AED6F1", color="#1B4F72", fontsize=16];
 
-    fast   -> audit;
-    block  -> audit;
-    hitl   -> audit;
-    benign -> done;
-    endlog -> done;
-    audit  -> done;
+    // Tier 2 Group
+    subgraph cluster_tier2 {
+        label = "TIER 2: COGNITIVE REASONING AGENT (LANGGRAPH AGENT)";
+        style = "dashed,rounded";
+        color = "#B03A2E";
+        bgcolor = "#FDEDEC";
+        fontname = "Arial Bold";
+        fontsize = 18;
+        fontcolor = "#641E16";
+
+        t2_guard [label="Guardrails & Security Encapsulation\n(Delimited Cryptographic Nonce + Token Miner)", fillcolor="#FADBD8", color="#B03A2E"];
+        t2_rag   [label="Dual-RAG (FAISS + BM25 RRF, k=60)\n+ Threat Memory (SQLite Reputation)", fillcolor="#FADBD8", color="#B03A2E"];
+        t2_llm   [label="Gemma-2-9B-IT Reasoning Engine\n(Quantized GGUF Q6_K via llama.cpp CUDA)", fillcolor="#FADBD8", color="#B03A2E"];
+        t2_valid [label="DecisionValidator & Deterministic Guardrails\n(Enforcing Pydantic LLMDecision Schema & Whitelist)", fillcolor="#FADBD8", color="#B03A2E"];
+    }
+
+    t2_action [label="Adjudication\nAction?", shape=diamond, fillcolor="#FCF3CF", color="#B7950B", fontsize=15];
+
+    // Actions
+    act_block [label="BLOCK_IP\n(Automated Execution of IP Block Rule)", fillcolor="#F9EBEA", color="#922B21", fontsize=16];
+    act_hitl  [label="AWAIT_HITL\n(Escalated to Streamlit Human Queue)", fillcolor="#FDEBD0", color="#B9770E", fontsize=16];
+    act_log   [label="LOG\n(Log Telemetry & Continuous Monitoring)", fillcolor="#E5E7E9", color="#5D6D7E", fontsize=16];
+
+    // Audit
+    hmac_audit [label="HMAC-SHA256 Cryptographic Audit Sealing\n(Tamper-Evident Non-Repudiation Log Chain)", fillcolor="#E8DAEF", color="#6C3483", fontsize=16];
+    end_node   [label="Pipeline Execution Complete", shape=oval, fillcolor="#E5E7E9", color="#283747", fontsize=15];
+
+    // Connections
+    start -> t1_filter;
+    t1_filter -> t1_cache -> t1_mlgate -> t1_check;
+    t1_check -> t1_benign [label=" No (Benign) "];
+    t1_check -> escalate  [label=" Yes (Anomalous) "];
+
+    escalate -> t2_guard;
+    t2_guard -> t2_rag -> t2_llm -> t2_valid -> t2_action;
+
+    t2_action -> act_block [label=" BLOCK_IP "];
+    t2_action -> act_hitl  [label=" AWAIT_HITL "];
+    t2_action -> act_log   [label=" LOG "];
+
+    act_block -> hmac_audit;
+    act_hitl  -> hmac_audit;
+    act_log   -> hmac_audit;
+    t1_benign -> hmac_audit;
+
+    hmac_audit -> end_node;
 }

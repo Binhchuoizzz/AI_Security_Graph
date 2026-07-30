@@ -54,3 +54,49 @@ def test_coverage_summary_is_consistent():
     assert s["total"] == len(_WAF_PATTERNS)
     assert s["mapped_to_crs"] + s["beyond_crs_scope"] == s["total"]
     assert s["mapped_to_crs"] > 0 and s["distinct_crs_files"] > 0
+
+
+# ==============================================================================
+# ÂM TÍNH GIẢ: DÙNG web shell đã trồng sẵn (khác với TRỒNG nó)
+# ==============================================================================
+#
+# Lỗi thật đo được trên luồng demo: mẫu WEB-WEB-029 (`POST /uploads/s.php`, thân `cmd=id`)
+# được Tier-1 chấm 0 điểm, 0 lý do -> hành động DROP. Vì DROP nên nó KHÔNG lên Tier-2 nữa:
+# một cuộc tấn công đi lọt TOÀN BỘ hệ thống mà không để lại dấu vết nào. Nguyên nhân: các
+# nhánh cũ của chữ ký "Web Shell / Code Execution" chỉ bắt lúc shell được TRỒNG (payload
+# chứa `<?php`, `eval(`, `system(`...), còn lúc kẻ tấn công GỌI shell đã nằm sẵn thì thân
+# yêu cầu không có một ký tự mã nào.
+
+
+def test_interacting_with_a_planted_web_shell_is_detected():
+    from src.tier1_filter.rule_engine import _WAF_PATTERNS
+
+    pat = _WAF_PATTERNS["Web Shell / Code Execution"]
+    for uri in (
+        "/uploads/s.php",
+        "POST /uploads/s.php",
+        "/files/x.jsp",
+        "/media/a.aspx",
+        "/temp/shell.phtml",  # noqa: S108 - chuỗi URI để khớp regex, không phải đường dẫn thật
+    ):
+        assert pat.search(uri), f"web shell đi lọt: {uri}"
+
+    # Vẫn phải bắt dạng TRỒNG shell như trước.
+    for planted in ("<?php system($_GET['c']); ?>", "eval(base64_decode($_POST['x']))"):
+        assert pat.search(planted), f"mất khả năng bắt cũ: {planted}"
+
+
+def test_web_shell_rule_does_not_fire_on_benign_static_assets():
+    """Chữ ký chỉ nhắm tệp THỰC THI ĐƯỢC trong thư mục tải lên — không phải mọi /uploads/."""
+    from src.tier1_filter.rule_engine import _WAF_PATTERNS
+
+    pat = _WAF_PATTERNS["Web Shell / Code Execution"]
+    for benign in (
+        "/uploads/photo.jpg",
+        "/files/report.pdf",
+        "/media/video.mp4",
+        "/images/logo.png",
+        "/static/app.js",
+        "/index.php",  # script ở gốc site là bình thường
+    ):
+        assert not pat.search(benign), f"dương tính giả: {benign}"

@@ -9,8 +9,10 @@ liệu đã trích trong luận văn); đây thuần là tổ chức lại code 
                    phân tầng ground_truth + MLflow.  -> results/ablation_results.json
   --mode bcde      Config B/C/D/E (Pure LLM / Welford+LLM / +dense-RAG / +hybrid-RAG)
                    trên 300 mẫu phân tầng.           -> results/ablation_bcde_results.json
-  --mode balanced  6 cấu hình A–F trên tập CÂN BẰNG 150/150 (benign thật để gate Welford
-                   có cơ hội DROP true-negative).    -> results/ablation_balanced_results.json
+  --mode balanced  6 cấu hình A–F trên tập CÂN BẰNG 1:1 (benign thật để gate Welford có cơ
+                   hội DROP true-negative). Cỡ mẫu SUY RA từ số benign sẵn có trong
+                   ground_truth (hiện là 80+80); warmup Welford lấy từ CICIDS thô held-out.
+                                                    -> results/ablation_balanced_results.json
   --mode mlgate    Config G — GIẢM TẢI LLM bằng Cổng ML (KHÔNG cần LLM). Đo bypass-rate +
                    F1 Cổng ML trên phần escalate.    -> results/ablation_mlgate_results.json
   --mode all       Chạy lần lượt af -> bcde -> balanced -> mlgate.
@@ -80,6 +82,26 @@ def stratified(dataset, limit):
     for _lbl, samples in by_label.items():
         selected.extend(samples[:per_class])
     return selected[:limit]
+
+
+def _print_action_confusion(action_scores: dict) -> None:
+    """In bảng chéo kỳ vọng × thực tế cho từng cấu hình.
+
+    `score_actions()` đã dựng sẵn ma trận này nhưng trước đây nó chỉ nằm im trong JSON.
+    Đây là thứ DUY NHẤT cho biết hệ sai KIỂU GÌ — vd "hoãn HITL trong khi lẽ ra phải chặn"
+    khác hẳn "chặn nhầm log lành tính", dù cả hai chỉ làm tụt cùng một con số accuracy.
+    """
+    for cfg, sc in action_scores.items():
+        conf = sc.get("confusion") or {}
+        if not conf:
+            continue
+        actual_labels = sorted({a for row in conf.values() for a in row})
+        print(f"\n  Bảng chéo hành động — {cfg}  (hàng = KỲ VỌNG, cột = THỰC TẾ)")
+        print("    " + f"{'kỳ vọng':>12}" + "".join(f"{a:>13}" for a in actual_labels))
+        for exp_a in sorted(conf):
+            row = conf[exp_a]
+            cells = "".join(f"{row.get(a, 0):>13}" for a in actual_labels)
+            print("    " + f"{exp_a:>12}" + cells)
 
 
 def _fresh_engine() -> RuleEngine:
@@ -317,6 +339,10 @@ def run_af(limit=None, out=None):
                 "narrative_summary": "",
                 "decisions": [],
                 "escalated_to_llm": needs_llm,
+                # LOG ĐẦU VÀO đại diện — bắt buộc để `evaluate_reasoning.py` chấm được
+                # NEO BẰNG CHỨNG (đối chiếu `field=value` trong lập luận với giá trị THẬT).
+                # Không có nó thì không phân biệt được model TRÍCH số từ log hay BỊA ra.
+                "log": logs[0] if logs else {},
             }
 
             if needs_llm:
@@ -373,6 +399,28 @@ def run_af(limit=None, out=None):
         results["expected_actions"] = expected_actions
         results["action_scores"] = action_scores
 
+        # ── CẢNH BÁO BASE-RATE gắn thẳng vào kết quả ─────────────────────────────────
+        # Tập ground_truth phân tầng thiên TẤN CÔNG rất nặng. Trên đó, một hàm
+        # `return True` cũng đạt F1 xấp xỉ base rate — nên F1 nhị phân ở chế độ này KHÔNG
+        # đo được năng lực, và chính nó là nguồn gốc con số "0,967" từng bị trích như một
+        # thành tích. Gắn cờ vào JSON để người đọc kết quả (và người viết luận văn) thấy
+        # ngay, thay vì phải nhớ cảnh báo nằm ở một tài liệu khác.
+        _y = results["Config_A"]["y_true"]
+        _rate = round(sum(_y) / len(_y), 4) if _y else 0.0
+        results["metric_health"] = {
+            "attack_base_rate": _rate,
+            "is_base_rate_artifact": _rate >= 0.85,
+            "binary_f1_trustworthy": _rate < 0.85,
+            "primary_metric": "action_scores.action_accuracy + autonomous_precision",
+            "warning": (
+                "Tập này thiên tấn công nặng: F1/Accuracy nhị phân xấp xỉ base rate nên "
+                "KHÔNG phân biệt được cấu hình. Dùng chấm-theo-hành-động làm thước đo "
+                "chính; muốn so độ chính xác thì chạy `--mode balanced`."
+            )
+            if _rate >= 0.85
+            else "",
+        }
+
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "w") as f:
             json.dump(results, f, indent=2)
@@ -393,6 +441,18 @@ def run_af(limit=None, out=None):
             mlflow.log_metric(f"{cfg}_AutonomyRate", float(sc["autonomy_rate"]))
             if sc["autonomous_precision"] is not None:
                 mlflow.log_metric(f"{cfg}_AutonomousPrecision", float(sc["autonomous_precision"]))
+        if results["metric_health"]["is_base_rate_artifact"]:
+            print(
+                f"\n[!] CẢNH BÁO BASE-RATE: tập này {results['metric_health']['attack_base_rate']:.1%} "
+                f"tấn công -> F1/Accuracy nhị phân xấp xỉ base rate, KHÔNG phân biệt được\n"
+                f"    cấu hình. Dùng bảng chấm-theo-hành-động ở trên; so độ chính xác thì "
+                f"chạy `--mode balanced`."
+            )
+
+        # ── BẢNG CHÉO 4 LỚP HÀNH ĐỘNG — hệ sai KIỂU GÌ, không chỉ sai bao nhiêu ──────
+        # `score_actions` đã dựng sẵn ma trận này nhưng trước đây chỉ nằm im trong JSON.
+        _print_action_confusion(action_scores)
+
         _ap_a = action_scores["Config_A"].get("autonomous_precision")
         _ap_f = action_scores["Config_F"].get("autonomous_precision")
         print(
@@ -558,25 +618,103 @@ def run_bcde(limit=300, out=None):
 # =========================================================================
 # MODE: balanced  — 6 cấu hình A–F trên tập CÂN BẰNG 150/150
 # =========================================================================
+def _raw_benign_warmup_logs(n: int, exclude: list) -> list[dict]:
+    """Nạp `n` flow benign THẬT từ CSV CICIDS thô để warmup Welford, LOẠI TRỪ mọi flow đã
+    có trong tập chấm (đối chiếu bằng chữ ký đặc trưng).
+
+    Vì sao không dùng golden baseline: `_fresh_engine()` CỐ Ý xoá Welford để ablation là
+    thí nghiệm đối chứng độc lập. Vì sao không cắt đôi benign của ground_truth: chỉ có 80
+    mẫu, cắt đôi thì tập chấm còn 40/40 và McNemar mất gần hết lực kiểm định. CSV thô cho
+    warmup dồi dào mà vẫn held-out.
+
+    Trả [] nếu không có dữ liệu thô -> caller suy biến sang cắt đôi ground_truth.
+    """
+    cic_dir = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "raw", "cicids2018"
+    )
+    if not os.path.isdir(cic_dir):
+        return []
+    csvs = sorted(f for f in os.listdir(cic_dir) if f.endswith(".csv"))
+    if not csvs:
+        return []
+
+    from experiments.build_golden_baseline import _flow_signature
+    from experiments.unified_dataset import map_cicids
+
+    excluded_sigs = set()
+    for s in exclude:
+        for log in s.get("logs", []) or []:
+            if isinstance(log, dict):
+                excluded_sigs.add(_flow_signature(log))
+
+    try:
+        import pandas as pd
+
+        out: list[dict] = []
+        for csv_name in csvs:
+            if len(out) >= n:
+                break
+            df = pd.read_csv(os.path.join(cic_dir, csv_name), nrows=20_000, low_memory=False)
+            df.rename(columns=lambda c: str(c).strip(), inplace=True)
+            label_col = next((c for c in df.columns if c.lower() == "label"), None)
+            if label_col is None:
+                continue
+            benign_rows = df[df[label_col].astype(str).str.strip().str.lower() == "benign"]
+            for row in benign_rows.to_dict("records"):
+                if len(out) >= n:
+                    break
+                log = map_cicids(row)
+                if _flow_signature(log) in excluded_sigs:
+                    continue  # trùng tập chấm -> rò rỉ, bỏ
+                out.append(log)
+        return out
+    except Exception as e:
+        print(f"[!] Không nạp được warmup benign từ CSV thô ({e}) -> suy biến sang ground_truth.")
+        return []
+
+
 def balanced_subset(dataset):
-    """Trả về (subset, warmup_logs): 150 benign + 150 attack; 150 benign held-out cho warmup."""
+    """Trả về (subset, warmup_logs): tập CHẤM cân bằng benign==attack + warmup held-out.
+
+    LỖI ĐÃ SỬA (2026-07-27): bản cũ hard-code `benign[:150]` và `benign[150:300]` trong khi
+    `ground_truth.json` chỉ có **80** mẫu benign. Hệ quả kép, cả hai đều âm thầm:
+      1. Tập "cân bằng" thực ra là 80 benign + 150 attack (35% benign) — KHÔNG cân bằng,
+         đúng thứ mà chế độ này sinh ra để tránh.
+      2. `benign[150:300]` bắt đầu NGOÀI mảng nên luôn trả [] -> warmup 0 flow, tức Welford
+         chưa bao giờ ấm trong suốt ablation "cân bằng", trái với mô tả trong luận văn.
+    Nay cỡ mẫu SUY RA TỪ dữ liệu thật: chia đôi benign sẵn có thành phần CHẤM và phần
+    WARMUP held-out, rồi lấy đúng bấy nhiêu attack để hai lớp bằng nhau.
+    """
     benign = [s for s in dataset if s["expected_action"] == "LOG"]
     attack = [s for s in dataset if s["expected_action"] in ("BLOCK_IP", "ALERT", "AWAIT_HITL")]
 
+    # Warmup ƯU TIÊN lấy từ CICIDS THÔ: held-out theo CẤU TẠO (khác nguồn dòng với
+    # ground_truth, lại còn loại trừ theo chữ ký) nên KHÔNG phải hy sinh mẫu benign của
+    # tập chấm. Chỉ khi không có CSV thô mới chia đôi benign — đánh đổi cỡ mẫu lấy warmup.
+    warmup_logs = _raw_benign_warmup_logs(n=150, exclude=benign)
+    if warmup_logs:
+        n_benign_score = min(N_BENIGN, len(benign))
+        warmup_benign: list = []
+    else:
+        n_benign_score = min(N_BENIGN, len(benign) // 2)
+        warmup_benign = benign[n_benign_score:]
+    benign_sel = benign[:n_benign_score]
+
+    # Attack lấy PHÂN TẦNG đều theo lớp, đúng bằng số benign -> cân bằng THẬT 1:1.
+    n_attack = min(N_ATTACK, n_benign_score)
     by_label = {}
     for s in attack:
         lbl = s["input"].get("cicids_label", "unknown")
         by_label.setdefault(lbl, []).append(s)
     num_classes = len(by_label)
-    per_class = max(1, (N_ATTACK + num_classes - 1) // num_classes)
+    per_class = max(1, (n_attack + num_classes - 1) // num_classes)
     attack_sel = []
     for _lbl, samples in by_label.items():
         attack_sel.extend(samples[:per_class])
-    attack_sel = attack_sel[:N_ATTACK]
+    attack_sel = attack_sel[:n_attack]
 
-    benign_sel = benign[:N_BENIGN]
-    warmup_benign = benign[N_BENIGN : N_BENIGN + 150]
-    warmup_logs = [log for s in warmup_benign for log in s.get("logs", [])]
+    if not warmup_logs:
+        warmup_logs = [log for s in warmup_benign for log in s.get("logs", [])]
     return benign_sel + attack_sel, warmup_logs
 
 
@@ -586,6 +724,19 @@ def run_balanced(out=None):
     n_b = sum(1 for s in dataset if s["expected_action"] == "LOG")
     n_a = len(dataset) - n_b
     print(f"[*] Ablation CÂN BẰNG: {len(dataset)} mẫu ({n_b} benign + {n_a} attack)")
+
+    # Chốt tính chất, không phải kiểm tra phòng thủ: nếu hai lớp lệch hoặc warmup rỗng thì
+    # con số sinh ra KHÔNG còn là thứ luận văn mô tả — thà dừng còn hơn báo cáo sai lặng lẽ.
+    if n_b != n_a:
+        raise SystemExit(
+            f"[!] Tập 'cân bằng' bị lệch: {n_b} benign vs {n_a} attack. Kiểm tra "
+            f"balanced_subset() / cỡ ground_truth trước khi trích số vào luận văn."
+        )
+    if not warmup_logs:
+        raise SystemExit(
+            "[!] Warmup benign RỖNG -> Welford không bao giờ ấm, Z-score không bao giờ bật. "
+            "Kết quả sẽ chỉ phản ánh luật tĩnh, KHÔNG phải cấu hình được mô tả."
+        )
 
     rule_engine = _fresh_engine()
     print(f"[*] Warmup baseline Welford trên {len(warmup_logs)} flow benign THẬT (held-out)...")
@@ -736,9 +887,6 @@ def run_mlgate(limit=None, out=None):
     if not gw.pipeline:
         print("[-] Không nạp được Cổng ML — bỏ mode mlgate.")
         return
-    LLM_MS = 5000.0  # ~1 lượt LLM (tham chiếu latency_benchmark)
-    ML_MS = 0.3  # ~1 lượt Cổng ML
-
     n = n_escalated = n_bypass = 0
     yt, yp = [], []
     print(f"[*] Chạy Config G (ML offload) trên {len(dataset)} mẫu (không gọi LLM)…")
@@ -763,10 +911,14 @@ def run_mlgate(limit=None, out=None):
     f1 = float(f1_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
     prec = float(precision_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
     rec = float(recall_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
-    t_no_ml = n_escalated * LLM_MS
-    t_ml = n_bypass * ML_MS + (n_escalated - n_bypass) * LLM_MS
-    saved_pct = (1 - t_ml / t_no_ml) * 100 if t_no_ml else 0.0
-
+    # ĐÃ GỠ `projected_latency_saved_pct` (+ ref_llm_ms/ref_ml_ms/projected_llm_calls_saved).
+    # Lý do: nó KHÔNG phải phép đo. Công thức là `bypass_rate` nhân với hai HẰNG SỐ GIẢ ĐỊNH
+    # cứng trong mã (LLM 5000 ms, ML 0,3 ms), nên con số ~80% chỉ là cách viết lại
+    # `ml_bypass_rate` dưới đơn vị thời gian. Nguy hiểm ở chỗ nó nằm ngay cạnh một con số
+    # ĐO THẬT rất giống (`latency_benchmark.json`, giảm ~83%) — người đọc không có cách nào
+    # phân biệt cái nào đo, cái nào giả định. Cần tuyên bố về độ trễ thì trích
+    # `measure_latency_baseline.py`. `projected_llm_calls_saved` cũng bị gỡ vì trùng khít
+    # `n_ml_bypass` — một con số thì chỉ nên có MỘT cái tên.
     result = {
         "dataset_size": n,
         "n_escalated_would_call_llm": n_escalated,
@@ -775,19 +927,19 @@ def run_mlgate(limit=None, out=None):
         "ml_f1_on_bypass": round(f1, 4),
         "ml_precision_on_bypass": round(prec, 4),
         "ml_recall_on_bypass": round(rec, 4),
-        "projected_llm_calls_saved": n_bypass,
-        "projected_latency_saved_pct": round(saved_pct, 2),
-        "ref_llm_ms": LLM_MS,
-        "ref_ml_ms": ML_MS,
-        "note": "Config G đo GIẢM TẢI LLM của Cổng ML; latency là CHIẾU từ tham chiếu, không đo mới.",
+        "note": (
+            "Config G đo GIẢM TẢI LLM của Cổng ML (tỉ lệ ca Cổng ML tự quyết). "
+            "Tuyên bố về ĐỘ TRỄ phải trích latency_benchmark.json — nơi độ trễ được ĐO, "
+            "không phải chiếu từ hằng số giả định."
+        ),
     }
     os.makedirs(RESULTS_DIR, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     print(
         f"[+] Config G: escalate={n_escalated} | ML bypass={n_bypass} "
-        f"({bypass_rate:.1%}) | F1(bypass)={f1:.4f} P={prec:.4f} R={rec:.4f} | "
-        f"tiết kiệm LLM≈{saved_pct:.1f}%\n[+] JSON: {out_path}"
+        f"({bypass_rate:.1%}) | F1(bypass)={f1:.4f} P={prec:.4f} R={rec:.4f}"
+        f"\n[+] JSON: {out_path}"
     )
     return result
 
@@ -800,6 +952,14 @@ if __name__ == "__main__":
     ap.add_argument("--limit", type=int, default=None, help="Giới hạn số mẫu (af/bcde)")
     ap.add_argument("--out", type=str, default=None, help="Ghi đè path output (chỉ khi 1 mode)")
     args = ap.parse_args()
+
+    # ĐÓNG BĂNG việc SINH luật động trong suốt lượt đo. Bắt buộc, không phải tuỳ chọn:
+    # `run_af` dùng CHUNG một `rule_engine` cho Config A và Config F, nên luật do tác tử của
+    # F sinh ra sẽ có hiệu lực ngay với A ở mẫu kế tiếp — baseline được chính treatment nâng
+    # đỡ, và delta A->F nói giảm đóng góp của Tầng 2. Xem chú thích dài ở
+    # `feedback_listener.receive_new_rule`. Đặt TRƯỚC mọi import chạm tới engine.
+    os.environ["SENTINEL_FREEZE_DYNAMIC_RULES"] = "1"
+    print("[*] Luật động: ĐÓNG BĂNG trong lượt đo (chống nhiễm baseline + để tái lập được).")
 
     if args.out and args.mode == "all":
         ap.error("--out chỉ dùng khi chạy 1 mode (af|bcde|balanced), không dùng với 'all'.")

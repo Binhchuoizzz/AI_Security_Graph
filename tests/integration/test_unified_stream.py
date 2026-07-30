@@ -142,6 +142,97 @@ def test_online_publisher_enriches_and_routes():
     assert zd_meta == zd_total and zd_total >= 1
 
 
+def test_every_attack_source_carries_ground_truth_label():
+    """Mọi nguồn TẤN CÔNG phải mang `expected_threat` — thống kê đếm bằng cờ này.
+
+    HỒI QUY: `enrich()` từng gắn cờ cho nguồn biên soạn nhưng QUÊN `zeroday` và
+    `adversarial`, dù cả hai là tấn công theo định nghĩa. Hệ quả: mọi phép đếm dùng
+    `expected_threat` (gồm dòng báo cáo phân bổ của `build_demo.py`) bỏ sót trọn hai nhóm,
+    khiến tỉ lệ tấn công của luồng demo bị báo THẤP HƠN thực tế.
+    """
+    samples = {
+        "zeroday": {"source": "zeroday", "id": "ZD-001", "mitre": "T1048", "name": "x", "log": {}},
+        "adversarial": {"source": "adversarial", "id": "ADV-001", "mitre": "T1190", "log": {}},
+    }
+    for src, ev in samples.items():
+        log = enrich(ev)
+        assert log.get("expected_threat") is True, f"nguồn '{src}' thiếu cờ expected_threat"
+        assert log.get("gt_label") == "Attack", f"nguồn '{src}' thiếu nhãn gt_label"
+
+    # `csic` THAY hai nguồn biên soạn đã gỡ. Nó khác ở chỗ mang CẢ tấn công LẪN lành tính
+    # (bộ CSIC gán nhãn normal/anomalous), và `gt_label` giữ TÊN HỌ tấn công thay vì chuỗi
+    # phẳng "Attack" — nên phải canh riêng, không gộp vào vòng lặp trên.
+    csic_atk = enrich(
+        {
+            "source": "csic",
+            "id": "CSIC-00001",
+            "mitre": "T1190",
+            "label": "SQL Injection",
+            "expected_threat": True,
+            "log": {"uri": "/x?id=1'+OR+1=1--"},
+        }
+    )
+    assert csic_atk.get("expected_threat") is True
+    assert csic_atk.get("gt_label") == "SQL Injection"
+    csic_ok = enrich(
+        {
+            "source": "csic",
+            "id": "CSIC-00002",
+            "mitre": "",
+            "label": "Benign",
+            "expected_threat": False,
+            "log": {"uri": "/index.jsp"},
+        }
+    )
+    assert csic_ok.get("expected_threat") is False, "CSIC lành tính KHÔNG được gắn cờ tấn công"
+
+
+def test_synthesized_ip_pools_are_disjoint_by_label():
+    """IP TỔNG HỢP của CICIDS/DAPT-volume: dải tấn công và dải benign phải RỜI NHAU.
+
+    HỒI QUY (đo được trên luồng demo cũ): IP gán theo `192.168.{ngày}.{i % 254}` với `i`
+    chạy trên khung đã nối tấn công-rồi-benign, nên cùng một IP quay vòng bất kể nhãn —
+    2.159/2.286 IP "tấn công" của `cicids_max` đồng thời là IP lành tính, và 83,6% sự kiện
+    benign của toàn luồng đến từ một IP từng tấn công. Điều đó vừa làm mọi phép đo MỨC IP
+    trở nên vô nghĩa, vừa khiến cơ chế chặn-theo-uy-tín dựng lên một thác báo động giả
+    thuần tuý do cách đánh số.
+
+    `dapt` (chuỗi APT) CỐ Ý nằm ngoài kiểm tra này: nó dùng IP THẬT của DAPT2020, nơi một
+    host bị chiếm quyền gửi cả lưu lượng lành lẫn tấn công — đó là hành vi thật và chính
+    là thứ mà liên kết chiến dịch phải bắt được.
+    """
+    warmup, main, _apt, _n = build_stream()
+    by_source: dict[str, dict[bool, set]] = {}
+    for ev in list(warmup) + list(main):
+        src = ev.get("source", "")
+        if src not in ("cicids_max", "dapt_max"):
+            continue
+        ip = ev["log"].get("Source IP")
+        if not ip:
+            continue
+        by_source.setdefault(src, {True: set(), False: set()})
+        by_source[src][bool(ev.get("expected_threat"))].add(ip)
+
+    assert by_source, "luồng không có nguồn khối lượng — build_stream có thể hỏng"
+    for src, pools in by_source.items():
+        overlap = pools[True] & pools[False]
+        assert not overlap, (
+            f"nguồn {src!r}: {len(overlap)} IP vừa tấn công vừa lành tính "
+            f"(ví dụ {sorted(overlap)[:3]}). Gán IP phải tách theo nhãn."
+        )
+
+
+def test_adversarial_id_is_populated():
+    """HỒI QUY: `adv_id` từng LUÔN rỗng vì đọc `ev['log']['gt_id']` — khoá không tồn tại.
+
+    Định danh nằm ở `ev['id']`. Không có nó thì không truy vết được mẫu đối kháng nào đã
+    gây ra phán quyết nào — mất khả năng hậu kiểm chính bộ đối kháng.
+    """
+    log = enrich({"source": "adversarial", "id": "ADV-003", "mitre": "T1059", "log": {}})
+    assert log["adv_id"] == "ADV-003"
+    assert log["adv_mitre"] == "T1059"
+
+
 def test_online_apt_recording_contract_matches_subscriber():
     """Mô phỏng đúng nhánh subscriber: ghi từng sự kiện DAPT-attack (mang metadata)
     của một IP vào bộ nhớ SẠCH theo thứ tự luồng -> bản án APT phải NỔI LÊN đúng

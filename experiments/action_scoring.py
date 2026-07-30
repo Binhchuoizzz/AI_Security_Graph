@@ -70,9 +70,29 @@ def score_actions(expected: list, actual: list) -> dict:
         confusion.setdefault(e, {}).setdefault(a, 0)
         confusion[e][a] += 1
 
+    # KHOẢNG TIN CẬY cho thước đo chính. Ablation cân bằng chỉ có n~160, nên chênh lệch
+    # vài phần nghìn giữa hai cấu hình HOÀN TOÀN có thể là nhiễu lấy mẫu. Không có CI thì
+    # không được phép nói "C tốt hơn A". Import cục bộ để module giữ nguyên tính thuần
+    # (không phụ thuộc lúc nạp) — `metrics_core` cũng thuần nên không có vòng lặp import.
+    from experiments.metrics_core import bootstrap_ci, wilson_ci
+
+    pairs = list(zip(exp, act, strict=False))
+    acc_ci = wilson_ci(correct, n)
+    autoprec_ci = (
+        bootstrap_ci(
+            [p for p in pairs if p[1] in TERMINAL_ACTIONS],
+            lambda s: sum(1 for e, a in s if e == a) / len(s),
+            seed=42,
+        )
+        if n_terminal
+        else None
+    )
+
     return {
         "n": n,
         "action_accuracy": round(correct / n, 4),
+        "action_accuracy_ci95": list(acc_ci),
+        "autonomous_precision_ci95": list(autoprec_ci) if autoprec_ci else None,
         "autonomy_rate": round(n_terminal / n, 4),
         "defer_rate": round(n_defer / n, 4),
         "unresolved_rate": round(n_unres / n, 4),

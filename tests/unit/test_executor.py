@@ -98,7 +98,12 @@ def test_audit_trail_integrity_verification():
 
     is_valid, msg = verify_audit_trail_integrity()
     assert is_valid is True
-    assert "toàn vẹn" in msg.lower() or "integrity" in msg.lower()
+    # Thông điệp phải PHẢN ÁNH mức bảo đảm thật: khi ký bằng khóa mặc định công khai thì
+    # đây chỉ là kiểm tra tính nhất quán, chưa phải bằng chứng chống giả mạo có chủ đích.
+    if executor.audit_key_is_default():
+        assert "khóa mặc định" in msg.lower(), "phải cảnh báo khóa mặc định, không nói quá"
+    else:
+        assert "toàn vẹn" in msg.lower() or "integrity" in msg.lower()
 
     # Tamper with the database manually to simulate log tampering
     with sqlite3.connect(executor.DB_PATH) as conn:

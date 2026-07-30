@@ -36,6 +36,11 @@ log "=== FULL ABLATION RUN $TS ===  log=$LOG"
 
 # ── 0) Dựng benchmark 4-luồng mới nhất ──────────────────────────────────────
 run "build_datatest (benchmark 4-luồng)" $PY scripts/build_datatest.py
+# Baseline Welford PHẢI dựng lại sau khi dataset đổi: golden_baseline.json seed trạng thái
+# (n, mean, M2) cho Tier-1; giữ baseline cũ trên dataset mới thì ngưỡng Z-score lệch pha với
+# phân phối dữ liệu, và mọi số zero-day/threshold phía sau đều sai theo. Bước này TRƯỚC ĐÂY
+# không có trong runner nên "chạy full" vẫn dùng baseline cũ.
+run "build_golden_baseline (seed Welford)" $PY experiments/build_golden_baseline.py
 
 # ── 1) OFFLINE (không cần LLM) ──────────────────────────────────────────────
 run "evaluate_ml_gate (Cổng ML, datatest)"          $PY experiments/evaluate_ml_gate.py
@@ -43,6 +48,19 @@ run "run_ablation --mode mlgate (Config G offload)" $PY experiments/run_ablation
 run "evaluate_unified_stream (Tier-1 + APT + zero)" $PY experiments/evaluate_unified_stream.py
 run "run_zeroday_graded (Welford sweep)"            $PY experiments/run_zeroday_graded.py
 run "run_threshold_sensitivity (Welford τ)"         $PY experiments/run_threshold_sensitivity.py
+# Bốn bài OFFLINE dưới đây có tệp kết quả trong experiments/results/ nhưng TRƯỚC ĐÂY không
+# nằm trong runner -> mỗi lần "chạy full" chúng vẫn giữ số CŨ, lệch pha với phần còn lại.
+run "run_apt_negative_control (đối chứng âm APT)"   $PY experiments/run_apt_negative_control.py
+run "run_context_stress (quá tải ngữ cảnh)"         $PY experiments/run_context_stress.py
+run "audit_tier_capability (năng lực 3 tầng)"       $PY experiments/audit_tier_capability.py --no-llm
+# Bộ 69 web-attack TỰ SOẠN đã bị GỠ HẲN. Quy kết kỹ thuật nay đo trên phần CSIC 2010
+# (request HTTP THẬT) nằm trong chính experiments/ground_truth.json, tách ra bằng cờ
+# --evidence-layer payload. KHÔNG bỏ cờ đó: phần CICIDS của đề là NetFlow thuần, không có
+# một ký tự payload, nên "kỹ thuật kỳ vọng" của nó không suy ra được từ đầu vào — trộn vào
+# sẽ kéo tụt chỉ số vì lý do không liên quan tới năng lực hệ thống.
+WEBATK=experiments/ground_truth.json
+LAYER="--evidence-layer payload"
+run "eval_attack_mapper --mode rrf (quy kết RRF)"   $PY scripts/eval_attack_mapper.py --mode rrf --ground-truth "$WEBATK" $LAYER --tag csic_payload_rrf
 
 # ── 2) Preflight LLM ────────────────────────────────────────────────────────
 if [ "$OFFLINE_ONLY" = "1" ]; then
@@ -69,6 +87,10 @@ run "run_ablation --mode af (Config A + F, full pipeline)" $PY experiments/run_a
 run "evaluate_reasoning (LLM-Judge Coherence/Accuracy)"    $PY experiments/evaluate_reasoning.py
 run "evaluate_tier2_decision (agent trên ca escalate)"     $PY experiments/evaluate_tier2_decision.py
 run "evaluate_adversarial (kháng guardrail Tier-2)"        $PY experiments/evaluate_adversarial.py
+run "measure_latency_baseline (độ trễ đầu-cuối)"           $PY experiments/measure_latency_baseline.py
+run "run_llm_robustness (kháng nhiễu prompt)"              $PY experiments/run_llm_robustness.py
+run "audit_tier_capability (đủ 3 tầng, CÓ LLM)"            $PY experiments/audit_tier_capability.py
+run "eval_attack_mapper --mode e2e (quy kết đầu-cuối)"     $PY scripts/eval_attack_mapper.py --mode e2e --ground-truth "$WEBATK" $LAYER --tag csic_payload_e2e
 run "run_ablation --mode balanced (A–F, 150/150) [BONUS]"  $PY experiments/run_ablation.py --mode balanced
 run "run_ablation --mode bcde (Config B–E) [BONUS]"        $PY experiments/run_ablation.py --mode bcde --limit "$BCDE_LIMIT"
 

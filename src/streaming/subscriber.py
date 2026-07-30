@@ -52,36 +52,45 @@ REDIS_URL = os.getenv("REDIS_URL", _config.get("redis", {}).get("url", "redis://
 QUEUES = _config.get("redis", {}).get("queues", ["queue_firewall", "queue_waf", "queue_sysmon"])
 ESCALATED_QUEUE = _config.get("redis", {}).get("escalated_queue", "queue_hitl")
 
-# Các khóa NHÃN DATASET (mang "đáp án" ground-truth / DAPT / zero-day) — phải LOẠI
-# khỏi log TRƯỚC khi đưa lên Agent/LLM, nếu không prompt sẽ bị lộ đáp án (label
-# leakage) làm mất giá trị demo online. GIỮ `gt_id` (định danh mờ, phục vụ đối
-# chiếu hậu kiểm) và các trường tier1_*/apt_emergent/apt_phases (enrichment do
-# HỆ THỐNG tự suy ra — tương đương SIEM context thật, không phải đáp án).
+# Các khóa NHÃN DATASET (mang "đáp án" ground-truth / DAPT / zero-day / gray-zone /
+# adversarial) — phải LOẠI khỏi log TRƯỚC khi đưa lên Agent/LLM, nếu không prompt sẽ bị
+# lộ đáp án (label leakage) làm mất giá trị demo online.
+#
+# LỌC THEO TIỀN TỐ, KHÔNG theo danh sách đen thủ công. Bản trước liệt kê tay từng khoá và
+# đã sót đúng những nguồn thêm sau: `gz_mitre` (đáp án MITRE nguyên văn), `adv_id`/
+# `adv_source`, và `unified_source` (tự khai 'zeroday'/'adversarial'/'grayzone'). Mỗi lần
+# thêm một nguồn dữ liệu là một lần danh sách đen lặng lẽ hở. Quy tắc tiền tố đóng lỗ đó:
+# mọi khoá do BỘ DỰNG DỮ LIỆU gắn đều mang tiền tố nguồn, nên mặc định bị loại; thứ nào
+# cần giữ phải được ghi TƯỜNG MINH vào _LABEL_KEY_ALLOW.
+_LABEL_KEY_PREFIXES = ("gt_", "zd_", "adv_", "gz_", "apt_", "wa_")
+
+# Ngoại lệ CÓ CHỦ ĐÍCH — không phải đáp án:
+#   gt_id            : định danh mờ (GT-001), phục vụ đối chiếu hậu kiểm, không nói nhãn.
+#   apt_emergent /   : do HỆ THỐNG tự suy ra từ Threat Memory (tương đương SIEM context
+#   apt_phases         thật), KHÔNG đọc từ dataset -> giữ lại mới đúng ngữ nghĩa vận hành.
+_LABEL_KEY_ALLOW = frozenset({"gt_id", "apt_emergent", "apt_phases"})
+
+# Khoá nhãn KHÔNG mang tiền tố nguồn -> phải liệt kê tay.
 _DATASET_LABEL_KEYS = frozenset(
     {
-        "gt_cicids_label",
-        "gt_expected_action",
-        "gt_expected_severity",
-        "gt_expected_mitre",
-        "gt_label",
         "expected_threat",
-        "apt_phase",
-        "apt_day",
-        "apt_label",
-        "apt_timestamp",
-        "apt_is_attack",
-        "apt_mitre_ttp",  # TTP THẬT của DAPT2020 = nhãn -> LOẠI khỏi prompt LLM (chống lộ đáp
-        # án ở luồng chung/benchmark). Tín hiệu demo có chủ đích đi qua `message` (demo_signals).
-        "zd_id",
-        "zd_name",
-        "zd_mitre",
+        "unified_source",  # tự khai nguồn ('zeroday'/'adversarial'/'grayzone') = lộ đáp án
+        "dataset_source",
+        "label",
+        "Label",
     }
 )
 
 
+def _is_dataset_label_key(key: str) -> bool:
+    if key in _LABEL_KEY_ALLOW:
+        return False
+    return key in _DATASET_LABEL_KEYS or key.startswith(_LABEL_KEY_PREFIXES)
+
+
 def _strip_dataset_labels(log: dict) -> dict:
     """Bản sao log KHÔNG còn nhãn dataset — an toàn để đưa vào prompt LLM."""
-    return {k: v for k, v in log.items() if k not in _DATASET_LABEL_KEYS}
+    return {k: v for k, v in log.items() if not _is_dataset_label_key(k)}
 
 
 def _redact_redis_url(url: str) -> str:
@@ -90,6 +99,61 @@ def _redact_redis_url(url: str) -> str:
     Mật khẩu Redis CHỈ được sống trong .env — không bao giờ để rò ra stdout/journald.
     """
     return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
+
+
+# ── PHÂN BỔ GIẢM TẢI: cơ chế NÀO đã chặn sự kiện này? ────────────────────────
+# VÌ SAO CẦN. Trước đây chỉ có `tier1_dropped_total` — biết "bao nhiêu bị chặn" nhưng KHÔNG
+# biết "chặn bởi cái gì". Sự kiện dừng ở Tier-1 không sinh dòng `tier2_trace.jsonl` nào, nên
+# hậu kiểm mù hoàn toàn. Hệ quả thực tế: không trả lời được câu "đẩy lần 2 có nhẹ hơn lần 1
+# không, nhờ cơ chế nào" — đúng câu hỏi mà cả kiến trúc 'nhớ mặt' sinh ra để trả lời.
+#
+# Gom về MỘT bảng dấu hiệu duy nhất thay vì rải chuỗi khắp nơi (bài học ML_GATE_MARKERS:
+# chuỗi trùng lặp ở nhiều tệp thì sửa một chỗ là lệch chỗ còn lại).
+#
+# THỨ TỰ CÓ Ý NGHĨA: một sự kiện thường mang NHIỀU lý do; ta quy cho cơ chế đã THỰC SỰ quyết
+# định. Hai cơ chế TRÍ NHỚ đứng đầu vì chúng ghi đè action và chính là thứ chỉ xuất hiện từ
+# lần đẩy thứ hai trở đi — tức phần giảm tải cần đo.
+OFFLOAD_MARKERS: tuple[tuple[str, str], ...] = (
+    ("t1_blacklist_memory", "TRÍ NHỚ Tier-1: IP đã bị chặn gần đây"),
+    ("t1_reputation_block", "IP có tiền sử NGUY HIỂM (điểm danh tiếng"),
+    ("t1_reputation_escalate", "IP có tiền sử đáng ngờ (điểm danh tiếng"),
+    ("t1_waf_signature", "WAF: Phát hiện "),
+    ("t1_injection_signature", "Prompt Injection Pattern: "),
+    ("t1_injection_signature", "Jailbreak Pattern: "),
+    ("t1_dynamic_rule", "Luật động [từ Tác tử]: "),
+    ("t1_apt_chain", "APT chain emergent: "),
+    ("t1_zscore", "Phát hiện dị biệt thống kê Zero-day ["),
+)
+
+
+def classify_offload_mechanisms(evaluated_log: dict) -> list[str]:
+    """TẤT CẢ cơ chế Tier-1 đã khai hoả trên sự kiện này (`['t1_other']` nếu không cơ chế nào).
+
+    LỖI ĐO LƯỜNG ĐÃ VÁ. Bản trước trả về DUY NHẤT khớp đầu tiên theo thứ tự khai báo. Một sự
+    kiện thường khớp nhiều cơ chế cùng lúc, và `t1_reputation_block` đứng gần đầu bảng — nên
+    ở lượt chạy WARM, khi hầu hết IP đã có tiền sử, nhãn "danh tiếng" CHE hết nhãn cụ thể.
+    Đo được giữa hai lượt đẩy cùng một tệp 5.000 sự kiện: chữ ký WAF báo 337 -> 0 và trí nhớ
+    blacklist 106 -> 0, trông như hai cơ chế đó ngừng hoạt động. Thực tế chúng vẫn chạy; chỉ
+    là mất nhãn. Bảng "cơ chế chặn" vì thế KHÔNG so được giữa lượt nguội và lượt warm — đúng
+    cái bảng dùng để trả lời câu hỏi trung tâm của RQ1.
+
+    Đa nhãn thì tổng các cơ chế LỚN HƠN số sự kiện; đó là đúng và phải đọc như vậy. Muốn quy
+    về một nhãn duy nhất cho mỗi sự kiện thì dùng `primary_offload_mechanism`.
+    """
+    reasons = evaluated_log.get("tier1_reasons") or []
+    if not isinstance(reasons, list):
+        reasons = [str(reasons)]
+    blob = " ǁ ".join(str(r) for r in reasons)
+    hits: list[str] = []
+    for key, marker in OFFLOAD_MARKERS:
+        if marker in blob and key not in hits:
+            hits.append(key)
+    return hits or ["t1_other"]
+
+
+def primary_offload_mechanism(evaluated_log: dict) -> str:
+    """Một nhãn duy nhất cho mỗi sự kiện — giữ tương thích với chỗ cần tổng = số sự kiện."""
+    return classify_offload_mechanisms(evaluated_log)[0]
 
 
 def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bool) -> str:
@@ -182,8 +246,14 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
             _s = json.load(_sf)
         raw_logs_total = int(_s.get("raw_logs_total", 0))
         tier1_dropped_total = int(_s.get("tier1_dropped_total", 0))
+        offload_counts = dict(_s.get("offload_counts") or {})
     except Exception:
         raw_logs_total = tier1_dropped_total = 0
+        offload_counts = {}
+    # LUỸ KẾ, cùng giao ước với raw_logs_total. Số của TỪNG lần đẩy lấy bằng cách chụp
+    # pipeline_stats.json trước/sau rồi trừ — không cần cơ chế reset riêng, và không mất
+    # dữ liệu nếu subscriber khởi động lại giữa chừng. Dùng dict (không rebind) để closure
+    # _flush_stats thấy được cập nhật mà không cần `nonlocal`.
 
     def _flush_stats():
         try:
@@ -193,6 +263,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                     {
                         "raw_logs_total": raw_logs_total,
                         "tier1_dropped_total": tier1_dropped_total,
+                        "offload_counts": offload_counts,
                         "pending_llm_queue": agent_q.qsize() if agent_q is not None else 0,
                     },
                     _f,
@@ -383,6 +454,24 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     _is_bl = False
                                 action = _apply_blacklist_memory(action, evaluated_log, _is_bl)
 
+                            # ── PHÂN BỔ GIẢM TẢI ────────────────────────────────────────
+                            # Đếm ở ĐÂY vì đây là điểm `action` của Tier-1 đã CHỐT (sau cả
+                            # APT lẫn trí nhớ blacklist) nhưng CHƯA rẽ sang Cổng ML/LLM —
+                            # tức đúng ranh giới "Tier-1 tự xử" và "phải nhờ tầng trên".
+                            offload_counts[f"action:{action}"] = (
+                                offload_counts.get(f"action:{action}", 0) + 1
+                            )
+                            if action != "ESCALATE":
+                                # ĐA NHÃN: đếm MỌI cơ chế đã khai hoả, không chỉ cơ chế đầu
+                                # bảng — nếu không, ở lượt warm nhãn "danh tiếng" che sạch
+                                # nhãn chữ ký/blacklist và bảng cơ chế mất khả năng so sánh
+                                # giữa các lượt (xem `classify_offload_mechanisms`).
+                                for _mech in classify_offload_mechanisms(evaluated_log):
+                                    offload_counts[_mech] = offload_counts.get(_mech, 0) + 1
+                                # Nhãn CHÍNH (tổng = số sự kiện) để đọc phân bổ theo tỉ lệ.
+                                _pri = f"primary:{primary_offload_mechanism(evaluated_log)}"
+                                offload_counts[_pri] = offload_counts.get(_pri, 0) + 1
+
                             # ── Phân luồng định tuyến thông minh (Tier 1 Routing) ─────────
                             if action == "ESCALATE":
                                 _src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
@@ -391,6 +480,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
 
                                 # ── TIER-1 ML GATEWAY (CỔNG ML) ──
                                 ml_action, ml_reasoning, ml_conf = ml_gateway.evaluate(raw_log)
+                                # Ranh giới cuối trước LLM: Cổng ML tự quyết (ml_action có
+                                # giá trị) hay phải nhờ Tier-2. Đây là mẫu số của "tỉ lệ gỡ
+                                # tải khỏi LLM" nên phải đếm tại chỗ, không suy ngược từ log.
+                                _mlk = "ml_gate_resolved" if ml_action else "escalated_to_llm"
+                                offload_counts[_mlk] = offload_counts.get(_mlk, 0) + 1
                                 if ml_action:
                                     # ML tự tin ra quyết định -> Chặn/Báo ngay mà KHÔNG cần LLM
                                     if ml_action == "BLOCK_IP":
@@ -679,4 +773,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
 
 
 if __name__ == "__main__":
-    start_listening()
+    # Số worker Tier-2 phải KHỚP số slot llama.cpp (`-np`), nếu không thì slot thừa nằm
+    # không: KV cache của nó vẫn chiếm VRAM mà chẳng phục vụ request nào. Đo được: server
+    # chạy `-np 2` trong khi mã luôn gọi `start_listening()` với mặc định 1 worker.
+    start_listening(agent_workers=int(os.getenv("SENTINEL_AGENT_WORKERS", "2")))

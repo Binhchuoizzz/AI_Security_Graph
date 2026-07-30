@@ -155,10 +155,9 @@ def run(n_events: int = 100):
     if not check_llm_server():
         print("[SKIP] llama.cpp server not running on port 5000 or 8080.")
         print("       Start with one of:")
-        print(
-            "         llama-server -m ~/text-generation-webui/user_data/models/gemma-2-9b-it-Q6_K.gguf -ngl 35 --port 5000"
-        )
-        print("         or set LLM_API_BASE=http://127.0.0.1:8080/v1")
+        print("         docker-compose up -d --force-recreate --no-deps llm")
+        print("         (model + ctx lấy từ LLM_MODEL_FILE / LLAMA_ARG_CTX_SIZE trong .env)")
+        print("         hoặc đặt LLM_API_BASE=http://127.0.0.1:8080/v1")
         print("       Then re-run this script.")
 
         # Lưu kết quả bỏ qua (skip) — KHÔNG được xoá mất số đo THẬT đã có.

@@ -5,6 +5,7 @@ Guardrails: LLM Decision Validator (Action Enum, Anti-DoS Shield, Confidence Gat
 import ipaddress
 import logging
 
+from src.agent import trace
 from src.guardrails.output_sanitizer import output_sanitizer
 from src.guardrails.prompt_filter import load_config
 
@@ -42,6 +43,8 @@ class DecisionValidator:
             logger.warning(
                 f"[DecisionValidator] Invalid action '{action}' overridden to AWAIT_HITL"
             )
+            if trace.enabled():
+                trace.add("validator", action_enum_override=str(action))
             validated["action"] = "AWAIT_HITL"
             action = "AWAIT_HITL"
 
@@ -56,6 +59,8 @@ class DecisionValidator:
             logger.warning(
                 f"[DecisionValidator] BLOCK_IP downgraded to AWAIT_HITL due to low confidence ({confidence})"
             )
+            if trace.enabled():
+                trace.add("validator", confidence_gate=True, confidence_gate_value=confidence)
             validated["action"] = "AWAIT_HITL"
             action = "AWAIT_HITL"
 
@@ -137,6 +142,11 @@ class DecisionValidator:
                 logger.warning(
                     f"[DecisionValidator] BLOCK_IP on critical asset '{target}' downgraded to ALERT"
                 )
+                # Lá chắn này KHÔNG chèn dấu vào reasoning (khác consensus guard) và cờ
+                # `_critical_shield` bị vứt trước khi ghi DB -> trước tracer, số lần nó nổ là
+                # KHÔNG THỂ đếm được sau khi chạy.
+                if trace.enabled():
+                    trace.add("validator", critical_shield=True, critical_shield_target=target)
                 validated["action"] = "ALERT"
                 action = "ALERT"
                 # Cờ để lớp remap-theo-confidence (nodes.py) KHÔNG đẩy NGƯỢC ALERT->BLOCK,
@@ -172,6 +182,8 @@ class DecisionValidator:
                 "[DecisionValidator] Tier-1/Tier-2 DISAGREEMENT: Tier-1 flagged attack but "
                 f"LLM downgraded to {action}. Possible semantic social-engineering — overriding to AWAIT_HITL."
             )
+            if trace.enabled():
+                trace.add("validator", tier_consensus_override=True, tier_consensus_from=action)
             validated["action"] = "AWAIT_HITL"
             validated["_tier_consensus_override"] = True
             note = (

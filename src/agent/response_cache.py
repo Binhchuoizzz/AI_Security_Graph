@@ -12,6 +12,7 @@ mọi thao tác get/set/evict được bọc trong một threading.Lock (tránh 
 during iteration' khi một luồng evict trong lúc luồng khác chèn).
 """
 
+import copy
 import hashlib
 import logging
 import threading
@@ -44,7 +45,12 @@ class ExactMatchResponseCache:
                 return None
             if time.time() - entry["ts"] < self.ttl_seconds:
                 logger.info(f"[ResponseCache] HIT - Bypassing LLM cho dấu vân {key[:8]}...")
-                return entry["result"]
+                # BẢN SAO SÂU, không phải tham chiếu. Bản trước trả thẳng `entry["result"]`,
+                # nên mọi thao tác bồi đắp verdict ở hạ nguồn (gắn cờ `_critical_shield`,
+                # sửa `action` sau banding, thêm ghi chú xuất xứ...) sẽ ghi ĐÈ luôn vào
+                # mục cache — mọi lần HIT sau đó nhận verdict đã bị sửa của lô trước. Đây là
+                # lỗi tiềm ẩn, chưa nổ chỉ vì thứ tự ghi hiện tại còn may.
+                return copy.deepcopy(entry["result"])
             # Hết hạn -> loại bỏ
             self.cache.pop(key, None)
             return None
@@ -111,17 +117,31 @@ class ExactMatchResponseCache:
         ]
         return "ftr:" + "§".join(parts)
 
-    def get_by_features(self, log: dict) -> dict | None:
+    def get_by_features(self, log: dict, has_history: bool = False) -> dict | None:
         """Tra cache theo đặc trưng (dùng lại LRU/TTL của get())."""
         if not log:
             return None
-        return self.get(self.feature_fingerprint(log))
+        return self.get(self.feature_fingerprint(log) + self._history_token(has_history))
 
-    def set_by_features(self, log: dict, llm_decision: dict):
+    def set_by_features(self, log: dict, llm_decision: dict, has_history: bool = False):
         """Lưu verdict theo đặc trưng (dùng lại eviction/TTL của set())."""
         if not log or not llm_decision:
             return
-        self.set(self.feature_fingerprint(log), llm_decision)
+        self.set(self.feature_fingerprint(log) + self._history_token(has_history), llm_decision)
+
+    @staticmethod
+    def _history_token(has_history: bool) -> str:
+        """Tách rổ cache theo 'IP này đã có tiền sử hay chưa'.
+
+        VÌ SAO CẦN: khoá lớp-2 CỐ Ý bỏ IP ra ngoài để gộp các flow cùng bản chất. Điều đó
+        đúng khi prompt không phụ thuộc IP. Nhưng từ khi Bộ nhớ Đe doạ dài hạn được đưa vào
+        prompt, hai IP cùng đặc trưng mà KHÁC tiền sử sẽ nhận hai prompt khác nhau — nếu
+        vẫn dùng chung một khoá thì verdict của IP sạch sẽ bị tái dùng cho kẻ tái phạm, tức
+        là xoá sạch tác dụng của chính tính năng vừa bật. Chỉ tách hai rổ (có/không tiền
+        sử), KHÔNG đưa IP vào khoá: giữ được gần như toàn bộ hiệu quả gộp, vì đại đa số lưu
+        lượng là IP chưa có tiền sử.
+        """
+        return "§hist:1" if has_history else "§hist:0"
 
 
 # Singleton instance

@@ -24,11 +24,11 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from experiments.metrics_core import confusion_report  # noqa: E402
 from experiments.unified_dataset import (  # noqa: E402
-    BENIGN_ACTIONS,
-    _is_threat,
     build_stream,
-    static_only_action,
+    score_stream,
+    warn_unhandled,
 )
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
@@ -39,69 +39,46 @@ THRESHOLDS = [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
 
 def eval_at_threshold(tau: float, warmup, main):
-    """Chạy TOÀN BỘ luồng gộp qua Tier-1 với ngưỡng Welford = tau. Trả về metrics."""
+    """Chạy TOÀN BỘ luồng gộp qua Tier-1 với ngưỡng Welford = tau. Trả về metrics.
+
+    Dùng `score_stream()` DÙNG CHUNG với `evaluate_unified_stream.py`. Trước đây file này
+    giữ một BẢN SAO của vòng chấm, và bản sao đó mang y hệt hai lỗi: bỏ sót nguồn
+    `cicids_max`/`dapt_max` (~25.000 sự kiện biến mất khỏi ma trận) và chấm cả warmup vào
+    lớp benign (test-on-train). Vì thế sweep từng cho đúng bộ số sai của bản gốc. Gộp về
+    một hàm nên từ nay sửa một chỗ là cả hai script cùng đúng.
+    """
     engine = RuleEngine()
     engine.z_threshold = tau
 
-    cls = {"tp": 0, "fp": 0, "tn": 0, "fn": 0}
-    flagged_total = 0  # số sự kiện bị Tier-1 gắn cờ (escalate/actioned) = tải Tier-2
-    total_events = 0
-    zd_caught = 0
-    zd_total = 0
+    scored = score_stream(engine, warmup, main, collect_zeroday=True)
+    warn_unhandled(scored["excluded_by_source"])
 
-    # Warmup: học baseline Welford từ benign (đóng góp TN/FP)
-    for ev in warmup:
-        res = engine.evaluate(ev["log"])
-        flagged = _is_threat(res["tier1_action"])
-        cls["fp" if flagged else "tn"] += 1
-        flagged_total += 1 if flagged else 0
-        total_events += 1
-
-    for ev in main:
-        src = ev["source"]
-        if src == "cicids":
-            res = engine.evaluate(ev["log"])
-            flagged = _is_threat(res["tier1_action"])
-            if ev["expected_threat"]:
-                cls["tp" if flagged else "fn"] += 1
-            else:
-                cls["fp" if flagged else "tn"] += 1
-            flagged_total += 1 if flagged else 0
-            total_events += 1
-        elif src == "dapt":
-            res = engine.evaluate(ev["log"])
-            flagged = _is_threat(res["tier1_action"])
-            flagged_total += 1 if flagged else 0
-            total_events += 1
-        elif src == "zeroday":
-            static_act = static_only_action(engine, ev["log"])
-            res = engine.evaluate(ev["log"])
-            zd_total += 1
-            if static_act in BENIGN_ACTIONS and _is_threat(res["tier1_action"]):
-                zd_caught += 1
-            flagged_total += 1 if _is_threat(res["tier1_action"]) else 0
-            total_events += 1
-
+    cls = scored["confusion"]
     tp, fp, tn, fn = cls["tp"], cls["fp"], cls["tn"], cls["fn"]
-    precision = tp / (tp + fp) if (tp + fp) else 0.0
-    recall = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
-    fpr = fp / (fp + tn) if (fp + tn) else 0.0
-    escalation_rate = flagged_total / total_events if total_events else 0.0
+    rep = confusion_report(tp, fp, tn, fn)
+
+    zd = scored["zeroday"]
+    zd_caught = sum(1 for z in zd if z["caught_by_welford"])
+    total_events = scored["n_stream_events"]
 
     return {
         "z_threshold": tau,
-        "precision": round(precision, 4),
-        "recall": round(recall, 4),
-        "f1": round(f1, 4),
-        "benign_fp_rate": round(fpr, 4),
-        "escalation_rate": round(escalation_rate, 4),
+        "precision": rep["precision"],
+        "recall": rep["recall"],
+        "f1": rep["f1"],
+        # MCC: chỉ số chính khi so các ngưỡng — không bị base rate làm nhiễu như F1.
+        "mcc": rep["mcc"],
+        "balanced_accuracy": rep["balanced_accuracy"],
+        "benign_fp_rate": round(fp / (fp + tn), 4) if (fp + tn) else 0.0,
+        # Tải đẩy lên Tier-2 = chi phí điện toán LLM của điểm vận hành này.
+        "escalation_rate": round(scored["n_flagged"] / total_events, 4) if total_events else 0.0,
         "zeroday_caught": zd_caught,
-        "zeroday_total": zd_total,
+        "zeroday_total": len(zd),
         "tp": tp,
         "fp": fp,
         "tn": tn,
         "fn": fn,
+        "n_scored": rep["n_scored"],
     }
 
 
@@ -123,8 +100,9 @@ def main():
         rows.append(r)
         star = "  <- điểm vận hành" if abs(tau - 3.5) < 1e-9 else ""
         print(
-            f"[τ={tau:>3.1f}σ] F1={r['f1']:.3f} P={r['precision']:.3f} R={r['recall']:.3f} "
-            f"| FP(benign)={r['benign_fp_rate']:.3f} | escal={r['escalation_rate']:.3f} "
+            f"[τ={tau:>3.1f}σ] MCC={r['mcc']:.3f} F1={r['f1']:.3f} P={r['precision']:.3f} "
+            f"R={r['recall']:.3f} | FP(benign)={r['benign_fp_rate']:.3f} "
+            f"| escal={r['escalation_rate']:.3f} "
             f"| zero-day={r['zeroday_caught']}/{r['zeroday_total']}{star}"
         )
 

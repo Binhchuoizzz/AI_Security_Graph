@@ -175,26 +175,93 @@ def load_few_shot_feedback_context() -> str:
     return result
 
 
-def build_triage_prompt(log_data: str, rag_context: str) -> list[dict]:
+# ── PHẠM VI BẰNG CHỨNG ───────────────────────────────────────────────────────
+# Quy kết ở đúng mức chi tiết mà bằng chứng cho phép — đây là lý do tồn tại của hai khối
+# dưới đây, và là điểm yếu lớn nhất của bản trước.
+#
+# ATT&CK vốn được xây chủ yếu cho hành vi ENDPOINT (tiến trình, dòng lệnh, registry). Một
+# bản ghi NetFlow chỉ có số đếm gói/byte/thời lượng/cổng: từ "220 gói ra cổng 443 trong 5
+# giây", DoS · C2 beaconing · rò rỉ dữ liệu đều khớp NHƯ NHAU. Vậy mà prompt cũ bắt mô hình
+# trả một mã kỹ thuật cho MỌI lô, bất kể lớp bằng chứng — tức ép nó đoán, rồi hệ thống ghi
+# lời đoán đó vào nhật ký kiểm toán như một quy kết có căn cứ.
+#
+# Đo được trên luồng sống: 82% truy vấn RAG dồn về T1498, và 14,3% số lô có mô hình đề xuất
+# một kỹ thuật KHÔNG nằm trong tài liệu vừa truy xuất cho chính lô đó.
+_SCOPE_FLOW = """
+=== EVIDENCE SCOPE: NETWORK FLOW ONLY (L3/L4) ===
+This batch contains ONLY network-flow telemetry: packet/byte counts, duration, ports,
+protocol. There is NO application payload, NO URI, NO command line, NO process data.
+
+Flow counters alone CANNOT distinguish denial-of-service from C2 beaconing from data
+exfiltration — all three produce elevated volume to a port. Therefore:
+- Attribute at TACTIC level (e.g. Impact, Discovery, Command and Control, Exfiltration),
+  which flow evidence CAN support. State it in "attack_method".
+- Set "mitre_technique" to "N/A" UNLESS the retrieved context contains a technique whose
+  detection is explicitly defined on network-flow observables AND the flow figures match it.
+- Naming a specific technique from counters alone is a GUESS. Prefer AWAIT_HITL.
+Use the NIST SP 800-61r2 material in the context to recommend the response step.
+"""
+
+_SCOPE_APP = """
+=== EVIDENCE SCOPE: APPLICATION LAYER (L7) ===
+This batch carries application-layer evidence (payload / URI / user-agent / message).
+This IS sufficient to attribute a specific ATT&CK technique. Quote the exact substring you
+relied on in "reasoning", and pick "mitre_technique" from the retrieved context.
+"""
+
+
+def evidence_scope_block(layer: str) -> str:
+    """Khối phạm vi theo lớp bằng chứng. 'application' -> quy kết kỹ thuật; còn lại -> tactic."""
+    return _SCOPE_APP if layer == "application" else _SCOPE_FLOW
+
+
+def build_triage_prompt(
+    log_data: str,
+    rag_context: str,
+    threat_memory_context: str = "",
+    evidence_layer: str = "flow",
+) -> list[dict]:
     """
     Xây dựng mảng tin nhắn (messages array) cho OpenAI client.
 
     System prompt giữ CỐ ĐỊNH (TRIAGE_SYSTEM_PROMPT) làm prefix để llama.cpp tái dùng
     KV-cache qua nhiều call; feedback few-shot (biến động theo luật động) được đưa vào ĐẦU
     user message thay vì nối vào system prompt (tránh phá prefix cache mỗi khi luật đổi).
+
+    `threat_memory_context` — TIỀN SỬ của IP lấy từ Bộ nhớ Đe doạ dài hạn.
+    LỖI ĐÃ SỬA: `node_llm_triage` vẫn TRUY VẤN SQLite để dựng chuỗi này mỗi lô, cất vào
+    state... rồi thôi. `build_triage_prompt` trước đây chỉ nhận hai tham số, và
+    `SentinelState.get_memory_for_prompt()` — hàm DUY NHẤT biết ghép tiền sử vào prompt —
+    không có một nơi nào gọi tới. Tức là Bộ nhớ Đe doạ dài hạn, một đóng góp chính của luận
+    văn (RQ3), chưa bao giờ tới được LLM: mô hình luôn phán quyết như thể mỗi IP là lần đầu
+    gặp. Đo trên lượt chạy nguội: 5/274 lô có tiền sử bị vứt; ở lượt ẤM con số này lớn hơn
+    nhiều vì phần lớn IP đã có lịch sử.
+
+    Đặt tiền sử SAU khối RAG và TRƯỚC khối log, và nói rõ đây là ngữ cảnh vận hành đã được
+    hệ thống xác thực — không phải dữ liệu do kẻ tấn công kiểm soát.
     """
     feedback_context = load_few_shot_feedback_context()
 
     user_sections = []
     if feedback_context:
         user_sections.append(feedback_context.strip())
+
+    memory_block = ""
+    if threat_memory_context and threat_memory_context.strip():
+        memory_block = (
+            "\n=== PRIOR HISTORY FOR THESE SOURCE IPs (system-derived, TRUSTED) ===\n"
+            f"{threat_memory_context.strip()}\n"
+            "Weigh this history: a host with repeated prior incidents warrants a firmer "
+            "action than a first-time observation of the same behaviour.\n"
+        )
+
     user_sections.append(
         f"""Please analyze the following network event:
-
+{evidence_scope_block(evidence_layer)}
 {RAG_START_TAG}
 {rag_context}
 {RAG_END_TAG}
-
+{memory_block}
 {LOG_START_TAG}
 {log_data}
 {LOG_END_TAG}"""

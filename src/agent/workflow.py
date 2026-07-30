@@ -10,6 +10,7 @@ try:
 except ImportError:
     raise ImportError("Missing dependency: pip install langgraph")
 
+from src.agent import trace
 from src.agent.nodes import (
     node_action_executor,
     node_attack_mapper,
@@ -84,5 +85,44 @@ def create_agent_workflow() -> CompiledStateGraph:
     return app
 
 
+class _TracedGraph:
+    """Proxy MỎNG quanh CompiledStateGraph: mở/đóng ĐÚNG MỘT bản ghi trace mỗi invoke.
+
+    VÌ SAO BỌC Ở SINGLETON chứ không ở `main.py`: có TÁM nơi gọi `agent_app.invoke(...)`
+    (main.py + 7 script trong `experiments/`/`scripts/`). Bọc ở đây phủ hết bằng một chỗ
+    sửa, và đảm bảo bất biến "một invoke = một bản ghi" không phụ thuộc người gọi nhớ hay
+    quên.
+
+    `flush()` nằm trong `except BaseException` rồi `raise` tiếp — lô ném lỗi VẪN có bản ghi,
+    vì đó chính là lô cần audit nhất. Khi `SENTINEL_TRACE` tắt, invoke đi thẳng xuống graph:
+    chi phí đúng một phép đọc bool.
+    """
+
+    # CỐ Ý KHÔNG dùng `__slots__`. Nó chặn `setattr` trên instance, mà đó chính là cách
+    # `tests/unit/test_tier2_eval_loop_guard.py` (và khuôn mẫu tương tự trong experiments)
+    # stub `agent_app.invoke` để chạy không cần LLM/GPU:
+    #     monkeypatch.setattr(ev.agent_app, "invoke", fake_invoke)
+    # Thêm `__slots__` làm ba test đó gãy cả ở thân test lẫn lúc teardown. Proxy phải THAY
+    # THẾ ĐƯỢC HOÀN TOÀN cho CompiledStateGraph trần trước đây — kể cả ở khả năng vá.
+    def __init__(self, app: CompiledStateGraph):
+        self._app = app
+
+    def __getattr__(self, name: str):
+        # Mọi API khác (stream/get_graph/...) uỷ quyền thẳng xuống graph đã biên dịch.
+        return getattr(self._app, name)
+
+    def invoke(self, state, *args, **kwargs):
+        if not trace.enabled():
+            return self._app.invoke(state, *args, **kwargs)
+        trace.begin(state)
+        try:
+            out = self._app.invoke(state, *args, **kwargs)
+        except BaseException as e:
+            trace.flush(status="error", error=e)
+            raise
+        trace.flush(status="ok", final_state=out)
+        return out
+
+
 # Thực thể duy nhất agent_app để xuất ra ngoài (Singleton)
-agent_app = create_agent_workflow()
+agent_app = _TracedGraph(create_agent_workflow())

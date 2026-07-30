@@ -1,0 +1,73 @@
+==============================================================================
+AUDIT LƯỢT CHẠY SỐNG — 403 bản ghi Tier-2   status={'ok': 403}
+Nối được nhãn: 403/403 (100.0%)
+==============================================================================
+
+── RAG ──────────────────────────────────────────────────────────────
+  Kỹ thuật top-1 KHÁC NHAU : 6   (entropy 0.61)
+  Tập trung nhất           : [('T1571', 233), ('T1499.002', 119), ('T1046', 23), ('T1498.001', 13), ('T1568.001', 12), ('T1498', 3)]
+  Truy vấn NGỮ CẢNH chạy   : 5  |  lô có payload: 10
+  Chấm được trên 12 lô có kỹ thuật kỳ vọng:
+    Recall@1:        0/12 (0.0%)   | mức HỌ CHA: 1/12 (8.3%)
+    Recall@3:       4/12 (33.3%)   | mức HỌ CHA: 4/12 (33.3%)
+    Recall@5:       4/12 (33.3%)   | mức HỌ CHA: 5/12 (41.7%)
+
+── LLM ──────────────────────────────────────────────────────────────
+  Gọi thật 123 | cache {'MISS': 123, 'feature': 280} | lỗi parse 0
+  Độ trễ p50 13.94s · p95 17.39s
+  Kỹ thuật KHÁC NHAU trả về: 13  [('T1571', 37), ('T1046', 8), ('T1499.002', 6), ('T1498.001', 5), ('T1568.001', 5), ('T1498', 4), ('T1071.001', 2), ('T1505.003', 2)]
+  Lô có kỹ thuật kỳ vọng: 12  (trả lời 11 · bỏ trắng/N-A 1)
+  Đúng / TOÀN BỘ lô     : 0/12 (0.0%)   <- con số TRUNG THỰC
+  Đúng / lô CÓ trả lời  : 0/11 (0.0%)   (bỏ qua ca bỏ trắng)
+  Đúng ở mức HỌ CHA     : 0/12 (0.0%)
+
+  ── theo TẦNG BẰNG CHỨNG (mỗi tầng chấm ở mức nó ĐỠ NỔI) ──
+  tầng             n   đúng KỸ THUẬT   đúng TACTIC  bỏ trắng
+  application     12     0/12 (0.0%)  5/12 (41.7%)         1
+  (flow = chỉ NetFlow: hệ thống CỐ Ý không quy kết kỹ thuật, nên đọc cột TACTIC;
+   application = có payload/URI/UA: đọc cột KỸ THUẬT.)
+
+── QUYẾT ĐỊNH ───────────────────────────────────────────────────────
+  Hành động cuối : {'ALERT': 170, 'AWAIT_HITL': 143, 'BLOCK_IP': 90}
+  Chính sách ghi đè: {}
+  Ánh xạ kỹ thuật (TRƯỚC lá chắn): {'low_confidence': 271, 'resolved': 132}
+  Ánh xạ kỹ thuật (SAU  lá chắn): {'low_confidence': 136, 'ungrounded_in_rag': 159, 'resolved': 108}
+  LÁ CHẮN NEO BẰNG CHỨNG nổ: 159 lô (hạ cấp hành động {'BLOCK_IP->AWAIT_HITL': 13}, chặn 13 lệnh BLOCK_IP tự chém)
+  Leo thang HITL tái phạm: 170
+  Khớp hành động KỲ VỌNG: 0/3 (0.0%)
+
+── BÓC TÁCH THEO NGUỒN (chỉ nguồn có kỹ thuật kỳ vọng) ───────────────
+  nguồn           n   RAG@1   RAG@3   RAG@5  LLM exact  LLM cha
+  zeroday        10    0.0%   30.0%   30.0%       0.0%     0.0%
+  dapt            2    0.0%   50.0%   50.0%       0.0%     0.0%
+  (webattack = nhóm DUY NHẤT có bằng chứng tầng ứng dụng trong đầu vào;
+   zeroday/dapt mang nhãn kỹ thuật KHÔNG suy ra được từ NetFlow thuần.)
+
+── RÒ RỈ NHÃN VÀO PROMPT (vùng dữ liệu giữa cặp nonce) ───────────────
+  Prompt kiểm được: 403
+  Có mã ATT&CK    : 0   <- phải = 0
+  Có khoá nhãn    : 0   <- phải = 0
+  Có tên nguồn    : 0   <- phải = 0
+
+[+] JSON -> reports/runs/p2_fsec/audit.json
+
+── PHÂN BỔ GIẢM TẢI (riêng lượt này) ────────────────────────────────
+  Sự kiện thô qua Tier-1: 5000
+
+  Hành động cuối của Tier-1:
+    BLOCK_IP           2302  ( 46.0%)
+    ESCALATE           1955  ( 39.1%)
+    DROP                707  ( 14.1%)
+    ALERT                36  (  0.7%)
+
+  Cơ chế đã CHẶN (không lên Tier-2):
+    Tiền sử IP ≥70 (SQLite, vĩnh viễn)       2302  ( 46.0%)
+    Điểm tĩnh khác                            707  ( 14.1%)
+    Dị biệt Z-score (zero-day)                 36  (  0.7%)
+    — tổng chặn ở Tier-1                     3045  ( 60.9%)
+
+  Trong số leo thang:
+    Cổng ML tự quyết (KHÔNG cần LLM)         1536  ( 78.6% ca leo thang)
+    Phải nhờ Tier-2 (LLM)                     419  ( 21.4% ca leo thang)
+
+  => Chỉ 419/5000 = 8.38% lưu lượng thô chạm tới LLM

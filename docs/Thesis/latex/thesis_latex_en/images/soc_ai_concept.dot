@@ -42,7 +42,7 @@ digraph sentinel_arch {
         fontname="Helvetica-Bold";
         grd   [label="AI Security Guardrails\n(Delimited Encapsulation)", fillcolor="#ffffff"];
         miner [label="Log Template Miner\n(Drain + Token Budget)", fillcolor="#ffffff"];
-        cache [label="Semantic Cache\n(In-Memory LRU, SHA-256 keys)", fillcolor="#ffffff"];
+        cache [label="Log-Template Cache\n(In-Memory LRU, SHA-256 keys)", fillcolor="#ffffff"];
         fsm   [label="LangGraph FSM\n(Orchestration Engine)", fillcolor="#ffffff"];
         tmem  [label="Threat Memory\n(SQLite DB)", fillcolor="#ffffff"];
         hmac  [label="HMAC Protection\n(Audit Logs)", fillcolor="#ffffff"];

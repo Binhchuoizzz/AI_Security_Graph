@@ -24,6 +24,8 @@
 \usepackage{cite}
 \usepackage{array}
 \usepackage{longtable}
+\usepackage{tabularx}
+\newcolumntype{Y}{>{\centering\arraybackslash}X}
 \usepackage{float}
 % --- Giữ mọi bảng/hình nằm trong đúng mục đã tham chiếu chúng ---
 % placeins cung cấp \FloatBarrier; ta chèn rào cản float ở đầu mỗi mục (section) và
@@ -173,11 +175,9 @@
 \vspace{0.5cm}
 
 \begin{singlespace}
-Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh mạng (SOC) đứng trước áp lực phải tự động hóa quá trình phân loại và phản hồi một khối lượng cảnh báo ngày một gia tăng; thế nhưng mọi giải pháp sẵn có đều buộc phải chấp nhận những đánh đổi đáng kể. Các công cụ tự động hóa truyền thống vận hành theo những kịch bản cứng nhắc, định sẵn, không thể suy xét các tình huống mơ hồ và cũng không thể lý giải cho quyết định của mình; trong khi việc đưa trực tiếp nhật ký thô vào một Mô hình Ngôn ngữ Lớn (LLM) lại quá chậm để đáp ứng thời gian thực, dễ bị thao túng ngay từ chính nội dung nhật ký, và sẽ vi phạm yêu cầu về chủ quyền dữ liệu nếu triển khai trên nền tảng đám mây. Nhằm khắc phục những hạn chế đó, luận văn đề xuất SENTINEL, một kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động. Tầng thứ nhất là một bộ lọc nhanh, tất định, loại bỏ tức thời phần lớn lưu lượng vô hại và chỉ chuyển tiếp phần thiểu số thực sự khả nghi lên tầng thứ hai, một tác tử trí tuệ nhân tạo vận hành cục bộ, suy luận trên các nguồn tri thức an ninh chuẩn mực (kỹ thuật MITRE ATT\&CK và hướng dẫn ứng phó sự cố của NIST) và hoạt động phía sau nhiều lớp rào chắn bảo vệ nhằm chống lại sự đánh lừa từ những đầu vào độc hại.
+Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đối mặt với áp lực quá tải khi khối lượng cảnh báo nhật ký vượt quá khả năng xử lý thủ công. Các công cụ tự động hóa truyền thống vận hành theo kịch bản tĩnh thiếu khả năng suy luận, trong khi việc đưa trực tiếp dữ liệu vào Mô hình Ngôn ngữ Lớn (LLM) lại gặp rào cản độ trễ, nguy cơ tiêm nhiễm câu lệnh (prompt injection) và vi phạm chủ quyền dữ liệu. Luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành cục bộ (air-gapped) giải quyết triệt để các rào cản trên. Tầng 1 vận hành như một bộ lọc tốc độ đường truyền nhằm tự động loại bỏ phần lớn lưu lượng nhiễu, trong khi Tầng 2 ứng dụng tác tử AI suy luận có trạng thái kết hợp tri thức MITRE ATT\&CK và quy định NIST để xử lý các đe dọa phức tạp đằng sau các rào chắn mật mã.
 
-Qua đánh giá trên các bộ dữ liệu phát hiện xâm nhập tiêu chuẩn, SENTINEL cho thấy khả năng duy trì tính khả thi thực tiễn của suy luận bằng trí tuệ nhân tạo: bằng cách chỉ dành năng lực tính toán đắt đỏ này cho số ít cảnh báo thực sự cần đến, hệ thống giảm hơn $80\%$ độ trễ phản hồi trung bình so với phương án chỉ sử dụng LLM. Hệ thống đồng thời chống chịu được các tấn công thao túng dựa trên nội dung, đưa ra những lý giải minh bạch và có thể kiểm chứng cho mỗi quyết định, và vận hành trọn vẹn trên phần cứng phổ thông tại chỗ mà không cần gửi dữ liệu ra bên ngoài. Nhìn chung, nghiên cứu khẳng định rằng sự kết hợp giữa một bộ lọc tất định tốc độ cao và một tầng suy luận trí tuệ nhân tạo an toàn, minh bạch, triển khai cục bộ chính là một hướng tiếp cận thiết thực và đáng tin cậy cho bài toán tự động hóa phòng thủ mạng hiện đại.
-
-
+Đánh giá thực nghiệm trên các tập dữ liệu xâm nhập chuẩn mực minh chứng hiệu năng vượt trội của SENTINEL. Tầng 1 xả tải tự động trên 80\% lưu lượng nhiễu ở độ trễ dưới 1\,ms, giúp rút ngắn độ trễ phản hồi toàn hệ thống xuống 211\,ms (nhanh gấp 11.6 lần so với mô hình Đơn tầng) và đạt băng thông trên 2.500 flows/s. Tầng 2 đạt độ chính xác quy kết kỹ thuật 94.6\% và F1-score 98.6\%. Cơ chế đóng gói Nonce vô hiệu hóa 100\% tấn công prompt injection, kết hợp niêm phong HMAC-SHA256 bảo đảm tính toàn vẹn vết chứng cứ. Hệ thống vận hành hoàn toàn cục bộ trên GPU 16\,GB với mức tiêu thụ tài nguyên tối ưu, khẳng định kiến trúc lai hai tầng là giải pháp thiết thực và hiệu quả cho phòng thủ SOC hiện đại.
 \end{singlespace}
 
 % Acknowledgements Page
@@ -188,21 +188,38 @@ Qua đánh giá trên các bộ dữ liệu phát hiện xâm nhập tiêu chu�
 \end{center}
 \vspace{0.5cm}
 
-Trước hết, tôi xin bày tỏ lòng biết ơn chân thành và sâu sắc nhất tới hai người thầy hướng dẫn khoa học của mình, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Sự định hướng khoa học chuẩn xác, những góp ý chuyên môn sâu sắc cùng sự tận tâm và kiên nhẫn dìu dắt của quý thầy trong suốt chặng đường thực hiện đề tài chính là nền tảng vững chắc để tôi hoàn thành công trình nghiên cứu này một cách trọn vẹn.
+\begin{singlespace}
+Để hoàn thành công trình nghiên cứu khoa học này và đạt được học vị Thạc sĩ Kỹ thuật Phần mềm, tôi đã nhận được sự hỗ trợ, động viên và dìu dắt quý báu từ rất nhiều cá nhân và tập thể.
 
-Tôi cũng xin trân trọng gửi lời tri ân tới quý thầy cô và cán bộ của Viện Quản trị \& Công nghệ FSB, Đại học FPT, những người đã trang bị cho tôi nền tảng tri thức học thuật quý báu và kiến tạo một môi trường học tập, nghiên cứu chuyên nghiệp, hiện đại, tạo mọi điều kiện thuận lợi cho học viên trong suốt quá trình theo học chương trình Thạc sĩ.
+Trước hết, tôi xin bày tỏ lòng biết ơn chân thành và kính trọng sâu sắc nhất tới hai thầy hướng dẫn khoa học của tôi, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác, sự định hướng chiến lược chuẩn xác và tinh thần làm việc nghiêm túc, quý thầy đã luôn dành thời gian kiên nhẫn chỉ bảo, định hướng tư duy phản biện và truyền cảm hứng nghiên cứu cho tôi trong suốt chặng đường thực hiện luận văn. Những góp ý chuyên môn sắc bén của quý thầy không chỉ giúp tôi từng bước hoàn thiện công trình này mà còn là hành trang tri thức vô giá cho sự nghiệp nghiên cứu an toàn thông tin và trí tuệ nhân tạo của tôi sau này.
 
-Đồng thời, tôi xin gửi lời cảm ơn sâu sắc tới Ban lãnh đạo cùng các đồng nghiệp tại Cục C12, Trung tâm Dữ liệu Quốc gia, nơi tôi đang công tác. Sự tạo điều kiện về thời gian, môi trường làm việc thực tiễn và những trao đổi chuyên môn quý giá đã tiếp thêm cho tôi nhiều động lực để hoàn thành tốt cả nhiệm vụ chuyên môn lẫn con đường học tập, nghiên cứu.
+Tôi xin trân trọng gửi lời tri ân tới Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị \& Công nghệ FSB cùng toàn thể quý thầy cô giáo Trường Đại học FPT. Quý thầy cô đã truyền dạy cho tôi những nền tảng tri thức lý thuyết và thực tiễn vững chắc, đồng thời tạo một môi trường học tập, nghiên cứu chuyên nghiệp, hiện đại, tạo mọi điều kiện thuận lợi nhất cho học viên nâng cao trình độ chuyên môn trong suốt khóa học Thạc sĩ.
 
-Cuối cùng, và cũng là điều thiêng liêng nhất, tôi xin dành trọn lòng tri ân tới gia đình thân yêu của mình, đặc biệt là người vợ hiền và con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn, sự thấu hiểu và nguồn động viên tinh thần không ngừng nghỉ của gia đình trong những tháng ngày tôi miệt mài với các đợt thực nghiệm kéo dài chính là điểm tựa lớn lao nhất, nâng bước tôi vững vàng trên hành trình chinh phục học vị Thạc sĩ.
+Tôi xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Cục C12, Trung tâm Dữ liệu Quốc gia. Sự tin tưởng, tạo điều kiện thuận lợi về mặt thời gian cùng những kinh nghiệm thực chiến vô cùng phong phú từ môi trường công tác thực tế tại đơn vị đã tiếp thêm cho tôi nhiều động lực và góc nhìn thực tiễn sâu sắc để áp dụng trực tiếp vào quá trình thiết kế, thực nghiệm và kiểm chứng hệ thống an ninh SENTINEL.
+
+Cuối cùng, và cũng là niềm tự hào lớn lao nhất, tôi xin dành trọn lòng tri ân sâu sắc nhất tới gia đình thân yêu của mình, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn vô bờ bến, sự thấu hiểu và nguồn động viên tinh thần không ngừng nghỉ của vợ và con trong suốt những tháng ngày tôi miệt mài bên máy tính với các đợt thực nghiệm kéo dài xuyên đêm chính là điểm tựa tinh thần vững chắc nhất, giúp tôi vượt qua mọi rào cản và khó khăn để hoàn thành tốt đẹp công trình nghiên cứu này.
+
+Mặc dù đã rất cố gắng nghiêm túc hoàn thiện luận văn với tất cả tinh thần trách nhiệm và lòng nhiệt huyết khoa học, song công trình khó tránh khỏi những hạn chế nhất định. Tôi rất mong nhận được sự chỉ dẫn, đóng góp ý kiến quý báu từ quý thầy cô trong Hội đồng chấm luận văn và các đồng nghiệp để đề tài tiếp tục được hoàn thiện và phát triển hơn nữa trong tương lai.
+
+\end{singlespace}
 
 
 % Lists and Table of Contents
 \newpage
+\tableofcontents
+
+\newpage
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
+
 \newpage
+\cleardoublepage
+\addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
+
 \newpage
+\cleardoublepage
 \addcontentsline{toc}{chapter}{Danh mục các từ viết tắt}
 \begin{center}
     {\Large\textbf{Danh mục các từ viết tắt}}
@@ -212,21 +229,25 @@ Cuối cùng, và cũng là điều thiêng liêng nhất, tôi xin dành trọn
 \begin{longtable}{lp{0.72\textwidth}}
 \textbf{Từ viết tắt} & \textbf{Định nghĩa đầy đủ} \\
 \midrule
+AI & Artificial Intelligence (Trí tuệ nhân tạo) \\
 APT & Advanced Persistent Threat (Mối đe dọa thường trực nâng cao) \\
 CTI & Cyber Threat Intelligence (Tình báo mối đe dọa mạng) \\
-DAPT & Dynamic/Delayed Advanced Persistent Threat (Tấn công APT động/trễ) \\
-FAISS & Facebook AI Similarity Search (Tìm kiếm tương đồng AI của Facebook) \\
-GGUF & GPT-Generated Unified Format (Định dạng hợp nhất do GPT tạo ra) \\
+DAPT & Dynamic Advanced Persistent Threat (Tấn công APT động) \\
+FAISS & Facebook AI Similarity Search (Cỗ máy tìm kiếm tương đồng FAISS) \\
+FPR & False Positive Rate (Tỷ lệ báo động giả) \\
+GGUF & GPT-Generated Unified Format (Định dạng hợp nhất GGUF) \\
 HITL & Human-in-the-Loop (Con người trong vòng lặp) \\
+HMAC & Hash-based Message Authentication Code (Mã xác thực thông điệp dựa trên hàm băm) \\
 LLM & Large Language Model (Mô hình ngôn ngữ lớn) \\
+MITRE ATT\&CK & MITRE Adversarial Tactics, Techniques, and Common Knowledge (Khung tri thức chiến thuật và kỹ thuật tấn công MITRE) \\
+NIST & National Institute of Standards and Technology (Viện Tiêu chuẩn và Công nghệ Quốc gia Hoa Kỳ) \\
 RAG & Retrieval-Augmented Generation (Sinh văn bản tăng cường truy xuất) \\
 RRF & Reciprocal Rank Fusion (Tổng hợp xếp hạng nghịch đảo) \\
 SIEM & Security Information and Event Management (Quản lý thông tin và sự kiện an ninh) \\
+SOAR & Security Orchestration, Automation, and Response (Điều phối, tự động hóa và phản hồi an ninh) \\
 SOC & Security Operations Center (Trung tâm điều hành an ninh mạng) \\
 \bottomrule
 \end{longtable}
-\newpage
-\tableofcontents
 
 % -----------------------------------------------------------------------------
 % MAIN BODY
@@ -255,17 +276,11 @@ SOC & Security Operations Center (Trung tâm điều hành an ninh mạng) \\
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
 
-\bibitem{mlids2016}
-A. L. Buczak and E. Guven, ``A Survey of Data Mining and Machine Learning Methods for Cyber Security Intrusion Detection,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 18, no. 2, pp. 1153--1176, 2016.
-
 \bibitem{siem2021}
 G. González-Granadillo, S. González-Zarzosa, and R. Diaz, ``Security Information and Event Management (SIEM): Analysis, Trends, and Usage in Critical Infrastructures,'' \textit{Sensors}, vol. 21, no. 14, art. 4759, 2021.
 
 \bibitem{bigdata2019}
 R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterogeneous Data: A Survey,'' \textit{Journal of Big Data}, vol. 2, art. 3, 2015.
-
-\bibitem{apt_stealth2021}
-M. Alshamrani \textit{et al.}, ``A Survey on Advanced Persistent Threats: Techniques, Solutions, Challenges, and Research Opportunities,'' \textit{IEEE Communications Surveys \& Tutorials}, vol. 21, no. 2, pp. 1851--1877, 2019.
 
 \bibitem{alertfatigue2022}
 S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Security Operations Centres: Research Challenges and Opportunities,'' \textit{ACM Computing Surveys}, vol. 57, no. 9, art. 224, 2025.
@@ -341,12 +356,6 @@ S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kan
 
 \bibitem{ragas2023}
 S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \textit{arXiv preprint arXiv:2309.15217}, 2023.
-
-\bibitem{mcnemar1947}
-Q. McNemar, ``Note on the Sampling Error of the Difference Between Correlated Proportions or Percentages,'' \textit{Psychometrika}, vol. 12, no. 2, pp. 153--157, 1947.
-
-\bibitem{mannwhitney1947}
-H. B. Mann and D. R. Whitney, ``On a Test of Whether One of Two Random Variables is Stochastically Larger than the Other,'' \textit{Annals of Mathematical Statistics}, vol. 18, no. 1, pp. 50--60, 1947.
 
 \bibitem{hmac1997}
 H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.

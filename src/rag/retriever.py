@@ -33,8 +33,29 @@ logger = logging.getLogger(__name__)
 # Khai báo đường dẫn
 INDEX_DIR = os.path.join(BASE_DIR, "knowledge_base", "faiss_index")
 
-# Cấu hình mặc định
-DEFAULT_TOP_K = 5
+
+# Cấu hình mặc định.
+#
+# `top_k` LẤY TỪ CẤU HÌNH, không hằng số cứng. Lỗi đã đo: `nodes.py` dựng
+# `DualRetriever(use_cache=True)` mà KHÔNG truyền `top_k`, nên hệ thống chạy thật bằng
+# `DEFAULT_TOP_K = 5` trong khi `config/system_settings.yaml` ghi `rag.top_k_results: 3`.
+# Cấu hình bị BỎ QUA hoàn toàn — ai đọc cấu hình để hiểu hệ thống (kể cả hội đồng) đều bị
+# dẫn sai. Đo trên tracer xác nhận đúng 5 tài liệu mỗi lô. Ta giữ NGUYÊN hành vi (5) và
+# sửa cấu hình cho khớp sự thật, thay vì đổi hành vi ngay trước lúc bảo vệ.
+def _configured_top_k(default: int = 5) -> int:
+    try:
+        from src.guardrails.prompt_filter import load_config
+
+        rag_cfg = load_config().get("rag", {})
+        if not isinstance(rag_cfg, dict):
+            return default
+        raw = rag_cfg.get("top_k_results", default)
+        return int(raw) if isinstance(raw, (int, float, str)) else default
+    except Exception:  # noqa: BLE001 - thiếu cấu hình thì dùng mặc định, không chặn khởi động
+        return default
+
+
+DEFAULT_TOP_K = _configured_top_k()
 MIN_SCORE_THRESHOLD = 0.15  # Cho FAISS dense search
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 

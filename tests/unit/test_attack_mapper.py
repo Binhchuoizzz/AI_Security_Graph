@@ -180,9 +180,15 @@ def test_anchor_preserves_subtechnique_id():
 
 
 def test_anchor_on_valid_id_not_in_kb_keeps_id_blank_tactic():
-    """Txxxx hợp lệ nhưng KB không phủ -> vẫn NEO id (honest: tactic trống)."""
-    mapping = map_attack(AttackMapperInput(attack_type="T1110 - Brute Force", confidence=0.8))
-    assert mapping.mitre_technique_id == "T1110"  # KHÔNG để RRF chệch sang cổng/giao thức
+    """Txxxx hợp lệ nhưng KB không phủ -> vẫn NEO id (honest: tactic trống).
+
+    Dùng `T1650` — mã đúng ĐỊNH DẠNG nhưng CỐ Ý nằm ngoài kho. Trước đây test dùng
+    `T1110`; sau khi kho được bổ sung 43 kỹ thuật cha/sub (2026-07-27) thì T1110 ĐÃ có
+    mặt, nên nó không còn kiểm được tính chất cần kiểm. Nếu mai này T1650 cũng được thêm
+    vào kho, đổi sang một mã vắng mặt khác — ĐỪNG nới lỏng phần khẳng định.
+    """
+    mapping = map_attack(AttackMapperInput(attack_type="T1650 - Acquire Access", confidence=0.8))
+    assert mapping.mitre_technique_id == "T1650"  # KHÔNG để RRF chệch sang cổng/giao thức
     assert mapping.mitre_tactic == "Unknown"
     assert mapping.mitre_tactic_id == ""
     assert mapping.mapping_status == "resolved"
@@ -304,9 +310,13 @@ def test_parent_technique_name_derived_from_kb_convention():
 
 
 def test_unknown_id_is_flagged_not_fabricated():
-    """KB không phủ -> KHÔNG bịa tên, KHÔNG im lặng: giữ nhãn LLM + cờ chưa đối chiếu."""
-    assert canonical_technique_name("T1499") is None
-    label, verified = verify_technique_label("T1499", "T1499 - Endpoint Denial of Service")
+    """KB không phủ -> KHÔNG bịa tên, KHÔNG im lặng: giữ nhãn LLM + cờ chưa đối chiếu.
+
+    Dùng `T1650` vì lý do như test neo ở trên: `T1499` từng vắng mặt nhưng nay đã có
+    trong kho, nên nó không còn kiểm được nhánh "không đối chiếu được tên".
+    """
+    assert canonical_technique_name("T1650") is None
+    label, verified = verify_technique_label("T1650", "T1650 - Acquire Access")
     assert verified is False
     assert UNVERIFIED_NAME_SUFFIX in label
 
@@ -337,3 +347,69 @@ def test_parse_json_object_handles_select_schema():
     # rác -> dict rỗng, KHÔNG ném lỗi
     assert _parse_json_object("không phải json") == {}
     assert _parse_json_object(None) == {}
+
+
+# ==============================================================================
+# LÁ CHẮN NEO BẰNG CHỨNG: không CHẶN TỰ ĐỘNG bằng kỹ thuật ngoài ngữ cảnh RAG
+# ==============================================================================
+#
+# Lá chắn chống-ảo-giác cũ chỉ hỏi "kỹ thuật này có trong kho không?", KHÔNG hỏi "nó có
+# nằm trong tài liệu vừa truy xuất cho lô này không?". Đo trên lượt chạy nguội 274 lô:
+# 25 câu trả lời nằm NGOÀI ngữ cảnh RAG, độ chính xác 0/4 trên các lô có nhãn (so với
+# 8/25 khi có neo). Trong đó 3 ca thành BLOCK_IP TỰ ĐỘNG ở confidence 0.93-0.95 — chặn
+# vĩnh viễn một IP dựa trên kỹ thuật mà bộ truy xuất chưa từng đưa ra.
+
+
+def _mapper_state(technique: str, rag_ctx: str, action: str = "BLOCK_IP"):
+    from src.agent.state import SentinelState
+
+    s = SentinelState()
+    s.rag_mitre_context = rag_ctx
+    s.current_batch_logs = [{"Source IP": "10.0.0.5", "service": "HTTP"}]
+    s.decisions = [
+        {
+            "action": action,
+            "confidence": 0.95,
+            "reasoning": "r",
+            "target": "10.0.0.5",
+            "mitre_technique": technique,
+        }
+    ]
+    return s
+
+
+def test_block_is_downgraded_when_technique_absent_from_rag():
+    from src.agent.nodes import node_attack_mapper
+
+    st = _mapper_state("T1030 - Data Transfer Size Limits", "T1498 Network Denial of Service")
+    out = node_attack_mapper(st)
+    d = out["decisions"][-1]
+    assert d["action"] == "AWAIT_HITL", "chặn tự động bằng kỹ thuật ngoài RAG vẫn lọt"
+    assert "NEO BẰNG CHỨNG" in d["reasoning"]
+
+
+def test_block_is_kept_when_technique_is_grounded():
+    from src.agent.nodes import node_attack_mapper
+
+    st = _mapper_state(
+        "T1498 - Network Denial of Service",
+        "T1498 Network Denial of Service — adversaries may perform DoS...",
+    )
+    out = node_attack_mapper(st)
+    assert out["decisions"][-1]["action"] == "BLOCK_IP", "hạ cấp OAN quyết định có neo"
+
+
+def test_ungrounded_technique_becomes_NA_not_a_plausible_guess():
+    """Thi hành hợp đồng của chính prompt: không khớp RAG -> N/A + AWAIT_HITL.
+
+    Đo thật: model chỉ tự trả 'N/A' 2/136 lần (1,5%); còn lại nó chọn một kỹ thuật nghe
+    hợp lý. Nhật ký kiểm toán không được khẳng định điều bằng chứng không đỡ.
+    """
+    from src.agent.nodes import node_attack_mapper
+
+    st = _mapper_state("T1030", "T1498 Network Denial of Service", action="ALERT")
+    d = node_attack_mapper(st)["decisions"][-1]
+    assert d["action"] == "AWAIT_HITL"
+    assert d["mitre_technique"] == "N/A", "vẫn khẳng định một kỹ thuật không có neo"
+    assert d["mitre_technique_id"] == ""
+    assert d["mapping_status"] == "ungrounded_in_rag"

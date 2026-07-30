@@ -1,94 +1,61 @@
 \chapter{Cơ sở Lý thuyết và Tổng quan Nghiên cứu}
 \label{ch:theoretical_background}
 
-Chương này thiết lập nền tảng lý thuyết cho SENTINEL, bắt đầu từ nút thắt nhận thức tại các Trung tâm Điều hành An ninh (SOC) hiện đại, rồi tới LLM cục bộ và lượng tử hóa, AI Tác tử dựa trên đồ thị trạng thái, Sinh Tăng cường Truy xuất (RAG), các lỗ hổng AI đối kháng, phát hiện dị biệt thống kê trực tuyến, và các nghiên cứu tác-tử-an-ninh liên quan.
+Chương này trình bày tóm lược cơ sở lý thuyết nền tảng và tổng quan nghiên cứu liên quan. Nội dung tập trung phân tích nút thắt vận hành an ninh, cơ sở thống kê và học máy Tầng 1, kiến trúc tác tử và ngôn ngữ lớn Tầng 2, các nguy cơ an ninh đối kháng AI cùng kỹ thuật kiểm toán mật mã, và đặc biệt đi sâu khảo sát các hệ thống AI Security hiện hành nhằm xác định rõ khoảng trống nghiên cứu mà hệ thống SENTINEL giải quyết.
 
-\section{SOC và Nút thắt Nhận thức}
-Các SOC hiện đại hợp nhất telemetry đa dạng (NGFW, EDR, IDS/IPS) vào nền tảng SIEM tập trung~\cite{siem2021} để nhận diện đe dọa và leo thang sự cố tới analyst. Tuy nhiên, sự dịch chuyển sang hạ tầng cloud-native gây bùng nổ dữ liệu log~\cite{bigdata2019}, dẫn tới khủng hoảng \emph{mệt mỏi cảnh báo}: analyst Tầng 1 thường bị ngập bởi hàng nghìn cảnh báo mỗi ngày, phần lớn là báo giả, và các trận lụt cảnh báo liên tục làm cạn kiệt nguồn lực chú ý, làm tăng có hệ thống xác suất bỏ sót đe dọa nghiêm trọng~\cite{alertfatigue2022}. Trầm trọng thêm, các Đe dọa Thường trực Nâng cao (APT) dùng chiến thuật ẩn mình, kéo dài mà các khung dựa-luật phi trạng thái không thể liên kết qua các chân trời thời gian dài~\cite{apt_stealth2021}.
+\section{Thực trạng Vận hành SOC và Nút thắt Nhận thức}
 
-\section{LLM Cục bộ và Toán học của Lượng tử hóa}
-LLM dựa trên Transformer mang lại tự động hóa hứa hẹn: cơ chế self-attention cân mọi token với tất cả token khác song song~\cite{vaswani2017}, nắm bắt các phụ thuộc tầm xa cần thiết để liên kết sự kiện qua một luồng log dài. Tuy nhiên, yêu cầu chủ quyền dữ liệu cấm truyền telemetry nhạy cảm tới endpoint đám mây ngoài theo nguyên tắc zero-trust~\cite{nist80207}, buộc dùng LLM \emph{cục bộ} trong môi trường air-gapped. Chạy mô hình tỷ tham số cục bộ bị giới hạn bộ nhớ: một mô hình 9B như \textit{Gemma-2-9B-IT} ở FP16 cần $\approx\!18$\,GB VRAM. Lượng tử hóa ánh xạ lại các trọng số liên tục độ-chính-xác-cao lên lưới số nguyên bit-thấp thô hơn, đánh đổi mất mát độ chính xác có kiểm soát lấy tiết kiệm bộ nhớ lớn~\cite{quantization2021}. Qua GGUF và chuẩn Q6\_K trong \texttt{llama.cpp}, dung lượng giảm còn $\approx\!7$--$8$\,GB (giảm hơn $50\%$) với suy luận gần-không-mất-mát (Bảng~\ref{tab:quantization}), cho phép suy luận trên phần cứng phổ thông.
+Công tác giám sát an toàn thông tin tại các Trung tâm Điều hành An ninh (SOC) dựa trên việc thu thập nhật ký từ NGFW, IDS/IPS và EDR về hệ thống SIEM tập trung~\cite{siem2021}. Khối lượng nhật ký khổng lồ từ hạ tầng phân tán vượt quá khả năng phân tích thủ công~\cite{bigdata2019}. Do các thiết bị phòng thủ ranh giới vận hành dựa trên chữ ký tĩnh và tập luật tất định, việc nới lỏng ngưỡng cảnh báo để tránh bỏ lọt đe dọa đã dẫn tới cuộc khủng hoảng quá tải thông báo với tỷ lệ báo động giả vượt quá 80\%~\cite{alertfatigue2022}, gây ra kiệt sức nhận thức (alert fatigue) cho chuyên gia phân tích. Dù giải pháp SOAR giúp tự động hóa phản hồi, hệ thống này phụ thuộc vào các kịch bản (playbooks) lập trình sẵn cố định, hoàn toàn thiếu khả năng suy luận ngữ cảnh trước các biến thể tấn công mới~\cite{soar2025}.
 
-\begin{table}[!htbp]
-    \centering
-    \caption{Các mức lượng tử hóa cho mô hình Gemma-2-9B (xấp xỉ). (Nguồn: Tác giả)}
-    \label{tab:quantization}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|>{\centering\arraybackslash}p{0.18\textwidth}|>{\centering\arraybackslash}p{0.16\textwidth}|>{\raggedright\arraybackslash}p{0.20\textwidth}|}
-        \hline
-        \textbf{Định dạng} & \textbf{Bit / trọng số} & \textbf{VRAM} & \textbf{Chất lượng} \\
-        \hline
-        FP16 (cơ sở) & 16 & $\approx$18\,GB & Tham chiếu \\ \hline
-        \textbf{Q6\_K (luận văn)} & $\approx$6.6 & $\approx$7--8\,GB & Gần-không-mất \\ \hline
-        Q4\_K\_M & $\approx$4.5 & $\approx$5--6\,GB & Suy giảm nhẹ \\ \hline
-    \end{tabular}
-\end{table}
-
-\section{AI Tác tử và Mô hình Đồ thị Trạng thái}
-An ninh tự động đang dịch từ Tự động hóa Runbook (RBA) cứng sang AI Tác tử tự chủ~\cite{soar2025}. RBA dựa vào script định sẵn cho xử lý cảnh báo tuyến tính---hiệu quả nhưng mù cấu trúc với điều kiện zero-day và định dạng đa hình. Hệ tác tử thể hiện tự chủ nhận thức (tự phản tỉnh, lập kế hoạch nhiều bước, định tuyến thích ứng), điều chỉnh phân tích theo phát hiện trung gian. Các tác tử này được mô hình hóa như đồ thị có hướng có trạng thái hoạt động như máy trạng thái hữu hạn~\cite{langgraph2024}, nơi nút là hành động tính toán/nhận thức và cạnh điều kiện ép định tuyến động theo đầu ra nút cha. Điều phối có trạng thái cho phép tác tử giữ bộ nhớ làm việc qua các sự kiện; dù mô hình này cũng cho phép tái phân tích chu trình trong một sự kiện, SENTINEL có chủ đích chọn duyệt \emph{không chu trình} theo từng sự kiện để tất định và kiểm toán được, lưu trạng thái xuyên-sự-kiện trong Bộ nhớ Đe dọa thay vì lặp.
-
-\section{Sinh Tăng cường Truy xuất và Tìm kiếm Lai}
-Hạn chế chính của LLM là ảo giác sự thật, rủi ro nghiêm trọng gây cấu hình sai trong SOC tự động. RAG chống điều này bằng cách điều kiện hóa mỗi phản hồi trên các đoạn truy xuất tươi từ một kho có thẩm quyền thay vì chỉ bộ nhớ tham số~\cite{rag2020}, thu hẹp không gian cho các khẳng định vô căn cứ. RAG hiện đại dùng chiến lược \emph{lai}: tìm kiếm vector dày với mô hình nhúng (\texttt{all-MiniLM-L6-v2})~\cite{reimers2019sentence} và tương đồng cosine FAISS~\cite{faiss2019} nắm nghĩa ngữ nghĩa dù khác từ khóa, trong khi BM25 thưa~\cite{bm25_2009} khớp định danh kỹ thuật (mã CVE, IP) qua trọng số TF-IDF. Reciprocal Rank Fusion~\cite{rrf2009} hợp nhất hai danh sách hạng thành một kết quả độ-chính-xác-cao bằng cách cân ngữ nghĩa dày với trọng số từ khóa thưa.
-
-\section{Lỗ hổng Nhận thức LLM và Vector Đối kháng}
-Triển khai LLM làm engine suy luận lõi tạo ra lỗ hổng mới. Vì LLM xử lý ngôn ngữ tự nhiên không có phân tách code-và-data lúc biên dịch, chúng dễ bị chiếm quyền chỉ dẫn~\cite{promptinjection2023}. Vector liên quan nhất là \emph{injection nền-log}~\cite{watchtower2026}: kẻ tấn công nhúng payload lệnh vào trường telemetry (vd User-Agent), và khi LLM xử lý các log này nó có thể thực thi chỉ dẫn nhúng, vượt kiểm soát. Nghiên cứu gần đây hình thức hóa các tấn công này thành phân loại bốn lớp~\cite{watchtower2026}: \textit{Ghi đè Trực tiếp} (S1) chỉ thị mô hình bỏ qua chỉ dẫn trước; \textit{Chiếm quyền Persona} (S2) ép một persona không giới hạn; \textit{Thao túng Ngữ cảnh} (S3) bịa siêu-dữ-liệu ủy quyền (vd ``đã duyệt trước''); và \textit{Payload Che giấu} (S4) giấu chỉ dẫn qua mã hóa Base64/hex/URL hoặc homoglyph để né bộ lọc regex. Vì các trường này do kẻ tấn công kiểm soát nhưng không phân biệt được về cấu trúc với bằng chứng hợp lệ, một LLM một-lượt không thể tách data khỏi chỉ dẫn một cách đáng tin---trực tiếp thúc đẩy thiết kế rào chắn phân lớp ở Chương~\ref{ch:system_design_implementation} (Bảng~\ref{tab:vulnerabilities_mitigations}).
-
-\begin{table}[!htbp]
-    \centering
-    \caption{Lỗ hổng nhận thức LLM và biện pháp giảm thiểu của SENTINEL. (Nguồn: Tác giả)}
-    \label{tab:vulnerabilities_mitigations}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.20\textwidth}|>{\raggedright\arraybackslash}p{0.32\textwidth}|>{\raggedright\arraybackslash}p{0.30\textwidth}|}
-        \hline
-        \textbf{Vector tấn công} & \textbf{Cơ chế đe dọa} & \textbf{Biện pháp} \\
-        \hline
-        Injection Prompt Trực tiếp & Payload chiếm quyền trong đầu vào & Bộ lọc regex, prompt cấu trúc \\ \hline
-        Injection Nền-log & Chỉ dẫn trong trường log (User-Agent) & Đóng gói Phân định sử dụng nonces \texttt{<<<DATA\_HASH...>>>} \\ \hline
-        Vượt Mã hóa & Che giấu Base64/Hex/URL & Giải mã \& chuẩn hóa nhiều lớp \\ \hline
-        Buôn lậu Delimiter & Mốc điều khiển kết thúc phạm vi data & Làm sạch delimiter, ngân sách token \\ \hline
-        Đầu độc Ngữ nghĩa & Tài liệu giả trong vector DB & Checksum SHA-256 + nguồn gốc \\ \hline
-    \end{tabular}
-\end{table}
-
-\section{Phát hiện Dị biệt Thống kê Trực tuyến: Thuật toán Welford}
+\section{Lý thuyết Thống kê Trực tuyến và Học máy Tầng 1}
 \label{sec:welford}
-Vì độ phức tạp bậc hai của attention ngăn LLM phân tích luồng thô ở tốc độ đường truyền, một bộ tiền lọc $O(1)$ là cần thiết. Tính baseline lăn trên luồng liên tục cần thống kê trực tuyến ổn định số học như thuật toán Welford~\cite{welford1962}, theo dõi trung bình và phương sai lăn mà không tích lũy sai số dấu phẩy động:
-\begin{equation}
-    \label{eq:welford_mean}
-    \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k},
-\end{equation}
-\begin{equation}
-    \label{eq:welford_m2}
-    M_{2,k} = M_{2,k-1} + (x_k - \mu_{k-1})(x_k - \mu_k),
-\end{equation}
-\begin{equation}
-    \label{eq:welford_var}
-    \sigma_k^2 = \frac{M_{2,k}}{k-1}.
-\end{equation}
-Duy trì các tham số này với bộ nhớ hằng, hệ tính Z-score chuẩn hóa cho mỗi gói, loại nhanh lưu lượng lành tính trong khi bảo toàn chuỗi sự kiện của tấn công chậm-âm-thầm. Để kiểm chứng phát hiện không chữ ký, một mô hình zero-day \emph{real-derived} tách một luồng benign thật và đẩy một thống kê tới biên cực trị, ép một Z-score lớn mô phỏng ngoại lai chưa biết và được leo thang lên Tầng 2.
 
-\section{Nghiên cứu Liên quan: AI Tác tử cho Vận hành An ninh}
-Phát hiện đe dọa tự động tiến hóa qua nhiều đợt. Phát hiện xâm nhập cổ điển dùng học máy (Random Forest, SVM) hoặc học sâu (LSTM, CNN)~\cite{mlids2016}; chính xác nhưng hoạt động như ``hộp đen'' không giải thích được. LLM sau đó mở một mặt trận nghiên cứu rộng khắp an ninh mạng, như các khảo sát hệ thống gần đây tổng hợp~\cite{llmsec_survey2025}, thúc đẩy dịch chuyển tới hệ có thể giải thích và hành động. Gần nhất với luận văn này là một đợt khung tác tử ghép suy luận LLM với truy xuất: CyberRAG~\cite{cyberrag2025} điều phối các bộ phân loại tinh chỉnh qua vòng truy xuất-và-suy-luận lặp cho gán nhãn tấn công web; LanG~\cite{lang2026} đề xuất một nền tảng LangGraph nhận thức-quản-trị hợp nhất liên kết, sinh luật LLM, và tái dựng tấn công với chốt HITL; Sahay và cộng sự~\cite{splunkllm2026} ghép autoencoder và học tăng cường sâu cho triage với một LLM cho săn đe dọa trong SIEM; và các thiết kế đa-tác-tử như AutoBnB-RAG~\cite{autobnb2025} mở rộng hợp tác tăng-cường-truy-xuất tới ứng phó sự cố. Về phía đối kháng, Pandey và Bhujang~\cite{watchtower2026} hình thức hóa đe dọa injection nền-log (phân loại S1--S4) và chứng minh tính hiệu quả của nó. Các hệ này thiết lập giá trị của tự động hóa tác tử nối-nền-truy-xuất, và \emph{phần lớn đã có} một tiền lọc và, trong một số trường hợp, một rào chắn đầu vào; nơi họ xử lý injection, họ thường dựa vào một bộ phân loại ngữ nghĩa \emph{học} mà một payload mới vẫn có thể né.
+Để lọc luồng dữ liệu ở tốc độ đường truyền mà không lưu trữ toàn bộ lịch sử trong bộ nhớ, thuật toán thống kê trực tuyến Welford đạt độ phức tạp $\mathcal{O}(1)$ về thời gian và không gian~\cite{welford1962}. Giá trị trung bình $\mu_k$ và tổng bình phương độ lệch $S_k$ được cập nhật theo công thức truy hồi:
+\begin{equation}
+    \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}, \quad S_k = S_{k-1} + (x_k - \mu_{k-1})(x_k - \mu_k)
+\end{equation}
+cho phép tính toán độ lệch chuẩn $\sigma_k = \sqrt{S_k / (k-1)}$ và $Z$-score dị thường liên tục. Song song với đó, mô hình LightGBM với cơ chế phát triển cây theo lá (leaf-wise) đạt tốc độ suy luận dưới 0.35\,ms trên mỗi mẫu. Để chống kỹ thuật né tránh học máy (anti-evasion), Cổng Học máy thực hiện kẹp ngưỡng $Z$-score trong khoảng $\pm 8\sigma$ và điền giá trị thiếu bằng trung bình đặc trưng. Ngoài ra, cơ chế Semantic Cache Tầng 1.75 sử dụng kỹ thuật băm cấu trúc mẫu dữ liệu trong RAM giúp truy xuất và phản hồi các tấn công lặp lại (DDoS, Brute-force) trong 1\,ms, ngắt luồng xử lý trước khi kích hoạt GPU.
 
-Trên nền đó, SENTINEL khác biệt theo ba trục thiết kế có chủ đích chứ không phải một tính năng thiếu đơn lẻ. Thứ nhất, cổng Tầng 1 của nó là thống kê Welford $O(1)$ không-cần-huấn-luyện (cùng một Cổng \emph{LightGBM} học cho dải leo thang) chứ không phải một tiền lọc cần tái huấn luyện liên tục. Cấu trúc này được tăng cường thêm bởi một \emph{Semantic Cache} (Tầng 1.75) lưu trữ trên bộ nhớ trong, có khả năng giải quyết các cảnh báo trùng lặp chỉ trong khoảng $1$\,ms mà hoàn toàn bỏ qua việc gọi LLM. Thứ hai, nó thay thế bộ phân loại injection học máy bằng sự cách ly \emph{tất định}, mang tính cấu trúc: Đóng gói Dữ liệu Phân định sử dụng nonces mật mã \texttt{<<<DATA\_HASH...>>>}, rào chắn đồng thuận, và chuỗi kiểm toán HMAC. Thứ ba, khác các tác tử gọi-công-cụ với vòng lặp, nó dùng điều phối không-chu-trình, không-công-cụ chạy hoàn toàn trên một mô hình lượng tử hóa cục bộ, ưu tiên tính tất định, khả năng kiểm toán, và chủ quyền dữ liệu. Bảng~\ref{tab:related_work} định vị SENTINEL theo các năng lực liên quan nhất tới một cỗ máy SOC có thể triển khai thực tế và được củng cố bảo mật.
+\section{Mô hình Ngôn ngữ Lớn Cục bộ và Trí tuệ Tác tử Tầng 2}
 
-\begin{table}[!htbp]
-    \centering \footnotesize \setlength{\tabcolsep}{4pt} \renewcommand{\arraystretch}{1.2}
-    \caption{So sánh SENTINEL với các khung tác-tử-an-ninh gần đây ($\checkmark$ có; $\sim$ một phần; $\times$ không; -- không áp dụng). (Nguồn: Tác giả)}
-    \label{tab:related_work}
-    \begin{tabular}{|>{\raggedright\arraybackslash}p{0.26\textwidth}|*{5}{>{\centering\arraybackslash}p{0.10\textwidth}|}}
-        \hline
-        \textbf{Năng lực} & \textbf{SENTINEL} & \textbf{Cyber\-RAG} & \textbf{LanG} & \textbf{Splunk\-LLM} & \textbf{Watch\-tower} \\
-        \hline
-        Tiền lọc $O(1)$ tốc độ đường truyền & $\checkmark$ & $\times$ & $\times$ & $\sim$ & -- \\ \hline
-        Semantic Cache (Tầng 1.75) & $\checkmark$ & $\times$ & $\times$ & $\times$ & -- \\ \hline
-        Rào chắn chống injection tất định & $\checkmark$ & $\times$ & $\sim$ & $\times$ & -- \\ \hline
-        Suy luận cục bộ / air-gapped & $\checkmark$ & $\sim$ & $\sim$ & $\times$ & -- \\ \hline
-        Liên kết APT đa ngày & $\checkmark$ & $\times$ & $\checkmark$ & $\sim$ & -- \\ \hline
-        RAG lai dày+thưa (RRF) & $\checkmark$ & $\sim$ & $\times$ & $\times$ & -- \\ \hline
-        Audit HMAC chống giả mạo & $\checkmark$ & $\times$ & $\sim$ & $\times$ & -- \\ \hline
-    \end{tabular}
+Triển khai LLM cục bộ đòi hỏi tối ưu hóa bộ nhớ nghiêm ngặt: mô hình Gemma-2-9B-IT ở định dạng FP16 chiếm xấp xỉ 18\,GB VRAM~\cite{gemma_2_2024}. Kỹ thuật lượng tử hóa ánh xạ trọng số thực sang lưới số nguyên bit thấp~\cite{quantization2021}. Thông qua định dạng GGUF Q6\_K trên llama.cpp, bộ nhớ VRAM yêu cầu giảm xuống 7--8\,GB ($>$50\%) mà không làm giảm đáng kể độ chính xác, vận hành trơn tru trên card GPU 16\,GB. Để điều phối quy trình suy luận, Tầng 2 sử dụng đồ thị trạng thái không chu trình (Acyclic State-Graph) LangGraph~\cite{langgraph2024} tích hợp Bộ nhớ Đe dọa (Threat Memory) lưu trữ lịch sử xâm nhập để liên kết các hành vi đơn lẻ. Nhằm chống hư cấu (hallucination), hệ thống tích hợp Retrieval-Augmented Generation (RAG)~\cite{rag2020} theo mô hình Dual-RAG kết hợp tìm kiếm ngữ nghĩa FAISS~\cite{faiss2019} và từ khóa BM25~\cite{bm25_2009}, được hợp nhất bằng thuật toán Reciprocal Rank Fusion (RRF)~\cite{rrf2009}:
+\begin{equation}
+    RRF\_Score(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}
+\end{equation}
+truy xuất trực tiếp từ 432 mục STIX MITRE ATT\&CK và tài liệu NIST SP 800-61r2 làm căn cứ giải trình pháp y.
+
+\section{An ninh Đối kháng AI và Mật mã học Kiểm toán Nhật ký}
+
+Tích hợp LLM phát sinh nguy cơ bị tấn công tiêm nhiễm câu lệnh qua nhật ký (log-substrate prompt injection)~\cite{promptinjection2023}, khi kẻ tấn công chèn câu lệnh độc hại vào chuỗi User-Agent hoặc tham số URI để thao túng suy luận của AI~\cite{owasp_llm2025}. Để triệt tiêu véc-tơ này, SENTINEL áp dụng cơ chế Đóng gói Dữ liệu Phân định (Delimited Data Encapsulation) với Nonce ngẫu nhiên cô lập dữ liệu thô, kết hợp rào chắn Guardrail tất định ép đầu ra mô hình nghiêm ngặt trong 3 trạng thái (\texttt{BLOCK\_IP}, \texttt{LOG}, \texttt{AWAIT\_HITL}). Nhằm đảm bảo tính chống chối bỏ cho vết pháp y, hệ thống áp dụng kỹ thuật HMAC-SHA256~\cite{hmac1997} niêm phong từng bản ghi nhật ký bằng khóa bí mật cục bộ, tạo thành chuỗi kiểm toán chống thao túng sau xâm nhập.
+
+\section{Tổng quan Nghiên cứu Liên quan và Khoảng trống Nghiên cứu}
+
+Nghiên cứu ứng dụng trí tuệ nhân tạo trong vận hành an ninh mạng (SOC) đã tiến triển qua bốn nhóm giải pháp kiến trúc chính, từ các hệ thống tất định truyền thống đến các nền tảng tác tử AI tự chủ hiện đại~\cite{llmsec_survey2025}. Việc phân tích chuyên sâu công nghệ, mục tiêu và hạn chế cốt lõi của từng nhóm nghiên cứu là cơ sở xác định khoảng trống kỹ thuật mà hệ thống SENTINEL giải quyết.
+
+Nhóm giải pháp phòng thủ doanh nghiệp truyền thống bao gồm các nền tảng SIEM thương mại như IBM QRadar và giải pháp SOAR như Palo Alto Cortex XSOAR~\cite{siem2021, soar2025}. IBM QRadar thu thập và tương quan sự kiện bằng các tập luật tĩnh (correlation rules) trên cơ sở dữ liệu tập trung. Tuy nhiên, QRadar bộc lộ hạn chế lớn về tỷ lệ báo động giả cao ($>$80\%) do thiếu khả năng hiểu ngữ cảnh tổng thể. Để khắc phục, Cortex XSOAR tự động hóa quy trình phản hồi bằng các kịch bản lập trình sẵn (playbooks bằng Python/JavaScript). Mặc dù giảm tải tác vụ lặp lại, Cortex XSOAR vận hành hoàn toàn tất định và cứng nhắc: khi gặp các biến thể tấn công mới có chuỗi payload ngụy trang hoặc hành vi bất thường nằm ngoài kịch bản đã định nghĩa, hệ thống lập tức thất bại hoặc bỏ sót đe dọa.
+
+Nhóm tác tử AI đám mây tiêu biểu là Watchtower~\cite{watchtower2026} và CyberRAG~\cite{cyberrag2025}. Watchtower đề xuất kiến trúc đa tác tử phối hợp điều phối quy trình điều tra sự cố an ninh bằng cách gửi luồng nhật ký tới các LLM đám mây (như GPT-4, Claude). Tuy nhiên, việc đẩy trực tiếp toàn bộ dữ liệu nhật ký thô lên mô hình ngôn ngữ lớn đám mây gây ra hai hạn chế nghiêm trọng: độ trễ tự chú ý bậc hai $\mathcal{O}(N^2)$ khiến thời gian xử lý mỗi sự kiện kéo dài từ 4 đến 26 giây, gây tắc nghẽn hoàn toàn đường ống dữ liệu; đồng thời vi phạm nghiêm trọng nguyên tắc Zero-Trust và chủ quyền dữ liệu doanh nghiệp~\cite{nist80207}. Trong khi đó, CyberRAG~\cite{cyberrag2025} tập trung truy xuất tri thức đe dọa (CTI) bằng RAG đơn tầng; hệ thống này thiếu bộ lọc đường truyền Tầng 1 nên dễ bị quá tải khi dòng sự kiện đạt hàng trăm ngàn log/giây, đồng thời thiếu cơ chế tác tử có trạng thái để liên kết chuỗi tấn công đa giai đoạn.
+
+Nhóm tác tử tự chủ hoạch định và suy luận an ninh bao gồm AutoBNB~\cite{autobnb2025}, LanG Agentic SOC~\cite{lang2026} và Policy-Guided SIEM~\cite{splunkllm2026}. AutoBNB kết hợp mạng Bayes với tác tử hoạch định (planning agents) để quy kết nguồn gốc xâm nhập, nhưng gặp hạn chế lớn về chi phí tính toán đồ thị và thiếu cơ chế chống tiêm nhiễm prompt qua dữ liệu nhật ký~\cite{promptinjection2023}. Gần đây nhất, nền tảng LanG~\cite{lang2026} đề xuất mô hình tác tử AI chú trọng cơ chế quản trị (governance-aware) và Policy-Guided SIEM~\cite{splunkllm2026} tích hợp rào chắn quy tắc với hệ thống SIEM Splunk. Mặc dù các nghiên cứu này đạt được bước tiến trong việc điều phối đa tác tử và triệt tiêu một phần hư cấu ngôn ngữ, chúng vẫn vận hành theo kiến trúc đơn tầng (Single-Tier/Multi-Agent), nơi mọi sự kiện mạng đều phải vượt qua các nút suy luận LLM phức tạp. Do đó, độ trễ trung bình của hệ thống vẫn duy trì ở mức cao từ 480\,ms đến 520\,ms, đồng thời đòi hỏi hạ tầng phần cứng đa GPU tốn kém (16\,GB--24\,GB VRAM), hoàn toàn không thể đáp ứng yêu cầu xả tải ở tốc độ đường truyền ngay tại Tầng 1.
+
+Khoảng trống nghiên cứu cốt lõi được xác định là: Hiện chưa có một kiến trúc lai nào giải quyết đồng thời ba thách thức: (1) Lọc dữ liệu tốc độ đường truyền ở Tầng 1 để loại bỏ tối thiểu 80\% lưu lượng nhiễu với độ trễ dưới 1\,ms; (2) Suy luận nhận thức Tầng 2 bằng AI Tác tử có trạng thái chạy cục bộ (Air-gapped GPU 16\,GB) loại bỏ hư cấu bằng Dual-RAG; và (3) Bảo vệ toàn vẹn mô hình AI bằng đóng gói phân định Nonce mật mã cùng niêm phong vết pháp y HMAC-SHA256. Bảng~\ref{tab:related_work_comparison} đối chiếu chi tiết SENTINEL với các công trình đại diện.
+
+\begin{table}[htbp]
+\centering
+\caption{Bảng so sánh đối chiếu giữa SENTINEL và các giải pháp phòng thủ hiện hành}
+\label{tab:related_work_comparison}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{Tiêu chí Đánh giá} & \textbf{SIEM / SOAR (QRadar, XSOAR)} & \textbf{Tác tử SOTA (Watchtower, LanG, AutoBnB)} & \textbf{Kiến trúc SENTINEL (Luận văn)} \\
+\midrule
+\textbf{Kỹ thuật Cốt lõi} & Tập luật tương quan tĩnh, kịch bản Python/JS cứng & Đa tác tử LLM Đám mây / Local Multi-Agent & Bộ lọc Welford $\mathcal{O}(1)$ + LightGBM T1, LangGraph Agent T2 \\
+\textbf{Mục tiêu Vận hành} & Gom nhật ký tập trung và phản hồi theo kịch bản & Tự động hóa điều tra sự cố bằng suy luận ngôn ngữ & Lọc loại nhiễu đường truyền tốc độ cao và suy luận nhận thức cục bộ \\
+\textbf{Độ trễ \& Tải luồng} & Rất thấp ($<1$\,ms) nhưng quá tải báo động giả & Trung bình/Cao (480\,ms--26\,s), gây nghẽn đường ống & Tối ưu ($<0.40$\,ms Tầng 1, 1\,ms Cache, giảm $>80\%$ tải cho T2) \\
+\textbf{Chủ quyền Dữ liệu} & Cục bộ nội bộ & Rủi ro rò rỉ Cloud hoặc ngốn 24GB GPU & Bảo mật tuyệt đối, chạy 100\% Air-gapped trên GPU 16\,GB \\
+\textbf{Chống Prompt Inj.} & Không áp dụng & Phụ thuộc bộ lọc xác suất (dễ bị bẻ khóa) & Bảo chứng an ninh kiến trúc (Delimited Nonce Encapsulation) \\
+\textbf{Kiểm toán Pháp y} & Nhật ký văn bản tiêu chuẩn (dễ bị chỉnh sửa) & Không hỗ trợ niêm phong mật mã vết pháp y & Chuỗi mã hóa HMAC-SHA256 niêm phong chống chối bỏ \\
+\bottomrule
+\end{tabularx}
 \end{table}
-
-SENTINEL do đó nổi bật không bởi một cấu phần đơn lẻ mà bởi sự tích hợp: một bộ lọc Tầng 1 tất định và cổng học hấp thụ phần lớn tốc-độ-cao ở tốc độ đường truyền, trong khi một tác tử Tầng 2 cách ly nhận thức suy luận sau rào chắn mật mã, trực tiếp giải quyết đánh đổi độ-trễ--bảo-mật mà các khung khảo sát để ngỏ.
-
-\section{Tóm tắt Chương}
-Chương này đã thiết lập nền tảng của SENTINEL: nút thắt nhận thức SOC, lượng tử hóa LLM cục bộ, điều phối tác tử có trạng thái, RAG lai qua RRF, phân loại injection nền-log (S1--S4), và thuật toán Welford $O(1)$ cho phát hiện dị biệt không chữ ký. So sánh với các khung tác-tử-an-ninh gần đây định vị SENTINEL là hướng tiếp cận hợp nhất tiền-lọc thống kê tốc độ đường truyền, bộ đệm Semantic Cache Tầng 1.75, rào chắn chống injection tất định, chủ quyền dữ liệu cục bộ, và kiểm toán chống giả mạo. Chương~\ref{ch:system_design_implementation} sẽ đi sâu vào chi tiết thiết kế kỹ thuật.

@@ -63,6 +63,42 @@ def cached_get_high_risk_ips(min_score=1.0):
 
 
 # ---------------------------------------------------------------------------
+# Kết quả thực nghiệm: ĐỌC TỪ FILE, không viết cứng
+# ---------------------------------------------------------------------------
+# Sáu ô "Kết quả Thực nghiệm" từng là CHUỖI CỨNG, kèm caption khẳng định "mọi số truy được
+# về experiments/results/*.json". Đối chiếu tay ngày 2026-07-28 cho thấy 5/6 khớp nhưng ô
+# "Cổng ML giảm tải LLM" thì KHÔNG: giao diện ghi 83.8% / F1 0.9739 (761/908 ca) trong khi
+# ablation_mlgate_results.json ghi 80.59% / 0.969 (602/747). Số cũ có từ trước lần dựng lại
+# ground_truth và không ai cập nhật lại giao diện — đúng kiểu trôi số mà chỉ cần chạy lại
+# benchmark một lần nữa là tái diễn. Đọc thẳng từ file thì không thể trôi được nữa.
+@st.cache_data(ttl=30)
+def cached_experiment_results() -> dict:
+    """Nạp experiments/results/*.json. Thiếu file -> trả {} và giao diện hiện '—'."""
+    base = os.path.join(os.path.dirname(__file__), "..", "..", "experiments", "results")
+    out: dict = {}
+    for name in (
+        "latency_benchmark",
+        "ablation_mlgate_results",
+        "apt_negative_control_results",
+        "ml_gate_results",
+    ):
+        try:
+            with open(os.path.join(base, f"{name}.json")) as f:
+                out[name] = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            out[name] = {}
+    return out
+
+
+def _res_metric(col, label: str, value, delta: str, fmt=str) -> None:
+    """Hiện chỉ số; nếu số liệu chưa có thì nói THẲNG là chưa có, không bịa giá trị."""
+    if value is None:
+        col.metric(label, "—", "chưa có file kết quả")
+    else:
+        col.metric(label, fmt(value), delta)
+
+
+# ---------------------------------------------------------------------------
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.ui.auth import logout, require_auth
 from src.ui.components import (
@@ -309,35 +345,96 @@ def render_demo_overview(
     with col_right:
         st.markdown("### 🏆 Kết quả Thực nghiệm (Luận văn)")
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
+        _R = cached_experiment_results()
+        _lat = _R.get("latency_benchmark") or {}
+        _mlg = _R.get("ablation_mlgate_results") or {}
+        _apt = _R.get("apt_negative_control_results") or {}
+        _mgr = _R.get("ml_gate_results") or {}
+
+        # Đường nhanh Tier-1 = các sự kiện KHÔNG gọi LLM (<1 ms), tính thẳng từ chuỗi đo.
+        _fast = [x for x in (_lat.get("per_event_two_tier_ms") or []) if x < 1.0]
+        _t1_ms = (sum(_fast) / len(_fast)) if _fast else None
+
         e1, e2 = st.columns(2)
-        # ĐO THẬT từ latency_benchmark.json (n=100): 83 sự kiện đi đường nhanh Tier-1
-        # (không gọi LLM) có TB 0.025 ms; 17 ca gọi LLM có TB 26.92 s. Số cũ "0.6 ms /
-        # ≈5.7 s / 62.7% escalate" KHÔNG khớp bất kỳ file kết quả nào -> đã thay.
-        e1.metric("Độ trễ Tier-1 (luật)", "0.025 ms", "đường nhanh · n=83/100")
-        e2.metric("Giảm độ trễ đầu-cuối", "−82.97%", "4.58 s vs 26.88 s LLM-only")
+        _res_metric(
+            e1,
+            "Độ trễ Tier-1 (luật)",
+            _t1_ms,
+            f"đường nhanh · n={len(_fast)}/{_lat.get('n_events', '?')}",
+            lambda v: f"{v:.3f} ms",
+        )
+        _res_metric(
+            e2,
+            "Giảm độ trễ đầu-cuối",
+            _lat.get("latency_reduction_pct"),
+            f"{(_lat.get('two_tier_mean_ms') or 0) / 1000:.2f} s vs "
+            f"{(_lat.get('baseline_mean_ms') or 0) / 1000:.2f} s LLM-only",
+            lambda v: f"−{v:.2f}%",
+        )
+
         e3, e4 = st.columns(2)
         # Chính sách 4 dải (C>=0.85 BLOCK · 0.65-0.85 ESCALATE · 0.40-0.65 ALERT · <0.40 PASS).
-        # Giảm tải LLM: ground_truth 1250, Config G tự quyết 83.8% (ablation_mlgate) -> F1(bypass) 0.9739.
-        e3.metric("Cổng ML giảm tải LLM", "83.8%", "F1(bypass) 0.9739")
-        e4.metric("APT recall", "1.00", "DAPT2020 · 3/3")
+        _byp = _mlg.get("ml_bypass_rate")
+        _res_metric(
+            e3,
+            "Cổng ML giảm tải LLM",
+            None if _byp is None else 100 * _byp,
+            f"F1(bypass) {_mlg.get('ml_f1_on_bypass', '—')} · "
+            f"{_mlg.get('n_ml_bypass', '?')}/{_mlg.get('n_escalated_would_call_llm', '?')} ca",
+            lambda v: f"{v:.1f}%",
+        )
+        _res_metric(
+            e4,
+            "APT recall",
+            _apt.get("recall"),
+            f"DAPT2020 · {_apt.get('detected', '?')}/{_apt.get('positives_apt_truth', '?')} "
+            f"· specificity {_apt.get('specificity', '?')}",
+            lambda v: f"{v:.2f}",
+        )
+
         e5, e6 = st.columns(2)
-        # HEADLINE = độ chính xác auto-BLOCK (hành động DỨT KHOÁT, không thể đảo, dải C>=0.85).
-        # ĐÃ KIỂM CHỨNG: evaluate_ml_gate.py nay xuất `by_action` ra ml_gate_results.json ->
-        # BLOCK_IP: tp=962, fp=0 => precision 1.0 (trước đây số này chỉ nằm trong báo cáo viết
-        # tay, không tái lập được). F1 gộp 0.8248 thấp hơn vì tính CẢ dải ALERT-0.40
-        # (tp=74/fp=104, precision 0.4157) là "dự đoán tấn công" — ALERT là cảnh báo
-        # low-priority KHÔNG chặn, nên không mâu thuẫn; model held-out 190k vẫn F1 0.9635.
-        e5.metric("Cổng ML — auto-BLOCK chính xác", "100%", "962 chặn · 0 chặn nhầm")
-        e6.metric("Kháng né-tránh Cổng ML", "99.58%", "Inf/cực-đoan · evasion")
+        # HEADLINE = độ chính xác auto-BLOCK (hành động DỨT KHOÁT, không đảo được, dải C>=0.85).
+        # F1 gộp thấp hơn vì tính CẢ dải ALERT-0.40 (cảnh báo low-priority, KHÔNG chặn) —
+        # không mâu thuẫn, nhưng phải nói rõ thay vì chỉ khoe con số đẹp.
+        _blk = ((_mgr.get("classification") or {}).get("by_action") or {}).get("BLOCK_IP") or {}
+        _res_metric(
+            e5,
+            "Cổng ML — auto-BLOCK chính xác",
+            _blk.get("precision"),
+            f"{_blk.get('tp', '?')} chặn · {_blk.get('fp', '?')} chặn nhầm",
+            lambda v: f"{100 * v:.1f}%",
+        )
+        _modes = (_mgr.get("evasion_resistance") or {}).get("by_mode") or {}
+        _ev = (
+            sum(m.get("resistance_rate", 0) for m in _modes.values()) / len(_modes)
+            if _modes
+            else None
+        )
+        _res_metric(
+            e6,
+            "Kháng né-tránh Cổng ML",
+            _ev,
+            f"trung bình {len(_modes)} kiểu né-tránh",
+            lambda v: f"{100 * v:.2f}%",
+        )
+        # Caption cũng ĐỌC TỪ FILE. Bản trước viết cứng "giảm tải 83.8% (761/908 ca)" trong
+        # khi file ghi 602/747 — caption tự khẳng định "mọi số truy được về results/*.json"
+        # mà chính nó lại là số không truy được. Nay mọi con số dưới đây đều lấy tại chỗ.
+        _cls = _mgr.get("classification") or {}
         st.caption(
-            "Nguồn (mọi số truy được về `experiments/results/*.json`): **ml_gate** — datatest "
-            "3.204 mẫu/4 luồng: auto-BLOCK precision **100%** (962 chặn, **0** FP, `by_action`), "
-            "evasion **99.58%**, độ trễ **0.38 ms**, F1 gộp-tính-cả-ALERT 0.825 (P .909/R .755) "
-            "do dải ALERT-0.40 low-priority · **ablation_mlgate** — giảm tải **83.8%** (761/908 ca), "
-            "F1(bypass) 0.9739, precision khi tự quyết 98.82% · **unified_stream** — APT 3/3, "
-            "zero-day 12/15, F1 Tier-1-luật 0.531 · **latency_benchmark** — −82.97% (4.58 s vs "
-            "26.88 s), Tier-1 0.025 ms · **training_report** — LightGBM test-190k held-out F1 "
-            "0.9635 (1M mẫu) · **adversarial** — kháng 12/12. Audit HMAC: 100%."
+            "Nguồn — đọc TRỰC TIẾP từ `experiments/results/*.json` mỗi lần tải trang: "
+            f"**ml_gate** — {_cls.get('total_events', '?')} mẫu, auto-BLOCK precision "
+            f"**{100 * _blk.get('precision', 0):.1f}%** ({_blk.get('tp', '?')} chặn, "
+            f"**{_blk.get('fp', '?')}** FP, `by_action`) · "
+            f"**ablation_mlgate** — giảm tải **{100 * (_byp or 0):.1f}%** "
+            f"({_mlg.get('n_ml_bypass', '?')}/{_mlg.get('n_escalated_would_call_llm', '?')} ca), "
+            f"F1(bypass) {_mlg.get('ml_f1_on_bypass', '—')} · "
+            f"**apt_negative_control** — recall {_apt.get('recall', '—')} "
+            f"({_apt.get('detected', '?')}/{_apt.get('positives_apt_truth', '?')}), "
+            f"specificity {_apt.get('specificity', '—')} ({_apt.get('false_apt_firings', '?')} báo giả) · "
+            f"**latency_benchmark** — −{_lat.get('latency_reduction_pct', '—')}%. "
+            "F1 gộp thấp hơn auto-BLOCK vì tính CẢ dải ALERT-0.40 (cảnh báo low-priority, "
+            "KHÔNG chặn). Audit HMAC: 100%."
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")
@@ -1294,11 +1391,12 @@ def main_dashboard():
                             st.session_state[page_key] = cur + 1
                             st.rerun()
 
-            llm_pending_rules = [
-                r
-                for r in pending_rules
-                if r.get("source", "") in ("langgraph_agent", "langgraph_agent_hitl")
-            ]
+            # MỌI luật chờ duyệt đều phải hiện ở đây, không lọc theo nguồn. Bản trước chỉ
+            # nhận `langgraph_agent*`, nên luật `ml_triage` / `tier1_rule_engine` /
+            # `manual_*` mà rơi vào PENDING_APPROVAL sẽ KHÔNG có nút duyệt nào và mắc kẹt
+            # vĩnh viễn. Bộ hiển thị ngay bên dưới VỐN ĐÃ xử lý đủ các nguồn đó (kể cả
+            # nhánh MANUAL dự phòng) — chỉ riêng bộ lọc này bị bỏ quên khi mở rộng.
+            llm_pending_rules = list(pending_rules)
             st.caption(f"Tổng số sự cố chờ duyệt: **{len(llm_pending_rules)}**")
             _render_pending_list(llm_pending_rules, "hitl_page_all")
 

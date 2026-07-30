@@ -42,7 +42,11 @@ from src.tier1_filter.rule_engine import (  # noqa: E402
 )
 
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
-DATATEST_PATH = os.path.join(ROOT, "experiments", "datatest.json")
+# datatest.json nằm ở data/, KHÔNG phải experiments/ (xem scripts/build_datatest.py:76 và
+# experiments/evaluate_ml_gate.py:36). Đường dẫn cũ trỏ vào file KHÔNG TỒN TẠI nên
+# _benchmark_signatures() lặng lẽ bỏ qua toàn bộ 3.204 flow của datatest — tức golden
+# baseline vẫn có thể học trúng chính các flow dùng để chấm Cổng ML (rò rỉ dữ liệu).
+DATATEST_PATH = os.path.join(ROOT, "data", "datatest.json")
 CIC_DIR = os.path.join(ROOT, "data", "raw", "cicids2018")
 OUT_PATH = os.path.join(ROOT, "config", "golden_baseline.json")
 
@@ -75,6 +79,13 @@ def _benchmark_signatures() -> set[str]:
     sigs: set[str] = set()
     for path in (GT_PATH, DATATEST_PATH):
         if not os.path.exists(path):
+            # KHÔNG được bỏ qua im lặng: thiếu một tập benchmark ở đây nghĩa là golden
+            # baseline có thể HỌC TRÚNG chính flow dùng để CHẤM — rò rỉ dữ liệu, và không
+            # có triệu chứng nào ngoài việc điểm số đẹp lên một cách vô căn cứ.
+            print(
+                f"    [!] CẢNH BÁO: không thấy tập benchmark {path} — flow của nó sẽ KHÔNG"
+                f" bị loại trừ khỏi baseline (nguy cơ rò rỉ dữ liệu)."
+            )
             continue
         with open(path, encoding="utf-8") as f:
             data = json.load(f)

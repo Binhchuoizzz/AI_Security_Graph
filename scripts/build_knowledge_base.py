@@ -1195,6 +1195,975 @@ ALL_MITRE = [
             "block source and review remote-access logs",
         ],
     },
+    # =========================================================================
+    # KỸ THUẬT CHA (parent techniques) — bổ sung 2026-07-27
+    # =========================================================================
+    # VÌ SAO CẦN: kho có sẵn 155 sub-technique nhưng THIẾU 37 kỹ thuật CHA của chúng.
+    # Hệ quả đo được:
+    #   - Lớp `Brute Force -Web` trong ground_truth kỳ vọng `T1110` — mã KHÔNG tồn tại
+    #     trong kho, nên 80 mẫu không bao giờ khớp đúng được.
+    #   - 12/37 mẫu thăm dò của chính dự án (zero-day / gray-zone / adversarial) trỏ tới
+    #     mã cha không có trong kho (T1498, T1059, T1071.001, T1021.00x, T1074, ...).
+    # Vì prompt triage dặn LLM trả `N/A` + `AWAIT_HITL` khi không khớp kỹ thuật nào trong
+    # ngữ cảnh RAG, những ca này VỀ CẤU TRÚC không thể trả lời đúng — chúng đội tỉ lệ
+    # AWAIT_HITL và dìm Context Precision, mà nhìn từ ngoài lại giống "LLM kém".
+    #
+    # Trường `tactic` dùng ĐÚNG từ vựng đang có trong kho (vd "Stealth", "Defense
+    # Impairment") thay vì tên chiến thuật chuẩn của MITRE, để không tạo ra hai hệ nhãn
+    # song song trong cùng một kho.
+    {
+        "id": "T1016",
+        "name": "System Network Configuration Discovery",
+        "tactic": "Discovery",
+        "description": "Adversaries may look for details about the network configuration and settings of systems they access or through information discovery of remote systems, including IP and MAC addresses, routing tables, DNS and proxy settings, to shape follow-on behaviours.",
+        "detection_indicators": [
+            "ipconfig/ifconfig/route/arp enumeration",
+            "reading resolv.conf or proxy settings",
+            "network adapter enumeration via API",
+            "T1016",
+        ],
+        "log_patterns": [
+            "process execution of ipconfig, ifconfig, route, arp, netstat",
+            "burst of network-configuration commands from one host",
+            "registry reads of network interface keys",
+        ],
+        "response_actions": [
+            "correlate with subsequent lateral movement attempts",
+            "baseline which hosts legitimately run network tooling",
+            "alert on discovery bursts from user workstations",
+        ],
+    },
+    {
+        "id": "T1021",
+        "name": "Remote Services",
+        "tactic": "Lateral Movement",
+        "description": "Adversaries may use valid accounts to log into a service that accepts remote connections, such as SSH, RDP, SMB/Windows Admin Shares, VNC, or WinRM, and then act as the logged-on user to move laterally through an environment.",
+        "detection_indicators": [
+            "authenticated session to internal host over RDP/SSH/SMB/WinRM",
+            "same account authenticating to many hosts in sequence",
+            "remote service access on a relocated/non-standard port",
+            "T1021",
+        ],
+        "log_patterns": [
+            "logon type 3/10 to multiple internal hosts from one source",
+            "SMB/WinRM/RDP connections fanning out across a subnet",
+            "remote service traffic outside business hours",
+        ],
+        "response_actions": [
+            "isolate source host and disable the account",
+            "restrict lateral protocols with host firewall and segmentation",
+            "hunt for the initial access that preceded the movement",
+        ],
+    },
+    {
+        "id": "T1055",
+        "name": "Process Injection",
+        "tactic": "Stealth",
+        "description": "Adversaries may inject code into processes in order to evade process-based defenses as well as possibly elevate privileges. Running code in the context of another process may allow access to that process's memory, system resources, and elevated privileges.",
+        "detection_indicators": [
+            "cross-process memory write followed by remote thread creation",
+            "unsigned module loaded into a signed process",
+            "unexpected parent/child process relationship",
+            "T1055",
+        ],
+        "log_patterns": [
+            "OpenProcess/WriteProcessMemory/CreateRemoteThread sequence",
+            "process with anomalous memory-region protections",
+            "legitimate binary making unexpected network connections",
+        ],
+        "response_actions": [
+            "capture process memory before termination",
+            "isolate host and hunt for injected payload persistence",
+            "enable exploit protections and driver-level telemetry",
+        ],
+    },
+    {
+        "id": "T1056",
+        "name": "Input Capture",
+        "tactic": "Collection",
+        "description": "Adversaries may use methods of capturing user input to obtain credentials or collect information, including keylogging, GUI input capture, web portal capture, and credential API hooking.",
+        "detection_indicators": [
+            "keyboard hook installation",
+            "credential prompt spawned by an untrusted process",
+            "API hooking on authentication functions",
+            "T1056",
+        ],
+        "log_patterns": [
+            "SetWindowsHookEx or raw input device registration",
+            "unexpected process reading keystroke buffers",
+            "spoofed credential dialog outside logon flow",
+        ],
+        "response_actions": [
+            "force password reset for affected users",
+            "isolate host and remove hooking component",
+            "enable credential guard and MFA",
+        ],
+    },
+    {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter",
+        "tactic": "Execution",
+        "description": "Adversaries may abuse command and script interpreters such as PowerShell, Windows Command Shell, Unix shells, Python, JavaScript, and Visual Basic to execute arbitrary commands, scripts, or binaries, often as an interactive foothold or as part of a payload delivered by another technique.",
+        "detection_indicators": [
+            "interpreter spawned by a non-interactive parent (web server, office app)",
+            "encoded or obfuscated command line",
+            "reverse shell established from an interpreter process",
+            "T1059",
+        ],
+        "log_patterns": [
+            "powershell -enc / -nop -w hidden command lines",
+            "bash -i redirected to /dev/tcp",
+            "sh or cmd.exe spawned by httpd/nginx/w3wp",
+        ],
+        "response_actions": [
+            "kill the interpreter process and isolate the host",
+            "enable script block and command line logging",
+            "hunt for the delivery vector that spawned the shell",
+        ],
+    },
+    {
+        "id": "T1074",
+        "name": "Data Staged",
+        "tactic": "Collection",
+        "description": "Adversaries may stage collected data in a central location or directory prior to exfiltration, sometimes compressing or encrypting it. Staging may occur on the local system or on a remote internal host.",
+        "detection_indicators": [
+            "large volume of files copied into one directory",
+            "archive created in a temporary or public directory",
+            "internal host receiving bulk data before outbound transfer",
+            "T1074",
+        ],
+        "log_patterns": [
+            "many file reads across shares followed by a single large write",
+            "archive utility invoked on a directory of collected documents",
+            "unusual growth of a staging folder before outbound traffic",
+        ],
+        "response_actions": [
+            "preserve the staging directory as evidence",
+            "block outbound transfer paths before exfiltration completes",
+            "identify the full scope of data collected",
+        ],
+    },
+    {
+        "id": "T1110",
+        "name": "Brute Force",
+        "tactic": "Credential Access",
+        "description": "Adversaries may use brute force techniques to gain access to accounts when passwords are unknown or when password hashes are obtained, including password guessing, password spraying, credential stuffing, and offline password cracking.",
+        "detection_indicators": [
+            "high volume of failed authentications from one source",
+            "single password tried across many accounts (spraying)",
+            "failure burst followed by a success",
+            "T1110",
+        ],
+        "log_patterns": [
+            "repeated 4625/authentication-failure events from one IP",
+            "SSH/FTP/RDP login failures at machine speed",
+            "one-to-one forward/backward packet ratio on an auth port",
+        ],
+        "response_actions": [
+            "block source IP and enforce account lockout policy",
+            "require MFA and reset any account that succeeded",
+            "review whether the source reached other services",
+        ],
+    },
+    {
+        "id": "T1132",
+        "name": "Data Encoding",
+        "tactic": "Command And Control",
+        "description": "Adversaries may encode data with a standard or non-standard data encoding system to make command and control traffic more difficult to detect, such as Base64, hexadecimal, or custom character substitution.",
+        "detection_indicators": [
+            "long encoded strings inside HTTP parameters or headers",
+            "high-entropy payload on an otherwise plaintext protocol",
+            "non-standard encoding scheme in beacon traffic",
+            "T1132",
+        ],
+        "log_patterns": [
+            "base64/hex blobs in URI query strings or cookies",
+            "uniform-length encoded payloads at regular intervals",
+            "encoded content on a protocol that normally carries text",
+        ],
+        "response_actions": [
+            "decode captured payloads to recover C2 commands",
+            "block the C2 destination and hunt for the implant",
+            "add decoding to inspection pipeline before signature matching",
+        ],
+    },
+    {
+        "id": "T1204",
+        "name": "User Execution",
+        "tactic": "Execution",
+        "description": "An adversary may rely upon specific actions by a user in order to gain execution, such as opening a malicious file or link delivered via phishing. User execution often directly follows initial access and precedes further compromise.",
+        "detection_indicators": [
+            "office application spawning a script interpreter",
+            "executable launched from a mail or browser download path",
+            "user opening an archive containing an executable payload",
+            "T1204",
+        ],
+        "log_patterns": [
+            "winword.exe/excel.exe spawning powershell or cmd",
+            "process started from Downloads or Temp directory",
+            "double-extension or masqueraded filename executed",
+        ],
+        "response_actions": [
+            "isolate host and preserve the delivered file",
+            "block the delivery sender/domain and sweep other mailboxes",
+            "disable macros and enforce attachment filtering",
+        ],
+    },
+    {
+        "id": "T1205",
+        "name": "Traffic Signaling",
+        "tactic": "Stealth",
+        "description": "Adversaries may use traffic signaling to hide open ports or other malicious functionality used for persistence or command and control. Traffic signalling involves the use of a magic value or sequence that must be sent to a system to trigger a special response, such as opening a closed port.",
+        "detection_indicators": [
+            "port knocking sequence preceding a new listening service",
+            "socket filter attached to a network interface",
+            "dormant implant activating after a specific packet",
+            "T1205",
+        ],
+        "log_patterns": [
+            "ordered connection attempts to a series of closed ports",
+            "raw socket or BPF filter installation on a host",
+            "service appearing on a port with no prior binding event",
+        ],
+        "response_actions": [
+            "capture full packet data around the activation",
+            "isolate host and enumerate listening sockets",
+            "block inbound access to the signalled port range",
+        ],
+    },
+    {
+        "id": "T1213",
+        "name": "Data from Information Repositories",
+        "tactic": "Collection",
+        "description": "Adversaries may leverage information repositories such as wikis, ticketing systems, code repositories, and shared drives to mine valuable information, including credentials, network diagrams, and business-sensitive documents.",
+        "detection_indicators": [
+            "bulk read or export from a wiki, ticketing, or code repository",
+            "account accessing repositories outside its normal scope",
+            "search queries for credential-like keywords",
+            "T1213",
+        ],
+        "log_patterns": [
+            "mass page/attachment downloads from a knowledge base",
+            "repository clone of many projects by one account",
+            "API export calls at volumes far above the user baseline",
+        ],
+        "response_actions": [
+            "revoke the account's repository tokens and sessions",
+            "audit exactly which documents were accessed",
+            "rotate any credentials that were stored in the repository",
+        ],
+    },
+    {
+        "id": "T1216",
+        "name": "System Script Proxy Execution",
+        "tactic": "Stealth",
+        "description": "Adversaries may use trusted scripts, often signed with certificates, to proxy the execution of malicious files. Several Microsoft signed scripts that are default on Windows installations can be used to proxy execution of other files and bypass application control.",
+        "detection_indicators": [
+            "signed system script invoking a remote or unusual payload",
+            "cscript/wscript running a built-in script with attacker arguments",
+            "application-control bypass via trusted script",
+            "T1216",
+        ],
+        "log_patterns": [
+            "PubPrn.vbs or similar system script with a remote script argument",
+            "signed .vbs/.js executed with network paths",
+            "script host process making outbound connections",
+        ],
+        "response_actions": [
+            "block the abused script path via application control rules",
+            "hunt for the payload the script proxied",
+            "enable script block logging and constrained language mode",
+        ],
+    },
+    {
+        "id": "T1218",
+        "name": "System Binary Proxy Execution",
+        "tactic": "Stealth",
+        "description": "Adversaries may bypass process and signature-based defenses by proxying execution of malicious content with signed, or otherwise trusted, binaries that ship with the operating system (commonly called LOLBins).",
+        "detection_indicators": [
+            "signed system binary loading an unexpected remote payload",
+            "rundll32/regsvr32/mshta invoking network resources",
+            "certutil or bitsadmin used for file transfer",
+            "T1218",
+        ],
+        "log_patterns": [
+            "regsvr32 /i:http..., mshta http..., rundll32 javascript:",
+            "certutil -urlcache -f downloading a payload",
+            "trusted binary spawning a child process from a temp path",
+        ],
+        "response_actions": [
+            "block the abused LOLBin via application control",
+            "isolate host and recover the proxied payload",
+            "alert on the specific command-line patterns going forward",
+        ],
+    },
+    {
+        "id": "T1222",
+        "name": "File and Directory Permissions Modification",
+        "tactic": "Defense Impairment",
+        "description": "Adversaries may modify file or directory permissions to evade access control lists and access protected files, or to make their own artefacts harder for defenders and other users to inspect or remove.",
+        "detection_indicators": [
+            "chmod/chown or icacls applied to sensitive paths",
+            "permissions loosened on system or log directories",
+            "ownership change on defender-relevant artefacts",
+            "T1222",
+        ],
+        "log_patterns": [
+            "icacls/takeown against system directories",
+            "chmod 777 or recursive chown on protected paths",
+            "ACL modification events on audit or backup locations",
+        ],
+        "response_actions": [
+            "restore intended permissions from a known-good baseline",
+            "audit what was accessed while permissions were relaxed",
+            "alert on permission changes to sensitive paths",
+        ],
+    },
+    {
+        "id": "T1484",
+        "name": "Domain or Tenant Policy Modification",
+        "tactic": "Defense Impairment",
+        "description": "Adversaries may modify the configuration settings of a domain or identity tenant to evade defenses and/or escalate privileges, for example by altering Group Policy Objects or adding a rogue federated identity provider.",
+        "detection_indicators": [
+            "unexpected Group Policy Object creation or modification",
+            "new federation trust or identity provider added to the tenant",
+            "domain-wide policy change outside a change window",
+            "T1484",
+        ],
+        "log_patterns": [
+            "GPO modification events from a non-administrative workstation",
+            "federation trust configuration change in tenant audit log",
+            "policy change immediately followed by broad access",
+        ],
+        "response_actions": [
+            "revert the policy change and preserve the prior version",
+            "treat the whole domain/tenant as suspect and rotate keys",
+            "alert on all policy and trust modifications",
+        ],
+    },
+    {
+        "id": "T1485",
+        "name": "Data Destruction",
+        "tactic": "Impact",
+        "description": "Adversaries may destroy data and files on specific systems or in large numbers on a network to interrupt availability. Data destruction is often irrecoverable by forensic means through overwriting files or data on local and remote drives.",
+        "detection_indicators": [
+            "mass file deletion or overwrite across shares",
+            "secure-wipe utility execution",
+            "backup or shadow copy removal preceding deletion",
+            "T1485",
+        ],
+        "log_patterns": [
+            "cipher /w, sdelete, or dd overwriting volumes",
+            "high-rate delete operations on file servers",
+            "destruction following successful exfiltration",
+        ],
+        "response_actions": [
+            "isolate affected hosts immediately to halt spread",
+            "restore from offline backups and verify integrity",
+            "preserve forensic images before remediation",
+        ],
+    },
+    {
+        "id": "T1491",
+        "name": "Defacement",
+        "tactic": "Impact",
+        "description": "Adversaries may modify visual content available internally or externally to an enterprise network, thus affecting the integrity of the original content. Defacement may be used to deliver messaging, intimidate, or claim credit for an intrusion.",
+        "detection_indicators": [
+            "unauthorised modification of web root content",
+            "replacement of index pages or internal portals",
+            "content change with no corresponding deployment record",
+            "T1491",
+        ],
+        "log_patterns": [
+            "web root file writes outside a deployment window",
+            "CMS content modification by an unexpected account",
+            "integrity monitoring alerts on public-facing pages",
+        ],
+        "response_actions": [
+            "restore content from version control and preserve the defaced copy",
+            "find and close the web application entry point used",
+            "review whether defacement masked a deeper compromise",
+        ],
+    },
+    {
+        "id": "T1498",
+        "name": "Network Denial of Service",
+        "tactic": "Impact",
+        "description": "Adversaries may perform network denial of service attacks to degrade or block the availability of targeted resources to users, by exhausting the network bandwidth services rely on. This may be a direct flood or a reflection/amplification attack.",
+        "detection_indicators": [
+            "inbound bandwidth saturation from many sources",
+            "extremely high packet rate with no return traffic",
+            "reflection/amplification traffic from open services",
+            "T1498",
+        ],
+        "log_patterns": [
+            "very high flow packets-per-second with zero backward packets",
+            "traffic volume orders of magnitude above baseline",
+            "distributed sources targeting a single destination",
+        ],
+        "response_actions": [
+            "engage upstream/ISP scrubbing rather than blocking single IPs",
+            "rate-limit at the network edge and enable anti-DDoS services",
+            "treat as possible cover for a concurrent intrusion",
+        ],
+    },
+    {
+        "id": "T1499",
+        "name": "Endpoint Denial of Service",
+        "tactic": "Impact",
+        "description": "Adversaries may perform endpoint denial of service attacks to degrade or block the availability of services to users, by exhausting the system resources those services rely on such as connection tables, CPU, or memory.",
+        "detection_indicators": [
+            "connection table exhaustion on a service",
+            "many long-lived half-open or slow connections",
+            "application-layer request flood with low bandwidth",
+            "T1499",
+        ],
+        "log_patterns": [
+            "very long flow duration with very few packets (slow-rate attack)",
+            "concurrent connection count far above baseline",
+            "repeated expensive application requests from one source",
+        ],
+        "response_actions": [
+            "apply per-source connection limits and timeouts",
+            "alert rather than auto-block when the source may be spoofed",
+            "scale or shield the targeted service",
+        ],
+    },
+    {
+        "id": "T1505",
+        "name": "Server Software Component",
+        "tactic": "Persistence",
+        "description": "Adversaries may abuse legitimate extensible development features of servers to establish persistent access, such as installing web shells, malicious server modules, transport agents, or IIS components.",
+        "detection_indicators": [
+            "new script file written into a web-accessible directory",
+            "server module or transport agent registered unexpectedly",
+            "web server process spawning a command interpreter",
+            "T1505",
+        ],
+        "log_patterns": [
+            "PHP/JSP/ASPX file created under the web root",
+            "requests to an unfamiliar single-file endpoint with command parameters",
+            "w3wp/httpd spawning cmd.exe or /bin/sh",
+        ],
+        "response_actions": [
+            "remove the component and preserve it for analysis",
+            "audit the full web root for additional implants",
+            "patch the vulnerability that allowed the write",
+        ],
+    },
+    {
+        "id": "T1542",
+        "name": "Pre-OS Boot",
+        "tactic": "Stealth",
+        "description": "Adversaries may abuse pre-OS boot mechanisms such as the master boot record, bootkits, firmware, or TFTP boot as a way to establish persistence and evade defenses that operate at the operating system level.",
+        "detection_indicators": [
+            "raw write to boot sectors or firmware regions",
+            "unexpected bootloader or firmware version change",
+            "persistence surviving a full OS reinstall",
+            "T1542",
+        ],
+        "log_patterns": [
+            "direct disk access to sector zero by a user-mode process",
+            "firmware update event with no change record",
+            "secure boot violation or integrity measurement mismatch",
+        ],
+        "response_actions": [
+            "treat the hardware as untrusted; reflash firmware",
+            "verify boot integrity measurements against known-good",
+            "consider hardware replacement for confirmed bootkits",
+        ],
+    },
+    {
+        "id": "T1546",
+        "name": "Event Triggered Execution",
+        "tactic": "Privilege Escalation",
+        "description": "Adversaries may establish persistence and possibly elevate privileges using system mechanisms that trigger execution based on specific events, such as WMI subscriptions, shell profile modification, accessibility features, or application shims.",
+        "detection_indicators": [
+            "WMI permanent event subscription created",
+            "shell profile or logon script modified",
+            "accessibility binary replaced or debugger key set",
+            "T1546",
+        ],
+        "log_patterns": [
+            "__EventFilter/__EventConsumer creation in WMI",
+            "modification of .bashrc, .profile, or logon scripts",
+            "Image File Execution Options debugger registry writes",
+        ],
+        "response_actions": [
+            "remove the trigger and identify what it launched",
+            "audit all event-based execution mechanisms on the host",
+            "monitor WMI subscription creation continuously",
+        ],
+    },
+    {
+        "id": "T1553",
+        "name": "Subvert Trust Controls",
+        "tactic": "Defense Impairment",
+        "description": "Adversaries may undermine security controls that will either warn users of untrusted activity or prevent execution of untrusted programs, for example by installing rogue root certificates, abusing code signing, or stripping mark-of-the-web.",
+        "detection_indicators": [
+            "new root certificate installed in the trust store",
+            "invalid or suspicious code-signing certificate accepted",
+            "mark-of-the-web removed from downloaded files",
+            "T1553",
+        ],
+        "log_patterns": [
+            "certificate store modification by a non-administrative process",
+            "execution of a binary with a recently issued signing certificate",
+            "SmartScreen or Gatekeeper bypass events",
+        ],
+        "response_actions": [
+            "remove the rogue certificate and rebuild the trust store",
+            "hunt for anything signed by the untrusted certificate",
+            "alert on all trust store modifications",
+        ],
+    },
+    {
+        "id": "T1559",
+        "name": "Inter-Process Communication",
+        "tactic": "Execution",
+        "description": "Adversaries may abuse inter-process communication mechanisms such as COM, DDE, or XPC for local code execution, allowing one process to drive execution in another and thereby blend into legitimate application behaviour.",
+        "detection_indicators": [
+            "office application invoking COM/DDE to spawn a process",
+            "unexpected IPC endpoint created by a user process",
+            "execution chain crossing process boundaries without a normal parent",
+            "T1559",
+        ],
+        "log_patterns": [
+            "DDE formula execution from a document",
+            "COM object instantiation followed by process creation",
+            "IPC channel usage between unrelated applications",
+        ],
+        "response_actions": [
+            "disable DDE and restrict COM object instantiation",
+            "trace the full execution chain across processes",
+            "isolate host and inspect the originating document",
+        ],
+    },
+    {
+        "id": "T1560",
+        "name": "Archive Collected Data",
+        "tactic": "Collection",
+        "description": "An adversary may compress and/or encrypt data that is collected prior to exfiltration, minimising the volume sent over the network and obfuscating the content from inspection.",
+        "detection_indicators": [
+            "archive utility run against a staging directory",
+            "password-protected or encrypted archive created",
+            "compression immediately preceding outbound transfer",
+            "T1560",
+        ],
+        "log_patterns": [
+            "7z/rar/zip/tar invoked with encryption flags",
+            "large archive appearing shortly before an outbound spike",
+            "archive created in a temp or public directory",
+        ],
+        "response_actions": [
+            "preserve the archive to determine what was taken",
+            "block the outbound path before transfer completes",
+            "alert on archiving of sensitive directories",
+        ],
+    },
+    {
+        "id": "T1565",
+        "name": "Data Manipulation",
+        "tactic": "Impact",
+        "description": "Adversaries may insert, delete, or manipulate data at rest, in transit, or in stored form in order to influence external outcomes or hide activity, thereby threatening the integrity rather than the availability of data.",
+        "detection_indicators": [
+            "unauthorised record modification in a business database",
+            "log or audit entries altered or removed",
+            "integrity check failure on stored data",
+            "T1565",
+        ],
+        "log_patterns": [
+            "direct database writes bypassing the application layer",
+            "checksum or hash mismatch on monitored files",
+            "modification of financial or transactional records off-hours",
+        ],
+        "response_actions": [
+            "restore affected data from verified backups",
+            "determine the full window of manipulation for restatement",
+            "enable integrity monitoring and immutable audit logging",
+        ],
+    },
+    {
+        "id": "T1574",
+        "name": "Hijack Execution Flow",
+        "tactic": "Stealth",
+        "description": "Adversaries may execute their own malicious payloads by hijacking the way operating systems run programs, for example via DLL search order hijacking, path interception, or service binary replacement, gaining both persistence and privilege escalation.",
+        "detection_indicators": [
+            "DLL loaded from an unexpected directory adjacent to a binary",
+            "service binary path modified",
+            "writable directory appearing early in a search path",
+            "T1574",
+        ],
+        "log_patterns": [
+            "module loaded from a user-writable path by a system service",
+            "service configuration change altering the executable path",
+            "unquoted service path with a writable parent directory",
+        ],
+        "response_actions": [
+            "restore the original binary and remove the planted module",
+            "audit service paths and directory permissions",
+            "enable DLL load telemetry and safe search order",
+        ],
+    },
+    {
+        "id": "T1586",
+        "name": "Compromise Accounts",
+        "tactic": "Resource Development",
+        "description": "Adversaries may compromise accounts with services that can be used during targeting, such as social media, email, or cloud accounts, using them to build trust with a victim ahead of an operation.",
+        "detection_indicators": [
+            "trusted third-party account exhibiting anomalous behaviour",
+            "supplier or partner mailbox sending unusual requests",
+            "known-good sender suddenly delivering malicious content",
+            "T1586",
+        ],
+        "log_patterns": [
+            "inbound mail from a trusted partner with anomalous attachments",
+            "compromised vendor account initiating access requests",
+            "credential reuse from a third-party breach corpus",
+        ],
+        "response_actions": [
+            "verify requests out of band before acting",
+            "notify the partner organisation of the suspected compromise",
+            "apply additional scrutiny to that sender for a period",
+        ],
+    },
+    {
+        "id": "T1587",
+        "name": "Develop Capabilities",
+        "tactic": "Resource Development",
+        "description": "Adversaries may build capabilities that can be used during targeting, such as malware, exploits, code signing certificates, or digital certificates, rather than purchasing or stealing them.",
+        "detection_indicators": [
+            "previously unseen malware family with no public signature",
+            "certificate issued to a fictitious organisation",
+            "custom tooling tailored to the victim environment",
+            "T1587",
+        ],
+        "log_patterns": [
+            "binary with zero reputation and no vendor detections",
+            "self-signed or newly issued certificate on delivered code",
+            "exploit targeting an environment-specific configuration",
+        ],
+        "response_actions": [
+            "preserve samples and share indicators with the community",
+            "prioritise behaviour-based rather than signature-based detection",
+            "assume targeted intent and widen the investigation scope",
+        ],
+    },
+    {
+        "id": "T1591",
+        "name": "Gather Victim Org Information",
+        "tactic": "Reconnaissance",
+        "description": "Adversaries may gather information about the victim's organisation that can be used during targeting, including physical locations, business relationships, operating tempo, and the roles and identities of key staff.",
+        "detection_indicators": [
+            "systematic scraping of organisational pages",
+            "enumeration of staff directories or org charts",
+            "queries for supplier and partner relationships",
+            "T1591",
+        ],
+        "log_patterns": [
+            "sequential access to staff or contact pages from one source",
+            "automated retrieval of corporate documents",
+            "external searches correlating employees to roles",
+        ],
+        "response_actions": [
+            "minimise sensitive organisational detail exposed publicly",
+            "brief high-profile staff on targeted social engineering",
+            "monitor for follow-on phishing using the gathered detail",
+        ],
+    },
+    {
+        "id": "T1596",
+        "name": "Search Open Technical Databases",
+        "tactic": "Reconnaissance",
+        "description": "Adversaries may search freely available technical databases such as DNS/passive DNS, WHOIS, digital certificates, CDN records, and scan databases for information about victims that can be used during targeting.",
+        "detection_indicators": [
+            "certificate transparency monitoring of the organisation's domains",
+            "passive DNS and WHOIS lookups preceding an attack",
+            "appearance of assets in public scan databases",
+            "T1596",
+        ],
+        "log_patterns": [
+            "newly issued certificates for lookalike domains",
+            "external enumeration of subdomains",
+            "internet-wide scanners indexing exposed services",
+        ],
+        "response_actions": [
+            "monitor certificate transparency for lookalike domains",
+            "reduce information disclosed in WHOIS and DNS records",
+            "inventory and shield internet-exposed assets",
+        ],
+    },
+    {
+        "id": "T1597",
+        "name": "Search Closed Sources",
+        "tactic": "Reconnaissance",
+        "description": "Adversaries may search and gather information about victims from closed or paid sources, such as threat intelligence vendors, private data brokers, and criminal marketplaces selling stolen credentials or access.",
+        "detection_indicators": [
+            "organisational credentials appearing in breach corpora",
+            "access to the environment advertised for sale",
+            "targeted intelligence not available from public sources",
+            "T1597",
+        ],
+        "log_patterns": [
+            "credential stuffing using credentials never publicly leaked",
+            "attacker knowledge of internal naming conventions",
+            "initial access consistent with purchased access",
+        ],
+        "response_actions": [
+            "subscribe to breach and dark-web monitoring for the domain",
+            "force rotation of any credentials found for sale",
+            "assume valid-account access and audit accordingly",
+        ],
+    },
+    {
+        "id": "T1598",
+        "name": "Phishing for Information",
+        "tactic": "Reconnaissance",
+        "description": "Adversaries may send phishing messages to elicit sensitive information that can be used during targeting. Unlike phishing for initial access, this variant seeks information rather than execution.",
+        "detection_indicators": [
+            "message soliciting credentials or organisational detail",
+            "spoofed internal sender requesting verification of information",
+            "link to a credential-harvesting page with no payload",
+            "T1598",
+        ],
+        "log_patterns": [
+            "inbound mail with a spoofed internal display name",
+            "user submitting credentials to an external lookalike domain",
+            "reply-to address inconsistent with the sender domain",
+        ],
+        "response_actions": [
+            "reset credentials for any user who responded",
+            "block the harvesting domain and sweep other recipients",
+            "reinforce out-of-band verification procedures",
+        ],
+    },
+    {
+        "id": "T1606",
+        "name": "Forge Web Credentials",
+        "tactic": "Credential Access",
+        "description": "Adversaries may forge credential materials such as web cookies or SAML tokens that can be used to access web applications and internet services, bypassing the normal authentication process entirely.",
+        "detection_indicators": [
+            "session token accepted without a corresponding authentication event",
+            "SAML assertion signed by an unexpected key",
+            "JWT with a weakened or absent signature algorithm",
+            "T1606",
+        ],
+        "log_patterns": [
+            "alg=none or unsigned token presented to an application",
+            "application access with no preceding identity provider logon",
+            "cookie reuse from a geographically impossible location",
+        ],
+        "response_actions": [
+            "revoke all sessions and rotate token signing keys",
+            "audit application access that bypassed the identity provider",
+            "enforce short token lifetimes and signature validation",
+        ],
+    },
+    {
+        "id": "T1608",
+        "name": "Stage Capabilities",
+        "tactic": "Resource Development",
+        "description": "Adversaries may upload, install, or otherwise set up capabilities on infrastructure under their control that can be used during targeting, such as staging malware, exploits, or credential-harvesting pages.",
+        "detection_indicators": [
+            "payload hosted on newly registered infrastructure",
+            "credential-harvesting page impersonating the organisation",
+            "staging server referenced by delivered content",
+            "T1608",
+        ],
+        "log_patterns": [
+            "outbound requests to a recently registered domain",
+            "download of a payload from attacker-controlled hosting",
+            "lookalike domain serving a cloned login page",
+        ],
+        "response_actions": [
+            "block and sinkhole the staging infrastructure",
+            "request takedown of impersonating content",
+            "hunt for hosts that already retrieved the staged payload",
+        ],
+    },
+    # T1685/T1686: kỹ thuật CHA của nhóm sub-technique vô hiệu hoá phòng thủ đã có sẵn
+    # trong kho (Disable or Modify Windows Event Log / Cloud Log / Linux Audit / Windows
+    # Host Firewall). Tên đặt theo đúng tập sub-technique của chúng.
+    {
+        "id": "T1685",
+        "name": "Disable or Modify Logging",
+        "tactic": "Defense Impairment",
+        "description": "Adversaries may disable or modify logging capabilities to limit the data available for detection and audit, covering host event logs, cloud logging integrations, and platform audit subsystems.",
+        "detection_indicators": [
+            "audit or event logging service stopped or reconfigured",
+            "cloud logging integration disabled or diverted",
+            "log retention or forwarding silently reduced",
+            "T1685",
+        ],
+        "log_patterns": [
+            "wevtutil cl, auditpol /clear, or auditd configuration changes",
+            "cloud trail/diagnostic setting deleted or paused",
+            "sudden gap in expected telemetry from a host",
+        ],
+        "response_actions": [
+            "treat telemetry gaps as active-intrusion indicators",
+            "restore logging configuration and forward to immutable storage",
+            "alert on any logging-service modification in real time",
+        ],
+    },
+    # ── Bổ sung đợt 2: các mã mà chính bộ thăm dò của dự án trỏ tới nhưng kho chưa có.
+    # Khác đợt trên (kỹ thuật CHA bị thiếu), đây chủ yếu là SUB-TECHNIQUE cụ thể mà
+    # ZD/GZ/ADV specs dùng làm nhãn kỳ vọng — thiếu chúng thì những ca đó không thể chấm
+    # đúng dù bộ ánh xạ hoạt động hoàn hảo.
+    {
+        "id": "T1102",
+        "name": "Web Service",
+        "tactic": "Command And Control",
+        "description": "Adversaries may use an existing, legitimate external web service as a means for relaying data to or from a compromised system. Popular websites and social media acting as a mechanism for C2 may give a significant amount of cover due to being commonly visited before or during a compromise.",
+        "detection_indicators": [
+            "beaconing to a legitimate cloud or social platform",
+            "C2 traffic blended into normally allowed web destinations",
+            "regular polling of a public paste or repository service",
+            "T1102",
+        ],
+        "log_patterns": [
+            "periodic requests to a public web service with uniform sizing",
+            "long-lived connection to a legitimate domain from a server host",
+            "traffic to a web service inconsistent with the host's role",
+        ],
+        "response_actions": [
+            "block the specific service endpoint rather than the whole domain",
+            "hunt for the implant polling the service",
+            "baseline which hosts legitimately reach external web services",
+        ],
+    },
+    {
+        "id": "T1071.001",
+        "name": "Web Protocols",
+        "tactic": "Command And Control",
+        "description": "Adversaries may communicate using application layer protocols associated with web traffic (HTTP/HTTPS) to avoid detection by blending in with existing traffic. Commands are embedded in the protocol traffic between client and server.",
+        "detection_indicators": [
+            "HTTP/HTTPS beaconing at a fixed cadence",
+            "web requests with anomalous user-agent or URI structure",
+            "long-lived web session carrying command traffic",
+            "T1071.001",
+        ],
+        "log_patterns": [
+            "uniform-interval outbound HTTP requests with small responses",
+            "POST bodies with encoded content to a single endpoint",
+            "web traffic to a destination with no browsing context",
+        ],
+        "response_actions": [
+            "block the C2 destination and capture full request bodies",
+            "hunt for the implant on the beaconing host",
+            "apply jitter-tolerant beacon detection on egress",
+        ],
+    },
+    {
+        "id": "T1021.001",
+        "name": "Remote Desktop Protocol",
+        "tactic": "Lateral Movement",
+        "description": "Adversaries may use valid accounts to log into a computer using the Remote Desktop Protocol, then act as the logged-on user to move laterally, often after harvesting credentials from an initial foothold.",
+        "detection_indicators": [
+            "RDP session to an internal host from a workstation",
+            "RDP exposed or relocated to a non-standard port",
+            "interactive logon outside business hours",
+            "T1021.001",
+        ],
+        "log_patterns": [
+            "logon type 10 events across multiple internal hosts",
+            "RDP traffic on a port other than 3389",
+            "one account opening RDP sessions to many machines",
+        ],
+        "response_actions": [
+            "disable the account and terminate active sessions",
+            "restrict RDP to jump hosts and enforce MFA",
+            "hunt for credential theft that preceded the movement",
+        ],
+    },
+    {
+        "id": "T1021.002",
+        "name": "SMB/Windows Admin Shares",
+        "tactic": "Lateral Movement",
+        "description": "Adversaries may use valid accounts to interact with a remote network share using Server Message Block, then perform actions as the logged-on user, commonly abusing hidden administrative shares such as C$ and ADMIN$.",
+        "detection_indicators": [
+            "access to hidden administrative shares from a workstation",
+            "file written to a remote host's ADMIN$ before service creation",
+            "SMB authentication relay attempts between servers",
+            "T1021.002",
+        ],
+        "log_patterns": [
+            "share access events for C$/ADMIN$/IPC$ across many hosts",
+            "remote file write followed by remote service start",
+            "NTLM relay indicators on file server logs",
+        ],
+        "response_actions": [
+            "block SMB between workstations via host firewall",
+            "require SMB signing to defeat relay attacks",
+            "audit which hosts the account reached",
+        ],
+    },
+    {
+        "id": "T1021.006",
+        "name": "Windows Remote Management",
+        "tactic": "Lateral Movement",
+        "description": "Adversaries may use valid accounts to interact with remote systems using Windows Remote Management (WinRM), a service that allows a user to interact with a remote system and execute commands, often blending with legitimate administration.",
+        "detection_indicators": [
+            "WinRM command execution fanning out to several hosts",
+            "wsmprovhost.exe spawning unexpected child processes",
+            "remote PowerShell session from a non-administrative host",
+            "T1021.006",
+        ],
+        "log_patterns": [
+            "WinRM connections on ports 5985/5986 across a subnet",
+            "wsmprovhost.exe as parent of cmd.exe or script interpreters",
+            "remote PowerShell sessions outside a change window",
+        ],
+        "response_actions": [
+            "restrict WinRM to designated management hosts",
+            "disable the account and review commands executed remotely",
+            "enable PowerShell script block and transcription logging",
+        ],
+    },
+    {
+        "id": "T1567.002",
+        "name": "Exfiltration to Cloud Storage",
+        "tactic": "Exfiltration",
+        "description": "Adversaries may exfiltrate data to a cloud storage service rather than over their primary command and control channel, blending the transfer with normal cloud usage and avoiding volume limits on the C2 channel.",
+        "detection_indicators": [
+            "bulk upload to a cloud storage provider not used by the organisation",
+            "archive transferred outbound to a personal storage account",
+            "large egress to a storage API from a server host",
+            "T1567.002",
+        ],
+        "log_patterns": [
+            "sustained outbound transfer to a cloud storage endpoint",
+            "compressed database dump uploaded to third-party storage",
+            "storage API traffic from a host with no business need",
+        ],
+        "response_actions": [
+            "block unsanctioned cloud storage destinations at egress",
+            "determine exactly what was uploaded and notify data owners",
+            "enforce DLP on outbound archives",
+        ],
+    },
+    {
+        "id": "T1686",
+        "name": "Disable or Modify Firewall",
+        "tactic": "Defense Impairment",
+        "description": "Adversaries may disable or modify host or cloud firewall rules to bypass controls limiting network usage, enabling command and control channels or lateral movement that policy would otherwise block.",
+        "detection_indicators": [
+            "host firewall disabled or profile turned off",
+            "permissive inbound rule added for an unusual port",
+            "cloud security group opened to the internet",
+            "T1686",
+        ],
+        "log_patterns": [
+            "netsh advfirewall set ... state off, or iptables -F",
+            "new allow rule created immediately before outbound C2",
+            "security group ingress opened to 0.0.0.0/0",
+        ],
+        "response_actions": [
+            "restore firewall policy from configuration management",
+            "investigate traffic permitted during the exposure window",
+            "alert on all firewall state and rule modifications",
+        ],
+    },
 ]
 
 ALL_NIST = [
@@ -1311,20 +2280,46 @@ def main():
     args = ap.parse_args()
 
     print("=== [1/2] Mo rong tri thuc (MITRE ATT&CK + NIST SP 800-61r2) ===")
-    extend_knowledge_base()
+    added_m, added_n = extend_knowledge_base()
 
     if args.no_index:
         print("\n[!] Bo qua rebuild index (--no-index).")
+        if added_m or added_n:
+            print(
+                "[!] CANH BAO: KB da doi nhung checksum CHUA duoc niem phong lai -> "
+                "DualRetriever se TU CHOI khoi dong. Chay lai KHONG co --no-index."
+            )
         return
 
-    print("\n=== [2/2] Rebuild FAISS + BM25 index + checksum ===")
     import sys
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from src.rag.embedder import build_all_indexes, update_checksums_file
 
+    # NIEM PHONG LAI checksum nguon TRUOC khi build index.
+    #
+    # VI SAO CAN: `build_all_indexes()` tu kiem tra toan ven KB va NEM LOI neu checksum
+    # lech (chot chong dau doc RAG). Nhung `extend_knowledge_base()` vua sua KB mot cach
+    # HOP LE -> checksum chac chan lech -> script tu chan chinh no. Truoc day day la be
+    # tac: khong the mo rong KB roi rebuild index trong cung mot lan chay.
+    #
+    # AN TOAN: chot toan ven bao ve DUONG CHAY (DualRetriever doc KB da niem phong). Cong
+    # cu nay CHINH LA duong sua doi hop phap duy nhat, nen viec no tu niem phong lai sau
+    # khi sua la dung vai tro. Ke tan cong sua tay file KB van bi chan o runtime.
+    # Dieu kien la "checksum CO LECH khong", KHONG phai "lan chay NAY co them gi khong":
+    # mot lan chay truoc bi dut giua chung (da ghi KB, chua kip build index) se de lai KB
+    # moi voi checksum cu, va khi do added_m = 0 nen kiem tra theo added_* se bo sot.
+    from src.rag.security import verify_document_integrity
+
+    if not verify_document_integrity(exclude_generated=True)["verified"]:
+        print(
+            f"\n=== [2/3] Niem phong lai checksum nguon (KB da doi; lan nay +{added_m}/+{added_n}) ==="
+        )
+        update_checksums_file()
+
+    print("\n=== [3/3] Rebuild FAISS + BM25 index + checksum ===")
     build_all_indexes()
-    update_checksums_file()
+    update_checksums_file()  # niem phong ca file nguon LAN index vua sinh
     print("\nDone: tri thuc da mo rong + index/checksum da rebuild (1 lan xay dung).")
 
 

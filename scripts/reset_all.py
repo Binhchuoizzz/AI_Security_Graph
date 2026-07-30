@@ -89,7 +89,7 @@ def stop_subscribers(dry_run: bool = False) -> None:
     print(f"      -> còn lại: {_count_subscribers()} (kỳ vọng 0)")
 
 
-def clear_data(dry_run: bool = False) -> None:
+def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
     print("[2/3] XOÁ dữ liệu app + Redis stream")
     import sqlite3
 
@@ -125,6 +125,20 @@ def clear_data(dry_run: bool = False) -> None:
             print(f"      [dry] blacklist:* = {len(bl_keys)} IP")
         except Exception as e:  # noqa: BLE001
             print(f"      [dry] Redis: {e}")
+        for rel in ("logs/guardrails_audit.db", "logs/tier2_trace.jsonl"):
+            p = os.path.join(ROOT, rel)
+            if not os.path.exists(p):
+                continue
+            if rel.endswith("tier2_trace.jsonl"):
+                n = sum(1 for _ in open(p, encoding="utf-8", errors="replace"))
+                print(f"      [dry] {rel} = {n} dòng" + (" (GIỮ)" if keep_trace else ""))
+            else:
+                with sqlite3.connect(p) as c:
+                    try:
+                        cnt = c.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+                        print(f"      [dry] {rel}::audit_log = {cnt} dòng")
+                    except sqlite3.OperationalError:
+                        pass
         return
 
     # --- SQLite ---
@@ -150,6 +164,24 @@ def clear_data(dry_run: bool = False) -> None:
             print(f"      -> xoá bảng trong {os.path.basename(db)}")
         except Exception as e:  # noqa: BLE001
             print(f"      [!] lỗi xoá {os.path.basename(db)}: {e}")
+
+    # --- SINK TIER-2: audit guardrails + tracer ------------------------------------ #
+    # LỖI ĐÃ SỬA: hai sink này KHÔNG nằm trong `db_tables` nên `reset_all` chưa bao giờ đụng
+    # tới chúng. Đo được lúc phát hiện: `guardrails_audit.db` = 10.888 dòng và
+    # `tier2_trace.jsonl` = 708 dòng tích luỹ qua nhiều lượt chạy khác nhau. Hệ quả: MỌI
+    # thống kê Tier-2 tính trên chúng đều trộn lẫn các lượt — một lượt "nguội" vẫn đọc ra số
+    # của lượt trước. Xoá ở đây để "reset" đúng nghĩa là reset.
+    for rel in ("logs/guardrails_audit.db", "logs/tier2_trace.jsonl"):
+        if rel.endswith("tier2_trace.jsonl") and keep_trace:
+            print("      -> GIỮ tier2_trace.jsonl (--keep-trace)")
+            continue
+        p = os.path.join(ROOT, rel)
+        try:
+            if os.path.exists(p):
+                os.remove(p)
+                print(f"      -> xoá {rel}")
+        except OSError as e:
+            print(f"      [!] không xoá được {rel}: {e}")
 
     # --- config JSON (counter + Tier-1 blocks) ---
     try:
@@ -237,11 +269,16 @@ def main():
         "--no-restart", action="store_true", help="Chỉ reset, KHÔNG bật lại subscriber."
     )
     ap.add_argument("--dry-run", action="store_true", help="Chỉ in việc sẽ làm, KHÔNG thay đổi gì.")
+    ap.add_argument(
+        "--keep-trace",
+        action="store_true",
+        help="GIỮ logs/tier2_trace.jsonl (để so nhiều lượt trong cùng một chiến dịch audit).",
+    )
     args = ap.parse_args()
 
     print("=== SENTINEL reset_all ===" + (" [DRY-RUN]" if args.dry_run else ""))
     stop_subscribers(args.dry_run)
-    clear_data(args.dry_run)
+    clear_data(args.dry_run, keep_trace=args.keep_trace)
     if args.no_restart:
         print("[3/3] --no-restart: BỎ QUA bật lại subscriber.")
     else:

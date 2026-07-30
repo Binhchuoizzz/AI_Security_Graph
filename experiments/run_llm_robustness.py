@@ -22,6 +22,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from experiments.metrics_core import resource_cost, wilson_ci  # noqa: E402
 from src.agent import llm_client as llm_mod  # noqa: E402
 from src.agent.llm_client import llm_client  # noqa: E402
 from src.agent.prompts import build_triage_prompt  # noqa: E402
@@ -51,21 +52,88 @@ def test_determinism(n_runs=5):
         actions.append(str(llm_client.parse_llm_response(raw).get("action", "?")).upper())
         print(f"   run {i + 1}: action={actions[-1]} | len={len(raw)}")
 
-    raw_identical = len(set(raws)) == 1
+    # ĐÃ GỠ `raw_identical`. Nó luôn False vì batching GPU làm văn bản thô dao động ở mức
+    # ký tự, và điều đó KHÔNG liên quan tới tuyên bố cần chứng minh: cái phải tất định là
+    # QUYẾT ĐỊNH, không phải cách diễn đạt. Báo một cờ luôn False cạnh một cờ luôn True chỉ
+    # tạo ấn tượng sai rằng hệ "chỉ tất định một nửa". `distinct_raw_outputs` được giữ vì
+    # nó ĐỊNH LƯỢNG mức dao động văn bản thay vì phán nhị phân.
     action_identical = len(set(actions)) == 1
-    print(
-        f"   -> raw output giống hệt: {sum(r == raws[0] for r in raws)}/{n_runs} "
-        f"({'TẤT ĐỊNH' if raw_identical else 'có biến thiên'})"
-    )
     print(f"   -> ACTION giống hệt:     {sum(a == actions[0] for a in actions)}/{n_runs}")
+    print(f"   -> biến thể văn bản thô: {len(set(raws))}/{n_runs} (batching GPU, không tính lỗi)")
     return {
         "n_runs": n_runs,
         "seed": 42,
-        "raw_identical": raw_identical,
         "action_identical": action_identical,
         "distinct_raw_outputs": len(set(raws)),
         "distinct_actions": len(set(actions)),
         "actions": actions,
+    }
+
+
+def test_seed_variance(n_samples: int = 10, seeds: tuple[int, ...] = (11, 42, 1337)):
+    """(A2) BIẾN THIÊN theo SEED trên NHIỀU mẫu — khác hẳn phép thử tất định ở trên.
+
+    VÌ SAO CẦN: `test_determinism` chỉ chứng minh "cùng seed + cùng prompt -> cùng kết
+    quả", tức là tính TÁI LẬP. Nó KHÔNG trả lời câu hỏi khác và quan trọng hơn cho luận
+    văn: *"nếu đổi seed thì kết luận có đổi không?"* — tức mọi con số trong Chương 4 có
+    phải là một lần bốc thăm may mắn hay không. Trước đây chỉ đo 1 seed, n=5, trên ĐÚNG
+    MỘT mẫu, nên không có căn cứ nào cho tính ổn định.
+
+    Cách đo: với mỗi mẫu, chạy qua các seed khác nhau và xem PHÁN QUYẾT có đổi không.
+    `flip_rate` = tỉ lệ mẫu mà hành động thay đổi khi chỉ đổi seed. Đây là cận dưới của
+    độ bất ổn: flip_rate cao nghĩa là chênh lệch nhỏ giữa các cấu hình trong ablation có
+    thể chỉ là nhiễu lấy mẫu của LLM, không phải hiệu ứng thật.
+    """
+    print(f"\n[A2] BIẾN THIÊN THEO SEED — {n_samples} mẫu × {len(seeds)} seed")
+    with open(GT_PATH) as f:
+        gt = json.load(f)
+    # Lấy mẫu phân tầng theo hành động kỳ vọng để không chỉ đo trên một loại ca.
+    by_action: dict[str, list] = {}
+    for s in gt:
+        by_action.setdefault(s.get("expected_action", "?"), []).append(s)
+    picked: list = []
+    while len(picked) < n_samples and any(by_action.values()):
+        for _act, bucket in by_action.items():
+            if bucket and len(picked) < n_samples:
+                picked.append(bucket.pop(0))
+
+    rag = "MITRE ATT&CK:\n(context)\n\nNIST SP 800-61r2:\n(context)"
+    rows, n_flip = [], 0
+    for s in picked:
+        logs = s.get("logs", [])
+        if not logs:
+            continue
+        messages = build_triage_prompt(log_data=str(logs[0]), rag_context=rag)
+        acts = []
+        for sd in seeds:
+            raw = llm_client.invoke(messages=messages, temperature=0.1, seed=sd)
+            acts.append(str(llm_client.parse_llm_response(raw).get("action", "?")).upper())
+        flipped = len(set(acts)) > 1
+        n_flip += int(flipped)
+        rows.append(
+            {
+                "sample_id": s["id"],
+                "actions_by_seed": dict(zip(seeds, acts, strict=False)),
+                "flipped": flipped,
+            }
+        )
+        print(f"   {s['id']:10s} {acts}  {'← ĐỔI' if flipped else ''}")
+
+    n = len(rows)
+    flip_rate = round(n_flip / n, 4) if n else 0.0
+    print(f"   -> {n_flip}/{n} mẫu ĐỔI phán quyết khi chỉ đổi seed (flip_rate={flip_rate})")
+    return {
+        "n_samples": n,
+        "seeds": list(seeds),
+        "n_flipped": n_flip,
+        "flip_rate": flip_rate,
+        "flip_rate_ci95": list(wilson_ci(n_flip, n)) if n else None,
+        "per_sample": rows,
+        "note": (
+            "flip_rate = tỉ lệ mẫu đổi phán quyết khi CHỈ đổi seed. Đây là cận dưới của độ "
+            "bất ổn: nếu nó không xấp xỉ 0, các chênh lệch nhỏ giữa cấu hình trong ablation "
+            "phải được đọc như nhiễu chứ không phải hiệu ứng thật."
+        ),
     }
 
 
@@ -117,6 +185,7 @@ def main():
     print("=" * 70)
 
     det = test_determinism()
+    var = test_seed_variance()
     deg = test_graceful_degradation()
 
     # Cache ngữ nghĩa (bonus): tỷ lệ hit giảm tải LLM
@@ -129,14 +198,49 @@ def main():
     except Exception:
         pass
 
-    out = {"determinism": det, "graceful_degradation": deg, "semantic_cache": cache}
+    # ── CHI PHÍ TÀI NGUYÊN — dùng token THẬT do server trả về, không ước lượng ──
+    # `token_monitor.get_stats()` đọc file bền vững và trả None nếu chưa có lượt gọi nào;
+    # schema là tổng luỹ kế (`calls`/`prompt_sum`/`completion_sum`), không phải trung bình.
+    cost = None
+    try:
+        from src.agent import token_monitor
+
+        stats = token_monitor.get_stats() or {}
+        n_calls = int(stats.get("calls") or 0)
+        if n_calls:
+            cost = resource_cost(
+                n_events=n_calls,  # ở script này mỗi lượt gọi ứng một sự kiện
+                n_llm_calls=n_calls,
+                mean_prompt_tokens=float(stats.get("prompt_sum") or 0) / n_calls,
+                mean_completion_tokens=float(stats.get("completion_sum") or 0) / n_calls,
+            )
+            print(
+                f"\n[C] CHI PHÍ: {cost['tokens_per_1k_events']} token/1k sự kiện · "
+                f"tránh được ${cost['avoided_api_usd_per_1k_events']}/1k nếu dùng API"
+            )
+    except Exception as e:
+        print(f"[!] Bỏ qua chi phí tài nguyên (không đọc được token_monitor): {e}")
+
+    out = {
+        "determinism": det,
+        "seed_variance": var,
+        "graceful_degradation": deg,
+        "semantic_cache": cache,
+        "resource_cost": cost,
+    }
     os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
     with open(OUT_JSON, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2, ensure_ascii=False)
     print(f"\n[+] Saved -> {OUT_JSON}")
     print(
-        f"\n  TỔNG: determinism action={det['action_identical']} · degradation safe={deg['safe']}"
+        f"\n  TỔNG: determinism action={det['action_identical']} · "
+        f"seed flip_rate={var['flip_rate']} · degradation safe={deg['safe']}"
     )
+    if var["flip_rate"] > 0.1:
+        print(
+            "  [!] flip_rate > 10%: phán quyết KHÔNG ổn định qua seed — mọi chênh lệch nhỏ\n"
+            "      giữa các cấu hình trong ablation phải đọc như nhiễu, không phải hiệu ứng."
+        )
 
 
 if __name__ == "__main__":

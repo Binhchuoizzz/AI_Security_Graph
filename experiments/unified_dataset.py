@@ -320,203 +320,64 @@ ADV_SPECS = [
     ),
 ]
 
-# ==============================================================================
-# GRAY-ZONE PROBES — vùng xám mà LỚP TĨNH bỏ sót, chỉ tầng NHẬN THỨC phán được
-# ==============================================================================
-# ĐỘNG CƠ: đo trên demo cho thấy 98%+ sự kiện là NetFlow thuần (không payload), nên tầng
-# LLM gần như chỉ nhận ca port-lạ rồi hoãn (AWAIT_HITL). Payload web LỘ LIỄU thì bị 29 họ
-# chữ ký Tier-1 chặn ngay, KHÔNG tới LLM. Khoảng trống thật là các hành vi mà con người
-# (và LLM) nhận ra là tấn công nhưng KHỚP-MẪU-CÚ-PHÁP không bắt được: chúng mô tả hành vi
-# bằng NGỮ NGHĨA (beaconing, exfil, lateral) chứ không bằng token đặc biệt.
-#
-# CÔNG THỨC (đã kiểm chứng qua đường THẬT Tier-1→ML→LLM, không đoán):
-#   port LẠ (không 80/443/8080/cổng-nhạy-cảm)  +  MỘT flow-feature cực trị (Z-score bắt)
-#   +  message NGỮ NGHĨA không khớp chữ ký  →  Tier-1 ESCALATE → ML abstain → LLM phán.
-# Đã đo: 2/2 mẫu mồi cho LLM BLOCK ở confidence 0.93 và 0.99, tên MITRE đúng (T1046, T1041).
-#
-# ⚠️ TRUNG THỰC — đây là ĐẦU VÀO thử nghiệm DO TÁC GIẢ BIÊN SOẠN (nhất quán với khai báo ở
-# Chương 5: "Bộ đối kháng do tác giả biên soạn, không thích ứng"). Chúng gắn nhãn nguồn
-# RIÊNG `grayzone` (KHÔNG trộn vào CICIDS/DAPT thật) và chỉ dùng để MINH HOẠ năng lực tầng
-# nhận thức trong demo — KHÔNG được dùng để tính bất kỳ "tỉ lệ chặn" nào trong luận văn.
-# Mỗi mẫu: (id, tên, cổng lạ, đặc-trưng-cực-trị {field: value}, message ngữ nghĩa, mitre).
-GRAYZONE_SPECS = [
-    (
-        "GZ-01",
-        "C2 beacon cổng phi chuẩn",
-        4444,
-        {"Total Length of Bwd Packets": 30_000_000},
-        "sustained low-rate outbound check-ins to a fixed external host, uniform 60s cadence, tiny encrypted responses",
-        "T1571 Non-Standard Port",
-    ),
-    (
-        "GZ-02",
-        "Exfil khối lượng lớn ra ngoài",
-        9001,
-        {"Total Length of Bwd Packets": 80_000_000},
-        "bulk transfer of an archive named customer_pii_export to an unrecognized external endpoint",
-        "T1041 Exfiltration Over C2 Channel",
-    ),
-    (
-        "GZ-03",
-        "Lateral WinRM tới nhiều host",
-        5985,
-        {"Total Fwd Packets": 260},
-        "remote command execution over WinRM fanning out to several internal hosts in sequence",
-        "T1021.006 Remote Services: Windows Remote Management",
-    ),
-    (
-        "GZ-04",
-        "Data staging trước exfil",
-        8444,
-        {"Total Length of Bwd Packets": 45_000_000},
-        "large volume of employee_records copied to an internal staging host prior to exfiltration",
-        "T1074 Data Staged",
-    ),
-    (
-        "GZ-05",
-        "Reverse tunnel cổng cao",
-        7443,
-        {"Total Fwd Packets": 240},
-        "persistent encrypted tunnel carrying interactive shell traffic to an external relay",
-        "T1572 Protocol Tunneling",
-    ),
-    (
-        "GZ-06",
-        "Trinh sát dịch vụ nội bộ",
-        9200,
-        {"Total Fwd Packets": 300},
-        "systematic probing of internal service ports across the subnet from a single source",
-        "T1046 Network Service Discovery",
-    ),
-    (
-        "GZ-07",
-        "Tải công cụ từ ngoài vào",
-        6667,
-        {"Total Length of Bwd Packets": 12_000_000},
-        "download of an unfamiliar executable payload from an external host over an IRC-style port",
-        "T1105 Ingress Tool Transfer",
-    ),
-    (
-        "GZ-08",
-        "Beacon DNS-over-nonstandard",
-        5353,
-        {"Total Fwd Packets": 220},
-        "high frequency of small lookups encoding data into subdomain labels toward one resolver",
-        "T1071.004 Application Layer Protocol: DNS",
-    ),
-    (
-        "GZ-09",
-        "Exfil chậm rời rạc",
-        8081,
-        {"Total Length of Bwd Packets": 20_000_000},
-        "slow trickle of outbound chunks to an external bucket, spread to stay under volume alarms",
-        "T1030 Data Transfer Size Limits",
-    ),
-    (
-        "GZ-10",
-        "Lateral SMB relay",
-        4445,
-        {"Total Fwd Packets": 250},
-        "authentication relay attempts moving laterally between file servers on an odd port",
-        "T1021.002 Remote Services: SMB/Windows Admin Shares",
-    ),
-    (
-        "GZ-11",
-        "C2 giả lưu lượng web",
-        8888,
-        {"Total Length of Bwd Packets": 35_000_000},
-        "long-lived connection mimicking web traffic but with periodic command-and-control polling",
-        "T1071.001 Application Layer Protocol: Web Protocols",
-    ),
-    (
-        "GZ-12",
-        "Thu thập trước nén",
-        9443,
-        {"Total Fwd Packets": 280},
-        "recursive read of home directories collecting documents before an archive is assembled",
-        "T1119 Automated Collection",
-    ),
-    (
-        "GZ-13",
-        "Exfil qua cloud storage",
-        8090,
-        {"Total Length of Bwd Packets": 60_000_000},
-        "upload of a compressed database dump to a third-party storage service not used by the org",
-        "T1567.002 Exfiltration to Cloud Storage",
-    ),
-    (
-        "GZ-14",
-        "Persistence qua dịch vụ từ xa",
-        5986,
-        {"Total Fwd Packets": 230},
-        "creation of a scheduled remote task on multiple hosts via an administrative protocol",
-        "T1053 Scheduled Task/Job",
-    ),
-    (
-        "GZ-15",
-        "Beacon jitter ngẫu nhiên",
-        6697,
-        {"Total Length of Bwd Packets": 25_000_000},
-        "irregular-interval check-ins with randomized jitter to evade periodicity detection",
-        "T1571 Non-Standard Port",
-    ),
-    (
-        "GZ-16",
-        "Lateral qua RDP phi chuẩn",
-        13389,
-        {"Total Fwd Packets": 270},
-        "remote desktop session opened to an internal host on a relocated RDP port",
-        "T1021.001 Remote Services: Remote Desktop Protocol",
-    ),
-    (
-        "GZ-17",
-        "Rò rỉ credential ra ngoài",
-        8443,
-        {"Total Length of Bwd Packets": 15_000_000},
-        "outbound transfer of a file whose contents resemble a harvested credential store",
-        "T1552 Unsecured Credentials",
-    ),
-    (
-        "GZ-18",
-        "Trinh sát tài khoản miền",
-        9389,
-        {"Total Fwd Packets": 310},
-        "repeated directory queries enumerating privileged domain accounts from one workstation",
-        "T1087.002 Account Discovery: Domain Account",
-    ),
-]
+# User-Agent THẬT THƯỜNG GẶP — dùng cho probe zero-day/adversarial.
+# TRƯỚC ĐÂY hai bộ dựng gắn `zero-day-probe/<id>` và `adv-probe/<id>`: chuỗi đó đi thẳng
+# vào prompt LLM (user_agent là trường hợp lệ, không bị lọc nhãn) và TỰ KHAI đây là mẫu
+# thử. Mọi phán quyết "phát hiện được zero-day" sau đó đều vô giá trị vì mô hình chỉ cần
+# đọc User-Agent. Định danh vẫn được giữ ở `zd_id`/`adv_id` — hai khoá NÀY bị loại trước
+# khi lên LLM, nên vẫn truy vết hậu kiểm được mà không lộ đáp án.
+_REALISTIC_UAS = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+    "Version/17.4 Safari/605.1.15",
+    "python-requests/2.31.0",
+    "curl/8.5.0",
+)
 
 
-def _build_grayzone(tkey):
-    """Sinh các sự kiện GRAY-ZONE (xem GRAYZONE_SPECS). Nhãn nguồn RIÊNG 'grayzone'."""
+def _build_csic(tkey, limit: int):
+    """Nạp request HTTP THẬT của CSIC 2010 (`data/csic.json`) vào luồng.
+
+    THAY THẾ hai nguồn BIÊN SOẠN đã gỡ (`webattack` 69 mẫu + `grayzone` 18 mẫu). Vì sao gỡ:
+    chúng từng là nguồn DUY NHẤT mang bằng chứng tầng ứng dụng trong luồng, nên mọi chỉ số
+    "quy kết kỹ thuật" của đồ án đứng trên 69 mẫu do CHÍNH TÁC GIẢ viết ra — cỡ mẫu quá nhỏ
+    và tự ra đề tự chấm, đúng chỗ phản biện bắt trước tiên.
+
+    CSIC 2010 là ~61.000 request HTTP THẬT đánh vào một ứng dụng thương mại điện tử thật.
+    Nhãn loại tấn công + mã ATT&CK do `scripts/build_csic_dataset.py` suy ra bằng bộ luật
+    viết ĐỘC LẬP với `_WAF_PATTERNS` của Tier-1 (dùng chữ ký của hệ thống để sinh đáp án rồi
+    chấm chính hệ thống là lập luận vòng tròn). Bản ghi không khớp họ nào để TRỐNG mã kỹ
+    thuật — vẫn chấm được PHÁT HIỆN, nhưng bị loại khỏi phần chấm QUY KẾT.
+
+    Khoá nhãn mang tiền tố `wa_` (giữ nguyên quy ước của nguồn cũ) nên tự động bị
+    `subscriber._LABEL_KEY_PREFIXES` tước trước khi vào prompt LLM.
+    """
+    path = os.path.join(ROOT, "data", "csic.json")
+    if limit <= 0 or not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as f:
+        rows = json.load(f)
+
     out = []
-    for i, (gid, name, port, extreme, msg, mitre) in enumerate(GRAYZONE_SPECS):
+    for i, ev in enumerate(rows[:limit]):
+        lab = ev.get("_label") or {}
+        log = {k: v for k, v in ev.items() if k != "_label"}
         day = 2 + (i % 4)
-        log = {
-            "Source IP": f"203.0.113.{130 + i}",  # dải TÀI LIỆU (RFC 5737), không đụng thật
-            "Destination IP": "198.51.100.20",
-            "Destination Port": port,
-            "Protocol": 6,
-            "service": f"PORT_{port}",
-            "message": msg,  # ngữ nghĩa — KHÔNG khớp chữ ký cú pháp
-            # nền flow "hợp lệ nhìn qua" + ĐÚNG MỘT feature cực trị để Z-score ESCALATE
-            "Total Fwd Packets": 40,
-            "Flow Duration": 30_000_000,
-            "Flow Pkts/s": 8.0,
-            "Total Length of Bwd Packets": 60_000,
-            **extreme,
-        }
         out.append(
             {
-                "id": gid,
-                "name": f"Gray-zone {name}",
-                "mitre": mitre,
-                "source": "grayzone",
+                "id": f"CSIC-{ev.get('csic_index', i):05d}",
+                "name": lab.get("gt_label", ""),
+                "mitre": lab.get("wa_mitre", ""),
+                "expected_action": lab.get("wa_expected_action", ""),
+                "source": "csic",
                 "day": day,
                 "t": tkey(day),
                 "log": log,
-                "expected_threat": True,
-                "label": "Attack",
+                "expected_threat": bool(lab.get("expected_threat")),
+                "label": lab.get("gt_label", ""),
             }
         )
     return out
@@ -562,7 +423,9 @@ def _build_zerodays(samples, tkey, repeat: int = 1):
             uid = zid if repeat == 1 else f"{zid}-{r:03d}"
             log["Source IP"] = f"10.{r % 250}.{(i * 7) % 250}.{(220 + i) % 254}"  # nguồn riêng
             log["Destination IP"] = dst  # đích ngoài (narrative exfil/C2)
-            log["user_agent"] = f"zero-day-probe/{uid}"
+            # UA THƯỜNG GẶP — KHÔNG tự khai là probe (xem _REALISTIC_UAS). Định danh `uid`
+            # đi ở `zd_id`, vốn bị loại trước khi lên LLM.
+            log["user_agent"] = _REALISTIC_UAS[n % len(_REALISTIC_UAS)]
             out.append(
                 {
                     "id": uid,
@@ -594,7 +457,8 @@ def _build_adversarials(tkey):
             "Protocol": 6,
             "service": "HTTP",
             "message": val,  # DAPT/WAF style payload
-            "user_agent": f"adv-probe/{aid}",
+            # UA THƯỜNG GẶP — KHÔNG tự khai là probe. Định danh `aid` đi ở `adv_id`.
+            "user_agent": _REALISTIC_UAS[i % len(_REALISTIC_UAS)],
         }
         out.append(
             {
@@ -612,17 +476,51 @@ def _build_adversarials(tkey):
     return out
 
 
+# 10 ngày CICIDS phủ ĐỦ 15 lớp tấn công. NGUỒN CHÂN LÝ DUY NHẤT — `build_datatest.py` và
+# `build_demo.py` từng mỗi nơi giữ một bản chép tay của đúng danh sách này (3 bản), nên sửa
+# một chỗ là hai chỗ kia trôi lệch mà không có gì báo.
+BENCHMARK_DAYS: tuple[str, ...] = (
+    "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv",  # Bot
+    "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",  # DoS Hulk / SlowHTTPTest
+    "Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv",  # DoS GoldenEye / Slowloris
+    "Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv",  # DDoS HOIC / LOIC-UDP
+    "Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # DDoS LOIC-HTTP (tên gốc sai chính tả)
+    "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",  # SSH / FTP-BruteForce
+    "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",  # Infiltration
+    "Friday-23-02-2018_TrafficForML_CICFlowMeter.csv",  # Web BF / XSS / SQLi
+    "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",  # Web BF / XSS / SQLi
+    "Wednesday-28-02-2018_TrafficForML_CICFlowMeter.csv",  # benign-heavy
+)
+
+
 def build_stream(
     cicids_max_rows: int = 20000,
-    cicids_max_days: tuple[str, ...] = ("Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",),
+    cicids_max_days: tuple[str, ...] = BENCHMARK_DAYS,
     dapt_max_rows: int = 5000,
-    zeroday_repeat: int = 1,
+    zeroday_repeat: int = 8,
     cicids_attack_ratio: float = 0.25,
-    include_grayzone: bool = False,
+    csic_max: int = 2000,
 ):
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
-    Tham số (MẶC ĐỊNH = hành vi cũ → datatest/eval KHÔNG đổi trừ khi caller override):
+    MẶC ĐỊNH ĐÃ SỬA (2026-07-30) — ba khuyết tật của bộ mặc định cũ, đo được:
+
+      1. `csic_max=0` -> luồng KHÔNG có một tấn công web nào. Chín script gọi
+         `build_stream()` trần (evaluate_tier2_decision, evaluate_unified_stream,
+         evaluate_rag_retrieval, run_threshold_sensitivity, run_zeroday_graded,
+         run_apt_negative_control, evaluate_feedback_loop, e2e_test_runner, và chính
+         module này) vì thế đo năng lực hệ thống trên luồng thuần NetFlow — trong khi
+         phạm vi nghiên cứu tuyên bố hai tập: CSE-CIC-IDS2018 VÀ CSIC 2010.
+      2. `cicids_max_days` chỉ có Thursday-01-03, tức CHỈ lớp Infiltration. Con số
+         "26.521 sự kiện CSE-CIC-IDS2018" từng trích trong luận văn thực chất là 20.000
+         dòng của MỘT lớp tấn công, chứ không phải 15 lớp. `datatest.json` lại dùng đủ
+         10 ngày — hai bộ số của cùng luận văn đứng trên hai nền dữ liệu khác nhau.
+      3. `zeroday_repeat=1` -> chỉ 15 mẫu zero-day, so với 360 trong datatest.
+
+    `cicids_max_rows` là TỔNG (chia đều cho các ngày), nên phủ 10 ngày KHÔNG làm luồng
+    phình: 20.000 dòng vẫn là 20.000, chỉ khác là trải trên 15 lớp thay vì dồn vào một.
+
+    Tham số:
       cicids_max_rows: tổng dòng CICIDS raw nạp (chia đều cho các ngày) — nguồn KHỐI LƯỢNG.
       cicids_max_days: danh sách file ngày CICIDS THẬT để trích tấn công đa dạng + benign.
       dapt_max_rows:   số dòng DAPT day1 raw.
@@ -761,16 +659,38 @@ def build_stream(
             if (len(atk_df) or len(ben_df))
             else df_cic.head(0)
         )
+        # IP nguồn của CICIDS là TỔNG HỢP (bộ CSV "TrafficForML" đã bỏ địa chỉ thật), nên
+        # ta phải tự gán. Bản trước gán `192.168.{ngày}.{i % 254}` với `i` chạy trên khung
+        # ĐÃ NỐI tấn công-rồi-benign: cùng một IP quay vòng mỗi 254 dòng bất kể nhãn, nên
+        # 2.159/2.286 IP "tấn công" cũng là IP lành tính. Hai hệ quả đều tệ:
+        #   1. Không thể đo được gì ở MỨC IP (containment, uy tín, tái phạm) — danh tính IP
+        #      vô nghĩa thì mọi quy trách nhiệm theo IP cũng vô nghĩa.
+        #   2. Cơ chế chặn-vĩnh-viễn theo uy tín chặn IP sau lần tấn công đầu, rồi chặn tiếp
+        #      ~84% lưu lượng LÀNH TÍNH của chính IP đó -> thác báo động giả thuần tuý do
+        #      cách đánh số, không phải tính chất của hệ thống.
+        # Tách hai dải là TRUNG THÀNH với testbed gốc: CSE-CIC-IDS2018 chạy tấn công từ một
+        # mạng ~50 máy TÁCH BIỆT với 420 máy nạn nhân. Cả hai dải đều nằm trong
+        # `trusted_internal_subnets` của config nên không tạo bất đối xứng nào cho Tier-1.
+        n_atk_host = n_ben_host = 0
         for i, (_, row) in enumerate(rows.iterrows()):
             is_attack = str(row.get("Label", "")).strip().lower() != "benign"
             log = row.to_dict()
+            # CSV CICIDS thô có Flow Byts/s = Inf (chia cho Flow Duration = 0). `pd.isna`
+            # chỉ bắt NaN, KHÔNG bắt Inf — Inf lọt vào Welford là trung bình/phương sai
+            # hỏng vĩnh viễn. Quy về 0 theo đúng quy ước default của `_safe_float`.
             for k, v in log.items():
-                if pd.isna(v):
+                if pd.isna(v) or (isinstance(v, float) and not math.isfinite(v)):
                     log[k] = 0
             port = _safe_int(row.get("Dst Port", 0))
+            if is_attack:
+                src_ip = f"172.16.{d_idx % 32}.{n_atk_host % 254}"
+                n_atk_host += 1
+            else:
+                src_ip = f"192.168.{10 + (d_idx % 40)}.{n_ben_host % 254}"
+                n_ben_host += 1
             log.update(
                 {
-                    "Source IP": f"192.168.{10 + (d_idx % 40)}.{i % 254}",
+                    "Source IP": src_ip,
                     "Destination IP": "10.0.0.1",
                     "Destination Port": port if port else (80 if is_attack else 443),
                     "Protocol": _safe_int(row.get("Protocol", 6)) or 6,
@@ -810,11 +730,22 @@ def build_stream(
         df_dapt.rename(columns=lambda x: x.strip(), inplace=True)
         if len(df_dapt) > dapt_per_day:
             df_dapt = df_dapt.sample(dapt_per_day, random_state=42)
+        # Cùng lý do như CICIDS ở trên: dải tấn công và dải benign phải RỜI NHAU, nếu không
+        # danh tính IP vô nghĩa. (Nguồn `dapt` — chuỗi APT — thì GIỮ NGUYÊN IP thật của
+        # DAPT2020, kể cả khi một host vừa gửi lưu lượng lành vừa gửi tấn công: đó là hành
+        # vi THẬT của máy bị chiếm quyền và chính là thứ liên kết chiến dịch cần bắt.)
+        n_atk_host = n_ben_host = 0
         for i, (_, row) in enumerate(df_dapt.iterrows()):
             label = str(row.get("Label", row.get("label", ""))).strip().lower()
             is_attack = label not in ["normal", "benign"]
+            if is_attack:
+                _src = f"172.20.{dd_idx}.{n_atk_host % 254}"
+                n_atk_host += 1
+            else:
+                _src = f"192.168.{40 + dd_idx}.{n_ben_host % 254}"
+                n_ben_host += 1
             log = {
-                "Source IP": f"192.168.{40 + dd_idx}.{i % 254}",
+                "Source IP": _src,
                 "Destination IP": "10.0.0.1",
                 "Destination Port": 80 if is_attack else 443,
                 "Protocol": 6,
@@ -848,15 +779,183 @@ def build_stream(
     # --- Inject Adversarial (4 payload OWASP THẬT) ---
     main.extend(_build_adversarials(tkey))
 
-    # --- Inject Gray-zone (vùng xám: LLM chặn bằng năng lực, xem GRAYZONE_SPECS) ---
-    # CHỈ cho DEMO. Grayzone là mẫu BIÊN SOẠN — tuyệt đối KHÔNG để lọt vào datatest/
-    # benchmark (build_datatest gọi build_stream mặc định include_grayzone=False), nếu
-    # không nó sẽ làm bẩn số thực nghiệm bằng đầu vào không phải dữ liệu thật.
-    if include_grayzone:
-        main.extend(_build_grayzone(tkey))
+    # --- Inject CSIC 2010: bằng chứng tầng ỨNG DỤNG THẬT --------------------
+    # Phần CICIDS của luồng là NetFlow THUẦN — không một ký tự payload — nên năng lực
+    # ÁNH XẠ KỸ THUẬT của Tier-2 không thể trình diễn được trên đó (bằng chứng để suy ra
+    # kỹ thuật KHÔNG TỒN TẠI trong đầu vào). CSIC bổ sung đúng lớp bằng chứng còn thiếu,
+    # và khác hai nguồn biên soạn đã gỡ, đây là request HTTP THẬT.
+    main.extend(_build_csic(tkey, csic_max))
 
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)
+
+
+# --------------------------------------------------------------------------- #
+# CHẤM LUỒNG — MỘT nguồn sự thật cho mọi script đo Tier-1 offline
+# --------------------------------------------------------------------------- #
+# Nguồn KHÔNG thuộc phân loại nhị phân, kèm LÝ DO (khác hẳn "bỏ sót"):
+#   dapt                 -> flow rút gọn tín hiệu thấp, đo ở chỉ số APT emergent
+#   zeroday              -> đo riêng ở chỉ số zero-day (static bỏ sót vs Welford bắt)
+#   adversarial          -> đầu vào DO TÁC GIẢ BIÊN SOẠN, không phải dữ liệu thật
+NON_CLASSIFIED_SOURCES: dict[str, str] = {
+    "dapt": "đo ở chỉ số APT emergent",
+    "zeroday": "đo ở chỉ số zero-day",
+    "adversarial": "đầu vào biên soạn — không tính vào tỉ lệ",
+}
+
+# Nguồn flow CÓ nhãn ground-truth -> được chấm phân loại. `*_max` trích thẳng từ CSV thô
+# và mang nhãn Label gốc; đây cũng là nơi có benign HELD-OUT (chưa dùng học baseline).
+# `csic` ĐƯỢC chấm phân loại: đây là request HTTP THẬT có nhãn normal/anomalous của chính
+# bộ dữ liệu — khác hẳn `grayzone`/`webattack` (tác giả tự soạn) đã bị gỡ.
+CLASSIFIED_SOURCES: frozenset[str] = frozenset({"cicids", "cicids_max", "dapt_max", "csic"})
+
+
+def score_stream(
+    engine,
+    warmup: list,
+    main: list,
+    *,
+    collect_zeroday: bool = True,
+    on_dapt=None,
+) -> dict:
+    """Chạy luồng gộp qua Tier-1 và chấm phân loại — dùng chung, KHÔNG chép lại.
+
+    VÌ SAO TỒN TẠI: `evaluate_unified_stream.py` và `run_threshold_sensitivity.py` từng
+    có HAI bản sao của cùng vòng chấm này, và cả hai mang y hệt hai lỗi:
+      1. Chỉ khớp `cicids`/`dapt`/`zeroday` nên ~25.000 sự kiện `cicids_max`/`dapt_max`
+         rơi ra ngoài mọi nhánh -> bị bỏ IM LẶNG khỏi ma trận nhầm lẫn.
+      2. Chấm cả 150 flow warmup, tức đo lớp benign trên CHÍNH tập dùng để học baseline
+         Welford (test-on-train).
+    Gộp về một hàm để sửa một lần là hết, và để nguồn mới thêm vào `build_stream()` không
+    thể lặng lẽ biến mất nữa (xem nhánh `UNHANDLED:`).
+
+    warmup: CHỈ đưa qua `engine.evaluate()` để học baseline — KHÔNG chấm.
+
+    on_dapt: callback `(ev, event_index)` gọi cho MỖI sự kiện nguồn `dapt`, ngay sau khi
+        nó đi qua Tier-1. Phát hiện APT phải bám ĐÚNG thứ tự luồng (bản án chỉ được bật
+        sau khi tích luỹ đủ sự kiện đa-ngày), nên việc ghi Threat Memory buộc phải nằm
+        TRONG chính vòng lặp này thay vì một lượt quét riêng.
+
+    Trả dict: confusion · scored_by_source · excluded_by_source · records · zeroday ·
+              n_flagged · n_stream_events.
+    """
+    cls = {"tp": 0, "fp": 0, "tn": 0, "fn": 0}
+    scored_by_source: dict[str, int] = defaultdict(int)
+    excluded_by_source: dict[str, int] = defaultdict(int)
+    records: list[dict] = []  # cho per_class_report / bootstrap CI
+    zd_results: list[dict] = []
+    n_flagged = 0
+    # Dấu vết mức IP theo ĐÚNG thứ tự luồng, phục vụ `metrics_core.ip_containment`.
+    # Ghi cho MỌI nguồn (kể cả nguồn không chấm phân loại) vì ngăn chặn là câu hỏi
+    # vận hành độc lập với việc sự kiện đó có nhãn lớp hay không. Người gọi tự lọc
+    # theo `source` — IP tổng hợp và IP thật phải báo cáo TÁCH NHAU.
+    ip_trace: list[dict] = []
+
+    for ev in warmup:
+        engine.evaluate(ev["log"])
+        excluded_by_source["warmup_benign"] += 1
+
+    for ev_index, ev in enumerate(main, start=1):
+        src = ev["source"]
+
+        if src in CLASSIFIED_SOURCES:
+            res = engine.evaluate(ev["log"])
+            flagged = _is_threat(res["tier1_action"])
+            threat = bool(ev.get("expected_threat"))
+            n_flagged += int(flagged)
+            if threat:
+                cls["tp" if flagged else "fn"] += 1
+            else:
+                cls["fp" if flagged else "tn"] += 1
+            ip_trace.append(
+                {
+                    "ip": ev["log"].get("Source IP", ""),
+                    "source": src,
+                    "is_attack": threat,
+                    "blocked": res["tier1_action"] == "BLOCK_IP",
+                }
+            )
+            scored_by_source[src] += 1
+            records.append(
+                {
+                    "label": ev.get("label") or ("Attack" if threat else "Benign"),
+                    "source": src,
+                    "is_threat": threat,
+                    "flagged": flagged,
+                    "action": res["tier1_action"],
+                }
+            )
+
+        elif src == "zeroday":
+            static_act = static_only_action(engine, ev["log"]) if collect_zeroday else None
+            res = engine.evaluate(ev["log"])
+            flagged = _is_threat(res["tier1_action"])
+            n_flagged += int(flagged)
+            excluded_by_source["zeroday"] += 1
+            ip_trace.append(
+                {
+                    "ip": ev["log"].get("Source IP", ""),
+                    "source": src,
+                    "is_attack": True,
+                    "blocked": res["tier1_action"] == "BLOCK_IP",
+                }
+            )
+            if collect_zeroday:
+                zd_results.append(
+                    {
+                        "id": ev.get("id"),
+                        "name": ev.get("name"),
+                        "mitre": ev.get("mitre"),
+                        "static_only_action": static_act,
+                        "full_action": res["tier1_action"],
+                        "z_score": round(res.get("tier1_z_score", 0.0), 2),
+                        "tier1_score": res.get("tier1_score", 0),
+                        "caught_by_welford": static_act in BENIGN_ACTIONS and flagged,
+                    }
+                )
+
+        elif src in NON_CLASSIFIED_SOURCES:  # dapt / adversarial
+            res = engine.evaluate(ev["log"])
+            n_flagged += int(_is_threat(res["tier1_action"]))
+            excluded_by_source[src] += 1
+            ip_trace.append(
+                {
+                    "ip": ev["log"].get("Source IP", ""),
+                    "source": src,
+                    "is_attack": bool(ev.get("is_attack") or ev.get("expected_threat")),
+                    "blocked": res["tier1_action"] == "BLOCK_IP",
+                }
+            )
+            if src == "dapt" and on_dapt is not None:
+                on_dapt(ev, ev_index)
+
+        else:
+            # KHÔNG im lặng: nguồn mới mà quên khai báo chính là lỗi đã nuốt 25.000 sự kiện.
+            engine.evaluate(ev["log"])
+            excluded_by_source[f"UNHANDLED:{src}"] += 1
+
+    return {
+        "confusion": cls,
+        "scored_by_source": dict(scored_by_source),
+        "excluded_by_source": dict(excluded_by_source),
+        "records": records,
+        "zeroday": zd_results,
+        "n_flagged": n_flagged,
+        "n_stream_events": len(warmup) + len(main),
+        "ip_trace": ip_trace,
+    }
+
+
+def warn_unhandled(excluded_by_source: dict) -> dict:
+    """In cảnh báo to nếu có nguồn chưa khai báo. Trả về phần bị bỏ sót (rỗng = sạch)."""
+    unhandled = {k: v for k, v in excluded_by_source.items() if k.startswith("UNHANDLED:")}
+    if unhandled:
+        print(
+            f"\n[!] CẢNH BÁO: nguồn sự kiện CHƯA KHAI BÁO bị loại khỏi phân loại: {unhandled}"
+            f"\n    Thêm nhánh vào `score_stream()` hoặc khai báo vào NON_CLASSIFIED_SOURCES"
+            f" kèm lý do — đừng để nó biến mất im lặng."
+        )
+    return unhandled
 
 
 # --------------------------------------------------------------------------- #
@@ -906,29 +1005,52 @@ def enrich(ev: dict, demo_signals: bool = False) -> dict:
         log["apt_is_attack"] = bool(ev.get("is_attack"))
         log["apt_timestamp"] = ev.get("timestamp", "")
         log["apt_mitre_ttp"] = ev.get("mitre_ttp", "")  # TTP THẬT (hiển thị tab Threat Intel)
-        # DEMO ONLY: threat-intel THẬT của DAPT2020 làm ngữ cảnh phát hiện. `message` sống
-        # sót qua rule_engine (engine chỉ ghi đè tier1_reasons) và được node_rag_context đọc
-        # vào truy vấn RAG -> LLM ánh xạ đúng TTP. Nội dung 100% từ dataset (không tự chế).
-        if demo_signals and bool(ev.get("is_attack")) and ev.get("mitre_ttp"):
+        # DEMO ONLY: ngữ cảnh tương quan THẬT của DAPT2020. `message` sống sót qua
+        # rule_engine (engine chỉ ghi đè tier1_reasons) và được node_rag_context đọc vào
+        # truy vấn RAG -> Tier-2 ánh xạ được kỹ thuật ĐA DẠNG thay vì đoán T1571 từ số cổng.
+        #
+        # CHỈ ĐƯA HOẠT ĐỘNG QUAN SÁT ĐƯỢC, KHÔNG ĐƯA MÃ ATT&CK. Bản trước ghi thẳng
+        # "kỹ thuật MITRE ATT&CK ghi nhận: T1046" vào message — tức trao ĐÁP ÁN cho LLM, nên
+        # mọi phép đo ánh xạ kỹ thuật trên luồng demo đều vòng tròn (LLM chỉ chép lại). Nhãn
+        # hoạt động ('Network Scan', 'SQL Injection'…) thì khác: đó là thứ một WAF/SIEM
+        # thật SẼ xuất ra, còn việc quy nó về mã ATT&CK nào chính là năng lực đang trình
+        # diễn -> phải để RAG + LLM tự làm. Mã thật vẫn nằm ở `apt_mitre_ttp` cho tab
+        # Threat Intel, và khoá đó bị loại trước khi lên prompt (tiền tố `apt_`).
+        if demo_signals and bool(ev.get("is_attack")) and ev.get("label"):
             log["message"] = (
-                f"[Threat-Intel DAPT2020] Giai đoạn tấn công: {ev.get('phase', '')}; "
-                f"kỹ thuật MITRE ATT&CK ghi nhận: {ev.get('mitre_ttp', '')}."
+                f"[Tương quan SIEM] Hoạt động ghi nhận: {ev.get('label', '')}; "
+                f"giai đoạn chiến dịch: {ev.get('phase', '')}."
             )
     elif ev["source"] == "zeroday":
         log["zd_id"] = ev.get("id")
         log["zd_mitre"] = ev.get("mitre")
         log["zd_name"] = ev.get("name")
-    elif ev["source"] == "adversarial":
-        # payload OWASP LLM Top-10 để thử Guardrails/Tier-2 khi escalate
-        log["adv_id"] = ev["log"].get("gt_id", "")
-        log["adv_source"] = "owasp_llm_top10"
-    elif ev["source"] == "grayzone":
-        # Vùng xám BIÊN SOẠN: gắn nhãn ground-truth = Attack để chấm audit đúng, kèm id
-        # để lọc ra khỏi mọi phép tính "tỉ lệ" (chỉ dùng minh hoạ demo, không benchmark).
-        log["gz_id"] = ev.get("id")
-        log["gz_mitre"] = ev.get("mitre")
+        # LỖI ĐÃ SỬA: thiếu `expected_threat` ở nhánh này (và ở `adversarial` bên dưới)
+        # trong khi nhánh nguồn biên soạn (đã gỡ) lại có. Zero-day là tấn công THEO ĐỊNH NGHĨA — mỗi
+        # mẫu là một flow benign thật bị đẩy một đặc trưng lên cực trị. Thiếu cờ nên mọi
+        # thống kê đếm bằng `expected_threat` (gồm dòng báo cáo của build_demo.py) BỎ SÓT
+        # toàn bộ nhóm này, khiến tỉ lệ tấn công của luồng demo bị báo thấp hơn thực tế.
         log["gt_label"] = "Attack"
         log["expected_threat"] = True
+    elif ev["source"] == "adversarial":
+        # payload OWASP LLM Top-10 để thử Guardrails/Tier-2 khi escalate
+        # LỖI ĐÃ SỬA: đọc `ev["log"]["gt_id"]` — khoá KHÔNG TỒN TẠI vì `_build_adversarials`
+        # không đặt `gt_id`; định danh nằm ở `ev["id"]` (ADV-001…). Hệ quả: `adv_id` LUÔN
+        # là chuỗi rỗng, nên không truy vết được mẫu đối kháng nào gây ra phán quyết nào.
+        log["adv_id"] = ev.get("id", "")
+        log["adv_mitre"] = ev.get("mitre", "")
+        log["adv_source"] = "owasp_llm_top10"
+        log["gt_label"] = "Attack"
+        log["expected_threat"] = True
+    elif ev["source"] == "csic":
+        # Request HTTP THẬT (CSIC 2010). Nhãn mang tiền tố `wa_` -> bị
+        # `subscriber._LABEL_KEY_PREFIXES` tước trước khi lên prompt LLM, nhưng vẫn còn
+        # trong sidecar để đối chiếu hậu kiểm.
+        log["wa_id"] = ev.get("id")
+        log["wa_mitre"] = ev.get("mitre")
+        log["wa_expected_action"] = ev.get("expected_action", "")
+        log["gt_label"] = ev.get("label", "")
+        log["expected_threat"] = bool(ev.get("expected_threat"))
     else:  # cicids / cicids_max / dapt_max: flow có nhãn ground-truth phẳng
         log["gt_label"] = ev.get("label", "")
         log["expected_threat"] = bool(ev.get("expected_threat"))

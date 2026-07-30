@@ -84,7 +84,10 @@ def test_summary_flags_invalid_metric_when_agent_mostly_crashes(monkeypatch, tmp
 
     assert summary is not None
     assert summary["metric_valid"] is False, "run toàn crash PHẢI bị đánh dấu không hợp lệ"
-    assert summary["n_invoke_errors"] == 20
-    assert summary["agent_reliability"] == 0.0
+    # Ba số sức khoẻ lượt chạy nay sống trong khối `run_health`, TÁCH khỏi nhóm chỉ số kết
+    # quả: chúng chứng minh phép đo có SẠCH hay không, chứ không nói gì về năng lực phát
+    # hiện. Nằm lẫn giữa MCC và recall thì `agent_reliability = 1.00` bị đọc như thành tích.
+    assert summary["run_health"]["n_invoke_errors"] == 20
+    assert summary["run_health"]["agent_reliability"] == 0.0
     assert summary["confusion"]["tp"] == 0, "crash KHÔNG được đóng góp TP"
     assert summary["threat_recall"] == 0.0, "recall không được bị bơm bởi ca crash"

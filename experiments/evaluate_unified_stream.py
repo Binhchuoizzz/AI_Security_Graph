@@ -35,15 +35,32 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from experiments.metrics_core import (  # noqa: E402
+    bootstrap_ci,
+    confusion_report,
+    ip_containment,
+    per_class_report,
+    weakest_classes,
+)
 from experiments.unified_dataset import (  # noqa: E402
-    BENIGN_ACTIONS,
     ROOT,
-    _is_threat,
     build_stream,
-    static_only_action,
+    score_stream,
+    warn_unhandled,
 )
 from src.agent.threat_memory import ThreatMemoryStore  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
+
+
+def _f1_of_pairs(pairs) -> float:
+    """F1 tính lại từ danh sách cặp (is_threat, flagged) — dùng cho bootstrap CI."""
+    tp = sum(1 for t, f in pairs if t and f)
+    fp = sum(1 for t, f in pairs if not t and f)
+    fn = sum(1 for t, f in pairs if t and not f)
+    p = tp / (tp + fp) if (tp + fp) else 0.0
+    r = tp / (tp + fn) if (tp + fn) else 0.0
+    return 2 * p * r / (p + r) if (p + r) else 0.0
+
 
 EVAL_MEM_DB = os.path.join(ROOT, "experiments", ".unified_eval_memory.db")
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "unified_stream_results.json")
@@ -71,95 +88,63 @@ def run():
     print(f"\n[*] Nguồn: {len(warmup)} benign (warmup) | {len(main)} sự kiện luồng chính")
     print(f"[*] DAPT: {n_chains} chuỗi | IP là APT thật (>=2 ngày tấn công): {len(apt_truth)}")
 
-    # Phân loại (tính trên CẢ benign warmup lẫn tấn công ở luồng chính) -- #
-    cls = {"tp": 0, "fp": 0, "tn": 0, "fn": 0}
+    # ---- APT: ghi chuỗi TỪ luồng (phải bám đúng thứ tự sự kiện) ---------- #
+    apt_detected: dict = {}  # ip -> {first_event_idx, first_day, fired, ...}
+    apt_event_counter: dict = defaultdict(int)
 
-    # ---- Phase warmup: học baseline Welford từ benign -------------------- #
-    # Các flow này expected = benign -> đóng góp TN/FP cho confusion matrix.
-    for ev in warmup:
-        res = engine.evaluate(ev["log"])
-        flagged = _is_threat(res["tier1_action"])
-        cls["fp" if flagged else "tn"] += 1
-
-    # ---- Phase chính: stream trộn theo thời gian ------------------------- #
-    # APT
-    apt_detected = {}  # ip -> {first_attack_event, fire_event, fire_day, days_at_fire}
-    apt_event_counter = defaultdict(int)
-    # zero-day
-    zd_results = []
-
-    ev_index = 0
-    for ev in main:
-        ev_index += 1
-        src = ev["source"]
-
-        if src == "cicids":
-            res = engine.evaluate(ev["log"])
-            flagged = _is_threat(res["tier1_action"])
-            if ev["expected_threat"]:
-                cls["tp" if flagged else "fn"] += 1
-            else:
-                cls["fp" if flagged else "tn"] += 1
-
-        elif src == "dapt":
-            # Mỗi sự kiện DAPT vẫn đi qua Tier-1 (thường DROP/LOG vì tín hiệu thấp)
-            engine.evaluate(ev["log"])
-            if not ev.get("is_attack"):
-                continue  # benign DAPT = nền nhiễu, KHÔNG ghi vào memory APT
-            ip = ev["ip"]
-            apt_event_counter[ip] += 1
-            # GHI vào bộ nhớ TỪ stream (tích lũy dần), rồi HỎI lại
-            before = memory.check_apt_chain(ip)
-            memory.record_apt_event(
-                src_ip=ip,
-                dst_ip=ev["dst_ip"],
-                apt_phase=ev["phase"],
-                apt_day=ev["day"],
-                label=ev["label"],
-                timestamp=ev["timestamp"],
-            )
-            after = memory.check_apt_chain(ip)
-            if ip not in apt_detected:
-                apt_detected[ip] = {
-                    "first_event_idx": ev_index,
-                    "first_day": ev["day"],
-                    "fired": False,
-                }
-            # ghi lại khoảnh khắc bản án LẬT từ False -> True
-            if (not before["is_apt"]) and after["is_apt"] and not apt_detected[ip]["fired"]:
-                apt_detected[ip].update(
-                    {
-                        "fired": True,
-                        "fire_event_idx": ev_index,
-                        "fire_day": ev["day"],
-                        "events_until_fire": apt_event_counter[ip],
-                        "phases_at_fire": after.get("phases_seen", ""),
-                    }
-                )
-
-        elif src == "zeroday":
-            static_act = static_only_action(engine, ev["log"])
-            res = engine.evaluate(ev["log"])
-            zd_results.append(
+    def _on_dapt(ev, ev_index):
+        """Bản án APT phải NỔI LÊN DẦN: ghi sự kiện vào memory rồi mới hỏi lại."""
+        if not ev.get("is_attack"):
+            return  # benign DAPT = nền nhiễu, KHÔNG ghi vào memory APT
+        ip = ev["ip"]
+        apt_event_counter[ip] += 1
+        before = memory.check_apt_chain(ip)
+        memory.record_apt_event(
+            src_ip=ip,
+            dst_ip=ev["dst_ip"],
+            apt_phase=ev["phase"],
+            apt_day=ev["day"],
+            label=ev["label"],
+            timestamp=ev["timestamp"],
+        )
+        after = memory.check_apt_chain(ip)
+        if ip not in apt_detected:
+            apt_detected[ip] = {"first_event_idx": ev_index, "first_day": ev["day"], "fired": False}
+        # ghi lại khoảnh khắc bản án LẬT từ False -> True
+        if (not before["is_apt"]) and after["is_apt"] and not apt_detected[ip]["fired"]:
+            apt_detected[ip].update(
                 {
-                    "id": ev["id"],
-                    "name": ev["name"],
-                    "mitre": ev["mitre"],
-                    "static_only_action": static_act,
-                    "full_action": res["tier1_action"],
-                    "z_score": round(res.get("tier1_z_score", 0.0), 2),
-                    "tier1_score": res.get("tier1_score", 0),
-                    "caught_by_welford": static_act in BENIGN_ACTIONS
-                    and _is_threat(res["tier1_action"]),
+                    "fired": True,
+                    "fire_event_idx": ev_index,
+                    "fire_day": ev["day"],
+                    "events_until_fire": apt_event_counter[ip],
+                    "phases_at_fire": after.get("phases_seen", ""),
                 }
             )
+
+    # ---- Chấm luồng qua hàm DÙNG CHUNG (xem unified_dataset.score_stream) - #
+    # Warmup CHỈ học baseline, KHÔNG chấm — chấm nó rồi báo là "độ chính xác" chính là
+    # test-on-train. Toàn bộ benign trong ma trận dưới đây là held-out.
+    scored = score_stream(engine, warmup, main, collect_zeroday=True, on_dapt=_on_dapt)
+    warn_unhandled(scored["excluded_by_source"])
+
+    cls = scored["confusion"]
+    scored_by_source = scored["scored_by_source"]
+    excluded_by_source = scored["excluded_by_source"]
+    zd_results = scored["zeroday"]
 
     # ---- Metrics --------------------------------------------------------- #
     tp, fp, tn, fn = cls["tp"], cls["fp"], cls["tn"], cls["fn"]
-    precision = tp / (tp + fp) if (tp + fp) else 0.0
-    recall = tp / (tp + fn) if (tp + fn) else 0.0
-    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0.0
-    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) else 0.0
+    report = confusion_report(tp, fp, tn, fn)
+    precision, recall = report["precision"], report["recall"]
+    f1, accuracy = report["f1"], report["accuracy"]
+
+    # Bóc theo TỪNG lớp tấn công: recall gộp có thể che mất một lớp bị bỏ sót SẠCH.
+    cls_report = per_class_report(scored["records"])
+    # CI bootstrap cho F1 — chạy trên kết quả đã chấm, không tốn thêm lượt gọi nào.
+    f1_ci = bootstrap_ci(
+        [(r["is_threat"], r["flagged"]) for r in scored["records"]], _f1_of_pairs, seed=42
+    )
 
     apt_fired = {ip: d for ip, d in apt_detected.items() if d.get("fired")}
     apt_truth_seen = apt_truth & set(apt_detected.keys())
@@ -170,6 +155,25 @@ def run():
 
     zd_caught = sum(1 for z in zd_results if z["caught_by_welford"])
 
+    # ---- NGĂN CHẶN MỨC IP -------------------------------------------------- #
+    # Báo TÁCH HAI NHÓM, không gộp. Lý do là tính hợp lệ của chính phép đo:
+    #   * `dapt` mang IP THẬT của DAPT2020, nơi một host bị chiếm quyền gửi CẢ lưu lượng
+    #     lành lẫn tấn công. Đây là ca KHÓ và thật — con số ở đây mới đáng đưa vào luận văn,
+    #     kèm Wilson CI vì n rất nhỏ (vài IP kẻ tấn công).
+    #   * Các nguồn còn lại có IP TỔNG HỢP (CICIDS bản ML đã bỏ địa chỉ thật). Sau khi tách
+    #     dải, một IP tổng hợp hoặc là kẻ tấn công hoặc là lành tính suốt luồng — sạch hơn
+    #     đời thật, nên số ở đây đo CƠ CHẾ (lệnh chặn có bật và có dính không) chứ không đo
+    #     độ khó. Gộp hai nhóm lại sẽ để nhóm dễ pha loãng nhóm khó.
+    ip_trace = scored["ip_trace"]
+    containment = {
+        "real_ips_dapt2020": ip_containment([e for e in ip_trace if e["source"] == "dapt"]),
+        "synthetic_ips_other": ip_containment([e for e in ip_trace if e["source"] != "dapt"]),
+        "note": (
+            "Chỉ nhóm `real_ips_dapt2020` dùng địa chỉ nguồn THẬT. Nhóm kia có IP tổng hợp "
+            "nên đo cơ chế ngăn chặn, KHÔNG đo độ khó — đừng trích như nhau."
+        ),
+    }
+
     summary = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "stream": {
@@ -177,6 +181,12 @@ def run():
             "main_events": len(main),
             "dapt_chains": n_chains,
             "apt_truth_ips": len(apt_truth),
+            # Kế toán MINH BẠCH: `main_events` là số sự kiện ĐI QUA hệ thống, KHÁC với số
+            # sự kiện được CHẤM. Trước đây báo cáo chỉ in main_events nên đọc nhầm thành
+            # cỡ mẫu của ma trận nhầm lẫn (thực tế nhỏ hơn 20 lần).
+            "n_scored": tp + fp + tn + fn,
+            "scored_by_source": dict(scored_by_source),
+            "excluded_by_source": dict(excluded_by_source),
         },
         "classification_cicids": {
             "tp": tp,
@@ -186,8 +196,24 @@ def run():
             "precision": round(precision, 4),
             "recall": round(recall, 4),
             "f1": round(f1, 4),
+            "f1_ci95_bootstrap": list(f1_ci),
+            # MCC là chỉ số CHÍNH: bằng 0 với mọi bộ đoán-một-lớp bất kể tỉ lệ lớp, nên
+            # không bị base rate đánh lừa như F1/Accuracy. `accuracy` giữ để đối chiếu
+            # tài liệu cũ, luôn đọc kèm `zero_r_accuracy`.
+            "mcc": report["mcc"],
+            "balanced_accuracy": report["balanced_accuracy"],
             "accuracy": round(accuracy, 4),
+            "majority_baseline": report["majority_baseline"],
+            "zero_r_accuracy": report["zero_r_accuracy"],
+            "accuracy_beats_baseline": report["accuracy_beats_baseline"],
+            "specificity": report["specificity"],
         },
+        # Quy trách nhiệm mức IP: F1 mức-sự-kiện phạt 497 flow còn lại của một kẻ tấn công
+        # đã bị cắt ở flow thứ 3, trong khi vận hành thật coi đó là thành công.
+        "ip_containment": containment,
+        # Bóc theo lớp: điểm mù không lộ ra nếu chỉ nhìn recall gộp.
+        "per_class": cls_report,
+        "weakest_classes": weakest_classes(cls_report, k=3),
         "apt_dapt": {
             "apt_truth_ips": len(apt_truth),
             "apt_truth_seen_in_stream": len(apt_truth_seen),
@@ -215,10 +241,44 @@ def run():
 def _print_console(summary, apt_fired, apt_truth, zd_results):
     c = summary["classification_cicids"]
     a = summary["apt_dapt"]
+    s = summary["stream"]
     print("\n" + "-" * 70)
-    print("  [1] CLASSIFICATION (CICIDS, trên luồng trộn)")
-    print(f"      F1={c['f1']}  Acc={c['accuracy']}  P={c['precision']}  R={c['recall']}")
+    print("  [1] CLASSIFICATION (mọi nguồn flow CÓ NHÃN, trên luồng trộn)")
+    # MCC đứng MỘT MÌNH ở dòng đầu. BalAcc đã bị hạ khỏi headline: nó gần như luôn kể lại
+    # cùng một câu chuyện với MCC nhưng trên thang dễ đọc nhầm (0,5 = đoán bừa, không phải
+    # 0), nên đặt cạnh nhau chỉ tạo hai con số cho một kết luận. Vẫn giữ trong JSON.
+    print(f"      MCC={c['mcc']}   <- chỉ số CHÍNH")
+    print(
+        f"      F1={c['f1']} (CI95 {c['f1_ci95_bootstrap']})  P={c['precision']}  R={c['recall']}"
+    )
+    print(
+        f"      Acc={c['accuracy']} vs ZeroR={c['zero_r_accuracy']} "
+        f"-> {'vượt mốc' if c['accuracy_beats_baseline'] else 'KHÔNG vượt mốc đoán hằng'}"
+    )
     print(f"      TP={c['tp']} FP={c['fp']} TN={c['tn']} FN={c['fn']}")
+    _ct = summary["ip_containment"]["real_ips_dapt2020"]
+    if _ct["n_attacker_ips"]:
+        _d = _ct["events_before_containment"]
+        print("\n  [1b] NGĂN CHẶN MỨC IP — chỉ IP THẬT của DAPT2020 (n nhỏ, đọc kèm CI)")
+        print(
+            f"      Chặn được {_ct['n_contained']}/{_ct['n_attacker_ips']} IP tấn công "
+            f"= {_ct['containment_rate']} (CI95 {_ct['containment_ci95']})"
+        )
+        print(f"      TỈ LỆ IP LỌT = {_ct['leak_rate']}")
+        print(
+            f"      Sự kiện lọt trước khi chặn: trung vị {_d['median']}, P95 {_d['p95']}, "
+            f"tối đa {_d['max']}"
+        )
+        print(
+            f"      Chặn oan IP lành tính: {_ct['benign_ip_false_block_rate']} "
+            f"({_ct['n_benign_ips_blocked']}/{_ct['n_benign_ips']}) <- đối trọng BẮT BUỘC"
+        )
+    print(f"      Đã chấm: {s['n_scored']} / {s['main_events']} sự kiện luồng chính")
+    print(f"      Theo nguồn: {s['scored_by_source']}")
+    print(f"      Loại (có lý do): {s['excluded_by_source']}")
+    weak = summary.get("weakest_classes") or []
+    if weak:
+        print(f"      3 lớp YẾU NHẤT (recall): {', '.join(f'{n}={v}' for n, v in weak)}")
     print("  [2] APT (DAPT, phát hiện EMERGENT từ memory sạch)")
     print(
         f"      APT thật thấy trong stream: {a['apt_truth_seen_in_stream']}"
@@ -263,10 +323,14 @@ def _write_report(summary, apt_fired, apt_truth, zd_results):
         "Các nguồn được **trộn xen kẽ trong từng ngày** bằng khóa thời gian golden-"
         "ratio (không xếp khối theo nguồn); DAPT giữ nguyên ngày thật.\n"
     )
-    lines.append(f"- Warmup benign CICIDS (học baseline Welford): **{s['warmup_benign']}**")
+    lines.append(
+        f"- Warmup benign CICIDS (CHỈ học baseline Welford, **không chấm**): "
+        f"**{s['warmup_benign']}**"
+    )
     lines.append(
         f"- Luồng chính trộn (benign nền + tấn công CICIDS + mọi sự kiện DAPT + "
-        f"zero-day): **{s['main_events']}** sự kiện"
+        f"zero-day): **{s['main_events']}** sự kiện đi qua hệ thống, "
+        f"trong đó **{s['n_scored']}** được chấm phân loại"
     )
     lines.append(
         f"- DAPT chuỗi: **{s['dapt_chains']}** | IP là APT thật (≥2 ngày tấn công): **{s['apt_truth_ips']}**\n"
@@ -279,13 +343,57 @@ def _write_report(summary, apt_fired, apt_truth, zd_results):
         "**đẩy phần tinh vi lên Tier-2** (vì vậy recall ở đây thấp là đúng thiết "
         "kế). F1 của TOÀN hệ thống (Tier-1 + LLM) được đo ở Ablation `Config F`.\n"
     )
+    lines.append(
+        "> **Phạm vi chấm:** mọi sự kiện flow CÓ NHÃN ground-truth ở luồng chính "
+        "(`cicids` từ `ground_truth.json` + `cicids_max`/`dapt_max` trích thẳng từ CSV thô). "
+        f"Cỡ mẫu thực chấm: **{s['n_scored']}** trên {s['main_events']} sự kiện luồng chính. "
+        "**150 flow benign warmup KHÔNG được chấm** — đó là tập dùng để HỌC baseline Welford, "
+        "chấm nó rồi báo là độ chính xác chính là test-on-train; toàn bộ benign trong ma trận "
+        "dưới đây là **held-out**.\n"
+    )
     lines.append("| Metric (Tier-1 gate) | Giá trị |")
     lines.append("| :--- | :---: |")
-    lines.append(f"| F1 | **{c['f1']}** |")
-    lines.append(f"| Accuracy | {c['accuracy']} |")
+    lines.append(f"| **MCC** (chỉ số chính) | **{c['mcc']}** |")
+    lines.append(f"| Balanced accuracy | {c['balanced_accuracy']} |")
+    lines.append(f"| F1 | {c['f1']} (CI95 {c['f1_ci95_bootstrap']}) |")
     lines.append(f"| Precision | {c['precision']} |")
     lines.append(f"| Recall (attack) | {c['recall']} |")
-    lines.append(f"| TP / FP / TN / FN | {c['tp']} / {c['fp']} / {c['tn']} / {c['fn']} |\n")
+    lines.append(f"| Specificity (benign) | {c['specificity']} |")
+    lines.append(f"| Accuracy | {c['accuracy']} |")
+    lines.append(f"| Mốc ZeroR (đoán hằng tốt nhất) | {c['zero_r_accuracy']} |")
+    lines.append(
+        f"| Accuracy vượt mốc? | {'CÓ' if c['accuracy_beats_baseline'] else '**KHÔNG**'} |"
+    )
+    lines.append(f"| TP / FP / TN / FN | {c['tp']} / {c['fp']} / {c['tn']} / {c['fn']} |")
+    lines.append(f"| Cỡ mẫu đã chấm | {s['n_scored']} |\n")
+    lines.append(f"- Đã chấm theo nguồn: `{s['scored_by_source']}`")
+    lines.append(f"- Loại khỏi phân loại (có lý do): `{s['excluded_by_source']}`\n")
+    lines.append(
+        "> **MCC là chỉ số chính, không phải F1.** Một bộ đoán-một-lớp cho MCC = 0 bất kể "
+        "tỉ lệ lớp, trong khi F1 và Accuracy đều bị base rate của tập đánh lừa.\n"
+    )
+
+    # --- Bóc theo lớp: recall gộp che mất lớp bị bỏ sót sạch ------------------ #
+    pc = summary.get("per_class") or {}
+    if pc:
+        lines.append("### 1.1 Bóc theo TỪNG lớp tấn công\n")
+        lines.append(
+            "Recall gộp có thể là trung bình của *bắt hết lớp này, bỏ sạch lớp kia*. Bảng "
+            "này là bằng chứng cho tính khái quát — và là nơi điểm mù lộ ra.\n"
+        )
+        lines.append("| Lớp | n | Recall (CI95) | Bỏ sót | Specificity | FP |")
+        lines.append("| :--- | ---: | :---: | ---: | :---: | ---: |")
+        for lbl, e in sorted(pc.items(), key=lambda kv: kv[1].get("recall", 2)):
+            rec = (
+                f"{e['recall']} {e.get('recall_ci95', '')}"
+                if "recall" in e
+                else "— (lớp lành tính)"
+            )
+            lines.append(
+                f"| {lbl} | {e['n']} | {rec} | {e.get('missed', '—')} "
+                f"| {e.get('specificity', '—')} | {e.get('false_positives', '—')} |"
+            )
+        lines.append("")
 
     lines.append("## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn\n")
     lines.append(

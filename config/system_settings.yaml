@@ -74,7 +74,7 @@ guardrails:
 llm:
   base_url: http://localhost:5000/v1
   estimated_vram_gb: 7
-  max_context_tokens: 8192
+  max_context_tokens: 16384
   model_name: gemma-2-9b-it-Q6_K
   request_timeout_seconds: 120
   seed: 42
@@ -94,7 +94,7 @@ rag:
   semantic_cache:
     max_size: 500
     ttl_seconds: 1800
-  top_k_results: 3
+  top_k_results: 5
 redis:
   escalated_queue: queue_hitl
   publisher_delay_seconds: 0.5

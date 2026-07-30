@@ -36,6 +36,14 @@ class SemanticCache:
 
     Dùng OrderedDict để implement LRU eviction khi cache đầy.
     TTL đảm bảo cache không bị stale.
+
+    TRUNG THỰC VỀ TÊN GỌI: đây là cache KHỚP-CHÍNH-XÁC trên MẪU log đã khai thác, KHÔNG
+    phải "semantic cache" theo nghĩa GPTCache (không có embedding, không có ngưỡng tương
+    đồng vector). Hai truy vấn khác nhau về chữ nhưng cùng ý nghĩa sẽ MISS. Cái làm nên
+    hiệu quả ở đây là bước Drain3 phía trước: nó gộp hàng loạt log gần-trùng về CÙNG một
+    mẫu, nên cache bắt được lưu lượng lặp (DDoS/brute-force) dù bản thân phép so khớp là
+    chính xác từng ký tự. Khi mô tả trong tài liệu/luận văn, gọi là "bộ đệm theo mẫu"
+    (template cache) — gọi là "semantic" là nói quá so với cơ chế thật.
     """
 
     def __init__(self, max_size: int = 500, ttl_seconds: int = 1800):

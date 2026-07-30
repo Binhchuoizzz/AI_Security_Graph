@@ -32,6 +32,46 @@ CONFIG_YAML_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
 
+# ── Khóa HMAC của sổ kiểm toán ────────────────────────────────────────────────────────
+# Khóa mặc định nằm TRONG mã nguồn công khai, nên khi thiếu env thì chuỗi băm KHÔNG còn
+# giá trị chống giả mạo: ai đọc repo cũng tính lại được hash hợp lệ cho bản ghi đã sửa và
+# verify_audit_trail_integrity() vẫn báo "toàn vẹn". Trước đây điều này diễn ra IM LẶNG ở
+# mọi lượt chạy (biến không có trong .env lẫn .env.example), trong khi tài liệu lại tuyên
+# bố "no hardcoded credentials". Nay cảnh báo MỘT lần lúc khởi động để trạng thái thật của
+# tính toàn vẹn luôn hiện rõ.
+_FALLBACK_LOG_SECRET = "sentinel_secure_fallback_log_secret_2026"  # noqa: S105
+
+
+def _log_secret() -> bytes:
+    """Khóa ký chuỗi audit. Một nguồn duy nhất cho cả ghi lẫn xác minh."""
+    return os.getenv("SENTINEL_LOG_SECRET", _FALLBACK_LOG_SECRET).encode()
+
+
+def generate_action_token(action: str, target: str, timestamp_str: str) -> str:
+    """Tạo Cryptographic Signed Token (HMAC-SHA256) cho phép thực thi hạ tầng (OWASP LLM06 Excessive Agency Defense)."""
+    msg = f"{action}:{target}:{timestamp_str}".encode()
+    return hmac.new(_log_secret(), msg, hashlib.sha256).hexdigest()
+
+
+def verify_action_token(action: str, target: str, timestamp_str: str, token: str) -> bool:
+    """Xác thực Token chữ ký hành động xem có hợp lệ và được tạo từ khóa bí mật SENTINEL không."""
+    expected_token = generate_action_token(action, target, timestamp_str)
+    return hmac.compare_digest(expected_token, token)
+
+
+def audit_key_is_default() -> bool:
+    """True nếu đang ký bằng khóa mặc định công khai (chuỗi audit KHÔNG chống giả mạo)."""
+    return not os.getenv("SENTINEL_LOG_SECRET")
+
+
+if audit_key_is_default():
+    logger.warning(
+        "[AUDIT] SENTINEL_LOG_SECRET chưa được đặt — chuỗi HMAC đang ký bằng khóa MẶC ĐỊNH "
+        "có sẵn trong mã nguồn. Phát hiện giả mạo lúc này CHỈ chống sửa đổi vô tình, KHÔNG "
+        "chống được kẻ tấn công đọc được repo. Sinh khóa: "
+        'python -c "import secrets; print(secrets.token_hex(32))" rồi đặt vào .env'
+    )
+
 # Cache whitelist (đọc từ YAML) để phòng vệ chiều sâu KHÔNG tốn I/O mỗi lần chặn.
 # Khử cache theo MTIME của file: hễ whitelist đổi (vd approve_rule vừa gỡ 1 IP) là
 # đọc lại NGAY — tránh đua dữ liệu khi block ngay sau khi gỡ khỏi whitelist.
@@ -217,9 +257,7 @@ def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
             )
 
             # 2. Tính toán mã băm HMAC
-            secret_key = os.getenv(
-                "SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026"
-            ).encode()
+            secret_key = _log_secret()
             message = f"{prev_hash}|{timestamp}|{action}|{safe_target}|{safe_reason}".encode()
             current_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
 
@@ -473,9 +511,7 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
         if not rows:
             return True, "Cơ sở dữ liệu trống. Hệ thống nhật ký trống nhưng toàn vẹn."
 
-        secret_key = os.getenv(
-            "SENTINEL_LOG_SECRET", "sentinel_secure_fallback_log_secret_2026"
-        ).encode()
+        secret_key = _log_secret()
         prev_hash = "genesis_block_hash_sentinel_soc"
 
         for row in rows:
@@ -493,6 +529,13 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
 
             prev_hash = integrity_hash
 
+        if audit_key_is_default():
+            # Nói đúng mức bảo đảm thực tế: với khóa công khai, đây là kiểm tra TÍNH NHẤT
+            # QUÁN chứ chưa phải bằng chứng chống giả mạo có chủ đích.
+            return True, (
+                "✅ Chuỗi nhật ký nhất quán (0 sửa đổi). ⚠️ Đang ký bằng khóa MẶC ĐỊNH công "
+                "khai — đặt SENTINEL_LOG_SECRET trong .env để có bảo đảm chống giả mạo thật."
+            )
         return True, "✅ Hệ thống nhật ký toàn vẹn (0 phát hiện sửa đổi hay giả mạo)."
     except Exception as e:
         return False, f"Lỗi trong quá trình kiểm tra toàn vẹn: {e}"

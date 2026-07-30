@@ -146,6 +146,29 @@ class FeedbackListener:
         Returns:
             dict chứa thông tin rule + status
         """
+        # ĐÓNG BĂNG khi đang chạy thực nghiệm bóc tách (ablation).
+        #
+        # LỖI ĐO ĐÃ VÁ (phát hiện 2026-07-30 lúc 00:00): `run_ablation` dựng MỘT `rule_engine`
+        # duy nhất rồi cho CẢ Config A (không LLM) lẫn Config F (đủ LLM) dùng chung. Mỗi luật
+        # do tác tử của F sinh ra được ghi vào config, và `_save_config_atomically` CHỦ ĐỘNG
+        # xoá cache (dòng ~107) nên luật có hiệu lực NGAY ở mẫu kế tiếp — kể cả với Config A.
+        #
+        # Hệ quả: Config A, vốn là kịch bản "giả sử KHÔNG có Tầng 2", lại được hưởng chính
+        # những luật mà chỉ Tầng 2 mới tạo ra nổi. Baseline bị treatment nâng đỡ, nên delta
+        # A->F NÓI GIẢM đóng góp thật của Tầng 2. Quan sát được: luật động phình 745 -> 1.498
+        # trong một lượt chạy, tức lượt sau xuất phát từ trạng thái khác lượt trước và
+        # benchmark KHÔNG tái lập được.
+        #
+        # Đóng băng chứ không xoá: tập luật đã được người duyệt vẫn còn hiệu lực cho cả hai
+        # cấu hình như nhau, chỉ chặn việc SINH THÊM giữa lượt đo. Vòng phản hồi vẫn chạy
+        # bình thường ở chế độ vận hành thật (biến này không đặt).
+        if os.getenv("SENTINEL_FREEZE_DYNAMIC_RULES") == "1":
+            logger.debug("[Feedback] Đóng băng luật động (đang đo ablation): bỏ qua '%s'", pattern)
+            return {
+                "status": "FROZEN_FOR_BENCHMARK",
+                "rule": {"field": field, "pattern": pattern, "score": score},
+            }
+
         # Validate dynamic rule using FeedbackValidator
         validator = FeedbackValidator()
         is_valid, errors = validator.validate_rule(field, pattern, score)
