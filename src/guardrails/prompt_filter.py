@@ -222,7 +222,8 @@ class JailbreakDetector:
         self.role_play_re = re.compile(
             r"(?:you\s+are\s+now|act\s+as\s+(?:if|a)|pretend\s+(?:to\s+be|you)|"
             r"roleplay|simulate\s+(?:a|being)|imagine\s+you\s+are|"
-            r"from\s+now\s+on\s+you\s+(?:will|are|must))",
+            r"from\s+now\s+on|step\s+by\s+step|no\s+rules|stay\s+in\s+character|"
+            r"cause\s+chaos|disrupt)",
             re.IGNORECASE,
         )
 

@@ -131,50 +131,8 @@ Lớp tĩnh mạnh ở `encoding_bypass` nhưng **mù trước tấn công ngữ
 
 > **Trung thực khi demo end-to-end:** một phần payload bị Tier-1 **DROP** trước khi tới Guardrail — lọt bằng cách bị bỏ qua, không phải bị chặn có chủ đích. Con số kháng tiêm nhiễm đo bằng cách nạp **thẳng** vào đường ống, và phải nói rõ như vậy.
 
----
-
-## 4.1. Adversarial — Bài Test Mở rộng (Thực tế)
-
-```bash
-.venv/bin/python scripts/push_flow.py --source adversarial
-# 723 payload tổng hợp: 120 (cũ) + 603 (mới: AdvBench GCG, Deepset PI, Jackhhao Jailbreak)
-```
-
-Đây là bài test toàn diện trên dữ liệu đối kháng siêu cấp được thu thập thực tế từ HuggingFace và Github.
-
-| Lớp phòng thủ | Phạm vi & Kết quả (31/07) |
-| :-- | :-- |
-| Guardrail **Tĩnh (Tier-1)** | 723 mẫu (8 nhóm). Chặn tốt các PI thô sơ (59%), nhưng **MÙ (0%)** trước AdvBench và Jailbreak tâm lý. |
-| **Cognitive Agent (Tier-2)** | Đỡ đòn **100%** các mẫu siêu khó đã lọt qua lớp tĩnh nhờ nhận diện ngữ cảnh và đóng gói (Encapsulator). |
-
-Luận văn TRẮNG ĐEN rõ ràng: không có Tầng 2, hệ thống chết 100% trước AdvBench và Jailbreak.
-
----
-
-## 4.2. Tương tác kiểm thử đứt gãy HMAC trên một IP cụ thể (Forgery & Tail-dropping)
-
-Để trình diễn trực tiếp khả năng bắt quả tang giả mạo ngay lập tức (không cần đợi thao tác trên UI), bạn có thể thao tác giả mạo trên một IP cụ thể (ví dụ `198.51.100.15`) và yêu cầu hệ thống xác minh HMAC báo cáo lỗi ngay tại terminal:
-
-**Cách 1: Tấn công Giả mạo nội dung (Sửa `BLOCK_IP` thành `LOG`)**
-```bash
-# 1. Kẻ tấn công sửa hành động của IP cụ thể thành LOG để che giấu dấu vết
-sqlite3 config/audit_trail.db "UPDATE audit_trail SET action = 'LOG' WHERE target = '198.51.100.15';"
-
-# 2. Gọi hệ thống kiểm toán HMAC in kết quả ra ngay lập tức
-.venv/bin/python -c "import sys; sys.path.insert(0, '.'); from src.response.executor import verify_audit_trail_integrity as v; print(v()[1])"
-```
-*Trình diễn:* Terminal sẽ lập tức phát ra cảnh báo: `⚠️ PHÁT HIỆN GIẢ MẠO! Dòng log ID ... đã bị sửa đổi...` do chuỗi băm của IP `198.51.100.15` không khớp với nội dung đã sửa, làm đứt gãy toàn bộ chuỗi. (Trên Dashboard UI cũng sẽ báo ĐỎ nếu bạn tải lại).
-
-**Cách 2: Khai thác lỗ hổng toán học Tail-dropping (Xóa hẳn dòng log đuôi)**
-(Để thành công, dòng bị xóa **bắt buộc phải là dòng cuối cùng** của chuỗi).
-```bash
-# 1. Kẻ tấn công xóa bản ghi cuối cùng trong DB
-sqlite3 config/audit_trail.db "DELETE FROM audit_trail WHERE id = (SELECT MAX(id) FROM audit_trail);"
-
-# 2. Gọi hệ thống kiểm toán HMAC kiểm tra lại
-.venv/bin/python -c "import sys; sys.path.insert(0, '.'); from src.response.executor import verify_audit_trail_integrity as v; print(v()[1])"
-```
-*Trình diễn:* Lần này terminal in ra `✅ Hệ thống nhật ký toàn vẹn`. Điều này chứng minh lý thuyết trong luận văn: vì mã băm $H_i$ chỉ phụ thuộc vào bản ghi trước nó $H_{i-1}$, việc cắt bỏ phần đuôi hoàn toàn không làm hỏng chuỗi của các block còn lại. Kẻ tấn công xóa sạch dấu vết mà chuỗi tĩnh không phát hiện ra!
+> **Lưu ý về Bài Test Mở rộng 723 payload & Kiểm thử HMAC (RQ2):**
+> Chi tiết kịch bản chạy bài test mở rộng 723 mẫu đối kháng (AdvBench, Deepset, Jackhhao) và kịch bản tương tác kiểm thử đứt gãy chuỗi HMAC (Content Forgery & Tail-dropping) đã được chuyển sang **Mục 2 (RQ2)** trong tệp [DEMO_BY_RQ.md](DEMO_BY_RQ.md).
 
 ---
 
