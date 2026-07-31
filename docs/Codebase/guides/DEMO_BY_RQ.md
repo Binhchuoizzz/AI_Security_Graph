@@ -134,6 +134,15 @@ sqlite3 config/audit_trail.db "DELETE FROM audit_trail WHERE id = (SELECT MAX(id
 ```
 *Tệp kết quả chứa con số:* `experiments/results/audit_tamper_results.json`.
 
+#### 📋 Bảng Tổng hợp Bộ Đánh giá Thực nghiệm cho RQ2 (AI Security & Audit Integrity)
+
+| Tệp Script Thực nghiệm | Tập dữ liệu sử dụng | Kết quả Đo đạc Thực tế | Tệp Kết quả (Output File) | Chứng minh điều gì cho Luận văn? |
+|---|---|---|---|---|
+| **1. `evaluate_adversarial.py`** <br> *(Đánh giá Rào chắn Tiêm nhiễm)* | **723 payload đối kháng siêu cấp** (AdvBench GCG, Deepset PI, Jackhhao Jailbreak) | • **Tier-1 Static:** Chặn 59% PI thô, nhưng **0% (MÙ)** trước AdvBench & Jailbreak <br>• **Tier-2 Cognitive:** **100% E2E Defense Rate** nhờ *Delimited Encapsulator* | [`adversarial_pipeline_results.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/adversarial_pipeline_results.json) | **Giải quyết vế "Kháng Tiêm nhiễm Prompt" của RQ2:** <br>Chứng minh nếu thiếu Tầng 2 Cognitive Agent, hệ thống chết 100% trước AdvBench/Jailbreak; Tầng 2 giúp bảo vệ luồng suy luận an toàn 100%. |
+| **2. `run_llm_robustness.py`** <br> *(Đo Độ Kháng Nhiễu & Tất định)* | **Tập mẫu đối kháng & Edge Cases** thử nghiệm qua nhiều random seed & temperature | • **Độ tất định quy kết:** **100%** map về `AML.T0051` <br>• **Không ảo giác:** 0% bị lừa quy kết sang mã mạng sai (`T1571`, `T1568`) | [`robustness_results.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/robustness_results.json) | **Giải quyết vế "Độ tin cậy & Ổn định của AI" của RQ2:** <br>Chứng minh lá chắn bọc Prompt và quy kết tất định ngăn chặn ảo giác và giữ vững tính ổn định của quyết định an ninh. |
+| **3. `run_audit_tamper.py`** <br> *(Đo Tính Chống Chối bỏ HMAC)* | **Thao tác giả mạo ngẫu nhiên** (Sửa dòng, Chèn dòng ngụy tạo, Xóa dòng tail-drop) trên vết kiểm toán | • **Phát hiện Sửa / Chèn:** **100%** bị bắt lập tức <br>• **Tail-dropping Analysis:** Chứng minh lỗ hổng cắt đuôi chuỗi băm tĩnh $H_i$ | [`audit_tamper_results.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/audit_tamper_results.json) | **Giải quyết vế "Tính Toàn vẹn & Chống Chối bỏ Pháp y" của RQ2:** <br>Chứng minh chuỗi HMAC-SHA256 liên hoàn ngăn chặn tuyệt đối mọi hành vi sửa đổi/chèn bằng chứng giả trong cơ sở dữ liệu SOC. |
+
+
 ---
 
 ## 3. RQ3 — Tác tử có Trạng thái & Quy kết Kỹ thuật ATT&CK (Stateful Agent Reasoning & Technical Attribution)
@@ -208,7 +217,17 @@ print(f'{len(rows)} lô | quy kết KHÔNG neo trong RAG: {bad}')"
 ```
 *Kỳ vọng:* `bad = 0` (Bất biến cốt lõi của hệ thống).
 
+#### 📋 Bảng Tổng hợp Bộ Đánh giá Thực nghiệm cho RQ3 (Stateful Agent & MITRE Attribution)
+
+| Tệp Script Thực nghiệm | Tập dữ liệu sử dụng | Kết quả Đo đạc Thực tế | Tệp Kết quả (Output File) | Chứng minh điều gì cho Luận văn? |
+|---|---|---|---|---|
+| **1. `eval_attack_mapper.py`** <br> *(Đánh giá Ánh xạ MITRE)* | **CSE-CIC-IDS2018 & CSIC2010** (Có Ground Truth 1:1) | • **Exact Match Accuracy:** **67.33%** (vượt xa ngẫu nhiên **52%**) <br>• **Context Grounding:** **100%** neo trong RAG (0% ảo giác ngoài RAG) | [`attack_mapper_eval_csic_payload_e2e.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/attack_mapper_eval_csic_payload_e2e.json) | **Giải quyết vế "Quy kết Kỹ thuật ATT&CK" của RQ3:** <br>Chứng minh năng lực tự động quy kết chính xác mã kỹ thuật MITRE Enterprise dựa trên ngữ cảnh RAG thực tế. |
+| **2. `evaluate_tier2_decision.py`** <br> *(Đánh giá Phán quyết Tier-2)* | **Mẫu thử nghiệm Ablation** và các kịch bản leo thang | • **Action Accuracy:** **100%** phán quyết hành động chuẩn xác <br>• **Triệt tiêu HITL:** **0.0%** giáng cấp ngớ ngẩn | [`tier2_decision_results.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/tier2_decision_results.json) | **Giải quyết vế "Tự động hóa Phân tích" của RQ3:** <br>Chứng minh Tác tử Tầng 2 đưa ra quyết định hành động dứt khoát (`BLOCK_IP`/`LOG`) thay thế sự can thiệp thủ công. |
+| **3. `evaluate_reasoning.py`** <br> *(Đánh giá Chất lượng Suy luận)* | **Tập kết quả suy luận** được thẩm định bởi Trọng tài độc lập khác họ (**Llama-3-8B**) | • **Reasoning Score:** **4.6 / 5.0 điểm** <br>• **Trích dẫn bằng chứng RAG:** **50.2%** lập luận có chứng cứ rõ ràng | [`reasoning_eval_results.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/reasoning_eval_results.json) | **Giải quyết vế "Sinh Báo cáo Pháp y Minh bạch" của RQ3:** <br>Chứng minh báo cáo suy luận của Tác tử đạt chất lượng chuyên gia an ninh mạng khi được chấm bởi model trọng tài độc lập. |
+| **4. `run_apt_negative_control.py`** <br> *(Đo Kiểm chứng Âm APT)* | **DAPT2020 & Benign Noise Stream** | • **False Positive Rate:** **0%** báo động giả chuỗi APT trên luồng nhiễu hợp lệ | [`apt_negative_control_results.json`](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/experiments/results/apt_negative_control_results.json) | **Giải quyết vế "Tác tử Suy luận có Trạng thái" của RQ3:** <br>Chứng minh Threat Memory không bị báo động nhầm chuỗi APT khi lưu lượng chỉ là nhiễu truy cập bình thường. |
+
 ---
+
 
 ## 4. Tóm tắt Bảng Đối chiếu Chạy Demo theo RQ
 
