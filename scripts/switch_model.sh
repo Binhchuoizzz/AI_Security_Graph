@@ -46,9 +46,9 @@ fi
 
 # Tự động điều chỉnh Context Size để chống tràn VRAM (OOM) cho các model 13B (không có GQA)
 if [[ "$MODEL_FILE" == *"13B"* ]]; then
-    CTX_SIZE=8192
-else
     CTX_SIZE=16384
+else
+    CTX_SIZE=32768
 fi
 
 if grep -q "^LLAMA_ARG_CTX_SIZE=" .env; then

@@ -8,7 +8,7 @@ Trả lời "log quá dài/nhiều thì tràn ngữ cảnh không, và biết ti
   - RAW (nối thẳng mọi log)            -> tăng TUYẾN TÍNH, vượt n_ctx rất nhanh.
   - COMPRESSED (Drain template mining) -> BÃO HÒA, bị chặn BẰNG THIẾT KẾ.
 
-Chứng minh kiến trúc giữ ngữ cảnh trong ngân sách (token_budget=4000, n_ctx=8192)
+Chứng minh kiến trúc giữ ngữ cảnh trong ngân sách (token_budget=4000, n_ctx=32768)
 bất kể số log, nên local LLM KHÔNG bị tràn vì "log quá nhiều". Tất định, KHÔNG LLM.
 
 Chạy:  .venv/bin/python experiments/run_context_stress.py
