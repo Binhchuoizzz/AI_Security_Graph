@@ -475,9 +475,17 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
             encapsulated_chars_final=len(batch_enc),
         )
 
+    _res = processed_data.get("individual_results", []) or []
+    is_adv = any(
+        r.get("injection_detected") or r.get("jailbreak_detected")
+        for r in _res
+        if isinstance(r, dict)
+    )
+
     return {
         "current_batch_encapsulated": batch_enc,
         "_guardrails_system_instruction": processed_data["system_instruction"],
+        "_is_adversarial": is_adv,
     }
 
 
@@ -503,6 +511,14 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
         # không thể phân biệt "bộ truy xuất tồi" với "truy vấn đưa vào đã rỗng nghĩa".
         trace.add("nodes", rag_context=round(time.time(), 6))
         trace.add("rag", technique_query=technique_q, context_query=context_q)
+
+    # Nếu phát hiện tấn công đối kháng (Prompt Injection/Jailbreak), BYPASS RAG
+    # để tránh nhiễm độc context hoặc ảo giác của LLM với các technique mạng.
+    if getattr(state, "_is_adversarial", False):
+        logger.info("[RAG CONTEXT] Phát hiện Adversarial Payload -> Bỏ qua RAG (chống ảo giác).")
+        if trace.enabled():
+            trace.add("rag", bypassed_for_adversarial=True)
+        return {"rag_mitre_context": "", "rag_nist_context": ""}
 
     # ── TRUY VẤN 1 (KỸ THUẬT): thuần tiếng Anh, KHÔNG payload -> ánh xạ MITRE ──
     results = retriever.retrieve(technique_q)
@@ -993,6 +1009,10 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
             " ".join(str(r) for r in (first_log.get("tier1_reasons") or [])[:3]),
         ]
     ).strip()
+
+    # Nếu là adversarial payload, ép type_hint về prompt_injection để mapper tất định xử lý
+    if getattr(state, "_is_adversarial", False):
+        type_hint = "prompt_injection"
 
     mapper_input = AttackMapperInput(
         attack_type=type_hint,

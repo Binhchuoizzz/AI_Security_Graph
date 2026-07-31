@@ -163,6 +163,9 @@ class SentinelState:
     _ml_bypass_action: str = ""
     """Action được gán bởi ML Triage khi bypass."""
 
+    _is_adversarial: bool = False
+    """Cờ hiệu cho biết Guardrails phát hiện payload adversarial (prompt injection/jailbreak)."""
+
     last_updated: str = ""
     """Timestamp ISO format của lần cập nhật state gần nhất."""
 
