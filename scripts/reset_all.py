@@ -158,6 +158,10 @@ def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
                 for t in tbls:
                     try:
                         c.execute(f"DELETE FROM {t}")  # noqa: S608
+                        try:
+                            c.execute("DELETE FROM sqlite_sequence WHERE name = ?", (t,))
+                        except sqlite3.OperationalError:
+                            pass
                     except sqlite3.OperationalError:
                         pass  # bảng chưa tồn tại (DB mới) -> bỏ qua
                 c.commit()

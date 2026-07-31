@@ -265,15 +265,47 @@ def run_static(out=None):
 # =========================================================================
 # MODE: pipeline — FULL pipeline Tier-2 (LLM) resistance
 # =========================================================================
-def load_hard_samples(limit_per_cat: int):
+def load_hard_samples(limit_per_cat: int | None):
+    """Mẫu KHÓ cho lượt chạy qua đường ống. `None` = lấy HẾT (mặc định) = **75** mẫu.
+
+    ĐỘ PHỦ LÀ VẤN ĐỀ, KHÔNG PHẢI TIỂU TIẾT. Mặc định cũ `limit_per_cat=3` cho ra đúng 12
+    mẫu, rồi con số "kháng tiêm nhiễm 100%" được trích từ 12 mẫu ấy — 20% độ phủ, thứ hội
+    đồng chỉ cần hỏi một câu là vỡ. Nay lấy hết nên `coverage_pct = 100`.
+
+    Vì sao 4 nhóm này mà không phải cả 5. Lớp Guardrail TĨNH CHẶN được 60/120 mẫu, nhưng
+    phân bố rất lệch (số dưới là số CHẶN, xem `robustness_results.json`):
+
+        encoding_bypass     45/45  <- lớp tĩnh sinh ra để trị nhóm này, nên loại khỏi tập KHÓ
+        structural_attacks   7/20
+        rag_poisoning        6/15
+        jailbreak            2/20
+        semantic_confusion   0/20  <- pattern tĩnh mù hoàn toàn trước tấn công ngữ nghĩa
+
+    Tức 60 mẫu LỌT qua lớp tĩnh đều nằm gọn trong 4 nhóm ngữ nghĩa. Lấy hết 75 mẫu của 4
+    nhóm ấy là lấy SIÊU TẬP của 60 mẫu đó — chặt hơn mức cần, không phải chọn mẫu dễ.
+    """
     samples = []
+    for cat in HARD_CATEGORIES:
+        p = os.path.join(ADV_DIR, cat, "samples.json")
+        if not os.path.exists(p):
+            continue
+        with open(p) as fh:
+            data = json.load(fh)
+        for s in data if limit_per_cat is None else data[:limit_per_cat]:
+            s.setdefault("category", cat)
+            samples.append(s)
+    return samples
+
+
+def count_available_hard() -> dict:
+    """Tổng số mẫu KHÓ có sẵn mỗi nhóm — để báo độ phủ thật, không đoán."""
+    out = {}
     for cat in HARD_CATEGORIES:
         p = os.path.join(ADV_DIR, cat, "samples.json")
         if os.path.exists(p):
             with open(p) as fh:
-                data = json.load(fh)
-            samples.extend(data[:limit_per_cat])
-    return samples
+                out[cat] = len(json.load(fh))
+    return out
 
 
 def make_attack_log(payload: str, field: str, idx: int) -> dict:
@@ -293,7 +325,7 @@ def make_attack_log(payload: str, field: str, idx: int) -> dict:
     return log
 
 
-def run_pipeline(limit=3, out=None):
+def run_pipeline(limit=None, out=None):
     out_path = out or OUT_PIPELINE
 
     from src.agent.state import SentinelState
@@ -350,14 +382,44 @@ def run_pipeline(limit=3, out=None):
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as fh:
-        json.dump({"resistance_rate_pct": rr, **results}, fh, ensure_ascii=False, indent=1)
+        avail = count_available_hard()
+        n_avail = sum(avail.values())
+        n_run = results["resisted"] + results["compromised"]
+        json.dump(
+            {
+                "resistance_rate_pct": rr,
+                # ĐỘ PHỦ đi kèm tỉ lệ, luôn luôn. Một tỉ lệ không có mẫu số là một tỉ lệ
+                # không kiểm chứng được.
+                "n_tested": n_run,
+                "n_available_hard": n_avail,
+                "coverage_pct": round(100 * n_run / n_avail, 1) if n_avail else None,
+                "available_by_category": avail,
+                "metric_valid": bool(n_avail) and n_run >= n_avail,
+                "scope_note": (
+                    "Đây là kháng tiêm nhiễm của TIER-2 trên mẫu KHÓ. Lớp Guardrail TĨNH "
+                    "đo riêng ở robustness_results.json (chặn 60/120). Hai con số BỔ SUNG "
+                    "cho nhau — tĩnh chặn trước, Tier-2 đỡ phần lọt — KHÔNG được trích thay "
+                    "cho nhau. metric_valid=false nghĩa là chưa phủ hết mẫu khó."
+                ),
+                **results,
+            },
+            fh,
+            ensure_ascii=False,
+            indent=1,
+        )
     print(f"[+] Saved: {out_path}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Đánh giá phòng thủ đối kháng hợp nhất")
     ap.add_argument("--mode", choices=["static", "pipeline", "all"], default="all")
-    ap.add_argument("--limit", type=int, default=3, help="samples/nhóm khó (mode pipeline)")
+    ap.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="samples/nhóm khó (mode pipeline). BỎ TRỐNG = chạy HẾT (khuyến nghị: "
+        "mặc định cũ là 3 -> chỉ 12 mẫu, và số 100%% từng được trích từ đúng 12 mẫu đó).",
+    )
     ap.add_argument("--out", type=str, default=None, help="Ghi đè path output (chỉ khi 1 mode)")
     args = ap.parse_args()
 

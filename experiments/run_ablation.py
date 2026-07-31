@@ -29,6 +29,7 @@ Chạy (cần LLM server cho mọi mode trừ phần rule-only):
 
 import json
 import os
+import re
 import sys
 import time
 from typing import Any
@@ -39,6 +40,7 @@ from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from experiments.action_scoring import score_actions  # noqa: E402
+from experiments.unified_dataset import drop_authored  # noqa: E402
 from src.agent.llm_client import DECISION_JSON_SCHEMA, llm_client  # noqa: E402
 from src.agent.nodes import retriever  # noqa: E402
 from src.agent.prompts import build_triage_prompt  # noqa: E402
@@ -82,6 +84,62 @@ def stratified(dataset, limit):
     for _lbl, samples in by_label.items():
         selected.extend(samples[:per_class])
     return selected[:limit]
+
+
+def _has_payload(sample: dict) -> bool:
+    """Mẫu có BẰNG CHỨNG TẦNG ỨNG DỤNG (message/payload) để quy kết được hay không."""
+    for lg in sample.get("logs") or []:
+        if str(lg.get("message", "")).strip() or str(lg.get("payload", "")).strip():
+            return True
+    return False
+
+
+def attributable(dataset: list, limit: int | None) -> list:
+    """Tập con CHẤM ĐƯỢC QUY KẾT: có payload VÀ có mã ATT&CK làm đáp án.
+
+    VÌ SAO KHÔNG DÙNG `stratified()` CHO MODE bcde. `stratified()` lấy đều theo LỚP TẤN CÔNG,
+    và các lớp đầu tệp đều là NetFlow thuần. Đo thật: với `--limit 8` thì **0/8** mẫu có
+    payload. Không có bằng chứng tầng ứng dụng thì KHÔNG CÓ GÌ để quy kết — cả bốn cấu hình
+    cùng ra 0% theo cấu trúc, và thước đo quy kết mới cũng không phân giải được B/C/D/E,
+    y hệt bệnh của bảng F1 nhị phân mà nó sinh ra để thay thế.
+
+    Đây đúng là dân số mà `scripts/eval_attack_mapper.py --evidence-layer payload` dùng:
+    550 mẫu có bằng chứng ứng dụng, trong đó 300 mẫu có mã ATT&CK làm đáp án.
+
+    LOẠI MẪU BIÊN SOẠN. Đo được trước khi vá: trong 300 mẫu ấy có 50 mẫu do tác giả tự viết
+    (`cicids_label == "Adversarial"`) — **16,7%** — và cả 50 cùng đáp án `T1190`, đẩy T1190
+    từ 52 lên 102 mẫu. Giữ lại thì thước đo thưởng cho việc khớp khuôn mẫu của chính tác giả
+    và cho việc thiên vị một mã duy nhất. Sau khi lọc còn **250 mẫu thật**, 5 mã phân bố
+    T1595.003=130 · T1190=52 · T1059.007=30 · T1071.001=26 · T1083=12.
+    """
+    pool = [
+        s
+        for s in dataset
+        if _has_payload(s) and _TECH_RE.search(str(s.get("expected_mitre_technique", "")))
+    ]
+    pool, n_authored = drop_authored(pool)
+    if n_authored:
+        print(
+            f"[i] Loại {n_authored} mẫu BIÊN SOẠN khỏi tập chấm quy kết "
+            f"-> còn {len(pool)} mẫu dữ liệu thật."
+        )
+    if not limit:
+        return pool
+    # Phân tầng theo LỚP trong chính tập chấm được, để không dồn hết vào một loại tấn công.
+    by_label: dict[str, list] = {}
+    for s in pool:
+        by_label.setdefault(s["input"].get("cicids_label", "unknown"), []).append(s)
+    per = max(1, (limit + len(by_label) - 1) // max(len(by_label), 1))
+    sel: list = []
+    # Bù cho đủ `limit` sau khi chia đều: lớp ít mẫu không lấp hết suất của mình, nên chia
+    # đều xong thường THIẾU so với limit (đo được: limit=300 chỉ ra 209). Người đọc thấy
+    # `--limit 300` mà kết quả ghi n=209 sẽ tưởng có lỗi lọc.
+    for _lbl, ss in by_label.items():
+        sel.extend(ss[:per])
+    if len(sel) < limit:
+        taken = {id(s) for s in sel}
+        sel.extend(s for s in pool if id(s) not in taken)
+    return sel[:limit]
 
 
 def _print_action_confusion(action_scores: dict) -> None:
@@ -194,9 +252,17 @@ def hybrid_context(query_text):
 
 
 def llm_action(logs, rag_context):
-    """Gọi LLM trên raw logs (KHÔNG guardrails encapsulation) + RAG tùy chọn."""
+    """Gọi LLM trên raw logs (KHÔNG guardrails encapsulation) + RAG tùy chọn.
+
+    Trả `(action, giây, meta)`. `meta` mang KỸ THUẬT LLM TỰ KHAI — bắt buộc phải có thì
+    B/C/D/E mới phân giải được: biến độc lập của bốn cấu hình này là CẤU HÌNH RAG, mà RAG
+    không đổi việc "có phải mối đe doạ không", nó đổi việc "quy kết kỹ thuật nào". Chấm
+    bằng F1 nhị phân nên bốn cấu hình từng ra giống nhau từng bit — thước đo sai đại lượng,
+    không phải hệ thống không có khác biệt.
+    """
     raw_logs_str = "\n".join(str(log) for log in logs)
     messages = build_triage_prompt(log_data=raw_logs_str, rag_context=rag_context)
+    meta: dict[str, Any] = {"technique_raw": "", "technique_id": "", "confidence": 0.0}
     t0 = time.time()
     try:
         # ĐỒNG BỘ với Config F: ép JSON hợp lệ (json_schema) + reasoning tiếng Việt, max_tokens rộng.
@@ -207,6 +273,9 @@ def llm_action(logs, rag_context):
             max_tokens=1536,
         )
         decision = llm_client.parse_llm_response(raw)
+        meta["technique_raw"] = str(decision.get("mitre_technique", "") or "").strip()
+        _m = re.search(r"\b(AML\.T\d{4}|T\d{4}(?:\.\d{3})?)\b", meta["technique_raw"], re.I)
+        meta["technique_id"] = _m.group(1).upper() if _m else ""
         raw_action = str(decision.get("action", "AWAIT_HITL")).upper().strip()
         if raw_action not in VALID_ACTIONS:
             raw_action = "AWAIT_HITL"
@@ -217,6 +286,7 @@ def llm_action(logs, rag_context):
             conf = float(decision.get("confidence", 0.0) or 0.0)
         except (TypeError, ValueError):
             conf = 0.0
+        meta["confidence"] = conf
         if raw_action in ("BLOCK_IP", "ALERT"):
             action = decision_policy.classify_llm(is_threat=True, confidence=conf)
         else:
@@ -224,7 +294,64 @@ def llm_action(logs, rag_context):
     except Exception as e:
         print(f"   [LLM ERROR] {e}")
         action = "AWAIT_HITL"
-    return action, time.time() - t0
+        meta["llm_error"] = str(e)[:120]
+    return action, time.time() - t0, meta
+
+
+# Mã kỹ thuật xuất hiện trong khối ngữ cảnh RAG -> tập "có bằng chứng đỡ" của lô đó.
+_TECH_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
+
+
+def score_attribution(
+    expected: list[str], claimed: list[str], grounded: list[bool], invoked: list[bool]
+) -> dict:
+    """Chấm QUY KẾT — thước đo đúng đại lượng cho B/C/D/E (bám RQ3).
+
+    `expected`: mã đúng theo `expected_mitre_technique` ('None' = mẫu không có mã).
+    `claimed` : mã LLM tự khai.
+    `grounded`: mã đó CÓ nằm trong khối RAG đưa cho chính cấu hình ấy hay không.
+    `invoked` : cấu hình này CÓ THỰC SỰ gọi LLM cho mẫu đó hay không.
+
+    `invoked` LÀ BẮT BUỘC, KHÔNG PHẢI TUỲ CHỌN. C/D/E chỉ gọi LLM khi Tier-1 leo thang; các
+    mẫu còn lại dừng ở phán quyết Tier-1 và không có cơ hội quy kết. Bản đầu của hàm này
+    chấm trên TOÀN BỘ mẫu nên đã trộn "Tier-1 xử lý xong, chưa hỏi LLM" vào cùng rổ với
+    "LLM từ chối quy kết". Đo thật trên 8 mẫu: C/D/E ra `abstain_rate = 1.0000` trong khi
+    chỉ 2/8 mẫu từng được đưa tới LLM — con số đó không mô tả hành vi nào có thật, và B
+    (luôn gọi LLM) thì không so được với chúng vì hai bên khác mẫu số.
+
+    Cùng nguyên tắc `evaluate_rag_retrieval.py` đang dùng: chấm ĐIỀU KIỆN HOÁ THEO LEO THANG,
+    và báo luôn `n_invoked` để không ai tưởng mẫu số là toàn tập.
+
+    LƯU Ý ĐỌC SỐ: với B (LLM thuần) và C (Welford+LLM) thì khối RAG RỖNG, nên
+    `ungrounded_rate` = 1.0 THEO CẤU TRÚC, không phải phát hiện thực nghiệm. Ý nghĩa của nó
+    là: hai cấu hình đó KHÔNG THỂ chứng minh mã mình nêu — mọi quy kết chỉ dựa vào trí nhớ
+    tham số. Cặp phân giải thật sự nằm giữa D (dense) và E (lai + RRF), nơi cả hai đều có
+    RAG nhưng khác cách truy xuất.
+    """
+    idx = [i for i in range(len(expected)) if invoked[i]]
+    scorable = [i for i in idx if _TECH_RE.search(expected[i] or "")]
+    exact = sum(
+        1 for i in scorable if claimed[i] and claimed[i].upper() == expected[i].strip().upper()
+    )
+    parent = sum(
+        1
+        for i in scorable
+        if claimed[i] and claimed[i].split(".")[0] == expected[i].strip().split(".")[0]
+    )
+    n_claimed = sum(1 for i in idx if claimed[i])
+    n_ungrounded = sum(1 for i in idx if claimed[i] and not grounded[i])
+    return {
+        "n_total": len(expected),
+        "n_invoked": len(idx),
+        "n_scorable": len(scorable),
+        "technique_exact_pct": round(100 * exact / len(scorable), 2) if scorable else None,
+        "technique_parent_pct": round(100 * parent / len(scorable), 2) if scorable else None,
+        "abstain_rate": round((len(idx) - n_claimed) / len(idx), 4) if idx else None,
+        "ungrounded_rate": round(n_ungrounded / n_claimed, 4) if n_claimed else None,
+        "n_claimed": n_claimed,
+        "n_ungrounded": n_ungrounded,
+        "denominator_note": "Chỉ tính mẫu cấu hình này THỰC SỰ gọi LLM (n_invoked).",
+    }
 
 
 def to_pred(action):
@@ -522,17 +649,35 @@ def run_af(limit=None, out=None):
 # =========================================================================
 def run_bcde(limit=300, out=None):
     out_path = out or OUT_BCDE
-    dataset = stratified(load_ground_truth(), limit)
-    print(f"[*] Ablation B-E tren {len(dataset)} mau (cung tap phan tang voi A/F)...")
+    dataset = attributable(load_ground_truth(), limit)
+    print(
+        f"[*] Ablation B-E trên {len(dataset)} mẫu CHẤM ĐƯỢC QUY KẾT "
+        f"(có payload + có mã ATT&CK). KHÔNG dùng phân tầng theo lớp như mode af: "
+        f"lớp NetFlow thuần không có bằng chứng để quy kết."
+    )
 
     rule_engine = _fresh_engine()
     _synthetic_warmup(rule_engine)
 
     R: dict[str, Any] = {
-        c: {"y_true": [], "y_pred": [], "latencies": [], "escalated": [], "actions": []}
+        c: {
+            "y_true": [],
+            "y_pred": [],
+            "latencies": [],
+            "escalated": [],
+            "actions": [],
+            # Hai trường mới: kỹ thuật LLM tự khai, và mã đó CÓ neo trong khối RAG của
+            # chính cấu hình ấy hay không. Đây là đại lượng mà B/C/D/E thực sự tác động.
+            "techniques": [],
+            "grounded": [],
+            # Cấu hình này CÓ gọi LLM cho mẫu đó không. C/D/E chỉ gọi khi Tier-1 leo thang;
+            # thiếu cờ này thì "chưa hỏi LLM" bị đếm chung với "LLM từ chối quy kết".
+            "llm_invoked": [],
+        }
         for c in "BCDE"
     }
     expected_actions: list[str] = []
+    expected_techs: list[str] = []
 
     for idx, sample in enumerate(dataset):
         is_attack = 1 if sample["expected_action"] in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
@@ -546,19 +691,26 @@ def run_bcde(limit=300, out=None):
         # Mặc định: gate KHÔNG escalate -> C/D/E dừng ở phán quyết Tier-1. Khởi tạo ở đây
         # để biến luôn bound dù đi nhánh nào (an toàn kiểu + ý nghĩa rõ khi chấm hành động).
         a_c = a_d = a_e = tier1_verdict
-        a_b, l_b = llm_action(logs, "")  # B — Pure LLM
+        # `m_*` giữ kỹ thuật LLM khai; `ctx_*` giữ khối RAG đã đưa cho chính cấu hình đó —
+        # phải là ĐÚNG khối ấy thì "có neo hay không" mới có nghĩa. Dùng chung một khối cho
+        # cả D và E sẽ xoá mất khác biệt giữa dense-only và lai+RRF, tức xoá luôn thứ đang đo.
+        m_c = m_d = m_e = {"technique_id": ""}
+        ctx_c = ctx_d = ctx_e = ""
+        a_b, l_b, m_b = llm_action(logs, "")  # B — Pure LLM (KHÔNG RAG)
         if needs_llm:  # C — Welford + LLM (no RAG)
-            a_c, l_c = llm_action(logs, "")
+            a_c, l_c, m_c = llm_action(logs, "")
             p_c = to_pred(a_c)
         else:
             l_c, p_c = 0.0006, tier1_pred
         if needs_llm:  # D — Welford + dense RAG
-            a_d, l_d = llm_action(logs, dense_only_context(query))
+            ctx_d = dense_only_context(query)
+            a_d, l_d, m_d = llm_action(logs, ctx_d)
             p_d = to_pred(a_d)
         else:
             l_d, p_d = 0.0006, tier1_pred
-        if needs_llm:  # E — Welford + hybrid RAG
-            a_e, l_e = llm_action(logs, hybrid_context(query))
+        if needs_llm:  # E — Welford + hybrid RAG (FAISS+BM25+RRF)
+            ctx_e = hybrid_context(query)
+            a_e, l_e, m_e = llm_action(logs, ctx_e)
             p_e = to_pred(a_e)
         else:
             l_e, p_e = 0.0006, tier1_pred
@@ -567,17 +719,23 @@ def run_bcde(limit=300, out=None):
         # quyết Tier-1 nên hành động là `tier1_verdict` — ghi đúng như vậy để chấm theo
         # hành động phản ánh ĐÚNG thứ pipeline thực sự làm.
         expected_actions.append(sample["expected_action"])
-        for c, pred, lat, act in (
-            ("B", to_pred(a_b), l_b, a_b),
-            ("C", p_c, l_c, a_c if needs_llm else tier1_verdict),
-            ("D", p_d, l_d, a_d if needs_llm else tier1_verdict),
-            ("E", p_e, l_e, a_e if needs_llm else tier1_verdict),
+        expected_techs.append(str(sample.get("expected_mitre_technique", "") or ""))
+        for c, pred, lat, act, meta, ctx in (
+            ("B", to_pred(a_b), l_b, a_b, m_b, ""),
+            ("C", p_c, l_c, a_c if needs_llm else tier1_verdict, m_c, ctx_c),
+            ("D", p_d, l_d, a_d if needs_llm else tier1_verdict, m_d, ctx_d),
+            ("E", p_e, l_e, a_e if needs_llm else tier1_verdict, m_e, ctx_e),
         ):
             R[c]["y_true"].append(is_attack)
             R[c]["y_pred"].append(pred)
             R[c]["latencies"].append(lat)
             R[c]["escalated"].append(1 if (c == "B" or needs_llm) else 0)
             R[c]["actions"].append(act)
+            tid = str(meta.get("technique_id", "") or "")
+            R[c]["techniques"].append(tid)
+            R[c]["grounded"].append(bool(tid) and tid in set(_TECH_RE.findall(ctx)))
+            # B luôn gọi LLM (đó là định nghĩa "LLM thuần"); C/D/E chỉ khi Tier-1 leo thang.
+            R[c]["llm_invoked"].append(True if c == "B" else needs_llm)
 
         print(
             f"[{idx + 1}/{len(dataset)}] {sample['id']} | true={is_attack} esc={int(needs_llm)} "
@@ -585,14 +743,73 @@ def run_bcde(limit=300, out=None):
         )
 
     R["expected_actions"] = expected_actions
+    R["expected_techniques"] = expected_techs
     R["action_scores"] = {c: score_actions(expected_actions, R[c]["actions"]) for c in "BCDE"}
+    # THƯỚC ĐO CHÍNH của chế độ này. Biến độc lập B/C/D/E là CẤU HÌNH RAG, và RAG không đổi
+    # việc "có phải mối đe doạ không" — nó đổi việc "quy kết kỹ thuật nào". Chấm bằng F1 nhị
+    # phân là đo sai đại lượng, và đó là lý do bốn cấu hình từng ra giống nhau TỪNG BIT.
+    R["attribution_scores"] = {
+        c: score_attribution(
+            expected_techs, R[c]["techniques"], R[c]["grounded"], R[c]["llm_invoked"]
+        )
+        for c in "BCDE"
+    }
+    # CẢNH BÁO LỰC KIỂM ĐỊNH. C/D/E chỉ gọi LLM khi Tier-1 leo thang, và trên mẫu có payload
+    # tỉ lệ leo thang đo được chỉ ~17%. Với `--limit 12` thì C/D/E mỗi cấu hình chỉ có 2 ca —
+    # không đủ để nói D khác E hay không. Ở cỡ đầy đủ (300 mẫu) sẽ được ~50 ca mỗi cấu hình.
+    _min_inv = min(R["attribution_scores"][c]["n_invoked"] for c in "CDE")
+    R["attribution_underpowered"] = _min_inv < 30
+    if R["attribution_underpowered"]:
+        R["attribution_power_warning"] = (
+            f"C/D/E chỉ được gọi {_min_inv} lần — KHÔNG đủ để so D với E. Chạy `--limit 300` "
+            f"(hoặc bỏ --limit) để có ~50 ca mỗi cấu hình trước khi trích bất kỳ so sánh nào."
+        )
+    R["metric_note"] = (
+        "Thước đo CHÍNH: attribution_scores. F1/Prec/Rec nhị phân giữ lại chỉ để đối chiếu "
+        "lịch sử — nó KHÔNG phân giải được B/C/D/E. `ungrounded_rate` của B và C bằng 1.0 "
+        "THEO CẤU TRÚC (không có RAG thì không có gì để neo); cặp so sánh có nghĩa là D "
+        "(dense-only) với E (lai FAISS+BM25+RRF)."
+    )
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(R, f, indent=2)
     print(f"\n[+] Saved -> {out_path}\n")
 
-    print("CHẤM THEO HÀNH ĐỘNG (thước đo CHÍNH):")
+    _lbl = {
+        "B": "LLM thuần",
+        "C": "+ Welford",
+        "D": "+ RAG dense",
+        "E": "+ RAG lai RRF",
+    }
+
+    print("QUY KẾT KỸ THUẬT (thước đo CHÍNH — bám RQ3):")
+    print(
+        f"  {'':>3} {'cấu hình':<15} {'exact':>8} {'parent':>8} {'không neo':>10} {'bỏ trống':>9}"
+    )
+    for c in "BCDE":
+        at = R["attribution_scores"][c]
+
+        def _p(v, pct=False):
+            return "  —" if v is None else (f"{v:>7.2f}%" if pct else f"{v:>9.4f}")
+
+        print(
+            f"  {c:>3} {_lbl[c]:<15} {_p(at['technique_exact_pct'], True)} "
+            f"{_p(at['technique_parent_pct'], True)} {_p(at['ungrounded_rate'])} "
+            f"{_p(at['abstain_rate'])}"
+        )
+    print("  (mẫu số = số ca cấu hình đó THỰC SỰ gọi LLM, không phải toàn tập):")
+    for c in "BCDE":
+        at = R["attribution_scores"][c]
+        print(
+            f"      {c}: gọi LLM {at['n_invoked']}/{at['n_total']} · chấm được {at['n_scorable']}"
+        )
+    print("  * B và C không có RAG -> 'không neo' = 1.0 THEO CẤU TRÚC. So D với E.")
+    if R.get("attribution_underpowered"):
+        print(f"  ⚠️  {R['attribution_power_warning']}")
+    print()
+
+    print("CHẤM THEO HÀNH ĐỘNG:")
     print(f"  {'':>3} {'khớp HĐ':>9} {'tự quyết':>9} {'hoãn':>8} {'chưa g.quyết':>13}")
     for c in "BCDE":
         sc = R["action_scores"][c]
@@ -602,6 +819,7 @@ def run_bcde(limit=300, out=None):
         )
     print()
 
+    print("F1 nhị phân — CHỈ để đối chiếu lịch sử, KHÔNG phân giải được B/C/D/E:")
     for c in "BCDE":
         yt, yp = R[c]["y_true"], R[c]["y_pred"]
         f1 = f1_score(yt, yp, zero_division=0)  # pyright: ignore[reportArgumentType]
@@ -610,7 +828,7 @@ def run_bcde(limit=300, out=None):
         esc = 100.0 * np.mean(R[c]["escalated"])
         mean_lat = float(np.mean(R[c]["latencies"]))
         print(
-            f"[Config {c}] F1={f1:.4f} | Prec={prec:.4f} | Rec={rec:.4f} "
+            f"  [Config {c}] F1={f1:.4f} | Prec={prec:.4f} | Rec={rec:.4f} "
             f"| escalate={esc:.1f}% | mean_lat={mean_lat:.3f}s"
         )
 
@@ -774,15 +992,17 @@ def run_balanced(out=None):
 
         # Mặc định như trên: không escalate -> C/D/E giữ phán quyết Tier-1.
         a_c = a_d = a_e = tier1_verdict
-        a_b, l_b = llm_action(logs, "")  # B — Pure LLM
+        # `_` nuốt phần meta (kỹ thuật LLM khai): chế độ `balanced` chấm theo HÀNH ĐỘNG trên
+        # tập cân bằng 150/150, không chấm quy kết — phần đó là việc của chế độ `bcde`.
+        a_b, l_b, _ = llm_action(logs, "")  # B — Pure LLM
         p_b = to_pred(a_b)
 
         if needs_llm:  # C/D/E
-            a_c, l_c = llm_action(logs, "")
+            a_c, l_c, _ = llm_action(logs, "")
             p_c = to_pred(a_c)
-            a_d, l_d = llm_action(logs, dense_only_context(query))
+            a_d, l_d, _ = llm_action(logs, dense_only_context(query))
             p_d = to_pred(a_d)
-            a_e, l_e = llm_action(logs, hybrid_context(query))
+            a_e, l_e, _ = llm_action(logs, hybrid_context(query))
             p_e = to_pred(a_e)
         else:
             l_c = l_d = l_e = 0.0006

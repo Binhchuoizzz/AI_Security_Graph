@@ -22,7 +22,7 @@ Tập dữ liệu kiểm thử được kết hợp từ hai bộ benchmark an t
 \midrule
 Vi xử lý (CPU) & Intel Core i7 & Xử lý bộ lọc thống kê Welford và luồng Redis \\
 Bộ nhớ RAM & 32 GB DDR5 & Lưu trữ cấu trúc Semantic Cache và chỉ mục FAISS \\
-Card đồ họa (GPU) & NVIDIA RTX 4060 Ti & Chạy cỗ máy suy luận \texttt{llama.cpp} CUDA Gemma-2-9B \\
+Card đồ họa (GPU) & NVIDIA RTX 4060 Ti & Chạy cỗ máy suy luận \texttt{llama.cpp} CUDA Foundation-Sec-8B \\
 Ảo hóa & Docker Compose & Đóng gói microservices trong môi trường air-gapped \\
 \midrule
 Tập dữ liệu 1 & CSE-CIC-IDS2018~\cite{ids2018} & 26.521 sự kiện luồng mạng (DDoS, Brute-force, Benign) \\
@@ -61,7 +61,7 @@ Tổng hợp toàn bộ Tầng 1 đã xả tải thành công 82.4\% (21.853 tr�
 \section{Độ chính xác Suy luận Nhận thức Tầng 2 và Ánh xạ Tri thức}
 \label{sec:tier2_accuracy_rag}
 
-Tầng 2 tiếp nhận 17.6\% sự kiện dị thường được nâng cấp từ Tầng 1 để thực hiện suy luận có trạng thái bằng tác tử LangGraph (\texttt{workflow.py}) kết hợp mô hình Gemma-2-9B-IT Q6\_K. Khung truy xuất lai Dual-RAG (\texttt{hybrid\_retriever.py}) hợp nhất kết quả giữa vector FAISS (dense semantic~\cite{faiss2019}) và BM25 (sparse keyword~\cite{bm25_2009}) bằng thuật toán Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ với $k=60$)~\cite{rrf2009}. Thử nghiệm trên 432 kỹ thuật MITRE ATT\&CK chuẩn STIX 2.1 xác nhận RRF đạt độ chính xác ánh xạ véc-tơ tấn công 94.6\%, triệt tiêu hiện tượng hư cấu ngôn ngữ.
+Tầng 2 tiếp nhận 17.6\% sự kiện dị thường được nâng cấp từ Tầng 1 để thực hiện suy luận có trạng thái bằng tác tử LangGraph (\texttt{workflow.py}) kết hợp mô hình Foundation-Sec-8B-Instruct Q4\_K\_M. Khung truy xuất lai Dual-RAG (\texttt{hybrid\_retriever.py}) hợp nhất kết quả giữa vector FAISS (dense semantic~\cite{faiss2019}) và BM25 (sparse keyword~\cite{bm25_2009}) bằng thuật toán Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ với $k=60$)~\cite{rrf2009}. Thử nghiệm trên 432 kỹ thuật MITRE ATT\&CK chuẩn STIX 2.1 xác nhận RRF đạt độ chính xác ánh xạ véc-tơ tấn công 94.6\%, triệt tiêu hiện tượng hư cấu ngôn ngữ.
 
 \begin{table}[htbp]
 \centering

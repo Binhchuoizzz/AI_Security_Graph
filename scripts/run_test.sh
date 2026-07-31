@@ -12,12 +12,11 @@
 #   ./scripts/run_test.sh              # đẩy luồng test (yêu cầu subscriber đã chạy sẵn)
 #   ./scripts/run_test.sh --no-push    # chỉ dựng hạ tầng + UI, KHÔNG đẩy
 #   ./scripts/run_demo.sh --small      # đẩy tập nhỏ (demo nhanh, ít chờ LLM)
-#   SENTINEL_LITE=0 ./scripts/run_demo.sh   # baseline nặng: Gemma 2 9B, ctx 16384, 2 parallel
+#   SENTINEL_LITE=0 ./scripts/run_test.sh   # đúng cấu hình đã đo: ctx 32768, 2 parallel
 #
 # Mặc định script chạy ở chế độ LOW-VRAM cho máy RAM 32GB / GPU VRAM thấp:
-# - Llama 3 8B Q5_K_M
-# - ctx 8192
-# - 1 parallel
+# - Foundation-Sec-8B-Instruct Q4_K_M  (CÙNG model với mọi số liệu trong luận văn)
+# - ctx 16384, 1 parallel -> 16.384 token/khe
 # - tắt Neo4j (vì là nhánh V2 tùy chọn, không nằm trên đường đi lõi)
 #
 # Sau khi chạy: mở http://localhost:8501 (đăng nhập: manager).
@@ -41,15 +40,17 @@ case "${1:-}" in
 esac
 
 # Profile phần cứng mặc định cho máy hiện tại: nhẹ hơn để tránh OOM VRAM/RAM.
+# Giữ ĐỒNG BỘ với scripts/run_demo.sh: cùng model, cùng 16.384 token/khe. Khác model giữa
+# demo/test và lượt đo thì hai bên mô tả hai hệ khác nhau.
 if [ "${SENTINEL_LITE:-1}" = "1" ]; then
-  : "${LLM_MODEL_FILE:=Meta-Llama-3-8B-Instruct-Q5_K_M.gguf}"
-  : "${LLAMA_ARG_CTX_SIZE:=8192}"
+  : "${LLM_MODEL_FILE:=Foundation-Sec-8B-Instruct-Q4_K_M.gguf}"
+  : "${LLAMA_ARG_CTX_SIZE:=16384}"
   : "${LLAMA_ARG_N_PARALLEL:=1}"
   : "${SENTINEL_AGENT_WORKERS:=1}"
   : "${SENTINEL_ENABLE_NEO4J:=0}"
 else
-  : "${LLM_MODEL_FILE:=gemma-2-9b-it-Q6_K.gguf}"
-  : "${LLAMA_ARG_CTX_SIZE:=16384}"
+  : "${LLM_MODEL_FILE:=Foundation-Sec-8B-Instruct-Q4_K_M.gguf}"
+  : "${LLAMA_ARG_CTX_SIZE:=32768}"
   : "${LLAMA_ARG_N_PARALLEL:=2}"
   : "${SENTINEL_AGENT_WORKERS:=2}"
   : "${SENTINEL_ENABLE_NEO4J:=1}"

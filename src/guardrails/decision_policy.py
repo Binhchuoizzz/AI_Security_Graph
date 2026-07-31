@@ -60,19 +60,19 @@ REPEAT_OFFENDER_MIN_CONF: float = ML_ESCALATE_CONF
 #   - `low_confidence`         : bằng chứng yếu (thường là NetFlow thuần) -> cần thêm telemetry
 #   - `llm_output_unreadable`  : lỗi vận hành (JSON hỏng/LLM chết) -> việc của kỹ sư, không phải analyst
 HITL_REASONS: dict[str, str] = {
-    "technique_not_in_rag": "Kỹ thuật mô hình đề xuất KHÔNG có trong tài liệu đã truy xuất",
-    "technique_unmappable": "Không khớp chắc chắn kỹ thuật ATT&CK nào",
-    "low_confidence": "Độ tin cậy dưới ngưỡng tự quyết (< 0,65)",
-    "llm_abstained": "Mô hình tự nhận không đủ căn cứ",
-    "llm_output_unreadable": "Không đọc được phản hồi mô hình (JSON hỏng / LLM không phản hồi)",
-    "port_only_c2": "Chỉ có số cổng phi chuẩn làm bằng chứng, không có dấu hiệu C2 nào khác",
-    "social_engineering_suspected": "Nghi log bị chèn nội dung thuyết phục mô hình hạ cấp",
-    "tier1_hitl_threshold": "Tier-1 đạt ngưỡng cần người duyệt",
+    "technique_not_in_rag": "Suggested technique not present in retrieved context",
+    "technique_unmappable": "Uncertain mapping to known ATT&CK technique",
+    "low_confidence": "Confidence below autonomous decision threshold (< 0.65)",
+    "llm_abstained": "Model self-assessed insufficient evidence",
+    "llm_output_unreadable": "Unreadable model response (Invalid JSON or timeout)",
+    "port_only_c2": "Non-standard port as sole evidence without C2 indicators",
+    "social_engineering_suspected": "Suspected prompt injection or downgrade attempt",
+    "tier1_hitl_threshold": "Tier-1 reached human review threshold",
 }
 
 
 def hitl_reason_text(code: str) -> str:
-    """Diễn giải tiếng Việt của mã lý do; trả chính mã nếu chưa khai báo."""
+    """English description of HITL reason code."""
     return HITL_REASONS.get(code, code)
 
 

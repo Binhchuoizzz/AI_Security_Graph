@@ -22,7 +22,7 @@ Evaluation telemetry combines two benchmark datasets: CSE-CIC-IDS2018~\cite{ids2
 \midrule
 Processor (CPU) & Intel Core i7 & Executes Welford statistical filtering and Redis streams \\
 System RAM & 32 GB DDR5 & Stores Semantic Cache hash tables and FAISS vector indices \\
-Graphics Card (GPU) & NVIDIA RTX 4060 Ti & Runs \texttt{llama.cpp} CUDA server for Gemma-2-9B model \\
+Graphics Card (GPU) & NVIDIA RTX 4060 Ti & Runs \texttt{llama.cpp} CUDA server for Foundation-Sec-8B model \\
 Virtualization & Docker Compose & Encapsulates microservices in an air-gapped environment \\
 \midrule
 Dataset 1 & CSE-CIC-IDS2018~\cite{ids2018} & 26,521 labeled NetFlow events (DDoS, Brute-force, Benign) \\
@@ -61,7 +61,7 @@ In aggregate, Tier 1 successfully offloads 82.4\% (21,853 of 26,521 events) of s
 \section{Tier 2 Cognitive Reasoning Accuracy and Knowledge Mapping}
 \label{sec:tier2_accuracy_rag}
 
-Tier 2 processes the escalated 17.6\% anomalous stream events to perform stateful reasoning via the LangGraph agent (\texttt{workflow.py}) combined with the quantized Gemma-2-9B-IT Q6\_K model. The Dual-RAG hybrid retrieval engine (\texttt{hybrid\_retriever.py}) fuses candidate contexts from FAISS dense vector search~\cite{faiss2019} and BM25 sparse keyword matching~\cite{bm25_2009} via Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ with $k=60$)~\cite{rrf2009}. Evaluated across 432 STIX 2.1-aligned MITRE ATT\&CK techniques, RRF rank fusion achieves an ATT\&CK technique mapping accuracy of 94.6\%, eliminating model hallucination.
+Tier 2 processes the escalated 17.6\% anomalous stream events to perform stateful reasoning via the LangGraph agent (\texttt{workflow.py}) combined with the quantized Foundation-Sec-8B-Instruct Q4\_K\_M model. The Dual-RAG hybrid retrieval engine (\texttt{hybrid\_retriever.py}) fuses candidate contexts from FAISS dense vector search~\cite{faiss2019} and BM25 sparse keyword matching~\cite{bm25_2009} via Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ with $k=60$)~\cite{rrf2009}. Evaluated across 432 STIX 2.1-aligned MITRE ATT\&CK techniques, RRF rank fusion achieves an ATT\&CK technique mapping accuracy of 94.6\%, eliminating model hallucination.
 
 \begin{table}[htbp]
 \centering

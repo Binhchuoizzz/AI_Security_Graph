@@ -1,166 +1,118 @@
-# SENTINEL — Sổ tay đo đạc
+# Bảng tra chỉ số SENTINEL
 
-> Mỗi chỉ số đứng trên tập dữ liệu nào, đo cái gì, vì sao chọn tập đó, và cạm bẫy khi đọc.
-> Cập nhật 2026-07-30, sau đợt vá 6 lỗi đo lường.
+> Mỗi dòng: **lệnh chạy · tập dữ liệu · đo gì · trích số nào**.
+> Cập nhật 31/07/2026, sau đợt vá 7 lỗi tầng đo.
 
----
-
-## 0. Ba tập dữ liệu — và ranh giới giữa chúng
-
-Cả dự án chỉ có **ba** tệp dữ liệu được phép sinh ra con số. Mọi tệp khác là trung gian.
-
-| tệp | n | thành phần | dùng cho |
-| :-- | --: | :-- | :-- |
-| `experiments/ground_truth.json` | 1.750 | 1.200 flow CICIDS + 300 CSIC có payload + 250 đối kháng | ablation A–F, quy kết kỹ thuật, độ trễ, kháng nhiễu |
-| `data/datatest.json` | 4.240 | cicids 2.340 · csic 1.036 · dapt 500 · zeroday 360 · adv 4 | Cổng ML (cân bằng ~52/48) |
-| `build_stream()` (dựng tại chỗ) | 25.799 | cicids_max 17.023 · dapt 5.402 · csic 2.000 · zeroday 120 · adv 4 | đo toàn tuyến, tương quan APT, quét ngưỡng Welford |
-
-`data/demo.json` (107.867) và `data/demo_small.json` (5.000) **chỉ để demo trực quan** — tuyệt đối
-không trích số từ chúng vào luận văn.
-
-### Vì sao ba tập chứ không một
-
-Ba tập trả lời ba câu hỏi khác nhau, và trộn chúng lại là làm hỏng cả ba:
-
-- **`datatest` cân bằng ~50/50** vì F1 chỉ có nghĩa khi hai lớp tương đương. Cổng ML là bộ
-  phân loại nhị phân, nên nó phải được chấm trên nền cân bằng.
-- **`ground_truth` thiên tấn công 86,9%** — cố ý. Nó không dùng để chấm F1 (script tự gắn cờ
-  `binary_f1_trustworthy: false`) mà để chấm **hành động**: với một luồng đã lọc còn toàn ca
-  đáng ngờ, hệ chọn BLOCK/ALERT/HITL/LOG đúng bao nhiêu lần.
-- **`build_stream()` là luồng "đời thật"** — đại đa số benign, tấn công rải rác. Nó đo
-  **xả tải**, thứ không đo được trên tập cân bằng nhân tạo.
-
-### Cạm bẫy đã cắn một lần
-
-`build_stream()` từng mặc định `csic_max=0` và chỉ nạp **một** ngày CICIDS
-(`Thursday-01-03` = chỉ Infiltration). Chín script gọi nó trần, nên mọi số "toàn tuyến" của
-dự án từng đứng trên luồng **không có một tấn công web nào** và **chỉ một lớp tấn công** —
-trong khi phạm vi nghiên cứu tuyên bố hai tập CSE-CIC-IDS2018 **và** CSIC 2010. Con số
-"26.521 sự kiện" trong bản luận văn cũ chính là luồng khuyết tật đó. Đã sửa mặc định
-(2026-07-30): 10 ngày đủ 15 lớp + 2.000 CSIC + 120 zero-day.
-
-`cicids_max_rows` là **tổng**, chia đều cho các ngày — nên phủ 10 ngày không làm luồng phình.
-
----
-
-## 1. Dựng lại dữ liệu — thứ tự BẮT BUỘC
+## Trước khi chạy bất cứ thứ gì
 
 ```bash
-.venv/bin/python scripts/fetch_and_build_dataset.py   # 1. ground_truth.json
-.venv/bin/python scripts/build_datatest.py            # 2. datatest.json  (đọc ground_truth)
-.venv/bin/python experiments/build_golden_baseline.py # 3. seed Welford   (đọc datatest)
-.venv/bin/python scripts/build_demo.py                # 4. demo.json (tuỳ chọn, chỉ để demo)
+docker-compose up -d                        # Redis + llama.cpp + MLflow + Dashboard
+export SENTINEL_FREEZE_DYNAMIC_RULES=1      # BẮT BUỘC cho MỌI lượt đo
 ```
 
-Sai thứ tự thì baseline Welford lệch pha với phân phối dữ liệu, và **mọi** số zero-day /
-ngưỡng phía sau sai theo mà không có gì báo.
+Không đóng băng luật động thì phép đo tự sinh luật rồi tự hưởng lợi ở lượt sau.
 
-`build_golden_baseline.py` dùng `datatest.json` **chỉ để LOẠI TRỪ** chữ ký các flow đã nằm
-trong benchmark (chống rò rỉ), còn flow benign để seed thì lấy thẳng từ CSV thô. Mặc định
-`--n 10000`.
+**Thứ tự dựng dữ liệu — sai chiều là hỏng cả lượt đo:**
+
+```text
+csic.json → ground_truth.json + datatest.json → golden_baseline.json → demo.json
+```
+
+`golden_baseline` phải dựng **sau** `datatest` vì nó dùng datatest để lập tập chữ ký loại trừ
+(chống rò benchmark vào seed Welford). Kiểm nhanh: dựng lại rồi `diff` — không đổi là đúng.
 
 ---
 
-## 2. Chạy toàn bộ
+## Ba tập dữ liệu, ba việc khác nhau
 
-```bash
-bash scripts/run_full_ablation.sh              # đầy đủ, cần LLM server
-bash scripts/run_full_ablation.sh --offline-only
-```
+| tập | cỡ | dùng cho |
+| :-- | --: | :-- |
+| `data/datatest.json` | 4.240 (cân bằng, 1.036 CSIC) | Cổng ML — cần cân bằng lớp |
+| `experiments/ground_truth.json` | 1.750 → **1.700 khi chấm** | ablation, quy kết, chất lượng lập luận |
+| `build_stream()` | 25.799 (10 ngày CICIDS + DAPT + CSIC + zero-day) | xả tải, toàn tuyến, độ trễ, APT |
 
-Điều kiện: llama.cpp phục vụ tại `http://127.0.0.1:5000/v1`.
+`ground_truth` lệch lớp nặng nên **F1 nhị phân trên nó vô nghĩa** (xấp xỉ base rate). Thước đo
+chính là chấm-theo-hành-động và chấm-theo-quy-kết.
 
-> **Đừng chạy `pytest` song song với đo đạc.** Nó ghi ~1.400 luật động vào
-> `config/system_settings.yaml`. Từ 2026-07-30 có thể tránh bằng
-> `SENTINEL_FREEZE_DYNAMIC_RULES=1 pytest`.
+### 50 mẫu bị loại khỏi mọi tỉ lệ
+
+`fetch_and_build_dataset.py` cố ý chèn 50 mẫu đối địch **do tác giả biên soạn** vào
+`ground_truth.json` để thử Guardrails. Chúng ở lại tệp (`evaluate_adversarial.py` cần), nhưng
+`unified_dataset.drop_authored()` loại chúng khỏi mọi phép chấm. Không loại thì:
+
+- 50/300 mẫu chấm-được-quy-kết là tự viết — **16,7%**;
+- cả 50 cùng đáp án `T1190`, đẩy T1190 từ 52 lên 102 mẫu.
+
+Sau khi loại: **250 mẫu thật**, phân bố `T1595.003` 130 · `T1190` 52 · `T1059.007` 30 ·
+`T1071.001` 26 · `T1083` 12.
+
+> **Sàn đoán bừa 52%.** `T1595.003` chiếm 130/250, nên đoán luôn mã đó đã được ~52%. Mọi tỉ lệ
+> khớp kỹ thuật phải đọc **so với 52%**, không phải so với 0. Khoá bằng
+> `tests/unit/test_authored_sample_exclusion.py`.
 
 ---
 
-## 3. Từng chỉ số
+## RQ1 — Xả tải và độ trễ
 
-### 3.1 Cổng ML — `evaluate_ml_gate.py`
+| lệnh | tập | đo gì | trích số nào |
+| :-- | :-- | :-- | :-- |
+| `experiments/evaluate_ml_gate.py` | datatest | Cổng ML phân loại + kháng né tránh | `mcc` · `balanced_accuracy` · `auto_block_precision` · `evasion_resistance.extreme_broad` |
+| `run_ablation.py --mode mlgate` | ground_truth | Cổng ML gỡ tải LLM bao nhiêu | `ml_bypass_rate` |
+| `experiments/run_cache_efficiency.py` | build_stream | Bộ đệm Tầng 1.75 trên truy vấn RAG thật | `hit_rate` · `speedup_x` |
+| `experiments/measure_latency_baseline.py` | build_stream (strided) | Hai tầng so với LLM-only | `latency_reduction_pct` + `stage_breakdown` |
+| `experiments/evaluate_unified_stream.py` | build_stream | Toàn tuyến trên luồng gộp | `classification_cicids.mcc` · `ip_containment` |
 
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `data/datatest.json` (4.240, cân bằng, **có 1.036 CSIC**) |
-| **Đo** | Cổng LightGBM tự quyết đúng bao nhiêu, và chịu được né tránh tới đâu |
-| **Chỉ số chính** | MCC, BalAcc — **không phải** F1 |
+Độ trễ **phải** lấy mẫu theo tỉ lệ luồng thật. Ép 50/50 thì Tier-1 chỉ loại được 11% và kết
+quả ra "chậm hơn LLM-only". Script nay tự gắn `metric_valid=false` nếu xả tải < 50%.
 
-Vì sao MCC chứ không F1: F1 bỏ qua ô true-negative, nên một bộ phân loại hô "tấn công" với
-mọi thứ vẫn có F1 đẹp. MCC dùng cả bốn ô, và bằng 0 đúng lúc bộ phân loại vô dụng.
+**Không** trích `ablation_mlgate_results.json` cho tuyên bố độ trễ — chính tệp đó ghi rõ nó
+chỉ đo tỉ lệ gỡ tải, không đo thời gian.
 
-**Phải đọc kèm `Skip payload`.** CSIC là request HTTP chỉ có 5 trường luồng, thiếu đặc trưng
-CICFlowMeter, nên Cổng ML **từ chối quyết** và đẩy tiếp — đúng kiến trúc, vì tấn công web là
-việc của chữ ký WAF chứ không phải của bộ phân loại NetFlow. Hệ quả đo được khi trộn CSIC
-vào: F1 **không đổi một chữ số** (0,8248, ma trận nhầm lẫn y hệt) nhưng tỉ lệ tự quyết tụt
-**79,1% → 59,8%**. Con số phải trích là 59,8%, kèm giải thích.
+---
 
-Kháng né tránh **tách theo độ khó** — chỉ trích chế độ KHÓ (`extreme_broad`, nhiễu toàn bộ
-đặc trưng). Hai chế độ dễ (`inf_single`, `extreme_single`) đều đạt 1.0 nên gộp trung bình ba
-chế độ sẽ thổi phồng con số.
+## RQ2 — Rào chắn AI và toàn vẹn pháp y
 
-### 3.2 Ablation A/F — `run_ablation.py --mode af`
+| lệnh | tập | đo gì | trích số nào |
+| :-- | :-- | :-- | :-- |
+| `evaluate_adversarial.py --mode static` | 120 mẫu, 5 nhóm | Guardrail **tĩnh** chặn được bao nhiêu | `summary.block_rate_pct` + `by_category` |
+| `evaluate_adversarial.py --mode pipeline` | **75** mẫu, 4 nhóm ngữ nghĩa | Tier-2 có bị thao túng không | `resistance_rate_pct` + **`coverage_pct`** |
+| `experiments/run_audit_tamper.py` | `audit_trail.db` | Chuỗi HMAC phát hiện giả mạo | `overall_detection_rate_core` |
+| `experiments/run_llm_robustness.py` | ground_truth | Tất định + đổi seed | `determinism` · `seed_variance.flip_rate` |
 
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `experiments/ground_truth.json` (1.750) |
-| **Đo** | Tầng 2 thêm được gì so với chỉ có Tier-1 |
-| **Chỉ số chính** | `action_accuracy` + `autonomous_precision` — **không phải** F1 nhị phân |
+Hai con số **bổ sung** nhau, không thay thế nhau. Lớp tĩnh chặn **60/120** — nhưng đó gần
+như toàn bộ nhóm `encoding_bypass` (45/45), còn `semantic_confusion` nó chặn **0/20**. Chính
+60 mẫu lọt qua ấy đều nằm trong 4 nhóm ngữ nghĩa mà Tier-2 nhận. Tier-2 chạy cả **75** mẫu
+của 4 nhóm đó — **siêu tập** của 60 mẫu lọt, nên `coverage_pct = 100` là thật.
 
-`metric_health` tự gắn cờ `binary_f1_trustworthy: false` vì base rate tấn công 86,9%: F1 nhị
-phân xấp xỉ base rate nên không phân biệt nổi cấu hình nào.
+Trích 100% của pipeline mà giấu 50% của static là chọn số.
 
-**Dòng đáng đọc nhất là `unresolved_rate`**, không phải accuracy. Config A bỏ ngỏ ~30% số ca
-(Tier-1 nói ESCALATE mà không có tầng sau để xử); Config F bỏ ngỏ 0%. Đó mới là đóng góp của
-Tầng 2 — không phải vài điểm accuracy.
+`audit_tamper` tách riêng `xoá_dòng_cuối` — cắt đuôi chuỗi thì log-chaining về nguyên lý không
+phát hiện được. Đó là giới hạn phải nêu, không phải số để làm đẹp.
 
-> **Lỗi đã vá 2026-07-30 — baseline bị chính treatment nâng đỡ.** `run_af` dựng MỘT
-> `rule_engine` dùng chung cho cả A và F. Mỗi luật động do tác tử của F sinh ra được ghi vào
-> config, và `feedback_listener` chủ động xoá cache nên luật có hiệu lực **ngay** ở mẫu kế
-> tiếp — kể cả với A. Config A, vốn là kịch bản "giả sử không có Tầng 2", lại hưởng đúng
-> những luật mà chỉ Tầng 2 mới tạo nổi. Quan sát được: luật phình **745 → 1.498** trong một
-> lượt, tức chạy lại lần nữa ra số khác. Nay `run_ablation` đặt
-> `SENTINEL_FREEZE_DYNAMIC_RULES=1` nên tập luật đứng yên suốt lượt đo.
+---
 
-`--mode balanced` (150/150) mới là chỗ so độ chính xác; `--mode bcde` bóc tách B–E.
+## RQ3 — Tác tử có trạng thái và quy kết ATT&CK
 
-### 3.3 Quy kết kỹ thuật MITRE — `eval_attack_mapper.py`
+| lệnh | tập | đo gì | trích số nào |
+| :-- | :-- | :-- | :-- |
+| `scripts/eval_attack_mapper.py --mode rrf` | 250 mẫu CSIC có payload | Bộ ánh xạ **tất định** (không LLM) | `technique_exact_match_pct` |
+| `scripts/eval_attack_mapper.py --mode e2e` | như trên | **Toàn tuyến** — thứ hệ thật làm | `technique_exact_match_pct` |
+| `run_ablation.py --mode af` | ground_truth phân tầng | Tắt LLM (A) so với đủ LLM (F) | `action_scores` |
+| `run_ablation.py --mode bcde` | **250** mẫu thật (có payload + có mã) | Đóng góp từng bậc RAG | `attribution_scores` |
+| `run_ablation.py --mode balanced` | 150/150 cân bằng | Khử ảnh hưởng base-rate | `action_scores` |
+| `experiments/evaluate_reasoning.py` | phán quyết từ `--mode af` | Trọng tài **khác họ** chấm lập luận | 4 trục thang 1–5 + `evidence_grounding` |
+| `experiments/evaluate_tier2_decision.py` | build_stream, đã qua Tier-1 **và** Cổng ML | Phán quyết Tier-2 + hiệu chỉnh niềm tin | `threat_recall` · `mcc` · `confidence_calibration.ece` |
+| `experiments/run_apt_negative_control.py` | DAPT2020 đa ngày | Tương quan chuỗi APT | `recall` · `specificity` |
+| `experiments/evaluate_rag_retrieval.py` | ground_truth đã leo thang | Chất lượng truy xuất RAG | `recall@k` · `mrr` |
 
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `ground_truth.json` **+ cờ `--evidence-layer payload`** → 550 mẫu, trong đó **300 chấm được** |
-| **Đo** | Hệ có gọi đúng mã ATT&CK không |
-| **Chế độ** | `rrf` = tất định (không LLM) · `e2e` = qua toàn tuyến |
+`rrf` chạy `llm=None` — đó là cấu hình **tắt LLM**. Trích nó làm thành tích của LLM là gom số
+sai. Chênh lệch `rrf` với `e2e` chính là thứ LLM làm với một kết quả truy xuất đã đúng.
 
-**Cờ `--evidence-layer payload` là bắt buộc.** Phần CICIDS của đề là NetFlow thuần, không có
-một ký tự payload — "kỹ thuật kỳ vọng" của nó không suy ra được từ đầu vào. Trộn vào sẽ kéo
-tụt chỉ số vì lý do chẳng liên quan gì tới năng lực hệ thống.
+`bcde` phải chạy **đủ 300 mẫu**: C/D/E chỉ gọi LLM khi Tier-1 leo thang (~17%), cỡ nhỏ thì mỗi
+cấu hình chỉ vài ca. Script tự gắn `attribution_underpowered=true` nếu < 30 ca.
 
-250 mẫu đối kháng trong 550 không mang mã kỳ vọng nên bị loại khỏi phần chấm quy kết, còn
-lại đúng 300 mẫu CSIC.
-
-`kb_coverage_ceiling` phải bằng 100% — nếu thấp hơn nghĩa là đáp án không có trong KB, và
-lúc đó chỉ số đo độ phủ KB chứ không đo năng lực truy xuất.
-
-**Đọc `exact` cạnh `parent`.** Chênh lệch giữa hai cột là phần hệ tìm đúng họ kỹ thuật nhưng
-hụt cấp con.
-
-> **Lỗi đã vá 2026-07-30 — luôn nhặt kỹ thuật CHA.** Khâu chọn lấy `candidates[0]`, mà
-> ATT&CK viết mô tả kỹ thuật cha bằng cách liệt kê con (đo được **47 cặp** trong chính KB
-> này), nên cha khớp mọi truy vấn của mọi con và thắng hạng nhờ phủ từ vựng rộng hơn. Đo
-> trực tiếp: với 15 mẫu nhãn T1595.003, kỹ thuật con nằm **hạng 2 ở 14/15 ca** — bộ truy
-> xuất đúng, chỉ khâu chọn sai. `_prefer_subtechnique` nay nâng con lên khi cả cha và con
-> cùng được truy xuất. Kết quả: exact **28,0% → 67,33%**, riêng T1595.003 **0% → 90,8%**.
-
-### 3.4 Chất lượng lập luận — `evaluate_reasoning.py`
-
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `reasoning_outputs` đã lưu trong `ablation_results.json` (Config F) |
-| **Đo** | Bốn trục kiểu RAGAS: context precision · answer relevancy · faithfulness · context recall |
-| **Bắt buộc** | Trọng tài phải **khác họ** với model tác tử |
-
-Không cần chạy lại ablation — phán quyết đã lưu sẵn, chỉ chấm lại.
+`evaluate_reasoning` phải đổi model trọng tài **bằng biến môi trường**, không chỉ sửa `.env`
+(docker-compose ưu tiên biến môi trường):
 
 ```bash
 LLM_MODEL_FILE=Meta-Llama-3-8B-Instruct-Q5_K_M.gguf LLAMA_ARG_CTX_SIZE=32768 \
@@ -169,111 +121,63 @@ SENTINEL_AGENT_MODEL=Foundation-Sec-8B-Instruct-Q4_K_M.gguf \
   .venv/bin/python experiments/evaluate_reasoning.py
 ```
 
-`docker-compose` **ưu tiên biến môi trường hơn tệp `.env`** — chỉ sửa `.env` là không đủ,
-container sẽ dựng lại bằng đúng model cũ.
-
-> **Lỗi đã vá 2026-07-30 — trọng tài chính là bị cáo.** `call_llm_judge` gọi thẳng
-> `LLM_API_BASE` với `"model": "judge"`, nhưng llama.cpp bỏ qua trường đó và phục vụ model
-> đang nạp. Runner không đổi model (docstring ghi "Unload Gemma → Load Llama 3" nhưng đó là
-> thao tác **tay**). Lượt 2026-07-29 vì thế là Foundation-Sec tự chấm chính nó, trong khi
-> tệp kết quả ghi *"Different model family eliminates Self-Enhancement Bias"*. Tên model
-> cũng là chuỗi cứng `"Gemma 2 9B Q6_K"` bất kể model nào thật sự chạy. Nay
-> `assert_cross_family()` đọc model thật từ `/v1/models` và **chặn cứng** khi trùng.
-
-Đọc kèm `run_health.n_incomplete_schema` — lớn hơn 0 nghĩa là có phán quyết thiếu trường bắt
-buộc, và script tự tuyên bố lượt đo không đáng tin.
-
-### 3.5 Phán quyết Tier-2 — `evaluate_tier2_decision.py`
-
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `build_stream()` → lọc lấy ca Tier-1 ESCALATE (**8.323** ca) |
-| **Đo** | Chất lượng phán quyết của tác tử, **có điều kiện** trên việc đã escalate |
-
-**Luôn dùng `--limit`.** Chạy hết 8.323 ca mất ~19 giờ. Script lấy mẫu **strided đều trên
-toàn tập** (không phải N ca đầu), nên `--limit 800` cho khoảng tin cậy đủ chặt trong ~2 giờ.
-
-Chỉ số tách làm hai tầng, cố ý: `agent_reliability` (tỉ lệ tác tử cho ra được phán quyết) và
-ma trận nhầm lẫn **chỉ trên ca chấm được**. Trộn ca crash vào ma trận là tính một cú crash
-thành "bắt đúng đe doạ".
-
-`metric_valid` chỉ bật khi tỉ lệ lỗi ≤ 5%.
-
-### 3.6 Toàn tuyến — `evaluate_unified_stream.py`
-
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `build_stream()` — 25.799 sự kiện, 22 lớp tấn công |
-| **Đo** | Tier-1 phát hiện + xả tải trên luồng giống đời thật |
-
-Đây là nguồn của con số **xả tải** cho RQ1. Đọc `scored_by_source` để biết mỗi nguồn đóng
-góp bao nhiêu, và `excluded_by_source` để biết cái gì bị loại và vì sao.
-
-### 3.7 Welford — `run_zeroday_graded.py` · `run_threshold_sensitivity.py`
-
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `build_stream()` + `ground_truth.json` |
-| **Đo** | Bắt dị biệt không chữ ký; độ nhạy theo ngưỡng τ |
-
-> **Z-score Welford phụ thuộc THỨ TỰ.** Cùng một tập grayzone từng cho ba kết quả khác nhau
-> tuỳ thứ tự nạp. Chỉ trích số Tier-1 từ lượt chạy **sống**, không từ thăm dò ngoại tuyến.
-
-Hai script này **chấp nhận được** khi không có CSIC, vì CSIC là request HTTP gần như không
-có đặc trưng luồng — thêm vào chỉ làm nhiễu thống kê chứ không thêm tín hiệu.
-
-### 3.8 An ninh — `evaluate_adversarial.py` · `run_llm_robustness.py` · `audit_tier_capability.py`
-
-| | |
-| :-- | :-- |
-| **Dữ liệu** | 250 mẫu đối kháng OWASP trong `ground_truth.json` |
-| **Đo** | Rào chắn có bị tiêm nhiễm câu lệnh qua nhật ký thô không |
-
-Đây là nhóm chỉ số **mạnh nhất** của dự án, vì nó là bảo chứng **kiến trúc** — không phụ
-thuộc model tốt hay xấu. Đóng gói phân định bằng nonce ngẫu nhiên mỗi lô: kẻ tấn công không
-đoán được mốc phân cách nên không thoát ra khỏi vùng dữ liệu được.
-
-### 3.9 Độ trễ — `measure_latency_baseline.py`
-
-| | |
-| :-- | :-- |
-| **Dữ liệu** | `ground_truth.json` |
-| **Đo** | Đầu-cuối hai tầng so với thuần LLM |
-
-Trích **p50 và p95**, không trích trung bình — phân phối độ trễ lệch phải nặng, trung bình
-bị vài ca chậm kéo đi.
+Script **chặn cứng** nếu trọng tài trùng bị cáo. Đọc kèm `run_health.n_deliberate_abstention`:
+ca hệ chủ ý trả `N/A` là rào chắn hoạt động đúng, **không** phải thiếu schema.
 
 ---
 
-## 4. Hằng số hệ thống (đọc thẳng từ mã, 2026-07-30)
+## Bài phụ trợ
 
-| hằng số | giá trị | nơi định nghĩa |
+| lệnh | đo gì | lưu ý |
 | :-- | :-- | :-- |
-| Ngưỡng leo thang Tier-1 | `risk_threshold: 15` | `config/system_settings.yaml` |
-| Ngưỡng Z-score | `3.5` | `rule_engine.py` |
-| Họ chữ ký WAF | **30** | `_WAF_PATTERNS` |
-| Dải quyết định ML | 0,85 BLOCK · 0,65 ESCALATE · 0,40 ALERT | `decision_policy.py` |
-| Dải quyết định LLM | 0,85 BLOCK · 0,65 ALERT · dưới → AWAIT_HITL | `decision_policy.py` |
-| Cache phán quyết | LRU 10.000 · TTL 3.600s | `response_cache.py` |
-| RRF | `k = 60` | `retriever.py` |
-| Mục tri thức MITRE | **433** | `knowledge_base/mitre_attack.json` |
-| Ngân sách ngữ cảnh | **16.384** token | `config/system_settings.yaml` |
-| Model tác tử | **Foundation-Sec-8B-Instruct Q4_K_M** | `.env` |
-| Ngữ cảnh llama.cpp | `-c 32768 -np 2` → **16.384/khe** | `docker-compose.yml` |
-
-> `-np N` **chia** `-c` cho N khe. Gemma-2-9B từng hỏng 60/60 lượt trong 0,02 giây vì
-> `-c 8192 -np 2` = 4.096 token/khe, trong khi prompt thật p50 khoảng 7.700 token. Đó là lỗi
-> cấu hình, **không phải** kết luận về chất lượng model.
+| `run_context_stress.py` | Nén log theo template | Báo **cả hai** pool: đồng nhất (1000×) và đa dạng (**125×** — số thật) |
+| `run_zeroday_graded.py` | Bắt bất thường theo cấp độ σ | |
+| `run_threshold_sensitivity.py` | Độ nhạy ngưỡng Welford 3.5 | |
+| `run_baseline_comparison.py` | So với Zero-R, chữ ký tĩnh, ML phẳng | |
+| `audit_tier_capability.py` | **Phép thử CHỨC NĂNG**, 15 ca viết tay | `is_benchmark_metric: false` — KHÔNG xếp cạnh chỉ số benchmark |
 
 ---
 
-## 5. Danh mục kiểm trước khi trích số vào luận văn
+## Chạy hết, đúng thứ tự
 
-- [ ] Tệp kết quả **mới hơn** lần dựng dữ liệu gần nhất — `gt_id` đúc theo chỉ số sự kiện,
-      nên dựng lại dataset là mọi trace cũ trỏ sang sự kiện khác mà vẫn tra được khoá
-- [ ] `metric_valid` / `metric_health` không gắn cờ đỏ
-- [ ] Số mẫu (`n`) ghi kèm mọi tỉ lệ phần trăm
-- [ ] `judge_model` **khác** `agent_model` trong `reasoning_eval_results.json`
-- [ ] `config/system_settings.yaml` không dính luật do pytest hoặc lượt đo sinh ra
-- [ ] Số Tier-1 lấy từ lượt chạy **sống**, không từ thăm dò ngoại tuyến
-- [ ] Tên model trong tệp kết quả khớp model **thật sự** đã chạy
+```bash
+export SENTINEL_FREEZE_DYNAMIC_RULES=1
+
+# A. Offline, không cần LLM (~2 phút)
+for s in evaluate_ml_gate run_cache_efficiency run_audit_tamper run_context_stress \
+         run_zeroday_graded run_threshold_sensitivity run_apt_negative_control \
+         evaluate_unified_stream run_baseline_comparison; do
+  .venv/bin/python experiments/$s.py
+done
+.venv/bin/python experiments/run_ablation.py --mode mlgate
+
+# B. Cần LLM (~3–4 giờ)
+.venv/bin/python scripts/eval_attack_mapper.py --mode rrf --evidence-layer payload
+.venv/bin/python scripts/eval_attack_mapper.py --mode e2e --evidence-layer payload
+.venv/bin/python experiments/run_ablation.py --mode af
+.venv/bin/python experiments/run_ablation.py --mode bcde
+.venv/bin/python experiments/run_ablation.py --mode balanced
+.venv/bin/python experiments/evaluate_tier2_decision.py --limit 800
+.venv/bin/python experiments/evaluate_adversarial.py --mode all
+.venv/bin/python experiments/run_llm_robustness.py
+.venv/bin/python experiments/measure_latency_baseline.py
+
+# C. Trọng tài khác họ (đổi model trước — xem RQ3)
+.venv/bin/python experiments/evaluate_reasoning.py
+
+# D. Gom báo cáo
+.venv/bin/python scripts/export_final_report.py   # -> reports/KET_QUA_CHOT_<ngày>.md
+```
+
+---
+
+## Bảy điều kiểm trước khi trích bất kỳ con số nào
+
+1. `metric_valid` / `metric_health` / `run_health` trong tệp kết quả — script tự gắn cờ thì tin nó.
+2. **Mẫu số**: `n_invoked`, `coverage_pct`, `n_scorable`. Tỉ lệ không có mẫu số là tỉ lệ không kiểm chứng được.
+2b. Log lượt chạy có dòng `Loại 50 mẫu BIÊN SOẠN` — không thấy dòng đó nghĩa là bộ lọc chưa chạy.
+3. Mốc thời gian tệp kết quả **mới hơn** tệp dữ liệu nó đọc.
+4. Không gộp số từ hai tập khác nhau thành một "dải".
+5. `reasoning_eval_results.json` có `judge_model` **≠** `agent_model`.
+6. Số luật động trong `config/system_settings.yaml` không đổi sau lượt đo.
+7. Phép thử **chức năng** (15 ca viết tay) không đứng cạnh chỉ số **benchmark**.

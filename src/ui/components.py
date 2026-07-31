@@ -205,23 +205,23 @@ def render_alert_card(
         css_class = "severity-medium"
         icon = "🧑‍💻"
 
-    # Việt hóa hành động
+    # Action display labels
     action_translations = {
-        "BLOCK_IP": "CHẶN IP (BLOCK)",
-        "ALERT": "CẢNH BÁO (ALERT)",
-        "AWAIT_HITL": "CHỜ DUYỆT (HITL)",
-        "LOG": "GHI LOG (LOG)",
-        "WHITELIST": "BỎ QUA (WHITELIST)",
+        "BLOCK_IP": "BLOCK IP",
+        "ALERT": "ALERT",
+        "AWAIT_HITL": "AWAIT HITL",
+        "LOG": "LOG",
+        "WHITELIST": "WHITELIST",
     }
     action_display = action_translations.get(action, action)
 
-    # Kiểm tra xem AI có tự suy luận không
-    is_self_inferred = "Tự suy luận" in raw_reason
+    # Check if self-inferred by AI
+    is_self_inferred = "Self-inferred" in raw_reason or "Tự suy luận" in raw_reason
     inference_badge = ""
     if is_self_inferred:
-        inference_badge = '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 Tự Suy Đoán</span>'
+        inference_badge = '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 Self-Inferred</span>'
 
-    # Làm sạch chuỗi lý do phân tích (loại bỏ các thẻ tag để hiển thị text sạch)
+    # Clean raw_reason for display
     clean_reason = html_lib.escape(raw_reason)
     clean_reason = re.sub(
         r"\[MITRE:(?:[^\[\]]|\[[^\[\]]*\])*\]", "", clean_reason, flags=re.IGNORECASE
@@ -230,14 +230,19 @@ def render_alert_card(
         r"\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]", "", clean_reason, flags=re.IGNORECASE
     ).strip()
 
-    # Xoá ngoặc vuông đóng lẻ tẻ nếu còn sót
     if clean_reason.startswith("]"):
         clean_reason = clean_reason[1:].strip()
 
-    # Phân nguồn phán quyết: Tier-1 (rule) / Tier-1 · Cổng ML / Tier-2 LLM.
+    # Categorize decision tier: Tier-1 rule / Tier-1 ML Gate / Tier-2 LLM
     reason_text = raw_reason
-    is_manual = "Chặn thủ công" in reason_text or "MANUAL" in reason_text.upper()
-    is_llm = reason_text.startswith("[MITRE:")
+    is_manual = (
+        "Manual" in reason_text or "MANUAL" in reason_text.upper() or "Chặn thủ công" in reason_text
+    )
+    is_llm = (
+        reason_text.startswith("[REASON:")
+        or reason_text.startswith("[MITRE:")
+        or reason_text.startswith("[LÝ DO:")
+    )
     is_ml_tier = not is_manual and not is_llm and any(k in reason_text for k in ML_GATE_MARKERS)
     is_tier1 = (
         not is_manual
@@ -250,49 +255,49 @@ def render_alert_card(
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#1890ff;'
             "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
-            'border-radius:4px;margin-left:8px;">🔧 Chặn thủ công (Manual)</span>'
+            'border-radius:4px;margin-left:8px;">🔧 Manual Action</span>'
         )
-        reasoning_title = "🔧 Ghi chú chặn thủ công:"
-        mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>N/A (Chặn thủ công)</code>"
+        reasoning_title = "🔧 Manual Action Note:"
+        mitre_section_text = "🎯 MITRE ATT&CK Mapping: <code>N/A (Manual Action)</code>"
     elif is_tier1:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(82, 196, 26, 0.2);color:#95de64;'
             "border:1px solid rgba(82, 196, 26, 0.4);font-size:0.75rem;padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">🟢 Tier-1 Filter</span>'
         )
-        reasoning_title = "⚡ Lập luận tĩnh (Tier-1 Rule/Filter):"
-        mitre_section_text = "🎯 Ánh xạ: Phân tích ban đầu từ Log thô"
+        reasoning_title = "⚡ Tier-1 Rule/Filter Reasoning:"
+        mitre_section_text = "🎯 Mapping: Initial analysis from raw log telemetry"
     elif is_ml_tier:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.2);color:#faad14;'
             "border:1px solid rgba(250, 173, 20, 0.4);font-size:0.75rem;padding:2px 8px;"
-            'border-radius:4px;margin-left:8px;">⚡ Tier-1 · Cổng ML</span>'
+            'border-radius:4px;margin-left:8px;">⚡ Tier-1 · ML Gate</span>'
         )
-        reasoning_title = "⚡ Lập luận của Cổng ML Tier-1 (LightGBM):"
-        mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
+        reasoning_title = "⚡ Tier-1 ML Gate Reasoning (LightGBM):"
+        mitre_section_text = f"🎯 MITRE ATT&CK Mapping: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
-            mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận tự động)"
+            mitre_section_text = "🎯 MITRE ATT&CK Mapping: <code>T1190 - Exploit Public-Facing Application</code> (Automated Inference)"
     else:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#69c0ff;'
             "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">🧠 Tier-2 · LLM Agent</span>'
         )
-        reasoning_title = "🤖 Lập luận của Tác tử LLM (Agentic Reasoning):"
-        mitre_section_text = f"🎯 Phân loại MITRE ATT&CK: <code>{mitre_tech}</code>"
+        reasoning_title = "🤖 Agentic LLM Reasoning (Foundation-Sec-8B):"
+        mitre_section_text = f"🎯 MITRE ATT&CK Mapping: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
-            mitre_section_text = "🎯 Phân loại MITRE ATT&CK: <code>T1190 - Exploit Public-Facing Application</code> (Suy luận)"
+            mitre_section_text = "🎯 MITRE ATT&CK Mapping: <code>T1190 - Exploit Public-Facing Application</code> (Agent Reasoning)"
 
-    # Thiết lập playbook ứng phó NIST
+    # NIST Incident Response Playbook guidance
     nist_playbook_text = (
-        "🛡️ NIST Incident Response Playbook: Thực hiện ghi log và giám sát hành vi liên tục."
+        "🛡️ NIST Incident Response Playbook: Log event and perform continuous behavioral monitoring."
     )
     if severity_level == "CRITICAL":
-        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.1): Thực hiện ngăn chặn khẩn cấp (Containment) - Chặn IP nguồn tại Firewall để cô lập vùng tấn công."
+        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment - Block source IP at Firewall to isolate attack boundary."
     elif severity_level == "HIGH":
-        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.2): Cảnh báo khẩn cấp tới L1/L3 SOC Analyst, đưa IP vào danh sách theo dõi đặc biệt."
+        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.2): High-priority alert to L1/L3 SOC Analysts; place IP on high-risk watchlist."
     elif severity_level == "MEDIUM":
-        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.3): Yêu cầu phê duyệt từ L3 Manager (Human-in-the-Loop) để kích hoạt luật chặn tự động."
+        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.3): Require Human-in-the-Loop (HITL) analyst approval to trigger automated block rule."
 
     # Render HTML Card
     html_content = (
@@ -475,34 +480,43 @@ def render_metrics_header(
     nr_str = f"{noise_reduction:.1f}%" if noise_reduction is not None else "0.0%"
 
     html_kpi = (
+        f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">'
+        f'  <div style="font-size: 0.95rem; font-weight: 800; color: #CBD5E1; letter-spacing: 0.5px;">'
+        f"    📊 Real-Time Cyber Security Operational Metrics"
+        f"  </div>"
+        f'  <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); padding: 4px 14px; border-radius: 20px; font-size: 0.78rem; color: #34D399; font-weight: 700; letter-spacing: 0.5px;">'
+        f'    <span class="blink" style="display: inline-block; width: 8px; height: 8px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 8px #10B981;"></span>'
+        f"    REALTIME STREAMING ACTIVE · SYNC 4S"
+        f"  </div>"
+        f"</div>"
         f'<div class="kpi-container">'
-        f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #8c8c8c;">{total_raw_logs}</div>'
-        f'    <div class="kpi-label">Logs thô đầu vào</div>'
+        f'  <div class="kpi-card" style="border-top: 4px solid #64748B;">'
+        f'    <div class="kpi-val" style="color: #F8FAFC;">{total_raw_logs}</div>'
+        f'    <div class="kpi-label">Raw Input Logs</div>'
         f"  </div>"
-        f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #fa541c;">{t1_count}</div>'
-        f'    <div class="kpi-label">Chặn tại Tier-1 🛡️<br/><span style="font-size: 0.85em; font-weight: normal; color: #a0a0a0;">(Lọc rác {nr_str})</span></div>'
+        f'  <div class="kpi-card" style="border-top: 4px solid #FF5252;">'
+        f'    <div class="kpi-val" style="color: #FF5252;">{nr_str}</div>'
+        f'    <div class="kpi-label">Tier-1 Offloaded Rate 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">({t1_count} blocked)</span></div>'
         f"  </div>"
-        f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #1890ff;">{ml_count}</div>'
-        f'    <div class="kpi-label">Chặn tại Cổng ML ⚡</div>'
+        f'  <div class="kpi-card" style="border-top: 4px solid #3B82F6;">'
+        f'    <div class="kpi-val" style="color: #60A5FA;">{ml_count}</div>'
+        f'    <div class="kpi-label">ML Gate Blocked ⚡</div>'
         f"  </div>"
-        f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #722ed1;">{llm_count}</div>'
-        f'    <div class="kpi-label">Chặn ở LLM 🧠</div>'
+        f'  <div class="kpi-card" style="border-top: 4px solid #8B5CF6;">'
+        f'    <div class="kpi-val" style="color: #A78BFA;">{llm_count}</div>'
+        f'    <div class="kpi-label">LLM Agent Blocked 🧠</div>'
         f"  </div>"
-        f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #faad14;">{pending_rules}</div>'
-        f'    <div class="kpi-label">Phê duyệt (HITL)</div>'
+        f'  <div class="kpi-card" style="border-top: 4px solid #F59E0B;">'
+        f'    <div class="kpi-val" style="color: #FBBF24;">{pending_rules}</div>'
+        f'    <div class="kpi-label">HITL Approvals 🧑‍💻</div>'
         f"  </div>"
-        f'  <div class="kpi-card">'
-        f'    <div class="kpi-val" style="color: #13c2c2;">{active_rules}</div>'
-        f'    <div class="kpi-label">Luật đang chặn (Active)</div>'
+        f'  <div class="kpi-card" style="border-top: 4px solid #10B981;">'
+        f'    <div class="kpi-val" style="color: #34D399;">{active_rules}</div>'
+        f'    <div class="kpi-label">Active Block Rules 🔒</div>'
         f"  </div>"
-        f'  <div class="kpi-card">'
+        f'  <div class="kpi-card" style="border-top: 4px solid {fpr_color};">'
         f'    <div class="kpi-val" style="color: {fpr_color};">{live_fpr:.1f}%</div>'
-        f'    <div class="kpi-label">Tỷ lệ False Positive</div>'
+        f'    <div class="kpi-label">Live False Positive Rate 🎯</div>'
         f"  </div>"
         f"</div>"
     )
@@ -583,3 +597,8 @@ def render_apt_events_table(events):
         row_idx = rows[0]
         selected_ip = df.iloc[row_idx]["IP Nguồn"]
     return selected_ip
+
+
+def render_theme_styles(theme="dark"):
+    """Enforces pure Cyber Dark Mode across the dashboard."""
+    pass

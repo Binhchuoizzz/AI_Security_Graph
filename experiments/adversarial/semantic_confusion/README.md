@@ -24,7 +24,7 @@ model biết cấu trúc attack của chính nó → bias trong cả generate l�
 ```
 Generator : Secondary Evaluation LLM (e.g., Llama 3)
 Judge     : Oracle Judge LLM
-Agent     : Primary Agent LLM (e.g., Gemma 2)
+Agent     : Primary Agent LLM (e.g., Foundation-Sec-8B)
 ```
 
 **Lý do Option C tốt hơn Option A/B:**

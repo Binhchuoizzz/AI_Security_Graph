@@ -9,7 +9,7 @@ MỤC ĐÍCH:
 
 THIẾT KẾ (đã chốt với chủ nhiệm đề tài):
   - TÁI DÙNG hạ tầng có sẵn: knowledge_base/mitre_attack.json (299 kỹ thuật) +
-    DualRetriever (FAISS+BM25, RRF k=60) + llm_client (llama.cpp Q6_K @ :5000).
+    DualRetriever (FAISS+BM25, RRF k=60) + llm_client (llama.cpp Foundation-Sec-8B @ :5000).
     KHÔNG tải lại STIX, KHÔNG tạo KB/endpoint song song.
   - Đường XÁC ĐỊNH (deterministic) cho các tấn công web phổ biến: tra
     WEB_ATTACK_MAP (do người soạn, mọi technique/tactic đều là ATT&CK THẬT).

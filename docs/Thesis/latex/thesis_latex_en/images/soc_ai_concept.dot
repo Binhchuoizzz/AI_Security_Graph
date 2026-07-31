@@ -46,7 +46,7 @@ digraph sentinel_arch {
         fsm   [label="LangGraph FSM\n(Orchestration Engine)", fillcolor="#ffffff"];
         tmem  [label="Threat Memory\n(SQLite DB)", fillcolor="#ffffff"];
         hmac  [label="HMAC Protection\n(Audit Logs)", fillcolor="#ffffff"];
-        llm   [label="Quantized LLM\n(Gemma-2-9B-IT Q6_K)", fillcolor="#ffe0b2"];
+        llm   [label="Quantized LLM\n(Foundation-Sec-8B Q4_K_M)", fillcolor="#ffe0b2"];
         drag  [label="Dual-RAG Hybrid Search\n(MITRE ATT&CK + NIST SP 800-61r2)", fillcolor="#ffffff"];
     }
 

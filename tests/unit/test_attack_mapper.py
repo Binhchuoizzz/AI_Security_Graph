@@ -413,3 +413,76 @@ def test_ungrounded_technique_becomes_NA_not_a_plausible_guess():
     assert d["mitre_technique"] == "N/A", "vẫn khẳng định một kỹ thuật không có neo"
     assert d["mitre_technique_id"] == ""
     assert d["mapping_status"] == "ungrounded_in_rag"
+
+
+def _fake_mapping(technique_id: str, technique: str):
+    """Bộ ánh xạ giả, để cô lập TRANH CHẤP giữa mã của mapper và mã LLM tự khai."""
+    from src.agent.attack_mapper import MitreMapping
+
+    return MitreMapping(
+        attack_type="x",
+        confidence=0.95,
+        mitre_tactic="Impact",
+        mitre_tactic_id="TA0040",
+        mitre_technique=technique,
+        mitre_technique_id=technique_id,
+        mitre_url=f"https://attack.mitre.org/techniques/{technique_id}/",
+        mapping_confidence=0.9,
+        mapping_status="resolved",
+        recommended_response="r",
+    )
+
+
+def test_llm_selfclaimed_technique_must_not_override_deterministic_mapper(monkeypatch):
+    """LỖI GỐC của khoảng cách rrf 67,33% -> e2e 2,33%.
+
+    Bản cũ: hễ LLM nêu một mã hợp lệ là mã đó THẮNG bộ ánh xạ RRF và đi thẳng ra
+    `mitre_technique_id` — trường được chấm điểm và ghi vào vết kiểm toán — mà KHÔNG hề
+    đối chiếu với tài liệu RAG của lô. Chỉ TÊN được kiểm, nên một mã bịa vẫn lọt.
+
+    Ở đây: RAG chỉ nói về T1498; mapper chốt T1498 (có neo); LLM tự khai T1030 (không neo).
+    Quy kết PHẢI là T1498, và lời tự khai của model phải được giữ riêng để đối chiếu.
+    """
+    from src.agent import nodes
+
+    monkeypatch.setattr(
+        nodes, "map_attack", lambda *a, **k: _fake_mapping("T1498", "Network Denial of Service")
+    )
+    st = _mapper_state("T1030 - Data Transfer Size Limits", "T1498 Network Denial of Service")
+    d = nodes.node_attack_mapper(st)["decisions"][-1]
+
+    assert d["mitre_technique_id"] == "T1498", "mã LLM tự khai vẫn đè được bộ ánh xạ tất định"
+    assert d["llm_claimed_technique"] == "T1030 - Data Transfer Size Limits"
+    assert d["action"] == "BLOCK_IP", "hạ cấp oan một quyết định CÓ neo"
+
+
+def test_llm_technique_accepted_only_when_grounded(monkeypatch):
+    """Mapper không neo được nhưng LLM nêu mã CÓ trong RAG -> nhận mã của LLM.
+
+    Vẫn truy nguyên được về bằng chứng, nên không có lý do vứt đi.
+    """
+    from src.agent import nodes
+
+    monkeypatch.setattr(
+        nodes, "map_attack", lambda *a, **k: _fake_mapping("T1030", "Data Transfer Size Limits")
+    )
+    st = _mapper_state("T1498 - Network Denial of Service", "T1498 Network Denial of Service")
+    d = nodes.node_attack_mapper(st)["decisions"][-1]
+
+    assert d["mitre_technique_id"] == "T1498"
+    assert d["mitre_url"].endswith("/T1498/"), "URL còn trỏ sang kỹ thuật của mapper"
+
+
+def test_attribution_never_leaves_the_rag_context(monkeypatch):
+    """Bất biến chốt: mã quy kết luôn hoặc rỗng, hoặc nằm trong RAG của chính lô đó."""
+    from src.agent import nodes
+
+    monkeypatch.setattr(
+        nodes, "map_attack", lambda *a, **k: _fake_mapping("T1055", "Process Injection")
+    )
+    st = _mapper_state("T1030", "T1498 Network Denial of Service", action="ALERT")
+    d = nodes.node_attack_mapper(st)["decisions"][-1]
+
+    assert d["mitre_technique_id"] == ""
+    assert d["mapping_status"] == "ungrounded_in_rag"
+    assert d["action"] == "AWAIT_HITL"

@@ -26,7 +26,7 @@ def load_config():
     except Exception:
         pass
     return {
-        "llm": {"max_context_tokens": 8192},
+        "llm": {"max_context_tokens": 16384},
         "guardrails": {"token_budget": 4000},
         "logging": {"audit_db_path": "logs/guardrails_audit.db"},
     }
@@ -40,7 +40,7 @@ class ContextOverflowGuard:
 
     def __init__(self):
         config = load_config()
-        self.max_tokens = int(config.get("llm", {}).get("max_context_tokens", 8192))
+        self.max_tokens = int(config.get("llm", {}).get("max_context_tokens", 16384))
         self.log_budget = int(config.get("guardrails", {}).get("token_budget", 4000))
 
     def check(self, prompt_tokens: int, log_tokens: int) -> dict:

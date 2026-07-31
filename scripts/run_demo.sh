@@ -15,12 +15,11 @@
 #   ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng + UI, KHÔNG đẩy
 #   ./scripts/run_demo.sh --small      # đẩy tập nhỏ (demo nhanh, ít chờ LLM)
 #   ./scripts/run_demo.sh --fresh --small   # kết hợp được: reset sạch + đẩy tập nhỏ
-#   SENTINEL_LITE=0 ./scripts/run_demo.sh   # baseline nặng: Gemma 2 9B, ctx 16384, 2 parallel
+#   SENTINEL_LITE=0 ./scripts/run_demo.sh   # đúng cấu hình đã đo: ctx 32768, 2 parallel
 #
 # Mặc định script chạy ở chế độ LOW-VRAM cho máy RAM 32GB / GPU VRAM thấp:
-# - Llama 3 8B Q5_K_M
-# - ctx 8192
-# - 1 parallel
+# - Foundation-Sec-8B-Instruct Q4_K_M  (CÙNG model với mọi số liệu trong luận văn)
+# - ctx 16384, 1 parallel -> 16.384 token/khe, y hệt ngân sách của chế độ đầy đủ
 # - tắt Neo4j (vì là nhánh V2 tùy chọn, không nằm trên đường đi lõi)
 #
 # Sau khi chạy: mở http://localhost:8501 (đăng nhập: manager).
@@ -51,15 +50,24 @@ done
 # THROUGHPUT: dải điểm mới (Cổng ML chặn/alert/drop phần lớn ở Tier-1, chỉ 0.65–0.85 escalate)
 # đã CẮT MẠNH tải LLM -> backlog nhỏ. Tăng AGENT_WORKERS (chỉ thread, KHÔNG tốn thêm VRAM) để
 # pipeline phần RAG/guardrails chồng lên thời gian chờ LLM; GIỮ N_PARALLEL để không phình VRAM.
+# MODEL PHẢI GIỐNG LƯỢT ĐO. Bản cũ để LITE (mặc định) chạy Meta-Llama-3-8B ở ctx 8192 trong
+# khi mọi con số trong luận văn đo trên Foundation-Sec-8B ở 16.384 token/khe. Demo và số liệu
+# khi đó mô tả HAI hệ khác nhau — người xem demo không thấy thứ đã được đo.
+#
+# `-np N` CHIA `-c` thành N khe, nên ngân sách thật là `ctx / n_parallel`:
+#   LITE   : 16384 / 1 = 16.384 token/khe   (ít VRAM hơn, chạy tuần tự)
+#   ĐẦY ĐỦ : 32768 / 2 = 16.384 token/khe   (đúng cấu hình đã đo)
+# Hai chế độ giữ NGUYÊN ngân sách mỗi khe; chỉ khác thông lượng. Prompt Tier-2 thật p50 ≈
+# 7.700 token, nên 8192/khe của bản cũ nằm sát trần — đúng kiểu hỏng đã giết cấu hình cũ.
 if [ "${SENTINEL_LITE:-1}" = "1" ]; then
-  : "${LLM_MODEL_FILE:=Meta-Llama-3-8B-Instruct-Q5_K_M.gguf}"
-  : "${LLAMA_ARG_CTX_SIZE:=8192}"
+  : "${LLM_MODEL_FILE:=Foundation-Sec-8B-Instruct-Q4_K_M.gguf}"
+  : "${LLAMA_ARG_CTX_SIZE:=16384}"
   : "${LLAMA_ARG_N_PARALLEL:=1}"
   : "${SENTINEL_AGENT_WORKERS:=2}"
   : "${SENTINEL_ENABLE_NEO4J:=0}"
 else
-  : "${LLM_MODEL_FILE:=gemma-2-9b-it-Q6_K.gguf}"
-  : "${LLAMA_ARG_CTX_SIZE:=16384}"
+  : "${LLM_MODEL_FILE:=Foundation-Sec-8B-Instruct-Q4_K_M.gguf}"
+  : "${LLAMA_ARG_CTX_SIZE:=32768}"
   : "${LLAMA_ARG_N_PARALLEL:=2}"
   : "${SENTINEL_AGENT_WORKERS:=4}"
   : "${SENTINEL_ENABLE_NEO4J:=1}"

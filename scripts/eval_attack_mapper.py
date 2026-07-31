@@ -340,11 +340,27 @@ def main():
         before = len(gt_all)
         gt_all = [s for s in gt_all if evidence_layer_of(s.get("logs") or []) == want]
         print(f"[i] Lọc tầng bằng chứng '{want}': {len(gt_all)}/{before} mẫu")
-        if not gt_all:
-            # SystemExit chứ không `return 1`: `main()` được gọi trần ở cuối tệp (không qua
-            # `sys.exit(main())`) nên giá trị trả về bị bỏ qua, và runner bash sẽ tưởng bước
-            # này THÀNH CÔNG rồi ghi đè kết quả cũ bằng một lượt chạy rỗng.
-            raise SystemExit("[!] Không mẫu nào khớp tầng bằng chứng đã chọn — dừng.")
+
+    # LOẠI MẪU DO TÁC GIẢ BIÊN SOẠN — chạy SAU bộ lọc tầng bằng chứng vì chúng đều mang
+    # payload nên đều lọt vào lát `application`. Đo được: 50 mẫu đối địch tự viết, chiếm
+    # 16,7% dân số CÓ đáp án ATT&CK, và cả 50 cùng đáp án `T1190` (đẩy T1190 từ 52 lên 102).
+    # Không loại thì `technique_exact_match_pct` vừa thưởng cho việc khớp khuôn mẫu của
+    # chính tác giả, vừa thưởng cho thiên vị một mã duy nhất.
+    from experiments.unified_dataset import drop_authored
+
+    gt_all, _n_authored = drop_authored(gt_all)
+    if _n_authored:
+        print(f"[i] Loại {_n_authored} mẫu BIÊN SOẠN -> còn {len(gt_all)} mẫu dữ liệu thật.")
+
+    # Kiểm rỗng ĐẶT SAU CẢ HAI bộ lọc, và KHÔNG còn gói trong `if evidence_layer != "all"`:
+    # `drop_authored` cũng có thể vét cạn tập, nên guard cũ sẽ bỏ lọt đúng trường hợp đó.
+    # SystemExit chứ không `return 1`: `main()` được gọi trần ở cuối tệp (không qua
+    # `sys.exit(main())`) nên giá trị trả về bị bỏ qua, và runner bash sẽ tưởng bước này
+    # THÀNH CÔNG rồi ghi đè kết quả cũ bằng một lượt chạy rỗng.
+    if not gt_all:
+        raise SystemExit(
+            "[!] Không còn mẫu nào sau khi lọc tầng bằng chứng + mẫu biên soạn — dừng."
+        )
     with open(args.kb, encoding="utf-8") as f:
         kb = json.load(f)
     kb_index = {t["id"]: t for t in kb if isinstance(t, dict) and t.get("id")}

@@ -119,15 +119,59 @@ if mh:
         f"Thước đo chính: `{mh.get('primary_metric')}`.\n"
     )
 
+# B–E: thước đo CHÍNH là QUY KẾT, không phải F1 nhị phân. Bản trước lọc bỏ mọi giá trị kiểu
+# dict nên hai tệp ablation in ra `{}` — toàn bộ số nằm ở khoá lồng, và báo cáo mất trắng
+# phần quan trọng nhất mà không có gì báo.
+bcde = g("ablation_bcde_results.json")
+_attr = bcde.get("attribution_scores") or {}
+if _attr:
+    w(
+        f"### Config B–E — quy kết kỹ thuật (`ablation_bcde_results.json`, {when('ablation_bcde_results.json')})\n"
+    )
+    w("Biến độc lập là **cấu hình RAG**, nên biến phụ thuộc phải là **quy kết** chứ không phải")
+    w("phát hiện nhị phân — đó là lý do bảng F1 cũ cho B ≡ C ≡ D ≡ E giống nhau từng bit.\n")
+    w("| | cấu hình | exact | parent | không neo | bỏ trống |")
+    w("| :-- | :-- | --: | --: | --: | --: |")
+    _lbl = {"B": "LLM thuần", "C": "+ Welford", "D": "+ RAG dense", "E": "+ RAG lai RRF"}
+    for c in "BCDE":
+        a = _attr.get(c, {})
+        w(
+            f"| {c} | {_lbl[c]} | {fmt(a.get('technique_exact_pct'), 2)}% | "
+            f"{fmt(a.get('technique_parent_pct'), 2)}% | {fmt(a.get('ungrounded_rate'))} | "
+            f"{fmt(a.get('abstain_rate'))} |"
+        )
+    if bcde.get("metric_note"):
+        w(f"\n> {bcde['metric_note']}\n")
+
 for tag, lab in (
     ("ablation_balanced_results.json", "Balanced (khử base-rate)"),
-    ("ablation_bcde_results.json", "Config B–E"),
-    ("ablation_mlgate_results.json", "Config G (ML offload)"),
+    ("ablation_bcde_results.json", "Config B–E — chấm theo hành động"),
 ):
     d = g(tag)
-    if d:
-        flat = {k: v for k, v in d.items() if not isinstance(v, (list, dict))}
-        w(f"**{lab}** — `{tag}` ({when(tag)}): `{json.dumps(flat, ensure_ascii=False)[:300]}`\n")
+    acts_x = d.get("action_scores") or {}
+    if not acts_x:
+        continue
+    keys = sorted(acts_x.keys())
+    w(f"**{lab}** — `{tag}` ({when(tag)})\n")
+    w("| chỉ số | " + " | ".join(keys) + " |")
+    w("| :-- | " + " | ".join("--:" for _ in keys) + " |")
+    for k, lb in (
+        ("action_accuracy", "đúng hành động"),
+        ("autonomous_precision", "tự quyết đúng"),
+        ("autonomy_rate", "tỉ lệ tự quyết"),
+        ("defer_rate", "chuyển người"),
+        ("unresolved_rate", "BỎ NGỎ"),
+    ):
+        w(f"| {lb} | " + " | ".join(fmt(acts_x[c].get(k)) for c in keys) + " |")
+    w("")
+
+_mg = g("ablation_mlgate_results.json")
+if _mg:
+    flat = {k: v for k, v in _mg.items() if not isinstance(v, (list, dict))}
+    w(
+        f"**Config G (ML offload)** — `ablation_mlgate_results.json` "
+        f"({when('ablation_mlgate_results.json')}): `{json.dumps(flat, ensure_ascii=False)[:300]}`\n"
+    )
 
 # ── 4. Quy kết ───────────────────────────────────────────────────────────────
 w("## 4. Quy kết kỹ thuật MITRE\n")
@@ -205,13 +249,25 @@ w("> lưu lượng bị loại trên luồng THẬT. **Phải đo lại trên `b
 
 # ── 7. An ninh + toàn tuyến ──────────────────────────────────────────────────
 w("## 7. An ninh · toàn tuyến · các bài còn lại\n")
+w("> Cỡ mẫu ghi trong nhãn ĐỌC TỪ CHÍNH TỆP, không viết cứng. Nhãn cũ ghi `adversarial` là")
+w('> "120 mẫu, 5 nhóm" trong khi tệp chỉ có **12** — bộ 120 mẫu là `robustness_results.json`')
+w("> và nó ra 50%. Hai bài khác nhau bị gọi chung một tên là cách số liệu bị trích nhầm.\n")
+_adv_n = (g("adversarial_pipeline_results.json").get("resisted") or 0) + (
+    g("adversarial_pipeline_results.json").get("compromised") or 0
+)
+_rob_n = (g("robustness_results.json").get("summary") or {}).get("total")
 for tag, lab in (
-    ("adversarial_pipeline_results.json", "Kháng tiêm nhiễm (120 mẫu, 5 nhóm)"),
-    ("llm_robustness_results.json", "Kháng nhiễu prompt"),
-    ("robustness_results.json", "Robustness"),
-    ("tier_capability_audit.json", "Năng lực 3 tầng (15 ca viết tay — phép thử CHỨC NĂNG)"),
-    ("unified_stream_results.json", "Toàn tuyến (build_stream 25.799)"),
-    ("tier2_decision_results.json", "Phán quyết Tier-2 (n=800 strided/8.323)"),
+    ("adversarial_pipeline_results.json", f"Kháng tiêm nhiễm qua đường ống (n={_adv_n})"),
+    ("llm_robustness_results.json", "Kháng nhiễu prompt (tất định + đổi seed)"),
+    ("robustness_results.json", f"Kháng né tránh mã hoá/cấu trúc (n={_rob_n})"),
+    ("audit_tamper_results.json", "RQ2 · Chống chối bỏ chuỗi HMAC (sửa/chèn/xoá)"),
+    ("cache_efficiency_results.json", "RQ1 · Bộ đệm Tầng 1.75 (hit-rate trên truy vấn thật)"),
+    (
+        "tier_capability_audit.json",
+        "Năng lực 3 tầng (15 ca viết tay — phép thử CHỨC NĂNG, KHÔNG phải chỉ số benchmark)",
+    ),
+    ("unified_stream_results.json", "Toàn tuyến (build_stream)"),
+    ("tier2_decision_results.json", "Phán quyết Tier-2 (tập ĐÃ qua Tier-1 VÀ Cổng ML)"),
     ("zeroday_graded_results.json", "Zero-day theo cấp độ"),
     ("threshold_sensitivity_results.json", "Độ nhạy ngưỡng Welford"),
     ("apt_negative_control_results.json", "Đối chứng âm APT"),

@@ -34,7 +34,7 @@ except Exception:
     _cfg = {}
 
 # n_ctx mục tiêu của app (server llama.cpp đặt 16384 nên còn headroom an toàn).
-N_CTX = int(_cfg.get("llm", {}).get("max_context_tokens", 8192))
+N_CTX = int(_cfg.get("llm", {}).get("max_context_tokens", 16384))
 WARN_RATIO = 0.90  # cảnh báo khi prompt vượt 90% ngân sách input
 # Ước lượng KHỞI ĐIỂM khi chưa có số đo thật. 3.5 char/token quá bảo thủ với nội dung
 # thật của SENTINEL (log/JSON nhiều chữ số + dấu câu): đo trên demo 100k cho thấy tỉ lệ
@@ -72,7 +72,7 @@ _state = _new_state()
 def _ratio() -> float:
     """Số ký tự trên mỗi token — ĐO THẬT nếu đủ mẫu, nếu chưa thì dùng hằng khởi điểm.
 
-    Tự hiệu chuẩn để CONTEXT GUARD phản ánh đúng tokenizer đang chạy (Gemma vs Llama
+    Tự hiệu chuẩn để CONTEXT GUARD phản ánh đúng tokenizer đang chạy (Foundation-Sec vs Llama
     cho tỉ lệ khác nhau), thay vì báo động giả bằng một hằng số đoán trước.
     """
     tok = _state["calib_tokens"]

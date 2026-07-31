@@ -18,7 +18,7 @@ enabling real-time standard deviation $\sigma_k = \sqrt{S_k / (k-1)}$ and contin
 
 \section{Local Large Language Models and Tier 2 Agentic Intelligence}
 
-Local LLM deployment demands strict memory optimization: Gemma-2-9B-IT in FP16 precision consumes approximately 18\,GB VRAM~\cite{gemma_2_2024}. Weight quantization maps floating-point parameters to integer grids~\cite{quantization2021}. Using GGUF Q6\_K format via \texttt{llama.\allowbreak cpp}, required VRAM drops to 7--8\,GB ($>$50\% savings) without significant accuracy loss, operating on a single 16\,GB GPU.
+Local LLM deployment demands strict memory optimization: Foundation-Sec-8B-Instruct in FP16 precision consumes approximately 18\,GB VRAM~\cite{foundation_sec_2024}. Weight quantization maps floating-point parameters to integer grids~\cite{quantization2021}. Using GGUF Q4\_K\_M format via \texttt{llama.\allowbreak cpp}, required VRAM drops to 7--8\,GB ($>$50\% savings) without significant accuracy loss, operating on a single 16\,GB GPU.
 
 To orchestrate reasoning, Tier 2 employs a LangGraph acyclic state graph~\cite{langgraph2024} integrated with Threat Memory. To prevent hallucination, the system integrates Retrieval-Augmented Generation (RAG)~\cite{rag2020} via a Dual-RAG architecture combining FAISS dense search~\cite{faiss2019} and BM25 sparse search~\cite{bm25_2009}, fused via Reciprocal Rank Fusion (RRF)~\cite{rrf2009}:
 \begin{equation}

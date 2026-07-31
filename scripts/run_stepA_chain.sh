@@ -49,7 +49,11 @@ run_model() {  # run_model <tệp gguf> <ctx>
 
 run_model Foundation-Sec-8B-Instruct-Q4_K_M.gguf 32768
 run_model WhiteRabbitNeo-V3-7B-Q4_K_M.gguf       32768
-run_model gemma-2-9b-it-Q6_K.gguf                8192
+# Foundation-Sec PHẢI đo ở 32768 như hai model kia. Lượt trước chạy nó ở 8192 với `-np 2` = 4.096
+# token/khe, trong khi prompt Tier-2 thật p50 ≈ 7.700 token -> hỏng 60/60 lượt trong 0,02
+# giây. Đó là hỏng do CẤU HÌNH, không phải kết luận về chất lượng model; so sánh ba model ở
+# ba ngân sách khác nhau thì bảng kết quả không nói lên điều gì.
+run_model foundation-sec-8b-instruct-Q4_K_M.gguf                32768
 
 # ── 4. Trả .env về model đang chọn + dựng lại container ─────────────────────
 say "▶ khôi phục Foundation-Sec làm model phục vụ"

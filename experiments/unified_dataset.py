@@ -810,6 +810,38 @@ NON_CLASSIFIED_SOURCES: dict[str, str] = {
 CLASSIFIED_SOURCES: frozenset[str] = frozenset({"cicids", "cicids_max", "dapt_max", "csic"})
 
 
+# --------------------------------------------------------------------------- #
+# CÙNG CHÍNH SÁCH ẤY, NHƯNG CHO `ground_truth.json`
+# --------------------------------------------------------------------------- #
+# `NON_CLASSIFIED_SOURCES` ở trên chỉ chắn được đường LUỒNG (`build_stream`), vì nó lọc theo
+# khoá `source` mà chỉ vỏ bọc luồng mới có. `ground_truth.json` là artefact KHÁC, dựng bởi
+# `scripts/fetch_and_build_dataset.py`, và ở dòng ~502 tệp đó CỐ Ý chèn 50 mẫu đối địch do
+# tác giả biên soạn — đúng mục đích ban đầu là để thử Guardrails, không phải để chấm điểm.
+#
+# Nhưng `ground_truth.json` KHÔNG mang khoá `source`, nên không script nào lọc được chúng.
+# Hậu quả đo được: trong 300 mẫu "chấm được quy kết" (có payload + có mã ATT&CK) thì 50 mẫu
+# — **16,7%** — là do tác giả tự viết, và cả 50 cùng một đáp án `T1190`. Riêng điều đó đã
+# nâng `T1190` từ 52 lên 102 mẫu, tức thưởng thêm cho việc đoán đúng một mã duy nhất.
+#
+# Mẫu đối địch VẪN Ở LẠI tệp (evaluate_adversarial.py cần chúng). Chỉ cấm chúng vào TỈ LỆ.
+AUTHORED_GT_LABELS: frozenset[str] = frozenset({"Adversarial"})
+
+
+def is_authored_sample(sample: dict) -> bool:
+    """Mẫu `ground_truth.json` do TÁC GIẢ BIÊN SOẠN — cấm vào mọi tỉ lệ của luận văn."""
+    return ((sample.get("input") or {}).get("cicids_label")) in AUTHORED_GT_LABELS
+
+
+def drop_authored(samples: list) -> tuple[list, int]:
+    """Lọc mẫu biên soạn khỏi tập chấm điểm. Trả `(còn_lại, số_đã_bỏ)`.
+
+    Luôn trả kèm SỐ ĐÃ BỎ để nơi gọi in ra được — loại mẫu trong im lặng thì người đọc
+    không có cách nào biết mẫu số đã đổi.
+    """
+    kept = [s for s in samples if not is_authored_sample(s)]
+    return kept, len(samples) - len(kept)
+
+
 def score_stream(
     engine,
     warmup: list,

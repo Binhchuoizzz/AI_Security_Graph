@@ -307,7 +307,26 @@ def main() -> None:
     out = os.path.join(os.path.dirname(__file__), "results", "tier_capability_audit.json")
     with open(out, "w", encoding="utf-8") as f:
         json.dump(
-            {"total": len(rows), "correct": n_ok, "rows": rows}, f, ensure_ascii=False, indent=1
+            {
+                "total": len(rows),
+                "correct": n_ok,
+                # TỰ KHAI BẢN CHẤT. "15/15 = 100%" là con số dễ bị trích nhầm nhất trong cả
+                # dự án: nó KHÔNG đo trên tập benchmark nào, mà trên các ca do chính tác giả
+                # viết tay để kiểm CHỨC NĂNG (ba tầng có chạy đúng vai không). Đặt nó cạnh
+                # F1/recall đo trên CSE-CIC-IDS2018 là so hai thứ khác loại.
+                "test_type": "functional",
+                "is_benchmark_metric": False,
+                "dataset": "15 ca viết tay trong chính tệp này — KHÔNG phải tập dữ liệu chuẩn",
+                "scope_note": (
+                    "Phép thử CHỨC NĂNG: xác nhận Tier-1/Cổng ML/Tier-2 mỗi tầng bắt đúng "
+                    "loại ca của mình. KHÔNG được trình bày như chỉ số hiệu năng trên "
+                    "benchmark, và KHÔNG được gọi là 'độ chính xác E2E'."
+                ),
+                "rows": rows,
+            },
+            f,
+            ensure_ascii=False,
+            indent=1,
         )
     print(f"\n[+] JSON: {out}")
 

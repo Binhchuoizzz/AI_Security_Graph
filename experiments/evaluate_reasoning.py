@@ -17,6 +17,11 @@ WORKFLOW:
   3. SENTINEL_AGENT_MODEL=<model tác tử> python experiments/evaluate_reasoning.py
   4. Kết quả: reasoning_eval_results.json + MLflow metrics. Đọc kèm
      `run_health.n_incomplete_schema` — lớn hơn 0 nghĩa là lượt đo KHÔNG đáng tin.
+     ĐỌC KÈM `run_health.n_deliberate_abstention`: ca hệ CHỦ Ý trả "N/A" (rào chắn neo-RAG
+     hoạt động đúng) được đếm RIÊNG, không tính là thiếu schema. Lượt 2026-07-30 báo
+     `n_incomplete_schema = 69/277` và tự tuyên bố không đáng tin — hoá ra toàn bộ 69 ca đều
+     ở đúng 80% (4/5 trường), tức chỉ khuyết `mitre_technique = "N/A"`. Cổng khi đó đang
+     PHẠT hệ vì từ chối bịa kỹ thuật.
 
 EVALUATION RUBRIC (4 chiều RAGAS-aligned, thang 1-5):
   - Context Precision: Xác định đúng kỹ thuật tấn công (MITRE)?
@@ -230,9 +235,8 @@ def run_judge_evaluation():
     print(f"[*] Total samples: {len(reasoning_outputs)}")
     print(f"    Escalated to LLM (will judge): {len(escalated)}")
     print(f"    Not escalated (Tier 1 only): {len(not_escalated)}")
-    # Tên model PHẢI đọc từ hệ thống, KHÔNG viết cứng: bản trước ghi cố định "Gemma 2 9B"
-    # vào tệp kết quả bất kể model nào thật sự sinh ra phán quyết, nên lượt chạy bằng
-    # Foundation-Sec vẫn xuất ra tệp mang tên Gemma. Số đúng + tên sai = vẫn là số sai.
+    # Tên model PHẢI đọc từ hệ thống, KHÔNG viết cứng tên cũ
+    # Số đúng + tên sai = vẫn là số sai.
     agent_model = os.getenv("SENTINEL_AGENT_MODEL") or os.getenv("LLM_MODEL_FILE") or "?"
     judge_model = assert_cross_family(agent_model)
 
@@ -259,6 +263,7 @@ def run_judge_evaluation():
     all_faithfulness = []
     all_recall = []
     all_schema_completeness = []
+    all_abstained: list[list[str]] = []
     all_grounding: list[dict] = []
 
     for idx, sample in enumerate(escalated):
@@ -286,12 +291,26 @@ def run_judge_evaluation():
         # thích. Trước đây nó được trích vào bảng 5D như bằng chứng "Tính giải thích 100%".
         latest_decision = sample.get("decisions", [{}])[-1] if sample.get("decisions") else {}
         required_fields = ["action", "confidence", "reasoning", "target", "mitre_technique"]
-        present_fields = sum(
-            1
+
+        # TỪ CHỐI CÓ CHỦ Ý ≠ THIẾU TRƯỜNG.
+        #
+        # Bản cũ coi `mitre_technique = "N/A"` là trường KHUYẾT, nên cổng hợp lệ báo
+        # `n_incomplete_schema = 69/277` và tự tuyên bố cả lượt đo không đáng tin. Nhưng
+        # "N/A" chính là hành vi ĐÚNG mà rào chắn neo-RAG được thiết kế để tạo ra: khi không
+        # có kỹ thuật nào có neo trong tài liệu truy xuất, hệ PHẢI nói "không biết" thay vì
+        # bịa. Đo trên lượt chạy sống: 99/239 lô kết thúc ở N/A vì đúng lý do đó.
+        #
+        # Tức cổng đang PHẠT hệ vì làm đúng, rồi con số phạt ấy lại được dùng để nghi ngờ
+        # toàn bộ kết quả. Tách hẳn hai khái niệm: trường THIẾU (hồi quy schema thật, phải
+        # báo động) và trường TỪ CHỐI (thiết kế, phải đếm riêng như một chỉ số).
+        ABSTAIN_VALUES = {"N/A", "UNKNOWN_TARGET"}
+        missing = [f for f in required_fields if latest_decision.get(f) in (None, "")]
+        abstained = [
+            f
             for f in required_fields
-            if latest_decision.get(f) not in [None, "", "UNKNOWN_TARGET", "N/A"]
-        )
-        schema_completeness = (present_fields / len(required_fields)) * 100
+            if f not in missing and str(latest_decision.get(f)).strip() in ABSTAIN_VALUES
+        ]
+        schema_completeness = ((len(required_fields) - len(missing)) / len(required_fields)) * 100
 
         # --- (b) NEO BẰNG CHỨNG — chỉ số giải thích CHÍNH ------------------------------
         # Prompt triage BẮT BUỘC mỗi luận điểm về hành vi phải kèm ít nhất một giá trị
@@ -306,6 +325,10 @@ def run_judge_evaluation():
             "sample_id": sample["sample_id"],
             "scores": scores,
             "schema_completeness_pct": schema_completeness,
+            "missing_fields": missing,
+            # Trường TỪ CHỐI có chủ ý (N/A) — thiết kế, không phải lỗi. Ghi ra để lượt sau
+            # truy nguyên được ngay thay vì chỉ thấy một con số 80% không rõ vì sao.
+            "abstained_fields": abstained,
             "evidence_grounding": grounding,
             "judge_latency_s": round(elapsed, 2),
             "schema_version": "v3_grounding",
@@ -318,6 +341,7 @@ def run_judge_evaluation():
         all_faithfulness.append(scores.get("faithfulness", 1))
         all_recall.append(scores.get("context_recall", 1))
         all_schema_completeness.append(schema_completeness)
+        all_abstained.append(abstained)
 
         print(
             f"Precision={scores.get('context_precision', '?')}/5  "
@@ -365,6 +389,14 @@ def run_judge_evaluation():
             "run_health": {
                 "n_incomplete_schema": sum(1 for v in all_schema_completeness if v < 100.0),
                 "n_scored": len(all_schema_completeness),
+                # Đếm RIÊNG các ca hệ CHỦ Ý trả "N/A" — đó là rào chắn neo-RAG hoạt động
+                # đúng, không phải hồi quy schema. Gộp chung vào n_incomplete_schema là
+                # lý do lượt đo trước tự gắn cờ "không đáng tin" một cách oan uổng.
+                "n_deliberate_abstention": sum(1 for a in all_abstained if a),
+                "abstained_field_counts": {
+                    f: sum(1 for a in all_abstained if f in a)
+                    for f in {x for a in all_abstained for x in a}
+                },
                 "note": (
                     "Cổng hợp lệ, KHÔNG phải chỉ số. n_incomplete_schema > 0 => phán quyết "
                     "thiếu trường bắt buộc => kết quả lượt đo này không đáng tin."

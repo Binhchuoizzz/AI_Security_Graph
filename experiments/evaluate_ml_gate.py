@@ -312,6 +312,17 @@ def main():
         sys.exit(1)
     with open(args.data, encoding="utf-8") as f:
         events = json.load(f)
+
+    # Chính sách CHUNG: đầu vào do tác giả biên soạn không vào bất kỳ tỉ lệ nào. Ở đây chỉ có
+    # 4/4240 dòng `unified_source == "adversarial"` (0,09%) nên con số gần như không đổi —
+    # loại vì tính NHẤT QUÁN, để câu "không một mẫu tự viết nào nằm trong tỉ lệ" đúng ở MỌI
+    # phép đo, chứ không phải đúng ở hầu hết. `zeroday` GIỮ LẠI: đó là biến thể REAL-DERIVED
+    # từ flow benign thật và là chỉ số hệ CÓ tuyên bố, không phải payload tưởng tượng.
+    _n_before = len(events)
+    events = [e for e in events if e.get("unified_source") != "adversarial"]
+    if len(events) != _n_before:
+        print(f"[i] Loại {_n_before - len(events)} sự kiện BIÊN SOẠN -> còn {len(events)}.")
+
     if args.limit:
         events = events[: args.limit]
 

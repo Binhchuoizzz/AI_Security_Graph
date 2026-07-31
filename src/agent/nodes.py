@@ -1008,49 +1008,83 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         logger.error(f"[ATT&CK MAPPER] Lỗi ánh xạ ({e}). Giữ nguyên quyết định triage.")
         return {}
 
-    # Ưu tiên technique CỤ THỂ của LLM cho hiển thị (badge == reasoning); fallback mapper
-    # khi LLM để N/A / không nêu technique-id hợp lệ. Enrichment tactic/url/response vẫn
-    # luôn lấy từ mapper (có cấu trúc, verify được).
+    # _ATTRIBUTION_MUST_BE_DETERMINISTIC_AND_GROUNDED
+    #
+    # LỖI ĐÃ VÁ (đo được, không phải suy đoán). Bản trước cho kỹ thuật LLM TỰ KHAI thắng bộ
+    # ánh xạ RRF bất cứ khi nào nó nêu một mã hợp lệ, vì mục đích hiển thị: "badge phải khớp
+    # reasoning". Nhưng `mitre_technique_id` không chỉ để hiển thị — nó là ĐẦU RA QUY KẾT của
+    # hệ, thứ được chấm điểm và ghi vào vết kiểm toán. Hậu quả trên 300 mẫu CSIC:
+    #
+    #     rrf (llm=None, chỉ RRF)       exact 67,33%   tactic 67,33%
+    #     e2e (toàn tuyến, LLM thắng)   exact  2,33%   tactic 24,33%
+    #
+    # `tactic` chỉ tụt một nửa vì nó vẫn lấy từ `mapping` — đúng theo cách mã cũ quy định.
+    # Nói cách khác: RAG lấy ĐÚNG tài liệu (trần độ phủ KB = 100%), RRF chọn ĐÚNG kỹ thuật,
+    # rồi free-text của LLM ghi đè lên ở bước cuối.
+    #
+    # Nặng hơn: lá chắn neo bằng chứng phía dưới CHỈ nằm ở nhánh "LLM trả N/A". Khi LLM CÓ
+    # nêu mã, mã đó đi thẳng ra quyết định mà không hề đối chiếu với tài liệu RAG của lô —
+    # chỉ TÊN được kiểm. Một mã bịa hoàn toàn vẫn lọt. Lá chắn canh đúng cái cửa mà kẻ gian
+    # không đi qua.
+    #
+    # NGUYÊN TẮC MỚI: quy kết là việc của bộ ánh xạ tất định; mọi mã — dù của mapper hay của
+    # LLM — đều phải CÓ NEO trong `rag_mitre_context` của chính lô này. Free-text của LLM vẫn
+    # được giữ nguyên ở `llm_claimed_technique` để trang hiển thị đối chiếu được hai nguồn,
+    # tức vẫn đạt mục đích ban đầu mà không đánh đổi tính đúng đắn.
+    #
+    # Neo rỗng (lô không có ngữ cảnh RAG) thì không kiểm được -> tin bộ ánh xạ, như bản cũ.
+    _rag_ids_pre = set(_TECHNIQUE_ID_RE.findall(state.rag_mitre_context or ""))
+    _mapper_id = mapping.mitre_technique_id or ""
+    _llm_id = _llm_tech_m.group(1).upper() if _llm_tech_m and _llm_tech_raw.upper() != "N/A" else ""
+
+    def _grounded(tech_id: str) -> bool:
+        """Không có ngữ cảnh RAG thì không có gì để đối chiếu — không kết tội được."""
+        return bool(tech_id) and (not _rag_ids_pre or tech_id in _rag_ids_pre)
+
     _name_verified = True
-    if _llm_tech_m and _llm_tech_raw.upper() != "N/A":
-        _final_tech_id = _llm_tech_m.group(1).upper()
-        # ĐỐI CHIẾU TÊN: id của LLM được giữ, nhưng TÊN phải khớp nguồn sự thật cục bộ.
-        # Trước đây nhãn free-text của LLM đi thẳng ra dashboard nên lọt các ca "đúng id,
-        # sai tên" (T1087 gắn nhãn "Network Service Discovery" — thực ra là T1046).
-        _final_tech, _name_verified = verify_technique_label(_final_tech_id, _llm_tech_raw)
+    _rejected_id = ""
+    # Ứng viên đã bị loại vì KHÔNG neo được. Lá chắn phía dưới cần biết để còn ghi đúng
+    # `mapping_status` + lý do vào vết kiểm toán — nếu chỉ lặng lẽ trả "" thì kết quả đúng
+    # nhưng nhật ký mất dấu VÌ SAO nó thành N/A.
+    _ungrounded_candidate = ""
+    if _grounded(_mapper_id):
+        # Đường chính: bộ ánh xạ tất định thắng. Đây là cấu hình đo được 67,33%.
+        _final_tech = f"{_mapper_id} - {mapping.mitre_technique}".strip(" -")
+        _final_tech_id = _mapper_id
+        if _llm_id and _llm_id != _mapper_id:
+            _rejected_id = _llm_id
+    elif _grounded(_llm_id):
+        # Mapper không neo được nhưng LLM nêu một mã CÓ trong tài liệu RAG của lô -> nhận,
+        # vì nó vẫn truy nguyên được về bằng chứng. TÊN phải khớp nguồn sự thật cục bộ:
+        # trước đây nhãn free-text đi thẳng ra dashboard nên lọt ca "đúng id, sai tên"
+        # (T1087 gắn nhãn "Network Service Discovery" — thực ra là T1046).
+        _final_tech, _name_verified = verify_technique_label(_llm_id, _llm_tech_raw)
+        _final_tech_id = _llm_id
+        _rejected_id = _mapper_id
     else:
-        # _MAPPER_GUESS_MUST_BE_GROUNDED
+        # Không nguồn nào neo được -> giữ "không biết", để lá chắn tự-chém phía dưới ép
+        # AWAIT_HITL với đúng lý do `technique_unmappable`.
         #
-        # LỖI ĐÃ VÁ, đo trên lượt chạy sống 281 lô: lá chắn neo bằng chứng khai hoả 96 lần,
-        # trong đó **93 lần do CHÍNH NHÁNH NÀY**, chỉ 3 lần do LLM. Trình tự: LLM trả `N/A`
-        # (nó tự thấy bằng chứng NetFlow không đủ để quy kết — đúng), rồi mapper vẫn suy ra
-        # một kỹ thuật từ TỪ KHOÁ (T1590.005, T1527, T1595, T1056.003...) hoàn toàn không có
-        # trong tài liệu RAG của lô đó, và lá chắn phải chặn lại.
-        #
-        # Ba hệ quả: (1) tốn thêm một vòng ánh xạ vô ích; (2) nhật ký kiểm toán ghi "kỹ thuật
-        # <X> do MODEL đề xuất" trong khi model đã từ chối — quy sai trách nhiệm; (3) nếu lấy
-        # tỉ lệ "không neo" làm chỉ số ảo giác của LLM thì SAI ĐỊA CHỈ hoàn toàn.
-        #
-        # Nguyên tắc: khi LLM đã ABSTAIN, mapper chỉ được nói thay nếu kỹ thuật của nó CÓ NEO
-        # trong ngữ cảnh RAG của chính lô này. Không có neo -> giữ nguyên "không biết", để lá
-        # chắn tự-chém phía dưới ép AWAIT_HITL với đúng lý do `technique_unmappable`.
-        _rag_ids_pre = set(_TECHNIQUE_ID_RE.findall(str(state.rag_mitre_context or "")))
-        _mapper_id = mapping.mitre_technique_id
-        if _mapper_id and _rag_ids_pre and _mapper_id not in _rag_ids_pre:
-            logger.info(
-                f"[ATT&CK MAPPER] LLM đã trả N/A và kỹ thuật mapper đề xuất ({_mapper_id}) "
-                f"KHÔNG có trong tài liệu RAG của lô — giữ 'không biết', không đoán thay."
+        # Đo trên lượt chạy sống 281 lô: lá chắn khai hoả 96 lần, 93 lần do MAPPER đoán từ
+        # TỪ KHOÁ (T1590.005, T1527, T1595, T1056.003...) khi LLM đã đúng đắn trả N/A. Nếu
+        # lấy tỉ lệ "không neo" làm chỉ số ảo giác của LLM thì SAI ĐỊA CHỈ hoàn toàn.
+        _final_tech, _final_tech_id = "N/A", ""
+        _rejected_id = _mapper_id or _llm_id
+        _ungrounded_candidate = _rejected_id
+
+    if _rejected_id:
+        logger.info(
+            f"[ATT&CK MAPPER] Kỹ thuật '{_rejected_id}' bị loại (không neo trong tài liệu RAG "
+            f"của lô, hoặc thua bộ ánh xạ tất định). Chốt: '{_final_tech_id or 'N/A'}'."
+        )
+        if trace.enabled():
+            trace.add(
+                "attack_mapper",
+                mapper_guess_suppressed=not _final_tech_id,
+                mapper_guess_rejected=_rejected_id,
+                llm_technique_rejected=_llm_id if _llm_id and _llm_id != _final_tech_id else "",
+                rag_grounded_ids=sorted(_rag_ids_pre)[:12],
             )
-            if trace.enabled():
-                trace.add(
-                    "attack_mapper",
-                    mapper_guess_suppressed=True,
-                    mapper_guess_rejected=_mapper_id,
-                )
-            _final_tech, _final_tech_id = "N/A", ""
-        else:
-            _final_tech = f"{_mapper_id} - {mapping.mitre_technique}".strip(" -")
-            _final_tech_id = _mapper_id
 
     # URL phải trỏ ĐÚNG technique đang hiển thị: khi badge lấy id của LLM (khác id mapper),
     # dùng lại mitre_url của mapper sẽ link sang một kỹ thuật KHÁC.
@@ -1065,6 +1099,10 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         {
             "mitre_technique": _final_tech,
             "mitre_technique_name_verified": _name_verified,
+            # Kỹ thuật do MODEL tự khai, giữ NGUYÊN VĂN và TÁCH RIÊNG khỏi đầu ra quy kết.
+            # Trang hiển thị đối chiếu được hai nguồn (bộ ánh xạ vs model) mà không để lời
+            # tự khai lọt vào trường được chấm điểm và ghi vết kiểm toán.
+            "llm_claimed_technique": _llm_tech_raw,
             "mitre_tactic": mapping.mitre_tactic,
             "mitre_tactic_id": mapping.mitre_tactic_id,
             "mitre_technique_id": _final_tech_id,
@@ -1091,12 +1129,12 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
             ran=True,
             llm_technique_raw=_llm_tech_raw,
             final_technique_id=_final_tech_id,
-            name_verified=bool(_name_verified),
+            name_verified=_name_verified,
             mapper_technique_id=mapping.mitre_technique_id,
             mapper_tactic=mapping.mitre_tactic,
             mapper_tactic_id=mapping.mitre_tactic_id,
             mapping_status=mapping.mapping_status,
-            mapping_confidence=round(float(mapping.mapping_confidence or 0.0), 4),
+            mapping_confidence=round(mapping.mapping_confidence or 0.0, 4),
             action_before=decision.get("action", ""),
         )
 
@@ -1121,14 +1159,22 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # Hạ `mitre_technique` về 'N/A' thay vì để một mã sai nằm lại: nhật ký kiểm toán và giao
     # diện analyst KHÔNG được khẳng định một kỹ thuật mà bằng chứng không đỡ. "Không biết"
     # là câu trả lời đúng và hữu ích hơn một phán đoán sai nghe có vẻ chắc chắn.
-    _rag_ids = set(_TECHNIQUE_ID_RE.findall(str(state.rag_mitre_context or "")))
-    _ungrounded = bool(_final_tech_id) and bool(_rag_ids) and _final_tech_id not in _rag_ids
+    _rag_ids = set(_TECHNIQUE_ID_RE.findall(state.rag_mitre_context or ""))
+    # Hai đường vào lá chắn:
+    #   (a) một mã đã lọt tới đây nhưng không có trong tài liệu RAG của lô;
+    #   (b) khâu quy kết phía trên ĐÃ loại hết ứng viên vì không neo được (_ungrounded_candidate).
+    # Thiếu (b) thì kết quả vẫn là N/A nhưng `mapping_status` ở lại "resolved" — vết kiểm toán
+    # mất dấu VÌ SAO, và đó đúng là thứ hội đồng sẽ hỏi.
+    _ungrounded = (
+        bool(_final_tech_id) and bool(_rag_ids) and _final_tech_id not in _rag_ids
+    ) or bool(_ungrounded_candidate)
+    _shield_target = _final_tech_id or _ungrounded_candidate
     if trace.enabled():
         trace.add("attack_mapper", technique_grounded_in_rag=not _ungrounded)
     if _ungrounded:
         _was_block = decision.get("action") == "BLOCK_IP"
         logger.warning(
-            f"[NEO BẰNG CHỨNG] {_final_tech_id} KHÔNG có trong ngữ cảnh RAG của lô này — "
+            f"[NEO BẰNG CHỨNG] {_shield_target} KHÔNG có trong ngữ cảnh RAG của lô này — "
             f"đặt kỹ thuật về N/A và chuyển người xử lý (đúng hợp đồng prompt)."
         )
         decision["action"] = "AWAIT_HITL"
@@ -1144,7 +1190,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         # con số sẽ sai gấp nhiều lần.
         _who = "model" if (_llm_tech_m and _llm_tech_raw.upper() != "N/A") else "bộ ánh xạ"
         decision["reasoning"] = (
-            f"[NEO BẰNG CHỨNG: kỹ thuật {_final_tech_id} do {_who} đề xuất KHÔNG nằm trong "
+            f"[NEO BẰNG CHỨNG: kỹ thuật {_shield_target} do {_who} đề xuất KHÔNG nằm trong "
             f"tài liệu đã truy xuất cho lô này — hệ thống KHÔNG khẳng định kỹ thuật, chuyển "
             f"người xử lý] {decision.get('reasoning', '')}"
         )
@@ -1153,7 +1199,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
                 "attack_mapper",
                 grounding_shield_fired=True,
                 grounding_shield_downgraded_block=_was_block,
-                grounding_shield_rejected_technique=_final_tech_id,
+                grounding_shield_rejected_technique=_shield_target,
             )
 
     # LÁ CHẮN BẢO VỆ CHỐNG HALLUCINATION (TỰ CHÉM):
@@ -1171,9 +1217,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
             trace.add("attack_mapper", hallucination_shield=True)
         decision["action"] = "AWAIT_HITL"
         decision.setdefault("hitl_reason", "technique_unmappable")
-        if "[CẢNH BÁO]" not in str(decision.get("reasoning", "")):
+        if "[WARNING]" not in str(decision.get("reasoning", "")):
             decision["reasoning"] = (
-                f"[CẢNH BÁO: Không thể ánh xạ kỹ thuật, nghi ngờ tự chém] {decision.get('reasoning', '')}"
+                f"[WARNING: Unable to confidently map technique, potential hallucination risk] {decision.get('reasoning', '')}"
             )
 
     if trace.enabled():
@@ -1461,9 +1507,9 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     # yếu" (cần thêm telemetry), việc nào là "LLM hỏng" (việc của kỹ sư vận hành).
     _reason_code = str(latest_decision.get("hitl_reason") or "")
     _reason_txt = (
-        f"[LÝ DO: {decision_policy.hitl_reason_text(_reason_code)}] " if _reason_code else ""
+        f"[REASON: {decision_policy.hitl_reason_text(_reason_code)}] " if _reason_code else ""
     )
-    formatted_reasoning = f"{_reason_txt}[MITRE: {mitre}] [Độ tin cậy: {conf:.2%}] {raw_reasoning}"
+    formatted_reasoning = f"{_reason_txt}[MITRE: {mitre}] [Confidence: {conf:.2%}] {raw_reasoning}"
 
     logger.warning(f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}")
 

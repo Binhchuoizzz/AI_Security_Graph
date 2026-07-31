@@ -43,7 +43,7 @@ digraph sentinel_arch {
         fsm   [label="LangGraph FSM\n(Bộ điều phối)", fillcolor="#ffffff"];
         tmem  [label="Bộ nhớ Đe dọa\n(CSDL SQLite)", fillcolor="#ffffff"];
         hmac  [label="Bảo vệ HMAC\n(Nhật ký kiểm toán)", fillcolor="#ffffff"];
-        llm   [label="LLM lượng tử hóa\n(Gemma-2-9B-IT Q6_K)", fillcolor="#ffe0b2"];
+        llm   [label="LLM lượng tử hóa\n(Foundation-Sec-8B Q4_K_M)", fillcolor="#ffe0b2"];
         drag  [label="Tìm kiếm lai Dual-RAG\n(MITRE ATT&CK + NIST SP 800-61r2)", fillcolor="#ffffff"];
     }
 

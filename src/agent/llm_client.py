@@ -2,7 +2,8 @@
 LangGraph Agent: Bộ điều hợp Client LLM
 
 CHỨC NĂNG:
-- Giao tiếp với Local LLM (Gemma 9B) thông qua OpenAI-compatible endpoint (llama.cpp server).
+- Giao tiếp với LLM cục bộ qua endpoint tương thích OpenAI (llama.cpp server). Tên model
+  đọc động từ `LLM_MODEL_FILE` / `llm.model_name` — KHÔNG viết cứng ở bất kỳ đâu.
 - Sử dụng OpenAI API format (OpenAI-compatible endpoint tại port 5000).
 - Triển khai cơ chế Retry, Exponential Backoff, và xử lý Timeout để đảm bảo
   Agent không bị crash khi model đang bận tính toán.
@@ -51,9 +52,14 @@ DEFAULT_SEED = _config.get("llm", {}).get("seed", 42)
 # Tên model đọc từ env LLM_MODEL_FILE (đồng bộ với model thực tế llama.cpp đang nạp
 # và tự khớp khi hot-swap qua scripts/switch_model.sh). llama.cpp bỏ qua tên này khi
 # chỉ nạp 1 model, nhưng giữ đồng bộ để chính xác và tương thích đa-model.
+# KHOÁ PHẢI LÀ `model_name` — config ghi `llm.model_name`, không phải `llm.model`. Bản cũ
+# đọc nhầm khoá nên LUÔN rơi về giá trị cứng "foundation-sec-8b.gguf": mọi nhật ký và vết
+# kiểm toán ghi tên model sai lệch trong khi Foundation-Sec mới là thứ đang chạy. llama.cpp
+# bỏ qua trường `model` khi chỉ nạp một model nên KHÔNG có gì báo lỗi — số đúng, tên sai,
+# và tên sai thì vẫn là số sai khi đem đi trích dẫn.
 DEFAULT_MODEL = os.getenv(
     "LLM_MODEL_FILE",
-    _config.get("llm", {}).get("model", "gemma-2-9b-it-Q6_K.gguf"),
+    _config.get("llm", {}).get("model_name", "Foundation-Sec-8B-Instruct-Q4_K_M.gguf"),
 )
 
 
@@ -81,7 +87,7 @@ class LLMDecision(BaseModel):
 
 # ── JSON SCHEMA cho quyết định triage ────────────────────────────────────────────────────────
 # Ép server llama.cpp XUẤT JSON HỢP LỆ (constrained decoding) — dứt điểm cảnh "JSON parse lỗi /
-# output bị cắt cụt" do gemma-2-9b tuồn prose ("**Analysis:** ...") thay vì JSON. Vì đi thẳng vào
+# output bị cắt cụt" do mô hình tuồn prose ("**Analysis:** ...") thay vì JSON. Vì đi thẳng vào
 # field, model cũng BÁM chỉ dẫn "reasoning viết bằng TIẾNG VIỆT" của prompt tốt hơn (hết trường
 # "Lý do" tiếng Anh). Server này KHÔNG tôn trọng response_format={"type":"json_object"} nhưng CÓ
 # tôn trọng {"type":"json_schema", ...} (đã kiểm thực tế). Thứ tự field khớp prompt để giữ hành vi.
@@ -225,7 +231,7 @@ class LLMClient:
     def parse_llm_response(self, raw: str) -> dict:
         """
         Parse JSON an toàn từ LLM output với cơ chế dự phòng (Fallback).
-        Ngăn chặn crash hệ thống khi Gemma 9B ảo tưởng (ví dụ: markdown fences,
+        Ngăn chặn crash hệ thống khi LLM ảo tưởng (ví dụ: markdown fences,
         trailing commas, hoặc chữ text kẹp chung với JSON).
         """
         # Loại bỏ các khung markdown (fences) nếu có

@@ -110,7 +110,7 @@ def switch_model(model_file: str, ctx: int) -> None:
     # LỖI ĐÃ VÁ: `load_dotenv()` ở đầu module đã nạp `LLM_MODEL_FILE` cũ vào `os.environ`.
     # `subprocess` kế thừa môi trường đó, mà docker-compose ƯU TIÊN biến môi trường hơn tệp
     # `.env` — nên nó dựng lại container bằng ĐÚNG model cũ, rồi vòng xác minh thấy "sai
-    # model" và chờ tới hết 10 phút. Quan sát được: cả WhiteRabbitNeo lẫn Gemma đều trượt ở
+    # model" và chờ tới hết 10 phút. Quan sát được: các mô hình khác đều trượt ở
     # đây, chỉ model đang chạy sẵn là đo được.
     os.environ["LLM_MODEL_FILE"] = model_file
     os.environ["LLAMA_ARG_CTX_SIZE"] = str(ctx)

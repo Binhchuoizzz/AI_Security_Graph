@@ -7,7 +7,7 @@
 
 > **SENTINEL** = **S**treaming **E**vents **N**etwork for **T**hreat **I**ntelligence, **N**eutralization, **E**scalation and **L**og-correlation
 
-SENTINEL attacks the **SOC Alert Fatigue Paradox** with a two-tier split: a cheap, deterministic **Tier-1** filter runs on every log at wire speed; an **ML gateway (LightGBM)** then resolves **83.8%** of the escalations without ever touching an LLM; and an expensive **Tier-2 LangGraph agent** (Gemma-2-9B-IT, running locally) reasons only over the ~16% that survive both. The design bet is that most logs never deserve an LLM — and the measured **−82.97% latency** versus an LLM-on-everything baseline is the payoff.
+SENTINEL attacks the **SOC Alert Fatigue Paradox** with a two-tier split: a cheap, deterministic **Tier-1** filter runs on every log at wire speed; an **ML gateway (LightGBM)** then resolves **83.8%** of the escalations without ever touching an LLM; and an expensive **Tier-2 LangGraph agent** (Foundation-Sec-8B-Instruct, running locally) reasons only over the ~16% that survive both. The design bet is that most logs never deserve an LLM — and the measured **−82.97% latency** versus an LLM-on-everything baseline is the payoff.
 
 This is a running system (Python · Redis Streams · LightGBM · LangGraph · llama.cpp · Streamlit · Docker) built for a Master's thesis: **306 pytest · 22/22 E2E**.
 
@@ -70,7 +70,7 @@ This is a running system (Python · Redis Streams · LightGBM · LangGraph · ll
 | 3 | **Guardrails** | Pre/Post | Regex + nonce delimiters | Data encapsulation, encoding neutralizer, jailbreak detection, output sanitizer, Tier-consensus gate. |
 | 4 | **Drain3 Miner** | Pre | Drain3 | Compresses log tokens before LLM input (context budget). |
 | 5 | **Dual-RAG** | Tier 2 | FAISS + BM25 + RRF | Hybrid retrieval over MITRE ATT&CK + NIST SP 800-61r2. |
-| 6 | **LangGraph Agent** | Tier 2 | LangGraph + Gemma-2-9B-IT Q6_K | 6-node reasoning DAG: triage → ATT&CK mapping → response. |
+| 6 | **LangGraph Agent** | Tier 2 | LangGraph + Foundation-Sec-8B-Instruct Q4_K_M | 6-node reasoning DAG: triage → ATT&CK mapping → response. |
 | 7 | **Threat Memory** | Tier 2 | SQLite | Long-term host behavior, multi-day APT correlation, IP reputation. |
 | 8 | **HMAC Audit Chain** | Integrity | SQLite + HMAC-SHA256 | Each entry hashes the previous → tamper-evident trail. |
 | 9 | **Auth & Live FPR** | UI | SQLite + PBKDF2 | Persistent lockout, real-time false-positive metrics. |
@@ -95,7 +95,7 @@ Offline deterministic run (2026-07-20, RTX 4060 Ti 16GB; rebalanced benchmark �
 
 **Tier-2 decision quality** (strided n=800 of the escalated stream, `tier2_decision_results.json`): **threat recall 1.00** (38/38 caught) · **benign specificity 0.00** (all 762 benign flagged too) · accuracy 0.0475 = the base rate. This eval deliberately **bypasses the ML gateway** on a 95%-benign escalated set, so it is the *pessimistic* view: Tier-2 alone is a max-recall safety net (never misses, never clears), while the ML gateway supplies the selectivity (98.82% precision on its 83.8% offload). Agent reliability 1.00, **0 parse failures** (the json-schema fix); decisions are now confidence-driven (353 BLOCK_IP · 445 AWAIT_HITL · 2 ALERT · mean conf 0.772), a real shift from the old all-`AWAIT_HITL` behaviour.
 
-**Judge methodology:** cross-family (Llama-3-8B judges Gemma-2-9B) to avoid self-enhancement bias, **n=908 escalated of 1,250** samples. Source of truth: `experiments/results/reasoning_eval_results.json`.
+**Judge methodology:** cross-family (Llama-3-8B judges Foundation-Sec-8B) to avoid self-enhancement bias, **n=908 escalated of 1,250** samples. Source of truth: `experiments/results/reasoning_eval_results.json`.
 
 > **Foundational capabilities — proof-of-concept, routed to Future Work, *not* headline claims:**
 > **Zero-day:** **12/15** classes caught by Welford where static rules missed them (graded boundary ≈4.0σ, pool n=30). **Emergent APT:** 3/3 recall on DAPT2020, specificity 1.0 against 4 benign multi-day IPs, Wilson 95% CI [0.44, 1.00]. Both run on small n with wide intervals — they show the mechanism works; they do not establish a rate.
@@ -160,7 +160,7 @@ AI_Security_Graph/
 │   ├── evaluate_ml_gate.py       # ML gateway (LightGBM) scoring + evasion resistance
 │   ├── run_ablation.py           # Ablation (--mode af | mlgate | bcde | balanced | all)
 │   ├── evaluate_adversarial.py   # Adversarial    (--mode static | pipeline)
-│   ├── evaluate_reasoning.py     # LLM-as-a-Judge (Llama-3 judges Gemma-2)
+│   ├── evaluate_reasoning.py     # LLM-as-a-Judge (Llama-3 judges Foundation-Sec)
 │   ├── evaluate_tier2_decision.py    # Tier-2 verdict quality on escalated cases
 │   ├── run_threshold_sensitivity.py  # Welford σ sweep (rebuts "3.5σ cherry-picked")
 │   ├── run_zeroday_graded.py     # Zero-day detection-boundary curve
@@ -177,7 +177,7 @@ AI_Security_Graph/
 │   ├── run_demo.sh               # ONE-COMMAND full demo (infra + subscriber + UI + stream)
 │   ├── demo.py                   # Push the MERGED flow (cicids+dapt+zeroday+adversarial) into Redis
 │   ├── push_flow.py              # Push ONE separate flow (cicids|dapt|zeroday|adversarial) for isolated demos
-│   ├── switch_model.sh           # Hot-swap the served LLM (gemma ⇄ llama judge)
+│   ├── switch_model.sh           # Hot-swap the served LLM (foundation-sec ⇄ llama judge)
 │   └── build_*.py                # KB / RAG index / DAPT chain / adversarial suite builders
 ├── demos/                        # Standalone CLI demos (tier1, guardrails, rag)
 ├── config/                       # system_settings.yaml, ablation/ (A–F), *.db (auto-generated)
@@ -245,11 +245,11 @@ python experiments/run_ablation.py --mode all
 
 ### 5. (Optional) Hot-swap the LLM
 
-The agent runs **Gemma-2-9B-IT**; the LLM-as-Judge axis uses **Meta-Llama-3-8B-Instruct** as an independent, cross-family judge.
+The agent runs **Foundation-Sec-8B-Instruct**; the LLM-as-Judge axis uses **Meta-Llama-3-8B-Instruct** as an independent, cross-family judge.
 
 ```bash
 ./scripts/switch_model.sh llama     # swap to the judge model
-./scripts/switch_model.sh gemma     # swap back
+./scripts/switch_model.sh foundation-sec # swap back
 ```
 
 ---

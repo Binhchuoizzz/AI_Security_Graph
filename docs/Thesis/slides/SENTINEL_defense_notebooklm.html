@@ -1424,7 +1424,7 @@
                     <div class="card-text" style="font-size: 21px; line-height: 1.7;">
                         <strong>Local Air-gapped GPU</strong><br>
                         NVIDIA RTX 4060 Ti 16GB<br>
-                        Mô hình Gemma-2-9B-IT Q6_K
+                        Mô hình Foundation-Sec-8B-Instruct Q4_K_M
                     </div>
                 </div>
             </div>
@@ -1710,7 +1710,7 @@
                     <rect x="920" y="60" width="160" height="120" rx="14" fill="#0F172A" stroke="#A78BFA" stroke-width="2.5" />
                     <text x="1000" y="98" text-anchor="middle" fill="#A78BFA" font-weight="800" font-size="15">TIER 2 AGENT</text>
                     <text x="1000" y="123" text-anchor="middle" fill="#E2E8F0" font-weight="600" font-size="14">LangGraph FSM</text>
-                    <text x="1000" y="148" text-anchor="middle" fill="#DDD6FE" font-size="13">Gemma-2 + Dual RAG</text>
+                    <text x="1000" y="148" text-anchor="middle" fill="#DDD6FE" font-size="13">Foundation-Sec + Dual RAG</text>
                 </svg>
             </div>
 
@@ -1845,7 +1845,7 @@
         <!-- SLIDE 11: TIER 2 LANGGRAPH AGENT STATE MACHINE SVG -->
         <section class="slide" data-slide="11">
             <div class="slide-tag">Chi tiết Kỹ thuật — Tier 2</div>
-            <h2 class="slide-title">Tác Tử Nhận Thức LangGraph & Local LLM (Gemma-2-9B)</h2>
+            <h2 class="slide-title">Tác Tử Nhận Thức LangGraph & Local LLM (Foundation-Sec-8B)</h2>
 
             <!-- FSM Diagram SVG -->
             <div style="width:100%; background: rgba(15, 23, 42, 0.03); border: 1px solid var(--border-glass); border-radius: 18px; padding: 20px; margin-bottom: 22px; text-align: center;">
@@ -1865,7 +1865,7 @@
 
                     <rect x="460" y="20" width="150" height="80" rx="12" fill="#6D28D9" />
                     <text x="535" y="55" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">LLM TRIAGE</text>
-                    <text x="535" y="75" text-anchor="middle" fill="#EDE9FE" font-size="13">Gemma-2-9B</text>
+                    <text x="535" y="75" text-anchor="middle" fill="#EDE9FE" font-size="13">Foundation-Sec-8B</text>
 
                     <rect x="680" y="20" width="150" height="80" rx="12" fill="#059669" />
                     <text x="755" y="55" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">ATTACK MAPPER</text>
@@ -1881,7 +1881,7 @@
                 <div class="card card-purple" style="padding: 32px 38px;">
                     <div class="card-title" style="font-size: 26px; margin-bottom: 16px;"><i class="fa-solid fa-diagram-next"></i> Đồ Thị Trạng Thái FSM LangGraph</div>
                     <p class="card-text" style="font-size: 22px; margin-bottom: 16px;">
-                        Chạy mô hình `Gemma-2-9B-IT` cục bộ qua `llama.cpp` server (cửa sổ 8,192 tokens, temp=0.1):
+                        Chạy mô hình `Foundation-Sec-8B-Instruct` cục bộ qua `llama.cpp` server (cửa sổ 8,192 tokens, temp=0.1):
                     </p>
                     <ul class="styled-list">
                         <li><strong>Pydantic Schema Decoding:</strong> Ép LLM xuất định dạng `LLMDecision` nghiêm ngặt.</li>
@@ -2146,7 +2146,7 @@
                 <div class="card card-blue" style="padding: 32px 38px;">
                     <div class="card-title" style="font-size: 26px; margin-bottom: 16px;"><i class="fa-solid fa-user-check"></i> Chấm Điểm LLM-as-a-Judge & RAGAS</div>
                     <p class="card-text" style="font-size: 22px; margin-bottom: 16px;">
-                        Đánh giá chất lượng suy luận của Gemma-2-9B và độ chuẩn xác RAG:
+                        Đánh giá chất lượng suy luận của Foundation-Sec-8B và độ chuẩn xác RAG:
                     </p>
                     <ul class="styled-list" style="font-size: 22px;">
                         <li><strong>MT-Bench Score:</strong> <strong style="color: var(--blue);">8.95 / 10.0</strong> (LLM-as-a-Judge)</li>
@@ -2337,7 +2337,7 @@ Em xin kính chào Quý Thầy Cô! Em tên là Nguyễn Đức Bình, Học vi�
 
 Hôm nay, em rất vinh dự được trình bày công trình nghiên cứu thạc sĩ của mình với đề tài: "SENTINEL: Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI Tác tử" (tên tiếng Anh: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI).
 
-Nghiên cứu này được thực hiện dưới sự hướng dẫn tận tình của TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Toàn bộ hệ thống được triển khai và kiểm chứng thực tế trên một máy trạm GPU cá nhân — Card màn hình NVIDIA RTX 4060 Ti 16GB — chạy mô hình trí tuệ nhân tạo Gemma 9B hoàn toàn cục bộ và cách ly mạng, đảm bảo tính chủ quyền và an toàn dữ liệu tuyệt đối.
+Nghiên cứu này được thực hiện dưới sự hướng dẫn tận tình của TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Toàn bộ hệ thống được triển khai và kiểm chứng thực tế trên một máy trạm GPU cá nhân — Card màn hình NVIDIA RTX 4060 Ti 16GB — chạy mô hình trí tuệ nhân tạo Foundation-Sec-8B hoàn toàn cục bộ và cách ly mạng, đảm bảo tính chủ quyền và an toàn dữ liệu tuyệt đối.
 
 Em xin phép được bắt đầu phần trình bày của mình ạ.`,
 
@@ -2413,7 +2413,7 @@ Tiếp theo là Cổng Học Máy (ML Gateway): Mô hình LightGBM được hu�
 
 Tầng 1.75 (Semantic Cache): Đóng vai trò "cuốn sổ nhớ" — khi bị tấn công lặp đi lặp lại như DDoS, hệ thống nhận ra ngay và trả kết quả dưới 1 mili-giây mà không cần gọi tới AI.
 
-Tầng 2 (Cognitive Agent): Bộ não Tác tử AI chạy mô hình Gemma 9B cục bộ trên GPU (tiết kiệm >50% VRAM nhờ Q6_K), kết hợp tra cứu tri thức Dual-RAG để đưa ra phán quyết chính xác F1 = 98.6% và có căn cứ.`,
+Tầng 2 (Cognitive Agent): Bộ não Tác tử AI chạy mô hình Foundation-Sec-8B cục bộ trên GPU (tiết kiệm >50% VRAM nhờ Q4_K_M), kết hợp tra cứu tri thức Dual-RAG để đưa ra phán quyết chính xác F1 = 98.6% và có căn cứ.`,
 
             8: `CHI TIẾT TẦNG 1 — WELFORD VÀ RULE ENGINE:
 
@@ -2449,13 +2449,13 @@ Semantic Cache giải quyết bài toán này bằng cách: Rút gọn dữ li�
 
 Khi một dòng log cùng loại xuất hiện lại, hệ thống nhận ra ngay lập tức và trả về kết quả chặn dưới 1 mili-giây mà không tốn một chút năng lượng GPU nào. Điều này giúp hệ thống giữ vững hiệu năng ngay cả khi bị tấn công dồn dập.`,
 
-            11: `CHI TIẾT TẦNG 2 — TÁC TỬ LANGGRAPH VÀ GEMMA 9B:
+            11: `CHI TIẾT TẦNG 2 — TÁC TỬ LANGGRAPH VÀ FOUNDATION-SEC 8B:
 
 Khi sự kiện được chuyển lên Tầng 2, bộ não AI Tác tử sẽ suy luận qua 5 bước tuần tự trong đồ thị LangGraph:
 
 Bước 1 (Guardrails): Kiểm tra danh sách IP ưu tiên của hạ tầng và đóng gói dữ liệu an toàn.
 Bước 2 (RAG Context): Tra cứu tài liệu tri thức bảo mật MITRE ATT&CK.
-Bước 3 (LLM Triage): Mô hình Gemma 9B phân tích ngữ cảnh và đề xuất hành động.
+Bước 3 (LLM Triage): Mô hình Foundation-Sec-8B phân tích ngữ cảnh và đề xuất hành động.
 Bước 4 (Attack Mapper): Gắn nhãn kỹ thuật tấn công theo chuẩn quốc tế.
 Bước 5 (Decision): Ra quyết định cuối cùng — Chặn IP (BLOCK_IP), Ghi log (LOG), hoặc Chuyển con người duyệt (AWAIT_HITL).
 

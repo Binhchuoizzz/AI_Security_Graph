@@ -16,6 +16,10 @@ import html
 import json
 from datetime import datetime
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import streamlit as st  # type: ignore
 from streamlit_autorefresh import st_autorefresh  # type: ignore
 
@@ -107,8 +111,31 @@ from src.ui.components import (
     render_alert_card,
     render_apt_events_table,
     render_metrics_header,
+    render_theme_styles,
     render_threat_intel_tables,
 )
+
+
+def _model_display_name() -> str:
+    """Tên model ĐANG chạy, đọc động — KHÔNG viết cứng.
+
+    Bản trước dán thẳng chuỗi tên model cũ vào chú giải và sơ đồ luồng. Khi hệ đổi sang
+    Foundation-Sec, giao diện vẫn khai tên cũ: người xem demo (kể cả hội đồng) đọc được một
+    tên model không hề chạy ở đâu. Viết cứng tên model là thứ chắc chắn sẽ rữa.
+    """
+    raw = os.getenv("LLM_MODEL_FILE") or ""
+    if not raw:
+        try:
+            from src.agent.llm_client import DEFAULT_MODEL
+
+            raw = DEFAULT_MODEL
+        except Exception:
+            return "LLM cục bộ"
+    # "Foundation-Sec-8B-Instruct-Q4_K_M.gguf" -> "Foundation-Sec-8B"
+    stem = raw.rsplit("/", 1)[-1].removesuffix(".gguf")
+    m = re.match(r"([A-Za-z0-9.\-]*?\d+[Bb])(?:[-_]|$)", stem)
+    return m.group(1) if m else stem
+
 
 # Cấu hình trang
 st.set_page_config(
@@ -260,7 +287,7 @@ def render_demo_overview(
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
-        "Welford $O(1)$ + **Cổng ML** (cùng Tier-1) → **Tier-2** tác tử LangGraph (Gemma-2-9B-IT Q6\\_K qua llama.cpp) + "
+        "Welford $O(1)$ + **Cổng ML** (cùng Tier-1) → **Tier-2** tác tử LangGraph (Foundation-Sec-8B-Instruct Q4\\_K\\_M qua llama.cpp) + "
         "**Dual-RAG** (MITRE ATT&CK / NIST SP 800-61r2) phía sau rào chắn mật mã, có **HITL** giám sát.*"
     )
 
@@ -289,61 +316,59 @@ def render_demo_overview(
     # Không bịa số khi chưa đo được: 99.6 hardcode cũ khiến demo trống vẫn khoe 99.6%.
     nr = noise_reduction
 
-    # ---------- Hàng chỉ số vận hành ----------
-    st.markdown("### 📊 Chỉ số Vận hành Thời gian thực")
+    # ---------- Operational Metrics Row ----------
+    st.markdown("### 📊 Real-Time Operational Metrics")
     c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-    c1.metric("Logs thô đầu vào", f"{raw_logs_count:,}")
-    c2.metric("Tổng IP Bị Chặn", f"{escalated:,}")
-    c3.metric("Đang chờ LLM ⏳", f"{pending_llm}")
+    c1.metric("Raw Input Logs", f"{raw_logs_count:,}")
+    c2.metric("Total Blocked IPs", f"{escalated:,}")
+    c3.metric("Pending LLM Queue ⏳", f"{pending_llm}")
     nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
-    c4.metric("Giảm tải (thô→cảnh báo)", nr_str)
-    c5.metric("IP rủi ro cao", f"{len(high_risk)}")
-    c6.metric("Phê duyệt luật (ML + LLM)", f"{len(pending_rules)}")
-    c7.metric("Chuỗi audit HMAC", "✅ Toàn vẹn" if integ_valid else "⚠️ Bị sửa")
+    c4.metric("Offloaded Rate", nr_str)
+    c5.metric("High Risk IPs", f"{len(high_risk)}")
+    c6.metric("Rule Approvals (HITL)", f"{len(pending_rules)}")
+    c7.metric("Audit HMAC Chain", "✅ Intact" if integ_valid else "⚠️ Modified")
 
     st.markdown("---")
     col_left, col_right = st.columns([3, 2])
 
-    # ---------- Cột trái: Live feed + APT ----------
+    # ---------- Left Column: Live Feed + APT ----------
     with col_left:
-        st.markdown("### 🚨 Dòng Cảnh báo Gần nhất (Live Threat Feed)")
+        st.markdown("### 🚨 Live Threat Feed (Recent Alerts)")
         if all_alerts:
             feed = [
                 {
-                    "Thời gian": str(a.get("timestamp", ""))[5:19],
-                    "Hành động": a.get("action", ""),
-                    "Đối tượng": a.get("target", ""),
-                    "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
+                    "Timestamp": str(a.get("timestamp", ""))[5:19],
+                    "Action": a.get("action", ""),
+                    "Target IP": a.get("target", ""),
+                    "MITRE ATT&CK": _extract_mitre_technique(a.get("reason", "")) or "—",
                 }
                 for a in all_alerts[:10]
             ]
             st.dataframe(pd.DataFrame(feed), width="stretch", height=300, hide_index=True)
         else:
-            st.info(
-                "Chưa có cảnh báo. Chạy luồng demo (unified_stream) hoặc seed dữ liệu để minh hoạ."
-            )
+            st.info("No alerts registered. Stream events via unified_stream or demo script.")
 
-        st.markdown("### 🎯 Chiến dịch APT đa giai đoạn (Multi-day Kill-chain)")
+        st.markdown("### 🎯 Multi-day APT Campaign (Kill-chain Correlation)")
         if apt_events:
             apt_tbl = [
                 {
-                    "Nguồn IP": e.get("src_ip", ""),
-                    "Ngày": e.get("apt_day", ""),
-                    "Giai đoạn": e.get("apt_phase", ""),
-                    "Nhãn": e.get("label", ""),
+                    "Source IP": e.get("src_ip", ""),
+                    "Day": e.get("apt_day", ""),
+                    "Killchain Phase": e.get("apt_phase", ""),
+                    "Threat Label": e.get("label", ""),
                 }
                 for e in apt_events[:12]
             ]
             st.dataframe(pd.DataFrame(apt_tbl), width="stretch", height=240, hide_index=True)
             st.caption(
-                f"🔗 Phát hiện **{len(apt_ips)} IP APT** qua tương quan đa ngày trong Threat Memory (SQLite)."
+                f"🔗 Detected **{len(apt_ips)} APT IPs** via multi-day threat correlation in Threat Memory (SQLite)."
             )
         else:
-            st.info("Chưa có sự kiện APT. Seed dữ liệu DAPT2020 để minh hoạ tương quan đa ngày.")
+            st.info("No APT events recorded. Seed DAPT2020 dataset for multi-day correlation demo.")
 
-    # ---------- Cột phải: kết quả thực nghiệm + trạng thái ----------
+    # ---------- Right Column: Benchmark Results + System Status ----------
     with col_right:
-        st.markdown("### 🏆 Kết quả Thực nghiệm (Luận văn)")
+        st.markdown("### 🏆 Empirical Thesis Benchmark Results")
         st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
         _R = cached_experiment_results()
         _lat = _R.get("latency_benchmark") or {}
@@ -438,7 +463,7 @@ def render_demo_overview(
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")
-        st.success("🟢 LLM cục bộ: Gemma-2-9B-IT Q6\\_K (llama.cpp · air-gapped)")
+        st.success("🟢 LLM cục bộ: Foundation-Sec-8B-Instruct Q4\\_K\\_M (llama.cpp · air-gapped)")
         st.success(
             "🟢 Audit HMAC-SHA256: " + ("Toàn vẹn" if integ_valid else "CẢNH BÁO: bị sửa đổi")
         )
@@ -453,7 +478,7 @@ def render_demo_overview(
             _c = "🟢" if _util < 75 else "🟡" if _util < 90 else "🔴"
             st.markdown(
                 f"{_c} **Ngân sách ngữ cảnh:** p95 **{_tok.get('utilization_pct_p95', 0)}%** · "
-                f"max **{_util}%** của {_tok.get('n_ctx', 8192)} token · "
+                f"max **{_util}%** của {_tok.get('n_ctx', 16384)} token · "
                 f"prompt TB {_tok.get('prompt_tokens_mean', 0)} / max {_tok.get('prompt_tokens_max', 0)} · "
                 f"⚠️ {_tok.get('overflow_warnings', 0)} cảnh báo sát trần ({_tok.get('calls', 0)} call)"
             )
@@ -609,18 +634,21 @@ def render_demo_overview(
 
 
 def main_dashboard():
-    # Auto-refresh UI mỗi 3000ms để tránh giật lag khi tải nhiều data
-    count = st_autorefresh(interval=3000, limit=10000, key="siem_dashboard_refresh")
+    # Force pure Cyber Dark Mode theme
+    render_theme_styles("dark")
+
+    # Auto-refresh UI mỗi 4000ms (4s) - mượt mà, phản hồi nhanh, tiết kiệm CPU
+    count = st_autorefresh(interval=4000, limit=10000, key="siem_dashboard_refresh")
 
     # Sidebar
     with st.sidebar:
-        st.markdown(f"### 👤 Tài khoản: `{st.session_state.get('username')}`")
-        st.markdown(f"### 🔑 Vai trò: `{st.session_state.get('role')}`")
-        if st.button("🚪 Đăng xuất"):
+        st.markdown(f"### 👤 Account: `{st.session_state.get('username')}`")
+        st.markdown(f"### 🔑 Role: `{st.session_state.get('role')}`")
+        if st.button("🚪 Logout"):
             logout()
 
         st.markdown("---")
-        st.markdown("### 🔍 Bộ lọc Sự cố")
+        st.markdown("### 🔍 Incident Filters")
 
         # Lọc theo hành động
         # Chỉ liệt kê các hành động THỰC SỰ có trong nhật ký sự cố (bỏ "LOG" vì đó là
@@ -806,7 +834,7 @@ def main_dashboard():
             "  </div>"
             '  <div class="glossary-item">'
             '    <span class="glossary-title">Tier-2 · LLM Agent:</span>'
-            '    <div class="glossary-desc">LangGraph Agent truy xuất tri thức Dual-RAG (MITRE & NIST) giúp Gemma-2-9B ra quyết định ngăn chặn.</div>'
+            f'    <div class="glossary-desc">LangGraph Agent truy xuất tri thức Dual-RAG (MITRE & NIST) giúp {html.escape(_model_display_name())} ra quyết định ngăn chặn.</div>'
             "  </div>"
             '  <div class="glossary-item">'
             '    <span class="glossary-title">Feedback Loop:</span>'
@@ -901,12 +929,12 @@ def main_dashboard():
 
     tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
-            "🎬 Tổng quan Demo",
-            "📊 Nhật ký SIEM & Audit Trail",
-            "🧑‍💻 Phê duyệt HITL (LLM)",
-            "🎯 Giám sát APT & Threat Intel",
-            "🔒 Quản lý Blocklist & Whitelist",
-            "🔍 Lỗ hổng & Tri thức Graph",
+            "🎬 Executive Overview",
+            "📊 SIEM Logs & Audit Trail",
+            "🧑‍💻 HITL Approvals",
+            "🎯 Threat Intel & APT Correlation",
+            "🔒 Blocklist & Whitelist Management",
+            "🔍 Graph Knowledge & Vulnerabilities",
         ]
     )
 
@@ -1038,9 +1066,9 @@ def main_dashboard():
 
             t1_tab, ml_gate_tab, t2_llm_tab = st.tabs(
                 [
-                    "🟢 Tier-1 · Luật (Welford + chữ ký)",
-                    "⚡ Tier-1 · Cổng ML (LightGBM)",
-                    "🧠 Tier-2 · Tác tử LLM (LangGraph)",
+                    "🟢 Tier-1 · Rules (Welford & Signatures)",
+                    "⚡ Tier-1 · ML Gate (LightGBM)",
+                    "🧠 Tier-2 · Agentic LLM (LangGraph)",
                 ]
             )
 
@@ -1257,16 +1285,16 @@ def main_dashboard():
 
                     src = rule.get("source", "")
                     if "langgraph_agent_hitl" in src:
-                        hitl_type = "🧠 AWAIT_HITL (Tier-2 LLM cần con người phân tích thêm)"
+                        hitl_type = "🧠 AWAIT_HITL (Tier-2 LLM requires human analyst review)"
                         hitl_color = "#722ed1"
                     elif "ml_triage" in src:
-                        hitl_type = "⚡ AWAIT_HITL (Cổng ML đề xuất xem xét)"
+                        hitl_type = "⚡ AWAIT_HITL (ML Gate recommendation)"
                         hitl_color = "#1890ff"
                     elif "tier1_rule_engine" in src:
-                        hitl_type = "🛡️ AWAIT_HITL (Tier-1 Rule Engine cảnh báo, chờ duyệt)"
+                        hitl_type = "🛡️ AWAIT_HITL (Tier-1 Rule Engine alert)"
                         hitl_color = "#faad14"
                     elif "langgraph_agent" in src:
-                        hitl_type = "🛑 BLOCK_IP (Hệ thống đề xuất chặn, chờ duyệt)"
+                        hitl_type = "🛑 BLOCK_IP (System recommendation for blocking)"
                         hitl_color = "#ff4d4f"
                     else:
                         hitl_type = f"🔧 MANUAL ({src})"
@@ -1277,15 +1305,15 @@ def main_dashboard():
                         expanded=True,
                     ):
                         st.markdown(
-                            f"**Loại chờ duyệt (HITL Type):** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
+                            f"**HITL Type:** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
                             unsafe_allow_html=True,
                         )
                         st.write(
-                            f"**Mức độ nghiêm trọng:** {sev_icon} {sev_label} (score {rule.get('score')})"
+                            f"**Severity:** {sev_icon} {sev_label} (score {rule.get('score')})"
                         )
-                        st.write(f"**Thời gian tạo:** {created}")
-                        st.write(f"**Trường dữ liệu:** {rule.get('field')}")
-                        st.write(f"**Lý do:** {rule.get('reason')}")
+                        st.write(f"**Created Time:** {created}")
+                        st.write(f"**Data Field:** {rule.get('field')}")
+                        st.write(f"**Reason:** {rule.get('reason')}")
 
                         # Lấy raw log để minh chứng
                         target_pattern = str(rule.get("pattern", ""))
@@ -1303,14 +1331,14 @@ def main_dashboard():
                         if not matched_audit:  # Fallback lấy cái mới nhất có raw_log
                             matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
                         if matched_audit and matched_audit.get("raw_log"):
-                            with st.expander("🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng)"):
+                            with st.expander("🔍 View Full Raw Log (Evidence)"):
                                 st.code(matched_audit.get("raw_log"), language="json")
 
                         if st.session_state.get("role") == "L3_Manager":
                             col1, col2 = st.columns([1, 1])
                             with col1:
                                 if st.button(
-                                    "✅ Phê duyệt", key=f"app_{rule.get('pattern')}_{page_key}"
+                                    "✅ Approve", key=f"app_{rule.get('pattern')}_{page_key}"
                                 ):
                                     # Phát hiện xung đột block↔whitelist TRƯỚC khi duyệt (approve_rule
                                     # sẽ tự gỡ khỏi whitelist) để thông báo cho analyst.
@@ -1324,7 +1352,7 @@ def main_dashboard():
                                     )
                                     st.cache_data.clear()
                                     st.success(
-                                        f"✅ Đã DUYỆT thành công luật chặn cho {rule.get('pattern')}"
+                                        f"✅ APPROVED blocking rule for {rule.get('pattern')}"
                                     )
                                     # Ghi audit khi DUYỆT luật (đồng bộ: duyệt block cũng để lại
                                     # 1 bản ghi như duyệt whitelist). Luật Source IP -> BLOCK_IP.
@@ -1334,7 +1362,7 @@ def main_dashboard():
                                     _log_to_db(
                                         _act,
                                         str(rule.get("pattern")),
-                                        f"[Tier-1 Filter] Luật được DUYỆT (HITL) bởi "
+                                        f"[Tier-1 Filter] Rule APPROVED (HITL) by "
                                         f"{st.session_state.get('username')}: {rule.get('reason')}",
                                     )
                                     if _act == "BLOCK_IP":
@@ -1343,13 +1371,13 @@ def main_dashboard():
                                         threat_memory.mark_ip_blocked(str(rule.get("pattern")))
                                     if _was_wl:
                                         st.warning(
-                                            f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist vì "
-                                            "chuyển sang CHẶN (block ↔ whitelist loại trừ lẫn nhau)."
+                                            f"⚠️ {rule.get('pattern')} REMOVED from Whitelist due to "
+                                            "blocking rule approval."
                                         )
                                     st.rerun()
                             with col2:
                                 if st.button(
-                                    "❌ Từ chối", key=f"rej_{rule.get('pattern')}_{page_key}"
+                                    "❌ Reject", key=f"rej_{rule.get('pattern')}_{page_key}"
                                 ):
                                     feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
                                     st.cache_data.clear()
@@ -1363,12 +1391,12 @@ def main_dashboard():
                                     _log_to_db(
                                         "LOG",
                                         str(rule.get("pattern")),
-                                        f"[Tier-1 Filter] Luật bị TỪ CHỐI (HITL) bởi {st.session_state.get('username')}: {rule.get('reason')}",
+                                        f"[Tier-1 Filter] Rule REJECTED (HITL) by {st.session_state.get('username')}: {rule.get('reason')}",
                                     )
-                                    st.warning(f"Đã từ chối luật {rule.get('pattern')}")
+                                    st.warning(f"Rejected rule for {rule.get('pattern')}")
                                     st.rerun()
                         else:
-                            st.warning("Bạn không có quyền L3_Manager để phê duyệt.")
+                            st.warning("L3_Manager role required to approve/reject.")
 
                 # Điều hướng trang (HITL)
                 if n_pages > 1:
@@ -2269,7 +2297,7 @@ def main_dashboard():
                 'ML [label="Tier-1 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
                 'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
-                'LLM [label="Tier-2 LLM Agent (Gemma-2-9B)", fillcolor="#1d39c4", color="#1d39c4"]; '
+                f'LLM [label="Tier-2 LLM Agent ({_model_display_name()})", fillcolor="#1d39c4", color="#1d39c4"]; '
                 'MEM [label="Threat Memory (APT)", fillcolor="#1d39c4", color="#1d39c4"]; '
                 'SOC -> T1 [label="ingest"]; T1 -> ML [label="escalate"]; '
                 'ML -> GR [label="bypass"]; GR -> RAG [label="ground"]; '

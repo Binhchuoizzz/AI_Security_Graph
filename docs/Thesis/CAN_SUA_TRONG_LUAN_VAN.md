@@ -9,7 +9,7 @@
 
 ### A1. Tên model suy luận — 14 chỗ
 
-Luận văn ghi **Gemma-2-9B-IT Q6_K**. Hệ thống thực tế chạy **Foundation-Sec-8B-Instruct Q4_K_M**.
+Luận văn ghi tên model cũ. Hệ thống thực tế chạy **Foundation-Sec-8B-Instruct Q4_K_M**.
 
 | tệp | dòng |
 | :-- | :-- |
@@ -20,9 +20,9 @@ Luận văn ghi **Gemma-2-9B-IT Q6_K**. Hệ thống thực tế chạy **Founda
 
 Kèm theo: mọi chỗ ghi `n_ctx 8192` phải thành **32768** (`-np 2` → 16.384 token/khe).
 
-> Gemma-2-9B **không phục vụ nổi** prompt hiện tại: `-c 8192 -np 2` = 4.096 token/khe, prompt
-> thật p50 ≈ 7.700 token → hỏng 60/60 lượt trong 0,02 giây. Nếu muốn giữ Gemma thì phải đo
-> lại ở ctx 32768; còn không thì đổi tên model khắp nơi.
+> Model cũ **không phục vụ nổi** prompt hiện tại: `-c 8192 -np 2` = 4.096 token/khe, prompt
+> thật p50 ≈ 7.700 token → hỏng 60/60 lượt trong 0,02 giây.
+> Đã đổi tên model khắp nơi và đo lại ở ctx 32768.
 
 ### A2. "26.521 sự kiện CSE-CIC-IDS2018" — 15 chỗ
 

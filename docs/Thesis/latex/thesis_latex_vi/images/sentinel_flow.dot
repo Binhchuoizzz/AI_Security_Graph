@@ -46,7 +46,7 @@ digraph sentinel_flow {
 
         t2_guard [label="Guardrails & Security Encapsulation\n(Delimited Cryptographic Nonce + Token Miner)", fillcolor="#FADBD8", color="#B03A2E"];
         t2_rag   [label="Dual-RAG (FAISS + BM25 RRF, k=60)\n+ Threat Memory (SQLite Reputation)", fillcolor="#FADBD8", color="#B03A2E"];
-        t2_llm   [label="Cỗ máy Gemma-2-9B-IT\n(Lượng tử hóa GGUF Q6_K via llama.cpp CUDA)", fillcolor="#FADBD8", color="#B03A2E"];
+        t2_llm   [label="Cỗ máy Foundation-Sec-8B-Instruct\n(Lượng tử hóa GGUF Q4_K_M via llama.cpp CUDA)", fillcolor="#FADBD8", color="#B03A2E"];
         t2_valid [label="DecisionValidator & Guardrail Tất định\n(Ép Schema Pydantic LLMDecision & Whitelist)", fillcolor="#FADBD8", color="#B03A2E"];
     }
 

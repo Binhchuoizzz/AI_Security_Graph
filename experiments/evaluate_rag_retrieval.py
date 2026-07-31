@@ -47,7 +47,7 @@ from collections import Counter
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from experiments.metrics_core import retrieval_report  # noqa: E402
-from experiments.unified_dataset import ROOT, build_stream  # noqa: E402
+from experiments.unified_dataset import ROOT, build_stream, drop_authored  # noqa: E402
 from src.agent.nodes import build_rag_queries  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
@@ -105,6 +105,11 @@ def run(limit: int | None = None, out: str | None = None) -> dict:
 
     with open(GT_PATH, encoding="utf-8") as f:
         gt = json.load(f)
+    # recall@k và MRR chấm trên `expected_mitre_technique`, nên 50 mẫu đối địch do tác giả
+    # biên soạn (đều cùng đáp án T1190) sẽ vào thẳng mẫu số. Loại trước khi lọc nhãn.
+    gt, _n_authored = drop_authored(gt)
+    if _n_authored:
+        print(f"[i] Loại {_n_authored} mẫu BIÊN SOẠN khỏi tập chấm truy xuất.")
     samples = [s for s in gt if _relevant_ids(s.get("expected_mitre_technique", ""))]
     if limit and limit < len(samples):
         stride = len(samples) / limit  # mẫu ĐỀU trên toàn tập, không phải N mẫu đầu

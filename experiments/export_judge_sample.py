@@ -1,7 +1,7 @@
 """SENTINEL — Hạ tầng KIỂM ĐỊNH trọng tài LLM bằng NGƯỜI (Cohen's κ).
 
 VẤN ĐỀ ĐANG GIẢI: điểm LLM-as-Judge hiện dựa vào MỘT trọng tài duy nhất (Llama-3 chấm
-Gemma-2) và KHÔNG mẫu nào được người đối chiếu. Hệ quả: khi Context Precision thấp, ta
+cùng họ) và KHÔNG mẫu nào được người đối chiếu. Hệ quả: khi Context Precision thấp, ta
 KHÔNG phân biệt được hai khả năng hoàn toàn khác nhau —
     (a) tác tử suy luận kém thật, hay
     (b) trọng tài chấm sai.

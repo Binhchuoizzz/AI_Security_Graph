@@ -12,7 +12,7 @@ Hai mối lo phản biện/TS về việc dùng LLM cục bộ trong quy trình 
       -> Giả lập LLM ném lỗi, chạy tác tử đầy đủ trên một mẫu tấn công, xác nhận
          hệ KHÔNG vỡ mà suy biến về AWAIT_HITL (Tier-1 vẫn bảo vệ độc lập).
 
-Cần LLM server (Gemma) cho phần (A). Chạy:
+Cần LLM server cho phần (A) — model nào đang phục vụ cũng được, script đọc động. Chạy:
     .venv/bin/python experiments/run_llm_robustness.py
 """
 
@@ -23,6 +23,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from experiments.metrics_core import resource_cost, wilson_ci  # noqa: E402
+from experiments.unified_dataset import drop_authored  # noqa: E402
 from src.agent import llm_client as llm_mod  # noqa: E402
 from src.agent.llm_client import llm_client  # noqa: E402
 from src.agent.prompts import build_triage_prompt  # noqa: E402
@@ -87,6 +88,8 @@ def test_seed_variance(n_samples: int = 10, seeds: tuple[int, ...] = (11, 42, 13
     print(f"\n[A2] BIẾN THIÊN THEO SEED — {n_samples} mẫu × {len(seeds)} seed")
     with open(GT_PATH) as f:
         gt = json.load(f)
+    # Cùng dân số THẬT như mọi phép đo ground_truth khác — xem `drop_authored`.
+    gt, _ = drop_authored(gt)
     # Lấy mẫu phân tầng theo hành động kỳ vọng để không chỉ đo trên một loại ca.
     by_action: dict[str, list] = {}
     for s in gt:

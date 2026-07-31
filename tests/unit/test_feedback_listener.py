@@ -19,7 +19,20 @@ def tmp_config(tmp_path, monkeypatch):
     cfg.write_text(yaml.dump({"tier1": {"dynamic_rules": []}}), encoding="utf-8")
     monkeypatch.setattr(fl, "CONFIG_PATH", str(cfg))
     monkeypatch.setattr(fl, "_lock", FileLock(str(cfg) + ".lock"))
+    # Các test dưới đây kiểm tra CHÍNH cơ chế ghi luật, nên phải chạy với cơ chế đó BẬT.
+    # `SENTINEL_FREEZE_DYNAMIC_RULES=1` là cờ dùng khi chạy benchmark (chặn pytest ghi ~1.400
+    # luật vào config thật); nếu để nó rò từ môi trường vào đây thì 5 test này đỏ mà nguyên
+    # nhân lại nằm ngoài mã đang kiểm. Test không được phụ thuộc biến môi trường của người gọi.
+    monkeypatch.delenv("SENTINEL_FREEZE_DYNAMIC_RULES", raising=False)
     return cfg
+
+
+def test_freeze_flag_blocks_rule_writes(tmp_config, monkeypatch):
+    """Cờ đóng băng phải THẬT SỰ chặn ghi — đây là thứ giữ config sạch suốt lượt đo."""
+    monkeypatch.setenv("SENTINEL_FREEZE_DYNAMIC_RULES", "1")
+    res = fl.FeedbackListener().receive_new_rule("Source IP", "203.0.113.77", score=50)
+    assert res["status"] == "FROZEN_FOR_BENCHMARK"
+    assert _rules(tmp_config) == [], "luật vẫn lọt vào config dù đã đóng băng"
 
 
 def _rules(cfg):

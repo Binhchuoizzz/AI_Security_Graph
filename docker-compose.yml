@@ -1,6 +1,6 @@
 services:
   # ================================================================
-  # LOCAL LLM SERVER — Gemma-2-9B-IT via llama.cpp (GPU Accelerated)
+  # LOCAL LLM SERVER — Foundation-Sec-8B-Instruct via llama.cpp (GPU Accelerated)
   # ================================================================
   llm:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
@@ -15,12 +15,12 @@ services:
     #   + hợp đồng JSON + khối chống tiêm nhiễm). Không có cờ này, tiền tố đó bị nạp lại từ
     #   đầu ở từng request, tức trả tiền prefill cho phần KHÔNG BAO GIỜ đổi. Bật lên cho
     #   llama.cpp tái dùng KV của tiền tố khớp -> cắt TTFT trên đường nóng.
-    command: -m /models/${LLM_MODEL_FILE:-gemma-2-9b-it-Q6_K.gguf} -c ${LLAMA_ARG_CTX_SIZE:-16384} --host 0.0.0.0 --port 8080 -ngl 99 --flash-attn on -np ${LLAMA_ARG_N_PARALLEL:-2} --cache-reuse ${LLAMA_ARG_CACHE_REUSE:-256}
+    command: -m /models/${LLM_MODEL_FILE:-Foundation-Sec-8B-Instruct-Q4_K_M.gguf} -c ${LLAMA_ARG_CTX_SIZE:-32768} --host 0.0.0.0 --port 8080 -ngl 99 --flash-attn on -np ${LLAMA_ARG_N_PARALLEL:-2} --cache-reuse ${LLAMA_ARG_CACHE_REUSE:-256}
     environment:
       # Buộc sử dụng toàn bộ GPU layers (offload hết lên VRAM)
       LLAMA_ARG_N_GPU_LAYERS: "99"
-      LLAMA_ARG_MODEL: "/models/${LLM_MODEL_FILE:-gemma-2-9b-it-Q6_K.gguf}"
-      LLAMA_ARG_CTX_SIZE: "${LLAMA_ARG_CTX_SIZE:-16384}"
+      LLAMA_ARG_MODEL: "/models/${LLM_MODEL_FILE:-Foundation-Sec-8B-Instruct-Q4_K_M.gguf}"
+      LLAMA_ARG_CTX_SIZE: "${LLAMA_ARG_CTX_SIZE:-32768}"
       LLAMA_ARG_HOST: "0.0.0.0"
       LLAMA_ARG_PORT: "8080"
       LLAMA_ARG_N_PARALLEL: "${LLAMA_ARG_N_PARALLEL:-2}"       # concurrent requests

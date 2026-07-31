@@ -12,7 +12,7 @@ SENTINEL giải **1 bài toán**: SOC bị ngập cảnh báo (alert fatigue), m
 
 - **Tier-1** (tất định, ~0.1ms/log): luật + thống kê **Welford** lọc phần lớn log ở "tốc độ đường truyền". Chỉ phần **mơ hồ** mới leo thang (`ESCALATE`).
 - **Cổng ML** (LightGBM, ~0.3ms): ca `ESCALATE` đi qua đây TRƯỚC — chấm xác suất tấn công rồi tự quyết **83.8%** (Chặn/Báo/Thả) mà **KHÔNG cần LLM**; chỉ ca ML "bỏ ngỏ" mới lên Tier-2.
-- **Tier-2** (nhận thức, ~vài giây/lô): tác tử **LangGraph** chạy LLM **Gemma-2-9B cục bộ** + **Dual-RAG** (MITRE/NIST) để suy luận có căn cứ, rồi hành động.
+- **Tier-2** (nhận thức, ~vài giây/lô): tác tử **LangGraph** chạy LLM **Foundation-Sec-8B cục bộ** + **Dual-RAG** (MITRE/NIST) để suy luận có căn cứ, rồi hành động.
 
 Mấu chốt: **tầng LLM nằm NGOÀI đường chặn đồng bộ** → LLM nghẽn thì chỉ chậm phần làm-giàu-ngữ-cảnh, KHÔNG chậm việc bảo vệ. Và **Tier-1 (không thể bị thuyết phục) làm trọng tài kiểm tra Tier-2** — nếu LLM bị lừa hạ cấp tấn công thành lành tính, hệ ép về con người duyệt.
 
@@ -85,7 +85,7 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 
 - 🎯 **Bản chất:** dựng prompt → gọi LLM → **KHÔNG tin ngay**: kiểm chứng bằng validator + lá chắn đồng thuận, rồi mới ghi. LLM chết → suy biến an toàn về `AWAIT_HITL`.
 - 📂 [nodes.py:160 `node_llm_triage`](../../../src/agent/nodes.py#L160). Kèm: [prompts.py:162 `build_triage_prompt`](../../../src/agent/prompts.py#L162) · [llm_client.py:131 `invoke`](../../../src/agent/llm_client.py#L131) + [llm_client.py:88 `DECISION_JSON_SCHEMA`](../../../src/agent/llm_client.py#L88) · [decision_validator.py:151 `enforce_tier_consensus`](../../../src/guardrails/decision_validator.py#L151).
-- ⚙️ **Gemma-2-9B-IT Q6_K** qua **llama.cpp** (OpenAI API), temp 0.1 + **seed 42** → tất định. **`response_format=DECISION_JSON_SCHEMA`** (constrained decoding) ép server xuất **JSON HỢP LỆ** → dứt điểm "parse lỗi/prose bị cắt cụt", và reasoning đi thẳng field nên **bám tiếng Việt** đúng chỉ dẫn prompt.
+- ⚙️ **Foundation-Sec-8B-Instruct Q4_K_M** qua **llama.cpp** (OpenAI API), temp 0.1 + **seed 42** → tất định. **`response_format=DECISION_JSON_SCHEMA`** (constrained decoding) ép server xuất **JSON HỢP LỆ** → dứt điểm "parse lỗi/prose bị cắt cụt", và reasoning đi thẳng field nên **bám tiếng Việt** đúng chỉ dẫn prompt.
 - 🔑 **Confidence LÁI action (`classify_llm`):** conf ≥0.85 → BLOCK · 0.65–0.85 → ALERT · <0.65 → AWAIT_HITL (bỏ kiểu "LLM tự chọn action"). Đồng bộ 1 nguồn với Cổng ML qua `decision_policy.py`.
 - 🔑 **Prompt Engineering nâng cao:** LLM bị ép phân tích chuỗi tấn công (Attack Chain) theo trình tự thời gian và đếm số lượng hành vi. Nó bắt buộc viết lý do bằng **ngôn ngữ tự nhiên (storytelling)** của chuyên gia SOC. Nếu gặp Zero-day không có trong RAG, nó được phép **Tự suy luận** kỹ thuật gần nhất, gắn nhãn `[Tự suy luận]`, và cấm ảo tưởng (hallucinate) các bước không có thật.
 - 🔑 **`enforce_tier_consensus`** = tinh túy bảo mật: Tier-1 nói tấn công mà LLM hạ xuống LOG/DROP → hệ KHÔNG tin LLM, ép `AWAIT_HITL`.

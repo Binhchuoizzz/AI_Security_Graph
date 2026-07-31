@@ -52,6 +52,7 @@ from experiments.unified_dataset import ROOT, build_stream  # noqa: E402
 from src.agent.state import SentinelState  # noqa: E402
 from src.agent.workflow import agent_app  # noqa: E402
 from src.guardrails import loop_detector  # noqa: E402
+from src.tier1_filter.ml_gateway import MLGateway  # noqa: E402
 from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "tier2_decision_results.json")
@@ -80,19 +81,42 @@ def _is_flagged(action: str) -> bool:
 
 
 def collect_escalated():
-    """Chạy Tier-1 thật trên luồng gộp, trả về danh sách sự kiện action==ESCALATE
-    (kèm ground-truth + nguồn). Warmup prefix để Welford ấm (golden cũng đã seed)."""
+    """Sự kiện THỰC SỰ tới Tier-2: qua Tier-1 **và** Cổng ML không tự quyết được.
+
+    LỖI ĐÃ VÁ. Bản cũ chỉ lọc `tier1_action == "ESCALATE"` rồi coi đó là đầu vào Tier-2 —
+    tức BỎ QUA Cổng ML LightGBM, chặng cuối cùng trước LLM trên đường nóng thật
+    (`src/streaming/subscriber.py`: `ESCALATE -> ml_gateway.evaluate() -> tự quyết thì dừng`).
+
+    Đo được trên 8.000 sự kiện đầu luồng:
+        Tier-1 ESCALATE           ~39,5%   -> nguồn của con số "8.323 ca escalate"
+        sau Cổng ML, tới LLM      ~10,3%   -> nguồn của con số xả tải ~90%
+    Hai con số đó từng bị đọc như mâu thuẫn; thật ra chúng là HAI ĐIỂM CẮT khác nhau.
+
+    Hệ quả của lỗi: LLM bị chấm trên một tập chứa hàng nghìn ca mà Cổng ML đã xử lý xong —
+    chủ yếu là lành tính. Mẫu số phình ra, và mọi chỉ số theo lớp (specificity, accuracy)
+    tính trên một dân số Tier-2 không bao giờ gặp trong vận hành.
+    """
     warmup, main, _apt_truth, _n = build_stream()
     engine = RuleEngine()
+    gateway = MLGateway()
     for ev in warmup:
         engine.evaluate(ev["log"])
     escalated = []
+    n_tier1_escalate = 0
+    n_ml_resolved = 0
     for ev in main:
         res = engine.evaluate(ev["log"])
-        if res.get("tier1_action") == "ESCALATE":
-            escalated.append(
-                {"log": dict(res), "source": ev["source"], "is_threat": _ground_truth(ev)}
-            )
+        if res.get("tier1_action") != "ESCALATE":
+            continue
+        n_tier1_escalate += 1
+        if gateway.evaluate(ev["log"])[0]:  # Cổng ML tự quyết -> KHÔNG tới Tier-2
+            n_ml_resolved += 1
+            continue
+        escalated.append({"log": dict(res), "source": ev["source"], "is_threat": _ground_truth(ev)})
+    print(
+        f"[*] Phễu tới Tier-2: Tier-1 escalate {n_tier1_escalate} -> Cổng ML tự quyết "
+        f"{n_ml_resolved} -> còn {len(escalated)} ca THỰC SỰ tới LLM"
+    )
     return escalated
 
 

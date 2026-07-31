@@ -17,7 +17,11 @@ import sqlite3
 import threading
 from datetime import datetime
 
+from dotenv import load_dotenv
+
 from src.guardrails.decision_policy import REPEAT_OFFENDER_MIN_CONF
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +250,8 @@ def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        with _audit_lock, sqlite3.connect(DB_PATH) as conn:
+        with _audit_lock, sqlite3.connect(DB_PATH, timeout=30.0) as conn:
+            conn.execute("BEGIN EXCLUSIVE")
             c = conn.cursor()
 
             # 1. Lấy integrity_hash của dòng log cuối cùng để liên kết (chaining)
