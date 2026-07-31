@@ -27,11 +27,11 @@ Third, developing a stateful reasoning engine based on a LangGraph agent state-g
 
 The design and empirical evaluation process of this thesis are guided by three strategic research questions:
 
-The first research question addresses pipeline efficiency and filtration economics: To what extent can the hybrid Tier 1 filtration pipeline (combining Welford O(1) statistics, LightGBM Machine Learning Gate, and Tier 1.75 Semantic Cache) achieve autonomous telemetry offload at wire-speed, and what overall response latency reduction is attained compared to a pure language model processing paradigm?
+The first research question (RQ1) addresses pipeline efficiency and filtration economics: How can a multi-tiered architecture be designed to autonomously offload security telemetry at wire-speed, thereby resolving the latency bottlenecks and resource consumption inherent in Large Language Models?
 
-The second research question addresses AI security boundaries and forensic integrity: To what degree does Delimited Data Encapsulation using random cryptographic nonces coupled with deterministic action guardrails neutralize log-substrate prompt injection attacks, and how does an HMAC log audit chain protect forensic non-repudiation against log manipulation attempts?
+The second research question (RQ2) addresses AI security boundaries and forensic integrity: What methodologies and security mechanisms can effectively withstand adversarial risks (such as log-substrate prompt injection) to protect the AI's reasoning flow, while simultaneously ensuring the integrity and non-repudiation of forensic audit trails?
 
-The third research question addresses stateful agent reasoning and technical attribution: How effectively does a stateful Tier 2 AI agent equipped with persistent Threat Memory and Dual-RAG correlate complex intrusion events, accurately attribute MITRE ATT\&CK technique codes, and produce transparent forensic justifications?
+The third research question (RQ3) addresses stateful agent reasoning and technical attribution: How can stateful reasoning capabilities and domain-specific knowledge retrieval be integrated into an AI Agent to automate intrusion analysis, accurately attribute attack techniques, and generate transparent forensic reports, effectively replacing manual human intervention?
 
 \section{Scope and Object of Study}
 
@@ -56,7 +56,7 @@ In system architecture, the research proposes and proves the efficacy of the SEN
 
 In AI security, the research contributes a structural defense mechanism utilizing Delimited Data Encapsulation with random cryptographic nonces and deterministic action guardrails. This provides an architectural security guarantee, neutralizing prompt injection attacks without relying on probabilistic semantic classifiers. Concurrently, an HMAC-SHA256 signature chain guarantees non-repudiation for forensic logs.
 
-In agentic logic and security knowledge, the research replaces rigid SOAR playbooks with a stateful LangGraph agent graph connected to a 432-item STIX-aligned MITRE ATT\&CK knowledge base and persistent Threat Memory, enabling automated correlation of complex intrusion events and transparent forensic justification generation running smoothly on consumer GPU hardware.
+In agentic logic and security knowledge, the research replaces rigid SOAR playbooks with a stateful LangGraph agent graph connected to a 433-item STIX-aligned MITRE ATT\&CK knowledge base and persistent Threat Memory, enabling automated correlation of complex intrusion events and transparent forensic justification generation running smoothly on consumer GPU hardware.
 
 \section{Structure of the Thesis}
 

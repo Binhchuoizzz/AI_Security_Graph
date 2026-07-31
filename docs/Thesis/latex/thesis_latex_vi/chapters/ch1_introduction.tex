@@ -27,11 +27,11 @@ Thứ ba, phát triển cỗ máy suy luận có trạng thái dựa trên đồ
 
 Tiến trình thiết kế và đánh giá thực nghiệm của luận văn được dẫn dắt bởi ba câu hỏi nghiên cứu chiến lược:
 
-Câu hỏi nghiên cứu thứ nhất về hiệu năng đường ống và kinh tế học tầng lọc: Đường ống lọc lai Tầng 1 (kết hợp bộ lọc thống kê Welford $O(1)$, Cổng Học máy LightGBM và Bộ đệm Semantic Cache Tầng 1.75) đạt tỷ lệ tự động xả tải bao nhiêu phần trăm trên luồng nhật ký an ninh ở tốc độ đường truyền, và mức độ rút ngắn độ trễ phản hồi tổng thể của hệ thống đạt được là bao nhiêu so với phương thức xử lý thuần mô hình ngôn ngữ?
+Câu hỏi nghiên cứu thứ nhất (RQ1) về hiệu năng đường ống và kinh tế học tầng lọc: Làm thế nào để thiết kế một kiến trúc phân tầng có khả năng xả tải tự động luồng dữ liệu an ninh ở tốc độ đường truyền nhằm giải quyết triệt để vấn đề "nút thắt cổ chai" về độ trễ và tiêu thụ tài nguyên của các Mô hình Ngôn ngữ Lớn?
 
-Câu hỏi nghiên cứu thứ hai về rào chắn an ninh AI và tính toàn vẹn vết pháp y: Cơ chế Đóng gói Dữ liệu Phân định sử dụng Nonce mật mã ngẫu nhiên kết hợp với Rào chắn Guardrail tất định vô hiệu hóa ở mức độ nào các véc-tơ tấn công tiêm nhiễm câu lệnh qua dữ liệu nhật ký thô, và chuỗi niêm phong mật mã HMAC bảo vệ tính chống chối bỏ của vết pháp y ra sao trước nguy cơ bị thao túng nhật ký?
+Câu hỏi nghiên cứu thứ hai (RQ2) về rào chắn an ninh AI và tính toàn vẹn vết pháp y: Phương pháp luận và cơ chế bảo mật nào có khả năng chống lại các rủi ro đối kháng (điển hình như tiêm nhiễm prompt qua nhật ký) nhằm bảo vệ luồng suy luận của AI, đồng thời đảm bảo tính toàn vẹn và không thể chối bỏ của các vết chứng cứ pháp y?
 
-Câu hỏi nghiên cứu thứ ba về suy luận tác tử có trạng thái và quy kết kỹ thuật: Khung tác tử AI Tầng 2 có trạng thái khi được tích hợp Bộ nhớ Đe dọa bền vững và cơ chế RAG kép mang lại hiệu quả ra sao trong việc tương quan các sự kiện xâm nhập phức tạp, quy kết chính xác mã kỹ thuật theo chuẩn MITRE ATT\&CK và sinh căn cứ giải thích pháp y minh bạch?
+Câu hỏi nghiên cứu thứ ba (RQ3) về suy luận tác tử có trạng thái và quy kết kỹ thuật: Làm thế nào để tích hợp năng lực suy luận có trạng thái và khả năng tra cứu tri thức chuyên ngành vào Tác tử AI nhằm tự động hóa quy trình phân tích, quy kết kỹ thuật tấn công chính xác và sinh ra các báo cáo pháp y minh bạch, thay thế sự can thiệp thủ công của con người?
 
 \section{Phạm vi và Đối tượng Nghiên cứu}
 
@@ -56,7 +56,7 @@ Về mặt kiến trúc hệ thống, nghiên cứu đề xuất và chứng min
 
 Về mặt bảo mật AI, nghiên cứu đóng góp cơ chế phòng thủ mang tính cấu trúc dựa trên kỹ thuật Đóng gói Dữ liệu Phân định sử dụng Nonce mật mã ngẫu nhiên và rào chắn Guardrail tất định. Cơ chế này đem lại bảo chứng an ninh kiến trúc, vô hiệu hóa hoàn toàn các cuộc tấn công tiêm nhiễm câu lệnh qua luồng dữ liệu thô mà không phụ thuộc vào các bộ phân loại ngữ nghĩa xác suất vốn dễ bị vượt qua. Đồng thời, chuỗi mã hóa HMAC-SHA256 đảm bảo tính chống chối bỏ cho toàn bộ vết pháp y.
 
-Về mặt tác tử và tri thức bảo mật, nghiên cứu thay thế các kịch bản SOAR cứng nhắc bằng đồ thị tác tử có trạng thái LangGraph kết nối với kho tri thức 432 mục MITRE ATT\&CK chuẩn STIX và Bộ nhớ Đe dọa bền vững. Giải pháp cho phép tự động phát hiện các sự kiện xâm nhập phức tạp và sinh căn cứ giải thích pháp y chuẩn xác, vận hành trơn tru trên hạ tầng GPU thương mại phổ thông.
+Về mặt tác tử và tri thức bảo mật, nghiên cứu thay thế các kịch bản SOAR cứng nhắc bằng đồ thị tác tử có trạng thái LangGraph kết nối với kho tri thức 433 mục MITRE ATT\&CK chuẩn STIX và Bộ nhớ Đe dọa bền vững. Giải pháp cho phép tự động phát hiện các sự kiện xâm nhập phức tạp và sinh căn cứ giải thích pháp y chuẩn xác, vận hành trơn tru trên hạ tầng GPU thương mại phổ thông.
 
 \section{Cấu trúc của Luận văn}
 
