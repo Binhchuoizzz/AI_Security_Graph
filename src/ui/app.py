@@ -1,3 +1,5 @@
+import typing
+
 """
 SENTINEL - Main Dashboard
 Khởi chạy bằng lệnh: streamlit run src/ui/app.py
@@ -94,7 +96,7 @@ def cached_experiment_results() -> dict:
     return out
 
 
-def _res_metric(col, label: str, value, delta: str, fmt=str) -> None:
+def _res_metric(col, label: str, value, delta: str, fmt: "typing.Callable | type" = str) -> None:
     """Hiện chỉ số; nếu số liệu chưa có thì nói THẲNG là chưa có, không bịa giá trị."""
     if value is None:
         col.metric(label, "—", "chưa có file kết quả")
@@ -655,7 +657,7 @@ def main_dashboard():
         # ghi chú benign/quản trị, không phải sự cố cần phân loại → tránh bộ lọc rỗng).
         action_filter = st.selectbox(
             "Phân loại Hành động",
-            options=["Tất cả", "BLOCK_IP", "ALERT", "LOG", "WHITELIST"],
+            options=["Tất cả", "BLOCK_IP", "ALERT", "WHITELIST"],
             index=0,
             key="action_filter_sb",
         )
@@ -665,6 +667,13 @@ def main_dashboard():
             options=["Tất cả", "T1059.004", "T1190", "T1595", "T1071", "N/A"],
             index=0,
             key="mitre_filter_sb",
+        )
+
+        st.markdown("---")
+        show_tampered_only = st.checkbox(
+            "🚨 Chỉ hiện thẻ bị GIẢ MẠO (Lỗi HMAC)",
+            value=False,
+            help="Chỉ hiển thị các dòng log đã bị thao túng nội dung hoặc đứt gãy chuỗi băm.",
         )
 
         # Tìm kiếm theo IP Mục tiêu
@@ -851,6 +860,14 @@ def main_dashboard():
 
     st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
 
+    # Fetch tampered IDs early for filtering and rendering
+    try:
+        from src.response.executor import get_tampered_audit_ids
+
+        tampered_ids = get_tampered_audit_ids()
+    except Exception:
+        tampered_ids = set()
+
     # Render KPI
     all_alerts = [a for a in cached_get_audit_trail(limit=2000) if a.get("action") != "AWAIT_HITL"]
     active_rules = feedback_mgr.get_active_dynamic_rules()
@@ -875,6 +892,9 @@ def main_dashboard():
             if mitre_filter in str(a.get("mitre_technique", ""))
             or mitre_filter in str(a.get("reason", ""))
         ]
+
+    if show_tampered_only:
+        filtered_alerts = [a for a in filtered_alerts if a.get("id") in tampered_ids]
 
     # Tính toán Live FPR dựa trên các rule được Duyệt (ACTIVE) vs Bác bỏ (REJECTED) bởi con người
     all_rules = feedback_mgr.get_all_dynamic_rules()
@@ -1054,6 +1074,7 @@ def main_dashboard():
             alerts_t2_llm = []
             for alert in filtered_alerts:
                 r = alert.get("reason", "")
+
                 # Detect theo MARKER dùng chung ML_GATE_MARKERS: "Cổng ML" (mới) / "ML Tier 2"
                 # (bản ghi CŨ trong DB) / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM
                 # giờ cũng ghi Tier-2.
@@ -1102,6 +1123,7 @@ def main_dashboard():
                         card_id=f"{tab_key}_{start_idx + idx}",
                         is_whitelisted=is_wl,
                         is_blocked=is_bl,
+                        is_tampered=(alert.get("id") in tampered_ids),
                     )
 
                 # Điều hướng trang
@@ -1135,13 +1157,14 @@ def main_dashboard():
                 # trùng TOÀN BỘ file tier1_blocks.json mỗi lượt refresh (nặng nhất trong UI).
                 tier1_blocks_data = cached_get_tier1_blocks(show=1000)
 
-                # Áp dụng bộ lọc
                 if action_filter not in ["Tất cả", "BLOCK_IP"]:
                     tier1_blocks_data = []
                 if active_search_ip:
                     tier1_blocks_data = [
                         blk for blk in tier1_blocks_data if active_search_ip in blk.get("ip", "")
                     ]
+                if show_tampered_only:
+                    tier1_blocks_data = []
 
                 # Phân trang
                 page_key_blocks = "current_page_t1_blocks"

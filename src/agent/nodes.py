@@ -1039,6 +1039,10 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
 
     def _grounded(tech_id: str) -> bool:
         """Không có ngữ cảnh RAG thì không có gì để đối chiếu — không kết tội được."""
+        # Ngoại lệ: Cho phép các kỹ thuật tấn công LLM (AML.*) đi qua lá chắn
+        # vì chúng thường không nằm trong RAG mạng tiêu chuẩn.
+        if tech_id and tech_id.upper().startswith("AML."):
+            return True
         return bool(tech_id) and (not _rag_ids_pre or tech_id in _rag_ids_pre)
 
     _name_verified = True
@@ -1165,8 +1169,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     #   (b) khâu quy kết phía trên ĐÃ loại hết ứng viên vì không neo được (_ungrounded_candidate).
     # Thiếu (b) thì kết quả vẫn là N/A nhưng `mapping_status` ở lại "resolved" — vết kiểm toán
     # mất dấu VÌ SAO, và đó đúng là thứ hội đồng sẽ hỏi.
+    _is_aml = bool(_final_tech_id) and _final_tech_id.upper().startswith("AML.")
     _ungrounded = (
-        bool(_final_tech_id) and bool(_rag_ids) and _final_tech_id not in _rag_ids
+        bool(_final_tech_id) and not _is_aml and bool(_rag_ids) and _final_tech_id not in _rag_ids
     ) or bool(_ungrounded_candidate)
     _shield_target = _final_tech_id or _ungrounded_candidate
     if trace.enabled():

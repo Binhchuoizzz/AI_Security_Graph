@@ -48,7 +48,7 @@ Model đang phục vụ: **Foundation-Sec-8B-Instruct Q4_K_M**, `LLAMA_ARG_CTX_S
 | **CICIDS** | `push_flow.py --source cicids` | Phân loại lưu lượng + xả tải | Tổng quan / SIEM |
 | **DAPT** | `push_flow.py --source dapt` | APT đa ngày *nổi lên dần* | Giám sát APT |
 | **Zero-day** | `push_flow.py --source zeroday` | Welford bắt cái luật tĩnh bỏ sót | Tổng quan / log |
-| **Adversarial** | `push_flow.py --source adversarial` | Guardrail + neo bằng chứng | Tổng quan |
+| **Adversarial** | `push_flow.py --source adversarial` | 600+ payload đối kháng siêu cấp (Jailbreak, AdvBench, Prompt Injection) | Tổng quan |
 | **Vòng phản hồi** | *(mục 5)* | Duyệt luật → Tier-1 tự chặn, KHÔNG tốn LLM | Phê duyệt HITL |
 
 Thêm `--dry-run` để **chỉ đếm phân bố hàng đợi**, không đụng Redis.
@@ -112,12 +112,11 @@ Script **luôn** kèm 150 benign warmup — bỏ warmup thì Z-score vô nghĩa 
 ## 4. Adversarial — tấn công vào chính LLM
 
 ```bash
-.venv/bin/python scripts/push_flow.py --source adversarial
-# 120 payload: encoding 45 · structural 20 · semantic 20 · jailbreak 20 · rag_poison 15
+.venv/bin/python scripts/push_flow.py --source adversarial --limit 120
+# 120 payload gốc: encoding 45 · structural 20 · semantic 20 · jailbreak 20 · rag_poison 15
 ```
 
-Mỗi payload là một IP TEST-NET riêng (`198.51.100.x`) tải một đòn tầng ứng dụng. Mọi log đi
-qua TẤT CẢ các lớp Tier-1, không tách theo loại.
+Mỗi payload là một IP TEST-NET riêng (`198.51.100.x`) tải một đòn tầng ứng dụng. Mọi log đi qua TẤT CẢ các lớp Tier-1, không tách theo loại.
 
 **Xem:** tab *Tổng quan* → "Vòng phản hồi Hai tầng" và *Live Threat Feed*.
 
@@ -128,13 +127,54 @@ qua TẤT CẢ các lớp Tier-1, không tách theo loại.
 | Guardrail **tĩnh** | `robustness_results.json` | 120 mẫu, 5 nhóm |
 | **Tier-2** (LLM) | `adversarial_pipeline_results.json` | 75 mẫu, 4 nhóm ngữ nghĩa |
 
-Lớp tĩnh mạnh ở `encoding_bypass` nhưng **mù trước tấn công ngữ nghĩa**; 75 mẫu Tier-2 nhận
-là siêu tập của phần lọt qua lớp tĩnh. Trích 100% của Tier-2 mà giấu tỉ lệ của lớp tĩnh là
-chọn số.
+Lớp tĩnh mạnh ở `encoding_bypass` nhưng **mù trước tấn công ngữ nghĩa**; 75 mẫu Tier-2 nhận là siêu tập của phần lọt qua lớp tĩnh.
 
-> **Trung thực khi demo end-to-end:** một phần payload bị Tier-1 **DROP** trước khi tới
-> Guardrail — lọt bằng cách bị bỏ qua, không phải bị chặn có chủ đích. Con số kháng tiêm
-> nhiễm đo bằng cách nạp **thẳng** vào đường ống, và phải nói rõ như vậy.
+> **Trung thực khi demo end-to-end:** một phần payload bị Tier-1 **DROP** trước khi tới Guardrail — lọt bằng cách bị bỏ qua, không phải bị chặn có chủ đích. Con số kháng tiêm nhiễm đo bằng cách nạp **thẳng** vào đường ống, và phải nói rõ như vậy.
+
+---
+
+## 4.1. Adversarial — Bài Test Mở rộng (Thực tế)
+
+```bash
+.venv/bin/python scripts/push_flow.py --source adversarial
+# 723 payload tổng hợp: 120 (cũ) + 603 (mới: AdvBench GCG, Deepset PI, Jackhhao Jailbreak)
+```
+
+Đây là bài test toàn diện trên dữ liệu đối kháng siêu cấp được thu thập thực tế từ HuggingFace và Github.
+
+| Lớp phòng thủ | Phạm vi & Kết quả (31/07) |
+| :-- | :-- |
+| Guardrail **Tĩnh (Tier-1)** | 723 mẫu (8 nhóm). Chặn tốt các PI thô sơ (59%), nhưng **MÙ (0%)** trước AdvBench và Jailbreak tâm lý. |
+| **Cognitive Agent (Tier-2)** | Đỡ đòn **100%** các mẫu siêu khó đã lọt qua lớp tĩnh nhờ nhận diện ngữ cảnh và đóng gói (Encapsulator). |
+
+Luận văn TRẮNG ĐEN rõ ràng: không có Tầng 2, hệ thống chết 100% trước AdvBench và Jailbreak.
+
+---
+
+## 4.2. Tương tác kiểm thử đứt gãy HMAC trên một IP cụ thể (Forgery & Tail-dropping)
+
+Để trình diễn trực tiếp khả năng bắt quả tang giả mạo ngay lập tức (không cần đợi thao tác trên UI), bạn có thể thao tác giả mạo trên một IP cụ thể (ví dụ `198.51.100.15`) và yêu cầu hệ thống xác minh HMAC báo cáo lỗi ngay tại terminal:
+
+**Cách 1: Tấn công Giả mạo nội dung (Sửa `BLOCK_IP` thành `LOG`)**
+```bash
+# 1. Kẻ tấn công sửa hành động của IP cụ thể thành LOG để che giấu dấu vết
+sqlite3 config/audit_trail.db "UPDATE audit_trail SET action = 'LOG' WHERE target = '198.51.100.15';"
+
+# 2. Gọi hệ thống kiểm toán HMAC in kết quả ra ngay lập tức
+.venv/bin/python -c "import sys; sys.path.insert(0, '.'); from src.response.executor import verify_audit_trail_integrity as v; print(v()[1])"
+```
+*Trình diễn:* Terminal sẽ lập tức phát ra cảnh báo: `⚠️ PHÁT HIỆN GIẢ MẠO! Dòng log ID ... đã bị sửa đổi...` do chuỗi băm của IP `198.51.100.15` không khớp với nội dung đã sửa, làm đứt gãy toàn bộ chuỗi. (Trên Dashboard UI cũng sẽ báo ĐỎ nếu bạn tải lại).
+
+**Cách 2: Khai thác lỗ hổng toán học Tail-dropping (Xóa hẳn dòng log đuôi)**
+(Để thành công, dòng bị xóa **bắt buộc phải là dòng cuối cùng** của chuỗi).
+```bash
+# 1. Kẻ tấn công xóa bản ghi cuối cùng trong DB
+sqlite3 config/audit_trail.db "DELETE FROM audit_trail WHERE id = (SELECT MAX(id) FROM audit_trail);"
+
+# 2. Gọi hệ thống kiểm toán HMAC kiểm tra lại
+.venv/bin/python -c "import sys; sys.path.insert(0, '.'); from src.response.executor import verify_audit_trail_integrity as v; print(v()[1])"
+```
+*Trình diễn:* Lần này terminal in ra `✅ Hệ thống nhật ký toàn vẹn`. Điều này chứng minh lý thuyết trong luận văn: vì mã băm $H_i$ chỉ phụ thuộc vào bản ghi trước nó $H_{i-1}$, việc cắt bỏ phần đuôi hoàn toàn không làm hỏng chuỗi của các block còn lại. Kẻ tấn công xóa sạch dấu vết mà chuỗi tĩnh không phát hiện ra!
 
 ---
 

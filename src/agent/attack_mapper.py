@@ -320,6 +320,8 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
         (
             "prompt injection",
             "jailbreak",
+            "roleplay_bypass",
+            "harmful_behavior",
             "ignore previous instructions",
             "ignore all previous",
             "system prompt",

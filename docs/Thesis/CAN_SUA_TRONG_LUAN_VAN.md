@@ -32,7 +32,7 @@ Con số này đến từ `build_stream()` với bộ mặc định cũ, mà b�
 `Thursday-01-03` = **chỉ lớp Infiltration**, và **không có CSIC**. Tức nó không phải
 "CSE-CIC-IDS2018" theo nghĩa người đọc hiểu.
 
-Sau khi sửa mặc định: **25.799 sự kiện · 22 lớp tấn công · 2.000 CSIC · 120 zero-day**.
+Sau khi sửa mặc định: **25.799 sự kiện · 22 lớp tấn công · 2.000 CSIC · 723 mẫu đối kháng**.
 
 ### A3. Xả tải 92,2% (389/5000) — 8 chỗ
 
@@ -118,7 +118,7 @@ chứng **kiến trúc**, không phụ thuộc may mắn của một model — v
 
 `ch1:40` — *"giới hạn trên hai tập benchmark: CSE-CIC-IDS2018 và CSIC 2010"*.
 
-Luồng thật còn có **DAPT2020** và zero-day tổng hợp. Mà chính RQ3 hỏi *"tương quan các sự
+Luồng thật còn có **DAPT2020** và đối kháng tổng hợp. Mà chính RQ3 hỏi *"tương quan các sự
 kiện xâm nhập phức tạp"* — năng lực đó **chỉ chứng minh được bằng DAPT2020**. Bỏ DAPT khỏi
 phạm vi là tự tước bằng chứng cho nửa câu hỏi RQ3, trong khi `ch5` vẫn đang trích DAPT2020.
 
@@ -194,3 +194,6 @@ Chưa rõ do bản vá ưu tiên kỹ thuật con hay do tính chất tập dữ
 4. **Ca T1571 kinh điển** để minh hoạ RQ2: model tự viết *"cổng 443 là cổng chuẩn"* rồi vẫn
    gán nhãn "Non-Standard Port" với **độ tin cậy 99%**. Bằng chứng sống cho luận điểm không
    thể tin vào confidence do LLM tự khai — và rào chắn tất định đã bắt được.
+
+## E. ĐÃ HOÀN THÀNH
+- Cập nhật Kịch bản Đối kháng: Thay thế 120 mẫu thành 723 mẫu (AdvBench, Deepset, Jackhhao) và chèn cite chuẩn xác trong Chương 4 và Chương 5 (cả VI và EN).

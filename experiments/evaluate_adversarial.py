@@ -46,9 +46,20 @@ STATIC_CATEGORIES = [
     "semantic_confusion",
     "jailbreak",
     "rag_poisoning",
+    "prompt_injection_hf",
+    "jailbreak_hf",
+    "advbench_gcg",
 ]
 # Nhóm KHÓ (bypass được lớp tĩnh) — phép thử thật cho Tier-2 LLM
-HARD_CATEGORIES = ["semantic_confusion", "jailbreak", "rag_poisoning", "structural_attacks"]
+HARD_CATEGORIES = [
+    "semantic_confusion",
+    "jailbreak",
+    "rag_poisoning",
+    "structural_attacks",
+    "prompt_injection_hf",
+    "jailbreak_hf",
+    "advbench_gcg",
+]
 
 
 # =========================================================================

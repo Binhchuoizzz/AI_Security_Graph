@@ -2225,7 +2225,7 @@
                 <div class="card card-blue" style="padding: 30px 36px;">
                     <div class="card-title" style="font-size: 25px; color: var(--blue); margin-bottom: 14px;"><i class="fa-solid fa-award"></i> Đóng Góp Luận Văn (Mục 5.2)</div>
                     <ul class="styled-list" style="margin-top: 14px; font-size: 21px; line-height: 1.75;">
-                        <li><strong>Lý thuyết:</strong> Kiến trúc Hai tầng (xả tải 92.2%, E2E 211ms, Action = 100%) &amp; Niêm phong mật mã Nonce Encapsulation (kháng 50% Tĩnh / 100% Toàn Tuyến PI).</li>
+                        <li><strong>Lý thuyết:</strong> Kiến trúc Hai tầng (xả tải 92.2%, E2E 211ms, Action = 100%) &amp; Niêm phong mật mã Nonce Encapsulation (kháng 0% Tĩnh / 100% Toàn Tuyến Đối kháng).</li>
                         <li><strong>Thực tiễn:</strong> Hệ thống mã nguồn mở Docker Compose air-gapped trên GPU thương mại RTX 4060 Ti 16GB.</li>
                     </ul>
                 </div>
@@ -2497,7 +2497,7 @@ Con số 2 — Độ trễ E2E 211ms (sai lầm 50/50): Đo đạc ép luồng 5
 
 Con số 3 — Tỷ lệ chính xác hành động 100%: Phán quyết an ninh của Tác tử AI đạt độ chính xác cao tuyệt đối (Action = 100%) và không cần bất kỳ can thiệp nào của con người.
 
-Con số 4 — Kháng 50% (Tĩnh) / 100% (Toàn tuyến) Prompt Injection: 100% các mẫu Prompt Injection đối kháng thử nghiệm đều bị vô hiệu hóa hoàn toàn nhờ lớp vỏ niêm phong Nonce Encapsulation.
+Con số 4 — Kháng 0% (Tĩnh) / 100% (Toàn tuyến) Đối kháng AI (Adversarial AI): 100% các mẫu Đối kháng và Prompt Injection thử nghiệm đều bị vô hiệu hóa hoàn toàn nhờ lớp vỏ niêm phong Nonce Encapsulation.
 
 Biểu đồ bên trái thể hiện trực quan: Thanh độ trễ của mô hình AI đơn tầng bị nghẽn nghiêm trọng, trong khi độ trễ trung bình E2E của SENTINEL đạt 211ms đáp ứng được thông lượng trên 2.500 flows/s, và các phản hồi tại Tầng 1 chỉ mất dưới 0.40 mili-giây.`,
 
@@ -2539,7 +2539,7 @@ Giới hạn 5 (5.3.5 - SQLite Container): Lưu trữ trạng thái SQLite trong
 Kính thưa Hội đồng, em xin tổng kết 2 đóng góp chính và 5 hướng phát triển tương lai:
 
 VỀ ĐÓNG GÓP (Mục 5.2):
-Đóng góp Lý thuyết: Đề xuất thành công Kiến trúc nhận thức Hai tầng kết hợp giữa toán học tất định ở Tầng 1 (xả tải 92.2%, E2E 211ms, Action = 100%) với mô hình ngôn ngữ phi tất định ở Tầng 2, cùng giải pháp mật mã Nonce Encapsulation kháng 50% Tĩnh / 100% Toàn Tuyến PI.
+Đóng góp Lý thuyết: Đề xuất thành công Kiến trúc nhận thức Hai tầng kết hợp giữa toán học tất định ở Tầng 1 (xả tải 92.2%, E2E 211ms, Action = 100%) với mô hình ngôn ngữ phi tất định ở Tầng 2, cùng giải pháp mật mã Nonce Encapsulation kháng 0% Tĩnh / 100% Toàn Tuyến Đối kháng.
 Đóng góp Thực tiễn: Hệ thống mã nguồn mở Docker Compose chạy hoàn toàn cục bộ air-gapped trên GPU thương mại RTX 4060 Ti 16GB VRAM.
 
 VỀ 5 HƯỚNG PHÁT TRIỂN (Mục 5.4) - tương ứng 1:1 với 5 giới hạn:

@@ -434,17 +434,18 @@ def get_audit_trail(limit=50):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute(
-                "SELECT timestamp, action, target, reason, raw_log FROM audit_trail ORDER BY id DESC LIMIT ?",
+                "SELECT id, timestamp, action, target, reason, raw_log FROM audit_trail ORDER BY id DESC LIMIT ?",
                 (limit,),
             )
             rows = c.fetchall()
         return [
             {
-                "timestamp": r[0],
-                "action": r[1],
-                "target": r[2],
-                "reason": r[3],
-                "raw_log": r[4] or "",
+                "id": r[0],
+                "timestamp": r[1],
+                "action": r[2],
+                "target": r[3],
+                "reason": r[4],
+                "raw_log": r[5] or "",
             }
             for r in rows
         ]
@@ -482,22 +483,58 @@ def get_audit_trail_for_ip(ip: str, limit=100):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute(
-                "SELECT timestamp, action, target, reason, raw_log FROM audit_trail WHERE target = ? ORDER BY id DESC LIMIT ?",
+                "SELECT id, timestamp, action, target, reason, raw_log FROM audit_trail WHERE target = ? ORDER BY id DESC LIMIT ?",
                 (ip, limit),
             )
             rows = c.fetchall()
         return [
             {
-                "timestamp": r[0],
-                "action": r[1],
-                "target": r[2],
-                "reason": r[3],
-                "raw_log": r[4] or "",
+                "id": r[0],
+                "timestamp": r[1],
+                "action": r[2],
+                "target": r[3],
+                "reason": r[4],
+                "raw_log": r[5] or "",
             }
             for r in rows
         ]
     except Exception:
         return []
+
+
+def get_tampered_audit_ids() -> set[int]:
+    """Trả về tập hợp các ID log bị chỉnh sửa sai lệch (HMAC hỏng)."""
+    tampered = set()
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            c = conn.cursor()
+            c.execute(
+                "SELECT id, timestamp, action, target, reason, integrity_hash FROM audit_trail ORDER BY id ASC"
+            )
+            rows = c.fetchall()
+
+        if not rows:
+            return tampered
+
+        secret_key = _log_secret()
+        prev_hash = "genesis_block_hash_sentinel_soc"
+
+        for row in rows:
+            row_id, timestamp, action, target, reason, integrity_hash = row
+            message = f"{prev_hash}|{timestamp}|{action}|{target}|{reason}".encode()
+            expected_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
+
+            if not integrity_hash or not hmac.compare_digest(integrity_hash, expected_hash):
+                tampered.add(row_id)
+
+            # Phục hồi prev_hash bằng hash THẬT SỰ TỒN TẠI trong DB để cô lập lỗi tại từng dòng,
+            # KHÔNG truyền lỗi dây chuyền làm hỏng toàn bộ các dòng sau nó (vì ta chỉ quan tâm
+            # đánh dấu dòng nào bị kẻ gian đụng tay vào sửa).
+            prev_hash = integrity_hash or "genesis_block_hash_sentinel_soc"
+
+    except Exception:
+        pass
+    return tampered
 
 
 def verify_audit_trail_integrity() -> tuple[bool, str]:
@@ -529,7 +566,11 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
             if not integrity_hash or not hmac.compare_digest(integrity_hash, expected_hash):
                 return (
                     False,
-                    f"⚠️ PHÁT HIỆN GIẢ MẠO! Dòng log ID {row_id} ({timestamp} - {action}) đã bị sửa đổi, xóa hoặc chèn sai thứ tự.",
+                    f"⚠️ PHÁT HIỆN GIẢ MẠO! Đứt gãy chuỗi băm tại dòng log **ID {row_id}**.\n\n"
+                    f"- **Thời điểm:** {timestamp}\n"
+                    f"- **Mục tiêu bị sửa đổi (IP):** `{target}`\n"
+                    f"- **Hành động đang hiển thị:** `{action}`\n\n"
+                    f"Lý do: Dữ liệu hiện tại trong DB không khớp với chữ ký mật mã ban đầu (đã bị sửa nội dung, hoặc dòng ngay trước nó bị xóa). Bằng chứng pháp y không còn giá trị!",
                 )
 
             prev_hash = integrity_hash

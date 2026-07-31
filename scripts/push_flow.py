@@ -6,13 +6,13 @@ Khác `scripts/demo.py` (đẩy luồng GỘP cicids+dapt+zeroday+adversarial), 
   --source cicids       Phân loại lưu lượng CIC-IDS2018 (BLOCK/ALERT/DROP + giảm tải nhiễu)
   --source dapt         Chuỗi APT đa ngày DAPT2020 (APT emergent trong Threat Memory)
   --source zeroday      Zero-day REAL-derived — Welford Z-score bắt cái luật tĩnh bỏ sót
-  --source adversarial  120 payload OWASP LLM Top-10 (Tier-1 chặn/escalate → Tier-2 guardrails)
+  --source adversarial  723 payload OWASP LLM Top-10 (Tier-1 chặn/escalate → Tier-2 guardrails)
 
 TÁI DÙNG data đã build + logic đã kiểm thử — KHÔNG bịa số liệu:
   - cicids/dapt/zeroday: LỌC từ `data/demo.json` theo `unified_source` (đã enrich sẵn bởi
     `build_demo.py` → `unified_dataset.enrich`). Dựng demo.json trước: `.venv/bin/python
     scripts/build_demo.py`.
-  - adversarial: 120 payload từ `experiments/adversarial/*/samples.json`, dựng event đúng shape
+  - adversarial: 723 payload từ `experiments/adversarial/*/samples.json`, dựng event đúng shape
     `_build_adversarials` rồi `enrich()` + `determine_queue()` của `unified_dataset` (1 nguồn chân lý).
     Mỗi payload 1 IP TEST-NET riêng (198.51.100.x / 203.0.113.x) để lệnh chặn hiện rõ trên UI.
 
@@ -102,7 +102,7 @@ def _unified_logs(source: str, limit: int, warmup: int):
 
 
 def _adversarial_logs(limit: int):
-    """(queue, log) cho 120 payload adversarial — mỗi mẫu 1 IP TEST-NET riêng."""
+    """(queue, log) cho 723 payload adversarial — mỗi mẫu 1 IP TEST-NET riêng."""
     samples: list[dict] = []
     for path in sorted(glob.glob(ADV_GLOB)):
         with open(path, encoding="utf-8") as f:

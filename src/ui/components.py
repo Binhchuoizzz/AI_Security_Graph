@@ -71,6 +71,7 @@ def render_alert_card(
     card_id="",
     is_whitelisted=False,
     is_blocked=False,
+    is_tampered=False,
 ):
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
     timestamp = alert.get("timestamp", "")
@@ -232,6 +233,9 @@ def render_alert_card(
 
     if clean_reason.startswith("]"):
         clean_reason = clean_reason[1:].strip()
+
+    # Giữ lại các ký tự xuống dòng (vì lúc render HTML sẽ bị hàm split('\n') và strip() nuốt mất)
+    clean_reason = clean_reason.replace("\n", "<br>")
 
     # Categorize decision tier: Tier-1 rule / Tier-1 ML Gate / Tier-2 LLM
     reason_text = raw_reason

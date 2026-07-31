@@ -124,7 +124,6 @@ docker-compose up -d redis llm mlflow agent_ui          # hạ tầng (bỏ neo4
 | Số liệu thô từng phép đo | `experiments/results/*.json` |
 | Báo cáo gộp | `.venv/bin/python scripts/export_final_report.py` → `reports/KET_QUA_CHOT_<ngày>.md` |
 | So sánh ablation | MLflow `http://localhost:5001` |
-
 ---
 
 ## 5. Kịch bản bảo vệ (~15 phút)
