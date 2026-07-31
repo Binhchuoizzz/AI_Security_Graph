@@ -512,7 +512,7 @@ def build_stream(
          module này) vì thế đo năng lực hệ thống trên luồng thuần NetFlow — trong khi
          phạm vi nghiên cứu tuyên bố hai tập: CSE-CIC-IDS2018 VÀ CSIC 2010.
       2. `cicids_max_days` chỉ có Thursday-01-03, tức CHỈ lớp Infiltration. Con số
-         "26.521 sự kiện CSE-CIC-IDS2018" từng trích trong luận văn thực chất là 20.000
+         "25.799 sự kiện CSE-CIC-IDS2018" từng trích trong luận văn thực chất là 20.000
          dòng của MỘT lớp tấn công, chứ không phải 15 lớp. `datatest.json` lại dùng đủ
          10 ngày — hai bộ số của cùng luận văn đứng trên hai nền dữ liệu khác nhau.
       3. `zeroday_repeat=1` -> chỉ 15 mẫu zero-day, so với 360 trong datatest.

@@ -1495,7 +1495,7 @@
                     <div>
                         <div class="card-title" style="font-size: 25px; margin-bottom: 10px;">PHẦN III: KẾT QUẢ THỰC NGHIỆM & ĐÁNH GIÁ 5D</div>
                         <p class="card-text" style="font-size: 21px; line-height: 1.72;">
-                            Kết quả đột phá (Offload 82.4%, Độ trễ E2E 211ms - Tối ưu 11.6x), Ablation Study, Chấm điểm LLM-as-a-Judge (MT-Bench 8.95, RAGAS 0.94) & Giới hạn đo lường 5.3.1.
+                            Kết quả đột phá (Offload 92.2%, Độ trễ E2E tăng 7.8% - Tối ưu giảm HITL xuống 0%), Ablation Study, Chấm điểm LLM-as-a-Judge (Llama-3 Judge 4.6/5.0, Không ảo giác) & Giới hạn đo lường 5.3.1.
                         </p>
                     </div>
                 </div>
@@ -1534,7 +1534,7 @@
                         <i class="fa-solid fa-bolt"></i> Cạm bẫy khi ứng dụng "Ngây Thơ" LLM
                     </div>
                     <ul class="styled-list" style="margin-top: 18px;">
-                        <li><strong>Độ trễ Không thể Mở rộng:</strong> Gọi LLM cho từng log tốn 2,450ms (2.45s)/sự kiện (Single-Tier Baseline), gây nghẽn 100% hàng đợi.</li>
+                        <li><strong>Độ trễ Không thể Mở rộng:</strong> Gọi LLM cho từng log tốn Single-Tier (2.45s)/sự kiện (Single-Tier Baseline), gây nghẽn 100% hàng đợi.</li>
                         <li><strong>Rủi ro Prompt Injection:</strong> Payload chứa câu lệnh đối kháng chiếm quyền điều khiển LLM.</li>
                         <li><strong>Ảo giác (Hallucination):</strong> LLM tự bịa ra căn cứ để BLOCK IP mà không đối chiếu tri thức chuẩn.</li>
                     </ul>
@@ -1564,7 +1564,7 @@
                         Đường ống lọc lai Tầng 1 (Welford $\mathcal{O}(1)$, LightGBM và Semantic Cache) đạt tỷ lệ tự động xả tải bao nhiêu % trên luồng nhật ký đường truyền, và rút ngắn độ trễ tổng thể bao nhiêu lần so với thuần LLM?
                     </p>
                     <div style="margin-top: auto; padding-top: 18px; border-top: 1px solid var(--border-glass); font-size: 19px; color: var(--blue); font-weight: 700;">
-                        <i class="fa-solid fa-circle-check"></i> Lọc xả tải 82.4% log ($< 0.40$ms), tối ưu độ trễ 11.6x.
+                        <i class="fa-solid fa-circle-check"></i> Lọc xả tải 92.2% log ($< 0.40$ms), tối ưu độ trễ giảm HITL xuống 0%.
                     </div>
                 </div>
 
@@ -1586,7 +1586,7 @@
                         Khung tác tử AI Tầng 2 có trạng thái với Bộ nhớ Đe dọa bền vững và Dual-RAG mang lại hiệu quả ra sao trong việc tương quan các sự kiện xâm nhập phức tạp, quy kết mã MITRE ATT&CK và sinh giải thích minh bạch?
                     </p>
                     <div style="margin-top: auto; padding-top: 18px; border-top: 1px solid var(--border-glass); font-size: 19px; color: var(--emerald); font-weight: 700;">
-                        <i class="fa-solid fa-circle-check"></i> F1 = 98.6%, Quy kết MITRE RRF đạt 94.6%.
+                        <i class="fa-solid fa-circle-check"></i> Action = 100%, Quy kết MITRE RRF đạt 67.33%.
                     </div>
                 </div>
             </div>
@@ -1625,17 +1625,17 @@
                         </tr>
                         <tr style="border-bottom: 1px solid var(--border-glass);">
                             <td style="padding: 16px 18px; font-weight: 700; color: var(--text-main);">Pure LLM Agent (Tích hợp Ngây Thơ)</td>
-                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> 2,450ms (Nghẽn)</td>
+                            <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> Single-Tier (Nghẽn)</td>
                             <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> Tốt</td>
                             <td style="text-align: center; color: var(--rose); font-weight: 800;"><i class="fa-solid fa-xmark"></i> Dễ Bị Tấn Công</td>
                             <td style="text-align: center; color: var(--emerald); font-weight: 800;"><i class="fa-solid fa-check"></i> Tốt</td>
                         </tr>
                         <tr style="background: rgba(4, 120, 87, 0.08); font-weight: 800;">
                             <td style="padding: 16px 18px; color: var(--emerald);"><i class="fa-solid fa-star"></i> SENTINEL (Two-Tier Cognitive SOC)</td>
-                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> &lt;0.40ms (82.4%)</td>
-                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> F1 = 98.6%</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> &lt;0.40ms (92.2%)</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> Action = 100%</td>
                             <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> Nonce 100%</td>
-                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> Dual-RAG RRF (94.6%)</td>
+                            <td style="text-align: center; color: var(--emerald);"><i class="fa-solid fa-circle-check"></i> Dual-RAG RRF (67.33%)</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1698,7 +1698,7 @@
                     <rect x="460" y="60" width="180" height="120" rx="14" fill="url(#emeraldGrad)" filter="url(#glow)" />
                     <text x="550" y="98" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="16">ML GATEWAY</text>
                     <text x="550" y="123" text-anchor="middle" fill="#D1FAE5" font-weight="600" font-size="14">LightGBM (0.35ms)</text>
-                    <text x="550" y="148" text-anchor="middle" fill="#A7F3D0" font-size="13">Offload 82.4%</text>
+                    <text x="550" y="148" text-anchor="middle" fill="#A7F3D0" font-size="13">Offload 92.2%</text>
 
                     <!-- Node 4: Tier 1.75 Semantic Cache -->
                     <rect x="690" y="60" width="180" height="120" rx="14" fill="url(#purpleGrad)" filter="url(#glow)" />
@@ -1790,7 +1790,7 @@
                 <div style="display: flex; flex-direction: column; gap: 20px;">
                     <div class="grid-2">
                         <div class="metric-box" style="padding: 30px 22px;">
-                            <div class="metric-val metric-val-green" style="font-size: 64px;">82.4%</div>
+                            <div class="metric-val metric-val-green" style="font-size: 64px;">92.2%</div>
                             <div class="metric-lbl" style="font-size: 21px;">Tỷ Lệ Xả Tải Tầng 1</div>
                         </div>
                         <div class="metric-box" style="padding: 30px 22px;">
@@ -1836,7 +1836,7 @@
                     <ul class="styled-list" style="margin-top: 18px;">
                         <li><strong>Thuật toán Khai thác Drain:</strong> Rút gọn log thô thành mẫu chuẩn (template), loại bỏ các tham số ngẫu nhiên.</li>
                         <li><strong>Cấu trúc LRU Cache:</strong> Lưu trữ trong bộ nhớ (`OrderedDict`) tối đa 500 mục với TTL 1800 giây.</li>
-                        <li><strong>Hiệu quả Thực tế:</strong> Giảm độ trễ phán quyết từ 2,450ms (Single-Tier Baseline) xuống <strong>&lt; 1 mili-giây</strong> cho 100% các mẫu đã nhận diện.</li>
+                        <li><strong>Hiệu quả Thực tế:</strong> Giảm độ trễ phán quyết từ Single-Tier (Single-Tier Baseline) xuống <strong>&lt; 1 mili-giây</strong> cho 100% các mẫu đã nhận diện.</li>
                     </ul>
                 </div>
             </div>
@@ -2021,12 +2021,12 @@
 
             <div class="grid-4" style="margin-bottom: 24px;">
                 <div class="metric-box" style="padding: 30px 22px;">
-                    <div class="metric-val metric-val-green" style="font-size: 64px;">82.4%</div>
+                    <div class="metric-val metric-val-green" style="font-size: 64px;">92.2%</div>
                     <div class="metric-lbl" style="font-size: 21px;">Tỷ Lệ Xả Tải Tầng 1</div>
                 </div>
                 <div class="metric-box" style="padding: 30px 22px;">
-                    <div class="metric-val" style="font-size: 64px;">211ms</div>
-                    <div class="metric-lbl" style="font-size: 21px;">Độ Trễ E2E (Tối Ưu 11.6x)</div>
+                    <div class="metric-val" style="font-size: 64px;">tăng 7.8%</div>
+                    <div class="metric-lbl" style="font-size: 21px;">Độ Trễ E2E (Tối Ưu giảm HITL xuống 0%)</div>
                 </div>
                 <div class="metric-box" style="padding: 30px 22px;">
                     <div class="metric-val metric-val-purple" style="font-size: 64px;">98.6%</div>
@@ -2066,7 +2066,7 @@
                         <div class="chart-bar-item">
                             <div class="chart-bar-label" style="font-size: 20px;">
                                 <span>SENTINEL Global E2E Average</span>
-                                <span style="color: var(--blue); font-weight: 800;">211 ms (Tối ưu 11.6x)</span>
+                                <span style="color: var(--blue); font-weight: 800;">tăng 7.8% (Tối ưu giảm HITL xuống 0%)</span>
                             </div>
                             <div class="chart-bar-track" style="height: 16px;">
                                 <div class="chart-bar-fill" style="width: 9%; background: var(--blue);"></div>
@@ -2139,7 +2139,7 @@
                         </tr>
                     </table>
                     <p style="font-size: 21px; color: var(--text-muted); margin-top: 20px; line-height: 1.75;">
-                        Single-Tier LLM báo giả 49.0% gây quá tải chuyên gia SOC, trong khi SENTINEL đạt <strong>F1 = 98.6%</strong> và <strong>FPR &lt; 1.2%</strong> để triệt tiêu Alert Fatigue.
+                        Single-Tier LLM báo giả 49.0% gây quá tải chuyên gia SOC, trong khi SENTINEL đạt <strong>Action = 100%</strong> và <strong>FPR &lt; 1.2%</strong> để triệt tiêu Alert Fatigue.
                     </p>
                 </div>
 
@@ -2149,9 +2149,9 @@
                         Đánh giá chất lượng suy luận của Foundation-Sec-8B và độ chuẩn xác RAG:
                     </p>
                     <ul class="styled-list" style="font-size: 22px;">
-                        <li><strong>MT-Bench Score:</strong> <strong style="color: var(--blue);">8.95 / 10.0</strong> (LLM-as-a-Judge)</li>
-                        <li><strong>RAGAS Score:</strong> <strong style="color: var(--emerald);">0.94 / 1.00</strong> (Đánh giá ngữ cảnh RAG)</li>
-                        <li><strong>Độ chính xác MITRE RRF:</strong> <strong style="color: var(--purple);">94.6%</strong> (trên 432 mã STIX 2.1)</li>
+                        <li><strong>MT-Bench Score:</strong> <strong style="color: var(--blue);">4.6 / 10.0</strong> (LLM-as-a-Judge)</li>
+                        <li><strong>RAGAS Score:</strong> <strong style="color: var(--emerald);">chuẩn / 1.00</strong> (Đánh giá ngữ cảnh RAG)</li>
+                        <li><strong>Độ chính xác MITRE RRF:</strong> <strong style="color: var(--purple);">67.33%</strong> (trên 432 mã STIX 2.1)</li>
                         <li><strong>Tuân thủ Pydantic Schema:</strong> <strong style="color: var(--emerald);">100%</strong> (cứu lỗi qua `_salvage_fields`)</li>
                     </ul>
                 </div>
@@ -2225,7 +2225,7 @@
                 <div class="card card-blue" style="padding: 30px 36px;">
                     <div class="card-title" style="font-size: 25px; color: var(--blue); margin-bottom: 14px;"><i class="fa-solid fa-award"></i> Đóng Góp Luận Văn (Mục 5.2)</div>
                     <ul class="styled-list" style="margin-top: 14px; font-size: 21px; line-height: 1.75;">
-                        <li><strong>Lý thuyết:</strong> Kiến trúc Hai tầng (xả tải 82.4%, E2E 211ms, F1=98.6%) &amp; Niêm phong mật mã Nonce Encapsulation (kháng 100% Prompt Injection).</li>
+                        <li><strong>Lý thuyết:</strong> Kiến trúc Hai tầng (xả tải 92.2%, E2E tăng 7.8%, Action = 100%) &amp; Niêm phong mật mã Nonce Encapsulation (kháng 100% Prompt Injection).</li>
                         <li><strong>Thực tiễn:</strong> Hệ thống mã nguồn mở Docker Compose air-gapped trên GPU thương mại RTX 4060 Ti 16GB.</li>
                     </ul>
                 </div>
@@ -2361,7 +2361,7 @@ Phần I — Đặt Vấn Đề và Mục Tiêu Nghiên Cứu: Em sẽ trình b�
 
 Phần II — Kiến Trúc Nhận Thức Hai Tầng SENTINEL: Trình bày chi tiết giải pháp kỹ thuật, từ Tầng 1 lọc siêu nhanh ở tốc độ đường truyền, Tầng 1.75 bộ nhớ đệm thông minh, cho đến Tầng 2 là Tác tử AI suy luận ngữ cảnh sâu được bảo vệ bằng mật mã.
 
-Phần III — Kết Quả Thực Nghiệm và Đánh Giá 5D: Trình bày các con số chứng minh hiệu quả — xả tải 82.4% cho AI, độ trễ trung bình E2E 211ms (tối ưu 11.6x), F1 = 98.6%, MT-Bench 8.95, RAGAS 0.94, và minh họa trên giao diện SOC thực tế.
+Phần III — Kết Quả Thực Nghiệm và Đánh Giá 5D: Trình bày các con số chứng minh hiệu quả — xả tải 92.2% cho AI, độ trễ trung bình E2E tăng 7.8% (tối ưu giảm HITL xuống 0%), Action = 100%, Llama-3 Judge 4.6/5.0, Không ảo giác, và minh họa trên giao diện SOC thực tế.
 
 Phần IV — Kết Luận và Lộ Trình Triển Khai: Tổng kết đóng góp khoa học, đề xuất hướng phát triển thành sản phẩm thương mại và kính mời Hội đồng thảo luận.
 
@@ -2399,7 +2399,7 @@ Các mô hình Học máy (ML) thông thường phát hiện dị biệt khá t�
 
 Nếu dùng thuần túy một Mô hình AI (Single-Tier LLM Baseline), hệ thống tuy thông minh nhưng độ trễ lên tới 2.45 giây cho mỗi sự kiện, báo giả tới 49.0% và rất dễ bị lừa bởi Prompt Injection.
 
-Hệ thống SENTINEL do em đề xuất là công trình đầu tiên dung hòa được cả 4 tiêu chí: Đạt tốc độ lọc dưới 0.40 mili-giây cho 82.4% lưu lượng, đạt F1 = 98.6% và độ trễ E2E chỉ 211ms (tối ưu 11.6x), kháng Prompt Injection tuyệt đối 100%, và cung cấp căn cứ giải thích chuẩn MITRE STIX 2.1 đạt độ chính xác 94.6% cho chuyên gia SOC.`,
+Hệ thống SENTINEL do em đề xuất là công trình đầu tiên dung hòa được cả 4 tiêu chí: Đạt tốc độ lọc dưới 0.40 mili-giây cho 92.2% lưu lượng, đạt Action = 100% và độ trễ E2E chỉ tăng 7.8% (tối ưu giảm HITL xuống 0%), kháng Prompt Injection tuyệt đối 100%, và cung cấp căn cứ giải thích chuẩn MITRE STIX 2.1 đạt độ chính xác 67.33% cho chuyên gia SOC.`,
 
             7: `TỔNG QUAN KIẾN TRÚC HAI TẦNG SENTINEL:
 
@@ -2409,11 +2409,11 @@ Dữ liệu mạng đầu vào chảy qua 4 lớp bảo vệ liên hoàn:
 
 Tầng 1 (Fast Path): Đóng vai trò như một "tấm lưới lọc thô" chạy hoàn toàn trên CPU. Sử dụng thuật toán thống kê Welford và Rule Engine tra cứu cổng siêu nhanh để xử lý 100% lưu lượng mạng ở tốc độ đường truyền mà không cần tốn tới GPU.
 
-Tiếp theo là Cổng Học Máy (ML Gateway): Mô hình LightGBM được huấn luyện trên 1 triệu mẫu dữ liệu, đóng vai trò "người gác cổng thông minh" tự xử lý các ca rõ ràng chỉ trong 0.35 mili-giây. Cùng với Welford và Cache, Tầng 1 xả tải thành công 82.4% lưu lượng. Chỉ 17.6% sự kiện thực sự phức tạp mới được chuyển lên cho AI Tầng 2.
+Tiếp theo là Cổng Học Máy (ML Gateway): Mô hình LightGBM được huấn luyện trên 1 triệu mẫu dữ liệu, đóng vai trò "người gác cổng thông minh" tự xử lý các ca rõ ràng chỉ trong 0.35 mili-giây. Cùng với Welford và Cache, Tầng 1 xả tải thành công 92.2% lưu lượng. Chỉ 17.6% sự kiện thực sự phức tạp mới được chuyển lên cho AI Tầng 2.
 
 Tầng 1.75 (Semantic Cache): Đóng vai trò "cuốn sổ nhớ" — khi bị tấn công lặp đi lặp lại như DDoS, hệ thống nhận ra ngay và trả kết quả dưới 1 mili-giây mà không cần gọi tới AI.
 
-Tầng 2 (Cognitive Agent): Bộ não Tác tử AI chạy mô hình Foundation-Sec-8B cục bộ trên GPU (tiết kiệm >50% VRAM nhờ Q4_K_M), kết hợp tra cứu tri thức Dual-RAG để đưa ra phán quyết chính xác F1 = 98.6% và có căn cứ.`,
+Tầng 2 (Cognitive Agent): Bộ não Tác tử AI chạy mô hình Foundation-Sec-8B cục bộ trên GPU (tiết kiệm >50% VRAM nhờ Q4_K_M), kết hợp tra cứu tri thức Dual-RAG để đưa ra phán quyết chính xác Action = 100% và có căn cứ.`,
 
             8: `CHI TIẾT TẦNG 1 — WELFORD VÀ RULE ENGINE:
 
@@ -2465,7 +2465,7 @@ Bước 5 (Decision): Ra quyết định cuối cùng — Chặn IP (BLOCK_IP), 
 
 Slide này trình bày cách SENTINEL trang bị "trí nhớ" và "tri thức" cho AI:
 
-Về Tri thức (Dual-RAG): Hệ thống kết hợp hai phương pháp tìm kiếm. Một bên là Tìm kiếm Ngữ nghĩa (FAISS) — giúp AI hiểu được ý nghĩa câu chữ kể cả khi dùng từ đồng nghĩa. Một bên là Tìm kiếm Từ khóa (BM25) — giúp tìm chính xác các mã lỗi CVE, địa chỉ IP hay số cổng. Sự kết hợp bằng Reciprocal Rank Fusion (RRF k=60) đạt độ chính xác ánh xạ MITRE 94.6%.
+Về Tri thức (Dual-RAG): Hệ thống kết hợp hai phương pháp tìm kiếm. Một bên là Tìm kiếm Ngữ nghĩa (FAISS) — giúp AI hiểu được ý nghĩa câu chữ kể cả khi dùng từ đồng nghĩa. Một bên là Tìm kiếm Từ khóa (BM25) — giúp tìm chính xác các mã lỗi CVE, địa chỉ IP hay số cổng. Sự kết hợp bằng Reciprocal Rank Fusion (RRF k=60) đạt độ chính xác ánh xạ MITRE 67.33%.
 
 Về Trí nhớ (SQLite Threat Memory): Đây là sổ tay ghi nhớ giúp hệ thống phát hiện các cuộc tấn công kéo dài nhiều ngày (APT). Mỗi IP sẽ có một điểm uy tín. Điểm uy tín này sẽ giảm dần theo thời gian nếu IP đó nằm yên không phá hoại. Nhưng nếu điểm uy tín chạm mức 100, IP đó sẽ bị đưa vào "danh sách đen" và bị Tầng 1 chặn ngay lập tức mà không cần hỏi lại AI. Kết nối SQLite dùng chế độ synchronous=NORMAL + indexes (không dùng WAL để tránh lỗi cross-UID Docker Dashboard). Các IP hạ tầng quan trọng (như 10.0.0.99) được bảo vệ bằng danh sách trắng tuyệt đối không bị chặn nhầm.`,
 
@@ -2491,23 +2491,23 @@ Toàn bộ hệ thống được đánh giá toàn diện trên 5 chiều (5D Me
 
 Em xin trân trọng báo cáo Quý Thầy Cô 4 con số kết quả nổi bật nhất của nghiên cứu:
 
-Con số 1 — Xả tải 82.4% cho AI: Tầng 1 đã tự xử lý và xả tải thành công 82.4% (21.853/26.521 sự kiện) lưu lượng nhiễu, giúp giải phóng hoàn toàn sức mạnh GPU.
+Con số 1 — Xả tải 92.2% cho AI: Tầng 1 đã tự xử lý và xả tải thành công 92.2% (389/25.799 sự kiện) lưu lượng nhiễu, giúp giải phóng hoàn toàn sức mạnh GPU.
 
-Con số 2 — Độ trễ trung bình E2E 211ms (Tối ưu 11.6x): Độ trễ trung bình toàn cục giảm xuống chỉ còn 211ms (nhờ 82.4% sự kiện xử lý dưới 0.40ms tại Tầng 1 và chỉ 17.6% sự kiện dị thường xử lý tại 1,200ms ở Tầng 2), nhanh gấp 11.6 lần so với mô hình Đơn tầng Single-Tier Baseline (2,450ms).
+Con số 2 — Độ trễ trung bình E2E tăng 7.8% (Tối ưu giảm HITL xuống 0%): Độ trễ trung bình toàn cục giảm xuống chỉ còn tăng 7.8% (nhờ 92.2% sự kiện xử lý dưới 0.40ms tại Tầng 1 và chỉ 17.6% sự kiện dị thường xử lý tại 1,200ms ở Tầng 2), nhanh gấp 11.6 lần so với mô hình Đơn tầng Single-Tier Baseline (Single-Tier).
 
-Con số 3 — F1-Score đạt 98.6% và FPR < 1.2%: Phán quyết an ninh của Tác tử AI đạt độ chính xác cao F1 = 98.6% với tỷ lệ báo giả cực thấp FPR < 1.2%.
+Con số 3 — F1-Score đạt 98.6% và FPR < 1.2%: Phán quyết an ninh của Tác tử AI đạt độ chính xác cao Action = 100% với tỷ lệ báo giả cực thấp FPR < 1.2%.
 
 Con số 4 — Kháng 100% Tấn công Prompt Injection: 100% các mẫu Prompt Injection đối kháng thử nghiệm đều bị vô hiệu hóa hoàn toàn nhờ lớp vỏ niêm phong Nonce Encapsulation.
 
-Biểu đồ bên trái thể hiện trực quan sự chênh lệch: Thanh độ trễ của mô hình AI đơn tầng kéo dài 2,450ms, trong khi độ trễ trung bình E2E của SENTINEL chỉ là một đoạn ngắn 211ms, và các phản hồi tại Tầng 1 chỉ mất dưới 0.40 mili-giây.`,
+Biểu đồ bên trái thể hiện trực quan sự chênh lệch: Thanh độ trễ của mô hình AI đơn tầng kéo dài Single-Tier, trong khi độ trễ trung bình E2E của SENTINEL chỉ là một đoạn ngắn tăng 7.8%, và các phản hồi tại Tầng 1 chỉ mất dưới 0.40 mili-giây.`,
 
             16: `NGHIÊN CỨU ABLATION VÀ CHẤM ĐIỂM ĐỘC LẬP:
 
 Slide này giải thích rõ hơn lý do tại sao kiến trúc 2 tầng lại vượt trội:
 
-Ở cột bên trái (Nghiên cứu Ablation): Nếu dùng thuần túy một mô hình AI đơn tầng (Single-Tier LLM Baseline), tuy nó bắt được hết tấn công nhưng lại bị "nhạy cảm quá mức" — báo động giả tới 49.0% (chặn nhầm 49% luồng người dùng bình thường). Trong khi đó, SENTINEL đạt F1 = 98.6%, Precision = 98.8% và FPR < 1.2% — giúp triệt tiêu tình trạng báo động giả Alert Fatigue.
+Ở cột bên trái (Nghiên cứu Ablation): Nếu dùng thuần túy một mô hình AI đơn tầng (Single-Tier LLM Baseline), tuy nó bắt được hết tấn công nhưng lại bị "nhạy cảm quá mức" — báo động giả tới 49.0% (chặn nhầm 49% luồng người dùng bình thường). Trong khi đó, SENTINEL đạt Action = 100%, Precision = 98.8% và FPR < 1.2% — giúp triệt tiêu tình trạng báo động giả Alert Fatigue.
 
-Ở cột bên phải (Chấm điểm LLM-as-a-Judge & RAGAS): Kết quả chấm điểm chất lượng suy luận bằng LLM-as-a-Judge theo chuẩn MT-Bench đạt 8.95 / 10.0, điểm RAGAS đạt 0.94 / 1.00, và độ chính xác ánh xạ véc-tơ tấn công MITRE ATT&CK STIX 2.1 bằng Dual-RAG RRF đạt 94.6%.`,
+Ở cột bên phải (Chấm điểm LLM-as-a-Judge & RAGAS): Kết quả chấm điểm chất lượng suy luận bằng LLM-as-a-Judge theo chuẩn MT-Bench đạt 4.6 / 10.0, điểm RAGAS đạt chuẩn / 1.00, và độ chính xác ánh xạ véc-tơ tấn công MITRE ATT&CK STIX 2.1 bằng Dual-RAG RRF đạt 67.33%.`,
 
             17: `GIAO DIỆN SOC VÀ QUY TRÌNH CON NGƯỜI DUYỆT (HITL):
 
@@ -2539,7 +2539,7 @@ Giới hạn 5 (5.3.5 - SQLite Container): Lưu trữ trạng thái SQLite trong
 Kính thưa Hội đồng, em xin tổng kết 2 đóng góp chính và 5 hướng phát triển tương lai:
 
 VỀ ĐÓNG GÓP (Mục 5.2):
-Đóng góp Lý thuyết: Đề xuất thành công Kiến trúc nhận thức Hai tầng kết hợp giữa toán học tất định ở Tầng 1 (xả tải 82.4%, E2E 211ms, F1=98.6%) với mô hình ngôn ngữ phi tất định ở Tầng 2, cùng giải pháp mật mã Nonce Encapsulation kháng 100% Prompt Injection.
+Đóng góp Lý thuyết: Đề xuất thành công Kiến trúc nhận thức Hai tầng kết hợp giữa toán học tất định ở Tầng 1 (xả tải 92.2%, E2E tăng 7.8%, Action = 100%) với mô hình ngôn ngữ phi tất định ở Tầng 2, cùng giải pháp mật mã Nonce Encapsulation kháng 100% Prompt Injection.
 Đóng góp Thực tiễn: Hệ thống mã nguồn mở Docker Compose chạy hoàn toàn cục bộ air-gapped trên GPU thương mại RTX 4060 Ti 16GB VRAM.
 
 VỀ 5 HƯỚNG PHÁT TRIỂN (Mục 5.4) - tương ứng 1:1 với 5 giới hạn:

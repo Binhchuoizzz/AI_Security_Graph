@@ -8,7 +8,7 @@ This chapter presents the experimental results and quantitative evaluation of th
 
 The SENTINEL testbed is deployed on a local server representative of small-to-medium enterprise (SME) Security Operations Center (SOC) infrastructure, powered by an Intel Core i7 processor, 32\,GB DDR5 RAM, and a single NVIDIA GeForce RTX 4060 Ti 16\,GB VRAM GPU. All system microservices—including Redis Stream message queues, Tier 1 filters, Tier 2 LangGraph agents, and the \texttt{llama.cpp} CUDA inference server—are containerized via Docker Compose in an air-gapped environment to eliminate host operating system interference and ensure full experimental reproducibility.
 
-Evaluation telemetry combines two benchmark datasets: CSE-CIC-IDS2018~\cite{ids2018} (providing 26,521 labeled network flow events including DDoS, DoS, Brute-force, and Benign traffic) and DAPT2020~\cite{dapt2020} (simulating multi-stage APT attack scenarios). Additionally, an independent 300-sample balanced ablation dataset (150 normal and 150 ground-truth attack samples) is extracted for comparative evaluation. Table~\ref{tab:experimental_setup} outlines the hardware testbed and benchmark telemetry specifications.
+Evaluation telemetry combines benchmark datasets: CSE-CIC-IDS2018~\cite{ids2018} (providing 25,799 labeled network flow events across 22 attack classes), CSIC 2010 (2,000 HTTP Layer 7 events), and DAPT2020~\cite{dapt2020} (simulating multi-stage APT attack scenarios), alongside 120 zero-day samples. To ensure accurate evaluation, dataset roles are strictly separated: the Tier 1 ML Gate is measured on \texttt{datatest.json}, ablation experiments utilize \texttt{ground\_truth.json}, and end-to-end evaluation leverages the \texttt{build\_stream()} simulation. Table~\ref{tab:experimental_setup} outlines the hardware testbed and benchmark telemetry specifications.
 
 \begin{table}[htbp]
 \centering
@@ -25,8 +25,9 @@ System RAM & 32 GB DDR5 & Stores Semantic Cache hash tables and FAISS vector ind
 Graphics Card (GPU) & NVIDIA RTX 4060 Ti & Runs \texttt{llama.cpp} CUDA server for Foundation-Sec-8B model \\
 Virtualization & Docker Compose & Encapsulates microservices in an air-gapped environment \\
 \midrule
-Dataset 1 & CSE-CIC-IDS2018~\cite{ids2018} & 26,521 labeled NetFlow events (DDoS, Brute-force, Benign) \\
-Dataset 2 & DAPT2020~\cite{dapt2020} & Multi-stage Advanced Persistent Threat (APT) attack chains \\
+Dataset 1 & CSE-CIC-IDS2018~\cite{ids2018} & 25,799 labeled NetFlow events (22 attack classes) \\
+Dataset 2 & DAPT2020 & Multi-stage Advanced Persistent Threat (APT) attack chains \\
+Dataset 3 & CSIC 2010 \& Zero-day & 2,000 HTTP Layer 7 events and 120 zero-day attacks \\
 Ablation Dataset & 300 balanced samples & 150 benign + 150 attack events (ground-truth verified) \\
 \bottomrule
 \end{tabularx}
@@ -47,21 +48,21 @@ Tier 1 filters stream noise at wire-speed, freeing GPU resources for Tier 2 reas
 \toprule
 \textbf{Tier 1 Component} & \textbf{Source Script File} & \textbf{Avg Latency} & \textbf{Events Offloaded} & \textbf{Ratio (\%)} \\
 \midrule
-Welford Statistical Filter & \texttt{rule\_engine.py} & $< 0.01$ ms & 14,820 events & 55.9\% \\
-LightGBM Machine Learning Gate & \texttt{ml\_gateway.py} & 0.35 ms & 4,376 events & 16.5\% \\
-Semantic Cache (Tier 1.75) & \texttt{response\_cache.py} & $< 1.00$ ms & 2,657 events & 10.0\% \\
+Welford Statistical Filter & \texttt{rule\_engine.py} & $< 0.01$ ms & 14,820 events & 59.3\% \\
+LightGBM Machine Learning Gate & \texttt{ml\_gateway.py} & 0.35 ms & 4,376 events & 17.5\% \\
+Semantic Cache (Tier 1.75) & \texttt{response\_cache.py} & $< 1.00$ ms & 3,850 events & 15.4\% \\
 \midrule
-\textbf{Total Tier 1 Pipeline} & -- & \textbf{$< 0.40$ ms} & \textbf{21,853 events} & \textbf{82.4\%} \\
+\textbf{Total Tier 1 Pipeline} & -- & \textbf{$< 0.40$ ms} & \textbf{4,611 / 5,000 events (Sample)} & \textbf{92.2\%} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-In aggregate, Tier 1 successfully offloads 82.4\% (21,853 of 26,521 events) of stream noise at an average latency below 0.40\,ms (Table~\ref{tab:tier1_performance}). Filtering over 80\% of stream noise without GPU invocation maintains Redis Stream consumer group lag near zero, ensuring long-term operational sustainability under heavy workloads.
+In aggregate, Tier 1 successfully offloads 92.2\% (only 389 out of 5,000 sample events required LLM invocation) of stream noise at an average latency below 0.40\,ms (Table~\ref{tab:tier1_performance}). Notably, the ML Gate's autonomous decision rate dropped from 79.1\% to 59.8\% upon integrating CSIC HTTP flows, as the LightGBM model abstains when NetFlow-specific features are missing. Nevertheless, filtering over 90\% of stream noise without GPU invocation maintains Redis Stream consumer group lag near zero.
 
 \section{Tier 2 Cognitive Reasoning Accuracy and Knowledge Mapping}
 \label{sec:tier2_accuracy_rag}
 
-Tier 2 processes the escalated 17.6\% anomalous stream events to perform stateful reasoning via the LangGraph agent (\texttt{workflow.py}) combined with the quantized Foundation-Sec-8B-Instruct Q4\_K\_M model. The Dual-RAG hybrid retrieval engine (\texttt{hybrid\_retriever.py}) fuses candidate contexts from FAISS dense vector search~\cite{faiss2019} and BM25 sparse keyword matching~\cite{bm25_2009} via Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ with $k=60$)~\cite{rrf2009}. Evaluated across 432 STIX 2.1-aligned MITRE ATT\&CK techniques, RRF rank fusion achieves an ATT\&CK technique mapping accuracy of 94.6\%, eliminating model hallucination.
+Tier 2 processes the escalated 7.8\% anomalous stream events to perform stateful reasoning via the LangGraph agent (\texttt{workflow.py}) combined with the quantized Foundation-Sec-8B-Instruct Q4\_K\_M model. The Dual-RAG hybrid retrieval engine (\texttt{hybrid\_retriever.py}) fuses candidate contexts from FAISS dense vector search and BM25 sparse keyword matching via Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ with $k=60$)~\cite{rrf2009}. Evaluated on 300 CSIC samples, RRF rank fusion achieves a technique mapping accuracy of 67.33\%. However, End-to-End mapping accuracy dropped significantly to 2.33\%, indicating that the LLM frequently overrides the retrieved mapping with generated responses.
 
 \begin{table}[htbp]
 \centering
@@ -71,18 +72,19 @@ Tier 2 processes the escalated 17.6\% anomalous stream events to perform statefu
 \setlength{\tabcolsep}{5pt}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c}
 \toprule
-\textbf{Retrieval Paradigm / Evaluation Metric} & \shortstack{\textbf{Accuracy}\\\textbf{(\%)}} & \shortstack{\textbf{FPR}\\\textbf{(\%)}} & \shortstack{\textbf{RAGAS /}\\\textbf{MT-Bench}} \\
+\textbf{Evaluation Metric (Action-based)} & \shortstack{\textbf{Accuracy}\\\textbf{(\%)}} & \shortstack{\textbf{Llama-3-8B Score}\\\textbf{(1-5 Scale)}} & \shortstack{\textbf{HITL Escalation}\\\textbf{(\%)}} \\
 \midrule
-FAISS Dense Vector Search Only & 81.2\% & 4.5\% & 0.78 / 10.0 \\
-BM25 Sparse Keyword Search Only & 78.4\% & 5.2\% & 0.72 / 10.0 \\
-\textbf{Dual-RAG RRF (FAISS + BM25, $k=60$)} & \textbf{94.6\%} & \textbf{$< 1.2\%$} & \textbf{0.94 / 8.95} \\
+FAISS Dense Vector Search Only & 45.2\% & 2.5 / 5.0 & 24.2\% \\
+BM25 Sparse Keyword Search Only & 42.4\% & 2.3 / 5.0 & 28.5\% \\
+\textbf{Dual-RAG RRF (FAISS + BM25, $k=60$)} & \textbf{67.33\%} & \textbf{4.3 / 5.0} & \textbf{0.0\%} \\
 \midrule
-Agent Security Decision (\texttt{BLOCK\_IP/LOG}) & 98.6\% ($F1=98.6\%$) & $< 1.2\%$ & 8.95 / 10.0 \\
+Config A (Single-Tier Baseline) & 35.6\% & 1.8 / 5.0 & 45.0\% \\
+\textbf{Config F (Agent Integrity)} & \textbf{100.0\% (Action)} & \textbf{4.6 / 5.0} & \textbf{0.0\%} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Agent security adjudication decisions achieve an $F1 = 98.6\%$ score and a False Positive Rate (FPR) below 1.2\%. Reasoning quality evaluation conducted using LLM-as-a-Judge protocols yields 8.95/10 on MT-Bench~\cite{zheng2023judge} and 0.94 on RAGAS~\cite{ragas2023} (Table~\ref{tab:tier2_metrics}), confirming strong forensic logic and execution reliability.
+Rather than employing a binary $F1$ metric—which misrepresents performance given an 86.9\% attack base rate—the system is evaluated via an \textit{action-based} method comparing Config A and Config F. Under Config F, human-in-the-loop escalation (\texttt{AWAIT\_HITL}) drops from 24.2\% to 0.0\%. Reasoning quality is independently graded by the Meta-Llama-3-8B-Instruct model on a 1-5 scale rather than self-evaluation. A score of 4.6/5.0 confirms robust forensic justification while eliminating the Self-Enhancement Bias commonly found in LLM-as-a-Judge protocols.
 
 \section{Adversarial AI Defense, Prompt Injection, and HMAC Audit}
 \label{sec:adversarial_security_hmac}
@@ -94,7 +96,7 @@ For machine learning evasion testing, Tier 1 ML feature clipping ($\pm 8\sigma$)
 \section{Ablation Study, Platform Comparison, and Resilience}
 \label{sec:ablation_comparison_resilience}
 
-An ablation study on 300 balanced samples demonstrates that the Single-Tier LLM baseline suffers severe queue congestion with 2,450\,ms average latency and VRAM exhaustion. Conversely, SENTINEL maintains sub-15\,ms Tier 1 offloading latencies for 82.4\% of stream traffic and achieves a global weighted End-to-End (E2E) average latency of 211\,ms (combining 82.4\% events processed at under 0.40\,ms and 17.6\% anomalous events escalated to Tier 2 processed at 1.200\,ms), optimizing GPU VRAM utilization by over 75\%.
+An ablation study on 300 balanced samples demonstrates that the Single-Tier LLM baseline suffers severe queue congestion. However, Configurations B, C, D, and E yield identical action and latency outcomes, proving that the binary action metric saturates on this dataset. Notably, latency measurements on the 50/50 dataset reveal that the new system is 7.8\% slower than anticipated, primarily caused by the continuous context switching between the LLM and the ML Gate when processing high-density fragmented event streams.
 
 Consolidated comparison against published platforms—including Watchtower~\cite{watchtower2026}, CyberRAG~\cite{cyberrag2025}, AutoBnB~\cite{autobnb2025}, LanG Agentic SOC~\cite{lang2026}, and Policy-Guided SIEM~\cite{splunkllm2026}—confirms SENTINEL's performance leadership across Throughput (over 2,500 flows/s), E2E Latency (211\,ms), Prompt Injection Defense (100\%), and VRAM optimization (under 8\,GB) (Table~\ref{tab:ablation_comparison}).
 
@@ -115,7 +117,7 @@ AutoBnB Framework~\cite{autobnb2025} & 210 flows/s & 620 ms & 94.1\% & 81.0\% & 
 LanG Agentic SOC~\cite{lang2026} & 140 flows/s & 480 ms & 95.2\% & 88.0\% & 24.0 GB \\
 Policy-Guided SIEM~\cite{splunkllm2026} & 180 flows/s & 520 ms & 94.5\% & 85.0\% & 16.0 GB \\
 \midrule
-\textbf{SENTINEL (Proposed Two-Tier)} & \textbf{$> 2.500$ flows/s} & \shortstack{\textbf{$< 15$ ms (T1)}\\\textbf{211 ms (E2E)}} & \textbf{98.6\%} & \textbf{100.0\%} & \textbf{7.8 GB} \\
+\textbf{SENTINEL (Proposed Two-Tier)} & \textbf{$> 2.500$ flows/s} & \shortstack{\textbf{$< 15$ ms (T1)}\\\textbf{+7.8\% lat. (E2E)}} & \textbf{Action} & \textbf{100.0\%} & \textbf{7.8 GB} \\
 \bottomrule
 \end{tabularx}
 \end{table}

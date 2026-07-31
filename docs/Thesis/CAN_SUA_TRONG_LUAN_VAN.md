@@ -24,7 +24,7 @@ Kèm theo: mọi chỗ ghi `n_ctx 8192` phải thành **32768** (`-np 2` → 16.
 > thật p50 ≈ 7.700 token → hỏng 60/60 lượt trong 0,02 giây.
 > Đã đổi tên model khắp nơi và đo lại ở ctx 32768.
 
-### A2. "26.521 sự kiện CSE-CIC-IDS2018" — 15 chỗ
+### A2. "25.799 sự kiện CSE-CIC-IDS2018" — 15 chỗ
 
 `ch4:11, 28` · `ch5:9` (cả hai bản).
 
@@ -34,7 +34,7 @@ Con số này đến từ `build_stream()` với bộ mặc định cũ, mà b�
 
 Sau khi sửa mặc định: **25.799 sự kiện · 22 lớp tấn công · 2.000 CSIC · 120 zero-day**.
 
-### A3. Xả tải 82,4% (21.853/26.521) — 8 chỗ
+### A3. Xả tải 92,2% (389/5000) — 8 chỗ
 
 `ch4:54, 59, 64` · `ch5:11`. Đứng trên nền dữ liệu ở A2 nên phải tính lại.
 

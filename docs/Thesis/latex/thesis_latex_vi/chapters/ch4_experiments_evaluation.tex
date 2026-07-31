@@ -8,7 +8,7 @@ Chương này trình bày toàn bộ kết quả thực nghiệm và đánh giá
 
 Hệ thống SENTINEL được triển khai thử nghiệm trên môi trường máy chủ cục bộ đại diện cho trung tâm điều hành an ninh (SOC) doanh nghiệp vừa và nhỏ, trang bị bộ vi xử lý Intel Core i7, 32\,GB RAM DDR5 và card đồ họa NVIDIA GeForce RTX 4060 Ti 16\,GB VRAM. Toàn bộ các vi dịch vụ—bao gồm hàng đợi Redis Stream, bộ lọc Tầng 1, tác tử LangGraph Tầng 2 và cỗ máy suy luận \texttt{llama.cpp} biên dịch cờ CUDA—được ảo hóa bằng Docker Compose trong môi trường khép kín (air-gapped) nhằm loại bỏ sự can thiệp ngẫu nhiên từ hệ điều hành và bảo đảm tính tái lập của thực nghiệm.
 
-Tập dữ liệu kiểm thử được kết hợp từ hai bộ benchmark an toàn thông tin uy tín là CSE-CIC-IDS2018~\cite{ids2018} (cung cấp 26.521 sự kiện luồng mạng gán nhãn bao gồm DDoS, DoS, Brute-force và Benign) và DAPT2020~\cite{dapt2020} (mô phỏng chuỗi tấn công APT đa giai đoạn rải rác). Bên cạnh đó, một tập dữ liệu Ablation gồm 300 mẫu cân bằng (150 mẫu bình thường và 150 mẫu tấn công ground-truth) được trích xuất độc lập phục vụ các bài đánh giá đối chứng chuyên sâu. Thông số chi tiết môi trường thực nghiệm được tổng hợp trong Bảng~\ref{tab:experimental_setup}.
+Tập dữ liệu kiểm thử được kết hợp từ các bộ benchmark an toàn thông tin uy tín là CSE-CIC-IDS2018~\cite{ids2018} (cung cấp 25.799 sự kiện luồng mạng gán nhãn thuộc 22 lớp tấn công), CSIC 2010 (2.000 sự kiện HTTP Layer 7) và DAPT2020~\cite{dapt2020} (mô phỏng chuỗi tấn công APT đa giai đoạn), cùng với 120 mẫu zero-day. Để đánh giá chính xác, nghiên cứu chia tách vai trò dữ liệu: Cổng ML (Tầng 1) được đo lường trên tập \texttt{datatest.json}, các thực nghiệm đối chứng (Ablation) 300 mẫu dùng \texttt{ground\_truth.json}, và đánh giá toàn tuyến (End-to-End) sử dụng hàm mô phỏng luồng \texttt{build\_stream()}. Thông số chi tiết môi trường thực nghiệm được tổng hợp trong Bảng~\ref{tab:experimental_setup}.
 
 \begin{table}[htbp]
 \centering
@@ -25,8 +25,9 @@ Bộ nhớ RAM & 32 GB DDR5 & Lưu trữ cấu trúc Semantic Cache và chỉ m�
 Card đồ họa (GPU) & NVIDIA RTX 4060 Ti & Chạy cỗ máy suy luận \texttt{llama.cpp} CUDA Foundation-Sec-8B \\
 Ảo hóa & Docker Compose & Đóng gói microservices trong môi trường air-gapped \\
 \midrule
-Tập dữ liệu 1 & CSE-CIC-IDS2018~\cite{ids2018} & 26.521 sự kiện luồng mạng (DDoS, Brute-force, Benign) \\
-Tập dữ liệu 2 & DAPT2020~\cite{dapt2020} & Chuỗi tấn công đa giai đoạn rải rác theo thời gian \\
+Tập dữ liệu 1 & CSE-CIC-IDS2018~\cite{ids2018} & 25.799 sự kiện luồng mạng (22 lớp tấn công) \\
+Tập dữ liệu 2 & DAPT2020 & Chuỗi tấn công đa giai đoạn rải rác theo thời gian \\
+Tập dữ liệu 3 & CSIC 2010 \& Zero-day & 2.000 sự kiện HTTP Layer 7 và 120 mẫu tấn công mới \\
 Ablation Dataset & 300 mẫu cân bằng & 150 mẫu bình thường + 150 mẫu tấn công (ground-truth) \\
 \bottomrule
 \end{tabularx}
@@ -47,21 +48,21 @@ Tầng 1 vận hành với mục tiêu sàng lọc triệt để lưu lượng n
 \toprule
 \textbf{Thành phần Tầng 1} & \textbf{Tệp nguồn Mã lệnh} & \textbf{Độ trễ TB} & \textbf{Số lượng Xả tải} & \textbf{Tỷ lệ (\%)} \\
 \midrule
-Bộ lọc Thống kê Welford & \texttt{rule\_engine.py} & $< 0.01$ ms & 14.820 sự kiện & 55.9\% \\
-Cổng Học máy LightGBM & \texttt{ml\_gateway.py} & 0.35 ms & 4.376 sự kiện & 16.5\% \\
-Semantic Cache (Tầng 1.75) & \texttt{response\_cache.py} & $< 1.00$ ms & 2.657 sự kiện & 10.0\% \\
+Bộ lọc Thống kê Welford & \texttt{rule\_engine.py} & $< 0.01$ ms & 14.820 sự kiện & 59.3\% \\
+Cổng Học máy LightGBM & \texttt{ml\_gateway.py} & 0.35 ms & 4.376 sự kiện & 17.5\% \\
+Semantic Cache (Tầng 1.75) & \texttt{response\_cache.py} & $< 1.00$ ms & 3.850 sự kiện & 15.4\% \\
 \midrule
-\textbf{Tổng cộng Tầng 1} & -- & \textbf{$< 0.40$ ms} & \textbf{21.853 sự kiện} & \textbf{82.4\%} \\
+\textbf{Tổng cộng Tầng 1} & -- & \textbf{$< 0.40$ ms} & \textbf{4.611 / 5.000 sự kiện (Sample)} & \textbf{92.2\%} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Tổng hợp toàn bộ Tầng 1 đã xả tải thành công 82.4\% (21.853 trên tổng số 26.521 sự kiện) lưu lượng nhiễu ở độ trễ trung bình dưới 0.40\,ms (Bảng~\ref{tab:tier1_performance}). Việc loại bỏ hơn 80\% sự kiện mà không cần gọi đến GPU giúp duy trì độ trễ duy trì (\texttt{lag}) của Redis consumer group gần như bằng 0, bảo đảm hệ thống vận hành bền vững dưới tải cao.
+Tổng hợp toàn bộ Tầng 1 đã xả tải thành công 92.2\% (chỉ 389 trên 5.000 sự kiện mẫu phải gọi đến LLM) lưu lượng nhiễu ở độ trễ trung bình dưới 0.40\,ms (Bảng~\ref{tab:tier1_performance}). Đáng chú ý, độ tự quyết định của Cổng ML giảm từ 79.1\% xuống 59.8\% khi tích hợp luồng HTTP CSIC do mô hình LightGBM tự động từ chối phán quyết khi thiếu hụt các trường đặc trưng NetFlow. Dù vậy, việc loại bỏ hơn 90\% sự kiện mà không cần gọi đến GPU giúp duy trì độ trễ \texttt{lag} của Redis consumer group gần như bằng 0.
 
 \section{Độ chính xác Suy luận Nhận thức Tầng 2 và Ánh xạ Tri thức}
 \label{sec:tier2_accuracy_rag}
 
-Tầng 2 tiếp nhận 17.6\% sự kiện dị thường được nâng cấp từ Tầng 1 để thực hiện suy luận có trạng thái bằng tác tử LangGraph (\texttt{workflow.py}) kết hợp mô hình Foundation-Sec-8B-Instruct Q4\_K\_M. Khung truy xuất lai Dual-RAG (\texttt{hybrid\_retriever.py}) hợp nhất kết quả giữa vector FAISS (dense semantic~\cite{faiss2019}) và BM25 (sparse keyword~\cite{bm25_2009}) bằng thuật toán Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ với $k=60$)~\cite{rrf2009}. Thử nghiệm trên 432 kỹ thuật MITRE ATT\&CK chuẩn STIX 2.1 xác nhận RRF đạt độ chính xác ánh xạ véc-tơ tấn công 94.6\%, triệt tiêu hiện tượng hư cấu ngôn ngữ.
+Tầng 2 tiếp nhận 7.8\% sự kiện dị thường được nâng cấp từ Tầng 1 để thực hiện suy luận có trạng thái bằng tác tử LangGraph (\texttt{workflow.py}) kết hợp mô hình Foundation-Sec-8B-Instruct Q4\_K\_M. Khung truy xuất lai Dual-RAG (\texttt{hybrid\_retriever.py}) hợp nhất kết quả giữa vector FAISS và BM25 bằng thuật toán Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ với $k=60$)~\cite{rrf2009}. Thử nghiệm trên 300 mẫu CSIC cho thấy RRF đạt độ chính xác ánh xạ véc-tơ tấn công 67.33\%. Tuy nhiên, độ chính xác ánh xạ Toàn tuyến (End-to-End) giảm đột ngột xuống mức 2.33\%, cho thấy LLM thường xuyên tự sinh câu trả lời đè lên bộ ánh xạ tri thức gốc.
 
 \begin{table}[htbp]
 \centering
@@ -71,18 +72,19 @@ Tầng 2 tiếp nhận 17.6\% sự kiện dị thường được nâng cấp t�
 \setlength{\tabcolsep}{5pt}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c}
 \toprule
-\textbf{Phương pháp / Tiêu chí Đánh giá} & \shortstack{\textbf{Độ chính}\\\textbf{xác (\%)}} & \shortstack{\textbf{Tỷ lệ Báo}\\\textbf{giả (\%)}} & \shortstack{\textbf{Điểm số RAGAS /}\\\textbf{MT-Bench}} \\
+\textbf{Chỉ số Đánh giá (Action-based)} & \shortstack{\textbf{Độ chính}\\\textbf{xác (\%)}} & \shortstack{\textbf{Điểm Llama-3-8B}\\\textbf{(Thang 1-5)}} & \shortstack{\textbf{Tỷ lệ Chuyển}\\\textbf{HITL (\%)}} \\
 \midrule
-FAISS Vector Search Đơn lẻ & 81.2\% & 4.5\% & 0.78 / 10.0 \\
-BM25 Keyword Search Đơn lẻ & 78.4\% & 5.2\% & 0.72 / 10.0 \\
-\textbf{Dual-RAG RRF (FAISS + BM25, $k=60$)} & \textbf{94.6\%} & \textbf{$< 1.2\%$} & \textbf{0.94 / 8.95} \\
+FAISS Vector Search Đơn lẻ & 45.2\% & 2.5 / 5.0 & 24.2\% \\
+BM25 Keyword Search Đơn lẻ & 42.4\% & 2.3 / 5.0 & 28.5\% \\
+\textbf{Dual-RAG RRF (FAISS + BM25, $k=60$)} & \textbf{67.33\%} & \textbf{4.3 / 5.0} & \textbf{0.0\%} \\
 \midrule
-Phán quyết Tác tử (\texttt{BLOCK\_IP/LOG}) & 98.6\% ($F1=98.6\%$) & $< 1.2\%$ & 8.95 / 10.0 \\
+Cấu hình A (Chỉ LLM Đơn tầng) & 35.6\% & 1.8 / 5.0 & 45.0\% \\
+\textbf{Cấu hình F (Tác tử Toàn vẹn)} & \textbf{100.0\% (Hành động)} & \textbf{4.6 / 5.0} & \textbf{0.0\%} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Phán quyết an ninh của tác tử đạt độ chính xác $F1 = 98.6\%$ và tỷ lệ báo giả $\text{FPR} < 1.2\%$. Đánh giá chất lượng lập luận bằng phương pháp LLM-as-a-Judge theo chuẩn MT-Bench~\cite{zheng2023judge} đạt 8.95/10 và RAGAS~\cite{ragas2023} đạt 0.94 (Bảng~\ref{tab:tier2_metrics}), khẳng định tính chặt chẽ pháp y và độ tin cậy thực thi ứng phó.
+Thay vì sử dụng thước đo $F1$ nhị phân vốn không phản ánh đúng thực tế khi tỷ lệ nhãn tấn công quá cao (86.9\%), hệ thống được đánh giá qua phương pháp \textit{chấm-theo-hành-động} (Config A so với Config F). Tại Cấu hình F, tỷ lệ chuyển giao người dùng (\texttt{AWAIT\_HITL}) giảm mạnh từ 24.2\% xuống 0.0\%. Đánh giá chất lượng lập luận được thực hiện độc lập bởi mô hình Meta-Llama-3-8B-Instruct trên thang 1-5 điểm thay vì để LLM tự chấm chính mình. Điểm số 4.6/5.0 khẳng định tính chặt chẽ pháp y, đồng thời loại bỏ rủi ro "Thiên kiến Tự đề cao" (Self-Enhancement Bias) thường gặp trong phương pháp LLM-as-a-Judge.
 
 \section{An toàn Đối kháng, Prompt Injection và Kiểm toán HMAC}
 \label{sec:adversarial_security_hmac}
@@ -94,7 +96,7 @@ Năng lực phòng thủ đối kháng của SENTINEL được xác minh qua ba 
 \section{Thử nghiệm Ablation, So sánh Tổng hợp và Độ bền Vận hành}
 \label{sec:ablation_comparison_resilience}
 
-Bài thử nghiệm Ablation đối chứng trên 300 mẫu cân bằng cho thấy mô hình Đơn tầng (Single-Tier LLM) bị nghẽn hàng đợi nghiêm trọng với độ trễ 2.450\,ms/sự kiện và tràn VRAM. Ngược lại, SENTINEL duy trì độ trễ Tầng 1 dưới 15\,ms đối với 82.4\% sự kiện xả tải và độ trễ trung bình End-to-End (E2E) toàn cục chỉ 211\,ms (kết hợp 82.4\% sự kiện xử lý tại dưới 0.40\,ms và 17.6\% sự kiện dị thường xử lý tại 1.200\,ms), tiết kiệm trên 75\% VRAM GPU.
+Bài thử nghiệm Ablation đối chứng trên 300 mẫu cân bằng cho thấy mô hình Đơn tầng (Single-Tier LLM) bị nghẽn hàng đợi nghiêm trọng. Tuy nhiên, các Cấu hình B, C, D, E cho ra kết quả hành động và độ trễ hoàn toàn giống nhau, chứng tỏ thước đo hành động nhị phân đã bị bão hòa (saturated) trên tập dữ liệu này. Đáng lưu ý, phép đo độ trễ trên tập 50/50 cho thấy hệ thống mới chậm hơn 7.8\% so với kỳ vọng, nguyên nhân chủ yếu do việc chuyển đổi ngữ cảnh liên tục giữa LLM và Cổng ML khi xử lý luồng sự kiện phân mảnh mật độ cao.
 
 So sánh tổng hợp với các nền tảng SOTA công bố gần đây—bao gồm Watchtower~\cite{watchtower2026}, CyberRAG~\cite{cyberrag2025}, AutoBnB~\cite{autobnb2025}, LanG~\cite{lang2026} và Policy-Guided SIEM~\cite{splunkllm2026}—khẳng định vị thế vượt trội của SENTINEL về băng thông (trên 2.500 flows/s), độ trễ E2E (211\,ms), khả năng kháng prompt injection (100\%) và mức tiêu thụ VRAM (dưới 8\,GB) (Bảng~\ref{tab:ablation_comparison}).
 
@@ -115,7 +117,7 @@ AutoBnB Framework~\cite{autobnb2025} & 210 flows/s & 620 ms & 94.1\% & 81.0\% & 
 LanG Agentic SOC~\cite{lang2026} & 140 flows/s & 480 ms & 95.2\% & 88.0\% & 24.0 GB \\
 Policy-Guided SIEM~\cite{splunkllm2026} & 180 flows/s & 520 ms & 94.5\% & 85.0\% & 16.0 GB \\
 \midrule
-\textbf{SENTINEL (Hai tầng Đề xuất)} & \textbf{$> 2.500$ flows/s} & \shortstack{\textbf{$< 15$ ms (T1)}\\\textbf{211 ms (E2E)}} & \textbf{98.6\%} & \textbf{100.0\%} & \textbf{7.8 GB} \\
+\textbf{SENTINEL (Hai tầng Đề xuất)} & \textbf{$> 2.500$ flows/s} & \shortstack{\textbf{$< 15$ ms (T1)}\\\textbf{+7.8\% trễ (E2E)}} & \textbf{Hành động} & \textbf{100.0\%} & \textbf{7.8 GB} \\
 \bottomrule
 \end{tabularx}
 \end{table}
