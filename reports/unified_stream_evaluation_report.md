@@ -2,7 +2,7 @@
 
 > **Thay thế** phương pháp 3 luồng tách rời. Gộp CICIDS + DAPT2020 + Zero-day vào **một luồng sắp theo thời gian**, stream tăng dần qua hệ thống thật (Tier-1 + Welford + Threat Memory) với **bộ nhớ khởi tạo sạch**.
 
-> **Sinh lúc:** 2026-07-30T06:42:53
+> **Sinh lúc:** 2026-07-31T21:06:26
 
 ---
 
@@ -22,16 +22,16 @@ Mọi sự kiện là data thật (CICIDS từ `ground_truth.json`, DAPT từ `d
 
 | Metric (Tier-1 gate) | Giá trị |
 | :--- | :---: |
-| **MCC** (chỉ số chính) | **0.0859** |
-| Balanced accuracy | 0.5462 |
-| F1 | 0.4164 (CI95 [0.4071, 0.425]) |
-| Precision | 0.3539 |
-| Recall (attack) | 0.5057 |
-| Specificity (benign) | 0.5866 |
-| Accuracy | 0.5616 |
-| Mốc ZeroR (đoán hằng tốt nhất) | 0.6907 |
+| **MCC** (chỉ số chính) | **0.093** |
+| Balanced accuracy | 0.5469 |
+| F1 | 0.3784 (CI95 [0.369, 0.388]) |
+| Precision | 0.3718 |
+| Recall (attack) | 0.3852 |
+| Specificity (benign) | 0.7087 |
+| Accuracy | 0.6087 |
+| Mốc ZeroR (đoán hằng tốt nhất) | 0.6908 |
 | Accuracy vượt mốc? | **KHÔNG** |
-| TP / FP / TN / FN | 3929 / 7173 / 10180 / 3841 |
+| TP / FP / TN / FN | 2992 / 5055 / 12300 / 4776 |
 | Cỡ mẫu đã chấm | 25123 |
 
 - Đã chấm theo nguồn: `{'cicids': 1170, 'cicids_max': 16953, 'dapt_max': 5000, 'csic': 2000}`
@@ -45,29 +45,29 @@ Recall gộp có thể là trung bình của *bắt hết lớp này, bỏ sạc
 
 | Lớp | n | Recall (CI95) | Bỏ sót | Specificity | FP |
 | :--- | ---: | :---: | ---: | :---: | ---: |
-| Attack | 5598 | 0.3639 [0.3514, 0.3766] | 3561 | — | — |
-| Bot | 80 | 0.5 [0.393, 0.607] | 40 | — | — |
-| Infilteration | 80 | 0.575 [0.4657, 0.6774] | 34 | — | — |
-| DDoS attacks-LOIC-HTTP | 80 | 0.5875 [0.478, 0.6889] | 33 | — | — |
-| DoS attacks-Slowloris | 80 | 0.5875 [0.478, 0.6889] | 33 | — | — |
-| Brute Force -Web | 80 | 0.6125 [0.5029, 0.7118] | 31 | — | — |
-| DoS attacks-Hulk | 80 | 0.7125 [0.6054, 0.8001] | 23 | — | — |
-| SQL Injection | 110 | 0.7182 [0.6278, 0.7938] | 31 | — | — |
-| DoS attacks-GoldenEye | 80 | 0.7875 [0.6858, 0.8629] | 17 | — | — |
-| Brute Force -XSS | 80 | 0.8125 [0.7134, 0.8829] | 15 | — | — |
-| DDOS attack-HOIC | 80 | 0.8625 [0.7703, 0.9215] | 11 | — | — |
-| Adversarial | 50 | 0.9 [0.7864, 0.9565] | 5 | — | — |
-| Anomalous (unclassified) | 836 | 0.9916 [0.9828, 0.9959] | 7 | — | — |
-| Backup/Source File Probing | 82 | 1.0 [0.9552, 1.0] | 0 | — | — |
-| CRLF Injection | 20 | 1.0 [0.8389, 1.0] | 0 | — | — |
-| Cross-Site Scripting | 27 | 1.0 [0.8754, 1.0] | 0 | — | — |
+| Adversarial | 50 | 0.0 [0.0, 0.0714] | 50 | — | — |
+| Bot | 80 | 0.0 [0.0, 0.0458] | 80 | — | — |
+| DoS attacks-GoldenEye | 80 | 0.0125 [0.0022, 0.0675] | 79 | — | — |
+| DoS attacks-Hulk | 80 | 0.025 [0.0069, 0.0866] | 78 | — | — |
+| DoS attacks-Slowloris | 80 | 0.025 [0.0069, 0.0866] | 78 | — | — |
+| DDoS attacks-LOIC-HTTP | 80 | 0.0375 [0.0128, 0.1045] | 77 | — | — |
+| Brute Force -Web | 80 | 0.275 [0.1892, 0.3814] | 58 | — | — |
+| SQL Injection | 109 | 0.3211 [0.2408, 0.4136] | 74 | — | — |
+| Attack | 5598 | 0.3249 [0.3128, 0.3373] | 3779 | — | — |
+| Infilteration | 80 | 0.325 [0.2324, 0.4336] | 54 | — | — |
+| Forced Browsing | 6 | 0.3333 [0.0968, 0.7] | 4 | — | — |
+| Brute Force -XSS | 80 | 0.525 [0.417, 0.6308] | 38 | — | — |
+| Anomalous (unclassified) | 835 | 0.6419 [0.6088, 0.6737] | 299 | — | — |
+| DDOS attack-HOIC | 80 | 0.65 [0.5408, 0.7455] | 28 | — | — |
+| Backup/Source File Probing | 83 | 1.0 [0.9558, 1.0] | 0 | — | — |
+| CRLF Injection | 19 | 1.0 [0.8318, 1.0] | 0 | — | — |
+| Cross-Site Scripting | 23 | 1.0 [0.8569, 1.0] | 0 | — | — |
 | DDOS attack-LOIC-UDP | 80 | 1.0 [0.9542, 1.0] | 0 | — | — |
 | DoS attacks-SlowHTTPTest | 80 | 1.0 [0.9542, 1.0] | 0 | — | — |
 | FTP-BruteForce | 80 | 1.0 [0.9542, 1.0] | 0 | — | — |
-| Forced Browsing | 4 | 1.0 [0.5101, 1.0] | 0 | — | — |
-| Path Traversal | 3 | 1.0 [0.4385, 1.0] | 0 | — | — |
+| Path Traversal | 5 | 1.0 [0.5655, 1.0] | 0 | — | — |
 | SSH-Bruteforce | 80 | 1.0 [0.9542, 1.0] | 0 | — | — |
-| Benign | 17353 | — (lớp lành tính) | — | 0.5866 | 7173 |
+| Benign | 17355 | — (lớp lành tính) | — | 0.7087 | 5055 |
 
 ## 2. Phát hiện APT (DAPT) — EMERGENT, không nạp sẵn
 
@@ -85,130 +85,130 @@ Bộ nhớ bắt đầu **rỗng**; mỗi sự kiện APT được ghi vào memo
 
 ## 3. Zero-day (signature-less) — static bỏ sót, Welford bắt
 
-Tổng: **120** | Welford bắt được (mà static bỏ sót): **81/120**
+Tổng: **120** | Welford bắt được (mà static bỏ sót): **80/120**
 
 | ID | Kịch bản | Rule tĩnh (static-only, đối chứng) | Full Tier-1 (Welford) | Z-Score |
 | :--- | :--- | :---: | :---: | :---: |
-| ZD-013-004 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.51 ✅ |
+| ZD-013-004 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.5 ✅ |
 | ZD-008-001 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 2.9 ⚠️ |
-| ZD-008-005 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.92 ⚠️ |
-| ZD-013-001 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.45 ✅ |
-| ZD-013-005 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 7.24 ✅ |
-| ZD-008-002 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 2.66 ⚠️ |
+| ZD-008-005 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.9 ⚠️ |
+| ZD-013-001 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.44 ✅ |
+| ZD-013-005 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 7.29 ✅ |
+| ZD-008-002 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 2.62 ⚠️ |
 | ZD-008-006 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.42 ⚠️ |
-| ZD-013-002 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.4 ✅ |
+| ZD-013-002 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.39 ✅ |
 | ZD-013-006 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.39 ✅ |
-| ZD-008-003 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.45 ⚠️ |
-| ZD-008-007 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.75 ⚠️ |
-| ZD-013-003 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.38 ✅ |
+| ZD-008-003 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.46 ⚠️ |
+| ZD-008-007 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.74 ⚠️ |
+| ZD-013-003 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.37 ✅ |
 | ZD-013-007 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.38 ✅ |
-| ZD-008-000 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **BLOCK_IP** | 7.74 ✅ |
-| ZD-008-004 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.63 ⚠️ |
-| ZD-013-000 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **BLOCK_IP** | 6.36 ✅ |
-| ZD-002-007 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.69 ⚠️ |
-| ZD-001-002 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.6 ✅ |
-| ZD-009-006 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.78 ⚠️ |
-| ZD-002-000 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.67 ⚠️ |
-| ZD-001-006 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.6 ✅ |
-| ZD-002-004 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **ESCALATE** | 8.05 ✅ |
-| ZD-009-003 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 2.52 ⚠️ |
-| ZD-001-003 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 8.13 ✅ |
-| ZD-009-007 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.38 ⚠️ |
-| ZD-002-001 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.65 ⚠️ |
-| ZD-001-007 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.6 ✅ |
-| ZD-009-000 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.63 ⚠️ |
-| ZD-002-005 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.64 ⚠️ |
-| ZD-001-000 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.59 ✅ |
-| ZD-009-004 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.46 ⚠️ |
-| ZD-001-004 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.59 ✅ |
-| ZD-002-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **ESCALATE** | 8.39 ✅ |
-| ZD-009-001 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **ESCALATE** | 8.43 ✅ |
-| ZD-002-006 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.61 ⚠️ |
-| ZD-001-001 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 8.47 ✅ |
-| ZD-009-005 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.54 ⚠️ |
-| ZD-001-005 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.58 ✅ |
-| ZD-002-003 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.59 ⚠️ |
-| ZD-009-002 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 2.94 ⚠️ |
-| ZD-003-001 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 17500.17 ✅ |
-| ZD-010-000 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.28 ⚠️ |
-| ZD-014-002 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.77 ⚠️ |
-| ZD-003-005 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 17626.42 ✅ |
-| ZD-010-004 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 2.44 ⚠️ |
-| ZD-014-006 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **ESCALATE** | 8.77 ✅ |
-| ZD-004-003 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.77 ⚠️ |
-| ZD-004-007 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.79 ⚠️ |
-| ZD-003-002 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 17907.96 ✅ |
-| ZD-010-001 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **BLOCK_IP** | 1.56 ✅ |
-| ZD-014-003 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.78 ⚠️ |
-| ZD-004-000 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.76 ⚠️ |
-| ZD-003-006 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18025.73 ✅ |
-| ZD-010-005 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.26 ⚠️ |
-| ZD-014-007 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 2.96 ⚠️ |
-| ZD-004-004 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **ESCALATE** | 8.98 ✅ |
-| ZD-014-000 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 2.65 ⚠️ |
-| ZD-003-003 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18286.65 ✅ |
-| ZD-010-002 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **ESCALATE** | 9.1 ✅ |
-| ZD-014-004 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.79 ⚠️ |
-| ZD-004-001 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.77 ⚠️ |
-| ZD-003-007 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18414.8 ✅ |
-| ZD-010-006 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.48 ⚠️ |
-| ZD-004-005 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.78 ⚠️ |
-| ZD-003-000 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18565.67 ✅ |
-| ZD-014-001 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.8 ⚠️ |
-| ZD-003-004 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18665.23 ✅ |
-| ZD-010-003 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 2.97 ⚠️ |
-| ZD-014-005 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.8 ⚠️ |
-| ZD-004-002 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.78 ⚠️ |
-| ZD-010-007 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.64 ⚠️ |
-| ZD-004-006 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **ESCALATE** | 9.36 ✅ |
-| ZD-011-005 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 503.18 ✅ |
-| ZD-015-007 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 9.41 ✅ |
-| ZD-005-004 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.65 ✅ |
-| ZD-006-002 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.42 ✅ |
-| ZD-015-000 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 9.48 ✅ |
-| ZD-006-006 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 9.52 ✅ |
-| ZD-011-002 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **BLOCK_IP** | 504.99 ✅ |
-| ZD-015-004 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.2 ✅ |
-| ZD-005-001 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.69 ✅ |
-| ZD-011-006 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 505.56 ✅ |
-| ZD-005-005 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.72 ✅ |
-| ZD-006-003 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.44 ✅ |
-| ZD-015-001 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.2 ✅ |
-| ZD-006-007 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.45 ✅ |
-| ZD-011-003 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 506.48 ✅ |
-| ZD-015-005 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.2 ✅ |
-| ZD-005-002 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.77 ✅ |
-| ZD-011-007 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 507.58 ✅ |
-| ZD-006-000 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.45 ✅ |
-| ZD-005-006 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.79 ✅ |
-| ZD-006-004 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.45 ✅ |
-| ZD-011-000 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 507.92 ✅ |
-| ZD-015-002 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.2 ✅ |
-| ZD-011-004 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 508.9 ✅ |
-| ZD-015-006 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.2 ✅ |
-| ZD-005-003 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.84 ✅ |
-| ZD-006-001 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.47 ✅ |
-| ZD-005-007 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.85 ✅ |
-| ZD-006-005 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.47 ✅ |
-| ZD-011-001 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 510.41 ✅ |
-| ZD-015-003 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.19 ✅ |
-| ZD-005-000 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.87 ✅ |
-| ZD-007-003 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7354.21 ✅ |
-| ZD-007-007 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7374.2 ✅ |
-| ZD-012-003 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23549.61 ✅ |
-| ZD-012-007 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23570.0 ✅ |
-| ZD-007-000 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7407.11 ✅ |
-| ZD-007-004 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7425.04 ✅ |
-| ZD-012-000 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23570.4 ✅ |
-| ZD-012-004 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23576.51 ✅ |
-| ZD-007-001 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7467.43 ✅ |
-| ZD-007-005 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7483.89 ✅ |
-| ZD-012-001 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23559.35 ✅ |
-| ZD-012-005 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23569.49 ✅ |
-| ZD-007-002 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7518.65 ✅ |
-| ZD-007-006 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7539.26 ✅ |
-| ZD-012-002 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23593.37 ✅ |
-| ZD-012-006 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23582.29 ✅ |
+| ZD-008-000 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **ESCALATE** | 7.87 ✅ |
+| ZD-008-004 | Zero-Day C2 Beacon cực nhỏ và ẩn | DROP (bỏ sót) | **DROP** | 1.58 ⚠️ |
+| ZD-013-000 | Zero-Day Burst Fwd packets đột biến | DROP (bỏ sót) | **ESCALATE** | 6.37 ✅ |
+| ZD-002-007 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.63 ⚠️ |
+| ZD-001-002 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.59 ✅ |
+| ZD-009-006 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.73 ⚠️ |
+| ZD-002-000 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.61 ⚠️ |
+| ZD-001-006 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.57 ✅ |
+| ZD-002-004 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **ESCALATE** | 8.2 ✅ |
+| ZD-009-003 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 2.46 ⚠️ |
+| ZD-001-003 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 8.29 ✅ |
+| ZD-009-007 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.37 ⚠️ |
+| ZD-002-001 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.58 ⚠️ |
+| ZD-001-007 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.53 ✅ |
+| ZD-009-000 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.58 ⚠️ |
+| ZD-002-005 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.57 ⚠️ |
+| ZD-001-000 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.51 ✅ |
+| ZD-009-004 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.47 ⚠️ |
+| ZD-001-004 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.5 ✅ |
+| ZD-002-002 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **ESCALATE** | 8.58 ✅ |
+| ZD-009-001 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **ESCALATE** | 8.63 ✅ |
+| ZD-002-006 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.54 ⚠️ |
+| ZD-001-001 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 8.67 ✅ |
+| ZD-009-005 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 1.49 ⚠️ |
+| ZD-001-005 | Zero-Day Exfil khối lượng Bwd cực lớn | DROP (bỏ sót) | **ESCALATE** | 4.46 ✅ |
+| ZD-002-003 | Zero-Day Beacon tần suất gói cực cao | DROP (bỏ sót) | **DROP** | 2.52 ⚠️ |
+| ZD-009-002 | Zero-Day Cửa sổ Fwd âm (anomaly) | DROP (bỏ sót) | **DROP** | 2.98 ⚠️ |
+| ZD-003-001 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 17945.76 ✅ |
+| ZD-010-000 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.3 ⚠️ |
+| ZD-014-002 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.81 ⚠️ |
+| ZD-003-005 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18071.76 ✅ |
+| ZD-010-004 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 2.38 ⚠️ |
+| ZD-014-006 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **ESCALATE** | 9.01 ✅ |
+| ZD-004-003 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.8 ⚠️ |
+| ZD-004-007 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.8 ⚠️ |
+| ZD-003-002 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18382.59 ✅ |
+| ZD-010-001 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.5 ⚠️ |
+| ZD-014-003 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.83 ⚠️ |
+| ZD-004-000 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.81 ⚠️ |
+| ZD-003-006 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18514.67 ✅ |
+| ZD-010-005 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.29 ⚠️ |
+| ZD-014-007 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 2.99 ⚠️ |
+| ZD-004-004 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **ESCALATE** | 9.23 ✅ |
+| ZD-014-000 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 2.67 ⚠️ |
+| ZD-003-003 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18807.95 ✅ |
+| ZD-010-002 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **ESCALATE** | 9.37 ✅ |
+| ZD-014-004 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.84 ⚠️ |
+| ZD-004-001 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.82 ⚠️ |
+| ZD-003-007 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 18946.54 ✅ |
+| ZD-010-006 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.42 ⚠️ |
+| ZD-004-005 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.83 ⚠️ |
+| ZD-003-000 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 19117.1 ✅ |
+| ZD-014-001 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.85 ⚠️ |
+| ZD-003-004 | Zero-Day Tunnel cửa sổ Bwd bất thường | DROP (bỏ sót) | **ESCALATE** | 19228.28 ✅ |
+| ZD-010-003 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 3.01 ⚠️ |
+| ZD-014-005 | Zero-Day Time delay khổng lồ | DROP (bỏ sót) | **DROP** | 1.86 ⚠️ |
+| ZD-004-002 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **DROP** | 1.84 ⚠️ |
+| ZD-010-007 | Zero-Day Gói SYN liên tục siêu nhỏ | DROP (bỏ sót) | **DROP** | 1.57 ⚠️ |
+| ZD-004-006 | Zero-Day Phiên kéo dài bất thường (low&slow) | DROP (bỏ sót) | **ESCALATE** | 9.66 ✅ |
+| ZD-011-005 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 494.72 ✅ |
+| ZD-015-007 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 9.71 ✅ |
+| ZD-005-004 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.75 ✅ |
+| ZD-006-002 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.48 ✅ |
+| ZD-015-000 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 9.78 ✅ |
+| ZD-006-006 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 9.83 ✅ |
+| ZD-011-002 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 495.9 ✅ |
+| ZD-015-004 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.06 ✅ |
+| ZD-005-001 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.79 ✅ |
+| ZD-011-006 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 496.38 ✅ |
+| ZD-005-005 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.81 ✅ |
+| ZD-006-003 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.5 ✅ |
+| ZD-015-001 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.06 ✅ |
+| ZD-006-007 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.51 ✅ |
+| ZD-011-003 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 496.85 ✅ |
+| ZD-015-005 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.06 ✅ |
+| ZD-005-002 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.87 ✅ |
+| ZD-011-007 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 497.99 ✅ |
+| ZD-006-000 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.51 ✅ |
+| ZD-005-006 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.88 ✅ |
+| ZD-006-004 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.52 ✅ |
+| ZD-011-000 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 498.15 ✅ |
+| ZD-015-002 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.06 ✅ |
+| ZD-011-004 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 498.9 ✅ |
+| ZD-015-006 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.06 ✅ |
+| ZD-005-003 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.94 ✅ |
+| ZD-006-001 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.53 ✅ |
+| ZD-005-007 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.95 ✅ |
+| ZD-006-005 | Zero-Day Payload Fwd khổng lồ | DROP (bỏ sót) | **ESCALATE** | 4.54 ✅ |
+| ZD-011-001 | Zero-Day Mảnh payload Bwd quá to | DROP (bỏ sót) | **ESCALATE** | 499.24 ✅ |
+| ZD-015-003 | Zero-Day Exfil gián đoạn Bwd burst | DROP (bỏ sót) | **ESCALATE** | 4.06 ✅ |
+| ZD-005-000 | Zero-Day Bùng nổ gói Bwd (volumetric mới) | DROP (bỏ sót) | **ESCALATE** | 12.97 ✅ |
+| ZD-007-003 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7416.91 ✅ |
+| ZD-007-007 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7437.54 ✅ |
+| ZD-012-003 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23361.76 ✅ |
+| ZD-012-007 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23369.67 ✅ |
+| ZD-007-000 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7470.87 ✅ |
+| ZD-007-004 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7489.08 ✅ |
+| ZD-012-000 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23362.48 ✅ |
+| ZD-012-004 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23366.84 ✅ |
+| ZD-007-001 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7531.08 ✅ |
+| ZD-007-005 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7548.43 ✅ |
+| ZD-012-001 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23350.71 ✅ |
+| ZD-012-005 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23356.68 ✅ |
+| ZD-007-002 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7580.85 ✅ |
+| ZD-007-006 | Zero-Day Cửa sổ Fwd dị thường | DROP (bỏ sót) | **ESCALATE** | 7600.89 ✅ |
+| ZD-012-002 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23372.84 ✅ |
+| ZD-012-006 | Zero-Day C2 PSH Flag chìm | DROP (bỏ sót) | **ESCALATE** | 23358.59 ✅ |
 
 ---
 
