@@ -250,22 +250,26 @@ class DualRetriever:
                 }
             )
 
-        # Level 3: Cross-Encoder Reranker (ms-marco-MiniLM-L-6-v2)
+        # Level 3: Cross-Encoder Reranker with RRF Score Blending (Anti-Domain Shift)
         try:
             from sentence_transformers import CrossEncoder  # type: ignore
 
             if not hasattr(self, "_reranker") or self._reranker is None:
-                self._reranker = CrossEncoder(
-                    "cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512
-                )
+                self._reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512)
             top_candidates = candidates[: self.top_k * 2]
             pairs = [[query_text, c["text"]] for c in top_candidates]
             if pairs:
                 scores = self._reranker.predict(pairs)
+                # Max-normalize scores
+                max_rrf = max((c["rrf_score"] for c in top_candidates), default=1.0) or 1.0
+                max_ce = max(scores, default=1.0) or 1.0
                 for c, score in zip(top_candidates, scores, strict=False):
-                    c["rerank_score"] = float(score)
+                    norm_rrf = c["rrf_score"] / max_rrf
+                    norm_ce = float(score) / max_ce if max_ce > 0 else 0.0
+                    # 80% RRF weight + 20% Cross-Encoder weight
+                    c["blended_score"] = 0.8 * norm_rrf + 0.2 * norm_ce
                 top_candidates = sorted(
-                    top_candidates, key=lambda x: x.get("rerank_score", 0.0), reverse=True
+                    top_candidates, key=lambda x: x.get("blended_score", 0.0), reverse=True
                 )
                 candidates[: len(top_candidates)] = top_candidates
         except Exception as e:
