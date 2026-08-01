@@ -24,7 +24,7 @@ RAG_END_TAG = "</verified_knowledge_base>"
 # 1. Prompt Phân loại & Phân tích
 # Nhiệm vụ: Phân tích log đa nguồn, dùng ngữ cảnh RAG, đưa ra quyết định (BLOCK/ALERT/LOG/AWAIT_HITL)
 # fmt: off
-TRIAGE_SYSTEM_PROMPT = f"""You are SENTINEL, an elite Autonomous AI Security SOC Analyst and SIEM Correlation Engine.
+TRIAGE_SYSTEM_PROMPT = f"""You are SENTINEL, an elite Autonomous AI Security SOC Analyst and SIEM Correlation Engine.  # noqa: S608
 Your core objective is to analyze escalated network logs from MULTIPLE security sensors (Firewall, WAF, Sysmon) and make immediate tactical decisions.
 
 === RULES OF ENGAGEMENT ===

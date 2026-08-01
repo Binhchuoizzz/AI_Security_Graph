@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import random
+
 import pandas as pd
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,15 +30,15 @@ def get_gt_hashes() -> set[str]:
     """Lấy danh sách MD5 hash của tất cả 1,750 mẫu trong ground_truth.json để loại trừ."""
     if not os.path.exists(GT_PATH):
         return set()
-    with open(GT_PATH, "r", encoding="utf-8") as f:
+    with open(GT_PATH, encoding="utf-8") as f:
         gt_data = json.load(f)
 
     hashes = set()
     for s in gt_data:
         logs = s.get("logs") or []
-        for l in logs:
-            if isinstance(l, dict):
-                hashes.add(_hash_log(l))
+        for log_item in logs:
+            if isinstance(log_item, dict):
+                hashes.add(_hash_log(log_item))
     return hashes
 
 
@@ -49,9 +50,20 @@ def format_csic_row_to_raft(csic_item: dict) -> dict:
 
     # Suy đoán nhãn từ URI / payload của CSIC
     uri_payload_lc = f"{uri} {payload}".lower()
-    tech = "T1083" if any(k in uri_payload_lc for k in ["/etc/passwd", "win.ini", ".bak", ".inc", "web-inf", "../", "..%2f"]) else (
-        "T1059.007" if any(k in uri_payload_lc for k in ["cmd", "exec", "; cat", "whoami", "$(head"]) else (
-            "T1190" if any(k in uri_payload_lc for k in ["select", "union", "<script", "onload="]) else "T1071.001"
+    tech = (
+        "T1083"
+        if any(
+            k in uri_payload_lc
+            for k in ["/etc/passwd", "win.ini", ".bak", ".inc", "web-inf", "../", "..%2f"]
+        )
+        else (
+            "T1059.007"
+            if any(k in uri_payload_lc for k in ["cmd", "exec", "; cat", "whoami", "$(head"])
+            else (
+                "T1190"
+                if any(k in uri_payload_lc for k in ["select", "union", "<script", "onload="])
+                else "T1071.001"
+            )
         )
     )
 
@@ -111,7 +123,9 @@ def format_netflow_to_raft(row: pd.Series) -> dict:
         {
             "action": "BLOCK_IP" if is_attack else "LOG",
             "confidence": 0.95 if is_attack else 0.05,
-            "mitre_technique": "T1595.003" if "SCAN" in label.upper() or "PORT" in label.upper() else ("T1190" if is_attack else "N/A"),
+            "mitre_technique": "T1595.003"
+            if "SCAN" in label.upper() or "PORT" in label.upper()
+            else ("T1190" if is_attack else "N/A"),
             "attack_method": f"Detected traffic pattern: {label}",
             "reasoning": f"Flow statistics indicate network pattern matching label {label}.",
         },
@@ -124,13 +138,15 @@ def format_netflow_to_raft(row: pd.Series) -> dict:
 def main():
     print("=== LLM LAB: Multi-Dataset RAFT Dataset Generator (Anti-Data Leakage) ===")
     gt_hashes = get_gt_hashes()
-    print(f"[*] Đã tải {len(gt_hashes)} MD5 hashes từ ground_truth.json để ĐẢM BẢO KHÔNG TRÙNG LẶP.")
+    print(
+        f"[*] Đã tải {len(gt_hashes)} MD5 hashes từ ground_truth.json để ĐẢM BẢO KHÔNG TRÙNG LẶP."
+    )
 
     records = []
 
     # 1) Trích xuất CSIC 2010 (Web App logs) ngoại trừ các mẫu đã nằm trong Benchmark GT
     if os.path.exists(CSIC_JSON):
-        with open(CSIC_JSON, "r", encoding="utf-8") as f:
+        with open(CSIC_JSON, encoding="utf-8") as f:
             csic_data = json.load(f)
         csic_added = 0
         for item in csic_data:
@@ -139,7 +155,9 @@ def main():
                 if h not in gt_hashes:
                     records.append(format_csic_row_to_raft(item))
                     csic_added += 1
-        print(f"[*] Đã thêm {csic_added} mẫu CSIC 2010 Web App (Đã lọc 100% không trùng GT Benchmark).")
+        print(
+            f"[*] Đã thêm {csic_added} mẫu CSIC 2010 Web App (Đã lọc 100% không trùng GT Benchmark)."
+        )
 
     # 2) Trích xuất CIC-IDS2017 (NetFlow logs)
     if os.path.exists(ML_LAB_CSV):
@@ -169,10 +187,16 @@ def main():
         for r in test_records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    print(f"[+] ĐÃ NÂNG CẤP THÀNH CÔNG TÁCH BIỆT MULTI-DATASET 100%:")
-    print(f"    - Tập QLoRA Train ({len(train_records)} mẫu): Kết hợp CSIC 2010 Web + CIC-IDS2017 -> {TRAIN_OUT}")
-    print(f"    - Tập QLoRA Test ({len(test_records)} mẫu): Kết hợp CSIC 2010 Web + CIC-IDS2017 -> {TEST_OUT}")
-    print(f"    - Tập Benchmark Evaluation: Giữ nguyên 100% UNSEEN từ experiments/ground_truth.json (KHÔNG CHẠM VÀO).")
+    print("[+] ĐÃ NÂNG CẤP THÀNH CÔNG TÁCH BIỆT MULTI-DATASET 100%:")
+    print(
+        f"    - Tập QLoRA Train ({len(train_records)} mẫu): Kết hợp CSIC 2010 Web + CIC-IDS2017 -> {TRAIN_OUT}"
+    )
+    print(
+        f"    - Tập QLoRA Test ({len(test_records)} mẫu): Kết hợp CSIC 2010 Web + CIC-IDS2017 -> {TEST_OUT}"
+    )
+    print(
+        "    - Tập Benchmark Evaluation: Giữ nguyên 100% UNSEEN từ experiments/ground_truth.json (KHÔNG CHẠM VÀO)."
+    )
 
 
 if __name__ == "__main__":

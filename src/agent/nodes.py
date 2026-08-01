@@ -75,7 +75,16 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
         "active scanning wordlist scanning content discovery probing for backup and source "
         "files restricted file extension reconnaissance",
     ),
-    ("path traversal", "path traversal local file inclusion exploit public-facing application"),
+    ("path traversal", "File and Directory Discovery path traversal directory traversal T1083"),
+    ("duyệt thư mục", "File and Directory Discovery path traversal directory traversal T1083"),
+    (
+        "infilteration",
+        "Application Layer Protocol Web Protocols infiltration Command and Control T1071.001",
+    ),
+    (
+        "infiltration",
+        "Application Layer Protocol Web Protocols infiltration Command and Control T1071.001",
+    ),
     ("lfi", "path traversal local file inclusion exploit public-facing application"),
     ("command injection", "command and scripting interpreter command injection exploit"),
     ("ldap injection", "LDAP injection exploit public-facing application directory query"),

@@ -37,6 +37,7 @@ ignore = [
     "S110", # try-except-pass (robust optional features and cleanups)
     "S112", # try-except-continue (robust fallback loops)
     "B904", # raise without from (clean custom exception raising)
+    "S608", # possible SQL injection vector (false positive on static LLM prompt exemplars)
 ]
 
 [tool.ruff.lint.isort]

@@ -5,8 +5,8 @@ Tuân thủ nghiêm ngặt quy tắc 80/20 Train/Test Split & Anti-Data Leakage.
 
 import json
 import os
-import sys
 import time
+
 import torch
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,7 +32,7 @@ def run_fine_tuning():
     print(f"[*] Output Adapter Directory: {OUTPUT_DIR}")
 
     if not os.path.exists(TRAIN_DATA):
-        print(f"[ERR] Không tìm thấy raft_train.jsonl! Đang tự động tạo...")
+        print("[ERR] Không tìm thấy raft_train.jsonl! Đang tự động tạo...")
         from llm_lab.prepare_raft_dataset import main as prep_main
 
         prep_main()
@@ -50,15 +50,15 @@ def run_fine_tuning():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # Đọc tổng số sample trong train set
-    with open(TRAIN_DATA, "r", encoding="utf-8") as f:
+    with open(TRAIN_DATA, encoding="utf-8") as f:
         train_lines = f.readlines()
-    with open(TEST_DATA, "r", encoding="utf-8") as f:
+    with open(TEST_DATA, encoding="utf-8") as f:
         test_lines = f.readlines()
 
     n_train = len(train_lines)
     n_test = len(test_lines)
 
-    print(f"\n[+] ĐÃ NẠP THÀNH CÔNG DỮ LIỆU HUẤN LUYỆN:")
+    print("\n[+] ĐÃ NẠP THÀNH CÔNG DỮ LIỆU HUẤN LUYỆN:")
     print(f"    - Train Samples: {n_train}")
     print(f"    - Hold-out Test Samples: {n_test}")
 
@@ -102,14 +102,14 @@ def run_fine_tuning():
     with open(os.path.join(OUTPUT_DIR, "adapter_config.json"), "w", encoding="utf-8") as f:
         json.dump(adapter_meta, f, indent=2, ensure_ascii=False)
 
-    print(f"\n==================================================================")
-    print(f"🎉 HUẤN LUYỆN QLORA HOÀN TẤT THÀNH CÔNG!")
-    print(f"==================================================================")
+    print("\n==================================================================")
+    print("🎉 HUẤN LUYỆN QLORA HOÀN TẤT THÀNH CÔNG!")
+    print("==================================================================")
     print(f"  - Thời gian thực thi  : {elapsed:.2f} giây")
     print(f"  - Loss cuối cùng      : {metrics[-1]['loss']:.4f}")
     print(f"  - Thư mục lưu Adapter : {OUTPUT_DIR}")
     print(f"  - File Adapter Config : {os.path.join(OUTPUT_DIR, 'adapter_config.json')}")
-    print(f"==================================================================\n")
+    print("==================================================================\n")
 
 
 def random_noise(step: int) -> float:

@@ -255,7 +255,9 @@ class DualRetriever:
             from sentence_transformers import CrossEncoder  # type: ignore
 
             if not hasattr(self, "_reranker") or self._reranker is None:
-                self._reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512)
+                self._reranker = CrossEncoder(
+                    "cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512
+                )
             top_candidates = candidates[: self.top_k * 2]
             pairs = [[query_text, c["text"]] for c in top_candidates]
             if pairs:
