@@ -139,9 +139,13 @@ class ExactMatchResponseCache:
         vẫn dùng chung một khoá thì verdict của IP sạch sẽ bị tái dùng cho kẻ tái phạm, tức
         là xoá sạch tác dụng của chính tính năng vừa bật. Chỉ tách hai rổ (có/không tiền
         sử), KHÔNG đưa IP vào khoá: giữ được gần như toàn bộ hiệu quả gộp, vì đại đa số lưu
-        lượng là IP chưa có tiền sử.
         """
         return "§hist:1" if has_history else "§hist:0"
+
+    def clear(self):
+        """Xoá sạch toàn bộ cache trong bộ nhớ (phục vụ cold-start evaluation)."""
+        with self._lock:
+            self.cache.clear()
 
 
 # Singleton instance

@@ -186,6 +186,9 @@ def predict_e2e(
     sample: dict, agent_app, SentinelState, loop_detector
 ) -> tuple[str, str, str, bool, float, dict]:
     """1 sample -> chạy full agent; đọc các trường MITRE có cấu trúc từ decision cuối."""
+    from src.agent.response_cache import response_cache
+
+    response_cache.clear()  # Ép Zero-Cache 100%: mọi mẫu bắt buộc LLM suy luận từ đầu
     logs = sample.get("logs") or []
     loop_detector.reset()  # BẮT BUỘC: tránh loop-guard cộng dồn qua các invoke
     t0 = time.time()
@@ -224,10 +227,12 @@ def isolate_for_e2e() -> str:
 
     import src.agent.nodes as nodes_mod
     import src.response.executor as executor
+    from src.agent.response_cache import response_cache
     from src.agent.threat_memory import ThreatMemoryStore
     from src.guardrails import audit_logger
     from src.tier1_filter.feedback_listener import FeedbackListener
 
+    response_cache.clear()  # Xoá toàn bộ response cache RAM khi khởi tạo E2E test
     tmp = tempfile.mkdtemp(prefix="mapper_e2e_")
     os.environ["MLFLOW_TRACKING_URI"] = "file:" + os.path.join(tmp, "mlruns")
 
@@ -243,15 +248,6 @@ def isolate_for_e2e() -> str:
     audit_logger.log_event = _noop  # type: ignore  # chặn ghi logs/guardrails_audit.db
 
     # 3) CÔ LẬP CẢ CHIỀU ĐỌC, không chỉ chiều ghi.
-    #
-    # LỖI ĐO LƯỜNG ĐÃ VÁ: `RuleEngine._get_reputation_score` đọc `ip_reputation` từ SQLite
-    # THẬT (nó tự `from src.agent.threat_memory import threat_memory` bên trong hàm, nên
-    # việc thay `nodes_mod.threat_memory` ở trên KHÔNG chạm tới nó). Bảng đó còn 925 IP điểm
-    # 100 do các lượt chạy SỐNG trước để lại, và dải IP của CSIC (198.51.100.0/24) trùng dải
-    # mà bộ web-attack cũ đã dùng — nên nhiều mẫu bị chặn vì TIỀN SỬ chứ không vì nội dung.
-    # Đo được: `tier1_reasons` khi ấy chỉ còn "IP có tiền sử NGUY HIỂM", tức truy vấn RAG mất
-    # sạch ngữ nghĩa tấn công. Phép đo ngoại tuyến khi đó phụ thuộc trạng thái của lượt chạy
-    # trước — không tái lập được.
     import src.agent.threat_memory as tm_mod
 
     tm_mod.threat_memory = ThreatMemoryStore(db_path=os.path.join(tmp, "threat_memory.db"))
