@@ -202,9 +202,11 @@ class DualRetriever:
         sparse_results = self._sparse_search(tokenized_query, source_key, fetch_k)
 
         # 3. Thuật toán dung hòa điểm số (Reciprocal Rank Fusion - RRF)
-        # Công thức: RRF_score = 1 / (k + rank_dense) + 1 / (k + rank_sparse)
-        # Sử dụng hằng số chuẩn k=60
+        # Công thức: RRF_score = w_dense / (k + rank_dense) + w_sparse / (k + rank_sparse)
+        # Sử dụng hằng số chuẩn k=60, ưu tiên Sparse (BM25) w_sparse=1.5 cho từ khoá kỹ thuật
         RRF_K = 60
+        W_DENSE = 1.0
+        W_SPARSE = 1.5
         rrf_scores = {}
 
         all_indices = set(dense_results.keys()).union(set(sparse_results.keys()))
@@ -214,9 +216,9 @@ class DualRetriever:
 
             rrf_score = 0.0
             if dense_rank < 1000:
-                rrf_score += 1.0 / (RRF_K + dense_rank)
+                rrf_score += W_DENSE / (RRF_K + dense_rank)
             if sparse_rank < 1000:
-                rrf_score += 1.0 / (RRF_K + sparse_rank)
+                rrf_score += W_SPARSE / (RRF_K + sparse_rank)
 
             rrf_scores[idx] = rrf_score
 
@@ -252,6 +254,11 @@ class DualRetriever:
 
     def retrieve(self, query_text: str) -> dict:
         """Hàm truy xuất ngữ cảnh chính."""
+        import urllib.parse
+
+        if query_text:
+            query_text = urllib.parse.unquote(query_text)
+
         # Kiểm tra Cache trước tiên
         if self.cache:
             cached = self.cache.get(query_text)

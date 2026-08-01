@@ -164,7 +164,9 @@ def predict_rrf(sample: dict, retriever) -> tuple[str, str, str, bool, float, di
     if context_q:
         query = f"{query} {context_q}"[:300]
     inp = AttackMapperInput(
-        attack_type="", payload=query, features=log if isinstance(log, dict) else {}
+        attack_type=str(evaluated.get("attack_type", "")),
+        payload=query,
+        features=log if isinstance(log, dict) else {},
     )
     curated = (
         normalize_attack_type(inp.attack_type, inp.payload, str(inp.features)) in WEB_ATTACK_MAP
