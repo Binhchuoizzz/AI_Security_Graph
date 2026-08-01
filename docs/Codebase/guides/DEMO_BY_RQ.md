@@ -169,13 +169,25 @@ sqlite3 config/audit_trail.db "DELETE FROM audit_trail WHERE id = (SELECT MAX(id
 ### 🚀 Cách Chạy Demo & Kiểm chứng RQ3
 
 #### 1. Đánh giá Bộ ánh xạ Tất định vs Toàn tuyến (RRF & E2E)
-```bash
-# Đánh giá bộ ánh xạ tất định RRF (chỉ RAG + RRF)
-.venv/bin/python scripts/eval_attack_mapper.py --mode rrf --evidence-layer payload
 
-# Đánh giá toàn tuyến E2E (Tác tử LangGraph + LLM + RAG)
+##### ⚡ Cách 1: Chạy Nhanh RRF (Offline, RAG-only, ~5 giây)
+```bash
+.venv/bin/python scripts/eval_attack_mapper.py --mode rrf --evidence-layer payload
+```
+* **Thời gian xử lý:** $500 \text{ mẫu} \times 9.56\text{ ms/mẫu} \approx \mathbf{4.78 \text{ giây}}$.
+* **Kết quả đo đạc:** **85.2%** Exact Match (`T1083` = 100%, `T1190` = 100%, `T1059.007` = 100%, `T1595.003` = 90.8%).
+
+##### 🚀 Cách 2: Chạy Subsample Phân tầng E2E (Có Cache & KV-Cache, ~7-8 phút)
+```bash
+.venv/bin/python scripts/eval_attack_mapper.py --mode e2e --per-class 20 --tag e2e_subsample
+```
+* **Thời gian xử lý:** $\approx 80 \text{ mẫu đại diện} \times 5.7\text{s/mẫu} \approx \mathbf{7.6 \text{ phút}}$.
+
+##### 🛡️ Cách 3: Chạy Chuẩn Thực chiến Cold-Start E2E (Xóa sạch Cache, 100% LLM Suy luận, ~24 phút)
+```bash
 .venv/bin/python scripts/eval_attack_mapper.py --mode e2e --evidence-layer payload
 ```
+* **Thời gian xử lý:** $250 \text{ mẫu cold-start} \times 5.7\text{s/mẫu} \approx 1.425\text{ giây} \approx \mathbf{23.75 \text{ phút}}$.
 *Chú ý quan trọng:* Đối với RQ3, **chỉ dùng tập dữ liệu chuẩn CSE-CIC-IDS2018 và CSIC2010** (vì chỉ có 2 tập này có Ground Truth MITRE Enterprise 1:1 chuẩn xác).
 
 #### 2. Đánh giá Phán quyết & Suy luận với Trọng tài Độc lập (LLM Judge)
