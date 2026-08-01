@@ -378,23 +378,6 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "c2_traffic",
             "c2 channel",
             "t1071.001",
-            "t1071",
-        ),
-    ),
-    (
-        "dir_discovery",
-        (
-            "file and directory discovery",
-            "directory discovery",
-            "file discovery",
-            "directory enumeration",
-            "dir enumeration",
-            "dir_discovery",
-            "/etc/passwd",
-            "etc/passwd",
-            "win.ini",
-            "#exec",
-            "t1083",
         ),
     ),
     (
@@ -452,7 +435,27 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     ("xxe", ("xxe", "xml external entity", "<!entity", "<!doctype")),
     ("rfi", ("rfi", "remote file inclusion")),
     ("lfi", ("lfi", "local file inclusion", "php://filter")),
-    ("path_traversal", ("path traversal", "directory traversal", "../", "..%2f", "%2e%2e")),
+    (
+        "path_traversal",
+        (
+            "path traversal",
+            "directory traversal",
+            "file and directory discovery",
+            "directory discovery",
+            "file discovery",
+            "directory enumeration",
+            "dir enumeration",
+            "dir_discovery",
+            "/etc/passwd",
+            "etc/passwd",
+            "win.ini",
+            "#exec",
+            "t1083",
+            "../",
+            "..%2f",
+            "%2e%2e",
+        ),
+    ),
     ("idor", ("idor", "insecure direct object", "broken object level", "bola")),
 ]
 
@@ -863,14 +866,14 @@ def map_attack(
     Returns:
         MitreMapping — schema LUÔN hợp lệ (pydantic validate khi khởi tạo).
     """
-    # 1) Đường XÁC ĐỊNH: dò loại tấn công web phổ biến trên mọi tín hiệu sẵn có.
-    key = normalize_attack_type(inp.attack_type, inp.payload, str(inp.features))
-    if key in WEB_ATTACK_MAP:
-        return _from_curated(key, inp)
-    # 2) NEO vào verdict của triage nếu attack_type chứa technique-id hợp lệ (triết lý A).
+    # 1) NEO vào verdict của triage nếu attack_type chứa technique-id hợp lệ (triết lý A).
     anchored = _from_triage_anchor(inp)
     if anchored is not None:
         return anchored
+    # 2) Đường XÁC ĐỊNH: dò loại tấn công web phổ biến trên mọi tín hiệu sẵn có.
+    key = normalize_attack_type(inp.attack_type, inp.payload, str(inp.features))
+    if key in WEB_ATTACK_MAP:
+        return _from_curated(key, inp)
     # 3) Đường suy luận RRF. Mặc định KHÔNG gọi LLM lần 2 (tốc độ): ca mơ hồ đằng nào cũng
     #    ra AWAIT_HITL nên không cần thêm 1 inference để đoán technique.
     if use_llm_select is None:

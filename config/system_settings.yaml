@@ -66,7 +66,6 @@ guardrails:
   - evil AI
   - FreeGPT
   - cause chaos
-  - disrupt
   - roleplay
   output_sanitizer:
     enabled: true
