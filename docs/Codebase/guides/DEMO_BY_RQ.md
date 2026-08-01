@@ -183,11 +183,14 @@ sqlite3 config/audit_trail.db "DELETE FROM audit_trail WHERE id = (SELECT MAX(id
 ```
 * **Thời gian xử lý:** $\approx 80 \text{ mẫu đại diện} \times 5.7\text{s/mẫu} \approx \mathbf{7.6 \text{ phút}}$.
 
-##### 🛡️ Cách 3: Chạy Chuẩn Thực chiến Cold-Start E2E (Xóa sạch Cache, 100% LLM Suy luận, ~24 phút)
+##### 🛡️ Cách 3: Chạy Chuẩn Thực chiến Cold-Start E2E (100% Zero-Cache RAM & DB, ~24 phút)
 ```bash
 .venv/bin/python scripts/eval_attack_mapper.py --mode e2e --evidence-layer payload
 ```
 * **Thời gian xử lý:** $250 \text{ mẫu cold-start} \times 5.7\text{s/mẫu} \approx 1.425\text{ giây} \approx \mathbf{23.75 \text{ phút}}$.
+* **Cơ chế Bảo đảm Cô lập (Strict Cold-Start Isolation):**
+  - **SQLite DB Cô lập:** Tạo thư mục tạm `/tmp/mapper_e2e_xxxx/threat_memory.db`, xóa sạch toàn bộ lịch sử IP blacklist và điểm uy tín cũ.
+  - **RAM Purge (`response_cache.clear()`):** Ép xóa bộ đệm RAM `response_cache` trước mỗi mẫu log, đảm bảo 100% mẫu trong đợt test đều phải qua GPU/LLM `Foundation-Sec-8B` suy luận thực sự từ đầu.
 *Chú ý quan trọng:* Đối với RQ3, **chỉ dùng tập dữ liệu chuẩn CSE-CIC-IDS2018 và CSIC2010** (vì chỉ có 2 tập này có Ground Truth MITRE Enterprise 1:1 chuẩn xác).
 
 #### 2. Đánh giá Phán quyết & Suy luận với Trọng tài Độc lập (LLM Judge)
