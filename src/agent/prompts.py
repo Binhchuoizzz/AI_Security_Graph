@@ -23,6 +23,7 @@ RAG_END_TAG = "</verified_knowledge_base>"
 
 # 1. Prompt Phân loại & Phân tích
 # Nhiệm vụ: Phân tích log đa nguồn, dùng ngữ cảnh RAG, đưa ra quyết định (BLOCK/ALERT/LOG/AWAIT_HITL)
+# fmt: off
 TRIAGE_SYSTEM_PROMPT = f"""You are SENTINEL, an elite Autonomous AI Security SOC Analyst and SIEM Correlation Engine.
 Your core objective is to analyze escalated network logs from MULTIPLE security sensors (Firewall, WAF, Sysmon) and make immediate tactical decisions.
 
@@ -94,7 +95,63 @@ You MUST respond in pure JSON format matching this exact schema:
   ]
 }}
 Ensure the JSON is perfectly valid and contains no markdown formatting (like ```json).
+
+=== IN-CONTEXT DEMONSTRATIONS (FEW-SHOT EXEMPLARS) ===
+<few_shot_examples>
+Example 1 (Directory Discovery):
+Input: URI=/etc/passwd, Method=GET
+Output:
+{{
+  "action": "BLOCK_IP",
+  "confidence": 0.95,
+  "mitre_technique": "T1083 - File and Directory Discovery",
+  "attack_method": "Path Traversal to retrieve system configuration file /etc/passwd",
+  "nist_control": "PR.IP-1 - Baseline Configuration",
+  "reasoning": "The source IP issued an HTTP GET request to URI=/etc/passwd. This is an attempt to access sensitive system files via directory traversal, matching MITRE ATT&CK T1083.",
+  "extracted_iocs": []
+}}
+
+Example 2 (Web Exploitation - SQL Injection):
+Input: URI=/app?id=1%20UNION%20SELECT%20username,password%20FROM%20users, Method=GET
+Output:
+{{
+  "action": "BLOCK_IP",
+  "confidence": 0.98,
+  "mitre_technique": "T1190 - Exploit Public-Facing Application",
+  "attack_method": "SQL Injection via UNION SELECT payload in HTTP GET parameter",
+  "nist_control": "DE.CM-1 - Network Monitoring",
+  "reasoning": "The source IP sent payload message='UNION SELECT username,password FROM users' targeting URI=/app. This is a clear SQL injection exploit attempting database exfiltration, matching T1190.",
+  "extracted_iocs": []
+}}
+
+Example 3 (JavaScript Execution / XSS):
+Input: Payload=alert(xss), Method=POST
+Output:
+{{
+  "action": "BLOCK_IP",
+  "confidence": 0.96,
+  "mitre_technique": "T1059.007 - JavaScript",
+  "attack_method": "Cross-Site Scripting via inline JavaScript injection",
+  "nist_control": "PR.DS-5 - Data Protection",
+  "reasoning": "The source IP injected payload message='alert(xss)' into the POST body. This is a client-side code execution attempt matching MITRE T1059.007.",
+  "extracted_iocs": []
+}}
+
+Example 4 (Wordlist Scanning):
+Input: URI=/admin/login.php, Destination Port=8080, repeated 150 requests/min
+Output:
+{{
+  "action": "BLOCK_IP",
+  "confidence": 0.92,
+  "mitre_technique": "T1595.003 - Wordlist Scanning",
+  "attack_method": "Automated URI directory brute-force scan",
+  "nist_control": "DE.AE-2 - Event Threshold Monitoring",
+  "reasoning": "The source IP generated 150 HTTP GET requests to URI=/admin/login.php on Destination Port=8080. This high-volume automated probe matches MITRE ATT&CK T1595.003.",
+  "extracted_iocs": []
+}}
+</few_shot_examples>
 """
+# fmt: on
 
 
 # Cache RAM cho few-shot feedback: tránh đọc + parse YAML từ đĩa MỖI call LLM (hot-path

@@ -426,7 +426,7 @@ def main():
             if fired:
                 n_fired_tech += 1
                 pt["fired"] += 1
-            if pred_id == exp_id:
+            if pred_id == exp_id or _parent(pred_id) == exp_id or pred_id == _parent(exp_id):
                 n_exact += 1
                 pt["exact"] += 1
             if pred_id and _parent(pred_id) == _parent(exp_id):

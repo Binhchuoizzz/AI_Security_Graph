@@ -250,6 +250,27 @@ class DualRetriever:
                 }
             )
 
+        # Level 3: Cross-Encoder Reranker (ms-marco-MiniLM-L-6-v2)
+        try:
+            from sentence_transformers import CrossEncoder  # type: ignore
+
+            if not hasattr(self, "_reranker") or self._reranker is None:
+                self._reranker = CrossEncoder(
+                    "cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512
+                )
+            top_candidates = candidates[: self.top_k * 2]
+            pairs = [[query_text, c["text"]] for c in top_candidates]
+            if pairs:
+                scores = self._reranker.predict(pairs)
+                for c, score in zip(top_candidates, scores, strict=False):
+                    c["rerank_score"] = float(score)
+                top_candidates = sorted(
+                    top_candidates, key=lambda x: x.get("rerank_score", 0.0), reverse=True
+                )
+                candidates[: len(top_candidates)] = top_candidates
+        except Exception as e:
+            logger.debug(f"[Reranker] Fallback to pure RRF: {e}")
+
         return candidates[: self.top_k]
 
     def retrieve(self, query_text: str) -> dict:
