@@ -310,6 +310,34 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         0.85,
         framework=FRAMEWORK_ATLAS,
     ),
+    "active_scan": _entry(
+        "Active Scanning: Wordlist Scanning",
+        "T1595.003",
+        "Active Scanning",
+        "Reconnaissance",
+        "TA0043",
+        0.90,
+        subtechnique_id="T1595.003",
+        subtechnique="Wordlist Scanning",
+    ),
+    "c2_web": _entry(
+        "Application Layer Protocol: Web Protocols",
+        "T1071.001",
+        "Application Layer Protocol",
+        "Command and Control",
+        "TA0011",
+        0.85,
+        subtechnique_id="T1071.001",
+        subtechnique="Web Protocols",
+    ),
+    "dir_discovery": _entry(
+        "File and Directory Discovery",
+        "T1083",
+        "File and Directory Discovery",
+        "Discovery",
+        "TA0007",
+        0.85,
+    ),
 }
 
 # Từ khoá -> khoá chuẩn (quét trên attack_type + payload + features). Thứ tự ưu
@@ -325,6 +353,48 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "ignore previous instructions",
             "ignore all previous",
             "system prompt",
+        ),
+    ),
+    (
+        "active_scan",
+        (
+            "active scanning",
+            "wordlist scanning",
+            "vulnerability scan",
+            "port scan",
+            "active_scan",
+            "wordlist_scan",
+            "t1595.003",
+            "t1595",
+        ),
+    ),
+    (
+        "c2_web",
+        (
+            "application layer protocol",
+            "web protocols",
+            "c2 beaconing",
+            "c2 communication",
+            "c2_traffic",
+            "c2 channel",
+            "t1071.001",
+            "t1071",
+        ),
+    ),
+    (
+        "dir_discovery",
+        (
+            "file and directory discovery",
+            "directory discovery",
+            "file discovery",
+            "directory enumeration",
+            "dir enumeration",
+            "dir_discovery",
+            "/etc/passwd",
+            "etc/passwd",
+            "win.ini",
+            "#exec",
+            "t1083",
         ),
     ),
     (
@@ -401,11 +471,14 @@ def _kw_hit(kw: str, haystack: str) -> bool:
 
 def normalize_attack_type(*texts: str) -> str:
     """Quét nhiều chuỗi (attack_type, payload, reasoning...) -> khoá chuẩn hoặc ""."""
-    haystack = " ".join(t for t in texts if t).lower()
-    if not haystack:
+    import urllib.parse
+
+    raw_haystack = " ".join(t for t in texts if t).lower()
+    if not raw_haystack:
         return ""
+    haystack = urllib.parse.unquote(raw_haystack)
     for key, kws in _ATTACK_KEYWORDS:
-        if any(_kw_hit(kw, haystack) for kw in kws):
+        if any(_kw_hit(kw, haystack) or _kw_hit(kw, raw_haystack) for kw in kws):
             return key
     return ""
 

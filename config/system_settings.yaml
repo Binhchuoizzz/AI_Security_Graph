@@ -146,4 +146,4 @@ tier1:
   - 192.168.1.254
 tier2:
   attack_mapper:
-    llm_select: false
+    llm_select: true
