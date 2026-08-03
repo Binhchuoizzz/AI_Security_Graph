@@ -1,6 +1,6 @@
 # Chạy & Demo SENTINEL
 
-> Cập nhật 31/07/2026. Chỉ số đo đạc xem [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md) và [DEMO_BY_RQ.md](DEMO_BY_RQ.md); tệp này là **cách vận hành**.
+> Cập nhật 31/07/2026. Chỉ số đo đạc xem [DEMO_BY_RQ.md](DEMO_BY_RQ.md); tệp này là **cách vận hành**.
 
 ---
 

@@ -4,7 +4,7 @@
 > (Tier-1 → Cổng ML → *(chỉ ca ML bỏ ngỏ)* Tier-2 → Dashboard), thay vì luồng gộp.
 >
 > Cách chạy hệ thống & demo theo RQ: [RUN_PROJECT.md](RUN_PROJECT.md) ·
-> Chỉ số đo đạc: [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md)
+> Chỉ số đo đạc: [DEMO_BY_RQ.md](DEMO_BY_RQ.md)
 
 ## Tài liệu này KHÔNG chứa số đo
 
@@ -184,7 +184,7 @@ Luật chỉ tự chặn khi **khớp IP chính xác** (`.15` ≠ `.150`) và **
 `docker logs -f sentinel_llm` (`total time` = một lô; `eval time` = throughput).
 
 Trọng tài chấm lập luận phải là **model khác họ** (`evaluate_reasoning.py` chặn cứng nếu
-trọng tài trùng bị cáo) — xem [BENCHMARK_GUIDE.md](BENCHMARK_GUIDE.md) mục RQ3.
+trọng tài trùng bị cáo) — xem [DEMO_BY_RQ.md](DEMO_BY_RQ.md) §3.
 
 ---
 

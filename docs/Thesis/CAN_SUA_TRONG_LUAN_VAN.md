@@ -132,7 +132,7 @@ phạm vi là tự tước bằng chứng cho nửa câu hỏi RQ3, trong khi `c
 | `ground_truth.json` 1.750 (86,9% tấn công) | ablation, quy kết, độ trễ |
 | `build_stream()` 25.799 | xả tải, toàn tuyến, APT |
 
-Chi tiết đã viết sẵn ở `docs/BENCHMARK_GUIDE.md`.
+Chi tiết đã viết sẵn ở `docs/Codebase/guides/DEMO_BY_RQ.md`.
 
 ### B4. Cổng ML: phải nói rõ vì sao tỉ lệ tự quyết tụt
 

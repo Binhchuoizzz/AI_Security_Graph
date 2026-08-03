@@ -1,8 +1,20 @@
 """
 Script chuẩn bị dữ liệu RAFT (Retrieval-Augmented Fine-Tuning) cho QLoRA trong llm_lab.
-ĐẢM BẢO TÁCH BIỆT DỮ LIỆU THỰC NGHIỆM (Anti-Data Leakage):
-- Trích xuất kết hợp từ CIC-IDS2017 (ml_lab/dataset_100k.csv) VÀ CSIC 2010 Web Logs (data/csic.json).
-- ĐÃ LOẠI TRỪ 100% CÁC MẪU TRÙNG LẶP KHỎI experiments/ground_truth.json (Hold-out Benchmark Isolation).
+
+Nguồn: CIC-IDS2017 (`ml_lab/dataset_100k.csv`) + CSIC 2010 Web Logs (`data/csic.json`).
+
+CÁCH LY VỚI TẬP CHẤM ĐIỂM — VÀ GIỚI HẠN CỦA NÓ.
+Mọi log trong `experiments/ground_truth.json` được băm rồi loại khỏi tập RAFT, để tập chấm
+điểm giữ nguyên tính chưa-từng-thấy.
+
+Đây là **loại trùng lặp CHÍNH XÁC**, KHÔNG phải "zero-overlap 100%" như bản trước ghi.
+`_hash_log()` băm MD5 trên chuỗi ghép `uri|payload|message`, nên nó chỉ bắt bản sao y hệt
+từng ký tự. Hai biến thể của CÙNG một đòn tấn công chỉ khác một tham số (`?id=1` với
+`?id=2`) cho hai mã băm khác nhau và **cả hai cùng lọt**. Nói "100%" là quá lời so với thứ
+cơ chế này bảo đảm được.
+
+Muốn tuyên bố mạnh hơn thì phải chuẩn hoá trước khi băm (bỏ giá trị tham số, giữ khung URI)
+hoặc dùng tương đồng gần đúng (MinHash/SimHash) kèm ngưỡng công bố được.
 """
 
 import hashlib
@@ -156,7 +168,7 @@ def main():
                     records.append(format_csic_row_to_raft(item))
                     csic_added += 1
         print(
-            f"[*] Đã thêm {csic_added} mẫu CSIC 2010 Web App (Đã lọc 100% không trùng GT Benchmark)."
+            f"[*] Đã thêm {csic_added} mẫu CSIC 2010 Web App (đã lọc trùng KHỚP CHÍNH XÁC với GT)."
         )
 
     # 2) Trích xuất CIC-IDS2017 (NetFlow logs)
@@ -187,7 +199,7 @@ def main():
         for r in test_records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    print("[+] ĐÃ NÂNG CẤP THÀNH CÔNG TÁCH BIỆT MULTI-DATASET 100%:")
+    print("[+] Dựng xong tập RAFT (đã loại trùng lặp CHÍNH XÁC với tập chấm điểm):")
     print(
         f"    - Tập QLoRA Train ({len(train_records)} mẫu): Kết hợp CSIC 2010 Web + CIC-IDS2017 -> {TRAIN_OUT}"
     )
@@ -195,7 +207,9 @@ def main():
         f"    - Tập QLoRA Test ({len(test_records)} mẫu): Kết hợp CSIC 2010 Web + CIC-IDS2017 -> {TEST_OUT}"
     )
     print(
-        "    - Tập Benchmark Evaluation: Giữ nguyên 100% UNSEEN từ experiments/ground_truth.json (KHÔNG CHẠM VÀO)."
+        "    - Tập chấm điểm `experiments/ground_truth.json`: KHÔNG CHẠM VÀO. Mọi log trùng"
+        " KHỚP CHÍNH XÁC đã bị loại khỏi tập RAFT (biến thể gần giống thì KHÔNG bắt được —"
+        " xem docstring đầu tệp)."
     )
 
 
