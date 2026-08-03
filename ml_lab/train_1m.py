@@ -52,7 +52,9 @@ EXCLUDE = {
 def main():
     print(f"[*] Load {DATA_FILE} …", flush=True)
     df = pd.read_csv(DATA_FILE)
-    y = df["Target"].values
+    # np.asarray: `.values` khai báo trả `ndarray | ExtensionArray`, mà np.bincount và
+    # train_test_split(stratify=) chỉ nhận ndarray. Cột Target là số nên ép kiểu không đổi dữ liệu.
+    y = np.asarray(df["Target"].values)
     df = df.rename(columns=RENAME_MAP)
     features = [c for c in df.columns if c not in EXCLUDE]
     for c in features:

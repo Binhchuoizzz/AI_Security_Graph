@@ -34,7 +34,9 @@ MODEL_OUT = os.path.join(ROOT, "ml_lab", "tier_2_model.pkl")
 print(f"[*] Loading dataset from {DATA_FILE}...")
 df = pd.read_csv(DATA_FILE)
 
-y = df["Target"].values
+# np.asarray: `.values` khai báo trả `ndarray | ExtensionArray`, mà np.bincount và
+# train_test_split(stratify=) chỉ nhận ndarray. Cột Target là số nên ép kiểu không đổi dữ liệu.
+y = np.asarray(df["Target"].values)
 # Define mapping from offline dataset to online streaming names for core features
 rename_map = {
     "Flow Duration": "Flow Duration",
@@ -76,7 +78,7 @@ X = df[features].values
 feature_names = features
 
 print(f"Dataset Shape: {X.shape}")
-print(f"Target Distribution: {np.bincount(y)} (0: Benign, 1: Attack)")  # pyright: ignore[reportArgumentType]
+print(f"Target Distribution: {np.bincount(y)} (0: Benign, 1: Attack)")
 
 # Plot Target Distribution
 plt.figure(figsize=(6, 4))
