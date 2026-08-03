@@ -289,6 +289,27 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
         except Exception:
             pass
 
+    def _tier1_block_record(ip: str, log: dict) -> dict:
+        """Hình dạng DUY NHẤT của một bản ghi trong `tier1_blocks.json`.
+
+        BẮT BUỘC đi qua hàm này ở MỌI chỗ append. Trước đây nhánh Cổng ML append thẳng
+        `evaluated_log` (khoá `"Source IP"`, `"tier1_score"`…) còn nhánh rule engine append
+        dict `{ip, score, reasons, ts}`. Bên đọc `_get_tier1_blocks()` lọc bằng `b.get("ip")`
+        ở CẢ HAI vòng (đếm và khử trùng) rồi `continue` khi thiếu — nên **mọi IP do Cổng ML
+        chặn đều bị bỏ lặng lẽ, không bao giờ hiện trên Dashboard**. Một tầng phòng thủ vô
+        hình, đúng tầng mà RQ1 cần trưng ra.
+        """
+        return {
+            "ip": ip,
+            "score": log.get("tier1_score", 0),
+            "reasons": [str(x) for x in (log.get("tier1_reasons") or [])],
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            # LOG THÔ ĐẦY ĐỦ để analyst audit tận gốc "cái gì đã bị chặn". Sidecar chỉ có
+            # ip/score/reasons thì nhìn bảng Tier-1 KHÔNG thể truy ra bản ghi nào gây ra
+            # lệnh chặn. Vẫn _strip_dataset_labels để không lộ nhãn đáp án của bộ dữ liệu.
+            "raw_log": _strip_dataset_labels(log),
+        }
+
     # ── SUY HAO DANH TIẾNG (decay) ─────────────────────────────────────────────────
     # threat_memory.decay_reputation() ĐÃ tồn tại và có unit test, nhưng TRƯỚC ĐÂY KHÔNG
     # NƠI NÀO trong code sản phẩm gọi nó — nên điểm xấu của một IP là VĨNH VIỄN trên thực
@@ -539,8 +560,15 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     evaluated_log["tier1_reasons"] = (
                                         evaluated_log.get("tier1_reasons") or []
                                     ) + [ml_reasoning]
-                                    if ml_action in ("BLOCK_IP", "WHITELIST_DROP"):
-                                        tier1_recent_blocks.append(evaluated_log)
+                                    # CHỈ BLOCK_IP. Bản cũ nhận cả `WHITELIST_DROP` — mà
+                                    # whitelist drop là CHO QUA, không phải lệnh chặn; để lẫn
+                                    # thì bảng "đã chặn" đếm luôn cả lưu lượng được đặc cách.
+                                    if ml_action == "BLOCK_IP" and _src_ip:
+                                        tier1_recent_blocks.append(
+                                            _tier1_block_record(_src_ip, evaluated_log)
+                                        )
+                                        if len(tier1_recent_blocks) > 200:
+                                            del tier1_recent_blocks[:-100]
 
                                     try:
                                         import mlflow
@@ -620,21 +648,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                         print(f"[!] mark_ip_blocked lỗi {src_ip}: {_e}")
                                     # Lưu block Tier-1 (kèm lý do) cho Dashboard đọc qua file
                                     tier1_recent_blocks.append(
-                                        {
-                                            "ip": src_ip,
-                                            "score": evaluated_log.get("tier1_score", 0),
-                                            "reasons": [
-                                                str(x)
-                                                for x in (evaluated_log.get("tier1_reasons") or [])
-                                            ],
-                                            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
-                                            # LOG THÔ ĐẦY ĐỦ để analyst audit tận gốc "cái gì
-                                            # đã bị chặn". Trước đây sidecar chỉ có ip/score/
-                                            # reasons -> nhìn bảng Tier-1 KHÔNG thể truy ra bản
-                                            # ghi nào gây ra lệnh chặn. Vẫn _strip_dataset_labels
-                                            # để không lộ nhãn đáp án của bộ dữ liệu.
-                                            "raw_log": _strip_dataset_labels(evaluated_log),
-                                        }
+                                        _tier1_block_record(src_ip, evaluated_log)
                                     )
                                     if len(tier1_recent_blocks) > 200:
                                         del tier1_recent_blocks[:-100]

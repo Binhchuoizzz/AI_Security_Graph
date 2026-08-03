@@ -63,6 +63,255 @@ def _derive_tier1_attack_type(reasons: list[str]) -> str:
     return " + ".join(labels)
 
 
+# ── Bộ dựng badge DÙNG CHUNG ───────────────────────────────────────────────────────
+# VÌ SAO PHẢI GOM MỘT CHỖ. Cùng logic này trước đây có BA bản chép tay: thẻ cảnh báo
+# (`render_alert_card`), cụm HITL trong `app.py`, và thẻ chặn Tier-1. Ba bản trôi dạt khác
+# nhau, và mỗi lần sửa một giá trị bịa lại phải đi tìm đủ ba nơi — thực tế đã có bốn giá trị
+# bịa phải sửa hai lần ở hai tệp. Một nguồn chân lý thì không tái diễn được.
+#
+# NGUYÊN TẮC CHUNG cho mọi hàm dưới đây: **không có dữ liệu thì nói là không có**, tuyệt đối
+# không điền giá trị mặc định trông-như-thật (điểm 100.0, đủ 5 mã, TTFT 0.3s…).
+
+_BADGE_RED = "background:rgba(255,77,79,0.15);color:#ff7875;border:1px solid rgba(255,77,79,0.35);"
+_BADGE_CYAN = (
+    "background:rgba(87,227,249,0.12);color:#57e3f9;border:1px solid rgba(87,227,249,0.3);"
+)
+_BADGE_GREEN = (
+    "background:rgba(82,196,26,0.15);color:#95de64;border:1px solid rgba(82,196,26,0.35);"
+)
+_BADGE_AMBER = (
+    "background:rgba(250,173,20,0.15);color:#faad14;border:1px solid rgba(250,173,20,0.35);"
+)
+_BADGE_BLUE = (
+    "background:rgba(24,144,255,0.15);color:#69c0ff;border:1px solid rgba(24,144,255,0.35);"
+)
+_BADGE_PURPLE = (
+    "background:rgba(114,46,209,0.15);color:#d3adf7;border:1px solid rgba(114,46,209,0.35);"
+)
+
+_GUARDRAIL_BOX = (
+    "color: #faad14; margin-top: 5px; font-size: 0.83rem; background: rgba(250,173,20,0.08);"
+    " padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(250,173,20,0.25);"
+)
+
+# Bắt cả mã ATT&CK Enterprise (T1190, T1059.007) lẫn mã ATLAS (AML.T0051). `_TECHNIQUE_ID_RE`
+# ở tầng agent CỐ Ý không bắt AML.* — ở đây thì phải bắt, vì màn hình cần hiện cả hai họ.
+_TECH_CODE_RE = re.compile(r"\b(AML\.T\d{4}|T\d{4}(?:\.\d{3})?)\b", re.IGNORECASE)
+
+
+def parse_mitre_technique(raw_reason: str) -> str:
+    """Bóc mã kỹ thuật từ chuỗi reason. Trả `"N/A"` khi không có — KHÔNG đoán thay."""
+    # `[MITRE: ...]` có thể chứa ngoặc vuông lồng nhau (ví dụ "[Tự suy luận]"), nên regex
+    # phải cho phép một cấp lồng thay vì dùng `[^\]]*` tham lam.
+    m = re.search(r"\[MITRE:\s*((?:[^\[\]]|\[[^\[\]]*\])*)\]", raw_reason, re.IGNORECASE)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    if t := _TECH_CODE_RE.search(raw_reason):
+        return t.group(1).upper()
+    return "N/A"
+
+
+def build_grounding_badge(raw_reason: str, mitre_tech: str) -> tuple[str, bool]:
+    """Thẻ neo-bằng-chứng. Trả `(html, is_grounded)` để bên gọi dùng lại cờ."""
+    has_tech = bool(mitre_tech and mitre_tech != "N/A" and not mitre_tech.startswith("N/A"))
+    is_grounded = "NEO BẰNG CHỨNG" in raw_reason or (
+        has_tech and "unmappable" not in raw_reason.lower()
+    )
+    if is_grounded:
+        return f'<span class="soc-badge" style="{_BADGE_GREEN}">✅ GROUNDED IN RAG</span>', True
+    return (
+        f'<span class="soc-badge" style="{_BADGE_AMBER}">🛡️ DEGRADED SAFEGUARD (N/A)</span>',
+        False,
+    )
+
+
+def build_origin_badge(raw_reason: str) -> str:
+    """Nguồn phán quyết: bộ đệm ngữ nghĩa hay suy luận thật trên GPU.
+
+    KHÔNG kèm số thời gian. Thẻ này chỉ phân biệt NGUỒN, nó không đo gì cả — bản cũ ghi
+    "(TTFT 0.3s)" cho mọi lô, một con số không đến từ phép đo nào.
+    """
+    low = raw_reason.lower()
+    if "PHÁN QUYẾT TÁI SỬ DỤNG" in raw_reason or "responsecache" in low or "tái sử dụng" in low:
+        return f'<span class="soc-badge" style="{_BADGE_PURPLE}">⚡ Semantic Cache Hit</span>'
+    return f'<span class="soc-badge" style="{_BADGE_BLUE}">🧠 Live GPU</span>'
+
+
+def build_threat_memory_badge(raw_reason: str) -> str:
+    """Lịch sử uy tín IP, đọc từ chuỗi reason của Threat Memory (thang 0–100).
+
+    CHỈ hiện phần parse được. Bản cũ mặc định `reputation = "100.0"` khi không parse được,
+    nên IP chưa có lịch sử nào vẫn hiện Risk 100/100; và còn suy ra "13 sự cố" từ việc chuỗi
+    IP demo `198.51.100` xuất hiện trong target.
+    """
+    inc_m = re.search(r"(\d+)\s+incidents", raw_reason, re.IGNORECASE)
+    blk_m = re.search(r"(\d+)\s+blocks", raw_reason, re.IGNORECASE)
+    score_m = re.search(
+        r"reputation score of ([\d.]+)/100|điểm rủi ro:?\s*(\d+)", raw_reason, re.IGNORECASE
+    )
+    inc = int(inc_m.group(1)) if inc_m else None
+    blk = int(blk_m.group(1)) if blk_m else None
+    rep = (score_m.group(1) or score_m.group(2)) if score_m else None
+    risk = f" · Risk: {rep}/100" if rep else ""
+
+    if inc is not None and blk is not None:
+        rem = max(0, inc - blk)
+        rem_s = f" · {rem} HITL/Audit" if rem > 0 else ""
+        body = f"{inc} sự cố ({blk} Block{rem_s}){risk}"
+    elif inc is not None:
+        body = f"{inc} sự cố{risk}"
+    elif rep:
+        body = f"Risk {rep}/100"
+    else:
+        return f'<span class="soc-badge" style="{_BADGE_CYAN}">📜 Threat Memory: chưa có dữ liệu uy tín</span>'
+    return f'<span class="soc-badge" style="{_BADGE_RED}">📜 Threat Memory: {body}</span>'
+
+
+def build_technique_codes_html(raw_reason: str) -> str:
+    """Các mã kỹ thuật NÊU TRONG phán quyết. Không có mã nào thì trả `""` (ẩn hẳn khối).
+
+    Bản cũ độn `["T1190","T1595.003","T1059.007","T1083","T1046"]` cho đủ 5 rồi dán nhãn
+    "Top-5 Ứng viên RAG Truy xuất (FAISS + BM25)" — tức gán cho bộ truy xuất những mã nó chưa
+    từng trả về. Nhãn nay nói đúng thứ đang hiện: mã đọc được từ chuỗi phán quyết.
+    """
+    seen: list[str] = []
+    for c in _TECH_CODE_RE.findall(raw_reason):
+        cu = c.upper()
+        if cu not in seen:
+            seen.append(cu)
+    if not seen:
+        return ""
+    shown = seen[:5]
+    badges = " · ".join(
+        f'<code style="color:#69c0ff;background:rgba(24,144,255,0.15);padding:1px 5px;'
+        f'border-radius:3px;font-size:0.8rem;">{html_lib.escape(c)}</code>'
+        for c in shown
+    )
+    return (
+        '<div class="soc-reasoning-section" style="color: #69c0ff; margin-top: 6px; font-size: 0.82rem;">'
+        f"  🔍 <b>Mã kỹ thuật nêu trong phán quyết ({len(shown)}):</b> {badges}"
+        "</div>"
+    )
+
+
+def build_guardrail_note(is_grounded: bool, mitre_tech: str, action: str) -> str:
+    """Ghi chú chính sách Guardrail — chỉ hiện cho ca bị ép hạ xuống `AWAIT_HITL`."""
+    if action.upper() != "AWAIT_HITL":
+        return ""
+    if is_grounded and mitre_tech and mitre_tech != "N/A":
+        body = (
+            f"Nhận diện mã kỹ thuật <code>{html_lib.escape(mitre_tech)}</code>, nhưng chưa chắc "
+            "bằng chứng payload (chỉ có tín hiệu tổng quát/cổng lạ) ➔ Tự động ép hạ "
+            "<code>AWAIT_HITL</code>."
+        )
+    else:
+        body = (
+            "Không chắc kỹ thuật MITRE cụ thể (hạ về N/A) ➔ Tự động ép hạ "
+            "<code>AWAIT_HITL</code> cho L3 Analyst duyệt."
+        )
+    return f'<div style="{_GUARDRAIL_BOX}">  🛡️ <b>Guardrail Policy (AGENTS.md):</b> {body}</div>'
+
+
+def build_tier1_block_badge(count: int, tier1_score) -> str:
+    """Thẻ cho bảng "Chặn tức thời Tier-1" — nguồn là `config/tier1_blocks.json`.
+
+    KHÔNG dùng `build_threat_memory_badge` ở đây: hai nguồn dữ liệu khác nhau.
+    - Threat Memory = kho uy tín SQLite, thang 0–100 (ngưỡng chặn 70).
+    - `tier1_score` = bộ CỘNG DỒN của rule engine, KHÔNG chặn trên (+50/+40/+30/+100/+z…).
+
+    Bản cũ in `Risk: {tier1_score}/100` nên hai luật cùng khớp là ra "Risk: 150/100" — một
+    phần trăm bất khả thi; và in `{count} sự cố ({count} Block)`, tức cùng một biến hiện hai
+    lần như thể hai con số độc lập xác nhận nhau.
+    """
+    return (
+        f'<span class="soc-badge" style="{_BADGE_RED}">'
+        f"⚡ Tier-1 Rule Engine: {count} lần chặn · điểm luật {tier1_score}</span>"
+    )
+
+
+def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
+    """Xây dựng Cây Phân rã MITRE ATT&CK: Tactic -> Technique -> Sub-technique."""
+    tech_upper = mitre_tech.upper()
+
+    if "AML.T0051" in tech_upper or "PROMPT INJECTION" in tech_upper:
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            "  🎯 <b>Cây Phân rã MITRE:</b> "
+            '<span style="color:#ffa940;">Framework: MITRE ATLAS</span> ➔ '
+            '<span style="color:#69c0ff;">Tactic: LLM Attack Vector</span> ➔ '
+            '<span style="color:#b7eb8f;">Technique: AML.T0051 - Prompt Injection</span>'
+            "</div>"
+        )
+
+    if "T1110.004" in tech_upper or "CREDENTIAL STUFFING" in tech_upper:
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            "  🎯 <b>Cây Phân rã MITRE:</b> "
+            '<span style="color:#ffa940;">TA0006 (Credential Access)</span> ➔ '
+            '<span style="color:#69c0ff;">T1110 (Brute Force)</span> ➔ '
+            '<span style="color:#b7eb8f;">T1110.004 (Credential Stuffing)</span>'
+            "</div>"
+        )
+    elif "T1110" in tech_upper or "BRUTE FORCE" in tech_upper:
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            "  🎯 <b>Cây Phân rã MITRE:</b> "
+            '<span style="color:#ffa940;">TA0006 (Credential Access)</span> ➔ '
+            '<span style="color:#69c0ff;">T1110 (Brute Force)</span>'
+            "</div>"
+        )
+
+    if "T1190" in tech_upper or "EXPLOIT" in tech_upper:
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            "  🎯 <b>Cây Phân rã MITRE:</b> "
+            '<span style="color:#ffa940;">TA0001 (Initial Access)</span> ➔ '
+            '<span style="color:#69c0ff;">T1190 (Exploit Public-Facing Application)</span>'
+            "</div>"
+        )
+
+    if "T1595.003" in tech_upper or "WORDLIST SCANNING" in tech_upper:
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            "  🎯 <b>Cây Phân rã MITRE:</b> "
+            '<span style="color:#ffa940;">TA0043 (Reconnaissance)</span> ➔ '
+            '<span style="color:#69c0ff;">T1595 (Active Scanning)</span> ➔ '
+            '<span style="color:#b7eb8f;">T1595.003 (Wordlist Scanning)</span>'
+            "</div>"
+        )
+
+    if "T1059.007" in tech_upper or "JAVASCRIPT" in tech_upper:
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            "  🎯 <b>Cây Phân rã MITRE:</b> "
+            '<span style="color:#ffa940;">TA0002 (Execution)</span> ➔ '
+            '<span style="color:#69c0ff;">T1059 (Command & Scripting)</span> ➔ '
+            '<span style="color:#b7eb8f;">T1059.007 (JavaScript Execution)</span>'
+            "</div>"
+        )
+
+    m_id = re.search(r"T(\d{4})(?:\.(\d{3}))?", tech_upper)
+    if m_id:
+        t_id = f"T{m_id.group(1)}"
+        sub_id = f"T{m_id.group(1)}.{m_id.group(2)}" if m_id.group(2) else ""
+        if sub_id:
+            return (
+                '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+                f'  🎯 <b>Cây Phân rã MITRE:</b> <span style="color:#ffa940;">TA0001 (Security Event)</span> ➔ '
+                f'<span style="color:#69c0ff;">{t_id} (Parent Technique)</span> ➔ '
+                f'<span style="color:#b7eb8f;">{sub_id} (Sub-Technique)</span>'
+                "</div>"
+            )
+        return (
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            f'  🎯 <b>Cây Phân rã MITRE:</b> <span style="color:#ffa940;">TA0001 (Security Event)</span> ➔ '
+            f'<span style="color:#69c0ff;">{t_id} (Primary Technique)</span>'
+            "</div>"
+        )
+
+    return ""
+
+
 def render_alert_card(
     alert,
     is_l3_manager=False,
@@ -154,16 +403,8 @@ def render_alert_card(
         return
 
     # Bóc tách Regex từ chuỗi Reason
-    mitre_tech = "N/A"
+    mitre_tech = parse_mitre_technique(raw_reason)
     confidence = "Chưa rõ"
-
-    # Lấy toàn bộ nội dung trong [MITRE: ...] bằng cách split hoặc regex không tham lam
-    # Vì mitre_technique có thể chứa [Tự suy luận] (ngoặc vuông lồng nhau), regex sẽ hơi khác
-    mitre_match = re.search(r"\[MITRE:\s*((?:[^\[\]]|\[[^\[\]]*\])*)\]", raw_reason, re.IGNORECASE)
-    if mitre_match:
-        mitre_tech = mitre_match.group(1).strip()
-    elif t_match := re.search(r"(T\d{4}(?:\.\d{3})?)", raw_reason):
-        mitre_tech = t_match.group(1)
 
     conf_match = re.search(
         r"(?:Confidence|Độ\s+tin\s+cậy):\s*([01]?\.\d+|1(?:\.0)?|\d+(?:\.\d+)?%)",
@@ -206,7 +447,6 @@ def render_alert_card(
         css_class = "severity-medium"
         icon = "🧑‍💻"
 
-    # Action display labels
     action_translations = {
         "BLOCK_IP": "BLOCK IP",
         "ALERT": "ALERT",
@@ -216,13 +456,11 @@ def render_alert_card(
     }
     action_display = action_translations.get(action, action)
 
-    # Check if self-inferred by AI
     is_self_inferred = "Self-inferred" in raw_reason or "Tự suy luận" in raw_reason
     inference_badge = ""
     if is_self_inferred:
         inference_badge = '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 Self-Inferred</span>'
 
-    # Clean raw_reason for display
     clean_reason = html_lib.escape(raw_reason)
     clean_reason = re.sub(
         r"\[MITRE:(?:[^\[\]]|\[[^\[\]]*\])*\]", "", clean_reason, flags=re.IGNORECASE
@@ -234,10 +472,8 @@ def render_alert_card(
     if clean_reason.startswith("]"):
         clean_reason = clean_reason[1:].strip()
 
-    # Giữ lại các ký tự xuống dòng (vì lúc render HTML sẽ bị hàm split('\n') và strip() nuốt mất)
     clean_reason = clean_reason.replace("\n", "<br>")
 
-    # Categorize decision tier: Tier-1 rule / Tier-1 ML Gate / Tier-2 LLM
     reason_text = raw_reason
     is_manual = (
         "Manual" in reason_text or "MANUAL" in reason_text.upper() or "Chặn thủ công" in reason_text
@@ -278,9 +514,14 @@ def render_alert_card(
             'border-radius:4px;margin-left:8px;">⚡ Tier-1 · ML Gate</span>'
         )
         reasoning_title = "⚡ Tier-1 ML Gate Reasoning (LightGBM):"
+        # KHÔNG điền mã thay khi hệ trả N/A. Trước đây chỗ này in sẵn "T1190 - Exploit
+        # Public-Facing Application" cho MỌI ca không quy kết được — tức màn hình công bố
+        # một kỹ thuật mà hệ chưa hề kết luận. N/A là kết quả thật, phải hiện đúng N/A.
         mitre_section_text = f"🎯 MITRE ATT&CK Mapping: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
-            mitre_section_text = "🎯 MITRE ATT&CK Mapping: <code>T1190 - Exploit Public-Facing Application</code> (Automated Inference)"
+            mitre_section_text = (
+                "🎯 MITRE ATT&CK Mapping: <code>N/A</code> — chưa quy kết được kỹ thuật"
+            )
     else:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#69c0ff;'
@@ -290,9 +531,10 @@ def render_alert_card(
         reasoning_title = "🤖 Agentic LLM Reasoning (Foundation-Sec-8B):"
         mitre_section_text = f"🎯 MITRE ATT&CK Mapping: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
-            mitre_section_text = "🎯 MITRE ATT&CK Mapping: <code>T1190 - Exploit Public-Facing Application</code> (Agent Reasoning)"
+            mitre_section_text = (
+                "🎯 MITRE ATT&CK Mapping: <code>N/A</code> — chưa quy kết được kỹ thuật"
+            )
 
-    # NIST Incident Response Playbook guidance
     nist_playbook_text = (
         "🛡️ NIST Incident Response Playbook: Log event and perform continuous behavioral monitoring."
     )
@@ -302,6 +544,15 @@ def render_alert_card(
         nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.2): High-priority alert to L1/L3 SOC Analysts; place IP on high-risk watchlist."
     elif severity_level == "MEDIUM":
         nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.3): Require Human-in-the-Loop (HITL) analyst approval to trigger automated block rule."
+
+    # ── Badge: dùng bộ dựng CHUNG (xem đầu tệp) để thẻ này, cụm HITL trong app.py và
+    # thẻ chặn Tier-1 không còn trôi dạt khỏi nhau.
+    grounding_badge, is_grounded = build_grounding_badge(raw_reason, mitre_tech)
+    origin_badge = build_origin_badge(raw_reason)
+    rep_badge = build_threat_memory_badge(raw_reason)
+    mitre_hierarchy_html = _build_mitre_hierarchy_html(mitre_tech)
+    rag_candidates_html = build_technique_codes_html(raw_reason)
+    guardrail_note_html = build_guardrail_note(is_grounded, mitre_tech, action)
 
     # Render HTML Card
     html_content = (
@@ -315,16 +566,22 @@ def render_alert_card(
         f'        <span class="soc-label">IP Mục tiêu:</span>'
         f'        <span class="soc-value-code">{target}</span>'
         f"    </div>"
-        f'    <div class="soc-detail-row">'
+        f'    <div class="soc-detail-row" style="flex-wrap:wrap;gap:4px;">'
         f'        <span class="soc-label">Ngữ cảnh:</span>'
         f'        <span class="soc-badge soc-mitre-badge">MITRE: {mitre_tech}</span>'
         f'        <span class="soc-badge soc-conf-badge">Độ tin cậy: {confidence}</span>'
         f"        {inference_badge}"
+        f"        {grounding_badge}"
+        f"        {origin_badge}"
+        f"        {rep_badge}"
         f"    </div>"
         f'    <div class="soc-reasoning-box">'
         f'        <div class="soc-reasoning-title">{reasoning_title}</div>'
         f'        <div style="margin-bottom: 8px;">{clean_reason}</div>'
         f'        <div class="soc-reasoning-section" style="color: #D3ADF7;">{mitre_section_text}</div>'
+        f"        {mitre_hierarchy_html}"
+        f"        {rag_candidates_html}"
+        f"        {guardrail_note_html}"
         f'        <div style="color: #98FB98; margin-top: 4px; font-size: 0.85rem; font-weight: 500;">{nist_playbook_text}</div>'
         f"    </div>"
         f"</div>"

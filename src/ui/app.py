@@ -1,7 +1,7 @@
 import typing
 
 """
-SENTINEL - Main Dashboard
+SENTINEL - Main SOC Dashboard (v2.5 Premium Audit UI)
 Khởi chạy bằng lệnh: streamlit run src/ui/app.py
 """
 
@@ -106,9 +106,11 @@ def _res_metric(col, label: str, value, delta: str, fmt: "typing.Callable | type
 
 # ---------------------------------------------------------------------------
 from src.tier1_filter.feedback_listener import FeedbackListener
+from src.ui import components as ui_components
 from src.ui.auth import logout, require_auth
 from src.ui.components import (
     ML_GATE_MARKERS,
+    build_tier1_block_badge,
     is_valid_ip,
     render_alert_card,
     render_apt_events_table,
@@ -1212,14 +1214,16 @@ def main_dashboard():
                             'border-radius:4px;margin-left:8px;">🛡️ Tier-1 Block · Redis TTL 1h</span>'
                             f'    <span class="soc-timestamp">{ts}</span>'
                             "  </div>"
-                            '  <div class="soc-detail-row">'
+                            '  <div class="soc-detail-row" style="flex-wrap:wrap;gap:4px;">'
                             '    <span class="soc-label">IP bị chặn:</span>'
                             f'    <span class="soc-value-code" style="color:#ff7875;">{ip}</span>'
-                            f'    <span style="color:#8c8c8c;font-size:0.8rem;margin-left:12px;">Bị chặn {count} lần · Điểm rủi ro: <b style="color:#ff4d4f;">{score}</b></span>'
+                            f"    {build_tier1_block_badge(count, score)}"
+                            '    <span class="soc-badge" style="background:rgba(82,196,26,0.15);color:#95de64;border:1px solid rgba(82,196,26,0.35);">🟢 Rule Engine Match</span>'
                             "  </div>"
                             '  <div class="soc-reasoning-box" style="margin-top:8px;">'
                             '    <div class="soc-reasoning-title">⚡ Lý do Tier-1 chặn (Rule Engine):</div>'
                             f'    <ul style="margin:6px 0 0 18px;font-size:0.85rem;color:#d9d9d9;">{reasons_html}</ul>'
+                            '    <div style="color: #98FB98; margin-top: 6px; font-size: 0.85rem; font-weight: 500;">🛡️ NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment - Block source IP at Firewall to isolate attack boundary.</div>'
                             "  </div>"
                             '  <div class="soc-detail-row" style="margin-top:8px;">'
                             '    <span class="soc-badge" style="background:rgba(255,77,79,0.15);color:#ff7875;'
@@ -1337,6 +1341,36 @@ def main_dashboard():
                         st.write(f"**Created Time:** {created}")
                         st.write(f"**Data Field:** {rule.get('field')}")
                         st.write(f"**Reason:** {rule.get('reason')}")
+
+                        # ── Badge + hierarchy + mã kỹ thuật cho thẻ HITL ──────────────
+                        # Dùng ĐÚNG bộ dựng mà `render_alert_card` dùng, để hai màn hình
+                        # không bao giờ nói khác nhau về cùng một bản ghi. Trước đây khối
+                        # này là ~70 dòng chép tay và đã trôi dạt: cùng bốn giá trị bịa phải
+                        # sửa hai lần ở hai tệp.
+                        raw_reason_hitl = str(rule.get("reason", ""))
+                        mitre_tech_hitl = ui_components.parse_mitre_technique(raw_reason_hitl)
+                        gr_badge, is_gr = ui_components.build_grounding_badge(
+                            raw_reason_hitl, mitre_tech_hitl
+                        )
+                        st.markdown(
+                            '<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);'
+                            'border-radius:6px;border:1px solid rgba(255,255,255,0.08);">'
+                            '<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;">'
+                            f"{gr_badge}"
+                            f"{ui_components.build_origin_badge(raw_reason_hitl)}"
+                            f"{ui_components.build_threat_memory_badge(raw_reason_hitl)}"
+                            "</div>"
+                            '<div class="soc-reasoning-section" style="color:#D3ADF7;margin-top:4px;'
+                            f'font-size:0.83rem;">🎯 MITRE ATT&CK Mapping: <code>{mitre_tech_hitl}</code></div>'
+                            f"{ui_components._build_mitre_hierarchy_html(mitre_tech_hitl)}"
+                            f"{ui_components.build_technique_codes_html(raw_reason_hitl)}"
+                            f"{ui_components.build_guardrail_note(is_gr, mitre_tech_hitl, 'AWAIT_HITL')}"
+                            '<div style="color:#98FB98;margin-top:6px;font-size:0.83rem;font-weight:500;">'
+                            "🛡️ NIST Incident Response Playbook (Section 3.2.3): Require "
+                            "Human-in-the-Loop (HITL) analyst approval to trigger automated block rule."
+                            "</div></div>",
+                            unsafe_allow_html=True,
+                        )
 
                         # Lấy raw log để minh chứng
                         target_pattern = str(rule.get("pattern", ""))

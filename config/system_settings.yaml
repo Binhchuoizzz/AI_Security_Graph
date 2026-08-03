@@ -30,10 +30,6 @@ guardrails:
   - you are now
   - system prompt
   - disregard
-  - <script>
-  - DROP TABLE
-  - UNION SELECT
-  - ; exec
   - forget everything
   - act as
   - new instructions
@@ -78,6 +74,11 @@ guardrails:
   - 10.0.0.0/8
   - 172.16.0.0/12
   - 192.168.0.0/16
+  web_attack_patterns:
+  - <script>
+  - DROP TABLE
+  - UNION SELECT
+  - ; exec
 llm:
   base_url: http://localhost:5000/v1
   estimated_vram_gb: 5

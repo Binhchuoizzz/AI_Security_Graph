@@ -170,18 +170,45 @@ def load_config():
 class PromptInjectionDetector:
     """
     Tầng 1: Phát hiện chuỗi Prompt Injection đã biết (Known Patterns).
+
+    HAI HỌ CHỮ KÝ, HAI MỤC ĐÍCH KHÁC NHAU:
+
+      * `injection_patterns`  — tấn công nhắm vào LLM (ignore instructions, roleplay, …)
+      * `web_attack_patterns` — tấn công web thật (`UNION SELECT`, `<script>`, …)
+
+    LỖI ĐÃ VÁ. Bốn chữ ký web từng nằm chung `injection_patterns`. Hạ nguồn,
+    `node_guardrails` đọc `injection_detected` để bật `_is_adversarial`, rồi
+    `node_attack_mapper` ép `type_hint = "prompt_injection"`. Hậu quả: một câu SQLi dạng
+    chữ thường bị quy kết thành **AML.T0051** thay vì **T1190** — sai cả họ khung (ATLAS
+    thay vì ATT&CK Enterprise). Trên dữ liệu hiện tại lỗi chưa kích hoạt (payload CSIC mã
+    hoá URL, và `scan()` chạy TRƯỚC `neutralize()`), nhưng chỉ cần đổi thứ tự hai bước đó
+    là 82/250 mẫu quy kết đổ sai.
+
+    `_injection_detected` vẫn hợp nhất CẢ HAI họ để lớp guardrail tĩnh giữ nguyên hành vi
+    và `robustness_results.json` vẫn so sánh được với các lượt đo cũ. Cờ MỚI
+    `_llm_attack_detected` mới là thứ nhánh đối kháng được phép dùng.
     """
 
-    def __init__(self, patterns: list | None = None):
+    def __init__(self, patterns: list | None = None, web_patterns: list | None = None):
         config = load_config()
-        self.patterns = patterns or config.get("guardrails", {}).get("injection_patterns", [])
+        guardrails_cfg = config.get("guardrails", {})
+        self.llm_patterns = patterns or guardrails_cfg.get("injection_patterns", [])
+        self.web_patterns = (
+            web_patterns
+            if web_patterns is not None
+            else guardrails_cfg.get("web_attack_patterns", [])
+        )
+        # `self.patterns` giữ nguyên nghĩa CŨ (hợp nhất) — có mã bên ngoài đọc thuộc tính này.
+        self.patterns = list(self.llm_patterns) + list(self.web_patterns)
         self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]
+        self._n_llm = len(self.llm_patterns)
 
     def scan(self, log_entry: dict) -> dict:
         """
         Quét log và ĐÁNH DẤU (không xóa).
         """
         is_injected = False
+        is_llm_attack = False
         detected_patterns = []
         injection_fields = []
 
@@ -195,11 +222,15 @@ class PromptInjectionDetector:
             for i, pattern in enumerate(self.compiled):
                 if pattern.search(str_value):
                     is_injected = True
+                    # `compiled` xếp LLM trước, web sau -> chỉ số < _n_llm là chữ ký LLM.
+                    if i < self._n_llm:
+                        is_llm_attack = True
                     detected_patterns.append(self.patterns[i])
                     injection_fields.append(key)
 
         result = dict(normalized_log)
         result["_injection_detected"] = is_injected
+        result["_llm_attack_detected"] = is_llm_attack
         result["_injection_patterns"] = detected_patterns
         result["_injection_fields"] = list(set(injection_fields))
         result["_isolation_level"] = "HIGH" if is_injected else "NORMAL"
@@ -612,6 +643,9 @@ class GuardrailsPipeline:
             "sanitized_log": neutralized,
             "encapsulated_text": encapsulated,
             "injection_detected": flagged.get("_injection_detected", False),
+            # Chỉ cờ này mới được dùng để định tuyến nhánh đối kháng — xem docstring
+            # `PromptInjectionDetector`. `injection_detected` bao gồm cả chữ ký web thật.
+            "llm_attack_detected": flagged.get("_llm_attack_detected", False),
             "injection_patterns": flagged.get("_injection_patterns", []),
             "injection_fields": flagged.get("_injection_fields", []),
             "jailbreak_detected": flagged.get("_jailbreak_detected", False),

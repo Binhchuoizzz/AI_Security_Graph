@@ -342,6 +342,22 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
 
 # Từ khoá -> khoá chuẩn (quét trên attack_type + payload + features). Thứ tự ưu
 # tiên xử lý trường hợp chồng lấn (vd "../" rất chung).
+#
+# TUYỆT ĐỐI KHÔNG ĐƯA MÃ KỸ THUẬT ("t1595", "t1083"…) VÀO DANH SÁCH NÀY.
+#
+# Lý do, đo được chứ không suy đoán. `nodes.py` dựng `type_hint` bằng cách nối
+# `decision["mitre_technique"]` — tức mã LLM TỰ KHAI — với reasoning và tier1_reasons, rồi
+# truyền vào `AttackMapperInput.attack_type`. Nếu ở đây có từ khoá là mã, bộ ánh xạ sẽ khớp
+# đúng cái mã mà LLM vừa nêu và trả lại y nguyên:
+#
+#     LLM tự khai 'T1595.003 Wordlist Scanning'  -> mapper trả 'T1595.003'
+#     LLM tự khai 'hoàn toàn bịa T9999'          -> mapper trả 'T9999'
+#
+# Khi đó "bộ ánh xạ tất định" không còn tất định — nó thành cái loa nhại lại LLM, và toàn
+# bộ lập luận "quy kết do bộ ánh xạ quyết, không do LLM quyết" sụp đổ. Bốn từ khoá dạng mã
+# (`t1595.003`, `t1595`, `t1071.001`, `t1083`) đã bị gỡ vì lý do này.
+#
+# Chỉ dùng từ khoá HÀNH VI: "wordlist scanning", "web protocols", "directory enumeration"…
 _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     (
         "prompt_injection",
@@ -364,8 +380,6 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "port scan",
             "active_scan",
             "wordlist_scan",
-            "t1595.003",
-            "t1595",
         ),
     ),
     (
@@ -377,7 +391,6 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "c2 communication",
             "c2_traffic",
             "c2 channel",
-            "t1071.001",
             "infilteration",
             "infiltration",
         ),
@@ -428,7 +441,6 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
             "web-inf",
             ".bak",
             ".inc",
-            "t1083",
             "../",
             "..%2f",
             "%2e%2e",
@@ -816,11 +828,31 @@ def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
         tactic, tactic_id = normalize_tactic(rec.get("tactic", ""))
         conf = 0.80  # triage grounded + KB xác nhận id
     else:
-        # id hợp lệ nhưng KB không phủ -> vẫn NEO (đúng hơn là để RRF chệch sang
-        # kỹ thuật cổng/giao thức), nhưng tactic để TRỐNG (honest) + hạ confidence.
+        # MÃ ĐÚNG ĐỊNH DẠNG NHƯNG KHO KHÔNG PHỦ -> vẫn GIỮ id, nhưng KHÔNG được "resolved".
+        #
+        # Giữ id là có chủ ý: kho chỉ có 433 mã, còn ATT&CK Enterprise nhiều hơn thế. `T1650`
+        # (Acquire Access) là mã THẬT mà kho chưa phủ — bỏ neo rồi để RRF chọn thay sẽ đổi
+        # một quy kết ĐÚNG lấy một quy kết SAI (thường chệch sang kỹ thuật cổng/giao thức).
+        #
+        # LỖI ĐÃ VÁ LÀ Ở NHÃN TRẠNG THÁI, KHÔNG PHẢI Ở VIỆC GIỮ ID. Bản trước gán
+        # `conf = 0.60`, mà `LOW_CONFIDENCE_THRESHOLD = 0.5`, nên `mapping_status` thành
+        # **"resolved"** — hệ tuyên bố đã phân giải xong một mã mà chính nó không kiểm được.
+        # Vì `inp.attack_type` do `nodes.py` dựng từ `decision["mitre_technique"]` (free-text
+        # của LLM), một mã bịa cũng hưởng nhãn ấy:
+        #
+        #     attack_type='hoàn toàn bịa T9999'  ->  mitre_technique_id='T9999', resolved
+        #
+        # Không có nguồn nào ngoài kho để phân biệt "mã thật kho thiếu" với "mã bịa", nên
+        # cách trung thực duy nhất là đối xử NHƯ NHAU: giữ id, hạ xuống dưới ngưỡng để thành
+        # `low_confidence` -> chuyển người xác minh. Lá chắn neo bằng chứng ở `nodes.py` vẫn
+        # là chốt chặn thứ hai khi lô có ngữ cảnh RAG.
         name = tid
         tactic, tactic_id = ("Unknown", "")
-        conf = 0.60
+        conf = 0.45  # DƯỚI LOW_CONFIDENCE_THRESHOLD (0.5) — cố ý, xem giải thích trên
+        logger.warning(
+            f"[ATT&CK MAPPER] Mã '{tid}' do triage nêu KHÔNG có trong kho {len(kb)} mục "
+            f"-> giữ id nhưng hạ xuống low_confidence (chuyển người xác minh)."
+        )
 
     # LÁ CHẮN "quá tổng quát": nếu neo vào kỹ thuật chỉ-dựa-cổng (T1571...) mà KHÔNG có
     # bằng chứng bổ trợ app-layer (payload/message) -> hạ về low_confidence để buộc con

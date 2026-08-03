@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import time
+import urllib.parse
 from typing import Any
 
 import mlflow  # type: ignore
@@ -293,6 +294,56 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
             if rs not in reasons:
                 reasons.append(rs)
     parts: list[str] = list(_canonical_attack_terms(reasons[:8]))
+
+    # BỔ SUNG TRÍCH XUẤT TÍN HIỆU HEURISTIC TỪ PAYLOAD/URI KHI REASONS THIẾU
+    # Trích xuất từ vựng kỹ thuật MITRE từ URI/payload giải mã (double URL decode)
+    p_terms: list[str] = []
+    text_blobs: list[str] = []
+    for lg in logs:
+        msg = str(lg.get("message", "")) + " " + str(lg.get("payload", ""))
+        uri_str = str(lg.get("uri") or lg.get("URI") or "")
+        raw_str = msg + " " + uri_str
+        if raw_str.strip():
+            dec = urllib.parse.unquote(urllib.parse.unquote(raw_str))
+            text_blobs.append(dec.lower())
+    full_text = " ".join(text_blobs)
+
+    if full_text:
+        # Tự động trích xuất khái niệm an ninh mạng chuẩn (RAG Query Expansion Layer)
+        # KHÔNG hardcode mã kỹ thuật MITRE hay tên file cụ thể của tập dữ liệu
+        if re.search(
+            r"\.(inc|bak|old|tmp|swp|zip|tar|gz|config|env)\b|/\.(bak|old|inc)|dirb|gobuster|wordlist",
+            full_text,
+            re.IGNORECASE,
+        ):
+            p_terms.append(
+                "web file extension enumeration directory content scanning wordlist probing"
+            )
+        if re.search(
+            r"waitfor\s*\+?\s*delay|union\s+select|select\s+.*from|exec\s*\(|drop\s+table",
+            full_text,
+            re.IGNORECASE,
+        ):
+            p_terms.append("sql injection database query delay public application exploitation")
+        if re.search(
+            r"<script|script>|alert\(|set-cookie|javascript:|%\w{2}set-cookie",
+            full_text,
+            re.IGNORECASE,
+        ):
+            p_terms.append("cross site scripting inline javascript execution command interpreter")
+        if re.search(
+            r"etc/passwd|win\.ini|web-inf|web\.xml|cmd=|exec\b|cat\s+/|/bin/sh|/bin/bash|\.\./",
+            full_text,
+            re.IGNORECASE,
+        ):
+            p_terms.append("path traversal sensitive configuration file directory discovery")
+        if re.search(r"login=|pwd=|password=", full_text, re.IGNORECASE):
+            p_terms.append("authentication request credential submission login attempt brute force")
+
+    for pt in p_terms:
+        if pt not in parts:
+            parts.append(pt)
+
     # KHÔNG đưa chuỗi lý do THÔ (tiếng Việt) vào: KB và embedder đều thiên tiếng Anh nên
     # nó gần như 0 tín hiệu truy xuất mà vẫn làm nhiễu vector.
     head = logs[0]
@@ -484,17 +535,36 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
             encapsulated_chars_final=len(batch_enc),
         )
 
+    # ── CỜ TẤN CÔNG NHẮM VÀO LLM — THEO TỪNG LOG, KHÔNG THEO CẢ LÔ ──
+    #
+    # HAI LỖI ĐÃ VÁ Ở ĐÂY.
+    #
+    # (1) SAI HỌ CHỮ KÝ. Bản trước đọc `injection_detected`, mà cờ đó gộp cả chữ ký tấn
+    #     công WEB (`UNION SELECT`, `<script>`, `; exec`). Một câu SQLi dạng chữ vì thế bị
+    #     coi là tấn công vào LLM và bị ép quy kết sang AML.T0051 thay vì T1190. Nay đọc
+    #     `llm_attack_detected` — cờ chỉ bật với chữ ký nhắm vào LLM.
+    #
+    # (2) SAI PHẠM VI. Bản trước dùng `any(...)` trên CẢ LÔ 10 log, nên một payload tiêm
+    #     nhiễm làm 9 log còn lại cùng mất ngữ cảnh và cùng bị ép nhãn. Nay giữ cờ theo
+    #     từng log; cờ mức lô chỉ còn để ghi vết, KHÔNG dùng để định tuyến quy kết.
     _res = processed_data.get("individual_results", []) or []
-    is_adv = any(
-        r.get("injection_detected") or r.get("jailbreak_detected")
-        for r in _res
+    adv_flags = [
+        bool(r.get("llm_attack_detected") or r.get("jailbreak_detected"))
         if isinstance(r, dict)
-    )
+        else False
+        for r in _res
+    ]
+    if trace.enabled():
+        trace.add("guardrails", llm_attack_flags=adv_flags, n_llm_attack=sum(adv_flags))
 
     return {
         "current_batch_encapsulated": batch_enc,
+        "_llm_attack_flags": adv_flags,
         "_guardrails_system_instruction": processed_data["system_instruction"],
-        "_is_adversarial": is_adv,
+        # Giữ khoá cũ cho tương thích, nhưng nay nó CHỈ mang nghĩa "lô có ít nhất một log
+        # bị tấn công nhắm vào LLM" và chỉ dùng để ghi vết / hiển thị. Mọi quyết định quy
+        # kết phải đọc `_llm_attack_flags` theo đúng chỉ số log.
+        "_is_adversarial": any(adv_flags),
     }
 
 
@@ -521,13 +591,29 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
         trace.add("nodes", rag_context=round(time.time(), 6))
         trace.add("rag", technique_query=technique_q, context_query=context_q)
 
-    # Nếu phát hiện tấn công đối kháng (Prompt Injection/Jailbreak), BYPASS RAG
-    # để tránh nhiễm độc context hoặc ảo giác của LLM với các technique mạng.
-    if getattr(state, "_is_adversarial", False):
-        logger.info("[RAG CONTEXT] Phát hiện Adversarial Payload -> Bỏ qua RAG (chống ảo giác).")
+    # ── LÔ BỊ TẤN CÔNG NHẮM VÀO LLM: BỎ TRUY VẤN 2, KHÔNG BỎ CẢ RAG ──
+    #
+    # LỖI ĐÃ VÁ. Bản trước `return {"rag_mitre_context": "", ...}` cho cả lô. Ý định đúng
+    # (đừng để payload tiêm nhiễm lái kết quả truy xuất) nhưng cách làm phá một bất biến
+    # lớn hơn: `node_attack_mapper` suy ra tập mã được phép từ CHÍNH chuỗi này —
+    #
+    #     _rag_ids_pre = set(_TECHNIQUE_ID_RE.findall(state.rag_mitre_context or ""))
+    #     _grounded(x) = not _rag_ids_pre or x in _rag_ids_pre
+    #
+    # Ngữ cảnh rỗng ⇒ `_rag_ids_pre` rỗng ⇒ `_grounded()` trả True cho MỌI mã. Tức mỗi lô
+    # đối kháng là một lô lá chắn neo bằng chứng bị TẮT — đúng những lô cần nó nhất.
+    #
+    # Chỗ nhiễm độc thật sự chỉ nằm ở TRUY VẤN 2 (mang payload). Truy vấn 1 đã thuần tiếng
+    # Anh và tuyệt đối không payload — xem `build_rag_queries`. Nên chỉ cần bỏ truy vấn 2.
+    _adv_flags = getattr(state, "_llm_attack_flags", None) or []
+    _skip_payload_query = any(_adv_flags)
+    if _skip_payload_query:
+        logger.info(
+            "[RAG CONTEXT] Lô có tấn công nhắm vào LLM -> bỏ truy vấn theo payload, "
+            "GIỮ truy vấn kỹ thuật (lá chắn neo bằng chứng vẫn hiệu lực)."
+        )
         if trace.enabled():
-            trace.add("rag", bypassed_for_adversarial=True)
-        return {"rag_mitre_context": "", "rag_nist_context": ""}
+            trace.add("rag", payload_query_skipped_for_llm_attack=True)
 
     # ── TRUY VẤN 1 (KỸ THUẬT): thuần tiếng Anh, KHÔNG payload -> ánh xạ MITRE ──
     results = retriever.retrieve(technique_q)
@@ -547,7 +633,7 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
     # ── TRUY VẤN 2 (NGỮ CẢNH): có payload -> bồi thêm ngữ cảnh vận hành ──
     # Chỉ chạy khi log THỰC SỰ có payload và nội dung khác truy vấn kỹ thuật, để không
     # tốn một lượt truy xuất vô ích trên NetFlow thuần (đại đa số lưu lượng).
-    if context_q and context_q != technique_q:
+    if context_q and context_q != technique_q and not _skip_payload_query:
         ctx = retriever.retrieve(context_q)
         if trace.enabled():
             trace.add(
@@ -1019,8 +1105,12 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         ]
     ).strip()
 
-    # Nếu là adversarial payload, ép type_hint về prompt_injection để mapper tất định xử lý
-    if getattr(state, "_is_adversarial", False):
+    # Ép `type_hint` về prompt_injection CHỈ khi chính log đang xét bị tấn công nhắm vào
+    # LLM. Bản trước dùng cờ mức LÔ (`any()` trên 10 log), nên một payload tiêm nhiễm lẫn
+    # trong lô đủ để mọi log còn lại bị gán nhãn ATLAS — kể cả một SQLi thật đáng ra phải
+    # là T1190. `first_log` là log mapper đang xét, nên lấy cờ ở đúng chỉ số 0.
+    _adv_flags_m = getattr(state, "_llm_attack_flags", None) or []
+    if _adv_flags_m and _adv_flags_m[0]:
         type_hint = "prompt_injection"
 
     mapper_input = AttackMapperInput(
@@ -1066,13 +1156,29 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     _mapper_id = mapping.mitre_technique_id or ""
     _llm_id = _llm_tech_m.group(1).upper() if _llm_tech_m and _llm_tech_raw.upper() != "N/A" else ""
 
-    def _grounded(tech_id: str) -> bool:
-        """Không có ngữ cảnh RAG thì không có gì để đối chiếu — không kết tội được."""
-        # Ngoại lệ: Cho phép các kỹ thuật tấn công LLM (AML.*) đi qua lá chắn
-        # vì chúng thường không nằm trong RAG mạng tiêu chuẩn.
-        if tech_id and tech_id.upper().startswith("AML."):
+    def _grounded(tech_id: str, from_curated: bool = False) -> bool:
+        """Không có ngữ cảnh RAG thì không có gì để đối chiếu — không kết tội được.
+
+        NGOẠI LỆ ATLAS, VÀ VÌ SAO NÓ PHẢI HẸP. Kho tri thức hiện có **0 mục `AML.*`**
+        (toàn bộ 433 mục là ATT&CK Enterprise), và `_TECHNIQUE_ID_RE` cũng chỉ khớp
+        `T\\d{4}`. Nên một mã ATLAS hợp lệ như `AML.T0051` (Prompt Injection) KHÔNG BAO GIỜ
+        neo được vào RAG — không phải vì nó sai, mà vì KB không chứa khung đó.
+
+        Bản trước xử lý bằng cách cho MỌI mã bắt đầu `AML.` đi qua. Quá rộng: regex bóc mã
+        của LLM là `(AML\\.T\\d{4}|T\\d{4}...)`, nên model tự khai `AML.T9999` cũng lọt
+        thẳng ra quyết định — đúng thứ lá chắn sinh ra để chặn.
+
+        Nay ngoại lệ chỉ áp cho mã đến từ **bảng ánh xạ thủ công tất định**
+        (`WEB_ATTACK_MAP`), là nguồn do con người soạn và kiểm được. Free-text của LLM
+        KHÔNG được hưởng ngoại lệ này. Đường `_from_triage_anchor` và đường RRF đều không
+        thể sinh mã `AML.*` (một bên regex chỉ bắt `T\\d{4}`, một bên tra KB không có ATLAS),
+        nên `from_curated` là điều kiện đủ chặt.
+        """
+        if not tech_id:
+            return False
+        if from_curated and tech_id.upper().startswith("AML."):
             return True
-        return bool(tech_id) and (not _rag_ids_pre or tech_id in _rag_ids_pre)
+        return not _rag_ids_pre or tech_id in _rag_ids_pre
 
     _name_verified = True
     _rejected_id = ""
@@ -1080,7 +1186,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # `mapping_status` + lý do vào vết kiểm toán — nếu chỉ lặng lẽ trả "" thì kết quả đúng
     # nhưng nhật ký mất dấu VÌ SAO nó thành N/A.
     _ungrounded_candidate = ""
-    if _grounded(_mapper_id):
+    if _grounded(_mapper_id, from_curated=True):
         # Đường chính: bộ ánh xạ tất định thắng. Đây là cấu hình đo được 67,33%.
         _final_tech = f"{_mapper_id} - {mapping.mitre_technique}".strip(" -")
         _final_tech_id = _mapper_id

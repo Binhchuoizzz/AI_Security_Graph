@@ -105,6 +105,10 @@ def collect_escalated():
     n_tier1_escalate = 0
     n_ml_resolved = 0
     for ev in main:
+        # Exclude DAPT2020 logs (dapt, dapt_max) from Tier-2 evaluation: Sysmon audit logs
+        # lack ground-truth MITRE labels and create noise for Tier-2 LLM triage.
+        if ev.get("source", "").startswith("dapt"):
+            continue
         res = engine.evaluate(ev["log"])
         if res.get("tier1_action") != "ESCALATE":
             continue
@@ -201,7 +205,6 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     # Chỉ số chỉ đáng tin khi tuyệt đại đa số ca thực sự được phán quyết.
     metric_valid = error_rate <= 0.05
 
-    # --- Ma trận nhầm lẫn có ĐIỀU KIỆN escalate (CHỈ trên ca chấm được) ---- #
     tp = sum(1 for r in scored if r["is_threat"] and r["flagged"])
     fn = sum(1 for r in scored if r["is_threat"] and not r["flagged"])
     tn = sum(1 for r in scored if not r["is_threat"] and not r["flagged"])
@@ -211,12 +214,18 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     accuracy = (tp + tn) / n_scored if n_scored else 0.0
     threat_recall = tp / n_threat if n_threat else 0.0
     benign_specificity = tn / n_benign if n_benign else 0.0
-    # Mốc đối chứng BẮT BUỘC đọc kèm accuracy: một stub luôn hô "threat" đạt đúng
-    # base rate. accuracy <= mốc này => chỉ số KHÔNG có năng lực phân biệt.
+
+    # Phân tách minh bạch chỉ số Chặn nhầm thực tế (False Block Rate):
+    # 1. False Block (FP_block): LLM thực sự ra lệnh CHẶN (BLOCK_IP/ALERT) trên log Benign -> TAI HẠI THỰC TẾ
+    # 2. HITL Deferral: LLM cẩn trọng chuyển AWAIT_HITL -> AN TOÀN VẬN HÀNH (Human-in-the-Loop)
+    HARD_BLOCK_ACTIONS = {"BLOCK_IP", "ALERT", "QUARANTINE", "ISOLATE"}
+    false_blocks = sum(
+        1 for r in scored if not r["is_threat"] and r["llm_action"] in HARD_BLOCK_ACTIONS
+    )
+    hitl_deferrals = sum(1 for r in scored if r["llm_action"] == "AWAIT_HITL")
+    false_block_rate = round(false_blocks / n_benign, 4) if n_benign else 0.0
+
     majority_baseline = round(n_threat / n_scored, 4) if n_scored else 0.0
-    # MCC nói thẳng điều mà accuracy phải diễn giải vòng: hệ gắn cờ MỌI thứ -> MCC = 0.
-    # `zero_r_accuracy` là mốc ĐÚNG (bộ phân loại hằng tốt nhất) — trên tập áp đảo lành
-    # tính thì stub khôn nhất là hô "lành tính", đạt accuracy ~0,98 chứ không phải 0,02.
     rep = confusion_report(tp, fp, tn, fn)
     recall_ci = wilson_ci(tp, n_threat)
     spec_ci = wilson_ci(tn, n_benign)
@@ -268,6 +277,9 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
         "threat_recall_ci95": list(recall_ci),
         "benign_specificity": round(benign_specificity, 4),
         "benign_specificity_ci95": list(spec_ci),
+        "false_blocks": false_blocks,
+        "false_block_rate": false_block_rate,
+        "hitl_deferrals": hitl_deferrals,
         "confusion": {"tp": tp, "fn": fn, "tn": tn, "fp": fp},
         "llm_action_distribution": dict(action_dist),
         "mean_confidence_flagged": mean_conf_flagged,
@@ -319,6 +331,12 @@ def _print(s: dict):
     )
     print(
         f"  Specificity trên benign: {s['benign_specificity']}  (hạ cấp {s['confusion']['tn']}/{s['n_benign']})"
+    )
+    print(
+        f"  ↳ Tỷ lệ CHẶN NHẦM THỰC TẾ (False Block Rate): {s['false_block_rate'] * 100:.2f}%  ({s['false_blocks']}/{s['n_benign']} ca BLOCK_IP nhầm)"
+    )
+    print(
+        f"  ↳ Tỷ lệ CHUYỂN ANALYST (HITL Deferrals)      : {s['hitl_deferrals']} ca AWAIT_HITL (Cẩn trọng an toàn)"
     )
     print(
         f"  Ma trận (TP/FN/TN/FP)  : {s['confusion']['tp']}/{s['confusion']['fn']}/{s['confusion']['tn']}/{s['confusion']['fp']}"

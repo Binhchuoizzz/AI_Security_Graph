@@ -179,19 +179,38 @@ def test_anchor_preserves_subtechnique_id():
     assert mapping.mitre_url == "https://attack.mitre.org/techniques/T1110/001/"
 
 
-def test_anchor_on_valid_id_not_in_kb_keeps_id_blank_tactic():
-    """Txxxx hợp lệ nhưng KB không phủ -> vẫn NEO id (honest: tactic trống).
+def test_anchor_on_valid_id_not_in_kb_keeps_id_but_defers_to_human():
+    """Txxxx hợp lệ nhưng KB không phủ -> vẫn NEO id, nhưng KHÔNG được "resolved".
 
     Dùng `T1650` — mã đúng ĐỊNH DẠNG nhưng CỐ Ý nằm ngoài kho. Trước đây test dùng
     `T1110`; sau khi kho được bổ sung 43 kỹ thuật cha/sub (2026-07-27) thì T1110 ĐÃ có
     mặt, nên nó không còn kiểm được tính chất cần kiểm. Nếu mai này T1650 cũng được thêm
     vào kho, đổi sang một mã vắng mặt khác — ĐỪNG nới lỏng phần khẳng định.
+
+    ĐỔI KHẲNG ĐỊNH TRẠNG THÁI (2026-08-03), có lý do. Phần GIỮ ID không đổi — đó vẫn là
+    tính chất chính test này canh. Nhưng `mapping_status` đổi `resolved` -> `low_confidence`:
+
+    `attack_type` được `nodes.py` dựng từ `decision["mitre_technique"]`, tức free-text của
+    LLM. Với `conf = 0.60` cũ (trên ngưỡng 0.5), một mã BỊA cũng được công bố là đã phân
+    giải — đo được: `'hoàn toàn bịa T9999'` -> `T9999`, status `resolved`. Không có nguồn
+    nào ngoài kho để tách "mã thật kho thiếu" khỏi "mã LLM bịa", nên cách trung thực là đối
+    xử như nhau: giữ id để không mất quy kết đúng, hạ dưới ngưỡng để chuyển người xác minh.
     """
     mapping = map_attack(AttackMapperInput(attack_type="T1650 - Acquire Access", confidence=0.8))
     assert mapping.mitre_technique_id == "T1650"  # KHÔNG để RRF chệch sang cổng/giao thức
     assert mapping.mitre_tactic == "Unknown"
     assert mapping.mitre_tactic_id == ""
-    assert mapping.mapping_status == "resolved"
+    assert mapping.mapping_status == "low_confidence"
+
+
+def test_fabricated_id_is_never_resolved():
+    """Mã bịa hoàn toàn KHÔNG được mang nhãn `resolved`.
+
+    Cặp đôi với test trên: cùng một cơ chế, nhìn từ phía kẻ tấn công. Kho có 433 mã; bất kỳ
+    mã nào ngoài đó đều phải qua người, dù nó là mã thật kho thiếu hay ảo giác của model.
+    """
+    mapping = map_attack(AttackMapperInput(attack_type="hoàn toàn bịa T9999", confidence=0.9))
+    assert mapping.mapping_status != "resolved"
 
 
 def test_no_anchor_when_no_technique_id_falls_to_rrf(monkeypatch):

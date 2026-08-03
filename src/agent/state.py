@@ -164,7 +164,19 @@ class SentinelState:
     """Action được gán bởi ML Triage khi bypass."""
 
     _is_adversarial: bool = False
-    """Cờ hiệu cho biết Guardrails phát hiện payload adversarial (prompt injection/jailbreak)."""
+    """Lô có ÍT NHẤT MỘT log bị tấn công nhắm vào LLM. CHỈ dùng để ghi vết/hiển thị.
+
+    KHÔNG dùng cờ này để định tuyến quy kết — nó là `any()` trên cả lô 10 log, nên một
+    payload tiêm nhiễm sẽ kéo theo 9 log vô can. Dùng `_llm_attack_flags` theo đúng chỉ số.
+    """
+
+    _llm_attack_flags: list[bool] = field(default_factory=list)
+    """Cờ tấn công nhắm vào LLM cho TỪNG log trong lô, cùng thứ tự `current_batch_logs`.
+
+    Chỉ bật bởi `guardrails.injection_patterns` (chữ ký nhắm vào LLM) và bộ dò jailbreak.
+    Chữ ký tấn công WEB (`UNION SELECT`, `<script>`…) nằm ở `web_attack_patterns` và KHÔNG
+    bật cờ này — nếu không, một câu SQLi sẽ bị quy kết sang ATLAS thay vì ATT&CK.
+    """
 
     last_updated: str = ""
     """Timestamp ISO format của lần cập nhật state gần nhất."""
