@@ -174,26 +174,39 @@ if _mg:
     )
 
 # ── 4. Quy kết ───────────────────────────────────────────────────────────────
+# Tên tệp theo quy ước `attack_mapper_eval_{mode}_{layer}.json` mà `eval_attack_mapper.py`
+# tự sinh. Báo RIÊNG từng tầng bằng chứng: tầng payload (CSIC) và tầng flow (CICIDS) là hai
+# bài toán khác nhau, gộp lại thì che mất hệ mạnh ở đâu và đuối ở đâu. `rrf` chạy `llm=None`
+# nên phải đứng cạnh `e2e` — hiệu số giữa hai cột chính là phần LLM đóng góp.
 w("## 4. Quy kết kỹ thuật MITRE\n")
-w("Tập: 300 mẫu CSIC có payload (`--evidence-layer payload`).\n")
-w("| chế độ | exact | parent | tactic | trần KB | p50 (ms) | tệp |")
-w("| :-- | --: | --: | --: | --: | --: | :-- |")
-for tag, lab in (
-    ("attack_mapper_eval_csic_payload_rrf.json", "rrf (tất định)"),
-    ("attack_mapper_eval_csic_payload_e2e.json", "e2e (toàn tuyến)"),
-):
+w("`rrf` = **tắt LLM** (trần đạt được từ truy xuất) · `e2e` = **toàn tuyến** (thứ hệ thật làm).")
+w("Mẫu số đọc ở cột `n` — đã loại 50 mẫu tác giả biên soạn qua `drop_authored()`.\n")
+w("| tầng bằng chứng | chế độ | n | exact | parent | tactic | trần KB | p50 (ms) | tệp |")
+w("| :-- | :-- | --: | --: | --: | --: | --: | --: | :-- |")
+_MAPPER_RUNS = (
+    ("payload (CSIC)", "rrf", "attack_mapper_eval_rrf_payload.json"),
+    ("payload (CSIC)", "e2e", "attack_mapper_eval_e2e_payload.json"),
+    ("flow (CICIDS)", "rrf", "attack_mapper_eval_rrf_flow.json"),
+    ("flow (CICIDS)", "e2e", "attack_mapper_eval_e2e_flow.json"),
+)
+for layer, mode, tag in _MAPPER_RUNS:
     d = g(tag)
-    if d:
-        cov = d.get("kb_coverage_ceiling", {})
-        w(
-            f"| {lab} | {fmt(d.get('technique_exact_match_pct'), 2)}% | "
-            f"{fmt(d.get('technique_parent_match_pct'), 2)}% | {fmt(d.get('tactic_match_pct'), 2)}% | "
-            f"{fmt(cov.get('exact_in_kb_pct'), 1)}% | {fmt(d.get('latency_ms_p50'), 1)} | {when(tag)} |"
-        )
+    if not d:
+        w(f"| {layer} | {mode} | — | — | — | — | — | — | **chưa chạy** |")
+        continue
+    cov = d.get("kb_coverage_ceiling", {})
+    w(
+        f"| {layer} | {mode} | {fmt(d.get('n_samples'))} | "
+        f"{fmt(d.get('technique_exact_match_pct'), 2)}% | "
+        f"{fmt(d.get('technique_parent_match_pct'), 2)}% | {fmt(d.get('tactic_match_pct'), 2)}% | "
+        f"{fmt(cov.get('exact_in_kb_pct'), 1)}% | {fmt(d.get('latency_ms_p50'), 1)} | {when(tag)} |"
+    )
 w("")
 for tag, lab in (
-    ("attack_mapper_eval_csic_payload_rrf.json", "rrf"),
-    ("attack_mapper_eval_csic_payload_e2e.json", "e2e"),
+    ("attack_mapper_eval_rrf_payload.json", "rrf · payload"),
+    ("attack_mapper_eval_e2e_payload.json", "e2e · payload"),
+    ("attack_mapper_eval_rrf_flow.json", "rrf · flow"),
+    ("attack_mapper_eval_e2e_flow.json", "e2e · flow"),
 ):
     d = g(tag)
     pt = d.get("per_attack_type") or {}

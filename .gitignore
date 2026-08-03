@@ -149,3 +149,8 @@ data/demo_small.json
 # Mọi biến thể .env (.env.bak, .env.local...) — chứa bí mật, KHÔNG BAO GIỜ commit.
 .env.*
 !.env.example
+
+# Lượt chạy THỬ trong lúc phát triển (n nhỏ, tham số tạm). Để lẫn trong results/ thì rất dễ
+# bị trích nhầm thành số liệu luận văn: ba tệp từng nằm đó cho ra 70% (n=10), 76% (n=50) và
+# 55% (n=20) — chênh nhau 21 điểm chỉ vì cỡ mẫu quá nhỏ.
+experiments/results/_scratch/

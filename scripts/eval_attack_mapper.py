@@ -295,7 +295,16 @@ def _assert_kb_covers_answers(coverage: dict, kb_path: str) -> None:
 def main():
     ap = argparse.ArgumentParser(description="Đánh giá ATT&CK Mapper (rrf | e2e).")
     ap.add_argument("--mode", choices=["rrf", "e2e"], required=True)
-    ap.add_argument("--tag", default="baseline", help="Nhãn run (vào tên file + JSON).")
+    ap.add_argument(
+        "--tag",
+        default=None,
+        help=(
+            "Nhãn run (vào tên file + JSON). BỎ TRỐNG thì tự đặt `{mode}_{evidence-layer}` "
+            "— ví dụ `e2e_payload`. Chỉ đặt tay khi thật sự cần một lượt riêng (ví dụ so "
+            "trước/sau khi nạp thêm KB); tag tự chế kiểu `clean_rag`, `test_fix` đã từng "
+            "sinh ra bốn tệp kết quả mâu thuẫn nhau mà không ai biết tệp nào là thật."
+        ),
+    )
     ap.add_argument("--ground-truth", default=GT_DEFAULT)
     ap.add_argument("--kb", default=KB_DEFAULT)
     ap.add_argument("--limit", type=int, default=None, help="Cắt tổng số sample.")
@@ -320,6 +329,11 @@ def main():
         ),
     )
     args = ap.parse_args()
+
+    # Tên tệp kết quả PHẢI tự nói lên nó đo cấu hình nào. `rrf` (tắt LLM) và `e2e` (toàn
+    # tuyến) trên `payload` và `flow` là bốn con số KHÁC NHAU, không thay thế nhau được.
+    if not args.tag:
+        args.tag = f"{args.mode}_{args.evidence_layer}"
 
     with open(args.ground_truth, encoding="utf-8") as f:
         gt_all = json.load(f)
