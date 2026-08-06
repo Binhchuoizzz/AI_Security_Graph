@@ -11,6 +11,7 @@ import json
 import os
 import pickle
 import time
+from datetime import datetime
 
 import lightgbm as lgb
 import numpy as np
@@ -133,13 +134,24 @@ def main():
     with open(MODEL_OUT, "wb") as f:
         pickle.dump(pipeline, f)
     print(f"[*] Saved {MODEL_OUT}")
+    # results đã sắp giảm dần theo Test F1 -> results[0] chính là model thắng. Nâng P/R/FPR của nó
+    # lên cấp cao nhất để báo cáo đọc được mà không phải lội vào mảng (collect_rq1_report.lay()
+    # chỉ đi theo khoá dict, không có chỉ số mảng).
+    tot = results[0]
     with open(METRICS_OUT, "w", encoding="utf-8") as f:
         json.dump(
             {
                 "best_model": best_name,
                 "best_test_f1": round(best_f1, 4),
+                "precision": tot["Precision"],
+                "recall": tot["Recall"],
+                "fpr": tot["FPR"],
                 "n_train": len(X_train),
                 "n_test": len(X_test),
+                # Xuất xứ: thiếu hai trường này thì không ai truy được số của lượt train NÀO,
+                # trên dữ liệu NÀO — mà 1.n tồn tại chính là để trả lời câu đó.
+                "trained_at": datetime.now().isoformat(timespec="seconds"),
+                "dataset": os.path.relpath(DATA_FILE, ROOT),
                 "results": results,
             },
             f,

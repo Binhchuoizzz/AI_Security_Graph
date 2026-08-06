@@ -20,6 +20,7 @@ An toàn: chỉ dùng IP TEST-NET (RFC 5737) không có trong tập demo; dọn 
 Chạy:  .venv/bin/python scripts/audit_offload_mechanisms.py
 """
 
+import json
 import os
 import sys
 
@@ -32,6 +33,7 @@ from dotenv import load_dotenv  # noqa: E402
 load_dotenv(os.path.join(ROOT, ".env"))
 
 import logging  # noqa: E402
+from datetime import datetime  # noqa: E402
 
 logging.disable(logging.WARNING)
 
@@ -42,11 +44,17 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 BAD_IP = "203.0.113.201"  # sẽ được gán reputation xấu
 WL_IP = "203.0.113.202"  # sẽ được whitelist
 
-results: list[tuple[str, bool, str]] = []
+# Trước 05/08/2026 script này CHỈ in ra màn hình. Hệ quả: chỉ số 1.l ("14/14 đạt") là chỉ số
+# RQ1 duy nhất không có tệp bằng chứng — muốn đối chiếu thì phải chạy lại tại chỗ. Ghi JSON
+# để nó đứng ngang hàng với mọi chỉ số khác.
+OUT_JSON = os.path.join(ROOT, "experiments", "results", "offload_mechanisms_audit.json")
+
+results: list[dict] = []
+_group = "?"  # cơ chế đang kiểm; `check()` đóng dấu vào từng mục để tách được theo cơ chế
 
 
 def check(name: str, ok: bool, detail: str = "") -> None:
-    results.append((name, ok, detail))
+    results.append({"co_che": _group, "phep_kiem": name, "dat": ok, "chi_tiet": detail})
     print(f"  {'PASS' if ok else 'FAIL'}  {name}" + (f"  — {detail}" if detail else ""))
 
 
@@ -69,10 +77,12 @@ def main() -> int:
     print("KIỂM BA CƠ CHẾ GIẢM TẢI TIER-1")
     print("=" * 78)
 
+    global _group
     mem = ThreatMemoryStore()
     mem.reset_ip_reputation(BAD_IP)
 
     # ── 1. BLOCKLIST: reputation >= 70 chặn on-sight ─────────────────
+    _group = "BLOCKLIST"
     print("\n── 1. BLOCKLIST (reputation bền, không TTL) ──")
     eng = RuleEngine()
     before = eng.evaluate(benign_log(BAD_IP))
@@ -107,6 +117,7 @@ def main() -> int:
     check("chặn ở Tier-1 => KHÔNG leo thang LLM", after.get("tier1_action") != "ESCALATE")
 
     # ── 2. WHITELIST: phân tích đủ nhưng luôn cho qua ────────────────
+    _group = "WHITELIST"
     print("\n── 2. WHITELIST (miễn trừ, nhưng vẫn phân tích) ──")
     mem.mark_ip_blocked(WL_IP, "T1110")  # cố tình cho tiền sử XẤU...
     eng3 = RuleEngine()
@@ -130,6 +141,7 @@ def main() -> int:
     )
 
     # ── 3. CACHE: hai rổ theo tiền sử ────────────────────────────────
+    _group = "CACHE"
     print("\n── 3. CACHE lớp-2 (gộp theo đặc trưng, tách theo tiền sử) ──")
     c = ExactMatchResponseCache()
     log_a = {
@@ -170,6 +182,7 @@ def main() -> int:
     )
 
     # ── Dọn dẹp ──────────────────────────────────────────────────────
+    _group = "DON_DEP"
     print("\n── Dọn dẹp ──")
     mem.reset_ip_reputation(BAD_IP)
     mem.reset_ip_reputation(WL_IP)
@@ -180,13 +193,43 @@ def main() -> int:
         f"điểm={r1.get('reputation_score')}",
     )
 
-    n_fail = sum(1 for _, ok, _ in results if not ok)
+    n_fail = sum(1 for r in results if not r["dat"])
     print("\n" + "=" * 78)
     print(f"KẾT QUẢ: {len(results) - n_fail}/{len(results)} đạt · {n_fail} hỏng")
     print("=" * 78)
-    for name, ok, detail in results:
-        if not ok:
-            print(f"  HỎNG: {name}  — {detail}")
+    for r in results:
+        if not r["dat"]:
+            print(f"  HỎNG: {r['phep_kiem']}  — {r['chi_tiet']}")
+
+    theo_co_che: dict[str, dict[str, int]] = {}
+    for r in results:
+        o = theo_co_che.setdefault(r["co_che"], {"tong": 0, "dat": 0})
+        o["tong"] += 1
+        o["dat"] += int(r["dat"])
+    os.makedirs(os.path.dirname(OUT_JSON), exist_ok=True)
+    with open(OUT_JSON, "w", encoding="utf-8") as fh:
+        json.dump(
+            {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "tong_phep_kiem": len(results),
+                "dat": len(results) - n_fail,
+                "hong": n_fail,
+                # `metric_valid` chỉ đúng khi KHÔNG có phép kiểm nào hỏng: đây là audit
+                # nhị phân, một phép hỏng nghĩa là cơ chế giảm tải tương ứng không đứng.
+                "metric_valid": n_fail == 0,
+                "theo_co_che": theo_co_che,
+                "ghi_chu": (
+                    "Kịch bản dựng sẵn trên IP TEST-NET (RFC 5737), KHÔNG phải lượt chạy sống. "
+                    "Chứng minh TỪNG cơ chế giảm tải Tier-1 hoạt động; không thay cho tỉ lệ xả "
+                    "tải tổng ở 1.e."
+                ),
+                "chi_tiet": results,
+            },
+            fh,
+            ensure_ascii=False,
+            indent=1,
+        )
+    print(f"[+] Đã ghi: {OUT_JSON}")
     return 1 if n_fail else 0
 
 

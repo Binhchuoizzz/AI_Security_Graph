@@ -675,6 +675,14 @@ class RuleEngine:
 
         self.whitelist_ips = set(tier1_config.get("whitelist_ips", []))
 
+        # --- DÀN DỰNG DEMO: tiền tố IP được leo thang thay vì chặn khi khớp chữ ký WAF ---
+        # MẶC ĐỊNH RỖNG = TẮT HẲN, không đổi một bit hành vi nào. Chỉ buổi trình diễn mới
+        # điền, và chỉ điền dải IP mà KHÔNG tập benchmark nào dùng (đã đối chiếu demo.json /
+        # datatest.json / csic.json / ground_truth.json). Xem nhánh dùng nó ở `evaluate`.
+        self.demo_escalate_prefixes = tuple(
+            str(p) for p in (tier1_config.get("demo_escalate_waf_prefixes") or [])
+        )
+
         # --- Reputation-based enforcement (tiền sử IP từ Threat Memory) ---
         # IP đã có "hồ sơ đen": điểm danh tiếng >= block_threshold -> Tier-1 CHẶN NGAY
         # (không tốn LLM); >= hitl_threshold -> AWAIT_HITL (đưa lên analyst) DÙ gói hiện
@@ -1132,6 +1140,25 @@ class RuleEngine:
                 # IP đã được Analyst DUYỆT chặn (HITL -> luật ACTIVE): Tier-1 TỰ CHẶN ngay,
                 # KHÔNG tốn LLM. Ưu tiên CAO NHẤT — kẻ tái phạm không cần leo thang lại.
                 log_entry["tier1_action"] = "BLOCK_IP"
+            elif (
+                self.demo_escalate_prefixes
+                and has_waf_match
+                and str(source_ip).startswith(self.demo_escalate_prefixes)
+            ):
+                # DÀN DỰNG CHO BUỔI DIỄN — KHÔNG phải hành vi mặc định. Xem
+                # `tier1.demo_escalate_waf_prefixes` trong config (mặc định RỖNG = tắt hẳn).
+                #
+                # Vì sao cần: đo được trên lượt chạy 2026-08-03 — Tier-1 tự giải quyết
+                # 1.894/2.000 sự kiện CSIC (94,7%), và TOÀN BỘ 357 mẫu có mã kỹ thuật đều
+                # dính lớp chữ ký WAF ngay tại đây. Hệ quả: trong 203 sự kiện CSIC lọt lên
+                # Tier-2 có ĐÚNG 0 mẫu mang mã kỹ thuật -> màn hình không bao giờ hiện được
+                # năng lực quy kết, dù năng lực ấy có thật.
+                #
+                # Núm này chỉ đổi ĐÍCH ĐẾN (chặn -> leo thang), KHÔNG đổi phán quyết và
+                # KHÔNG chạm dữ liệu. Nó lọc theo tiền tố IP nên chỉ với tay tới đúng dải
+                # dàn dựng; mọi tập benchmark không có IP nào thuộc dải đó.
+                log_entry["tier1_action"] = "ESCALATE"
+                reasons.append("[DÀN DỰNG DEMO] chữ ký WAF -> leo thang thay vì chặn")
             elif has_waf_match:
                 log_entry["tier1_action"] = "BLOCK_IP"
             elif has_injection_match:
@@ -1185,6 +1212,10 @@ class RuleEngine:
         self.sensitive_ports = set(tier1_config.get("sensitive_ports", self.sensitive_ports))
         self.max_fwd_packets = tier1_config.get("max_fwd_packets", self.max_fwd_packets)
         self.whitelist_ips = set(tier1_config.get("whitelist_ips", []))
+        # Nạp lại kèm hot-reload: tắt dàn dựng giữa buổi mà không cần khởi động lại tiến trình.
+        self.demo_escalate_prefixes = tuple(
+            str(p) for p in (tier1_config.get("demo_escalate_waf_prefixes") or [])
+        )
         self.reputation_enforcement = tier1_config.get(
             "reputation_enforcement", self.reputation_enforcement
         )

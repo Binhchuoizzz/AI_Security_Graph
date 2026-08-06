@@ -225,6 +225,68 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     hitl_deferrals = sum(1 for r in scored if r["llm_action"] == "AWAIT_HITL")
     false_block_rate = round(false_blocks / n_benign, 4) if n_benign else 0.0
 
+    # --- PHÂN LOẠI CẢNH BÁO: cách SOC thật hỏi ---------------------------- #
+    # Việc của Tier-2 trong SOC là tách cảnh báo THẬT khỏi cảnh báo GIẢ mà Tier-1 đẩy lên.
+    # Ma trận nhầm lẫn ở trên dùng giao ước "không hạ cấp im lặng = dương", nên nó gộp
+    # AWAIT_HITL vào dương — hợp lý cho câu hỏi "có bỏ sót không", nhưng SAI cho câu hỏi
+    # "LLM khẳng định nhầm bao nhiêu": chuyển cho người xem KHÔNG phải một lời khẳng định.
+    # Ba kết cục dưới đây tách hẳn, và FP chỉ tính trên phần LLM THỰC SỰ KẾT LUẬN.
+    DISMISS_ACTIONS = {"LOG", "DROP"}
+    confirmed = [r for r in scored if r["llm_action"] in HARD_BLOCK_ACTIONS]
+    dismissed = [r for r in scored if r["llm_action"] in DISMISS_ACTIONS]
+    deferred = [r for r in scored if r["llm_action"] == "AWAIT_HITL"]
+    n_decided = len(confirmed) + len(dismissed)
+    tp_conf = sum(1 for r in confirmed if r["is_threat"])
+    fp_conf = len(confirmed) - tp_conf
+    triage = {
+        # Thành phần cảnh báo ĐẾN — bắt buộc nêu kèm: FP là hàm của tỉ lệ này, y như xả tải.
+        "n_alerts_in": n_scored,
+        "true_alert_rate_in": round(n_threat / n_scored, 4) if n_scored else 0.0,
+        "n_confirmed": len(confirmed),
+        "n_dismissed": len(dismissed),
+        "n_deferred": len(deferred),
+        "n_decided": n_decided,
+        "defer_rate": round(len(deferred) / n_scored, 4) if n_scored else 0.0,
+        # SỐ CHÍNH: trong những cảnh báo LLM khẳng định là thật, bao nhiêu phần là giả.
+        "fp_rate_on_confirmed": round(fp_conf / len(confirmed), 4) if confirmed else None,
+        "fp_rate_ci95": wilson_ci(fp_conf, len(confirmed)) if confirmed else None,
+        "precision_on_confirmed": round(tp_conf / len(confirmed), 4) if confirmed else None,
+        # GIÁ TRỊ GIA TĂNG: trong các cảnh báo GIẢ đi vào, bao nhiêu cái LLM lọc bỏ được.
+        # Bằng 0 nghĩa là Tier-2 không giảm được một chút tải cảnh báo nào.
+        "false_alarm_dismissal_rate": (
+            round(sum(1 for r in dismissed if not r["is_threat"]) / n_benign, 4)
+            if n_benign
+            else None
+        ),
+        # HÀNG ĐỢI CHUYỂN NGƯỜI — đây mới là chỗ Tier-2 tạo ra giá trị, nếu có. Kênh khẳng
+        # định và kênh hoãn phải đo RIÊNG: một kênh có thể hỏng trong khi kênh kia vẫn tốt.
+        # Nếu hàng đợi hoãn giàu đe doạ hơn dòng vào, analyst chỉ cần xem hàng đợi đó.
+        "threat_recall_in_deferred": (
+            round(sum(1 for r in deferred if r["is_threat"]) / n_threat, 4) if n_threat else None
+        ),
+        "deferred_true_rate": (
+            round(sum(1 for r in deferred if r["is_threat"]) / len(deferred), 4)
+            if deferred
+            else None
+        ),
+        "deferred_enrichment_x": (
+            round(
+                (sum(1 for r in deferred if r["is_threat"]) / len(deferred))
+                / (n_threat / n_scored),
+                2,
+            )
+            if deferred and n_threat and n_scored
+            else None
+        ),
+        # Analyst chỉ xem hàng đợi hoãn thì khối lượng giảm bao nhiêu.
+        "workload_reduction": round(1 - len(deferred) / n_scored, 4) if n_scored else None,
+        "cach_doc": (
+            "fp_rate_on_confirmed là tỉ lệ cảnh báo giả trong phần LLM KHẲNG ĐỊNH là thật; "
+            "AWAIT_HITL không nằm trong mẫu số. LUÔN trích kèm true_alert_rate_in — cùng một "
+            "hệ trên luồng có tỉ lệ cảnh báo thật khác sẽ cho FP khác."
+        ),
+    }
+
     majority_baseline = round(n_threat / n_scored, 4) if n_scored else 0.0
     rep = confusion_report(tp, fp, tn, fn)
     recall_ci = wilson_ci(tp, n_threat)
@@ -281,6 +343,7 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
         "false_block_rate": false_block_rate,
         "hitl_deferrals": hitl_deferrals,
         "confusion": {"tp": tp, "fn": fn, "tn": tn, "fp": fp},
+        "triage": triage,
         "llm_action_distribution": dict(action_dist),
         "mean_confidence_flagged": mean_conf_flagged,
         "confidence_calibration": calibration,

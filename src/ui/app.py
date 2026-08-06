@@ -9,6 +9,7 @@ import math
 import os
 import re
 import sys
+import time
 
 import pandas as pd  # type: ignore
 
@@ -26,8 +27,10 @@ import streamlit as st  # type: ignore
 from streamlit_autorefresh import st_autorefresh  # type: ignore
 
 from src.agent.threat_memory import threat_memory
+from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
 from src.response.executor import (
     count_audit_alerts,
+    count_blocks_by_tier,
     get_audit_trail,
     get_audit_trail_for_ip,
     verify_audit_trail_integrity,
@@ -48,6 +51,33 @@ def cached_count_audit_alerts():
     return count_audit_alerts()
 
 
+# Nhãn hiển thị của từng tầng — MỘT nơi duy nhất, để bảng "đã chặn", phần chia tab và mọi
+# chỗ khác không thể gọi cùng một tầng bằng hai cái tên.
+_TIER_LABELS = {
+    TIER_RULE: "Luật Tier-1 🟢",
+    TIER_ML: "Cổng ML ⚡",
+    TIER_LLM: "LLM 🧠",
+    TIER_MANUAL: "Analyst 🧑‍💻",
+}
+
+
+def _nhan_tang(alert: dict) -> str:
+    """Tầng nào ra quyết định này — đọc cột `tier`, chỉ đoán khi bản ghi có trước migration."""
+    nhan = _TIER_LABELS.get(str(alert.get("tier") or ""))
+    if nhan:
+        return nhan
+    r = str(alert.get("reason", ""))
+    if any(k in r for k in ML_GATE_MARKERS):
+        return "Cổng ML ⚡"
+    return "LLM 🧠" if r.startswith("[MITRE:") else "Luật Tier-1 🟢"
+
+
+@st.cache_data(ttl=2)
+def cached_count_blocks_by_tier():
+    """Số lệnh chặn theo tầng — đọc CÙNG bảng mà các tab nhật ký đọc, nên không thể lệch."""
+    return count_blocks_by_tier()
+
+
 @st.cache_data(ttl=2)
 def cached_get_audit_trail_for_ip(ip, limit=50):
     return get_audit_trail_for_ip(ip, limit)
@@ -56,6 +86,22 @@ def cached_get_audit_trail_for_ip(ip, limit=50):
 @st.cache_data(ttl=2)
 def cached_get_tier1_blocks(show=12):
     return _get_tier1_blocks(show)
+
+
+@st.cache_data(ttl=5)
+def cached_get_ip_reputation(ip: str):
+    """Hàng `ip_reputation` của một IP — nguồn THẬT cho badge Threat Memory.
+
+    Trước đây badge chỉ regex trên câu lý do, nên IP lần đầu bị chặn hiện "chưa có dữ liệu
+    uy tín" dù kho đã ghi `reputation_score = 100`. Cache 5s vì mỗi thẻ cảnh báo gọi một lần
+    và `st.tabs` render mọi tab mỗi lượt refresh.
+    """
+    if not ip:
+        return None
+    try:
+        return threat_memory.get_ip_reputation(ip)
+    except Exception:
+        return None
 
 
 @st.cache_data(ttl=5)
@@ -285,7 +331,14 @@ def _get_tier1_blocks(show: int = 12) -> list[dict]:
 
 
 def render_demo_overview(
-    all_alerts, active_rules, pending_rules, raw_logs_count, noise_reduction, pending_llm=0
+    all_alerts,
+    active_rules,
+    pending_rules,
+    raw_logs_count,
+    pending_llm=0,
+    offload_counts=None,
+    pending_llm_stale=False,
+    blocks_by_tier=None,
 ):
     """Tab Tổng quan Trình diễn — gom mọi thứ cần show vào MỘT màn hình."""
     st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
@@ -304,33 +357,79 @@ def render_demo_overview(
         apt_events = []
     apt_ips = sorted({s for e in apt_events if (s := e.get("src_ip"))})
     try:
-        # ĐỒNG BỘ WHITELIST: bỏ IP đã whitelist khỏi đếm "IP rủi ro cao" (đã miễn trừ).
-        _wl_demo = set(feedback_mgr.get_whitelisted_ips() or [])
-        high_risk = [
-            r for r in (cached_get_high_risk_ips(min_score=1.0) or []) if r["ip"] not in _wl_demo
-        ]
-    except Exception:
-        high_risk = []
-    try:
         integ_valid, _integ_msg = verify_audit_trail_integrity()
     except Exception:
         integ_valid = True
 
-    escalated = sum(1 for a in all_alerts if a.get("action") in ("BLOCK_IP",))
-    # Không bịa số khi chưa đo được: 99.6 hardcode cũ khiến demo trống vẫn khoe 99.6%.
-    nr = noise_reduction
+    _oc = offload_counts if isinstance(offload_counts, dict) else {}
+
+    def _n(key: str) -> int:
+        try:
+            return int(_oc.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    # Hàng metric in SỐ LỆNH CHẶN theo tầng, đọc từ chính `audit_trail` mà các tab nhật ký
+    # đọc — hai màn hình vì thế không thể lệch. Các bộ đếm SỰ KIỆN ĐI QUA (escalated_to_llm,
+    # ml_gate_resolved) không lên màn hình nữa: chúng đếm thứ khác hẳn với "đã chặn" và từng
+    # khiến 1.881 đứng cạnh một nhật ký 210 dòng.
+    _bt = blocks_by_tier if isinstance(blocks_by_tier, dict) else {}
+    _ml_blk = int(_bt.get(TIER_ML, 0) or 0)
+    _llm_blk = int(_bt.get(TIER_LLM, 0) or 0)
+    # LỖ HỔNG ĐÃ BIẾT: nhánh `BLOCK_IP` của Tier-1 (subscriber.py) đẩy IP vào blacklist Redis,
+    # ghi Threat Memory và ring buffer, nhưng KHÔNG gọi `_log_to_db`. Hàng nghìn lệnh chặn
+    # Tier-1 vì thế KHÔNG có dòng nào trong sổ kiểm toán HMAC — đếm theo `tier` sẽ ra 0 và
+    # trông như Tier-1 chẳng chặn gì. Lấy số từ bộ đếm luồng và NÓI RÕ nguồn khác nhau, thay
+    # vì lặng lẽ trộn hai nguồn vào một hàng như thể chúng cùng gốc.
+    _t1_blk_audit = int(_bt.get(TIER_RULE, 0) or 0)
+    _t1_blk = _t1_blk_audit or _n("action:BLOCK_IP")
+    _t1_tu_so_dem = _t1_blk_audit == 0 and _t1_blk > 0
+    # Tổng lấy bằng COUNT(*) chứ KHÔNG đếm trên `all_alerts`: danh sách đó bị trần 2000 dòng
+    # nên khi luồng vượt ngưỡng, "tổng lệnh chặn" âm thầm bão hoà và nhỏ hơn tổng ba tầng.
+    escalated = sum(int(v or 0) for v in _bt.values())
 
     # ---------- Operational Metrics Row ----------
     st.markdown("### 📊 Real-Time Operational Metrics")
-    c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
-    c1.metric("Raw Input Logs", f"{raw_logs_count:,}")
-    c2.metric("Total Blocked IPs", f"{escalated:,}")
-    c3.metric("Pending LLM Queue ⏳", f"{pending_llm}")
-    nr_str = f"{nr:.1f}%" if nr is not None else "0.0%"
-    c4.metric("Offloaded Rate", nr_str)
-    c5.metric("High Risk IPs", f"{len(high_risk)}")
-    c6.metric("Rule Approvals (HITL)", f"{len(pending_rules)}")
-    c7.metric("Audit HMAC Chain", "✅ Intact" if integ_valid else "⚠️ Modified")
+    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8)
+    c1.metric("Log thô vào", f"{raw_logs_count:,}")
+    c2.metric(
+        "Chặn ghi sổ kiểm toán",
+        f"{escalated:,}",
+        help="Phán quyết BLOCK_IP CÓ dòng trong audit trail HMAC (Cổng ML + Tier-2 + thủ "
+        "công). CHƯA gồm lệnh chặn của luật Tier-1 — nhánh đó hiện không ghi sổ.",
+    )
+    c3.metric(
+        "Tier-1 luật chặn" + (" ⚠️" if _t1_tu_so_dem else ""),
+        f"{_t1_blk:,}",
+        help=(
+            "⚠️ Số này đọc từ BỘ ĐẾM LUỒNG (pipeline_stats), KHÔNG từ sổ kiểm toán: nhánh "
+            "BLOCK_IP của luật Tier-1 đẩy IP vào blacklist Redis + Threat Memory nhưng không "
+            "ghi dòng audit nào. Vì vậy nó KHÔNG nằm trong chuỗi HMAC và không tra ngược "
+            "được từng lệnh."
+            if _t1_tu_so_dem
+            else "Lệnh chặn do bộ máy luật Tier-1 ra, đếm trên audit trail."
+        ),
+    )
+    c4.metric("Cổng ML chặn", f"{_ml_blk:,}", help="Lệnh chặn do Cổng ML (LightGBM) ra.")
+    c5.metric(
+        "Tier-2 LLM chặn",
+        f"{_llm_blk:,}",
+        help="Lệnh chặn do tác tử LangGraph ra — khớp đúng số thẻ ở tab Tier-2.",
+    )
+    c6.metric(
+        "Hàng đợi LLM (lô) ⏳",
+        f"{pending_llm}" + (" ⏸" if pending_llm_stale and pending_llm else ""),
+        help=(
+            "Số LÔ còn chờ Tier-2 (mỗi lô gom nhiều log cùng một IP), ảnh chụp tức thời. "
+            + (
+                "⏸ = luồng ĐÃ DỪNG (hơn 60s không ai ghi pipeline_stats.json)."
+                if pending_llm_stale and pending_llm
+                else ""
+            )
+        ),
+    )
+    c7.metric("Chờ duyệt (HITL)", f"{len(pending_rules)}")
+    c8.metric("Chuỗi HMAC", "✅ Nguyên vẹn" if integ_valid else "⚠️ Bị sửa")
 
     st.markdown("---")
     col_left, col_right = st.columns([3, 2])
@@ -540,6 +639,7 @@ def render_demo_overview(
                         "Chỉ loại nhãn/đáp án của bộ dữ liệu (chống lộ nhãn)."
                     )
                     st.markdown(f"**Lý do chặn:** {' · '.join(_b.get('reasons') or []) or '—'}")
+                    ui_components.render_ground_truth(_b["raw_log"])
                     st.json(_b["raw_log"])
             else:
                 st.caption(
@@ -605,9 +705,10 @@ def render_demo_overview(
                         "Thời gian": str(a.get("timestamp", ""))[5:19],
                         "Hành động": a.get("action", ""),
                         "IP / Host": a.get("target", ""),
-                        "Quyết định bởi": "Cổng ML ⚡"
-                        if any(k in str(a.get("reason", "")) for k in ML_GATE_MARKERS)
-                        else "LLM 🧠",
+                        # Đọc cột `tier` do CHÍNH tầng ra quyết định ghi. Bản cũ dò chuỗi
+                        # trong câu lý do, cùng lỗi đã vá ở phần chia tab: câu lý do của
+                        # Tier-2 có thể chứa cụm "Tier-1" và bị gán nhầm nguồn.
+                        "Quyết định bởi": _nhan_tang(a),
                         "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
                         "Lý do": (str(a.get("reason", "")) or "—")[:110],
                     }
@@ -871,7 +972,14 @@ def main_dashboard():
         tampered_ids = set()
 
     # Render KPI
-    all_alerts = [a for a in cached_get_audit_trail(limit=2000) if a.get("action") != "AWAIT_HITL"]
+    _ALERT_CAP = 2000
+    all_alerts = [
+        a for a in cached_get_audit_trail(limit=_ALERT_CAP) if a.get("action") != "AWAIT_HITL"
+    ]
+    # Các tab nhật ký đọc danh sách BỊ TRẦN này, còn hàng chỉ số đọc COUNT(*) không trần. Khi
+    # sổ vượt trần, hai bên lệch nhau MÀ KHÔNG BÁO GÌ — người xem chỉ thấy tab ít hơn chỉ số
+    # và tưởng có số bịa. Phát cảnh báo tại đúng thời điểm đó.
+    _alerts_capped = cached_count_audit_alerts() > _ALERT_CAP
     active_rules = feedback_mgr.get_active_dynamic_rules()
     pending_rules = feedback_mgr.get_pending_rules()
     whitelisted_ips = feedback_mgr.get_whitelisted_ips()
@@ -903,13 +1011,20 @@ def main_dashboard():
     approved_rules_count = sum(1 for r in all_rules if r.get("status") == "ACTIVE")
     rejected_rules_count = sum(1 for r in all_rules if r.get("status") == "REJECTED")
     total_reviewed = approved_rules_count + rejected_rules_count
-    live_fpr = (rejected_rules_count / total_reviewed) * 100 if total_reviewed > 0 else 0.0
+    # ĐÂY KHÔNG PHẢI FPR. Nhãn cũ trên KPI là "Live False Positive Rate", nhưng công thức là
+    # (luật bị analyst BÁC BỎ) / (luật đã được analyst xem xét) — mẫu số là số LUẬT ĐỀ XUẤT,
+    # không phải số sự kiện lành tính. FPR thật là FP/(FP+TN) trên toàn luồng và phải đo bằng
+    # benchmark có đáp án, không suy được từ thao tác duyệt. Trong buổi bảo vệ, in một con số
+    # dán nhãn FPR mà không phải FPR là chỗ chết người.
+    #
+    # Chưa ai duyệt luật nào -> `None` để hiện "—". Bản cũ trả 0.0 nên Dashboard mở lên là
+    # khoe "0.0% False Positive" dù chưa có một mẩu bằng chứng nào.
+    live_fpr = (rejected_rules_count / total_reviewed) * 100 if total_reviewed > 0 else None
 
     # Số liệu THẬT (không ước lượng): đọc counter do subscriber ghi ra
     # config/pipeline_stats.json khi xử lý log thô qua Tier-1.
     # raw_logs_total = tổng log đã phân tích; pending_llm_queue = backlog Tier-2.
     raw_logs_count = 0
-    noise_reduction = None
     try:
         import json as _json
 
@@ -922,21 +1037,24 @@ def main_dashboard():
             _ps = _json.load(_sf)
         raw_logs_count = int(_ps.get("raw_logs_total", 0))
         pending_llm_count = int(_ps.get("pending_llm_queue", 0))
+        # `pending_llm_queue` là ẢNH CHỤP hàng đợi TRONG TIẾN TRÌNH subscriber tại lần ghi
+        # cuối. Subscriber dừng (hết luồng / bị kill) thì con số ĐÓNG BĂNG ở đó chứ không về
+        # 0 — đo thật: file còn 623 trong khi Redis đã `lag 0`. Nếu cứ in trần con số, người
+        # đọc tưởng Tier-2 đang chạy. Lấy tuổi tệp làm mốc: quá 60s không ai ghi = luồng đã
+        # dừng, và 623 kia là số sự kiện ĐÃ ack khỏi Redis nhưng CHƯA kịp phân tích.
+        pending_llm_stale = (time.time() - os.path.getmtime(_stats_p)) > 60
+        # `offload_counts` chứa bộ đếm TOÀN luồng, không trần — nguồn đúng cho phễu và cho
+        # tỉ lệ xả tải. Trước đây UI KHÔNG đọc khoá này một lần nào, nên phễu phải chắp vá
+        # từ ring buffer 12 dòng + audit_trail trần 2000 (xem `render_metrics_header`).
+        _offload_counts = _ps.get("offload_counts") or {}
     except Exception:
         pending_llm_count = 0
-        pass
+        pending_llm_stale = False
+        _offload_counts = {}
 
-    # MỘT nguồn sự thật: Tỷ lệ giảm tải = (log thô − TỔNG cảnh báo) / log thô.
-    # BUG ĐÃ SỬA: trước đây dùng len(all_alerts), mà all_alerts = get_audit_trail(limit=2000)
-    # bị chặn cứng 2000 dòng. Khi luồng vượt 2000 cảnh báo, len() BÃO HOÀ nên tỷ lệ tự
-    # phồng lên (100k log thô -> luôn ~98%) BẤT KỂ số cảnh báo thật. Nay đếm bằng
-    # COUNT(*) trên audit_trail (cached_count_audit_alerts) -> đúng ở mọi quy mô.
-    total_alerts = cached_count_audit_alerts()
-    if raw_logs_count > total_alerts:
-        noise_reduction = ((raw_logs_count - total_alerts) / raw_logs_count) * 100
-    else:
-        noise_reduction = None  # raw chưa hợp lệ -> header dùng fallback an toàn
-
+    # "Giảm nhiễu" ĐÃ BỎ khỏi Dashboard: nó là (log thô − cảnh báo tới analyst) / log thô,
+    # đại lượng KHÁC với xả tải LLM và luôn cao hơn ~11 điểm. Để cả hai phần trăm cạnh nhau
+    # thì người đọc trích số nào cũng thấy "đúng". Nay chỉ giữ MỘT chỉ số: xả tải LLM.
     t1_blocks_list = cached_get_tier1_blocks()
 
     render_metrics_header(
@@ -945,8 +1063,9 @@ def main_dashboard():
         len(active_rules),
         raw_logs_count,
         live_fpr,
-        noise_reduction,
         t1_blocks=t1_blocks_list,
+        offload_counts=_offload_counts,
+        blocks_by_tier=cached_count_blocks_by_tier(),
     )
 
     tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
@@ -966,8 +1085,10 @@ def main_dashboard():
             active_rules,
             pending_rules,
             raw_logs_count,
-            noise_reduction,
+            offload_counts=_offload_counts,
             pending_llm=pending_llm_count,
+            pending_llm_stale=pending_llm_stale,
+            blocks_by_tier=cached_count_blocks_by_tier(),
         )
 
     with tab1:
@@ -984,20 +1105,10 @@ def main_dashboard():
                     with col_chart1:
                         st.markdown("##### 📈 Xu hướng Sự cố theo Thời gian (Timeline)")
 
-                        def assign_tier(r):
-                            r_str = str(r)
-                            if any(k in r_str for k in ML_GATE_MARKERS):
-                                return "Cổng ML"
-                            elif (
-                                "Tier 1" in r_str
-                                or "Tier-1" in r_str
-                                or "whitelist" in r_str.lower()
-                            ):
-                                return "Tier-1 Filter"
-                            else:
-                                return "LLM Agent"
-
-                        df_alerts["Nguồn"] = df_alerts["reason"].apply(assign_tier)
+                        # Cùng nguồn chân lý với bảng "đã chặn" và phần chia tab: cột `tier`.
+                        # Biểu đồ này từng dò chuỗi riêng, nên một sự cố có thể được xếp vào
+                        # tầng A trên biểu đồ và tầng B ở tab ngay bên cạnh.
+                        df_alerts["Nguồn"] = [_nhan_tang(a) for a in all_alerts]
                         trend_df = (
                             df_alerts.groupby(["hour", "Nguồn"]).size().reset_index(name="Số lượng")  # type: ignore[call-overload]
                         )
@@ -1075,17 +1186,40 @@ def main_dashboard():
             alerts_t1_mlgate = []
             alerts_t2_llm = []
             for alert in filtered_alerts:
-                r = alert.get("reason", "")
+                # NGUỒN CHÂN LÝ: cột `tier` do chính tầng ra quyết định ghi vào audit_trail.
+                #
+                # LỖI ĐÃ SỬA: trước đây chỉ có heuristic DÒ CHUỖI trong câu lý do bên dưới.
+                # Câu lý do khi LLM hỏng chứa cụm "Tier-1 (xác định) vẫn bảo vệ độc lập", nên
+                # một sự cố của Tier-2 rơi nhầm sang tab Tier-1 ngay khi action không phải
+                # AWAIT_HITL. Phân loại bằng cách đọc văn xuôi là mời lỗi vào nhà.
+                _tier = str(alert.get("tier") or "")
+                if _tier == TIER_ML:
+                    alerts_t1_mlgate.append(alert)
+                    continue
+                if _tier in (TIER_RULE, TIER_MANUAL):
+                    alerts_t1_rule.append(alert)
+                    continue
+                if _tier == TIER_LLM:
+                    alerts_t2_llm.append(alert)
+                    continue
 
-                # Detect theo MARKER dùng chung ML_GATE_MARKERS: "Cổng ML" (mới) / "ML Tier 2"
-                # (bản ghi CŨ trong DB) / "Decision Tree". KHÔNG dùng "Tier-2" trần vì nhánh LLM
-                # giờ cũng ghi Tier-2.
+                # Bản ghi TRƯỚC migration (`tier` rỗng) -> rơi về heuristic cũ. Giữ nguyên
+                # thứ tự cũ để lịch sử hiển thị y như trước, không đổi hồi tố.
+                r = alert.get("reason", "")
                 if any(k in r for k in ML_GATE_MARKERS):
                     alerts_t1_mlgate.append(alert)
                 elif "Tier 1" in r or "Tier-1" in r or "whitelist" in r.lower():
                     alerts_t1_rule.append(alert)
                 else:
                     alerts_t2_llm.append(alert)
+
+            if _alerts_capped:
+                st.warning(
+                    f"⚠️ Sổ kiểm toán đã vượt {_ALERT_CAP:,} dòng — các tab dưới đây chỉ hiển "
+                    f"thị {_ALERT_CAP:,} sự cố MỚI NHẤT. Số ở hàng chỉ số phía trên là COUNT(*) "
+                    "trên toàn sổ nên sẽ LỚN HƠN tổng ba tab. Đây là giới hạn hiển thị, không "
+                    "phải số liệu lệch."
+                )
 
             t1_tab, ml_gate_tab, t2_llm_tab = st.tabs(
                 [
@@ -1126,6 +1260,8 @@ def main_dashboard():
                         is_whitelisted=is_wl,
                         is_blocked=is_bl,
                         is_tampered=(alert.get("id") in tampered_ids),
+                        # Số THẬT trong kho uy tín, thay cho việc regex trên câu lý do.
+                        reputation=cached_get_ip_reputation(target_ip),
                     )
 
                 # Điều hướng trang
@@ -1182,9 +1318,17 @@ def main_dashboard():
                 paged_blocks = tier1_blocks_data[start_idx:end_idx]
 
                 # ── Phần 1: Block tức thời (Redis ring buffer) ──
-                st.markdown(f"**🛡️ Chặn tức thời Tier-1 (Redis):** {len(tier1_blocks_data)} IP")
+                # NÓI RÕ ĐÂY LÀ "GẦN NHẤT". Nhãn cũ ("Chặn tức thời Tier-1: 12 IP") đọc như
+                # một TỔNG, trong khi nguồn là ring buffer bị cắt hai lần: subscriber chỉ ghi
+                # 50 bản ghi cuối, UI lại cắt còn 12. Đặt cạnh ô "Tier-1 luật chặn" hàng nghìn
+                # thì trông như hai con số mâu thuẫn, thực ra là hai thứ khác nhau.
+                st.markdown(
+                    f"**🛡️ Chặn tức thời Tier-1 — {len(tier1_blocks_data)} IP GẦN NHẤT** "
+                    "_(không phải tổng)_"
+                )
                 st.caption(
-                    "_(đọc từ ring buffer `config/tier1_blocks.json` — TTL 1h, không cần LLM)_"
+                    "_(ring buffer `config/tier1_blocks.json` — chỉ giữ các lệnh chặn mới nhất, "
+                    "TTL 1h, không cần LLM. Tổng số lệnh chặn xem ở hàng chỉ số phía trên.)_"
                 )
                 if not tier1_blocks_data:
                     st.info(
@@ -1358,7 +1502,7 @@ def main_dashboard():
                             '<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;">'
                             f"{gr_badge}"
                             f"{ui_components.build_origin_badge(raw_reason_hitl)}"
-                            f"{ui_components.build_threat_memory_badge(raw_reason_hitl)}"
+                            f"{ui_components.build_threat_memory_badge(raw_reason_hitl, cached_get_ip_reputation(str(rule.get('pattern') or '')))}"
                             "</div>"
                             '<div class="soc-reasoning-section" style="color:#D3ADF7;margin-top:4px;'
                             f'font-size:0.83rem;">🎯 MITRE ATT&CK Mapping: <code>{mitre_tech_hitl}</code></div>'
@@ -1389,6 +1533,7 @@ def main_dashboard():
                             matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
                         if matched_audit and matched_audit.get("raw_log"):
                             with st.expander("🔍 View Full Raw Log (Evidence)"):
+                                ui_components.render_ground_truth(matched_audit.get("raw_log"))
                                 st.code(matched_audit.get("raw_log"), language="json")
 
                         if st.session_state.get("role") == "L3_Manager":
@@ -1521,6 +1666,7 @@ def main_dashboard():
                         matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
                     if matched_audit and matched_audit.get("raw_log"):
                         with st.expander("🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng)"):
+                            ui_components.render_ground_truth(matched_audit.get("raw_log"))
                             st.code(matched_audit.get("raw_log"), language="json")
 
                     if st.session_state.get("role") == "L3_Manager":
@@ -2086,6 +2232,7 @@ def main_dashboard():
                         block_ip(
                             manual_block_ip,
                             f"[Tier-1 Filter] Admin {st.session_state.get('username')} chặn thủ công: {manual_block_reason}",
+                            tier=TIER_MANUAL,
                         )
 
                         if _was_wl:

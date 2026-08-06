@@ -124,6 +124,17 @@ class ThreatMemoryStore:
                 )
             """)
 
+            # Cột `blocked_hits`: số GÓI TIN đến từ một IP ĐÃ bị chặn (chặn tại chỗ, on-sight).
+            # Tách khỏi `total_blocks` vì hai thứ này khác nhau về bản chất và trước đây bị gộp:
+            # `mark_ip_blocked` cộng `total_blocks` MỖI gói khớp, nên một IP CSIC gửi 24 request
+            # dính chữ ký WAF hiện lên là "24 lần chặn" trong khi sổ kiểm toán có ĐÚNG 0 lệnh
+            # chặn cho nó. Chính sách thật: 2 ALERT -> 1 BLOCK, và đã chặn lần đầu thì KHÔNG có
+            # lần sau. `total_blocks` phải phản ánh SỐ QUYẾT ĐỊNH, không phải lưu lượng.
+            c.execute("PRAGMA table_info(ip_reputation)")
+            _cols = [col[1] for col in c.fetchall()]
+            if "blocked_hits" not in _cols:
+                c.execute("ALTER TABLE ip_reputation ADD COLUMN blocked_hits INTEGER DEFAULT 0")
+
             # Bảng 2: Known Entities — tools/services hợp pháp nội bộ
             c.execute("""
                 CREATE TABLE IF NOT EXISTS known_entities (
@@ -277,20 +288,37 @@ class ThreatMemoryStore:
         now = datetime.now(timezone.utc).isoformat()
         with _write_lock, self._connect() as conn:
             c = conn.cursor()
-            c.execute("SELECT ip FROM ip_reputation WHERE ip = ?", (ip,))
-            if c.fetchone():
+            c.execute("SELECT reputation_score FROM ip_reputation WHERE ip = ?", (ip,))
+            row = c.fetchone()
+            if row is None:
+                c.execute(
+                    "INSERT INTO ip_reputation (ip, total_incidents, total_blocks, total_alerts, "
+                    "first_seen, last_seen, reputation_score, last_mitre_technique, blocked_hits) "
+                    "VALUES (?, 1, 1, 0, ?, ?, 100.0, ?, 0)",
+                    (ip, now, now, mitre_technique),
+                )
+            elif float(row[0] or 0.0) >= 100.0:
+                # ĐÃ bị chặn từ trước -> KHÔNG có "lần chặn thứ hai". Gói này chỉ là lưu lượng
+                # đến từ một IP đang nằm trong danh sách đen; ghi vào `blocked_hits` và cập nhật
+                # `last_seen`, KHÔNG đụng `total_blocks`/`total_incidents`.
+                #
+                # LỖI ĐÃ SỬA: bản cũ cộng dồn vô điều kiện, nên `198.51.100.38` hiện
+                # `total_blocks = 24` trong khi sổ kiểm toán có ĐÚNG 0 lệnh chặn cho nó — con số
+                # trên Dashboard mâu thuẫn thẳng với chính sách "2 ALERT -> 1 BLOCK, chặn rồi
+                # thì thôi", và không một phép hậu kiểm nào đối chiếu được.
+                c.execute(
+                    "UPDATE ip_reputation SET blocked_hits = blocked_hits + 1, last_seen = ?, "
+                    "last_mitre_technique = CASE WHEN ? != '' THEN ? ELSE last_mitre_technique END "
+                    "WHERE ip = ?",
+                    (now, mitre_technique, mitre_technique, ip),
+                )
+            else:
+                # Lần chặn ĐẦU TIÊN của IP này -> đây mới là một quyết định chặn thật.
                 c.execute(
                     "UPDATE ip_reputation SET reputation_score = 100.0, "
                     "total_blocks = total_blocks + 1, total_incidents = total_incidents + 1, "
                     "last_seen = ?, last_mitre_technique = ? WHERE ip = ?",
                     (now, mitre_technique, ip),
-                )
-            else:
-                c.execute(
-                    "INSERT INTO ip_reputation (ip, total_incidents, total_blocks, total_alerts, "
-                    "first_seen, last_seen, reputation_score, last_mitre_technique) "
-                    "VALUES (?, 1, 1, 0, ?, ?, 100.0, ?)",
-                    (ip, now, now, mitre_technique),
                 )
             conn.commit()
 
@@ -351,7 +379,14 @@ class ThreatMemoryStore:
         try:
             with self._connect() as conn:
                 c = conn.cursor()
-                c.execute("UPDATE ip_reputation SET reputation_score = 0.0 WHERE ip = ?", (ip,))
+                # `blocked_hits` cũng về 0: analyst gỡ chặn là xoá trạng thái "đang bị chặn",
+                # nên bộ đếm gói-chặn-tại-chỗ của lần chặn cũ không còn ý nghĩa. Nếu IP tái
+                # phạm sau này thì đó là một lần chặn MỚI, đếm lại từ đầu.
+                c.execute(
+                    "UPDATE ip_reputation SET reputation_score = 0.0, blocked_hits = 0 "
+                    "WHERE ip = ?",
+                    (ip,),
+                )
                 conn.commit()
                 logger.info(f"[THREAT MEMORY] Reset reputation score for IP {ip}")
         except Exception as e:

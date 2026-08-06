@@ -120,6 +120,8 @@ threat_memory:
   reputation_decay_inactive_days: 7
   reputation_decay_rate: 0.95
 tier1:
+  demo_escalate_waf_prefixes:
+  - 198.19.
   dynamic_rules: []
   golden_baseline:
     enabled: true

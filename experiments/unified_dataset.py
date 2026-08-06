@@ -33,6 +33,10 @@ DAPT_PATH = os.path.join(ROOT, "data", "processed", "dapt2020_chains.jsonl")
 
 THREAT_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"}
 BENIGN_ACTIONS = {"DROP", "LOG"}
+# Hành động DUY NHẤT đẩy sự kiện lên tầng trên (Cổng ML -> LLM). Lấy thẳng từ đường chạy
+# thật: `subscriber.py` bọc toàn bộ nhánh Cổng ML/LLM trong `if action == "ESCALATE"`, và
+# chính nó đếm mọi hành động khác là "đã gỡ tải". `BLOCK_IP` là điểm CUỐI, không phải leo thang.
+ESCALATE_ACTION = "ESCALATE"
 BENIGN_PHASES = {"Benign", "benign", "Normal", "normal", "", None, "Unknown"}
 
 
@@ -356,8 +360,19 @@ def _build_csic(tkey, limit: int):
     `subscriber._LABEL_KEY_PREFIXES` tước trước khi vào prompt LLM.
     """
     path = os.path.join(ROOT, "data", "csic.json")
-    if limit <= 0 or not os.path.exists(path):
+    if limit <= 0:
         return []
+    # KHÔNG trả rỗng lặng lẽ. Lỗi thật đã xảy ra: `data/demo.json` được dựng lúc 13:52:56
+    # còn `data/csic.json` mãi 13:52:58 mới ghi xong, nên nhánh này trả `[]` và luồng demo
+    # 99.867 sự kiện ra đời với ĐÚNG 0 bản ghi CSIC — không một cảnh báo nào. Hệ quả đo
+    # được: toàn bộ tầng bằng chứng ứng dụng biến mất, 96% ca AWAIT_HITL dồn về tầng flow,
+    # và người đọc tưởng đó là điểm yếu của mô hình chứ không phải lỗi dựng dữ liệu.
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Yêu cầu {limit} sự kiện CSIC nhưng KHÔNG thấy {path}.\n"
+            "Dựng trước rồi hãy dựng luồng:\n"
+            "    .venv/bin/python scripts/build_csic_dataset.py --limit 4000"
+        )
     with open(path, encoding="utf-8") as f:
         rows = json.load(f)
 
@@ -378,6 +393,131 @@ def _build_csic(tkey, limit: int):
                 "log": log,
                 "expected_threat": bool(lab.get("expected_threat")),
                 "label": lab.get("gt_label", ""),
+            }
+        )
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# ĐỐI KHÁNG NHẮM VÀO LLM (prompt injection / jailbreak)
+# --------------------------------------------------------------------------- #
+# Hai kho văn bản CÔNG KHAI đã tải sẵn về `data/adversarial_llm/raw/` (xem
+# `scripts/download_raw_attacks.py`). Đây là câu chữ do NGƯỜI KHÁC công bố, KHÔNG phải
+# tác giả tự soạn — khác hẳn hai nguồn `grayzone`/`webattack` đã bị gỡ.
+_ADV_LLM_CORPORA: tuple[tuple[str, str, str], ...] = (
+    ("deepset_prompt_injections.json", "prompt_injection", "deepset/prompt-injections"),
+    ("jackhhao_jailbreaks.json", "jailbreak", "jackhhao/jailbreak-classification"),
+)
+
+# Bốn trường VĂN BẢN mà một bản ghi thật có thể mang. Rải đều bốn trường để chứng minh
+# guardrail soi MỌI trường chuỗi (`PromptInjectionDetector.scan` duyệt hết key không bắt
+# đầu bằng `_`), chứ không phải chỉ canh mỗi `message`.
+_ADV_LLM_FIELDS: tuple[str, ...] = ("message", "payload", "uri", "user_agent")
+
+
+def _build_adv_llm(samples, tkey, limit: int):
+    """Nhúng prompt-injection/jailbreak CÔNG KHAI vào flow benign THẬT.
+
+    VÌ SAO CẦN: `adversarial` (4 payload OWASP) là nhóm DUY NHẤT thử được lớp Guardrails,
+    mà 4 mẫu thì không nói lên điều gì. Nguồn này nâng cỡ mẫu bằng văn bản tấn công có
+    xuất xứ công khai, nên số liệu guardrail không còn đứng trên đầu vào tác giả tự viết.
+
+    KHÔNG BỊA: nền mỗi bản ghi là một flow benign THẬT trong `ground_truth.json` (cùng pool
+    `_build_zerodays` dùng), giữ NGUYÊN mọi đặc trưng flow. Việc duy nhất là đặt một chuỗi
+    tấn công công khai vào MỘT trường văn bản, và đổi IP nguồn để truy vết được.
+
+    ĐÁP ÁN LÀ `AML.T0051`, KHÔNG PHẢI Ô TRỐNG. Kho tri thức đúng là có 0 mục `AML.*` (toàn
+    bộ 433 mục là ATT&CK Enterprise), nhưng đường đi của họ ATLAS ĐÃ được thiết kế miễn neo
+    RAG: `nodes._grounded(..., from_curated=True)` cho mã `AML.*` đến từ bảng thủ công
+    `attack_mapper.WEB_ATTACK_MAP` đi thẳng qua lá chắn, và `prompts.py` ép mọi tấn công
+    nhắm vào chính AI về `BLOCK_IP`. Ngoại lệ HẸP đúng chỗ: free-text của LLM KHÔNG được
+    hưởng, nên `AML.T9999` model tự bịa vẫn bị chặn.
+
+    JAILBREAK CŨNG LÀ `AML.T0051` — không phải `AML.T0054`. `_ATTACK_KEYWORDS` gom
+    "jailbreak"/"roleplay_bypass"/"harmful_behavior" vào chung khoá `prompt_injection`, nên
+    hệ thống KHÔNG có đường nào sinh ra `AML.T0054`. Đặt đáp án là mã hệ thống không thể
+    sinh thì đó là chấm sai đề, không phải đo. Hạn chế này (gộp hai kỹ thuật ATLAS làm một)
+    phải nêu khi báo cáo, chứ không giấu bằng cách bịa nhãn đẹp hơn.
+    """
+    if limit <= 0:
+        return []
+
+    raw_dir = os.path.join(ROOT, "data", "adversarial_llm", "raw")
+    texts: list[tuple[str, str, str]] = []  # (văn bản, loại tấn công, xuất xứ)
+    for fname, atk_type, origin in _ADV_LLM_CORPORA:
+        path = os.path.join(raw_dir, fname)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as f:
+            rows = json.load(f)
+        for r in rows:
+            s = r if isinstance(r, str) else str(r.get("text") or r.get("prompt") or "")
+            if s.strip():
+                texts.append((s.strip(), atk_type, origin))
+
+    if not texts:
+        raise FileNotFoundError(
+            f"Yêu cầu {limit} sự kiện đối kháng LLM nhưng {raw_dir} trống.\n"
+            "Tải trước:  .venv/bin/python scripts/download_raw_attacks.py"
+        )
+
+    # Trộn TẤT ĐỊNH hai kho (không random seed trôi nổi): xen kẽ để cả prompt_injection lẫn
+    # jailbreak đều có mặt dù `limit` nhỏ.
+    by_type: dict[str, list] = defaultdict(list)
+    for t in texts:
+        by_type[t[1]].append(t)
+    order: list[tuple[str, str, str]] = []
+    lists = [by_type[k] for k in sorted(by_type)]
+    for i in range(max(len(v) for v in lists)):
+        for v in lists:
+            if i < len(v):
+                order.append(v[i])
+
+    # Nền benign THẬT — cùng tiêu chí "static-clean" của `_build_zerodays`.
+    SENSITIVE = {21, 22, 23, 53, 139, 445, 3389}
+    pool = []
+    for s in samples:
+        inp = s.get("input", {})
+        if inp.get("cicids_label", "") != "Benign":
+            continue
+        nl = inp.get("network_layer", {})
+        if not nl or _safe_int(nl.get("dst_port")) in SENSITIVE:
+            continue
+        pool.append(nl)
+
+    out = []
+    for n in range(min(limit, len(order))):
+        text, atk_type, origin = order[n]
+        base_nl = pool[(n * 41) % len(pool)] if pool else {"dst_port": 443, "service": "HTTPS"}
+        log = map_cicids(base_nl)  # flow benign THẬT làm nền
+        # `n // 2`, KHÔNG phải `n % 4`. `order` xen kẽ hai kho theo chu kỳ 2 (chẵn=jailbreak,
+        # lẻ=prompt_injection), nên `n % 4` khiến {message, uri} chỉ nhận jailbreak còn
+        # {payload, user_agent} chỉ nhận prompt_injection — hai biến dính chặt nhau, đọc số
+        # ra không biết chênh lệch đến từ TRƯỜNG hay từ LOẠI tấn công. Chia đôi trước rồi mới
+        # chia trường thì mỗi trường nhận đủ cả hai loại.
+        field = _ADV_LLM_FIELDS[(n // 2) % len(_ADV_LLM_FIELDS)]
+        log[field] = text
+        # DẢI RIÊNG 198.18.0.0/15 (RFC 2544, dành cho benchmark — không ai định tuyến thật).
+        # LỖI ĐÃ SỬA: bản trước dùng `172.16.x.x`, TRÙNG dải của DAPT2020 — đo được 4 IP
+        # đụng độ trong luồng 3.300 (172.16.0.25/.43/.151/.235). Hậu quả không nhỏ: một
+        # IP vừa mang prompt injection vừa mang flow nguồn khác, nên lệnh chặn IP đè lên
+        # cả hai và mọi thống kê tính theo IP bị nhiễm chéo.
+        log["Source IP"] = f"198.18.{(n // 250) % 250}.{n % 250}"
+        log["user_agent"] = log.get("user_agent") or _REALISTIC_UAS[n % len(_REALISTIC_UAS)]
+        out.append(
+            {
+                "id": f"ADVLLM-{n:04d}",
+                "name": f"LLM {atk_type}",
+                "mitre": "AML.T0051",  # cả jailbreak — xem docstring
+                "source": "adv_llm",
+                "adv_type": atk_type,
+                "adv_origin": origin,
+                "adv_field": field,
+                "day": 1 + (n % 5),
+                "t": tkey(1 + (n % 5)),
+                "log": log,
+                "expected_threat": True,
+                "label": "Attack",
             }
         )
     return out
@@ -500,6 +640,7 @@ def build_stream(
     zeroday_repeat: int = 8,
     cicids_attack_ratio: float = 0.25,
     csic_max: int = 2000,
+    adv_llm_max: int = 0,
 ):
     """Trả về (warmup_events, main_events, apt_truth, n_chains).
 
@@ -786,6 +927,11 @@ def build_stream(
     # và khác hai nguồn biên soạn đã gỡ, đây là request HTTP THẬT.
     main.extend(_build_csic(tkey, csic_max))
 
+    # --- Đối kháng nhắm vào LLM (prompt injection / jailbreak công khai) ----
+    # MẶC ĐỊNH 0: benchmark hiện có KHÔNG chấm nhóm này, bật lên vô điều kiện sẽ làm mọi
+    # con số cũ trôi mà không ai biết. Script nào cần thì truyền tay (`build_demo_small`).
+    main.extend(_build_adv_llm(samples, tkey, adv_llm_max))
+
     main.sort(key=lambda x: x["t"])
     return warmup, main, apt_truth, len(chains)
 
@@ -801,6 +947,7 @@ NON_CLASSIFIED_SOURCES: dict[str, str] = {
     "dapt": "đo ở chỉ số APT emergent",
     "zeroday": "đo ở chỉ số zero-day",
     "adversarial": "đầu vào biên soạn — không tính vào tỉ lệ",
+    "adv_llm": "đo ở chỉ số guardrail + quy kết ATLAS, không thuộc phân loại flow nhị phân",
 }
 
 # Nguồn flow CÓ nhãn ground-truth -> được chấm phân loại. `*_max` trích thẳng từ CSV thô
@@ -877,6 +1024,19 @@ def score_stream(
     records: list[dict] = []  # cho per_class_report / bootstrap CI
     zd_results: list[dict] = []
     n_flagged = 0
+    # Đếm phán quyết Tier-1 theo TỪNG hành động. Tồn tại vì `n_flagged` (= `_is_threat`) trả
+    # lời câu hỏi PHÁT HIỆN ("Tier-1 có coi đây là mối đe doạ không") chứ KHÔNG trả lời câu
+    # hỏi TẢI ("ca này có phải nhờ tầng trên không") — `BLOCK_IP` nằm trong `THREAT_ACTIONS`
+    # nhưng là điểm CUỐI, chặn tại Tier-1 và không bao giờ tới LLM.
+    #
+    # LỖI ĐÃ VÁ: `evaluate_feedback_loop` từng lấy `n_flagged` làm "tỉ lệ leo thang". Hệ quả
+    # là mỗi khi vòng phản hồi THÀNH CÔNG (luật mới biến một ca escalate thành BLOCK_IP tại
+    # Tier-1, tải LLM về 0) thì con số "leo thang" lại TĂNG. Thước đo tăng đúng lúc thứ nó đo
+    # được cải thiện — nên kết luận thu được là ngược dấu.
+    #
+    # Ranh giới lấy THẲNG từ đường chạy thật: `subscriber.py` chỉ rẽ sang Cổng ML rồi LLM khi
+    # `action == "ESCALATE"`; mọi hành động khác Tier-1 tự xử xong (chính nó đếm là "gỡ tải").
+    action_counts: dict[str, int] = defaultdict(int)
     # Dấu vết mức IP theo ĐÚNG thứ tự luồng, phục vụ `metrics_core.ip_containment`.
     # Ghi cho MỌI nguồn (kể cả nguồn không chấm phân loại) vì ngăn chặn là câu hỏi
     # vận hành độc lập với việc sự kiện đó có nhãn lớp hay không. Người gọi tự lọc
@@ -892,6 +1052,7 @@ def score_stream(
 
         if src in CLASSIFIED_SOURCES:
             res = engine.evaluate(ev["log"])
+            action_counts[res["tier1_action"]] += 1
             flagged = _is_threat(res["tier1_action"])
             threat = bool(ev.get("expected_threat"))
             n_flagged += int(flagged)
@@ -921,6 +1082,7 @@ def score_stream(
         elif src == "zeroday":
             static_act = static_only_action(engine, ev["log"]) if collect_zeroday else None
             res = engine.evaluate(ev["log"])
+            action_counts[res["tier1_action"]] += 1
             flagged = _is_threat(res["tier1_action"])
             n_flagged += int(flagged)
             excluded_by_source["zeroday"] += 1
@@ -948,6 +1110,7 @@ def score_stream(
 
         elif src in NON_CLASSIFIED_SOURCES:  # dapt / adversarial
             res = engine.evaluate(ev["log"])
+            action_counts[res["tier1_action"]] += 1
             n_flagged += int(_is_threat(res["tier1_action"]))
             excluded_by_source[src] += 1
             ip_trace.append(
@@ -963,7 +1126,8 @@ def score_stream(
 
         else:
             # KHÔNG im lặng: nguồn mới mà quên khai báo chính là lỗi đã nuốt 25.000 sự kiện.
-            engine.evaluate(ev["log"])
+            _res = engine.evaluate(ev["log"])
+            action_counts[_res["tier1_action"]] += 1
             excluded_by_source[f"UNHANDLED:{src}"] += 1
 
     return {
@@ -975,6 +1139,11 @@ def score_stream(
         "n_flagged": n_flagged,
         "n_stream_events": len(warmup) + len(main),
         "ip_trace": ip_trace,
+        # `n_flagged` = PHÁT HIỆN (gồm cả BLOCK_IP, vốn kết thúc tại Tier-1).
+        # `n_escalated` = TẢI thật đẩy lên Cổng ML/LLM. Hai câu hỏi khác nhau, đừng thay nhau.
+        "action_counts": dict(action_counts),
+        "n_escalated": action_counts.get(ESCALATE_ACTION, 0),
+        "n_await_hitl": action_counts.get("AWAIT_HITL", 0),
     }
 
 
@@ -1083,6 +1252,17 @@ def enrich(ev: dict, demo_signals: bool = False) -> dict:
         log["wa_expected_action"] = ev.get("expected_action", "")
         log["gt_label"] = ev.get("label", "")
         log["expected_threat"] = bool(ev.get("expected_threat"))
+    elif ev["source"] == "adv_llm":
+        # Prompt injection / jailbreak CÔNG KHAI nhúng vào flow benign THẬT. Mọi khoá nhãn
+        # mang tiền tố `adv_` nên đã nằm sẵn trong `_LABEL_KEY_PREFIXES` -> bị tước trước
+        # khi lên prompt (không tự khai đáp án cho chính LLM đang bị tấn công).
+        log["adv_id"] = ev.get("id", "")
+        log["adv_mitre"] = ev.get("mitre", "")  # AML.T0051 — đáp án để hậu kiểm quy kết
+        log["adv_source"] = ev.get("adv_origin", "")
+        log["adv_llm_type"] = ev.get("adv_type", "")
+        log["adv_llm_field"] = ev.get("adv_field", "")
+        log["gt_label"] = "Attack"
+        log["expected_threat"] = True
     else:  # cicids / cicids_max / dapt_max: flow có nhãn ground-truth phẳng
         log["gt_label"] = ev.get("label", "")
         log["expected_threat"] = bool(ev.get("expected_threat"))

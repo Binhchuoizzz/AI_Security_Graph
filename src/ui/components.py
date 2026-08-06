@@ -5,17 +5,123 @@ NÂNG CẤP PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
 
 import html as html_lib
 import json
+import os
 import re
 from datetime import datetime
 
 import pandas as pd  # type: ignore
 import streamlit as st  # type: ignore
 
+from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
+
 # Marker chuỗi để nhận diện phán quyết đến từ CỔNG ML Tier-1 (dùng CHUNG cho components.py
 # và app.py để phân loại nguồn NHẤT QUÁN — 1 nguồn chân lý, tránh drift giữa các nơi).
 # "Cổng ML" đã bao "Cổng ML Tier-1 (LightGBM)" (substring) nên không cần liệt kê riêng;
 # "ML Tier 2" / "Decision Tree" là nhãn LỊCH SỬ cho các bản ghi CŨ còn trong DB (phòng thủ).
 ML_GATE_MARKERS = ("Cổng ML", "ML Tier 2", "Decision Tree")
+
+
+# Khoá nhãn trong sidecar `data/*.labels.json`, xếp theo nguồn. Sidecar là ĐÁP ÁN — nó nằm
+# NGOÀI luồng, chưa bao giờ đi vào prompt; tra ở đây chỉ để analyst đối chiếu bằng mắt.
+_GT_TECH_KEYS = ("wa_mitre", "zd_mitre", "adv_mitre", "apt_mitre_ttp")
+_GT_LABELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_ground_truth(_stamp: tuple) -> dict:
+    """Gộp mọi `data/*.labels.json` thành một bảng tra gt_id -> nhãn.
+
+    `_stamp` là (đường dẫn, mtime) của từng tệp — đổi tệp thì cache tự hỏng. Gộp mọi
+    sidecar vì Dashboard không biết luồng nào đang chạy (demo.json hay demo_small.json).
+    """
+    merged: dict = {}
+    for path, _ in _stamp:
+        try:
+            with open(path) as f:
+                merged.update(json.load(f))
+        except (OSError, ValueError):
+            continue
+    return merged
+
+
+def get_ground_truth(gt_id: str) -> dict | None:
+    """Tra đáp án của MỘT sự kiện theo `gt_id`. Trả None nếu không có sidecar/không khớp."""
+    if not gt_id:
+        return None
+    try:
+        stamp = tuple(
+            sorted(
+                (os.path.join(_GT_LABELS_DIR, n), os.path.getmtime(os.path.join(_GT_LABELS_DIR, n)))
+                for n in os.listdir(_GT_LABELS_DIR)
+                if n.endswith(".labels.json")
+            )
+        )
+    except OSError:
+        return None
+    if not stamp:
+        return None
+    return _load_ground_truth(stamp).get(gt_id)
+
+
+def render_ground_truth(raw_log_str) -> None:
+    """In ĐÁP ÁN của bộ dữ liệu ngay cạnh log thô, để đối chiếu bằng mắt.
+
+    Log thô đã bị LOẠI mọi khoá nhãn trước khi vào Tier-1 (chống lộ nhãn) — chỉ `gt_id`
+    được giữ, và nó là mã băm vô nghĩa với mô hình. Đáp án nằm ở sidecar tách rời, đọc
+    tại đây và CHỈ tại đây. Không có sidecar thì im lặng, không bịa.
+    """
+    if not raw_log_str:
+        return
+    try:
+        rec = json.loads(raw_log_str) if isinstance(raw_log_str, str) else raw_log_str
+        gt_id = str((rec or {}).get("gt_id") or "")
+    except (ValueError, TypeError, AttributeError):
+        return
+    gt = get_ground_truth(gt_id)
+    if not gt:
+        return
+
+    techs = []
+    for k in _GT_TECH_KEYS:
+        v = gt.get(k)
+        if isinstance(v, str) and v.strip():
+            techs.append(v.strip())
+        elif isinstance(v, list):
+            techs.extend(str(x).strip() for x in v if str(x).strip())
+    seen: list[str] = []
+    for t in techs:
+        if t not in seen:
+            seen.append(t)
+
+    is_attack = bool(gt.get("expected_threat") or gt.get("apt_is_attack"))
+    verdict = "🔴 TẤN CÔNG" if is_attack else "🟢 LÀNH TÍNH"
+    color = "#FF7875" if is_attack else "#95DE64"
+
+    dong = [f'<span style="color:{color};font-weight:800;">{verdict}</span>']
+    if gt.get("gt_label"):
+        dong.append(f"nhãn <b>{html_lib.escape(str(gt['gt_label']))}</b>")
+    if seen:
+        dong.append(
+            "kỹ thuật <code>"
+            + "</code> · <code>".join(html_lib.escape(t) for t in seen)
+            + "</code>"
+        )
+    if gt.get("wa_expected_action"):
+        dong.append(
+            f"hành động kỳ vọng <code>{html_lib.escape(str(gt['wa_expected_action']))}</code>"
+        )
+    if gt.get("unified_source"):
+        dong.append(f"nguồn <i>{html_lib.escape(str(gt['unified_source']))}</i>")
+
+    st.markdown(
+        '<div style="margin-top:6px;padding:8px 10px;background:rgba(250,173,20,0.07);'
+        'border-left:3px solid #FAAD14;border-radius:4px;font-size:0.85rem;color:#D9D9D9;">'
+        '<span style="color:#FAAD14;font-weight:800;">📗 ĐÁP ÁN BỘ DỮ LIỆU</span> — '
+        + " · ".join(dong)
+        + f'<div style="opacity:0.6;font-size:0.78rem;margin-top:4px;">gt_id <code>{html_lib.escape(gt_id)}</code>'
+        " · đọc từ sidecar <code>data/*.labels.json</code>, KHÔNG đi qua Tier-1/LLM</div></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def is_valid_ip(ip_str: str) -> bool:
@@ -137,13 +243,44 @@ def build_origin_badge(raw_reason: str) -> str:
     return f'<span class="soc-badge" style="{_BADGE_BLUE}">🧠 Live GPU</span>'
 
 
-def build_threat_memory_badge(raw_reason: str) -> str:
-    """Lịch sử uy tín IP, đọc từ chuỗi reason của Threat Memory (thang 0–100).
+def build_threat_memory_badge(raw_reason: str, reputation: dict | None = None) -> str:
+    """Lịch sử uy tín IP — ƯU TIÊN bản ghi THẬT trong kho, chỉ đọc câu văn khi không có.
 
-    CHỈ hiện phần parse được. Bản cũ mặc định `reputation = "100.0"` khi không parse được,
-    nên IP chưa có lịch sử nào vẫn hiện Risk 100/100; và còn suy ra "13 sự cố" từ việc chuỗi
-    IP demo `198.51.100` xuất hiện trong target.
+    `reputation`: hàng `ip_reputation` lấy từ `ThreatMemoryStore.get_ip_reputation(ip)`.
+
+    VÌ SAO PHẢI TRUYỀN VÀO. Bản cũ CHỈ regex trên `raw_reason`, mà chuỗi "reputation score
+    of X/100" chỉ có mặt khi prompt đã nhét ngữ cảnh Threat Memory vào — tức khi IP ĐÃ có
+    tiền sử lúc gọi LLM. Với IP lần đầu bị chặn, câu văn không có số, nên badge in "chưa có
+    dữ liệu uy tín" TRONG KHI kho đã ghi `reputation_score = 100`. Đo thật trên
+    `203.0.113.159`: kho có `total_blocks=2, reputation_score=100.0`, màn hình vẫn nói chưa
+    có gì. Cùng một bệnh với việc phân tab bằng cách dò chuỗi.
+
+    CHỈ hiện phần biết chắc. Bản cũ hơn nữa còn mặc định `reputation = "100.0"` khi không
+    parse được, nên IP sạch cũng hiện Risk 100/100.
     """
+    if isinstance(reputation, dict) and reputation:
+        blk = int(reputation.get("total_blocks") or 0)
+        alr = int(reputation.get("total_alerts") or 0)
+        hits = int(reputation.get("blocked_hits") or 0)
+        rep_v = reputation.get("reputation_score")
+        # `blocked_hits` = gói đến từ IP ĐÃ bị chặn (chặn tại chỗ). Tách hẳn khỏi số LẦN CHẶN
+        # vì chính sách là "2 ALERT -> 1 BLOCK, chặn rồi thì thôi" — gộp hai thứ vào một cột
+        # từng làm một IP hiện "24 lần chặn" trong khi sổ kiểm toán có 0 lệnh chặn cho nó.
+        phan = []
+        if blk:
+            phan.append(f"{blk} lần chặn")
+        if alr:
+            phan.append(f"{alr} cảnh báo")
+        if hits:
+            phan.append(f"{hits} gói chặn tại chỗ")
+        if rep_v is not None:
+            phan.append(f"điểm {float(rep_v):.0f}/100")
+        if phan:
+            return (
+                f'<span class="soc-badge" style="{_BADGE_RED}">'
+                f"📜 Threat Memory: {' · '.join(phan)}</span>"
+            )
+
     inc_m = re.search(r"(\d+)\s+incidents", raw_reason, re.IGNORECASE)
     blk_m = re.search(r"(\d+)\s+blocks", raw_reason, re.IGNORECASE)
     score_m = re.search(
@@ -163,7 +300,9 @@ def build_threat_memory_badge(raw_reason: str) -> str:
     elif rep:
         body = f"Risk {rep}/100"
     else:
-        return f'<span class="soc-badge" style="{_BADGE_CYAN}">📜 Threat Memory: chưa có dữ liệu uy tín</span>'
+        return (
+            f'<span class="soc-badge" style="{_BADGE_CYAN}">📜 Threat Memory: chưa có điểm</span>'
+        )
     return f'<span class="soc-badge" style="{_BADGE_RED}">📜 Threat Memory: {body}</span>'
 
 
@@ -321,8 +460,14 @@ def render_alert_card(
     is_whitelisted=False,
     is_blocked=False,
     is_tampered=False,
+    reputation=None,
 ):
-    """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium."""
+    """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium.
+
+    `reputation`: hàng `ip_reputation` của IP đích (nếu nơi gọi tra sẵn được). Truyền vào thì
+    badge Threat Memory đọc SỐ THẬT trong kho thay vì regex trên câu văn — xem
+    `build_threat_memory_badge`.
+    """
     timestamp = alert.get("timestamp", "")
     try:
         dt = datetime.fromisoformat(timestamp)
@@ -394,6 +539,7 @@ def render_alert_card(
         st.markdown("".join(line.strip() for line in wl_html.split("\n")), unsafe_allow_html=True)
         with st.expander("🔍 Xem LOG THÔ (Raw Flow từ IP Whitelist)", expanded=False):
             if _wl_raw:
+                render_ground_truth(_wl_raw)
                 try:
                     st.json(json.loads(_wl_raw))
                 except Exception:
@@ -475,21 +621,34 @@ def render_alert_card(
     clean_reason = clean_reason.replace("\n", "<br>")
 
     reason_text = raw_reason
-    is_manual = (
-        "Manual" in reason_text or "MANUAL" in reason_text.upper() or "Chặn thủ công" in reason_text
-    )
-    is_llm = (
-        reason_text.startswith("[REASON:")
-        or reason_text.startswith("[MITRE:")
-        or reason_text.startswith("[LÝ DO:")
-    )
-    is_ml_tier = not is_manual and not is_llm and any(k in reason_text for k in ML_GATE_MARKERS)
-    is_tier1 = (
-        not is_manual
-        and not is_llm
-        and not is_ml_tier
-        and ("Tier-1" in reason_text or "whitelist" in reason_text.lower())
-    )
+    # NGUỒN CHÂN LÝ là cột `tier` do chính tầng ra quyết định ghi vào audit_trail. Dò chuỗi
+    # chỉ dùng cho bản ghi có TRƯỚC khi thêm cột. Huy hiệu trên thẻ là thứ analyst nhìn đầu
+    # tiên; để nó suy từ văn xuôi thì một sự cố Tier-2 có cụm "Tier-1" trong lý do sẽ đeo
+    # nhầm huy hiệu Tier-1 — ngay cạnh cái tab đã phân loại nó đúng.
+    _tier_col = str(alert.get("tier") or "") if isinstance(alert, dict) else ""
+    if _tier_col:
+        is_manual = _tier_col == TIER_MANUAL
+        is_llm = _tier_col == TIER_LLM
+        is_ml_tier = _tier_col == TIER_ML
+        is_tier1 = _tier_col == TIER_RULE
+    else:
+        is_manual = (
+            "Manual" in reason_text
+            or "MANUAL" in reason_text.upper()
+            or "Chặn thủ công" in reason_text
+        )
+        is_llm = (
+            reason_text.startswith("[REASON:")
+            or reason_text.startswith("[MITRE:")
+            or reason_text.startswith("[LÝ DO:")
+        )
+        is_ml_tier = not is_manual and not is_llm and any(k in reason_text for k in ML_GATE_MARKERS)
+        is_tier1 = (
+            not is_manual
+            and not is_llm
+            and not is_ml_tier
+            and ("Tier-1" in reason_text or "whitelist" in reason_text.lower())
+        )
 
     if is_manual:
         tier_badge = (
@@ -549,7 +708,7 @@ def render_alert_card(
     # thẻ chặn Tier-1 không còn trôi dạt khỏi nhau.
     grounding_badge, is_grounded = build_grounding_badge(raw_reason, mitre_tech)
     origin_badge = build_origin_badge(raw_reason)
-    rep_badge = build_threat_memory_badge(raw_reason)
+    rep_badge = build_threat_memory_badge(raw_reason, reputation)
     mitre_hierarchy_html = _build_mitre_hierarchy_html(mitre_tech)
     rag_candidates_html = build_technique_codes_html(raw_reason)
     guardrail_note_html = build_guardrail_note(is_grounded, mitre_tech, action)
@@ -662,6 +821,7 @@ def render_alert_card(
         )
         raw_log_str = alert.get("raw_log") if isinstance(alert, dict) else None
         if raw_log_str:
+            render_ground_truth(raw_log_str)
             try:
                 st.json(json.loads(raw_log_str))
             except (ValueError, TypeError):
@@ -689,56 +849,94 @@ def render_metrics_header(
     pending_rules,
     active_rules,
     total_raw_logs=0,
-    live_fpr=0.0,
-    noise_reduction=None,
+    live_fpr=None,
     t1_blocks=None,
+    offload_counts=None,
+    blocks_by_tier=None,
 ):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
 
-    noise_reduction = (log thô − cảnh báo gửi analyst) / log thô.
+    CHỈ MỘT chỉ số phần trăm: xả tải LLM = 1 − (`escalated_to_llm` / log thô).
 
-    ĐỌC CHO ĐÚNG: đây là mức giảm tải mà ANALYST cảm nhận, KHÔNG phải tỉ lệ lọc của
-    Tier-1. Nó là tích của HAI cơ chế: (1) Tier-1 chặn phần lớn log, (2) Cổng ML + LLM GỘP
-    nhiều log escalate thành 1 phán quyết. Ví dụ đo thật 2026-07-15 trên luồng gộp:
-    4796 thô -> Tier 1 escalate 2034 (tức Tier 1 chỉ lọc 57.6%) -> gộp thành 218 cảnh
-    báo -> hiển thị 95.5%. Muốn biết riêng tỉ lệ lọc Tier 1 thì lấy từ
-    config/pipeline_stats.json (raw_logs_total vs số escalate), ĐỪNG suy từ số này.
+    Tham số `noise_reduction` cũ đã BỎ. Nó là đại lượng khác — (log thô − cảnh báo gửi
+    analyst) / log thô — và luôn cao hơn ~11 điểm vì một lô nhiều log gộp thành 1 cảnh báo.
+    Hai phần trăm đứng cạnh nhau chỉ khiến người đọc trích nhầm số nào cũng thấy "đúng".
+
+    offload_counts: dict `offload_counts` nguyên văn từ `config/pipeline_stats.json`.
     """
-    total_alerts = len(all_alerts) if isinstance(all_alerts, list) else 0
+    # ---- Phễu: MỘT nguồn duy nhất, KHÔNG trần -------------------------------------------
+    # LỖI ĐÃ SỬA (đo trên lượt chạy 10k): phễu cũ ghép ba nguồn có cửa sổ lưu trữ khác nhau
+    # rồi đặt cạnh nhau như thể cộng được:
+    #     t1_count  = len(t1_blocks)   <- ring buffer `tier1_blocks.json`, UI cắt còn 12
+    #     ml_count / llm_count         <- audit_trail qua all_alerts, trần 2000
+    # Ba con số cho CÙNG khái niệm "chặn" khi ấy là 50 / 140 / 4.083. Phễu vì thế vẽ Tier-1
+    # ≈ 12 bên cạnh Cổng ML hàng trăm — ĐẢO NGƯỢC câu chuyện xả tải, làm tầng gánh nặng
+    # nhất trông như tầng yếu nhất.
+    #
+    # `pipeline_stats.json` đếm TOÀN luồng, không trần -> là nguồn đúng cho phễu.
+    _oc = offload_counts if isinstance(offload_counts, dict) else {}
 
-    if noise_reduction is None:
-        noise_reduction = 0.0
-        if total_raw_logs > 0:
-            noise_reduction = ((total_raw_logs - total_alerts) / total_raw_logs) * 100
+    def _oc_int(key: str) -> int:
+        try:
+            return int(_oc.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0
 
-    # Phân loại alerts để làm Phễu (Funnel)
-    t1_count = 0
-    ml_count = 0
-    llm_count = 0
-    if isinstance(all_alerts, list):
-        for alert in all_alerts:
-            r = alert.get("reason", "")
-            action = alert.get("action", "")
-            is_manual = "Chặn thủ công" in r or "MANUAL" in r.upper()
-            is_llm = r.startswith("[MITRE:")
-            is_ml = not is_manual and not is_llm and any(k in r for k in ML_GATE_MARKERS)
+    escalated_to_llm = _oc_int("escalated_to_llm")
+    # Hai thẻ giữa phễu in SỐ LỆNH CHẶN, đọc từ chính bảng `audit_trail` mà các tab nhật ký
+    # đọc — nên hai màn hình không thể lệch nhau.
+    #
+    # BẢN CŨ in `ml_gate_resolved` (1.881) và `escalated_to_llm` (1.403), là số SỰ KIỆN ĐI
+    # QUA chứ không phải lệnh chặn. Đối chiếu với nhật ký (210 và 77 dòng) lệch cả chục lần,
+    # vì Cổng ML giải quyết phần lớn bằng nhánh DROP vốn không ghi sổ, còn phần đẩy sang
+    # Tier-2 thì bị nén spam và xếp hàng chờ.
+    _bt = blocks_by_tier if isinstance(blocks_by_tier, dict) else {}
+    ml_count = int(_bt.get(TIER_ML, 0) or 0)
+    llm_count = int(_bt.get(TIER_LLM, 0) or 0)
+    # Tier-1 gánh = tổng luồng trừ phần nó đẩy tiếp cho Cổng ML/LLM.
+    t1_count = max(0, int(total_raw_logs or 0) - _oc_int("action:ESCALATE"))
 
-            if action == "BLOCK_IP":
-                if is_ml:
+    # Xả tải LLM = phần KHÔNG tốn một token nào. Khác hẳn `noise_reduction` ở trên.
+    llm_offload = None
+    if total_raw_logs > 0 and _oc:
+        llm_offload = (1 - escalated_to_llm / total_raw_logs) * 100
+
+    if not (TIER_ML in _bt or TIER_LLM in _bt):
+        # Sổ kiểm toán chưa có bản ghi nào mang cột `tier` (dữ liệu tạo TRƯỚC lần thêm cột)
+        # -> rơi về cách suy từ câu lý do. Kém chính xác nhưng KHÔNG bịa: chỉ đếm dòng thật.
+        ml_count = llm_count = 0
+        if isinstance(all_alerts, list):
+            for alert in all_alerts:
+                r = alert.get("reason", "")
+                if alert.get("action") != "BLOCK_IP":
+                    continue
+                is_manual = "Chặn thủ công" in r or "MANUAL" in r.upper()
+                is_llm = r.startswith("[MITRE:")
+                if not is_manual and not is_llm and any(k in r for k in ML_GATE_MARKERS):
                     ml_count += 1
                 elif is_llm:
                     llm_count += 1
-    if isinstance(t1_blocks, list):
-        t1_count = len(t1_blocks)
 
-    # Xác định màu sắc cho live_fpr (dưới 10% xanh lá, dưới 25% vàng, ngược lại đỏ)
-    fpr_color = "#52c41a"  # green
-    if live_fpr > 25.0:
-        fpr_color = "#ff4d4f"  # red
+    if not _oc:
+        # Chưa có pipeline_stats (vd. mở Dashboard trước khi đẩy luồng) -> KHÔNG bịa số cho
+        # Tier-1, và để `llm_offload` là None (hiện "—").
+        t1_count = len(t1_blocks) if isinstance(t1_blocks, list) else 0
+
+    # Tỉ lệ analyst BÁC BỎ luật do hệ đề xuất — KHÔNG phải False Positive Rate (xem chú thích
+    # tại chỗ tính trong app.py). None = chưa ai duyệt luật nào -> hiện "—", không hiện 0.0%.
+    reject_str = f"{live_fpr:.1f}%" if live_fpr is not None else "—"
+    fpr_color = "#52c41a"  # xanh
+    if live_fpr is None:
+        fpr_color = "#94A3B8"  # xám: chưa đo được
+    elif live_fpr > 25.0:
+        fpr_color = "#ff4d4f"  # đỏ
     elif live_fpr > 10.0:
-        fpr_color = "#faad14"  # orange/yellow
+        fpr_color = "#faad14"  # vàng
 
-    nr_str = f"{noise_reduction:.1f}%" if noise_reduction is not None else "0.0%"
+    # CHỈ MỘT chỉ số phần trăm trên phễu: xả tải LLM = 1 − (sự kiện TỚI LLM / log thô).
+    # "Giảm nhiễu" từng đứng cạnh đây nhưng là đại lượng KHÁC (log thô − cảnh báo tới
+    # analyst) và luôn cao hơn ~11 điểm, nên đặt cạnh nhau chỉ khiến người đọc trích nhầm.
+    offload_str = f"{llm_offload:.1f}%" if llm_offload is not None else "—"
 
     html_kpi = (
         f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">'
@@ -752,32 +950,32 @@ def render_metrics_header(
         f"</div>"
         f'<div class="kpi-container">'
         f'  <div class="kpi-card" style="border-top: 4px solid #64748B;">'
-        f'    <div class="kpi-val" style="color: #F8FAFC;">{total_raw_logs}</div>'
+        f'    <div class="kpi-val" style="color: #F8FAFC;">{int(total_raw_logs or 0):,}</div>'
         f'    <div class="kpi-label">Raw Input Logs</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #FF5252;">'
-        f'    <div class="kpi-val" style="color: #FF5252;">{nr_str}</div>'
-        f'    <div class="kpi-label">Tier-1 Offloaded Rate 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">({t1_count} blocked)</span></div>'
+        f'    <div class="kpi-val" style="color: #FF5252;">{offload_str}</div>'
+        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Tier-1 xử lý {t1_count:,}</span></div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #3B82F6;">'
-        f'    <div class="kpi-val" style="color: #60A5FA;">{ml_count}</div>'
-        f'    <div class="kpi-label">ML Gate Blocked ⚡</div>'
+        f'    <div class="kpi-val" style="color: #60A5FA;">{ml_count:,}</div>'
+        f'    <div class="kpi-label">Cổng ML chặn ⚡</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #8B5CF6;">'
-        f'    <div class="kpi-val" style="color: #A78BFA;">{llm_count}</div>'
-        f'    <div class="kpi-label">LLM Agent Blocked 🧠</div>'
+        f'    <div class="kpi-val" style="color: #A78BFA;">{llm_count:,}</div>'
+        f'    <div class="kpi-label">Tier-2 LLM chặn 🧠</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #F59E0B;">'
-        f'    <div class="kpi-val" style="color: #FBBF24;">{pending_rules}</div>'
+        f'    <div class="kpi-val" style="color: #FBBF24;">{int(pending_rules or 0):,}</div>'
         f'    <div class="kpi-label">HITL Approvals 🧑‍💻</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #10B981;">'
-        f'    <div class="kpi-val" style="color: #34D399;">{active_rules}</div>'
+        f'    <div class="kpi-val" style="color: #34D399;">{int(active_rules or 0):,}</div>'
         f'    <div class="kpi-label">Active Block Rules 🔒</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid {fpr_color};">'
-        f'    <div class="kpi-val" style="color: {fpr_color};">{live_fpr:.1f}%</div>'
-        f'    <div class="kpi-label">Live False Positive Rate 🎯</div>'
+        f'    <div class="kpi-val" style="color: {fpr_color};">{reject_str}</div>'
+        f'    <div class="kpi-label">Analyst bác bỏ luật 🎯</div>'
         f"  </div>"
         f"</div>"
     )

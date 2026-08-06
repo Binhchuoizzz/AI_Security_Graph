@@ -73,6 +73,7 @@
 % Mục lục chỉ hiển thị tới cấp mục (X.Y); ẩn tiểu mục (X.Y.Z) cho gọn, chuyên nghiệp
 \setcounter{tocdepth}{1}
 \titleformat{\chapter}[display]{\Large\bfseries\centering}{\chaptername\ \thechapter}{0.5em}{}
+\titlespacing*{\chapter}{0pt}{20pt}{16pt} % KHÔNG kéo âm: mẹo ép trang cũ (-30pt) làm đầu chương chật
 \titleformat{\section}{\large\bfseries}{\thesection}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
 \titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
@@ -106,7 +107,12 @@
 }
 
 % =============================================================================
-\renewcommand{\arraystretch}{1.3} % uniform vertical spacing for all tables
+\renewcommand{\arraystretch}{1.3} % giãn dòng bảng thống nhất
+% Tên model/hàm dài (Foundation-Sec-8B-Instruct, build_stream()) không ngắt dòng được
+% -> ở cỡ 12pt chúng đẩy chữ vượt LỀ PHẢI 2,8cm. \sloppy cho TeX giãn khoảng trắng
+% thay vì để chữ lấn ra lề: đúng luật lề của template, đổi lại vài dòng thưa hơn.
+\sloppy
+
 \begin{document}
 \selectlanguage{vietnamese}
 
@@ -162,9 +168,9 @@
 % -----------------------------------------------------------------------------
 % FRONT MATTER (ARABIC NUMERALS 1, 2, 3...)
 % -----------------------------------------------------------------------------
-\pagenumbering{arabic}
+\pagenumbering{roman} % Template: phần đầu (trước Chương 1) đánh i, ii, iii
 \pagestyle{fancy}
-\setcounter{page}{1} % Starts from page 1 after cover pages
+\setcounter{page}{1}
 
 % Abstract Page
 \newpage
@@ -174,11 +180,9 @@
 \end{center}
 \vspace{0.5cm}
 
-\begin{singlespace}
-Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đối mặt với áp lực quá tải khi khối lượng cảnh báo nhật ký vượt quá khả năng xử lý thủ công. Các công cụ tự động hóa truyền thống vận hành theo kịch bản tĩnh thiếu khả năng suy luận, trong khi việc đưa trực tiếp dữ liệu vào Mô hình Ngôn ngữ Lớn (LLM) lại gặp rào cản độ trễ, nguy cơ tiêm nhiễm câu lệnh (prompt injection) và vi phạm chủ quyền dữ liệu. Luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành cục bộ (air-gapped) giải quyết triệt để các rào cản trên. Tầng 1 vận hành như một bộ lọc tốc độ đường truyền nhằm tự động loại bỏ phần lớn lưu lượng nhiễu, trong khi Tầng 2 ứng dụng tác tử AI suy luận có trạng thái kết hợp tri thức MITRE ATT\&CK và quy định NIST để xử lý các đe dọa phức tạp đằng sau các rào chắn mật mã.
-
-Đánh giá thực nghiệm trên các tập dữ liệu xâm nhập chuẩn mực minh chứng hiệu năng vượt trội của SENTINEL. Tầng 1 xả tải tự động 92.2\% lưu lượng nhiễu ở độ trễ dưới 1\,ms và đạt băng thông trên 2.500 flows/s. Tầng 2 đạt độ chính xác quy kết kỹ thuật 67.33\% (RRF) và kiểm soát hoàn toàn tỷ lệ bỏ lọt tấn công so với mô hình Đơn tầng. Cơ chế đóng gói Nonce vô hiệu hóa 100\% tấn công prompt injection, kết hợp niêm phong HMAC-SHA256 bảo đảm tính toàn vẹn vết chứng cứ. Hệ thống vận hành hoàn toàn cục bộ trên GPU 16\,GB với mức tiêu thụ tài nguyên tối ưu, khẳng định kiến trúc lai hai tầng là giải pháp thiết thực và hiệu quả cho phòng thủ SOC hiện đại.
-\end{singlespace}
+\begin{spacing}{1.667}
+Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành An ninh (SOC) đối mặt với tình trạng quá tải cảnh báo khi khối lượng nhật ký liên tục vượt xa khả năng xử lý của chuyên viên phân tích. Các công cụ tự động hoá truyền thống vận hành theo kịch bản tĩnh thiếu khả năng suy luận theo ngữ cảnh, trong khi đưa trực tiếp nhật ký thô vào Mô hình Ngôn ngữ Lớn (LLM) lại vấp phải nút thắt độ trễ, nguy cơ tiêm nhiễm câu lệnh và vi phạm chủ quyền dữ liệu. Luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành cục bộ hoàn toàn (air-gapped), kết hợp tác tử suy luận LLM với Sinh có Tăng cường Truy xuất (RAG). Tầng 1 vận hành như một bộ lọc tốc độ đường truyền---luật xác định, chấm bất thường Welford và cổng LightGBM---để tự động loại bỏ nhiễu nền của luồng, trong khi Tầng 2 sử dụng tác tử AI suy luận có trạng thái, dựa trên tri thức MITRE ATT\&CK và hướng dẫn NIST, để xử lý các đe doạ phức tạp phía sau các rào chắn mật mã. Kết quả thực nghiệm trên các bộ dữ liệu xâm nhập chuẩn cho thấy hiệu quả của SENTINEL. Tầng 1 cùng Cổng Học máy tự động gỡ tải \textbf{90,6\%} lưu lượng đầu vào. Vì sự kiện điển hình không bao giờ chạm tới mô hình, độ trễ toàn tuyến ở mức trung vị giảm còn \textbf{0,88\,ms} so với \textbf{17.174,7\,ms} của đường LLM đơn tầng. Cơ chế đóng gói Nonce vô hiệu hoá tiêm nhiễm câu lệnh bằng cấu trúc chứ không bằng nhận dạng nội dung, kháng được toàn bộ \textbf{678} mẫu đối kháng mà lớp lọc tĩnh không hấp thụ được; chuỗi niêm phong HMAC-SHA256 phát hiện mọi kiểu giả mạo cốt lõi, qua đó bảo đảm tính toàn vẹn và khả năng phát hiện giả mạo của nhật ký kiểm toán---song do dùng khoá đối xứng, không cấu thành chống chối bỏ theo nghĩa mật mã học---toàn bộ vận hành trên một máy trạm local. SENTINEL chứng minh kiến trúc lai hai tầng là một mô hình phòng thủ đáng tin cậy và hiệu quả cho SOC hiện đại.
+\end{spacing}
 
 % Acknowledgements Page
 \newpage
@@ -188,20 +192,16 @@ Trong bối cảnh an ninh mạng hiện đại, các Trung tâm Điều hành A
 \end{center}
 \vspace{0.5cm}
 
-\begin{singlespace}
-Để hoàn thành công trình nghiên cứu khoa học này và đạt được học vị Thạc sĩ Kỹ thuật Phần mềm, tôi đã nhận được sự hỗ trợ, động viên và dìu dắt quý báu từ rất nhiều cá nhân và tập thể.
+\begin{spacing}{1.667}
+Để hoàn thành công trình nghiên cứu này và đạt được học vị Thạc sĩ Kỹ thuật Phần mềm, tôi đã nhận được sự hỗ trợ, động viên và dìu dắt quý báu từ rất nhiều cá nhân và tập thể.
 
-Trước hết, tôi xin bày tỏ lòng biết ơn chân thành và kính trọng sâu sắc nhất tới hai thầy hướng dẫn khoa học của tôi, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác, sự định hướng chiến lược chuẩn xác và tinh thần làm việc nghiêm túc, quý thầy đã luôn dành thời gian kiên nhẫn chỉ bảo, định hướng tư duy phản biện và truyền cảm hứng nghiên cứu cho tôi trong suốt chặng đường thực hiện luận văn. Những góp ý chuyên môn sắc bén của quý thầy không chỉ giúp tôi từng bước hoàn thiện công trình này mà còn là hành trang tri thức vô giá cho sự nghiệp nghiên cứu an toàn thông tin và trí tuệ nhân tạo của tôi sau này.
+Trước hết, tôi xin bày tỏ lòng biết ơn chân thành và kính trọng sâu sắc nhất tới hai thầy hướng dẫn khoa học của tôi, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác, sự định hướng chiến lược chuẩn xác và tinh thần làm việc nghiêm túc, quý thầy đã luôn dành thời gian kiên nhẫn chỉ bảo, định hướng tư duy phản biện và truyền cảm hứng nghiên cứu cho tôi trong suốt chặng đường thực hiện luận văn. Những góp ý chuyên môn sắc bén của quý thầy không chỉ giúp tôi hoàn thiện công trình này mà còn là hành trang tri thức vô giá cho sự nghiệp nghiên cứu an toàn thông tin và trí tuệ nhân tạo của tôi sau này.
 
-Tôi xin trân trọng gửi lời tri ân tới Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị \& Công nghệ FSB cùng toàn thể quý thầy cô giáo Trường Đại học FPT. Quý thầy cô đã truyền dạy cho tôi những nền tảng tri thức lý thuyết và thực tiễn vững chắc, đồng thời tạo một môi trường học tập, nghiên cứu chuyên nghiệp, hiện đại, tạo mọi điều kiện thuận lợi nhất cho học viên nâng cao trình độ chuyên môn trong suốt khóa học Thạc sĩ.
+Tôi xin trân trọng gửi lời tri ân tới Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị \& Công nghệ FSB cùng toàn thể quý thầy cô Trường Đại học FPT đã truyền dạy nền tảng tri thức lý thuyết và thực tiễn vững chắc trong một môi trường nghiên cứu chuyên nghiệp, hiện đại. Tôi cũng xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Cục C12, Trung tâm Dữ liệu Quốc gia---sự tin tưởng, điều kiện thuận lợi về thời gian cùng những kinh nghiệm thực chiến phong phú từ đơn vị đã đem lại góc nhìn thực tiễn sâu sắc, áp dụng trực tiếp vào quá trình thiết kế, thực nghiệm và kiểm chứng hệ thống SENTINEL.
 
-Tôi xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Cục C12, Trung tâm Dữ liệu Quốc gia. Sự tin tưởng, tạo điều kiện thuận lợi về mặt thời gian cùng những kinh nghiệm thực chiến vô cùng phong phú từ môi trường công tác thực tế tại đơn vị đã tiếp thêm cho tôi nhiều động lực và góc nhìn thực tiễn sâu sắc để áp dụng trực tiếp vào quá trình thiết kế, thực nghiệm và kiểm chứng hệ thống an ninh SENTINEL.
+Cuối cùng, và cũng là niềm tự hào lớn lao nhất, tôi xin dành trọn lòng tri ân sâu sắc nhất tới gia đình thân yêu, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn vô bờ bến và nguồn động viên không ngừng nghỉ của vợ và con trong những tháng ngày tôi miệt mài với các đợt thực nghiệm kéo dài xuyên đêm chính là điểm tựa vững chắc nhất giúp tôi hoàn thành công trình này. Mặc dù đã rất cố gắng, luận văn khó tránh khỏi hạn chế; tôi rất mong nhận được sự chỉ dẫn và đóng góp quý báu từ quý thầy cô trong Hội đồng chấm luận văn cùng các đồng nghiệp.
 
-Cuối cùng, và cũng là niềm tự hào lớn lao nhất, tôi xin dành trọn lòng tri ân sâu sắc nhất tới gia đình thân yêu của mình, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn vô bờ bến, sự thấu hiểu và nguồn động viên tinh thần không ngừng nghỉ của vợ và con trong suốt những tháng ngày tôi miệt mài bên máy tính với các đợt thực nghiệm kéo dài xuyên đêm chính là điểm tựa tinh thần vững chắc nhất, giúp tôi vượt qua mọi rào cản và khó khăn để hoàn thành tốt đẹp công trình nghiên cứu này.
-
-Mặc dù đã rất cố gắng nghiêm túc hoàn thiện luận văn với tất cả tinh thần trách nhiệm và lòng nhiệt huyết khoa học, song công trình khó tránh khỏi những hạn chế nhất định. Tôi rất mong nhận được sự chỉ dẫn, đóng góp ý kiến quý báu từ quý thầy cô trong Hội đồng chấm luận văn và các đồng nghiệp để đề tài tiếp tục được hoàn thiện và phát triển hơn nữa trong tương lai.
-
-\end{singlespace}
+\end{spacing}
 
 
 % Lists and Table of Contents
@@ -213,8 +213,7 @@ Mặc dù đã rất cố gắng nghiêm túc hoàn thiện luận văn với t�
 \addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
 
-\newpage
-\cleardoublepage
+\vspace{1.2cm}
 \addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
 
@@ -224,9 +223,11 @@ Mặc dù đã rất cố gắng nghiêm túc hoàn thiện luận văn với t�
 \begin{center}
     {\Large\textbf{Danh mục các từ viết tắt}}
 \end{center}
-\vspace{0.5cm}
+\vspace{0.25cm}
 
-\begin{longtable}{lp{0.72\textwidth}}
+\begingroup\footnotesize % BỌC NHÓM: không bọc thì cỡ chữ rò xuống TOÀN BỘ thân bài (đo được: thân bài chạy ở 10pt thay vì 12pt)
+\setlength{\LTpre}{0pt}\setlength{\LTpost}{0pt}
+\begin{longtable}{lp{0.74\textwidth}}
 \textbf{Từ viết tắt} & \textbf{Định nghĩa đầy đủ} \\
 \midrule
 AI & Artificial Intelligence (Trí tuệ nhân tạo) \\
@@ -248,12 +249,15 @@ SOAR & Security Orchestration, Automation, and Response (Điều phối, tự đ
 SOC & Security Operations Center (Trung tâm điều hành an ninh mạng) \\
 \bottomrule
 \end{longtable}
+\endgroup
 
 % -----------------------------------------------------------------------------
 % MAIN BODY
 % -----------------------------------------------------------------------------
 \newpage
-\onehalfspacing % Apply 1.5 Spacing rules to main body text
+\pagenumbering{arabic} % Template: nội dung chính đánh lại từ 1
+\setcounter{page}{1}
+\doublespacing % Template: "Tất cả phần luận (text) phải cách dòng đôi"
 
 % Include modular chapter files
 \setcounter{table}{0}
@@ -268,9 +272,13 @@ SOC & Security Operations Center (Trung tâm điều hành an ninh mạng) \\
 % REFERENCES (Continuous page numbering)
 % -----------------------------------------------------------------------------
 \newpage
-\singlespacing % References are typically single-spaced
+\pagenumbering{arabic} % Template: tài liệu tham khảo KHÔNG đánh liên tục với nội dung
+\setcounter{page}{1}
+\singlespacing
 
 \begin{thebibliography}{99}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
 \addcontentsline{toc}{chapter}{Tài liệu tham khảo}
 
 \bibitem{ids2018}

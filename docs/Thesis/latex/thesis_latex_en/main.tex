@@ -72,6 +72,7 @@
 % Mục lục chỉ hiển thị tới cấp mục (X.Y); ẩn tiểu mục cho gọn, chuyên nghiệp
 \setcounter{tocdepth}{1}
 \titleformat{\chapter}[display]{\Large\bfseries\centering}{\chaptername\ \thechapter}{0.5em}{}
+\titlespacing*{\chapter}{0pt}{20pt}{16pt} % KHÔNG kéo âm: mẹo ép trang cũ (-30pt) làm đầu chương chật
 \titleformat{\section}{\large\bfseries}{\thesection}{0.5em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
 \titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
@@ -105,7 +106,12 @@
 }
 
 % =============================================================================
-\renewcommand{\arraystretch}{1.3} % uniform vertical spacing for all tables
+\renewcommand{\arraystretch}{1.3} % giãn dòng bảng thống nhất
+% Tên model/hàm dài (Foundation-Sec-8B-Instruct, build_stream()) không ngắt dòng được
+% -> ở cỡ 12pt chúng đẩy chữ vượt LỀ PHẢI 2,8cm. \sloppy cho TeX giãn khoảng trắng
+% thay vì để chữ lấn ra lề: đúng luật lề của template, đổi lại vài dòng thưa hơn.
+\sloppy
+
 \begin{document}
 \selectlanguage{english}
 
@@ -161,9 +167,9 @@
 % -----------------------------------------------------------------------------
 % FRONT MATTER (ARABIC NUMERALS 1, 2, 3...)
 % -----------------------------------------------------------------------------
-\pagenumbering{arabic}
+\pagenumbering{roman} % Template: phần đầu (trước Chương 1) đánh i, ii, iii
 \pagestyle{fancy}
-\setcounter{page}{1} % Starts from page 1 after cover pages
+\setcounter{page}{1}
 
 % Abstract Page
 \newpage
@@ -173,11 +179,9 @@
 \end{center}
 \vspace{0.5cm}
 
-\begin{singlespace}
-In the modern cybersecurity landscape, Security Operations Centers (SOCs) face acute alert fatigue as continuous telemetry volume far exceeds human analyst processing capacity. Traditional automation tools relying on static playbooks lack contextual reasoning, whereas feeding raw logs directly to Large Language Models (LLMs) suffers severe latency bottlenecks, prompt injection risks, and data sovereignty violations. This thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped. Tier 1 functions as a wire-speed filter to automatically discard baseline stream noise, while Tier 2 employs a stateful AI reasoning agent backed by MITRE ATT\&CK and NIST guidance to handle complex threats behind cryptographic guardrails.
-
-Empirical evaluation on benchmark intrusion datasets demonstrates SENTINEL's high efficiency. Tier 1 automatically offloads 92.2\% of stream noise at sub-millisecond latency with throughput exceeding 2,500 flows/s. Tier 2 achieves a 67.33\% technique mapping accuracy (via RRF) and outperforms the Single-Tier baseline in generating accurate security actions. Delimited Nonce encapsulation neutralizes 100\% of prompt injection attacks, while HMAC-SHA256 hash-chaining guarantees audit trail non-repudiation, operating on a single 16\,GB GPU under optimal resource consumption. SENTINEL proves that a two-tier hybrid architecture provides a trustworthy and effective paradigm for modern SOC defense.
-\end{singlespace}
+\begin{spacing}{1.667}
+In the modern cybersecurity landscape, Security Operations Centers (SOCs) face acute alert fatigue as continuous telemetry volume far exceeds human analyst processing capacity. Traditional automation tools relying on static playbooks lack contextual reasoning, whereas feeding raw logs directly to Large Language Models (LLMs) suffers severe latency bottlenecks, prompt injection risks, and data sovereignty violations. This thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, coupling an LLM reasoning agent with Retrieval-Augmented Generation (RAG). Tier 1 functions as a wire-speed filter---deterministic rules, Welford anomaly scoring, and a LightGBM gate---to automatically discard baseline stream noise, while Tier 2 employs a stateful AI reasoning agent backed by MITRE ATT\&CK and NIST guidance to handle complex threats behind cryptographic guardrails. Empirical evaluation on benchmark intrusion datasets demonstrates SENTINEL's efficiency. Tier 1 and the ML Gate automatically offload \textbf{90.6\%} of the incoming stream. Because the typical event never reaches the model, the median end-to-end latency falls to \textbf{0.88\,ms} from \textbf{17,174.7\,ms} under a single-tier LLM baseline. Delimited Nonce encapsulation neutralizes prompt injection structurally rather than by content recognition, resisting all \textbf{678} adversarial samples that the static pre-filter cannot absorb, while HMAC-SHA256 hash-chaining detects every core tampering mode and thereby guarantees audit trail integrity and tamper-evidence---though not, given its symmetric key, cryptographic non-repudiation---operating on a local workstation. SENTINEL proves that a two-tier hybrid architecture provides a trustworthy and effective paradigm for modern SOC defense.
+\end{spacing}
 
 % Acknowledgements Page
 \newpage
@@ -187,20 +191,16 @@ Empirical evaluation on benchmark intrusion datasets demonstrates SENTINEL's hig
 \end{center}
 \vspace{0.5cm}
 
-\begin{singlespace}
-The completion of this Master's thesis and the achievement of the Master of Software Engineering degree represent a journey that would not have been possible without the invaluable support, encouragement, and guidance of numerous individuals and institutions.
+\begin{spacing}{1.667}
+The completion of this Master's thesis would not have been possible without the invaluable support and guidance of numerous individuals and institutions.
 
-First and foremost, I wish to express my deepest, most sincere gratitude and profound respect to my academic supervisors, Dr. Bui Van Hieu and Dr. Dang Van Hieu. Through their profound scholarship, precise strategic orientation, and rigorous research ethics, they tirelessly devoted their time to guiding my critical thinking, offering sharp professional critiques, and inspiring my scientific curiosity throughout every phase of this research. Their invaluable mentorship has not only shaped this thesis into a rigorous academic work but also established an enduring foundation for my future career in cybersecurity and artificial intelligence engineering.
+First and foremost, I wish to express my deepest gratitude and profound respect to my academic supervisors, Dr. Bui Van Hieu and Dr. Dang Van Hieu. Through their scholarship, precise strategic orientation, and rigorous research ethics, they devoted their time to guiding my critical thinking, offering sharp professional critiques, and inspiring my scientific curiosity throughout this research. Their mentorship has shaped this thesis into a rigorous academic work and established a foundation for my future career in cybersecurity and artificial intelligence engineering.
 
-I am deeply grateful to the Board of Management, the leadership of the FSB School of Business and Technology, and the faculty members of FPT University. Their dedicated teaching equipped me with strong theoretical and practical knowledge, while providing a professional, modern, and supportive research environment throughout my Master's studies.
+I am deeply grateful to the Board of Management, the leadership of the FSB School of Business and Technology, and the faculty of FPT University, whose dedicated teaching equipped me with strong theoretical and practical knowledge within a professional research environment. I also thank the Leadership and my colleagues at Department C12, the National Data Center, whose trust, flexible accommodation of my schedule, and operational insights directly informed the design and empirical validation of the SENTINEL system.
 
-I extend my heartfelt thanks to the Leadership and my esteemed colleagues at Department C12, the National Data Center. Their trust, flexible accommodation of my schedule, and rich practical insights gained from real-world operations provided immense motivation and invaluable practical perspectives that directly informed the design, implementation, and empirical validation of the SENTINEL security system.
+Finally, and most cherished of all, I dedicate my deepest gratitude to my beloved family, especially my dear wife and our young child. Their silent sacrifices, patience, and constant encouragement during the countless late nights of system evaluation were my pillar of strength. While every effort has been made to conduct this research with rigor, limitations inevitably remain, and I welcome all constructive feedback from the examination committee and fellow researchers.
 
-Finally, and most cherished of all, I dedicate my deepest emotional gratitude to my beloved family, especially my dear wife and our young child. Their silent sacrifices, infinite patience, unwavering understanding, and constant encouragement during the countless late nights spent conducting intensive system evaluations served as my solid pillar of strength, enabling me to overcome all obstacles and successfully bring this work to fruition.
-
-While every effort has been made to conduct this research with utmost rigor and scientific dedication, limitations inevitably remain. I humbly welcome all constructive feedback and guidance from the thesis examination committee and fellow researchers to further refine and expand this work in the future.
-
-\end{singlespace}
+\end{spacing}
 
 
 % Lists and Table of Contents
@@ -212,8 +212,7 @@ While every effort has been made to conduct this research with utmost rigor and 
 \addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
 
-\newpage
-\cleardoublepage
+\vspace{1.2cm}
 \addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
 
@@ -223,9 +222,11 @@ While every effort has been made to conduct this research with utmost rigor and 
 \begin{center}
     {\Large\textbf{List of Abbreviations}}
 \end{center}
-\vspace{0.5cm}
+\vspace{0.25cm}
 
-\begin{longtable}{lp{0.72\textwidth}}
+\begingroup\footnotesize % BỌC NHÓM: không bọc thì cỡ chữ rò xuống TOÀN BỘ thân bài (đo được: thân bài chạy ở 10pt thay vì 12pt)
+\setlength{\LTpre}{0pt}\setlength{\LTpost}{0pt}
+\begin{longtable}{lp{0.74\textwidth}}
 \textbf{Abbreviation} & \textbf{Full Description} \\
 \midrule
 AI & Artificial Intelligence \\
@@ -247,12 +248,15 @@ SOAR & Security Orchestration, Automation, and Response \\
 SOC & Security Operations Center \\
 \bottomrule
 \end{longtable}
+\endgroup
 
 % -----------------------------------------------------------------------------
 % MAIN BODY
 % -----------------------------------------------------------------------------
 \newpage
-\onehalfspacing % Apply 1.5 Spacing rules to main body text
+\pagenumbering{arabic} % Template: nội dung chính đánh lại từ 1
+\setcounter{page}{1}
+\doublespacing % Template: "Tất cả phần luận (text) phải cách dòng đôi"
 
 % Include modular chapter files
 \setcounter{table}{0}
@@ -267,10 +271,14 @@ SOC & Security Operations Center \\
 % REFERENCES (Continuous page numbering)
 % -----------------------------------------------------------------------------
 \newpage
-\singlespacing % References are typically single-spaced
+\pagenumbering{arabic} % Template: tài liệu tham khảo KHÔNG đánh liên tục với nội dung
+\setcounter{page}{1}
+\singlespacing
 
 \begin{thebibliography}{99}
 \addcontentsline{toc}{chapter}{References}
+\setlength{\itemsep}{0pt}
+\setlength{\parskip}{0pt}
 
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.

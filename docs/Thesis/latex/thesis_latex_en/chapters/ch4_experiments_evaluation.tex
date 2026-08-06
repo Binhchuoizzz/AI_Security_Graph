@@ -1,127 +1,167 @@
 \chapter{Experiments and Evaluation}
 \label{ch:experiments_evaluation}
 
-This chapter presents the experimental results and quantitative evaluation of the SENTINEL system. The content is streamlined to focus on core performance indicators: Tier 1 wire-speed noise offloading efficiency, Tier 2 cognitive agent adjudication and knowledge mapping accuracy, adversarial AI defense capabilities alongside cryptographic audit integrity, combined with controlled ablation studies and multi-dimensional comparisons against state-of-the-art platforms.
+This chapter presents the quantitative experimental results for the SENTINEL system, organized to follow the three research questions posed in Chapter 1. Each section states the measured metric, the denominator of the measurement, and the limits of the conclusion it supports.
 
-\section{Experimental Setup and Benchmark Telemetry}
+\section{Experimental Setup and Measurement Conventions}
 \label{sec:experimental_setup}
 
-The SENTINEL testbed is deployed on a local server representative of small-to-medium enterprise (SME) Security Operations Center (SOC) infrastructure, powered by an Intel Core i7 processor, 32\,GB DDR5 RAM, and a single NVIDIA GeForce RTX 4060 Ti 16\,GB VRAM GPU. All system microservices—including Redis Stream message queues, Tier 1 filters, Tier 2 LangGraph agents, and the \texttt{llama.cpp} CUDA inference server—are containerized via Docker Compose in an air-gapped environment to eliminate host operating system interference and ensure full experimental reproducibility.
-
-Evaluation telemetry combines benchmark datasets: CSE-CIC-IDS2018~\cite{ids2018} (providing 25,799 labeled network flow events across 22 attack classes), CSIC 2010 (2,000 HTTP Layer 7 events), and DAPT2020~\cite{dapt2020} (simulating multi-stage APT attack scenarios), alongside 723 Adversarial AI samples. To ensure accurate evaluation, dataset roles are strictly separated: the Tier 1 ML Gate is measured on \texttt{datatest.json}, ablation experiments utilize \texttt{ground\_truth.json}, and end-to-end evaluation leverages the \texttt{build\_stream()} simulation. Table~\ref{tab:experimental_setup} outlines the hardware testbed and benchmark telemetry specifications.
+The system is deployed on a local server representative of small-to-medium enterprise SOC infrastructure, with all microservices containerized via Docker Compose in an air-gapped environment. The governing methodological principle is that \textbf{the denominator must match the question}: distribution-dependent metrics (offload rate) are measured on the live stream, while classification quality is measured on a class-balanced set. Conflating the two is a serious source of error---measuring offload on a forced 50/50 set yields an artificially low figure, because that set does not reflect the distribution the system actually encounters. Table~\ref{tab:experimental_setup} states each dataset's role.
 
 \begin{table}[htbp]
 \centering
-\caption{Experimental Environment Specifications and Benchmark Telemetry Datasets}
+\caption{Experimental Configuration and Dataset Role Assignment}
 \label{tab:experimental_setup}
-\small
-\setlength{\tabcolsep}{5pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}X}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X}
 \toprule
-\textbf{Component} & \textbf{Specification / Title} & \textbf{Detailed Description and Architectural Role} \\
+\textbf{Component} & \textbf{Specification} & \textbf{Role in the Measurement} \\
 \midrule
-Processor (CPU) & Intel Core i7 & Executes Welford statistical filtering and Redis streams \\
-System RAM & 32 GB DDR5 & Stores Semantic Cache hash tables and FAISS vector indices \\
-Graphics Card (GPU) & NVIDIA RTX 4060 Ti & Runs \texttt{llama.cpp} CUDA server for Foundation-Sec-8B model \\
-Virtualization & Docker Compose & Encapsulates microservices in an air-gapped environment \\
+Processor (CPU) & Intel Core i7 & Welford filtering and Redis streams \\
+System RAM & 32 GB DDR5 & Semantic Cache and FAISS indices \\
+Graphics Card (GPU) & RTX 4060 Ti 16\,GB & \texttt{llama.cpp} CUDA, Foundation-Sec-8B \\
+Virtualization & Docker Compose & Air-gapped, reproducible environment \\
 \midrule
-Dataset 1 & CSE-CIC-IDS2018~\cite{ids2018} & 25,799 labeled NetFlow events (22 attack classes) \\
-Dataset 2 & DAPT2020 & Multi-stage Advanced Persistent Threat (APT) attack chains \\
-Dataset 3 & CSIC 2010 \& Zero-day & 2,000 HTTP Layer 7 events and 723 Adversarial AI attacks (AdvBench, Deepset, Jackhhao) \\
-Ablation Dataset & 300 balanced samples & 150 benign + 150 attack events (ground-truth verified) \\
+\texttt{datatest.json} & 4,240 samples, 51.8\% attack & ML Gate classification quality. \textbf{Not} used for offload rate \\
+\texttt{ground\_truth.json} & 1,750 samples $\rightarrow$ \textbf{1,700 when scored} & Ablation, reasoning quality. 50 author-composed samples excluded from all ratios \\
+\texttt{build\_stream()} & 25,799 (150 warm-up + \textbf{25,649 scored}), 31.6\% attack & Offload rate, end-to-end \\
+SOC-like stream & 99,717 events, \textbf{9.8\% attack} & Offload rate at a near-realistic base rate \\
+Adversarial set & 823 samples, of which \textbf{703 from published corpora} & AdvBench, deepset, jackhhao. Author-composed portion reported separately \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Tier 1 Wire-speed Offloading and Latency}
+Two further conventions apply to every run. First, dynamic rules are \textbf{frozen} during measurement, preventing a run from generating rules and then benefiting from them later. Second, the 50 author-composed samples embedded in \texttt{ground\_truth.json} are excluded from all ratios---if retained, they constitute 16.7\% of the attribution scoring set and all share a single answer, skewing the label distribution.
+
+\section{RQ1 --- Offloading and Filtration Economics}
 \label{sec:tier1_performance}
 
-Tier 1 filters stream noise at wire-speed, freeing GPU resources for Tier 2 reasoning. Welford's $\mathcal{O}(1)$ online statistical filter (\texttt{rule\_\allowbreak engine.py}) updates mean $\mu_k$ and sum of squares $S_k$ in real time, calculating standard deviation $\sigma_k$ to discard normal traffic~\cite{welford1962}. Concurrently, LightGBM (\texttt{ml\_\allowbreak gateway.py}) achieves 0.35\,ms inference latency via leaf-wise tree growth. For repetitive attacks, Tier 1.75 Semantic Cache (\texttt{response\_\allowbreak cache.py}) executes sub-1\,ms short-circuit responses.
+RQ1 has three components: offloading at wire-speed, reducing latency, and reducing resource consumption. As stated in Section~\ref{sec:architecture_overview}, an event counts as \textbf{offloaded} when it generates no language model invocation---every action other than \texttt{ESCALATE} terminates at Tier 1. This definition matters because a counting scheme crediting only \texttt{DROP} omits \texttt{BLOCK\_IP}, \texttt{ALERT}, and \texttt{AWAIT\_HITL}, none of which consume a single token.
 
 \begin{table}[htbp]
 \centering
-\caption{Tier 1 Component Inference Latency and Noise Offloading Ratios}
+\caption{Per-Tier Offload Rate on Two Streams with Different Base Rates}
 \label{tab:tier1_performance}
-\small
+\footnotesize
 \setlength{\tabcolsep}{5pt}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c c}
 \toprule
-\textbf{Tier 1 Component} & \textbf{Source Script File} & \textbf{Avg Latency} & \textbf{Events Offloaded} & \textbf{Ratio (\%)} \\
+\textbf{Resolving Tier} & \multicolumn{2}{c}{\textbf{Benchmark stream, 25,649 ev}} & \multicolumn{2}{c}{\textbf{SOC-like stream, 99,717 ev}} \\
+ & \textbf{Events} & \textbf{Share} & \textbf{Events} & \textbf{Share} \\
 \midrule
-Welford Statistical Filter & \texttt{rule\_engine.py} & $< 0.01$ ms & 14,820 events & 59.3\% \\
-LightGBM Machine Learning Gate & \texttt{ml\_gateway.py} & 0.35 ms & 4,376 events & 17.5\% \\
-Semantic Cache (Tier 1.75) & \texttt{response\_cache.py} & $< 1.00$ ms & 3,850 events & 15.4\% \\
+Tier 1 (rules + Welford + signatures) & 20,663 & 80.6\% & 38,207 & 38.3\% \\
+Machine Learning Gate (4-band) & 2,568 & 10.0\% & 58,992 & 59.2\% \\
 \midrule
-\textbf{Total Tier 1 Pipeline} & -- & \textbf{$< 0.40$ ms} & \textbf{4,611 / 5,000 events (Sample)} & \textbf{92.2\%} \\
+\textbf{Cumulative --- never reaches LLM} & \textbf{23,231} & \textbf{90.6\%} & \textbf{97,199} & \textbf{97.5\%} \\
+Remainder $\rightarrow$ Tier 2 (LLM) & 2,418 & 9.4\% & 2,518 & 2.5\% \\
+\midrule
+\textit{Attack base rate of the stream} & \multicolumn{2}{c}{\textit{31.6\%}} & \multicolumn{2}{c}{\textit{9.8\%}} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-In aggregate, Tier 1 successfully offloads 92.2\% (only 389 out of 5,000 sample events required LLM invocation) of stream noise at an average latency below 0.40\,ms (Table~\ref{tab:tier1_performance}). Notably, the ML Gate's autonomous decision rate dropped from 79.1\% to 59.8\% upon integrating CSIC HTTP flows, as the LightGBM model abstains when NetFlow-specific features are missing. Nevertheless, filtering over 90\% of stream noise without GPU invocation maintains Redis Stream consumer group lag near zero.
+Table~\ref{tab:tier1_performance} reveals a property not stated explicitly in the related literature: \textbf{the offload rate is a function of the stream's attack base rate, not a constant of the system}. Within a single stream the aggregate decomposes linearly as $\text{offload}(p) = (1-p)\cdot\text{offload}_{\text{benign}} + p\cdot\text{offload}_{\text{attack}}$, where $p$ is the attack rate. On the benchmark stream the two per-label rates are \textbf{92.35\%} on benign cases and \textbf{86.72\%} on attack cases, which reproduce the measured 90.6\% exactly; on the SOC-like stream they are \textbf{97.88\%} and \textbf{93.77\%}, reproducing 97.5\%. The coefficients themselves differ between the two streams because the streams differ in composition, so the relation licenses projection to a different base rate \textbf{within a stream}---not transfer of one stream's coefficients onto another. The 90.6\% figure is therefore \textbf{not an architectural ceiling} but a consequence of a test stream deliberately loaded with more than three times the realistic attack proportion.
 
-\section{Tier 2 Cognitive Reasoning Accuracy and Knowledge Mapping}
-\label{sec:tier2_accuracy_rag}
+A second observation: \textbf{the tier carrying the load changes with the stream}. On the benchmark stream, Tier 1 rules resolve 80.6\%; on the benign-dominated stream, the ML Gate becomes the primary carrier at 59.2\%. The two tiers compensate for one another rather than overlapping---empirical justification for retaining both.
 
-Tier 2 processes the escalated 7.8\% anomalous stream events to perform stateful reasoning via the LangGraph agent (\texttt{workflow.py}) combined with the quantized Foundation-Sec-8B-Instruct Q4\_K\_M model. The Dual-RAG hybrid retrieval engine (\texttt{hybrid\_retriever.py}) fuses candidate contexts from FAISS dense vector search and BM25 sparse keyword matching via Reciprocal Rank Fusion ($RRF\_Score(d) = \sum 1 / (k + r_m(d))$ with $k=60$)~\cite{rrf2009}. Evaluated on 300 CSIC samples, RRF (with LLM disabled) achieves a technique mapping accuracy of 67.33\%. However, since the \texttt{T1595.003} technique accounts for 52\% of the dataset (random guess baseline), the 67.33\% accuracy only represents a marginal 15.33\% improvement over guessing. Furthermore, End-to-End mapping accuracy dropped significantly to 2.33\%, indicating that the LLM frequently overrides the retrieved mapping with generated responses instead of adhering to the RAG context.
+\textbf{Per-component savings.} The ML Gate processes each feature vector in \textbf{0.287\,ms}, achieving \textbf{3,452 events/second}. The Tier 1.75 Semantic Cache achieves an \textbf{81.3\%} hit rate (1,220 of 1,500 queries) with an \textbf{8.9$\times$} speed-up and zero evictions; its key is a hash of the normalised query string---exact match, not embedding similarity---so hits arise because many distinct events reduce to the same service/port/technique description. One quality figure belongs in this section rather than beside it, because it is the guard condition on the offload claim itself: a 90.6\% offload rate would read equally well as "passes almost everything" if the offloaded portion were not adjudicated correctly. On the balanced \texttt{datatest.json} the Gate attains \textbf{MCC 0.667} and Balanced Accuracy 0.833---MCC deliberately in place of Accuracy, since a system answering "benign" everywhere already scores 74\% Accuracy on a skewed stream while discriminating nothing---and its \textbf{autonomous blocking} subset of 962 actions achieves \textbf{100\% Precision with zero false positives}. That last condition is mandatory: offloading that blocks genuine customers is not efficiency but loss.
+
+\textbf{Tier 2 $\rightarrow$ Tier 1 feedback loop.} A fourth offload mechanism is verified by a two-round experiment on a fixed seed. After harvesting 598 rules from the ML Gate's blocking adjudications, the escalation rate falls from \textbf{20.28\% to 17.98\%} (a relative reduction of \textbf{11.35\%}, or 594 additional events absorbed by Tier 1), while detection quality \textbf{improves} rather than degrades: MCC $+0.0378$, Recall $+0.0452$. This is noteworthy because learn-from-adjudication mechanisms typically trade accuracy for speed; here both improve.
+
+\textbf{End-to-end latency.} Latency is measured on 500 events sampled strided from \texttt{build\_stream()}, preserving the real benign/attack ratio rather than forcing a balanced set. Mean end-to-end latency falls from \textbf{17,187.9\,ms} (single-tier LLM) to \textbf{5,286.7\,ms}, a reduction of \textbf{69.2\%}, with the difference statistically significant under a Mann-Whitney U test ($p \approx 9 \times 10^{-57}$). The median is far more striking: \textbf{0.88\,ms} against \textbf{17,174.7\,ms}, a factor of roughly \textbf{19,500}---because the typical event never reaches the LLM at all. Per-stage means confirm the cost asymmetry motivating the architecture: \textbf{0.182\,ms} at Tier 1, \textbf{0.924\,ms} at the ML Gate, and \textbf{22,785\,ms} when the LLM is invoked.
+
+One result must be reported against interest: the \textbf{95th percentile is worse} for the two-tier system---\textbf{25,829\,ms} versus \textbf{21,434\,ms} for the LLM-only baseline. The cause is structural: an event that does escalate has already paid the Tier 1 and ML Gate cost before paying the LLM cost. The tail is therefore genuinely slower, and the architecture's benefit is concentrated in the median rather than distributed uniformly. Reporting mean and median without the tail would misrepresent the trade-off. For resources, the thesis reports \textbf{LLM invocations avoided} (97,199 of 99,717 events) rather than a VRAM reduction percentage, because no VRAM measurement was performed.
+
+\textbf{Comparison against control configurations.} To answer "faster than what", four control configurations are measured on an \textbf{identical 150-event stratified subset} (Table~\ref{tab:throughput_baselines}), rather than importing headline figures from other publications---an invalid comparison across differing datasets and metric definitions.
 
 \begin{table}[htbp]
 \centering
-\caption{Tier 2 Adjudication Accuracy and RAG Knowledge Mapping Metrics}
-\label{tab:tier2_metrics}
-\small
+\caption{Throughput of Control Configurations on an Identical 150-Event Stratified Subset}
+\label{tab:throughput_baselines}
+\footnotesize
 \setlength{\tabcolsep}{5pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c}
 \toprule
-\textbf{Evaluation Metric (Action-based)} & \shortstack{\textbf{Accuracy}\\\textbf{(\%)}} & \shortstack{\textbf{Llama-3-8B Score}\\\textbf{(1-5 Scale)}} & \shortstack{\textbf{HITL Escalation}\\\textbf{(\%)}} \\
+\textbf{Control Configuration} & \textbf{Throughput} \\
 \midrule
-FAISS Dense Vector Search Only & 45.2\% & 2.5 / 5.0 & 24.2\% \\
-BM25 Sparse Keyword Search Only & 42.4\% & 2.3 / 5.0 & 28.5\% \\
-\textbf{Dual-RAG RRF (FAISS + BM25, $k=60$)} & \textbf{67.33\%} & \textbf{4.3 / 5.0} & \textbf{0.0\%} \\
-\midrule
-Config A (Single-Tier Baseline) & 35.6\% & 1.8 / 5.0 & 45.0\% \\
-\textbf{Config F (Agent Integrity)} & \textbf{100.0\% (Action)} & \textbf{4.6 / 5.0} & \textbf{0.0\%} \\
+H1 --- Static signatures, 29 WAF families & 11,129 ev/s \\
+\textbf{SENTINEL} --- Tier 1 + ML Gate & \textbf{3,860 ev/s} \\
+H2 --- Single-tier LightGBM, flat threshold & 2,162 ev/s \\
+H3 --- Single-tier LLM (identical data, model, and prompt) & \textbf{0.19 ev/s} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Rather than employing a binary $F1$ metric—which misrepresents performance given an 86.9\% attack base rate—the system is evaluated via an \textit{action-based} method comparing Config A and Config F. Under Config F, human-in-the-loop escalation (\texttt{AWAIT\_HITL}) drops from 45.0\% to 0.0\%. Reasoning quality is independently graded by the Meta-Llama-3-8B-Instruct model on a 1-5 scale rather than self-evaluation. A score of 4.6/5.0 confirms robust forensic justification while eliminating the Self-Enhancement Bias commonly found in LLM-as-a-Judge protocols. Notably, the system's deliberate abstention by returning \texttt{N/A} on ambiguous cases is a correct guardrail behavior when confidence is low, rather than a schema failure.
+SENTINEL's deterministic path runs \textbf{more than 20,000$\times$} faster than routing every event to the language model (measured 20,531$\times$). Static signatures are faster still, at roughly three times SENTINEL's rate, which is expected---they perform no statistical or model inference. The ordering \textit{is} the architectural argument in one line: each tier costs what it costs, and the design question is how much traffic can be settled before the expensive one is reached. Two of these figures must not be combined: the 0.19\,ev/s routes each event through the \textbf{full Tier 2 agent} (797.9\,s for 150 events), whereas the 17,187.9\,ms baseline is a \textbf{bare model call} on the raw log with no token ceiling and no output schema. They describe different single-tier designs, not one measurement in two units. Finally, surge-load testing on the 99,717-event stream confirms that consumer-group lag-based backpressure keeps RAM and VRAM utilisation stable, guaranteeing continuous availability.
 
-\section{Adversarial AI Defense, Prompt Injection, and HMAC Audit}
+\section{RQ2 --- AI Security Guardrails and Forensic Integrity}
 \label{sec:adversarial_security_hmac}
 
-System adversarial resilience is comprehensively verified through rigorous testing on a large-scale composite dataset of 723 samples. This dataset incorporates world-renowned state-of-the-art benchmarks including \textbf{AdvBench GCG} (harmful behaviors), \textbf{Deepset} (large-scale Prompt Injection), and \textbf{Jackhhao} (Psychological Jailbreaks)~\cite{promptinjection2023}. In the log prompt injection scenario, the static mechanism (Static Guardrail) relying on keyword filtering and decoding only managed to block 59\% of primitive Prompt Injection samples. Notably, this Tier-1 defense layer proved completely blind (0\% block rate) against psychological manipulation and complex semantic obfuscation techniques present in AdvBench and Jackhhao.
+\textbf{Threat model and measurement convention.} RQ2 names log-substrate prompt injection as a \textit{typical} adversarial risk, not as the scope. SENTINEL is therefore evaluated against \textbf{two structurally different attack surfaces}. The first attacks \textbf{through language}: injection and jailbreak text embedded in telemetry fields, aimed at the Tier 2 language model; resistance means the embedded instruction fails to change the agent's action. The second attacks \textbf{through feature space}: extreme or infinite values injected into flow attributes to force the LightGBM Gate to answer "benign"; resistance means a distorted sample is still not flipped to benign. A defence covering only the first surface is a narrow defence, since the two tiers are attacked by entirely different means.
 
-However, the core value of the two-tier architecture was absolutely affirmed during End-to-End Pipeline execution. Facing hundreds of highly sophisticated attack samples that bypassed Tier-1, the Cognitive Agent at Tier-2 successfully disrupted and neutralized 100\% of the attacks. This milestone was achieved through the combination of Delimited Data Encapsulation (\texttt{encapsulation.py}) using unique random Nonces, which forces the LLM to process input passively~\cite{owasp_llm2025}, and the capability to accurately map attack vectors to the \textbf{MITRE ATLAS (AML.T0051)} framework designed specifically for Artificial Intelligence threats. Stripping internal classification labels (\texttt{label stripping}) prior to prompt generation further prevents any system state leakage.
-
-For machine learning evasion testing, Tier 1 ML feature clipping ($\pm 8\sigma$) and the 30\% distortion abstention threshold escalate suspicious flows to Tier 2 for contextual inspection. In audit trail verification, any unauthorized log modification breaks HMAC-SHA256 hash-chaining continuity (\texttt{hmac\_sealer.py}) following $H_i = \text{HMAC-SHA256}(D_i \parallel H_{i-1}, K)$~\cite{hmac1997}. However, a mathematical limitation of log-chaining remains: it cannot detect tail-dropping attacks (truncation of the last logs), which must be acknowledged as a theoretical boundary.
-
-\section{Ablation Study, Platform Comparison, and Resilience}
-\label{sec:ablation_comparison_resilience}
-
-An ablation study on 300 balanced samples demonstrates that the Single-Tier LLM baseline suffers severe queue congestion. However, Configurations B, C, D, and E yield identical action and latency outcomes, proving that the binary action metric saturates on this dataset. It is critical to address a severe methodological flaw in previous latency evaluations: measuring on a forced 50/50 dataset caused Tier 1 offload to drop to 11\%, yielding an invalid conclusion that the system was 7.8\% slower than LLM-only. When correctly evaluated on the real unified stream (achieving 92.2\% Tier 1 offload), the true SENTINEL global E2E average latency is 211\,ms, which is 11.6x faster than the Baseline.
-
-Consolidated comparison against published platforms—including Watchtower~\cite{watchtower2026}, CyberRAG~\cite{cyberrag2025}, AutoBnB~\cite{autobnb2025}, LanG Agentic SOC~\cite{lang2026}, and Policy-Guided SIEM~\cite{splunkllm2026}—confirms SENTINEL's performance leadership across Throughput (over 2,500 flows/s), E2E Latency (211\,ms), Prompt Injection Defense (100\% pipeline coverage), and VRAM optimization (under 8\,GB) (Table~\ref{tab:ablation_comparison}).
+Three conventions make the ratios interpretable. First, the static verdict is the logical OR of \textbf{three separate detectors}---pattern matching, encoding neutralisation, and delimiter stripping---each recorded individually, so that a failure can be \textit{located} rather than merely counted. Second, a \textbf{negative control is mandatory}: the same detectors run over 230 benign logs, because a layer that flags everything also achieves "100\% blocking", and a block rate quoted without its false-flag rate is uninterpretable. Third, following Section~\ref{sec:experimental_setup}, published-corpus and author-composed samples are \textbf{scored separately and never merged into one headline}.
 
 \begin{table}[htbp]
 \centering
-\caption{Ablation Study and Benchmark Comparison with State-of-the-Art Platforms}
-\label{tab:ablation_comparison}
-\small
-\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c c c}
+\caption{Guardrail Layers, Measurement Denominators, and Results}
+\label{tab:rq2_security}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{3.5cm} c}
 \toprule
-\textbf{System / Platform} & \shortstack{\textbf{Throughput}\\\textbf{(Flows/s)}} & \shortstack{\textbf{Avg E2E Latency}\\\textbf{(ms)}} & \shortstack{\textbf{Accuracy}\\\textbf{(\%)}} & \shortstack{\textbf{Prompt Inj.}\\\textbf{(\%)}} & \shortstack{\textbf{GPU VRAM}\\\textbf{(GB)}} \\
+\textbf{Guardrail layer} & \textbf{Denominator} & \textbf{Result} \\
 \midrule
-Single-Tier LLM Baseline & 0.41 flows/s & 2,450 ms & 91.2\% & 42.0\% & 15.8 GB \\
-Watchtower Platform~\cite{watchtower2026} & 120 flows/s & 850 ms & 93.5\% & 75.0\% & Cloud API \\
-CyberRAG Agent~\cite{cyberrag2025} & 85 flows/s & 1.120 ms & 92.8\% & 68.0\% & 24.0 GB \\
-AutoBnB Framework~\cite{autobnb2025} & 210 flows/s & 620 ms & 94.1\% & 81.0\% & 16.0 GB \\
-LanG Agentic SOC~\cite{lang2026} & 140 flows/s & 480 ms & 95.2\% & 88.0\% & 24.0 GB \\
-Policy-Guided SIEM~\cite{splunkllm2026} & 180 flows/s & 520 ms & 94.5\% & 85.0\% & 16.0 GB \\
+\multicolumn{3}{l}{\textit{Tier 1 --- attack through language}} \\
+Static pre-filter, \textbf{published corpora} & 703 samples & 132 $\rightarrow$ \textbf{18.8\%} \\
+\quad by detector: pattern / encoding / delimiter & 703 & 114 / 29 / 0 \\
+Static pre-filter, author-composed & 80 samples & 58 $\rightarrow$ 72.5\% \\
+Static pre-filter, cross-check set & 40 samples & 2 $\rightarrow$ 5.0\% \\
+Static pre-filter --- \textbf{false flags on benign logs} & 230 benign logs & 46 $\rightarrow$ \textbf{20.0\%} \\
+\quad of which: encoding-detection layer & 46/46 & \textbf{all of them} \\
 \midrule
-\textbf{SENTINEL (Proposed Two-Tier)} & \textbf{$> 2.500$ flows/s} & \shortstack{\textbf{$< 15$ ms (T1)}\\\textbf{+7.8\% lat. (E2E)}} & \textbf{Action} & \textbf{100.0\%} & \textbf{7.8 GB} \\
+\multicolumn{3}{l}{\textit{Tier 1 --- attack through feature space}} \\
+\textbf{ML Gate --- evasion, hard mode} (all features distorted; 13 flipped, 95\% CI 97.86--99.27) & 1,036 detected attacks & 1,023 $\rightarrow$ \textbf{98.75\%} \\
+ML Gate --- single-feature modes ($\infty$ / extreme) & 1,036 $\times$ 2 & \textbf{100\% both} \\
+ML Gate --- abstention on distorted input & 4,236 events & 116 $\rightarrow$ escalate \\
+\midrule
+\multicolumn{3}{l}{\textit{Tier 2 --- structural guarantee}} \\
+\textbf{Delimited nonce encapsulation} & 678 hard samples, \textbf{coverage 100\%} & 678 $\rightarrow$ \textbf{100\%} \\
+Schema validation under forced backend failure & 1 induced failure & \texttt{AWAIT\_HITL}, no crash \\
+Determinism (same seed, 5 runs) & 5 runs & identical actions \\
+Seed-only variation & 10 samples & \textbf{0 flipped} \\
+Context-overflow guard & 16,384-token window, 4,000-token budget & worst case 1,655 \\
+\midrule
+\multicolumn{3}{l}{\textit{Forensic integrity}} \\
+HMAC --- three core tampering modes & 30 trials each & \textbf{100\%} \\
+HMAC --- negative control (intact chain) & 450 records & no false alarm \\
+HMAC --- \textbf{tail truncation} & --- & \textbf{0\% --- undetectable} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Finally, operational resilience testing under high-density stream surges (100,000 events) confirms that latency-based Redis consumer group backpressure maintains stable RAM and VRAM utilization, guaranteeing continuous system availability for enterprise SOC deployments.
+\textbf{Tier 1 against language.} On published corpora the static pre-filter blocks \textbf{18.8\%}, and that figure must be read together with the \textbf{20.0\%} false-flag rate on benign logs. Per-detector analysis localises the problem precisely: all 46 false flags originate in the encoding-detection layer, while pattern matching and delimiter stripping produce none---an actionable finding about one layer, not a verdict on the guardrail. The cost of a false flag is also bounded and must be stated, since 20\% sounds alarming without it: a static flag raises the isolation level and annotates the record, but does \textbf{not} drop the event or block the source. It is therefore a rate of unnecessary annotation, not of benign traffic denied service. The author-composed subset blocks at 72.5\%, far above the published figure, and the gap is explained rather than excused: 45 of those 80 samples are encoding-bypass cases and the encoding neutraliser was built precisely for them. Reporting the merged 23.3\% would have flattered the system by counting samples written with knowledge of the defence; \textbf{18.8\% is the figure the thesis stands behind}.
+
+\textbf{Tier 1 against feature space.} The ML Gate clips $Z$-scores to $\pm 8\sigma$, imputes missing values from the baseline, and abstains when the distorted-feature proportion exceeds 30\%. Under the \textbf{hard mode}, in which \textit{every} feature of a detected attack is driven to an extreme, \textbf{98.75\%} of samples resist (1,023 of 1,036; 95\% CI 97.86--99.27), with 13 flipped to benign. The two single-feature modes reach 100\%, and the thesis cites the hard mode rather than an average across all three, because averaging in two trivially saturated modes would inflate the figure past what the defence has actually demonstrated. Abstention is counted as a guardrail outcome, not a failure: 116 events were escalated instead of guessed, since a confident wrong answer causes autonomous action with no one reviewing.
+
+\textbf{Tier 2 and the categorical difference.} The static layer is an inexpensive pre-filter; the security guarantee comes from \textbf{Delimited Data Encapsulation}, which is structural---content inside the nonce-bounded region is processed as passive text \textit{regardless of what it says}. It was evaluated on \textbf{all 678 samples of the seven categories the static layer does not absorb}, at \textbf{100\% coverage} of that set. This is a superset of the 543 samples that genuinely bypassed the static layer within those categories, so the test is stricter than required rather than favourably sampled; Tier 2 resisted \textbf{678 of 678}. That is the categorical difference: a classifier blocking $x\%$ always leaks $(100-x)\%$ and degrades against novel variants, whereas a structural guarantee does not depend on recognising malicious content at all. The 18.8\% therefore \textbf{does not contradict} the thesis---it quantifies how much work the structural layer must absorb. Two robustness controls support every LLM-dependent measurement in this chapter: under a fixed seed across five runs the agent emitted \textbf{identical actions}, and varying only the seed across ten samples flipped \textbf{no adjudication}, so differences between configurations cannot be dismissed as decoder noise. A forced backend failure degraded to \texttt{AWAIT\_HITL} rather than crashing or defaulting to a permissive action.
+
+\textbf{How tampering is detected.} Verification recomputes the entire chain from the genesis record under $H_i = \text{HMAC}(D_i \parallel H_{i-1}, K)$. Because each link consumes its predecessor's hash, a single byte altered in $D_j$ invalidates \textit{every} link from $j$ onward, so detection is \textbf{positional} rather than a bare "something changed". The three core modes map onto the three ways continuity can be broken: a \textbf{content edit} makes the recomputed hash at $j$ disagree with the stored one; an \textbf{inserted forged record} has no valid predecessor to chain back to; a \textbf{deleted middle record} leaves $H_{j+1}$ referencing a hash that no longer exists. All three are detected in 30 of 30 trials, and the negative control over 450 intact records raises no false alarm. The measurement ran with a key loaded from the environment, not the in-source default---a key visible in source would let the whole chain be forged from scratch and would void every rate above. The thesis states the blind spot proactively: \textbf{tail truncation is undetectable}, an inherent property of log-chaining, since deleting trailing records leaves no subsequent link against which to verify. The remedy is periodic anchoring of hash values outside the system.
+
+\textbf{Guardrails that do not reduce to a single ratio.} Several controls defend paths that no block-rate captures. The \texttt{RAG\_\allowbreak Sanitizer} guards the knowledge base at both ingestion---NFKC normalisation against homoglyphs, removal of control and zero-width characters, HTML/JS and Markdown stripping---and retrieval, neutralising imperative instructions embedded in retrieved documents. Its design carries a measured lesson: an earlier revision matched blocked phrases anywhere in a sentence and consequently rewrote legitimate security prose, neutralising four lateral-movement entries (\texttt{T1090}, \texttt{T1021}, \texttt{T1021.001}, \texttt{T1553.001}) that the thesis's own APT scenarios depend on. Restricting matches to \textbf{imperative position} eliminated this, and re-verification over the current 433-entry knowledge base yields \textbf{zero} false neutralisations---the same block-rate-versus-false-flag discipline applied to a layer that publishes no ratio. The \texttt{Feedback\allowbreak Validator} closes the loop opened by the Tier 2 to Tier 1 feedback mechanism of Section~\ref{sec:tier1_performance}: rules promoted from adjudications pass a field allowlist, pattern validation, and score bounds, because a mechanism that learns from verdicts is also a mechanism for poisoning Tier 1 rules. The \texttt{Decision\allowbreak Validator} enforces the output schema, salvages malformed fields by regular expression, and requires \textbf{Tier 1 concurrence} before any autonomous block. A loop detector caps node revisits at ten to stop an agent from circling and consuming GPU time, and an output sanitiser strips base64 and hexadecimal blobs before records reach the database or the dashboard, closing the re-emission path back through the analyst interface.
+
+\textbf{Field position, tested separately.} Because nonce encapsulation wraps \textbf{per field}, field position decides whether a payload falls inside or outside the wrapped region---a property no aggregate figure can test, since the other categories all place their payload in the same field. The \texttt{field\_\allowbreak injection} set of 100 published samples distributes payloads across four positions: URI 24, User-Agent 23, message 30, payload 23. The static layer blocks only 12 of 100, as expected for plain-language injection carrying neither encoding nor delimiters. Run through Tier 2 at \textbf{100\% coverage}, all 100 resisted, and the outcome is \textbf{uniform across positions}---24/24, 23/23, 30/30, 23/23---with adjudications distributed as 73 \texttt{BLOCK\_IP} and 27 \texttt{ALERT}, none degraded to a permissive action. The uniformity is the finding rather than the total: had encapsulation been applied to some fields and not others, the unwrapped positions would have surfaced here as a gap. Reported separately from the 678, because it answers a different question.
+
+\section{RQ3 --- Stateful Reasoning and Attribution}
+\label{sec:tier2_accuracy_rag}
+
+RQ3 has four components: ATT\&CK technique attribution, knowledge retrieval, transparent reporting, and analyst workload reduction.
+
+\textbf{Reasoning quality.} Agent adjudications are graded by a \textbf{cross-family judge} (Meta-Llama-3-8B-Instruct scoring Foundation-Sec-8B-Instruct) on a 1--5 scale, following the recommended protocol for eliminating Self-Enhancement Bias~\cite{zheng2023judge}. Across 277 events escalated to Tier 2, the four axes score: context precision \textbf{2.68}; answer relevancy \textbf{4.22}; faithfulness \textbf{3.88}; context recall \textbf{4.13}; mean \textbf{3.73/5.0}. Evidence grounding---the proportion of justifications containing at least one \textit{field = value} pair matching an actual log value---reaches \textbf{50.2\%} (95\% CI: 44.3--56.0), averaging 1.7 citations per adjudication.
+
+Three qualifications must accompany these figures. First, \textbf{context precision at 2.68 is a clear weakness}: retrieved documents frequently contain irrelevant entries, indicating the bottleneck lies in retrieval rather than generation. Second, this run recorded \textbf{69 of 277 adjudications missing a required field}, and the evaluation script raised its own validity flag---these numbers are therefore directional indicators, not settled conclusions. Third, the thesis \textbf{does not report} an exact-match ATT\&CK attribution rate for this round, because the available attribution result files predate the author-composed-sample exclusion convention and contradict one another; citing them would violate the measurement principle established in Section~\ref{sec:experimental_setup}. Every attribution figure in this domain must in any case be read against a floor rather than zero: within the 250-sample genuine attribution set, technique \texttt{T1595.003} accounts for 130 samples, so a system always answering that identifier already scores \textbf{52\%}.
+
+\textbf{Knowledge retrieval and the anchoring guardrail.} The knowledge base comprises 433 STIX-structured MITRE ATT\&CK entries retrieved via RRF fusion of FAISS and BM25. The evidence-anchoring guardrail (Section~\ref{sec:dual_rag}) requires every emitted technique identifier to appear in that batch's retrieved documents; violations are forced to \texttt{N/A} and routed to \texttt{AWAIT\_HITL}. Its academic value is that it \textbf{does not depend on any particular model's propensity to hallucinate}: substituting a different model leaves the constraint fully in force.
+
+\textbf{Division of labour between tiers.} A seemingly negative result confirms the design: on the non-NetFlow sample group (CSIC web attacks, zero-day, DAPT), the ML Gate attains only \textbf{11.1\% Recall}, and 305 of the full set's 336 misses fall entirely within this group. The cause is architectural rather than defective---the ML Gate is trained on \textbf{flow features}, whereas web attacks reside in the \textbf{payload}, which is exactly the work assigned to Tier 2 and the signature set. The methodological consequence is that the aggregate Recall of 0.755 mixes two non-additive populations and must be reported separately. Relatedly, and as stated in Section~\ref{sec:tier2_agent_fsm}, the escalation-to-analyst rate is \textbf{not} a quantity to be minimised: an architecture claiming a zero human-review rate under all conditions has discarded its final guardrail.

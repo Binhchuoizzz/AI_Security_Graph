@@ -2,6 +2,20 @@
 Guardrails Central Constants and Helper Functions
 """
 
+# --------------------------------------------------------------------------- #
+# TẦNG RA QUYẾT ĐỊNH — ghi tường minh vào cột `audit_trail.tier`
+# --------------------------------------------------------------------------- #
+# VÌ SAO TỒN TẠI: Dashboard từng xếp cảnh báo vào 3 tab bằng cách DÒ CHUỖI trong câu lý do
+# ("Cổng ML" -> tab ML, "Tier-1" -> tab luật, còn lại -> tab LLM). Câu lý do khi LLM hỏng có
+# chứa cụm "Tier-1 (xác định) vẫn bảo vệ độc lập", nên một sự cố của Tier-2 rơi nhầm sang tab
+# Tier-1 ngay khi action không phải AWAIT_HITL. Phân loại phải đến từ nơi BIẾT sự thật.
+#
+# Bản ghi TRƯỚC migration có `tier = ''` -> UI rơi về heuristic cũ, không mất dữ liệu.
+TIER_RULE = "tier1_rule"  # bộ máy luật Tier-1 (chữ ký, Welford, luật tĩnh/động)
+TIER_ML = "tier1_ml"  # Cổng ML (LightGBM) — vẫn thuộc Tier-1
+TIER_LLM = "tier2_llm"  # tác tử LangGraph Tier-2
+TIER_MANUAL = "manual"  # analyst thao tác tay trên Dashboard
+
 KEY_ALIASES = {
     "src_ip": "Source IP",
     "source_ip": "Source IP",

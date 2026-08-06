@@ -34,7 +34,7 @@ from src.guardrails import (
     loop_detector,
     output_sanitizer,
 )
-from src.guardrails.constants import normalize_log_keys
+from src.guardrails.constants import TIER_LLM, normalize_log_keys
 from src.rag.retriever import DualRetriever
 from src.response.executor import block_ip, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
@@ -666,6 +666,16 @@ def _degraded_reason(decision: dict) -> str:
     không phải hệ thống đánh giá sự cố là vô hại, và vì sao độ tin cậy = 0.
     """
     err = str(decision.get("error", "") or "")
+    if err == "llm_unavailable":
+        # Nguyên nhân HẠ TẦNG — tách hẳn khỏi "model trả JSON hỏng". Gộp hai thứ này vào một
+        # câu là đẩy analyst đi truy sai hướng (đã xảy ra: thông điệp đổ lỗi max_tokens trong
+        # khi máy chủ LLM đơn giản là không chạy).
+        return (
+            "Máy chủ LLM KHÔNG phản hồi nên Tier-2 chưa từng chạy — đây là sự cố hạ tầng, "
+            "không phải model trả lời sai. Hệ thống suy biến an toàn: chuyển người xử lý. "
+            "Độ tin cậy 0 phản ánh việc KHÔNG có phán quyết, KHÔNG có nghĩa sự cố vô hại. "
+            "Kiểm tra dịch vụ LLM rồi cho chạy lại; Tier-1 vẫn bảo vệ độc lập."
+        )
     if err == "parse_failed":
         return (
             "Tác tử AI đã phân tích nhưng model trả về JSON KHÔNG hợp lệ — không trích được "
@@ -802,8 +812,9 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     else:
         start_time = time.time()
         # Suy biến có kiểm soát (graceful degradation): nếu LLM cục bộ chết/không kết nối
-        # được (connection refused, timeout sau retry), KHÔNG để vỡ đồ thị — trả chuỗi rỗng
-        # để parse_llm_response cho AWAIT_HITL an toàn. Tier-1 (xác định) vẫn bảo vệ độc lập.
+        # được (connection refused, timeout sau retry), KHÔNG để vỡ đồ thị — chuyển AWAIT_HITL
+        # an toàn. Tier-1 (xác định) vẫn bảo vệ độc lập.
+        llm_unavailable_err = ""
         try:
             # response_format=json_schema -> server ép JSON hợp lệ (hết "parse lỗi"/prose) và
             # reasoning bám tiếng Việt; max_tokens rộng để JSON reasoning dài KHÔNG bị cắt cụt.
@@ -819,11 +830,30 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
                 f"Tier-1 vẫn bảo vệ độc lập."
             )
             raw_response = ""
+            llm_unavailable_err = str(e) or e.__class__.__name__
         end_time = time.time()
         latency_sec = end_time - start_time
 
-        # Parse JSON an toàn
-        decision_json = llm_client.parse_llm_response(raw_response)
+        if llm_unavailable_err:
+            # KHÔNG parse chuỗi rỗng. LỖI ĐÃ SỬA: trước đây nhánh này rơi thẳng vào
+            # `parse_llm_response("")`, chạy hết cascade salvage rồi trả thông điệp mặc định
+            # đổ lỗi cho "output bị cắt cụt theo max_tokens hoặc sai định dạng". Thực tế máy
+            # chủ LLM không phản hồi — không có output nào để mà cắt cụt. Đo được ngày
+            # 2026-08-03: container restart, 10 lần `APIConnectionError`, 3 bản ghi
+            # AWAIT_HITL mang lý do sai khiến analyst đi truy một vấn đề không tồn tại.
+            decision_json = {
+                "action": "AWAIT_HITL",
+                "confidence": 0.0,
+                "reasoning": (
+                    f"⚠️ Máy chủ LLM không phản hồi ({llm_unavailable_err}). Đây là sự cố "
+                    "HẠ TẦNG, không phải mô hình trả lời sai. Tự động chuyển AWAIT_HITL để "
+                    "người xác minh; Tier-1 (xác định) vẫn bảo vệ độc lập."
+                ),
+                "error": "llm_unavailable",
+            }
+        else:
+            # Parse JSON an toàn
+            decision_json = llm_client.parse_llm_response(raw_response)
 
         if trace.enabled():
             trace.add(
@@ -916,11 +946,14 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     # AWAIT_HITL, và suy biến an toàn khi không đọc được phản hồi.
     if action == "AWAIT_HITL" and not validated_decision.get("hitl_reason"):
         _err = str(validated_decision.get("error") or "")
-        validated_decision["hitl_reason"] = (
-            "llm_output_unreadable"
-            if _err in ("parse_failed", "parse_salvaged", "llm_unavailable")
-            else "llm_abstained"
-        )
+        if _err == "llm_unavailable":
+            # Máy chủ không phản hồi — sự cố VẬN HÀNH. Tách khỏi "model trả JSON hỏng" vì
+            # hai thứ này cần hai cách sửa khác hẳn nhau (bật lại dịch vụ vs. sửa prompt).
+            validated_decision["hitl_reason"] = "llm_unavailable"
+        elif _err in ("parse_failed", "parse_salvaged"):
+            validated_decision["hitl_reason"] = "llm_output_unreadable"
+        else:
+            validated_decision["hitl_reason"] = "llm_abstained"
     if trace.enabled():
         if validated_decision.get("hitl_reason"):
             trace.add("policy", hitl_reason=validated_decision["hitl_reason"])
@@ -1057,16 +1090,19 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # GATE: nếu triage KHÔNG đọc được (parse_failed) thì KHÔNG dập một MITRE "tự tin" lên một
     # triage rỗng — sẽ gây hiểu lầm (vd T1548.003 "Sudo Caching" trên một flow mạng). Để
     # technique NEUTRAL, giữ reasoning trung thực; con người xác minh (đã AWAIT_HITL).
-    if decision.get("error") == "parse_failed":
+    # `llm_unavailable` phải nằm CÙNG cổng này: triage khi máy chủ LLM chết cũng rỗng y hệt
+    # lúc JSON hỏng, nên dập một mã MITRE lên nó cũng gây hiểu lầm y hệt.
+    _triage_err = str(decision.get("error") or "")
+    if _triage_err in ("parse_failed", "llm_unavailable"):
         logger.warning(
-            "[ATT&CK MAPPER] Bỏ qua ánh xạ vì triage parse_failed — tránh MITRE gây hiểu lầm."
+            f"[ATT&CK MAPPER] Bỏ qua ánh xạ vì triage {_triage_err} — tránh MITRE gây hiểu lầm."
         )
         if trace.enabled():
             trace.add(
                 "attack_mapper",
                 ran=False,
-                skipped="parse_failed",
-                mapping_status="unmapped_parse_failed",
+                skipped=_triage_err,
+                mapping_status=f"unmapped_{_triage_err}",
             )
         decision.update(
             {
@@ -1546,7 +1582,11 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
         # bộ đếm tái phạm; truyền tường minh để chính sách nằm ở MỘT chỗ (decision_policy)
         # thay vì phụ thuộc ngầm vào việc dải nào gọi hàm này.
         result_action = raise_alert(
-            target, formatted_reasoning, raw_log=raw_log_json, confidence=float(confidence or 0.0)
+            target,
+            formatted_reasoning,
+            raw_log=raw_log_json,
+            confidence=float(confidence or 0.0),
+            tier=TIER_LLM,
         )
         # Tín hiệu APT (persistent-IP / multi-day) — đọc incident vừa ghi, KHÔNG record trùng.
         _check_apt_signal(target, mitre_tech, confidence)
@@ -1577,6 +1617,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
                 target,
                 formatted_reasoning,
                 raw_log=raw_log_json,
+                tier=TIER_LLM,
             )
 
         rule_pattern = target

@@ -33,6 +33,7 @@ load_dotenv()
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from src.agent.threat_memory import ThreatMemoryStore
+from src.guardrails.constants import TIER_ML, TIER_RULE
 from src.guardrails.state_monitor import audit_logger
 from src.response.executor import block_ip, raise_alert
 from src.tier1_filter.feedback_listener import FeedbackListener
@@ -78,6 +79,10 @@ _DATASET_LABEL_KEYS = frozenset(
         "dataset_source",
         "label",
         "Label",
+        # Cờ lát DÀN DỰNG của luồng demo. Nó KHÔNG nói kỹ thuật nào, nhưng lát dàn dựng
+        # được chọn ĐÚNG bằng tiêu chí "có mã kỹ thuật", nên cờ này tương quan HOÀN HẢO với
+        # việc mẫu đó có đáp án hay không — thừa sức làm mồi cho LLM. Tước như mọi nhãn khác.
+        "demo_staged",
     }
 )
 
@@ -367,8 +372,19 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                     break
                 try:
                     on_batch_ready(batch)
+                    # Đếm TẠI CHỖ số sự kiện THỰC SỰ được Tier-2 phân tích xong. Trước đây
+                    # Dashboard suy con số này bằng `escalated_to_llm − pending_llm_queue`,
+                    # mà hai vế KHÁC ĐƠN VỊ: vế trái đếm SỰ KIỆN, vế phải đếm LÔ trong hàng
+                    # đợi. Phép trừ ấy cho 841 trong khi Tier-2 mới xong 89 — sai 9 lần.
+                    offload_counts["tier2_analysed"] = offload_counts.get(
+                        "tier2_analysed", 0
+                    ) + len(batch)
+                    offload_counts["tier2_batches"] = offload_counts.get("tier2_batches", 0) + 1
                 except Exception as e:  # 1 lô lỗi KHÔNG được giết worker
                     print(f"[!] Agent worker lỗi xử lý lô: {e}")
+                    offload_counts["tier2_failed"] = offload_counts.get("tier2_failed", 0) + len(
+                        batch
+                    )
                 finally:
                     q.task_done()
 
@@ -513,6 +529,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                             _src_ip,
                                             ml_reasoning or "",
                                             raw_log=json.dumps(evaluated_log),
+                                            tier=TIER_ML,
                                         )
                                         tier1_dropped_total += 1
                                         FeedbackListener().receive_new_rule(
@@ -535,6 +552,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                                 # truyền độ tin cậy để KHÔNG bị tính vào bộ
                                                 # đếm tái phạm rồi tự leo thang thành chặn.
                                                 confidence=ml_conf,
+                                                tier=TIER_ML,
                                             )
                                             or "ALERT"
                                         )
@@ -543,6 +561,15 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     elif ml_action == "DROP":
                                         # Log sạch do Cổng ML xác nhận -> noise reduction THẬT.
                                         tier1_dropped_total += 1
+
+                                    # Cổng ML "giải quyết" theo BA cách, chỉ HAI trong đó ghi ra
+                                    # sổ kiểm toán: BLOCK_IP và ALERT. Nhánh DROP (log sạch) im
+                                    # lặng hoàn toàn — đó là lý do `ml_gate_resolved` = 1.881 mà
+                                    # nhật ký chỉ có 210 dòng. Tách bộ đếm theo hành động để
+                                    # Dashboard nói được "1.671 ca cho qua" thay vì để hụt.
+                                    offload_counts[f"ml_gate:{ml_action}"] = (
+                                        offload_counts.get(f"ml_gate:{ml_action}", 0) + 1
+                                    )
 
                                     audit_event = {
                                         "event_type": "ML_TRIAGE_DECISION",
@@ -591,6 +618,13 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                         _is_pending = False
                                     if _is_pending:
                                         _suppressed = True
+                                        # Sự kiện ĐÃ được tính vào `escalated_to_llm` nhưng sẽ
+                                        # KHÔNG bao giờ tới Tier-2 (IP này đang có lô chạy dở,
+                                        # TTL 60s). Không đếm riêng thì phễu không khép được và
+                                        # người đọc thấy "tới LLM" lớn hơn hẳn nhật ký Tier-2.
+                                        offload_counts["tier2_suppressed"] = (
+                                            offload_counts.get("tier2_suppressed", 0) + 1
+                                        )
 
                                 if _suppressed:
                                     # Ghi nhận thầm lặng, không đẩy lên queue LLM để tránh spam
@@ -681,6 +715,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                             raw_log=json.dumps(
                                                 _strip_dataset_labels(evaluated_log)
                                             ),
+                                            tier=TIER_RULE,
                                         )
 
                             elif action == "WHITELIST_DROP":
@@ -709,6 +744,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                         f"IP whitelist — CHO QUA, KHÔNG chặn (điểm Tier-1 "
                                         f"{_wl_score}). Phân tích để giám sát: {_wl_summary}",
                                         raw_log=json.dumps(_strip_dataset_labels(evaluated_log)),
+                                        tier=TIER_RULE,
                                     )
 
                         except json.JSONDecodeError:

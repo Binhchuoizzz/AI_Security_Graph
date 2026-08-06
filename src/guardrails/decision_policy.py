@@ -58,13 +58,20 @@ REPEAT_OFFENDER_MIN_CONF: float = ML_ESCALATE_CONF
 #   - `technique_not_in_rag`   : kho tri thức THIẾU kỹ thuật đó -> việc cần làm là BỔ SUNG KHO
 #   - `technique_unmappable`   : có tài liệu nhưng không khớp chắc -> analyst quyết
 #   - `low_confidence`         : bằng chứng yếu (thường là NetFlow thuần) -> cần thêm telemetry
-#   - `llm_output_unreadable`  : lỗi vận hành (JSON hỏng/LLM chết) -> việc của kỹ sư, không phải analyst
+#   - `llm_output_unreadable`  : model TRẢ LỜI nhưng JSON hỏng -> việc của kỹ sư (prompt/schema)
+#   - `llm_unavailable`        : model KHÔNG trả lời (mất kết nối/quá hạn) -> việc của vận hành
+#
+# Hai mã cuối từng gộp làm một, và câu mô tả chung đổ lỗi cho "Invalid JSON or timeout". Đo
+# ngày 2026-08-03: container LLM restart, 10 lần `APIConnectionError`, 3 bản ghi AWAIT_HITL
+# hiện lên Dashboard với lý do nhắc `max_tokens` — analyst đọc xong sẽ đi truy định dạng
+# prompt trong khi việc cần làm chỉ là bật lại dịch vụ. Hai nguyên nhân, hai cách sửa.
 HITL_REASONS: dict[str, str] = {
     "technique_not_in_rag": "Suggested technique not present in retrieved context",
     "technique_unmappable": "Uncertain mapping to known ATT&CK technique",
     "low_confidence": "Confidence below autonomous decision threshold (< 0.65)",
     "llm_abstained": "Model self-assessed insufficient evidence",
-    "llm_output_unreadable": "Unreadable model response (Invalid JSON or timeout)",
+    "llm_output_unreadable": "Model replied but JSON was unparseable",
+    "llm_unavailable": "LLM service unreachable — infrastructure fault, not a model error",
     "port_only_c2": "Non-standard port as sole evidence without C2 indicators",
     "social_engineering_suspected": "Suspected prompt injection or downgrade attempt",
     "tier1_hitl_threshold": "Tier-1 reached human review threshold",

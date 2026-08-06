@@ -19,11 +19,11 @@ def test_audit_hmac_chain_intact_under_concurrency(tmp_path, monkeypatch):
 
     db = tmp_path / "audit_trail.db"
     monkeypatch.setattr(executor, "DB_PATH", str(db))
-    with sqlite3.connect(str(db)) as c:
-        c.execute(
-            "CREATE TABLE audit_trail (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, "
-            "action TEXT, target TEXT, reason TEXT, integrity_hash TEXT, raw_log TEXT)"
-        )
+    # Dùng CHÍNH `_init_db()` thay vì chép tay câu CREATE TABLE. Bản cũ chép tay nên schema
+    # tồn tại ở HAI nơi: thêm cột `tier` vào sản phẩm là test đổ ngay với
+    # "table audit_trail has no column named tier". Test phải kiểm hành vi, không phải giữ
+    # một bản sao schema tự trôi khỏi bản thật. (`test_executor.py` vốn đã làm đúng cách này.)
+    executor._init_db()
 
     n_threads, per_thread = 4, 25
 

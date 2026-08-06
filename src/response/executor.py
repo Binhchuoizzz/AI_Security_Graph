@@ -219,6 +219,13 @@ def _init_db():
         # QUYẾT ĐỊNH (action/target/reason); raw_log là ngữ cảnh đầu vào đính kèm.
         if "raw_log" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN raw_log TEXT")
+        # Cột tier: TẦNG đã ra quyết định, ghi TƯỜNG MINH lúc quyết thay vì để Dashboard đoán.
+        # Trước đây UI xếp cảnh báo vào 3 tab bằng cách dò chuỗi trong câu lý do, nên một sự cố
+        # của Tier-2 mà câu lý do có nhắc "Tier-1 vẫn bảo vệ độc lập" là rơi nhầm sang tab
+        # Tier-1. Phân loại phải đến từ nơi BIẾT sự thật, không phải từ việc đọc văn xuôi.
+        # Ngoài phạm vi HMAC — chữ ký phủ QUYẾT ĐỊNH (action/target/reason), tier là siêu dữ liệu.
+        if "tier" not in columns:
+            c.execute("ALTER TABLE audit_trail ADD COLUMN tier TEXT DEFAULT ''")
 
         # CHỈ MỤC target: get_audit_trail_for_ip() lọc WHERE target=? (UI gọi nhiều lần mỗi
         # lượt refresh — mỗi luật chờ duyệt, mỗi lần điều tra IP). Không index -> quét toàn
@@ -231,11 +238,14 @@ def _init_db():
 _init_db()
 
 
-def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
+def _log_to_db(action: str, target: str, reason: str, raw_log: str = "", tier: str = ""):
     """Ghi nhật ký kiểm toán (audit trail) kèm xác thực, làm sạch đầu vào và liên kết mã HMAC.
 
     raw_log: chuỗi JSON của LOG THÔ đầu vào (đặc trưng luồng đã loại nhãn) — chỉ để hiển
-    thị minh bạch trên Dashboard, KHÔNG tham gia HMAC (chữ ký phủ quyết định)."""
+    thị minh bạch trên Dashboard, KHÔNG tham gia HMAC (chữ ký phủ quyết định).
+
+    tier: tầng ĐÃ ra quyết định — `tier1_rule` / `tier1_ml` / `tier2_llm`. Cũng ngoài phạm vi
+    HMAC. Bỏ trống thì Dashboard rơi về heuristic dò chuỗi cũ (dành cho bản ghi trước migration)."""
     # Xác thực hành động
     if not _validator.validate_action(action):
         logger.error(
@@ -266,10 +276,20 @@ def _log_to_db(action: str, target: str, reason: str, raw_log: str = ""):
             message = f"{prev_hash}|{timestamp}|{action}|{safe_target}|{safe_reason}".encode()
             current_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
 
-            # 3. Ghi vào database (raw_log là ngữ cảnh đầu vào, ngoài phạm vi HMAC)
+            # 3. Ghi vào database (raw_log + tier là siêu dữ liệu, ngoài phạm vi HMAC)
             c.execute(
-                "INSERT INTO audit_trail (timestamp, action, target, reason, integrity_hash, raw_log) VALUES (?, ?, ?, ?, ?, ?)",
-                (timestamp, action, safe_target, safe_reason, current_hash, raw_log or ""),
+                "INSERT INTO audit_trail "
+                "(timestamp, action, target, reason, integrity_hash, raw_log, tier) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    timestamp,
+                    action,
+                    safe_target,
+                    safe_reason,
+                    current_hash,
+                    raw_log or "",
+                    tier or "",
+                ),
             )
             conn.commit()
     except Exception as e:
@@ -332,7 +352,7 @@ def unblock_ip(ip: str):
         logger.error(f"[FIREWALL MOCK] Failed to reset reputation for {safe_ip}: {e}")
 
 
-def block_ip(ip: str, reason: str, raw_log: str = ""):
+def block_ip(ip: str, reason: str, raw_log: str = "", tier: str = ""):
     safe_ip = _validator.sanitize_target(ip)
     # ĐỒNG BỘ WHITELIST (phòng vệ chiều sâu): IP đã whitelist KHÔNG BAO GIỜ bị chặn thật —
     # dù suy luận LLM/Tier-2 có nêu tên nó trong 1 batch nhiều IP. Ghi bản WHITELIST (cho
@@ -345,10 +365,11 @@ def block_ip(ip: str, reason: str, raw_log: str = ""):
             f"IP whitelist — BỎ QUA lệnh chặn từ Tier-2/LLM (giữ đặc cách cho qua). "
             f"Lý do gốc: {reason}",
             raw_log,
+            tier,
         )
         return
     logger.warning(f" [FIREWALL MOCK] BLOCKING IP: {safe_ip} | Lý do: {reason}")
-    _log_to_db("BLOCK_IP", safe_ip, reason, raw_log)
+    _log_to_db("BLOCK_IP", safe_ip, reason, raw_log, tier)
     # TRÍ NHỚ: đưa vào blacklist để Tier-1 chặn thẳng lần sau (Tier-2 không phải xử lại).
     _add_to_blacklist(safe_ip)
     # KHO KNOWN-BAD BỀN (reputation=100): Tier-1 chặn on-sight VĨNH VIỄN cho tới khi Analyst
@@ -362,7 +383,13 @@ def block_ip(ip: str, reason: str, raw_log: str = ""):
         logger.warning(f"[BLOCK] mark_ip_blocked lỗi cho {safe_ip}: {e}")
 
 
-def raise_alert(msg: str, reason: str, raw_log: str = "", confidence: float | None = None) -> str:
+def raise_alert(
+    msg: str,
+    reason: str,
+    raw_log: str = "",
+    confidence: float | None = None,
+    tier: str = "",
+) -> str:
     """Ghi CẢNH BÁO — CHOKE-POINT chung cho cả Cổng ML (Tier-1) và LLM (Tier-2).
 
     Chính sách REPEAT-OFFENDER (thống nhất): một IP ĐÃ từng cảnh báo ĐỦ MẠNH trước đó (hoặc
@@ -381,7 +408,7 @@ def raise_alert(msg: str, reason: str, raw_log: str = "", confidence: float | No
     # Whitelist: miễn trừ leo thang — chỉ ghi ALERT.
     if ip in _whitelisted_ips():
         logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
-        _log_to_db("ALERT", msg, reason, raw_log)
+        _log_to_db("ALERT", msg, reason, raw_log, tier)
         return "ALERT"
 
     prior_alerts = 0
@@ -406,6 +433,7 @@ def raise_alert(msg: str, reason: str, raw_log: str = "", confidence: float | No
             ip,
             f"Tái phạm: IP đã bị CẢNH BÁO {prior_alerts} lần trước đó -> tự động CHẶN. {reason}",
             raw_log,
+            tier,  # leo thang GIỮ NGUYÊN tầng đã phát hiện, không đổi chủ sở hữu quyết định
         )
         return "BLOCK_IP"
 
@@ -413,7 +441,7 @@ def raise_alert(msg: str, reason: str, raw_log: str = "", confidence: float | No
     # cảnh báo yếu vẫn vào audit trail để analyst thấy, nhưng KHÔNG được phép tự tích luỹ
     # thành một lệnh chặn ở lần sau.
     logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
-    _log_to_db("ALERT", msg, reason, raw_log)
+    _log_to_db("ALERT", msg, reason, raw_log, tier)
     if confidence is not None and confidence < REPEAT_OFFENDER_MIN_CONF:
         logger.info(
             f"[ALERT] {ip}: độ tin cậy {confidence:.2f} < {REPEAT_OFFENDER_MIN_CONF:.2f} "
@@ -434,7 +462,8 @@ def get_audit_trail(limit=50):
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
             c.execute(
-                "SELECT id, timestamp, action, target, reason, raw_log FROM audit_trail ORDER BY id DESC LIMIT ?",
+                "SELECT id, timestamp, action, target, reason, raw_log, tier "
+                "FROM audit_trail ORDER BY id DESC LIMIT ?",
                 (limit,),
             )
             rows = c.fetchall()
@@ -446,6 +475,7 @@ def get_audit_trail(limit=50):
                 "target": r[3],
                 "reason": r[4],
                 "raw_log": r[5] or "",
+                "tier": r[6] or "",
             }
             for r in rows
         ]
@@ -476,6 +506,25 @@ def count_audit_alerts(exclude_actions: tuple[str, ...] = ("AWAIT_HITL",)) -> in
         return int(row[0]) if row else 0
     except Exception:
         return 0
+
+
+def count_blocks_by_tier() -> dict[str, int]:
+    """Số lệnh BLOCK_IP theo từng tầng — nguồn DUY NHẤT cho phễu chặn của Dashboard.
+
+    VÌ SAO PHẢI ĐẾM Ở ĐÂY. Phễu từng in `ml_gate_resolved` (1.881) và `escalated_to_llm`
+    (1.403) từ `pipeline_stats.json`, nhưng hai bộ đếm đó đếm SỰ KIỆN ĐI QUA, không phải
+    lệnh chặn: Cổng ML "giải quyết" phần lớn bằng nhánh DROP vốn không ghi sổ, còn phần đẩy
+    sang Tier-2 thì bị nén spam và xếp hàng. Người xem đối chiếu với nhật ký (210 và 77 dòng)
+    thấy lệch cả chục lần. COUNT(*) trên chính bảng mà nhật ký đọc thì không thể lệch.
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT tier, COUNT(*) FROM audit_trail WHERE action = 'BLOCK_IP' GROUP BY tier"
+            ).fetchall()
+        return {str(t or ""): int(n) for t, n in rows}
+    except Exception:
+        return {}
 
 
 def get_audit_trail_for_ip(ip: str, limit=100):

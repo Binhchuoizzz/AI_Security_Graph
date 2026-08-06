@@ -32,3 +32,22 @@ attack_mapper_eval_rrf_all.json        attack_mapper_eval_e2e_all.json
 
 Tên tệp tự nói lên nó đo cấu hình nào, nên không còn sinh được cặp số mâu thuẫn mà
 không ai biết tệp nào là thật.
+
+## `latency_benchmark_PRE_OFFLOAD_FIX.json` — loại 04/08/2026
+
+Đo bằng `measure_latency_baseline.py` **trước** khi vá cách đếm xả tải. Bản cũ coi Tier-1 "xong
+việc" chỉ khi hành động là `DROP`/`WHITELIST_DROP`:
+
+```python
+if result.get("tier1_action") in ("DROP", "WHITELIST_DROP"):   # dòng 130, SAI
+```
+
+Nhưng `subscriber.py:511` bọc toàn bộ nhánh Cổng ML/LLM trong `if action == "ESCALATE"` — nghĩa là
+`BLOCK_IP`, `ALERT`, `AWAIT_HITL` cũng **kết thúc tại Tier-1**. Hậu quả kép:
+
+1. **Xả tải bị hạ thấp**: ghi 74,0%, trong khi cùng luồng cùng engine đếm đúng là **90,6%**.
+2. **Độ trễ hai tầng bị thổi phồng**: những ca Tier-1 ĐÃ CHẶN vẫn bị gửi lên LLM trong phép đo,
+   nên mỗi ca như vậy cộng thêm ~23 giây không có thật vào `two_tier_mean_ms`.
+
+Cùng họ với lỗi đã vá ở `evaluate_feedback_loop` (`BLOCK_IP` bị đếm là *leo thang*). **Không trích
+bất kỳ số nào trong tệp này.** Giữ lại chỉ để đối chiếu mức chênh trước/sau khi vá.

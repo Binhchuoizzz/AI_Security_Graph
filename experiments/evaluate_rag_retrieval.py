@@ -96,7 +96,7 @@ def _kb_technique_ids() -> set[str]:
     return {_norm_technique(e.get("id", "")) for e in entries} - {""}
 
 
-def run(limit: int | None = None, out: str | None = None) -> dict:
+def run(limit: int | None = None, out: str | None = None, evidence_layer: str = "all") -> dict:
     print("=" * 72)
     print("  SENTINEL — CHẤT LƯỢNG TRUY XUẤT DUAL-RAG (offline, không cần LLM)")
     print("=" * 72)
@@ -105,6 +105,21 @@ def run(limit: int | None = None, out: str | None = None) -> dict:
 
     with open(GT_PATH, encoding="utf-8") as f:
         gt = json.load(f)
+    # LỌC TẦNG BẰNG CHỨNG — cùng vị từ với `eval_attack_mapper.py`, cố ý dùng chung
+    # `evidence_layer_of` chứ không chép lại điều kiện.
+    #
+    # VÌ SAO CẦN. Recall@k ở đây được viện dẫn như TRẦN của chỉ số quy kết 3.a/3.b. Câu đó
+    # chỉ đúng khi hai bên chấm trên CÙNG dân số: bản mặc định chạy trên toàn `ground_truth`
+    # (đa số là NetFlow thuần, T1110/T1499 chiếm hơn nửa) còn 3.a/3.b lọc `payload`. So một
+    # con số 38% của tập này với 80% của tập kia rồi gọi cái trước là "trần" là so hai mẫu
+    # số khác nhau — nghe như mâu thuẫn trong khi không hề mâu thuẫn.
+    if evidence_layer != "all":
+        from src.agent.nodes import evidence_layer_of
+
+        want = {"payload": "application", "flow": "flow"}[evidence_layer]
+        _before = len(gt)
+        gt = [s for s in gt if evidence_layer_of(s.get("logs") or []) == want]
+        print(f"[i] Lọc tầng bằng chứng '{want}': {len(gt)}/{_before} mẫu")
     # recall@k và MRR chấm trên `expected_mitre_technique`, nên 50 mẫu đối địch do tác giả
     # biên soạn (đều cùng đáp án T1190) sẽ vào thẳng mẫu số. Loại trước khi lọc nhãn.
     gt, _n_authored = drop_authored(gt)
@@ -196,6 +211,9 @@ def run(limit: int | None = None, out: str | None = None) -> dict:
 
     result = {
         "n_samples": len(queries),
+        # Ghi thẳng vào tệp kết quả: hai lượt chạy khác `evidence_layer` cho hai con số
+        # KHÔNG thay thế nhau được, mà tên tệp mặc định thì giống hệt nhau.
+        "evidence_layer": evidence_layer,
         "n_no_query": n_no_query,
         # Kế toán mẫu số: chấm CÓ ĐIỀU KIỆN trên ca Tier-1 leo thang, đúng như đường thật.
         "n_not_escalated_excluded": n_not_escalated,
@@ -271,6 +289,20 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Chất lượng truy xuất Dual-RAG (offline)")
     ap.add_argument("--limit", type=int, default=None, help="lấy mẫu đều bấy nhiêu truy vấn")
     ap.add_argument("--out", type=str, default=None)
+    ap.add_argument(
+        "--evidence-layer",
+        choices=["payload", "flow", "all"],
+        default="all",
+        help=(
+            "Lọc theo TẦNG BẰNG CHỨNG, cùng vị từ với `eval_attack_mapper.py`. Dùng "
+            "`payload` khi cần con số so được với 3.a/3.b; `all` (mặc định) giữ hành vi cũ."
+        ),
+    )
     args = ap.parse_args()
-    run(limit=args.limit, out=args.out)
+    # Tên tệp mặc định phải tự nói ra nó chấm lát nào — nếu không, lượt `payload` sẽ lặng lẽ
+    # ghi đè lượt `all` và cả hai con số cùng biến mất.
+    _out = args.out
+    if _out is None and args.evidence_layer != "all":
+        _out = OUT_JSON.replace(".json", f"_{args.evidence_layer}.json")
+    run(limit=args.limit, out=_out, evidence_layer=args.evidence_layer)
     _ = Counter  # giữ import cho phần mở rộng theo nguồn (chưa dùng)

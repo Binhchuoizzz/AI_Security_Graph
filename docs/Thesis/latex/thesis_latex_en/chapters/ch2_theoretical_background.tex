@@ -1,20 +1,21 @@
 \chapter{Theoretical Background and Literature Review}
 \label{ch:theoretical_background}
 
-This chapter outlines the foundational theoretical principles and comprehensive literature review underlying the thesis. The content systematically analyzes Security Operations Center (SOC) operational bottlenecks, Tier 1 online statistical and machine learning foundations, Tier 2 stateful agent and local LLM architectures, adversarial AI security threats alongside cryptographic audit mechanisms, and conducts a deep survey of existing AI Security systems to delineate the precise research gaps addressed by SENTINEL.
+This chapter outlines the theoretical principles and literature review underlying the thesis: SOC operational bottlenecks, Tier 1 statistical and machine learning foundations, Tier 2 stateful agent and local LLM architectures, adversarial threats with cryptographic audit mechanisms, and a survey of existing AI Security systems delineating the research gap addressed by SENTINEL.
 
 \section{SOC Operational Realities and Cognitive Bottlenecks}
 
-Information security monitoring in modern enterprise Security Operations Centers (SOCs) relies on aggregating raw telemetry logs from Next-Generation Firewalls (NGFW), Intrusion Detection Systems (IDS/IPS), and Endpoint Detection and Response (EDR) agents into centralized SIEM platforms~\cite{siem2021}. Telemetry volume from distributed enterprise infrastructure far exceeds human manual analysis capabilities~\cite{bigdata2019}. Because perimeter defense devices operate using static signatures and deterministic rulesets, relaxing alert thresholds to avoid missing threats leads to a severe alert volume crisis with false positive rates exceeding 80\%~\cite{alertfatigue2022}, resulting in cognitive alert fatigue for security analysts. Although Security Orchestration, Automation, and Response (SOAR) platforms assist in automating response workflows, they depend on rigid, pre-programmed playbooks that entirely lack contextual reasoning when encountering novel attack variants~\cite{soar2025}.
+Security monitoring in modern SOCs relies on aggregating raw telemetry from Next-Generation Firewalls, Intrusion Detection Systems, and Endpoint Detection and Response agents into centralized SIEM platforms~\cite{siem2021}, at volumes far exceeding human analysis capacity~\cite{bigdata2019}. Because perimeter devices operate on static signatures and deterministic rulesets, relaxing alert thresholds to avoid missing threats produces an alert volume crisis with false positive rates exceeding 80\%~\cite{alertfatigue2022} and consequent analyst alert fatigue. SOAR platforms automate response workflows but depend on rigid pre-programmed playbooks that lack contextual reasoning when confronted with novel attack variants~\cite{soar2025}.
 
 \section{Online Statistical Theory and Tier 1 Machine Learning}
 \label{sec:welford}
 
 To filter high-density telemetry streams at wire-speed without maintaining full historical logs in memory, Welford's algorithm maintains $\mathcal{O}(1)$ time and memory complexity~\cite{welford1962}. Sample mean $\mu_k$ and sum of squared deviations $S_k$ are updated via recurrence relations:
 \begin{equation}
+\label{eq:welford}
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}, \quad S_k = S_{k-1} + (x_k - \mu_{k-1})(x_k - \mu_k)
 \end{equation}
-enabling real-time standard deviation $\sigma_k = \sqrt{S_k / (k-1)}$ and continuous $Z$-score anomaly metric evaluation. Concurrently, the LightGBM machine learning gate utilizes leaf-wise tree growth to achieve sub-0.35\,ms inference latencies per NetFlow sample. To counter machine learning evasion attacks, the ML Gate enforces $Z$-score feature clipping within $\pm 8\sigma$ and baseline mean imputation. Additionally, the Tier 1.75 Semantic Cache uses payload template hashing in RAM to execute short-circuit responses for repetitive volumetric attacks (such as DDoS or brute-force attempts) in under 1\,ms, bypassing GPU invocation.
+enabling real-time standard deviation $\sigma_k = \sqrt{S_k / (k-1)}$ and continuous $Z$-score anomaly evaluation without retaining the raw event series. Concurrently, the LightGBM machine learning gate utilizes leaf-wise tree growth and histogram feature binning to achieve sub-third-of-a-millisecond inference per sample. To counter machine learning evasion attacks, the ML Gate enforces $Z$-score feature clipping within $\pm 8\sigma$ and baseline mean imputation. Additionally, the Tier 1.75 Semantic Cache hashes normalised query strings in RAM, reusing adjudications across events that reduce to the same description and short-circuiting the pipeline before any GPU invocation.
 
 \section{Local Large Language Models and Tier 2 Agentic Intelligence}
 
@@ -22,42 +23,45 @@ Local LLM deployment demands strict memory optimization: Foundation-Sec-8B-Instr
 
 To orchestrate reasoning, Tier 2 employs a LangGraph acyclic state graph~\cite{langgraph2024} integrated with Threat Memory. To prevent hallucination, the system integrates Retrieval-Augmented Generation (RAG)~\cite{rag2020} via a Dual-RAG architecture combining FAISS dense search~\cite{faiss2019} and BM25 sparse search~\cite{bm25_2009}, fused via Reciprocal Rank Fusion (RRF)~\cite{rrf2009}:
 \begin{equation}
+\label{eq:rrf}
     RRF\_Score(d) = \sum_{m \in M} \frac{1}{k + r_m(d)}
 \end{equation}
 retrieving context directly from 433 STIX MITRE ATT\&CK technique entries and NIST SP 800-61r2 guidance for forensic justification.
 
 \section{Adversarial AI Security and Cryptographic Log Audit}
 
-Integrating LLMs introduces log-substrate prompt injection risks~\cite{promptinjection2023}, where attackers inject malicious instructions into User-Agent headers or Syslog strings to hijack AI reasoning~\cite{owasp_llm2025}. To neutralize this vector, SENTINEL applies Delimited Data Encapsulation with random Nonce tags to isolate raw inputs, combined with deterministic Guardrails enforcing structured outputs into 3 valid actions (\texttt{BLOCK\_IP}, \texttt{LOG}, \texttt{AWAIT\_HITL}). To guarantee forensic non-repudiation, the system uses HMAC-SHA256 signature chaining~\cite{hmac1997} to seal audit records with a local secret key, producing a tamper-evident audit trail.
+Integrating LLMs introduces log-substrate prompt injection risks~\cite{promptinjection2023}, where attackers inject malicious instructions into User-Agent headers or Syslog strings to hijack AI reasoning~\cite{owasp_llm2025}. The defining property of this vector is that \textbf{log content is authored by the attacker}: any defense based on recognising malicious content is an unending race against novel phrasings. To neutralise the vector structurally, SENTINEL applies Delimited Data Encapsulation with random nonce tags isolating raw inputs, combined with deterministic guardrails constraining outputs to three valid actions (\texttt{BLOCK\_IP}, \texttt{LOG}, \texttt{AWAIT\_HITL}).
+
+To protect forensic records, the system uses HMAC-SHA256 signature chaining~\cite{hmac1997} to seal audit records with a local secret key, producing a tamper-evident audit trail. The scope of this guarantee must be stated precisely: because HMAC uses a \textbf{shared symmetric key}, the mechanism establishes \textbf{integrity and tamper-evidence}, but does \textbf{not} constitute non-repudiation in the cryptographic sense---that property requires asymmetric signatures. This boundary is respected throughout the thesis.
 
 \section{Overview of Related Research and Research Gaps}
 
-Artificial intelligence research applied to Security Operations Centers (SOCs) has evolved across four major architectural paradigms, spanning traditional deterministic platforms to modern autonomous agentic systems~\cite{llmsec_survey2025}. Analyzing the core technologies, objectives, and limitations of each paradigm establishes the exact technical research gap resolved by SENTINEL.
+Artificial intelligence research applied to Security Operations Centers has evolved across three architectural paradigms~\cite{llmsec_survey2025}.
 
-Traditional enterprise defense solutions include commercial SIEM platforms such as IBM QRadar and SOAR systems such as Palo Alto Cortex XSOAR~\cite{siem2021, soar2025}. IBM QRadar aggregates and correlates telemetry using static correlation rules on centralized databases. However, QRadar exhibits high false positive alert rates ($>$80\%) due to a lack of contextual comprehension. To mitigate this, Cortex XSOAR automates incident response workflows using pre-programmed playbooks (written in Python/JavaScript). Although it reduces manual repetitive tasks, Cortex XSOAR operates deterministically: when encountering novel attack variants with obfuscated payloads or anomalous behaviors outside predefined playbooks, the system fails or misses threats entirely.
+\textbf{Traditional enterprise defense} comprises SIEM platforms such as IBM QRadar and SOAR systems such as Palo Alto Cortex XSOAR~\cite{siem2021, soar2025}. QRadar correlates telemetry with static rules and exhibits high false positive rates ($>$80\%) from a lack of contextual comprehension; Cortex XSOAR automates response via playbooks and fails on variants outside them. The strength of this paradigm is very low latency---precisely the property SENTINEL's Tier 1 inherits rather than discards.
 
-Cloud-based LLM agent systems are represented by platforms such as Watchtower~\cite{watchtower2026} and CyberRAG~\cite{cyberrag2025}. Watchtower proposes a multi-agent framework coordinating incident investigation workflows by transmitting raw telemetry logs to commercial cloud LLMs (such as GPT-4 or Claude). However, transmitting raw logs to cloud models introduces two severe technical limitations: quadratic self-attention latency $\mathcal{O}(N^2)$ extends processing time per event to 4--26 seconds, causing queue congestion at wire-speed; concurrently, transferring enterprise telemetry violates Zero-Trust principles and data sovereignty mandates~\cite{nist80207}. Meanwhile, CyberRAG~\cite{cyberrag2025} focuses on single-tier RAG threat intelligence retrieval; lacking a Tier 1 wire-speed filter, CyberRAG suffers queue exhaustion under high event streams and lacks stateful correlation for multi-stage APT campaigns.
+\textbf{Cloud-based LLM agent systems} are represented by Watchtower~\cite{watchtower2026} and CyberRAG~\cite{cyberrag2025}. Watchtower transmits raw telemetry to commercial cloud LLMs, incurring quadratic self-attention latency $\mathcal{O}(N^2)$ of 4--26 seconds per event and violating Zero-Trust and data sovereignty mandates~\cite{nist80207}. CyberRAG focuses on single-tier RAG retrieval; lacking a wire-speed filter it suffers queue exhaustion, and it lacks stateful correlation for multi-stage campaigns.
 
-Autonomous planning and security reasoning agents comprise AutoBNB~\cite{autobnb2025}, LanG Agentic SOC~\cite{lang2026}, and Policy-Guided SIEM~\cite{splunkllm2026}. AutoBNB combines Bayesian networks with planning agents for attack graph generation and root-cause attribution, but encounters high graph computation costs and lacks structural defenses against log prompt injection attacks~\cite{promptinjection2023}. Most recently, the LanG platform~\cite{lang2026} introduced governance-aware multi-agent orchestration, and Policy-Guided SIEM~\cite{splunkllm2026} integrated rule-guided guardrails with Splunk SIEM workflows. While these systems advance multi-agent coordination and hallucination reduction, they remain single-tier architectures where every network event must traverse complex LLM reasoning nodes. Consequently, average processing latency remains high between 480\,ms and 520\,ms, requiring multi-GPU server infrastructure (16\,GB--24\,GB VRAM), failing to deliver wire-speed telemetry noise offloading at Tier 1.
+\textbf{Autonomous planning and reasoning agents} comprise AutoBnB~\cite{autobnb2025}, LanG Agentic SOC~\cite{lang2026}, and Policy-Guided SIEM~\cite{splunkllm2026}, which combine Bayesian planning, governance-aware multi-agent orchestration, and rule-guided guardrails over Splunk workflows respectively. While these advance multi-agent coordination, they remain single-tier architectures in which every event traverses an LLM reasoning node; published average latency consequently remains between 480\,ms and 520\,ms on 16--24\,GB VRAM infrastructure.
 
-The primary research gap identified is: Currently, no hybrid architecture simultaneously satisfies three critical requirements: (1) Wire-speed Tier 1 noise offloading filtering at least 80\% of stream noise under 1\,ms latency; (2) Tier 2 stateful agent cognitive reasoning running locally (air-gapped 16\,GB GPU) with Dual-RAG hallucination reduction; and (3) Structural AI model integrity protection via Delimited Nonce encapsulation and HMAC-SHA256 forensic sealing. Table~\ref{tab:related_work_comparison} provides a comparative synthesis contrasting SENTINEL against representative paradigms.
+The research gap is therefore: \textbf{no hybrid architecture simultaneously satisfies three requirements}---(1) resolving the majority of telemetry at the statistical/ML tier under one millisecond; (2) stateful cognitive reasoning running locally on a 16\,GB GPU with RAG-anchored hallucination control; and (3) structural model-integrity protection via Delimited Nonce encapsulation and HMAC-SHA256 forensic sealing. Table~\ref{tab:related_work_comparison} contrasts SENTINEL against these paradigms.
 
 \begin{table}[htbp]
 \centering
 \caption{Comparative analysis between SENTINEL and existing security defense paradigms}
 \label{tab:related_work_comparison}
-\small
+\footnotesize
 \setlength{\tabcolsep}{4pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
 \toprule
 \textbf{Evaluation Metric} & \textbf{SIEM / SOAR (QRadar, XSOAR)} & \textbf{SOTA Agents (Watchtower, LanG, AutoBnB)} & \textbf{SENTINEL Architecture (Thesis)} \\
 \midrule
 \textbf{Core Technology} & Static correlation rules, rigid Python/JS playbooks & Cloud Multi-Agent LLMs / Local Multi-Agent RAG & Welford $\mathcal{O}(1)$ + LightGBM T1, LangGraph Agent T2 \\
-\textbf{Operational Goal} & Centralized log aggregation and playbook response & Automated incident investigation via LLM reasoning & Wire-speed stream noise offloading and local cognitive reasoning \\
-\textbf{Latency \& Throughput} & Very low ($<1$\,ms) but high false positive surge & Medium/High (480\,ms--26\,s), pipeline congestion & Optimal ($<0.40$\,ms Tier 1, 1\,ms Cache, $>80\%$ T2 offloading) \\
-\textbf{Data Sovereignty} & Local enterprise & Cloud leakage risks or heavy 24GB GPU requirement & Absolute security, 100\% Air-gapped on a 16\,GB GPU \\
-\textbf{Prompt Inj. Defense} & Not applicable & Probability semantic filters (vulnerable to evasion) & Architectural guarantee (Delimited Nonce Encapsulation) \\
-\textbf{Forensic Audit} & Standard text logs (vulnerable to post-compromise edits) & No cryptographic audit trail sealing & HMAC-SHA256 hash-chaining non-repudiation seal \\
+\textbf{Operational Goal} & Centralized log aggregation and playbook response & Automated incident investigation via LLM reasoning & Resolve traffic at the cheap tier, reserve the expensive tier for cases needing reasoning \\
+\textbf{Cost Tiering} & One cheap tier, no reasoning & One expensive tier, every event reaches the LLM & \textbf{Two tiers}: cheap first, expensive second \\
+\textbf{Data Sovereignty} & Local enterprise & Cloud leakage risk or 24GB GPU requirement & 100\% air-gapped on a 16\,GB GPU \\
+\textbf{Prompt Inj. Defense} & Not applicable & Probabilistic semantic filters (evadable) & Structural guarantee, independent of payload content \\
+\textbf{Forensic Audit} & Standard text logs (editable post-compromise) & No cryptographic sealing & HMAC-SHA256 chain, tamper-evident \\
 \bottomrule
 \end{tabularx}
 \end{table}

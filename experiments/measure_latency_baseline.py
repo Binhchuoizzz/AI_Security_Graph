@@ -19,6 +19,7 @@ KẾT QUẢ ĐẦU RA:
   experiments/results/latency_benchmark.json
 """
 
+import argparse
 import json
 import os
 import sys
@@ -125,7 +126,16 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
         t_start = time.perf_counter()
 
         result = engine.evaluate(log)
-        if result.get("tier1_action") in ("DROP", "WHITELIST_DROP"):
+        # Tier-1 XONG VIỆC với mọi hành động TRỪ `ESCALATE`. Nguồn sự thật là `subscriber.py`:
+        # toàn bộ nhánh Cổng ML/LLM nằm trong `if action == "ESCALATE"`, và chính nó đếm mọi
+        # hành động khác là "đã gỡ tải".
+        #
+        # LỖI ĐÃ VÁ (04/08/2026): điều kiện cũ là `in ("DROP", "WHITELIST_DROP")`, tức coi
+        # `BLOCK_IP` · `ALERT` · `AWAIT_HITL` là CHƯA xử lý xong. Hậu quả kép: (1) tỉ lệ xả tải
+        # bị hạ thấp — đo 74,0% trong khi cùng luồng, cùng engine, đếm đúng thì là 90,6%;
+        # (2) những ca Tier-1 ĐÃ CHẶN vẫn bị gửi lên LLM trong phép đo, nên độ trễ hai tầng
+        # cộng thêm hàng chục giây không có thật. Cùng họ với lỗi ở `evaluate_feedback_loop`.
+        if result.get("tier1_action") != "ESCALATE":
             dt = (time.perf_counter() - t_start) * 1000
             stage_n["tier1_drop"] += 1
             stage_ms["tier1_drop"].append(dt)
@@ -204,6 +214,34 @@ def measure_llm_only_baseline(events: list) -> list:
     return latencies
 
 
+def derive_stats(two_tier: list, baseline: list) -> dict:
+    """Thống kê phái sinh từ độ trễ thô — MỘT chỗ tính duy nhất.
+
+    Tách khỏi `run()` để lượt đo cũ (JSON đã lưu `per_event_*_ms`) tính bù được bằng ĐÚNG
+    công thức này thay vì chép số từ log — chép tay là đúng chỗ số liệu bị sai lệch.
+
+    Mann-Whitney U một phía (`alternative="less"`): giả thuyết đối là hai tầng NHANH HƠN.
+    Dùng phi tham số vì độ trễ ở đây hai đỉnh và lệch nặng, t-test giả định sai phân bố.
+    """
+    out: dict[str, float | bool | None] = {
+        "two_tier_median_ms": round(float(np.median(two_tier)), 2),
+        "two_tier_p95_ms": round(float(np.percentile(two_tier, 95)), 2),
+        "baseline_median_ms": round(float(np.median(baseline)), 2),
+        "baseline_p95_ms": round(float(np.percentile(baseline, 95)), 2),
+    }
+    try:
+        from scipy.stats import mannwhitneyu
+
+        stat, p = mannwhitneyu(two_tier, baseline, alternative="less")
+        out["mannwhitney_u"] = round(float(stat), 2)
+        out["mannwhitney_p"] = float(p)
+        out["significant_p05"] = bool(p < 0.05)
+    except ImportError:
+        out["mannwhitney_p"] = None
+        out["significant_p05"] = None
+    return out
+
+
 def run(n_events: int = 100):
     # Kiểm tra máy chủ LLM
     if not check_llm_server():
@@ -280,6 +318,11 @@ Status:            {"✅ PASS" if reduction_pct >= 60 else "❌ FAIL"}
         "latency_reduction_pct": round(reduction_pct, 2),
         "target_pct": 60,
         "pass": bool(reduction_pct >= 60),
+        # Median/P95/Mann-Whitney từng CHỈ được in ra màn hình rồi mất theo phiên terminal.
+        # Với phân bố hai đỉnh như ở đây (đa số ca xong trong ~1 ms, số ít phải chờ LLM ~23 s)
+        # thì mean một mình mô tả sai; median và P95 mới nói được đuôi. Ghi vào JSON để báo cáo
+        # đọc thẳng, không ai phải chép tay từ log.
+        **derive_stats(two_tier_latencies, baseline_latencies),
         # Phân rã theo chặng: tổng nhanh/chậm KHÔNG cho biết lợi thế đến từ đâu. Nếu số ca
         # thoát ở Tier-1 + Cổng ML thấp thì con số tổng chỉ đang tả tập mẫu, không tả kiến trúc.
         "stage_breakdown": stage_breakdown,
@@ -316,5 +359,22 @@ Status:            {"✅ PASS" if reduction_pct >= 60 else "❌ FAIL"}
 
 
 if __name__ == "__main__":
-    success = run()
+    # LỖI ĐÃ SỬA: script KHÔNG có argparse, nên `--n 1000` mà tài liệu hướng dẫn bị nuốt IM
+    # LẶNG qua sys.argv và mọi lượt đo vẫn chạy n=100. Tức con số độ trễ đang trích trong luận
+    # văn là mẫu 100 — dưới ngưỡng mà chính tài liệu đặt ra (cần ~1000 để đủ ca chạm LLM), và
+    # cái cờ lẽ ra để sửa điều đó thì chưa bao giờ có tác dụng.
+    #
+    # CHI PHÍ: nhánh baseline gửi MỌI sự kiện thẳng lên LLM (~18,9 s/lần đo được ở lượt gần
+    # nhất). n=100 mất ~30 phút; n=1000 mất ~5 giờ. Giữ mặc định 100 để không ai vô tình khởi
+    # động một lượt 5 giờ, nhưng cờ nay CÓ THẬT.
+    _ap = argparse.ArgumentParser(description="Độ trễ hai tầng vs LLM-only")
+    _ap.add_argument(
+        "--n",
+        type=int,
+        default=100,
+        help="số sự kiện lấy mẫu (strided trên build_stream). Tài liệu khuyến nghị 1000 để có "
+        "đủ ca chạm LLM; đổi lại lượt đo kéo dài ~5 giờ vì nhánh baseline gọi LLM cho mọi ca.",
+    )
+    _args = _ap.parse_args()
+    success = run(_args.n)
     sys.exit(0 if success else 1)
