@@ -14,7 +14,7 @@ digraph agentic_fsm {
     triage  [label="llm_triage\n(Foundation-Sec-8B Q4_K_M, temp 0.1\n-> structured JSON verdict)", fillcolor="#e8f5e9"];
 
     route1  [label="route_after_triage\n(threat & confidence > 0.7 ?)", shape=diamond, fillcolor="#fff3cd"];
-    mapper  [label="attack_mapper\n(structured MITRE ATT&CK enrichment)", fillcolor="#e8f5e9"];
+    mapper  [label="attack_mapper\n(structured MITRE ATT&CK enrichment\n+ evidence-anchoring guardrail)", fillcolor="#e8f5e9"];
     route2  [label="route by action", shape=diamond, fillcolor="#fff3cd"];
 
     exec    [label="action_executor\n(firewall policy / report /\nforensic record)", fillcolor="#f8d7da"];

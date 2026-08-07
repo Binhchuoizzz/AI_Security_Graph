@@ -1,0 +1,39 @@
+// SENTINEL — high-level architecture (Chapter 3 overview figure).
+// Deliberately block-level only: no algorithms, no numbers. Each block is expanded
+// in its own section, and the label says where. Render:
+//   dot -Tpdf arch_overview.dot -o arch_overview.pdf
+digraph arch_overview {
+    rankdir=TB;
+    bgcolor="white";
+    nodesep=0.45;
+    ranksep=0.55;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=13,
+          margin="0.22,0.14", penwidth=1.6, color="#37474f"];
+    edge [fontname="Helvetica", fontsize=11, color="#546e7a", penwidth=1.4];
+
+    sources [label="Telemetry sources\nNGFW · IDS/IPS · EDR", shape=oval, fillcolor="#e3f2fd"];
+    queue   [label="Redis Stream ingestion queue", fillcolor="#eceff1"];
+
+    tier1 [label=<<b>TIER 1 — Wire-speed filter</b><br/>Statistical baseline · Application signatures<br/>Machine Learning Gate · Semantic cache<br/><i>detail: Section 3.3</i>>,
+           fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.2];
+
+    settled [label="Settled at Tier 1\nBLOCK_IP · ALERT · AWAIT_HITL · DROP\n(no language-model call)",
+             fillcolor="#f5f5f5", color="#757575"];
+
+    tier2 [label=<<b>TIER 2 — Cognitive agent</b><br/>Guardrails · Dual-RAG retrieval<br/>Local reasoning model · Decision validation<br/><i>detail: Sections 3.4–3.6</i>>,
+           fillcolor="#fdecea", color="#c62828", penwidth=2.2];
+
+    response [label="Response and SOC dashboard\nFirewall policy · Analyst review queue", fillcolor="#e3f2fd"];
+    audit    [label="HMAC-SHA256 audit chain\nintegrity and tamper-evidence", fillcolor="#ede7f6", color="#5e35b1"];
+
+    sources -> queue -> tier1;
+    tier1 -> settled [label="  majority of traffic  "];
+    tier1 -> tier2   [label="  ESCALATE only  ", penwidth=2.0, color="#c62828"];
+    tier2 -> response;
+    settled -> response [style=dashed];
+
+    { rank=same; settled; tier2; }
+
+    settled -> audit [style=dashed, arrowhead=open];
+    tier2   -> audit [style=dashed, arrowhead=open];
+}

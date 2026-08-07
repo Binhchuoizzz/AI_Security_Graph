@@ -1,0 +1,33 @@
+// SENTINEL — Tầng 1 phóng to (Mục 3.3). Chỉ rõ nhánh nào KẾT THÚC và nhánh duy nhất
+// nào leo thang, vì chính phân biệt đó định nghĩa "xả tải" ở Chương 4.
+// Render: dot -Tpdf tier1_detail.dot -o tier1_detail.pdf
+digraph tier1_detail {
+    rankdir=TB;
+    bgcolor="white";
+    nodesep=0.40;
+    ranksep=0.45;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12,
+          margin="0.20,0.12", penwidth=1.6, color="#2e7d32", fillcolor="#e8f5e9"];
+    edge [fontname="Helvetica", fontsize=10, color="#546e7a", penwidth=1.3];
+
+    inp [label="Sự kiện đã chuẩn hoá từ hàng đợi thu nhận", shape=oval, fillcolor="#e3f2fd", color="#1565c0"];
+
+    welford [label="Thống kê trực tuyến Welford O(1)\nZ-score trượt so với nền theo khoá"];
+    sig     [label="Tập chữ ký tầng ứng dụng\n29 họ tấn công web, kiểu OWASP CRS\ngiải mã nhiều vòng trước khi đối sánh"];
+    cache   [label="Bộ đệm ngữ nghĩa Tầng 1.75\nbăm chuỗi truy vấn đã chuẩn hoá"];
+    mlgate  [label="Cổng Học máy LightGBM\nchặn Z-score ±8σ · điền khuyết theo nền"];
+
+    band [label="Chính sách bốn dải tự tin\n0,85 / 0,65 / 0,40", shape=diamond, fillcolor="#fff8e1", color="#f9a825"];
+
+    abstain [label="Tỉ lệ đặc trưng bị bóp méo > 30%\n→ TỪ CHỐI PHÁN QUYẾT", fillcolor="#fff3e0", color="#ef6c00"];
+
+    term  [label="KẾT THÚC TẠI TẦNG 1\nBLOCK_IP (đòi Tầng 1 đồng thuận)\nALERT · AWAIT_HITL · DROP",
+           fillcolor="#f5f5f5", color="#757575", penwidth=2.0];
+    esc   [label="ESCALATE → Tầng 2", fillcolor="#fdecea", color="#c62828", penwidth=2.0];
+
+    inp -> welford -> sig -> cache -> mlgate -> band;
+    mlgate -> abstain [style=dashed, label="  tự tin thấp  "];
+    abstain -> esc [style=dashed];
+    band -> term [label="  đã kết luận  "];
+    band -> esc  [label="  cần suy luận  "];
+}

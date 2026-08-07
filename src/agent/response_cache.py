@@ -99,8 +99,16 @@ class ExactMatchResponseCache:
             reasons = "|".join(sorted(str(r) for r in reasons))
         else:
             reasons = str(reasons)
+        # MỌI trường tầng ứng dụng phải vào khoá. Bỏ sót một trường thì trường đó vừa GỘP
+        # mẫu số của phép đo (06/08: 100 mẫu field_injection chỉ sinh 79 phán quyết độc lập
+        # vì thiếu `user_agent`), vừa là MẶT ĐẦU ĐỘC CACHE trong vận hành: kẻ tấn công đổi
+        # riêng trường không nằm trong khoá thì nhận lại verdict cũ của một log lành.
+        # `User-Agent` viết hoa là dạng chuẩn hoá của `normalize_log_keys`.
         app = (
-            (str(log.get("message", "")) + str(log.get("payload", "")) + str(log.get("uri", "")))
+            "".join(
+                str(log.get(k, "") or "")
+                for k in ("message", "payload", "uri", "user_agent", "User-Agent", "headers")
+            )
             .strip()
             .lower()
         )

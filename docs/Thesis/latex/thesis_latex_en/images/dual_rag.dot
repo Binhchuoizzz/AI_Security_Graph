@@ -1,0 +1,48 @@
+// SENTINEL — Dual-RAG retrieval and the evidence-anchoring guardrail (Section 3.5).
+// The anchoring check is drawn on the OUTPUT side on purpose: it constrains what the
+// model may assert, not what the retriever may return.
+// Render: dot -Tpdf dual_rag.dot -o dual_rag.pdf
+digraph dual_rag {
+    rankdir=LR;
+    bgcolor="white";
+    nodesep=0.35;
+    ranksep=0.50;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12,
+          margin="0.20,0.12", penwidth=1.6, color="#37474f", fillcolor="#eceff1"];
+    edge [fontname="Helvetica", fontsize=10, color="#546e7a", penwidth=1.3];
+
+    query [label="Normalised query\nservice · port · observed technique", shape=oval, fillcolor="#e3f2fd", color="#1565c0"];
+
+    subgraph cluster_kb {
+        label="Knowledge base";
+        fontname="Helvetica"; fontsize=12; fontcolor="#37474f";
+        style="dashed,rounded"; color="#90a4ae"; bgcolor="#fafafa";
+        kb1 [label="MITRE ATT&CK\nSTIX 2.1 technique entries", fillcolor="#e8eaf6"];
+        kb2 [label="NIST SP 800-61r2\nincident handling guidance", fillcolor="#e8eaf6"];
+    }
+
+    faiss [label="FAISS dense search\nSentence-BERT embeddings\nsemantic intent", fillcolor="#e8f5e9", color="#2e7d32"];
+    bm25  [label="BM25 sparse search\nexact identifiers: CVE, ports,\nregistry keys", fillcolor="#e8f5e9", color="#2e7d32"];
+
+    rrf   [label="Reciprocal Rank Fusion\nk = 60", shape=diamond, fillcolor="#fff8e1", color="#f9a825"];
+    prompt[label="Retrieved context\ninjected at rag_context", fillcolor="#eceff1"];
+    llm   [label="Reasoning model\nemits a technique identifier", fillcolor="#fdecea", color="#c62828"];
+
+    anchor [label="EVIDENCE-ANCHORING GUARDRAIL\nis the identifier present in\nTHIS batch's retrieved documents?",
+            shape=diamond, fillcolor="#ede7f6", color="#5e35b1", penwidth=2.2];
+
+    keep [label="Assert the technique", fillcolor="#e8f5e9", color="#2e7d32"];
+    drop [label="Force N/A\nroute to AWAIT_HITL", fillcolor="#fff3e0", color="#ef6c00", penwidth=2.0];
+
+    query -> faiss;
+    query -> bm25;
+    kb1 -> faiss [style=dashed, arrowhead=open];
+    kb2 -> faiss [style=dashed, arrowhead=open];
+    kb1 -> bm25  [style=dashed, arrowhead=open];
+    kb2 -> bm25  [style=dashed, arrowhead=open];
+    faiss -> rrf;
+    bm25  -> rrf;
+    rrf -> prompt -> llm -> anchor;
+    anchor -> keep [label="  yes  "];
+    anchor -> drop [label="  no  ", color="#ef6c00", penwidth=1.8];
+}

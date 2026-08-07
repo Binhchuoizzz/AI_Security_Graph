@@ -180,7 +180,7 @@
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-In the modern cybersecurity landscape, Security Operations Centers (SOCs) face acute alert fatigue as continuous telemetry volume far exceeds human analyst processing capacity. Traditional automation tools relying on static playbooks lack contextual reasoning, whereas feeding raw logs directly to Large Language Models (LLMs) suffers severe latency bottlenecks, prompt injection risks, and data sovereignty violations. This thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, coupling an LLM reasoning agent with Retrieval-Augmented Generation (RAG). Tier 1 functions as a wire-speed filter---deterministic rules, Welford anomaly scoring, and a LightGBM gate---to automatically discard baseline stream noise, while Tier 2 employs a stateful AI reasoning agent backed by MITRE ATT\&CK and NIST guidance to handle complex threats behind cryptographic guardrails. Empirical evaluation on benchmark intrusion datasets demonstrates SENTINEL's efficiency. Tier 1 and the ML Gate automatically offload \textbf{90.6\%} of the incoming stream. Because the typical event never reaches the model, the median end-to-end latency falls to \textbf{0.88\,ms} from \textbf{17,174.7\,ms} under a single-tier LLM baseline. Delimited Nonce encapsulation neutralizes prompt injection structurally rather than by content recognition, resisting all \textbf{678} adversarial samples that the static pre-filter cannot absorb, while HMAC-SHA256 hash-chaining detects every core tampering mode and thereby guarantees audit trail integrity and tamper-evidence---though not, given its symmetric key, cryptographic non-repudiation---operating on a local workstation. SENTINEL proves that a two-tier hybrid architecture provides a trustworthy and effective paradigm for modern SOC defense.
+Security Operations Centres are judged on whether a genuine intrusion is caught in time, yet the volume of activity they must inspect far exceeds what the analysts on duty can read. Existing responses each solve part of the problem: signature rules decide quickly but cannot interpret intent, correlation platforms aggregate evidence but still hand humans more candidates than they can work through, and automated playbooks execute reliably only on scenarios someone anticipated. What is left for the analyst---assembling context around an alert and judging it---is exactly the part that does not scale. This thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, which places cheap decisions before expensive ones so that reasoning is spent only where it is needed. Tier 1 is a wire-speed filter---deterministic rules, Welford anomaly scoring, and a LightGBM gate---resolving baseline stream noise without invoking a language model. Surviving events reach Tier 2, a stateful reasoning agent running a locally hosted quantised model behind cryptographic guardrails. Its context is assembled from the event itself (request line, headers, payload, flow statistics), compressed by log-template mining under an explicit token budget; security knowledge is represented as a retrieval corpus of 433 MITRE ATT\&CK entries and 107 NIST SP 800-61r2 procedures, indexed both as dense vectors for semantic similarity and as a sparse BM25 index for exact identifiers, the two rankings combined by Reciprocal Rank Fusion. An output-side check requires every technique the agent asserts to appear in that batch's retrieved documents, or the verdict is withheld for an analyst. Empirical evaluation on benchmark intrusion datasets demonstrates SENTINEL's efficiency. Tier 1 and the ML Gate automatically offload \textbf{90.6\%} of the incoming stream. Because the typical event never reaches the model, the median end-to-end latency falls to \textbf{0.88\,ms} from \textbf{17,174.7\,ms} under a single-tier LLM baseline. Delimited Nonce encapsulation neutralizes prompt injection structurally rather than by content recognition, resisting all \textbf{678} adversarial samples that the static pre-filter cannot absorb, while HMAC-SHA256 hash-chaining detects every core tampering mode and thereby guarantees audit trail integrity and tamper-evidence---though not, given its symmetric key, cryptographic non-repudiation---operating on a local workstation. SENTINEL proves that a two-tier hybrid architecture provides a trustworthy and effective paradigm for modern SOC defense.
 \end{spacing}
 
 % Acknowledgements Page
@@ -280,14 +280,8 @@ SOC & Security Operations Center \\
 \setlength{\itemsep}{0pt}
 \setlength{\parskip}{0pt}
 
-\bibitem{ids2018}
-I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
-
 \bibitem{siem2021}
 G. González-Granadillo, S. González-Zarzosa, and R. Diaz, ``Security Information and Event Management (SIEM): Analysis, Trends, and Usage in Critical Infrastructures,'' \textit{Sensors}, vol. 21, no. 14, art. 4759, 2021.
-
-\bibitem{bigdata2019}
-R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterogeneous Data: A Survey,'' \textit{Journal of Big Data}, vol. 2, art. 3, 2015.
 
 \bibitem{alertfatigue2022}
 S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Security Operations Centres: Research Challenges and Opportunities,'' \textit{ACM Computing Surveys}, vol. 57, no. 9, art. 224, 2025.
@@ -295,26 +289,77 @@ S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Securit
 \bibitem{soar2025}
 Ismail, R. Kurnia, Z. A. Brata, G. A. Nelistiani, S. Heo, H. Kim, and H. Kim, ``Toward Robust Security Orchestration and Automated Response in Security Operations Centers with a Hyper-Automation Approach Using Agentic Artificial Intelligence,'' \textit{Information}, vol. 16, no. 5, art. 365, 2025.
 
-\bibitem{welford1962}
-B. P. Welford, ``Note on a Method for Calculating Corrected Sums of Squares and Products,'' \textit{Technometrics}, vol. 4, no. 3, pp. 419--420, 1962.
-
-\bibitem{rag2020}
-P. Lewis \textit{et al.}, ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 33, pp. 9459--9474, 2020.
-
-\bibitem{langgraph2024}
-LangChain AI, ``LangGraph: Multi-Actor, Stateful LLM Applications,'' \textit{GitHub repository}, 2024. [Online]. Available: https://github.com/langchain-ai/langgraph
+\bibitem{vaswani2017}
+A. Vaswani \textit{et al.}, ``Attention is All You Need,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, pp. 5998--6008, 2017.
 
 \bibitem{promptinjection2023}
 K. Greshake, S. Abdelnabi, S. Mishra, A. Endres, T. Holz, and M. Fritz, ``More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models,'' \textit{arXiv preprint arXiv:2302.12173}, 2023.
 
-\bibitem{nist80061}
-P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' NIST Special Publication 800-61 Revision 2, 2012.
+\bibitem{nist80207}
+S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,'' NIST Special Publication 800-207, National Institute of Standards and Technology, 2020.
+
+\bibitem{owasp_llm2025}
+OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
+
+\bibitem{ids2018}
+I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
+
+\bibitem{csic2010}
+C. Torrano-Giménez, A. Pérez-Villegas, and G. Álvarez Marañón, ``HTTP DATASET CSIC 2010,'' Information Security Institute, Spanish National Research Council (CSIC), 2010. [Online]. Available: https://www.isi.csic.es/dataset/HTTP
+
+\bibitem{dapt2020}
+S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kang, ``DAPT 2020 -- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \textit{Deployable Machine Learning for Security Defense (MLHat 2020)}, Communications in Computer and Information Science, vol. 1271, Springer, 2020, pp. 138--163.
+
+\bibitem{advbench2023}
+A. Zou, Z. Wang, J. Z. Kolter, and M. Fredrikson, ``Universal and Transferable Adversarial Attacks on Aligned Language Models,'' \textit{arXiv preprint arXiv:2307.15043}, 2023.
+
+\bibitem{deepset2023}
+Deepset, ``Prompt Injections Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/deepset/prompt-injections
+
+\bibitem{jackhhao2023}
+J. Hao, ``Jailbreak Classification Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/jackhhao/jailbreak-classification
+
+\bibitem{bigdata2019}
+R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterogeneous Data: A Survey,'' \textit{Journal of Big Data}, vol. 2, art. 3, 2015.
+
+\bibitem{welford1962}
+B. P. Welford, ``Note on a Method for Calculating Corrected Sums of Squares and Products,'' \textit{Technometrics}, vol. 4, no. 3, pp. 419--420, 1962.
+
+\bibitem{quantization2021}
+A. Gholami \textit{et al.}, ``A Survey of Quantization Methods for Efficient Neural Network Inference,'' \textit{arXiv preprint arXiv:2103.13630}, 2021.
+
+\bibitem{foundation_sec_2024}
+P. Kassianik, B. Saglam \textit{et al.} (Cisco Foundation AI), ``Llama-3.1-FoundationAI-SecurityLLM-Base-8B Technical Report,'' \textit{arXiv preprint arXiv:2504.21039}, 2025.
+
+\bibitem{foundation_sec_instruct}
+S. Weerawardhena, P. Kassianik, B. Nelson, B. Saglam \textit{et al.} (Cisco Foundation AI), ``Llama-3.1-FoundationAI-SecurityLLM-8B-Instruct Technical Report,'' \textit{arXiv preprint arXiv:2508.01059}, 2025.
+
+\bibitem{langgraph2024}
+LangChain AI, ``LangGraph: Multi-Actor, Stateful LLM Applications,'' \textit{GitHub repository}, 2024. [Online]. Available: https://github.com/langchain-ai/langgraph
+
+\bibitem{rag2020}
+P. Lewis \textit{et al.}, ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 33, pp. 9459--9474, 2020.
+
+\bibitem{faiss2019}
+J. Johnson, M. Douze, and H. Jégou, ``Billion-Scale Similarity Search with GPUs,'' \textit{IEEE Transactions on Big Data}, vol. 7, no. 3, pp. 535--547, 2019.
+
+\bibitem{bm25_2009}
+S. Robertson and H. Zaragoza, ``The Probabilistic Relevance Framework: BM25 and Beyond,'' \textit{Foundations and Trends in Information Retrieval}, vol. 3, no. 4, pp. 333--389, 2009.
 
 \bibitem{rrf2009}
-G. V. Cormack, C. L. A. Clarke, and S. Buettcher, ``Reciprocal Rank Fusion Outperforms Condorcet and Individual Bootstrap Product Algorithms,'' in \textit{Proceedings of the 32nd International ACM SIGIR Conference on Research and Development in Information Retrieval}, 2009.
+G. V. Cormack, C. L. A. Clarke, and S. Buettcher, ``Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods,'' in \textit{Proceedings of the 32nd International ACM SIGIR Conference on Research and Development in Information Retrieval}, 2009, pp. 758--759.
 
 \bibitem{watchtower2026}
 R. Pandey and A. Bhujang, ``Poisoning the Watchtower: Prompt Injection Attacks Against LLM-Augmented Security Operations Through Adversarial Log Content,'' \textit{arXiv preprint arXiv:2605.24421}, 2026.
+
+\bibitem{hmac1997}
+H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.
+
+\bibitem{llmsec_survey2025}
+J. Zhang \textit{et al.}, ``When LLMs Meet Cybersecurity: A Systematic Literature Review,'' \textit{Cybersecurity}, vol. 8, 2025.
+
+\bibitem{alahmadi2022}
+B. A. AlAhmadi, L. Axon, and I. Martinovic, ``99\% False Positives: A Qualitative Study of SOC Analysts' Perspectives on Security Alarms,'' in \textit{Proceedings of the 31st USENIX Security Symposium}, 2022, pp. 2783--2800.
 
 \bibitem{cyberrag2025}
 F. Blefari, C. Cosentino, F. A. Pironti, A. Furfaro, and F. Marozzo, ``CyberRAG: An Agentic RAG cyber attack classification and reporting tool,'' \textit{Future Generation Computer Systems}, vol. 176, art. 108186, 2026.
@@ -322,65 +367,32 @@ F. Blefari, C. Cosentino, F. A. Pironti, A. Furfaro, and F. Marozzo, ``CyberRAG:
 \bibitem{autobnb2025}
 Z. Liu and A. Anwar, ``AutoBnB-RAG: Enhancing Multi-Agent Incident Response with Retrieval-Augmented Generation,'' \textit{arXiv preprint arXiv:2508.13118}, 2025.
 
-\bibitem{llmsec_survey2025}
-J. Zhang \textit{et al.}, ``When LLMs Meet Cybersecurity: A Systematic Literature Review,'' \textit{Cybersecurity}, vol. 8, 2025.
-
 \bibitem{lang2026}
 A. Abdennebi, N. Kara, L. Lahlou, and H. Ould-Slimane, ``LanG -- A Governance-Aware Agentic AI Platform for Unified Security Operations,'' \textit{arXiv preprint arXiv:2604.05440}, 2026.
 
 \bibitem{splunkllm2026}
 R. Sahay \textit{et al.}, ``Policy-Guided Threat Hunting: An LLM Enabled Framework with Splunk SOC Triage,'' \textit{arXiv preprint arXiv:2603.23966}, 2026.
 
-\bibitem{vaswani2017}
-A. Vaswani \textit{et al.}, ``Attention is All You Need,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, pp. 5998--6008, 2017.
-
-\bibitem{quantization2021}
-A. Gholami \textit{et al.}, ``A Survey of Quantization Methods for Efficient Neural Network Inference,'' \textit{arXiv preprint arXiv:2103.13630}, 2021.
-
-\bibitem{faiss2019}
-J. Johnson, M. Douze, and H. Jégou, ``Billion-Scale Similarity Search with GPUs,'' \textit{IEEE Transactions on Big Data}, vol. 7, no. 3, pp. 535--547, 2019.
-
-\bibitem{bm25_2009}
-S. Robertson and H. Zaragoza, ``The Probabilistic Relevance Framework: BM25 and Beyond,'' \textit{Foundations and Trends in Information Retrieval}, vol. 3, no. 4, pp. 333--380, 2009.
-
 \bibitem{he2017drain}
 P. He, J. Zhu, S. He, J. Li, and M. R. Lyu, ``Drain: An Online Log Parsing Approach with Fixed Depth Tree,'' in \textit{Proceedings of the IEEE International Conference on Web Services (ICWS)}, 2017, pp. 33--40.
-
-\bibitem{foundation_sec_2024}
-Cybersecurity Research Team, ``Foundation-Sec: An Open LLM for Cyber Threat Detection,'' \textit{Security Preprint}, 2024.
 
 \bibitem{strom2018mitre}
 B. E. Strom, A. Applebaum, D. P. Miller, K. C. Nickels, A. G. Pennington, and C. B. Thomas, ``MITRE ATT\&CK: Design and Philosophy,'' The MITRE Corporation, Technical Report MP180360, 2018.
 
+\bibitem{nist80061}
+P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' NIST Special Publication 800-61 Revision 2, 2012.
+
 \bibitem{reimers2019sentence}
 N. Reimers and I. Gurevych, ``Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks,'' in \textit{Proceedings of the Conference on Empirical Methods in Natural Language Processing (EMNLP)}, 2019.
 
-\bibitem{zheng2023judge}
-L. Zheng \textit{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 36, 2023.
-
-\bibitem{dapt2020}
-S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kang, ``DAPT 2020 -- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \textit{Deployable Machine Learning for Security Defense (MLHat 2020)}, Communications in Computer and Information Science, vol. 1271, Springer, 2020, pp. 138--163.
+\bibitem{shen2024dan}
+X. Shen, Z. Chen, M. Backes, Y. Shen, and Y. Zhang, ```Do Anything Now': Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models,'' in \textit{Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications Security (CCS)}, 2024, pp. 1671--1685.
 
 \bibitem{ragas2023}
 S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluation of Retrieval Augmented Generation,'' \textit{arXiv preprint arXiv:2309.15217}, 2023.
 
-\bibitem{hmac1997}
-H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authentication,'' Internet Engineering Task Force, RFC 2104, 1997.
-
-\bibitem{owasp_llm2025}
-OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
-
-\bibitem{nist80207}
-S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,'' NIST Special Publication 800-207, National Institute of Standards and Technology, 2020.
-
-\bibitem{advbench2023}
-A. Zou, Z. Wang, J. Z. Kolter, and M. Fredrikson, ``Universal and Transferable Adversarial Attacks on Aligned Language Models,'' \textit{arXiv preprint arXiv:2307.15043}, 2023.
-
-\bibitem{jackhhao2023}
-J. Hao \textit{et al.}, ``Jailbreak Prompts on Large Language Models,'' \textit{GitHub repository}, 2023. [Online]. Available: https://github.com/verazuo/jailbreak\_llms
-
-\bibitem{deepset2023}
-Deepset, ``Prompt Injections Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/deepset/prompt-injections
+\bibitem{zheng2023judge}
+L. Zheng \textit{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 36, 2023.
 
 \end{thebibliography}
 

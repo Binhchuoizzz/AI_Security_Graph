@@ -1,20 +1,27 @@
 \chapter{Thiết kế Hệ thống và Triển khai Kỹ thuật}
 \label{ch:system_design_implementation}
 
-Chương này trình bày thiết kế kiến trúc và giải pháp triển khai của hệ thống SENTINEL: luồng xử lý phân tầng, bộ lọc đường truyền Tầng 1 cùng Cổng Học máy, kiến trúc suy luận tác tử Tầng 2 và Bộ nhớ Đe dọa, cơ chế truy xuất tri thức Dual-RAG, giải pháp an ninh đối kháng cùng kỹ thuật kiểm toán mật mã, và phương án triển khai cục bộ.
+Chương này trình bày phương pháp nghiên cứu, sau đó đi vào thiết kế kiến trúc và giải pháp triển khai của hệ thống SENTINEL: luồng xử lý phân tầng, bộ lọc đường truyền Tầng 1 cùng Cổng Học máy, kiến trúc suy luận tác tử Tầng 2 và Bộ nhớ Đe dọa, cơ chế truy xuất tri thức Dual-RAG, giải pháp an ninh đối kháng cùng kỹ thuật kiểm toán mật mã, và phương án triển khai cục bộ.
+
+\section{Phương pháp Nghiên cứu}
+\label{sec:methodology}
+
+Luận văn theo phương pháp Nghiên cứu Khoa học Thiết kế (DSR): đóng góp là một sản phẩm nhân tạo, và sản phẩm ấy được đánh giá bằng đo đạc chứ không bằng lập luận. Ba bình diện cấu thành quá trình xây dựng. \textbf{Bình diện thống kê và học máy} cung cấp năng lực lọc ở tốc độ đường truyền qua thuật toán Welford $\mathcal{O}(1)$ tính $Z$-score trực tuyến, tiếp nối bằng phân loại LightGBM. \textbf{Bình diện logic tác tử} cung cấp năng lực suy luận theo ngữ cảnh qua đồ thị trạng thái LangGraph điều phối một mô hình ngôn ngữ lưu trú cục bộ trên nền truy xuất lai FAISS/BM25/RRF. \textbf{Bình diện bảo mật đối kháng} cung cấp ranh giới phòng thủ, thử ứng suất khả năng kháng tiêm nhiễm câu lệnh và kiểm tra toàn vẹn vết nhật ký. Hiệu quả được đánh giá trên năm chiều---chất lượng phân loại, hiệu năng xử lý, khả năng kháng đối kháng, độ nhất quán của căn cứ giải thích do mô hình độc lập chấm, và toàn vẹn vết kiểm toán---ánh xạ đúng vào ba câu hỏi nghiên cứu ở Mục~\ref{sec:rq} và ba mục kết quả của Chương~\ref{ch:experiments_evaluation}.
+
+Ba nguyên tắc đo lường chi phối mọi con số trong luận văn: \textbf{mẫu số phải khớp câu hỏi}, thước đo phải \textbf{miễn nhiễm với tỉ lệ nền} (MCC và Balanced Accuracy thay vì Accuracy hay $F1$ nhị phân), và mọi tỉ lệ đều phải báo \textbf{kèm mẫu số và độ phủ phép đo}. Hệ quả của chúng đủ nghiêm trọng để được phân tích tại đúng chỗ chúng phát huy tác dụng, ở Mục~\ref{sec:experimental_setup}.
 
 \section{Kiến trúc Tổng thể SENTINEL và Tích hợp Ngăn xếp SOC}
 \label{sec:architecture_overview}
 
 SENTINEL áp dụng Kiến trúc Nhận thức Hai tầng với nguyên lý thiết kế cốt lõi là phân tách nhiệm vụ tính toán theo chi phí: Tầng 1 vận hành các thuật toán thống kê và học máy phi trạng thái để giải quyết dứt điểm phần lớn lưu lượng ở tốc độ đường truyền; Tầng 2 vận hành cỗ máy tác tử ngôn ngữ có trạng thái nhằm suy luận ngữ cảnh sâu cho các sự kiện dị thường phức tạp.
 
-Hình~\ref{fig:sentinel_flow} minh họa luồng thực thi. Nhật ký thô từ các nguồn giám sát ranh giới (NGFW, IDS/IPS, EDR) được nạp vào hàng đợi Redis Stream. Ngay khi sự kiện tới, Tầng 1 tính $Z$-score trực tuyến bằng thuật toán Welford và phân loại tương tác đặc trưng qua Cổng Học máy LightGBM. Các luồng tuân theo phân bố nền hoặc trùng mẫu truy vấn đã lưu trong Semantic Cache được phán quyết dưới mili-giây, không chạm tới GPU.
+Hình~\ref{fig:arch_overview} trình bày kiến trúc chỉ ở mức khối. Nhật ký thô từ các nguồn giám sát ranh giới được nạp vào hàng đợi Redis Stream rồi chuyển cho Tầng 1, nơi giải quyết dứt điểm phần lớn lưu lượng; chỉ những sự kiện mang nhãn \texttt{ESCALATE} mới đi tiếp lên Tầng 2, và mọi phán quyết từ cả hai tầng đều được niêm phong vào cùng một chuỗi kiểm toán. Cấu trúc bên trong mỗi khối được cố ý lược bỏ ở đây và phóng to ở đúng mục ghi trên chính khối đó, để người đọc mỗi lúc chỉ phải tiếp nhận một mức trừu tượng.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.66\textwidth]{images/sentinel_flow.png}
-    \caption{Luồng thực thi vận hành trong pipeline SENTINEL. (Nguồn: Tác giả)}
-    \label{fig:sentinel_flow}
+    \includegraphics[width=0.72\textwidth]{images/arch_overview.pdf}
+    \caption{SENTINEL ở mức khối: hai tầng tách nhau theo chi phí, với một đường leo thang duy nhất nối giữa. (Nguồn: Tác giả)}
+    \label{fig:arch_overview}
 \end{figure}
 
 Một điểm thiết kế quyết định cần nêu rõ: trong danh mục hành động của Tầng 1, \textbf{chỉ trạng thái \texttt{ESCALATE} mới dẫn tiếp lên Tầng 2}. Các phán quyết \texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{AWAIT\_HITL} và \texttt{DROP} đều \textbf{kết thúc tại Tầng 1}. Đây là cơ sở để định nghĩa tỉ lệ xả tải ở Chương 4: một sự kiện được xem là đã gỡ tải khi nó không phát sinh lời gọi mô hình ngôn ngữ, bất kể phán quyết cuối là chặn hay bỏ qua.
@@ -24,18 +31,34 @@ Tại Tầng 2, cỗ máy tác tử LangGraph kích hoạt chuỗi suy luận b�
 \section{Tầng 1: Bộ lọc Tốc độ Đường truyền và Cổng Học máy}
 \label{sec:tier1_mlgate}
 
-Tầng 1 là rào chắn phi trạng thái đầu tiên, kết hợp bộ lọc thống kê Welford $\mathcal{O}(1)$ (Công thức~\ref{eq:welford}) với Cổng Học máy LightGBM nhằm bảo đảm độ trễ mili-giây trước khi kích hoạt GPU.
+Tầng 1 là rào chắn phi trạng thái đầu tiên, kết hợp bộ lọc thống kê Welford $\mathcal{O}(1)$ (Công thức~\ref{eq:welford}) với Cổng Học máy LightGBM nhằm bảo đảm độ trễ mili-giây trước khi kích hoạt GPU. Hình~\ref{fig:tier1_detail} phóng to đúng khối tương ứng của Hình~\ref{fig:arch_overview}.
 
-Bộ lọc thống kê tính $Z = (x - \mu)/\sigma$ theo thời gian thực trên các đặc trưng lưu lượng (tần suất gói tin, dung lượng luồng, thời lượng kết nối), với $\mu$ và $\sigma$ cập nhật theo công thức truy hồi ở Mục~\ref{sec:welford} mà không lưu lịch sử thô~\cite{welford1962}; lưu lượng tuân theo phân bố nền bị loại ngay lập tức. Bên cạnh nhánh thống kê, Tầng 1 vận hành tập chữ ký ứng dụng gồm \textbf{29 họ tấn công web} với chuẩn hoá đa vòng theo lối OWASP CRS---giải mã URL và thực thể HTML trước khi khớp mẫu---nhằm bắt payload ngụy trang bằng mã hoá. Đối với hành vi lặp lại diện rộng, Semantic Cache Tầng 1.75 băm chuỗi truy vấn đã chuẩn hoá trong RAM và tái sử dụng phán quyết có sẵn.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.68\textwidth]{images/tier1_detail.pdf}
+    \caption{Tầng 1 phóng to. Chỉ nhánh \texttt{ESCALATE} đi tới Tầng 2; mọi phán quyết khác kết thúc tại đây, và đó chính là thứ Chương~\ref{ch:experiments_evaluation} tính là xả tải. (Nguồn: Tác giả)}
+    \label{fig:tier1_detail}
+\end{figure}
+
+Bộ lọc thống kê tính $Z = (x - \mu)/\sigma$ theo thời gian thực trên các đặc trưng lưu lượng (tần suất gói tin, dung lượng luồng, thời lượng kết nối), với $\mu$ và $\sigma$ cập nhật theo công thức truy hồi ở Mục~\ref{sec:welford} mà không lưu lịch sử thô~\cite{welford1962}; lưu lượng tuân theo phân bố nền bị loại ngay lập tức. Bên cạnh nhánh thống kê, Tầng 1 vận hành tập chữ ký ứng dụng gồm \textbf{30 họ tấn công web} với chuẩn hoá đa vòng theo lối OWASP CRS---giải mã URL và thực thể HTML trước khi khớp mẫu---nhằm bắt payload ngụy trang bằng mã hoá. Để tập chữ ký này không chỉ là lời tự khai, mỗi họ được neo vào hai khung tham chiếu công khai: \textbf{23 trong 30} họ ánh xạ được sang tệp luật OWASP CRS 3.3 (11 tệp khác nhau) và tập chữ ký phủ đủ \textbf{10} hạng mục OWASP Top 10:2021. Bảy họ còn lại không có đối ứng CRS \textbf{do bản chất, không phải do bỏ sót}---ransomware, đào tiền mã hoá, đánh cắp thông tin xác thực, tệp nhị phân sẵn có của hệ điều hành và reverse shell là hành vi ở tầng endpoint và mạng, nằm ngoài phạm vi một bộ luật viết cho giao dịch HTTP. Đối với hành vi lặp lại diện rộng, Semantic Cache Tầng 1.75 băm chuỗi truy vấn đã chuẩn hoá trong RAM và tái sử dụng phán quyết có sẵn.
 
 Cổng Học máy LightGBM tiếp nối, đánh giá các tương tác đặc trưng phi tuyến. Mô hình dùng cây phát triển theo lá, huấn luyện trên 949.535 mẫu NetFlow (664.674 huấn luyện, 189.907 hold-out). Nhằm triệt tiêu né tránh học máy, Cổng ML kẹp $Z$-score trong $\pm 8\sigma$ và điền giá trị thiếu bằng trung bình baseline; nếu tỷ lệ đặc trưng biến dạng vượt 30\%, nó \textbf{từ chối phán quyết} và nâng cấp lên Tầng 2. Abstain là lựa chọn có chủ đích: một câu trả lời sai kèm độ tin cậy cao nguy hiểm hơn lời thú nhận không biết, vì nó khiến hệ tự hành động mà không ai kiểm lại. Phán quyết được ánh xạ sang hành động theo \textbf{chính sách bốn dải độ tin cậy} ($0{,}85$ / $0{,}65$ / $0{,}40$ tương ứng \texttt{BLOCK\_IP} / \texttt{ESCALATE} / \texttt{ALERT} / \texttt{LOG}), bảo đảm độ tin cậy \textit{quyết định} hành động thay vì chỉ được ghi kèm, và cô lập phần tự động chặn vào dải cao nhất---nơi còn đòi hỏi sự đồng thuận của luật Tầng 1.
 
 \section{Tầng 2: Tác tử Nhận thức LangGraph và Bộ nhớ Đe dọa}
 \label{sec:tier2_agent_fsm}
 
-Tầng 2 đảm nhận suy luận nhận thức có trạng thái, vận hành mô hình Foundation-Sec-8B-Instruct lượng tử hóa GGUF Q4\_K\_M~\cite{foundation_sec_2024} qua llama.cpp biên dịch cờ CUDA trên GPU cục bộ 16\,GB VRAM, cắt VRAM yêu cầu từ 18\,GB (FP16) xuống 7--8\,GB mà không suy giảm đáng kể độ chính xác.
+Tầng 2 đảm nhận suy luận nhận thức có trạng thái, vận hành mô hình Foundation-Sec-8B-Instruct~\cite{foundation_sec_2024, foundation_sec_instruct} lượng tử hoá theo cách đã trình bày ở Mục~\ref{sec:local_llm}, phục vụ bởi llama.cpp biên dịch cờ CUDA trên GPU cục bộ 16\,GB VRAM. Hình~\ref{fig:tier2_graph} phóng to khối Tầng 2 của Hình~\ref{fig:arch_overview}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.74\textwidth]{images/agentic_fsm_workflow.pdf}
+    \caption{Đồ thị trạng thái tác tử Tầng 2, phản ánh đúng \texttt{src/agent/workflow.py}: đồ thị không chu trình, mọi đường đi đều kết thúc ở một hành động đã thực thi, một lần chuyển chuyên viên, hoặc kết thúc chu kỳ. (Nguồn: Tác giả)}
+    \label{fig:tier2_graph}
+\end{figure}
 
 Quy trình được điều phối bởi đồ thị LangGraph~\cite{langgraph2024} qua năm trạm: lọc rào chắn (\texttt{guardrails}), làm giàu ngữ cảnh (\texttt{rag\_\allowbreak context}), phân loại sơ bộ (\texttt{llm\_\allowbreak triage}), ánh xạ kỹ thuật (\texttt{attack\_\allowbreak mapper}), và thực thi (\texttt{action\_\allowbreak executor} hoặc \texttt{human\_\allowbreak in\_\allowbreak loop}). Trạm ánh xạ đòi hỏi căn cứ xác thực từ kho tri thức; nếu không có mã kỹ thuật phù hợp rõ ràng, đồ thị định tuyến sang kiểm duyệt chuyên gia (\texttt{AWAIT\_HITL}) thay vì đoán mò. Đường chuyển-người \textbf{là một đầu ra thiết kế, không phải thất bại}: hệ thống \textit{phân loại} việc cần người chứ không thay thế người. Tại \texttt{llm\_\allowbreak triage}, hệ thực hiện \textbf{gỡ nhãn} (\texttt{label stripping}), loại mọi trường phân loại nội bộ khỏi prompt---điều kiện tiên quyết cho tính hợp lệ của mọi số đo ở Chương 4, vì nhãn thật lọt vào ngữ cảnh sẽ khiến mô hình chép đáp án chứ không suy luận.
+
+Hai cơ chế giới hạn thứ được phép đi vào chu trình suy luận đó. Các sự kiện lặp lại trước hết bị gom bởi \textbf{Drain}---kỹ thuật khai phá khuôn mẫu nhật ký trực tuyến~\cite{he2017drain}---nhóm những bản ghi gần trùng về cùng một khuôn, nhờ đó một đợt bùng nổ một nghìn dòng tương tự tốn của cửa sổ ngữ cảnh xấp xỉ chi phí của một dòng. Tiếp đó, \textbf{bộ giám sát ngân sách token} ước lượng trước mỗi lần gọi và ghi lại lượng token thật do máy chủ trả về sau đó, để việc tiến sát trần ngữ cảnh là một điều kiện \textbf{quan sát được và có ghi nhật ký}, không phải một lần cắt cụt âm thầm. Mục~\ref{sec:adversarial_security_hmac} báo cáo kết quả của cặp cơ chế này trước một đầu vào cố ý làm quá khổ.
 
 Để liên kết hành vi rải rác theo thời gian, Tầng 2 duy trì Bộ nhớ Đe dọa trên SQLite tối ưu chỉ mục, cấu hình \texttt{synchronous=\allowbreak NORMAL} với rollback-journal thay cho WAL nhằm tránh xung đột quyền truy cập cross-UID trong Docker. Bộ nhớ quản lý uy tín IP (\texttt{ip\_\allowbreak reputation}), thực thể nội bộ (\texttt{known\_\allowbreak entities}), chỉ báo rủi ro (\texttt{apt\_\allowbreak indicators}) và sự kiện đe dọa (\texttt{threat\_\allowbreak events}). Điểm uy tín $S$ suy giảm theo thời gian im lặng $t$:
 \begin{equation}
@@ -46,24 +69,40 @@ với $\lambda$ là hệ số suy giảm. Khi đạt ngưỡng tối đa ($S = 1
 \section{Cơ chế Truy xuất Tri thức Lai Dual-RAG}
 \label{sec:dual_rag}
 
-Để hạn chế hư cấu và bảo đảm minh bạch cho quyết định an ninh, Tầng 2 tích hợp Dual-RAG trên kho 433 mục MITRE ATT\&CK chuẩn STIX 2.1~\cite{strom2018mitre} cùng tài liệu NIST SP 800-61r2~\cite{nist80061}. Truy xuất chạy song song hai cơ chế bổ trợ: tìm kiếm ngữ nghĩa bằng vector FAISS~\cite{faiss2019} với mô hình Sentence-BERT~\cite{reimers2019sentence}, phát hiện các kỹ thuật cùng bản chất nhưng khác từ khóa; và tìm kiếm từ khóa thưa BM25~\cite{bm25_2009}, bảo đảm khớp chính xác các định danh như mã CVE, khóa Registry hoặc số hiệu cổng. Kết quả được hợp nhất bằng RRF (Công thức~\ref{eq:rrf}) với $k=60$ rồi chèn vào ngữ cảnh tại \texttt{rag\_\allowbreak context}.
+Để hạn chế hư cấu và bảo đảm minh bạch cho quyết định an ninh, Tầng 2 tích hợp Dual-RAG trên kho 433 mục MITRE ATT\&CK chuẩn STIX 2.1~\cite{strom2018mitre} cùng tài liệu NIST SP 800-61r2~\cite{nist80061}. Truy xuất chạy song song hai cơ chế bổ trợ: tìm kiếm ngữ nghĩa bằng vector FAISS~\cite{faiss2019} với mô hình Sentence-BERT~\cite{reimers2019sentence}, phát hiện các kỹ thuật cùng bản chất nhưng khác từ khóa; và tìm kiếm từ khóa thưa BM25~\cite{bm25_2009}, bảo đảm khớp chính xác các định danh như mã CVE, khóa Registry hoặc số hiệu cổng. Kết quả được hợp nhất bằng RRF (Công thức~\ref{eq:rrf}) với $k=60$ rồi chèn vào ngữ cảnh tại \texttt{rag\_\allowbreak context}. Hình~\ref{fig:dual_rag} thể hiện đường truy xuất cùng phép kiểm neo áp lên đầu ra của mô hình.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/dual_rag.pdf}
+    \caption{Truy xuất Dual-RAG và rào chắn neo bằng chứng. Phép kiểm nằm ở phía đầu ra: nó ràng buộc thứ mô hình được phép khẳng định, không phải thứ bộ truy xuất được phép trả về. (Nguồn: Tác giả)}
+    \label{fig:dual_rag}
+\end{figure}
+
+Bản thân truy xuất cũng là một ranh giới tin cậy, vì một mục tri thức bị đầu độc sẽ được mô hình đọc như nguồn có thẩm quyền. Vì vậy một \textbf{bộ khử độc RAG} chuẩn hoá Unicode, bóc thẻ đánh dấu và vô hiệu hoá các cấu trúc mệnh lệnh trong mọi đoạn văn truy xuất được trước khi chúng vào prompt. Khó khăn nằm ở chỗ văn xuôi an ninh hợp lệ vốn viết ở thể mệnh lệnh---các bản khuyến cáo bảo người đọc hãy chặn, hãy tắt, hãy cô lập---nên một bộ lọc quá tay sẽ âm thầm làm hỏng chính kho tri thức mà nó bảo vệ; Mục~\ref{sec:adversarial_security_hmac} báo cáo tỉ lệ vô hiệu hoá oan đo trên toàn bộ kho.
 
 Trên nền truy xuất này, hệ thống áp dụng \textbf{rào chắn neo bằng chứng}: mọi mã kỹ thuật do mô hình công bố đều bị đối chiếu ngược với tập tài liệu đã truy xuất của chính lô đó; mã không hiện diện bị ép về \texttt{N/A} và chuyển \texttt{AWAIT\_HITL}. Đây là ràng buộc \textbf{kiểm chứng được của kiến trúc}, không phụ thuộc vào xu hướng hư cấu của mô hình cụ thể---và chính là ranh giới phân biệt một hệ thống có tri thức với một lớp bọc quanh mô hình ngôn ngữ.
 
 \section{Kiến trúc An ninh AI và Niêm phong Kiểm toán Mật mã}
 \label{sec:ai_security_hmac}
 
-Tiêm nhiễm câu lệnh qua nhật ký~\cite{promptinjection2023} là kỹ thuật chèn câu lệnh điều khiển vào các trường nhật ký thô (User-Agent, URI, nội dung Syslog) nhằm chiếm quyền điều khiển hành vi mô hình. SENTINEL áp dụng Đóng gói Dữ liệu Phân định với nonce mật mã sinh mới cho mỗi lô xử lý~\cite{owasp_llm2025}: toàn bộ nhật ký thô được bọc trong cặp thẻ chứa nonce, buộc mô hình xử lý nội dung bên trong như văn bản thuần túy. Sinh nonce theo từng lô---thay vì dùng chuỗi phân định cố định---là bắt buộc, vì dấu phân định bất biến có thể bị suy ra từ mã nguồn hoặc quan sát lặp lại, khi đó kẻ tấn công có thể tự đóng vùng bọc để thoát ra. Song song, rào chắn tất định ép phán quyết tuân thủ cấu trúc Pydantic (\texttt{LLMDecision}); khi định dạng lỗi, cơ chế phục hồi bằng Regex trích xuất trường cốt lõi hoặc chuyển về trạng thái an toàn \texttt{AWAIT\_HITL}.
+Tiêm nhiễm câu lệnh qua nhật ký~\cite{promptinjection2023} là kỹ thuật chèn câu lệnh điều khiển vào các trường nhật ký thô (User-Agent, URI, nội dung Syslog) nhằm chiếm quyền điều khiển hành vi mô hình. SENTINEL áp dụng Đóng gói Dữ liệu Phân định với nonce mật mã sinh mới cho mỗi lô xử lý~\cite{owasp_llm2025}: toàn bộ nhật ký thô được bọc trong cặp thẻ chứa nonce, buộc mô hình xử lý nội dung bên trong như văn bản thuần túy. Sinh nonce theo từng lô---thay vì dùng chuỗi phân định cố định---là bắt buộc, vì dấu phân định bất biến có thể bị suy ra từ mã nguồn hoặc quan sát lặp lại, khi đó kẻ tấn công có thể tự đóng vùng bọc để thoát ra. Song song, ba bộ thẩm định tất định canh giữ các ranh giới mà mô hình ngôn ngữ có thể chạm tới. \textbf{Bộ thẩm định dữ liệu} loại bỏ nhật ký dị dạng trước khi nó kịp được đóng khung thành prompt. \textbf{Bộ thẩm định quyết định} ép phán quyết tuân thủ cấu trúc Pydantic (\texttt{LLMDecision}), ràng buộc hành động trong tập giá trị cho phép và từ chối lệnh chặn nhắm vào dải địa chỉ nội bộ hoặc dải dành riêng; khi định dạng lỗi, cơ chế phục hồi bằng Regex trích xuất trường cốt lõi hoặc chuyển về trạng thái an toàn \texttt{AWAIT\_HITL}. \textbf{Bộ thẩm định phản hồi} áp cùng thế trận zero-trust lên chính những luật mà hệ tự đề xuất cho mình, để một phán quyết bị thao túng không thể cài được luật vĩnh viễn vào Tầng 1.
 
 Về kiểm toán, mỗi bản ghi phán quyết thứ $i$ được liên kết chuỗi bằng HMAC-SHA256~\cite{hmac1997}:
 \begin{equation}
     H_i = \text{HMAC-SHA256}(D_i \parallel H_{i-1}, K)
 \end{equation}
-trong đó $D_i$ là dữ liệu bản ghi hiện tại, $H_{i-1}$ là băm bản ghi liền trước, và $K$ là khóa bí mật nạp từ biến môi trường---không mã hoá cứng trong nguồn, vì khóa lộ trong mã khiến toàn chuỗi có thể bị làm giả lại từ đầu. Liên kết chuỗi khiến mọi sửa đổi hay xóa bản ghi giữa chuỗi làm đứt gãy tính liên tục và bị phát hiện tức thì. Như đã nêu ở Mục~2.4, cơ chế này bảo đảm \textbf{toàn vẹn và phát hiện giả mạo}; do dùng khóa đối xứng, nó không cấu thành chống chối bỏ theo nghĩa mật mã học.
+trong đó $D_i$ là dữ liệu bản ghi hiện tại, $H_{i-1}$ là băm bản ghi liền trước, và $K$ là khóa bí mật nạp từ biến môi trường---không mã hoá cứng trong nguồn, vì khóa lộ trong mã khiến toàn chuỗi có thể bị làm giả lại từ đầu. Liên kết chuỗi khiến mọi sửa đổi hay xoá bản ghi giữa chuỗi làm đứt gãy tính liên tục và bị phát hiện tức thì---bảo đảm toàn vẹn và phát hiện giả mạo, song không phải chống chối bỏ, vì lý do khoá đối xứng đã nêu ở Mục~\ref{sec:adversarial_theory}. Hình~\ref{fig:nonce_hmac} đặt cả hai cơ chế mật mã lên cùng một sơ đồ, mỗi cơ chế ở một biên của tầng suy luận.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\textwidth]{images/nonce_hmac.pdf}
+    \caption{Đóng gói nonce ở biên đầu vào và chuỗi HMAC ở biên đầu ra. Điểm mù cắt đuôi được vẽ ra chứ không lược đi, vì nó là hệ quả của chính cấu trúc. (Nguồn: Tác giả)}
+    \label{fig:nonce_hmac}
+\end{figure}
 
 \section{SOC Dashboard và Kiến trúc Triển khai Cục bộ}
 \label{sec:dashboard_deployment}
 
-Bảng điều khiển SOC Analyst Dashboard được xây dựng trên Streamlit, kết nối trực tiếp Redis Stream và Bộ nhớ Đe dọa để cung cấp góc nhìn thời gian thực: phễu xả tải theo từng tầng, dòng thời gian chuỗi tấn công đa giai đoạn, chỉ báo toàn vẹn chuỗi HMAC, và bảng kiểm duyệt HITL. Toàn bộ dịch vụ đóng gói bằng Docker Compose; \texttt{llama.cpp} biên dịch cờ CUDA cho card RTX 4060 Ti; \texttt{threat\_memory.db} và chỉ mục FAISS gắn trên Docker Volume độc lập để điểm uy tín IP và vết pháp y sống sót qua tái khởi động.
+Bảng điều khiển SOC Analyst Dashboard được xây dựng trên Streamlit, kết nối trực tiếp Redis Stream và Bộ nhớ Đe dọa để cung cấp góc nhìn thời gian thực: phễu xả tải theo từng tầng, dòng thời gian chuỗi tấn công đa giai đoạn, chỉ báo toàn vẹn chuỗi HMAC, và bảng kiểm duyệt HITL. Nhịp nạp dữ liệu được điều tiết bằng backpressure đo theo \textbf{độ trễ của consumer-group}---số entry đã công bố nhưng consumer chưa nhận. Khác biệt này không phải chuyện hình thức: vì subscriber tiêu thụ bằng \texttt{XREADGROUP} và \texttt{XACK}, hai thao tác đều không xoá entry, nên độ dài stream luôn dính sát ngưỡng trần dù consumer xử lý nhanh đến đâu, và một producer tự hãm theo độ dài stream sẽ treo vĩnh viễn trước một hàng đợi thực ra đã trống. Toàn bộ dịch vụ đóng gói bằng Docker Compose; \texttt{llama.cpp} biên dịch cờ CUDA cho card RTX 4060 Ti; \texttt{threat\_memory.db} và chỉ mục FAISS gắn trên Docker Volume độc lập để điểm uy tín IP và vết pháp y sống sót qua tái khởi động.
 
-Thiết kế tuân thủ chuẩn Zero Trust~\cite{nist80207}: chuỗi mật khẩu trong \texttt{REDIS\_URL} được che phủ trước khi ghi log. Nhằm chịu tải khi lưu lượng tăng đột biến, hệ thống áp dụng backpressure dựa trên \textbf{độ tồn đọng (\texttt{lag}) của Redis consumer group} thay vì độ dài hàng đợi. Lựa chọn này mang tính bắt buộc: độ dài một Redis Stream chỉ tăng theo thời gian kể cả khi mọi bản ghi đã xử lý xong, nên dùng nó làm tín hiệu điều tiết sẽ khiến hệ tự bóp nghẹt nguồn phát vĩnh viễn; chỉ tồn đọng của consumer group mới phản ánh đúng phần công việc còn lại.
+Thiết kế tuân thủ chuẩn Zero Trust~\cite{nist80207}: chuỗi mật khẩu trong \texttt{REDIS\_URL} được che phủ trước khi ghi log. Nhằm chịu tải khi lưu lượng tăng đột biến, hệ thống áp dụng backpressure dựa trên \textbf{độ tồn đọng (\texttt{lag}) của Redis consumer group} thay vì độ dài hàng đợi: độ dài một stream chỉ tăng lên kể cả khi mọi bản ghi đã xử lý xong, nên điều tiết theo nó sẽ bóp nghẹt nguồn phát vĩnh viễn, trong khi tồn đọng của consumer group phản ánh đúng phần công việc còn lại.

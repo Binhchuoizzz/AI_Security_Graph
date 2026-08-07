@@ -1,0 +1,48 @@
+// SENTINEL — Truy xuất Dual-RAG và rào chắn neo bằng chứng (Mục 3.5).
+// Phép kiểm neo được vẽ ở phía ĐẦU RA có chủ ý: nó ràng buộc thứ mô hình được phép
+// khẳng định, không phải thứ bộ truy xuất được phép trả về.
+// Render: dot -Tpdf dual_rag.dot -o dual_rag.pdf
+digraph dual_rag {
+    rankdir=LR;
+    bgcolor="white";
+    nodesep=0.35;
+    ranksep=0.50;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12,
+          margin="0.20,0.12", penwidth=1.6, color="#37474f", fillcolor="#eceff1"];
+    edge [fontname="Helvetica", fontsize=10, color="#546e7a", penwidth=1.3];
+
+    query [label="Truy vấn đã chuẩn hoá\ndịch vụ · cổng · kỹ thuật quan sát được", shape=oval, fillcolor="#e3f2fd", color="#1565c0"];
+
+    subgraph cluster_kb {
+        label="Kho tri thức";
+        fontname="Helvetica"; fontsize=12; fontcolor="#37474f";
+        style="dashed,rounded"; color="#90a4ae"; bgcolor="#fafafa";
+        kb1 [label="MITRE ATT&CK\ncác mục kỹ thuật chuẩn STIX 2.1", fillcolor="#e8eaf6"];
+        kb2 [label="NIST SP 800-61r2\nhướng dẫn xử lý sự cố", fillcolor="#e8eaf6"];
+    }
+
+    faiss [label="Tìm kiếm dày đặc FAISS\nnhúng Sentence-BERT\ný định ngữ nghĩa", fillcolor="#e8f5e9", color="#2e7d32"];
+    bm25  [label="Tìm kiếm thưa BM25\nđịnh danh chính xác: CVE, cổng,\nkhoá Registry", fillcolor="#e8f5e9", color="#2e7d32"];
+
+    rrf   [label="Hợp nhất Hạng Nghịch đảo\nk = 60", shape=diamond, fillcolor="#fff8e1", color="#f9a825"];
+    prompt[label="Ngữ cảnh truy xuất\nchèn vào tại rag_context", fillcolor="#eceff1"];
+    llm   [label="Mô hình suy luận\ncông bố một mã kỹ thuật", fillcolor="#fdecea", color="#c62828"];
+
+    anchor [label="RÀO CHẮN NEO BẰNG CHỨNG\nmã đó có nằm trong tài liệu\ntruy xuất của CHÍNH lô này không?",
+            shape=diamond, fillcolor="#ede7f6", color="#5e35b1", penwidth=2.2];
+
+    keep [label="Khẳng định kỹ thuật", fillcolor="#e8f5e9", color="#2e7d32"];
+    drop [label="Ép về N/A\nchuyển AWAIT_HITL", fillcolor="#fff3e0", color="#ef6c00", penwidth=2.0];
+
+    query -> faiss;
+    query -> bm25;
+    kb1 -> faiss [style=dashed, arrowhead=open];
+    kb2 -> faiss [style=dashed, arrowhead=open];
+    kb1 -> bm25  [style=dashed, arrowhead=open];
+    kb2 -> bm25  [style=dashed, arrowhead=open];
+    faiss -> rrf;
+    bm25  -> rrf;
+    rrf -> prompt -> llm -> anchor;
+    anchor -> keep [label="  có  "];
+    anchor -> drop [label="  không  ", color="#ef6c00", penwidth=1.8];
+}

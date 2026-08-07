@@ -1,20 +1,27 @@
 \chapter{System Design and Technical Implementation}
 \label{ch:system_design_implementation}
 
-This chapter details the architectural design and implementation of SENTINEL: the two-tier execution pipeline, Tier 1 wire-speed filtration and Machine Learning Gate, the Tier 2 agentic reasoning engine and Threat Memory, Dual-RAG knowledge retrieval, adversarial security controls with cryptographic audit sealing, and the local deployment architecture.
+This chapter states the research methodology and then details the architectural design and implementation of SENTINEL: the two-tier execution pipeline, Tier 1 wire-speed filtration and Machine Learning Gate, the Tier 2 agentic reasoning engine and Threat Memory, Dual-RAG knowledge retrieval, adversarial security controls with cryptographic audit sealing, and the local deployment architecture.
+
+\section{Research Methodology}
+\label{sec:methodology}
+
+The thesis follows Design Science Research (DSR): the contribution is an artefact, and the artefact is evaluated by measurement rather than by argument. Three pillars structure the construction. The \textbf{statistical and machine learning pillar} supplies wire-speed filtration through Welford $\mathcal{O}(1)$ online statistics for rolling $Z$-score anomaly detection, followed by LightGBM classification. The \textbf{agentic logic pillar} supplies contextual reasoning through a LangGraph state-graph orchestrating a locally hosted language model over hybrid FAISS/BM25/RRF retrieval. The \textbf{adversarial security pillar} supplies the defensive boundary, stress-testing prompt injection resilience and verifying forensic log integrity. Efficacy is assessed across five dimensions---classification quality, processing performance, adversarial resistance, explanation coherence scored by an independent judge model, and audit integrity---which map onto the three research questions of Section~\ref{sec:rq} and onto the three result sections of Chapter~\ref{ch:experiments_evaluation}.
+
+Three measurement principles govern every figure reported in this thesis: \textbf{the denominator must match the question}, metrics must be \textbf{immune to base rate} (MCC and Balanced Accuracy rather than Accuracy or binary $F1$), and every ratio must be reported \textbf{together with its denominator and its measurement coverage}. Their consequences are consequential enough to be worked through where they bite, in Section~\ref{sec:experimental_setup}.
 
 \section{SENTINEL Architecture Overview and SOC Stack Integration}
 \label{sec:architecture_overview}
 
 SENTINEL enforces a Cognitive Two-Tier Architecture whose core design principle is strict decoupling of work by cost: Tier 1 executes stateless statistical and machine learning algorithms resolving the majority of traffic at wire-speed, while Tier 2 hosts a stateful language model agent performing deep contextual reasoning for complex anomalous events.
 
-Figure~\ref{fig:sentinel_flow} illustrates the execution flow. Raw telemetry from perimeter sources (NGFW, IPS, EDR) is ingested into a Redis Stream queue. On arrival, Tier 1 computes online $Z$-score metrics using Welford's running statistics and classifies feature interactions through the LightGBM Machine Learning Gate. Flows conforming to baseline distributions, or matching query templates already held in the Tier 1.75 Semantic Cache, are adjudicated sub-millisecond without touching the GPU.
+Figure~\ref{fig:arch_overview} presents the architecture at block level only. Raw telemetry from perimeter sources is ingested into a Redis Stream queue and handed to Tier 1, which settles the majority of it outright; only events marked \texttt{ESCALATE} continue to Tier 2, and every adjudication from either tier is sealed into the same audit chain. The internal structure of each block is deliberately omitted here and expanded in the section named on the block itself, so that the reader meets one level of abstraction at a time.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.66\textwidth]{images/sentinel_flow.png}
-    \caption{Operational execution workflow within the SENTINEL pipeline. (Source: Author)}
-    \label{fig:sentinel_flow}
+    \includegraphics[width=0.72\textwidth]{images/arch_overview.pdf}
+    \caption{SENTINEL at block level: two tiers separated by cost, with a single escalation path between them. (Source: Author)}
+    \label{fig:arch_overview}
 \end{figure}
 
 One design decision must be stated explicitly: among Tier 1's action vocabulary, \textbf{only \texttt{ESCALATE} proceeds to Tier 2}. The adjudications \texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{AWAIT\_HITL}, and \texttt{DROP} all \textbf{terminate at Tier 1}. This is the basis for the offload definition used in Chapter 4: an event counts as offloaded when it generates no language model invocation, regardless of whether the final adjudication was to block or to pass.
@@ -24,18 +31,34 @@ At Tier 2, the LangGraph agent triggers a reasoning cycle on the locally hosted 
 \section{Tier 1: Wire-speed Filter and Machine Learning Gate}
 \label{sec:tier1_mlgate}
 
-Tier 1 is the stateless perimeter layer, combining the Welford $\mathcal{O}(1)$ statistical baseline filter (Equation~\ref{eq:welford}) with a LightGBM Machine Learning Gate to guarantee millisecond latency before any GPU invocation.
+Tier 1 is the stateless perimeter layer, combining the Welford $\mathcal{O}(1)$ statistical baseline filter (Equation~\ref{eq:welford}) with a LightGBM Machine Learning Gate to guarantee millisecond latency before any GPU invocation. Figure~\ref{fig:tier1_detail} expands the corresponding block of Figure~\ref{fig:arch_overview}.
 
-The statistical filter computes $Z = (x - \mu)/\sigma$ in real time across flow attributes (packet rates, flow volumes, connection durations), with $\mu$ and $\sigma$ updated via the recurrences of Section~\ref{sec:welford} without retaining raw series~\cite{welford1962}; traffic conforming to the baseline is shed immediately. Alongside this statistical branch, Tier 1 operates an application signature set covering \textbf{29 web attack families} with multi-round normalisation in the OWASP CRS style---decoding URL and HTML entities before matching---to catch payloads disguised by encoding. For repetitive volumetric behaviour, the Tier 1.75 Semantic Cache hashes normalised query strings in RAM and reuses existing adjudications.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.68\textwidth]{images/tier1_detail.pdf}
+    \caption{Tier 1 expanded. Only the \texttt{ESCALATE} branch reaches Tier 2; every other adjudication terminates here, which is what Chapter~\ref{ch:experiments_evaluation} counts as offload. (Source: Author)}
+    \label{fig:tier1_detail}
+\end{figure}
+
+The statistical filter computes $Z = (x - \mu)/\sigma$ in real time across flow attributes (packet rates, flow volumes, connection durations), with $\mu$ and $\sigma$ updated via the recurrences of Section~\ref{sec:welford} without retaining raw series~\cite{welford1962}; traffic conforming to the baseline is shed immediately. Alongside this statistical branch, Tier 1 operates an application signature set covering \textbf{30 web attack families} with multi-round normalisation in the OWASP CRS style---decoding URL and HTML entities before matching---to catch payloads disguised by encoding. So that this set is not merely self-declared, each family is anchored to two public reference frames: \textbf{23 of the 30} map onto OWASP CRS 3.3 rule files (11 distinct files) and the set spans all \textbf{10} OWASP Top 10:2021 categories. The remaining \textbf{7} have no CRS counterpart by construction, not by omission---ransomware, cryptomining, credential theft, living-off-the-land binaries and reverse shells are endpoint and network behaviours, outside the scope of a rule set written for HTTP transactions. For repetitive volumetric behaviour, the Tier 1.75 Semantic Cache hashes normalised query strings in RAM and reuses existing adjudications.
 
 A LightGBM Gradient Boosted Decision Tree model follows, evaluating non-linear feature interactions. It uses leaf-wise growth and is trained on 949,535 NetFlow samples (664,674 training, 189,907 hold-out). To neutralise evasion, the Gate clips feature $Z$-scores within $\pm 8\sigma$ and imputes missing values with baseline means; if distorted feature proportions exceed 30\%, it \textbf{abstains} and escalates. Abstention is deliberate: a confident wrong answer is more dangerous than an admission of ignorance, because it causes the system to act autonomously with no one reviewing. Gate adjudications map to actions through a unified \textbf{four-band confidence policy} ($0.85$ / $0.65$ / $0.40$ for \texttt{BLOCK\_IP} / \texttt{ESCALATE} / \texttt{ALERT} / \texttt{LOG}), so that confidence \textit{drives} the action rather than merely accompanying it, and autonomous blocking is isolated to the top band, which additionally requires Tier 1 rule concurrence.
 
 \section{Tier 2: Stateful LangGraph Agent and Threat Memory}
 \label{sec:tier2_agent_fsm}
 
-Tier 2 performs stateful cognitive reasoning, executing a GGUF Q4\_K\_M quantized Foundation-Sec-8B-Instruct model~\cite{foundation_sec_2024} via CUDA-compiled llama.cpp on a single 16\,GB VRAM GPU, cutting required VRAM from ~18\,GB (FP16) to 7--8\,GB with negligible accuracy loss.
+Tier 2 performs stateful cognitive reasoning, executing a Foundation-Sec-8B-Instruct model~\cite{foundation_sec_2024, foundation_sec_instruct} quantized as described in Section~\ref{sec:local_llm} and served by CUDA-compiled llama.cpp on a single 16\,GB VRAM GPU. Figure~\ref{fig:tier2_graph} expands the Tier 2 block of Figure~\ref{fig:arch_overview}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.74\textwidth]{images/agentic_fsm_workflow.pdf}
+    \caption{The Tier 2 agent state-graph, mirroring \texttt{src/agent/workflow.py}: an acyclic graph with no loops, in which every path terminates in an executed action, an analyst hand-off, or an end of cycle. (Source: Author)}
+    \label{fig:tier2_graph}
+\end{figure}
 
 Reasoning is orchestrated by a LangGraph state-graph~\cite{langgraph2024} across five nodes: guardrail inspection, context enrichment (\texttt{rag\_\allowbreak context}), triage (\texttt{llm\_\allowbreak triage}), technique mapping (\texttt{attack\_\allowbreak mapper}), and action execution or hand-off to \texttt{human\_\allowbreak in\_\allowbreak loop}. Technique mapping requires explicit verification from domain knowledge; absent an unambiguous match, the graph routes to analyst review (\texttt{AWAIT\_HITL}) rather than emitting a speculative action. The human-review path \textbf{is a designed output, not a failure}: the system triages the work requiring a human rather than eliminating the human. At \texttt{llm\_\allowbreak triage} the system performs \textbf{label stripping}, removing every internal classification field from the prompt---a precondition for the validity of every measurement in Chapter 4, since a ground-truth label reaching the context would let the model copy the answer rather than reason to it.
+
+Two controls bound what may enter that reasoning cycle. Repetitive events are first collapsed by \textbf{Drain} online log-template mining~\cite{he2017drain}, which groups near-identical records under a shared template so that a burst of a thousand similar lines costs the context window roughly what one line costs. A \textbf{token budget monitor} then performs a preflight estimate before each invocation and records the server-reported usage after it, so that approaching the context ceiling is an observed and logged condition rather than a silent truncation. Section~\ref{sec:adversarial_security_hmac} reports what the pair achieves against a deliberately oversized input.
 
 To correlate traces over time, Tier 2 maintains Threat Memory on an index-optimized SQLite database configured with \texttt{synchronous=\allowbreak NORMAL} and rollback-journal rather than WAL, preventing cross-UID file lock crashes under Docker. It tracks IP reputation (\texttt{ip\_\allowbreak reputation}), internal entities (\texttt{known\_\allowbreak entities}), risk indicators (\texttt{apt\_\allowbreak indicators}), and threat events (\texttt{threat\_\allowbreak events}). Reputation score $S$ decays over silent period $t$:
 \begin{equation}
@@ -46,24 +69,40 @@ where $\lambda$ is the decay rate. On reaching the maximum ($S = 100$), Tier 1 e
 \section{Dual-RAG Hybrid Knowledge Retrieval}
 \label{sec:dual_rag}
 
-To limit hallucination and ground security decisions, Tier 2 incorporates a Dual-RAG retrieval system over 433 STIX 2.1-structured MITRE ATT\&CK entries~\cite{strom2018mitre} and NIST SP 800-61r2 guidance~\cite{nist80061}. Retrieval runs two complementary mechanisms: dense semantic search via FAISS~\cite{faiss2019} with a Sentence-BERT embedding model~\cite{reimers2019sentence}, identifying techniques sharing semantic intent despite keyphrase variation; and sparse keyword matching via BM25~\cite{bm25_2009}, ensuring exact retrieval of identifiers such as CVE codes, Registry keys, or service ports. Candidates are consolidated using RRF (Equation~\ref{eq:rrf}) with $k=60$ and injected into the prompt at \texttt{rag\_\allowbreak context}.
+To limit hallucination and ground security decisions, Tier 2 incorporates a Dual-RAG retrieval system over 433 STIX 2.1-structured MITRE ATT\&CK entries~\cite{strom2018mitre} and NIST SP 800-61r2 guidance~\cite{nist80061}. Retrieval runs two complementary mechanisms: dense semantic search via FAISS~\cite{faiss2019} with a Sentence-BERT embedding model~\cite{reimers2019sentence}, identifying techniques sharing semantic intent despite keyphrase variation; and sparse keyword matching via BM25~\cite{bm25_2009}, ensuring exact retrieval of identifiers such as CVE codes, Registry keys, or service ports. Candidates are consolidated using RRF (Equation~\ref{eq:rrf}) with $k=60$ and injected into the prompt at \texttt{rag\_\allowbreak context}. Figure~\ref{fig:dual_rag} shows the retrieval path together with the anchoring check applied to the model's output.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\textwidth]{images/dual_rag.pdf}
+    \caption{Dual-RAG retrieval and the evidence-anchoring guardrail. The check sits on the output side: it constrains what the model may assert, not what the retriever may return. (Source: Author)}
+    \label{fig:dual_rag}
+\end{figure}
+
+Retrieval is itself a trust boundary, since a poisoned knowledge entry would be read by the model as authoritative. A \textbf{RAG sanitizer} therefore normalises Unicode, strips markup and neutralises imperative constructions in every retrieved passage before it enters the prompt. The difficulty is that legitimate security prose is written in the imperative---advisories instruct the reader to block, disable or isolate---so an over-eager filter silently degrades the knowledge base it is protecting; Section~\ref{sec:adversarial_security_hmac} reports the false-neutralisation rate measured over the entire corpus.
 
 On top of retrieval the system applies an \textbf{evidence-anchoring guardrail}: every technique identifier emitted by the model is checked back against that batch's retrieved documents, and identifiers absent from them are forced to \texttt{N/A} and routed to \texttt{AWAIT\_HITL}. This is a \textbf{verifiable architectural constraint} rather than a dependency on how prone a given model is to hallucinate---and it is precisely what separates a knowledge-grounded system from a wrapper around a language model.
 
 \section{Adversarial AI Security and Cryptographic Audit Sealing}
 \label{sec:ai_security_hmac}
 
-Log-substrate prompt injection~\cite{promptinjection2023} embeds control instructions inside raw telemetry fields (User-Agent headers, URI parameters, Syslog text) to hijack model behaviour. SENTINEL implements Delimited Data Encapsulation with a cryptographic nonce regenerated per processing batch~\cite{owasp_llm2025}: raw telemetry is enclosed within nonce-bearing delimiters, forcing the model to treat the enclosed content as passive data. Per-batch generation---rather than a fixed delimiter---is essential, because an invariant delimiter can be inferred from source code or repeated observation, at which point an attacker can close the encapsulation and escape it. In parallel, a deterministic guardrail enforces Pydantic schema validation (\texttt{LLMDecision}); on formatting errors, regular expression salvaging recovers essential fields or defaults to the safe \texttt{AWAIT\_HITL} state.
+Log-substrate prompt injection~\cite{promptinjection2023} embeds control instructions inside raw telemetry fields (User-Agent headers, URI parameters, Syslog text) to hijack model behaviour. SENTINEL implements Delimited Data Encapsulation with a cryptographic nonce regenerated per processing batch~\cite{owasp_llm2025}: raw telemetry is enclosed within nonce-bearing delimiters, forcing the model to treat the enclosed content as passive data. Per-batch generation---rather than a fixed delimiter---is essential, because an invariant delimiter can be inferred from source code or repeated observation, at which point an attacker can close the encapsulation and escape it. In parallel, three deterministic validators guard the boundaries a language model can reach. The \textbf{data validator} rejects malformed telemetry before it is ever framed as a prompt. The \textbf{decision validator} enforces Pydantic schema validation (\texttt{LLMDecision}), constrains the action to the permitted enumeration, and refuses block orders aimed at internal or reserved address ranges; on formatting errors, regular expression salvaging recovers essential fields or defaults to the safe \texttt{AWAIT\_HITL} state. The \textbf{feedback validator} applies the same zero-trust posture to the rules the system proposes for itself, so that a manipulated adjudication cannot install a permanent rule in Tier 1. Figure~\ref{fig:nonce_hmac} places both cryptographic controls on the same diagram, one at each boundary of the reasoning tier.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.80\textwidth]{images/nonce_hmac.pdf}
+    \caption{Nonce encapsulation at the input boundary and HMAC chaining at the output boundary. The tail-truncation blind spot is drawn rather than omitted, because it follows from the construction. (Source: Author)}
+    \label{fig:nonce_hmac}
+\end{figure}
 
 For auditing, each adjudication record $i$ is chained using HMAC-SHA256~\cite{hmac1997}:
 \begin{equation}
     H_i = \text{HMAC-SHA256}(D_i \parallel H_{i-1}, K)
 \end{equation}
-where $D_i$ is the current record, $H_{i-1}$ the preceding hash, and $K$ a local secret key loaded from the environment rather than hardcoded, since a key exposed in source allows the entire chain to be forged from scratch. Chaining ensures any alteration or deletion within the chain breaks continuity and is flagged immediately. As stated in Section~2.4, this guarantees \textbf{integrity and tamper-evidence}; because the key is symmetric, it does not constitute non-repudiation in the cryptographic sense.
+where $D_i$ is the current record, $H_{i-1}$ the preceding hash, and $K$ a local secret key loaded from the environment rather than hardcoded, since a key exposed in source allows the entire chain to be forged from scratch. Chaining ensures any alteration or deletion within the chain breaks continuity and is flagged immediately---guaranteeing integrity and tamper-evidence, though not, for the symmetric-key reason given in Section~\ref{sec:adversarial_theory}, non-repudiation.
 
 \section{SOC Dashboard and On-Premises Deployment Architecture}
 \label{sec:dashboard_deployment}
 
-The SOC Analyst Dashboard is built with Streamlit, connecting directly to Redis Stream and Threat Memory to provide real-time visibility: the per-tier offload funnel, multi-stage intrusion timelines, HMAC chain integrity status, and the Human-in-the-Loop review panel. All services are containerized with Docker Compose; \texttt{llama.\allowbreak cpp} is compiled with CUDA for the RTX 4060 Ti; and \texttt{threat\_memory.db} with the FAISS index are mounted on persistent volumes so reputation scores and audit records survive restarts.
+The SOC Analyst Dashboard is built with Streamlit, connecting directly to Redis Stream and Threat Memory to provide real-time visibility: the per-tier offload funnel, multi-stage intrusion timelines, HMAC chain integrity status, and the Human-in-the-Loop review panel. Ingestion is rate-limited by backpressure measured as \textbf{consumer-group lag}---the number of entries published but not yet claimed by a consumer. The distinction is not cosmetic: because subscribers consume with \texttt{XREADGROUP} and \texttt{XACK}, neither of which removes entries, stream length stays pinned near its cap however promptly the consumers work, and a producer throttling on stream length would stall permanently against a queue that is in fact empty. All services are containerized with Docker Compose; \texttt{llama.\allowbreak cpp} is compiled with CUDA for the RTX 4060 Ti; and \texttt{threat\_memory.db} with the FAISS index are mounted on persistent volumes so reputation scores and audit records survive restarts.
 
-Deployment adheres to Zero Trust mandates~\cite{nist80207}: password strings in \texttt{REDIS\_URL} are redacted before logging. To manage stream surges, backpressure is driven by \textbf{Redis consumer group lag} rather than queue length. This choice is mandatory: a Redis Stream's length only grows over time even when every record has been fully processed, so using it as the throttling signal would strangle the producer permanently; only consumer group lag reflects the work actually outstanding.
+Deployment adheres to Zero Trust mandates~\cite{nist80207}: password strings in \texttt{REDIS\_URL} are redacted before logging. To manage stream surges, backpressure is driven by \textbf{Redis consumer group lag} rather than queue length: a stream's length only grows even when every record has been processed, so throttling on it would strangle the producer permanently, whereas consumer group lag reflects the work actually outstanding.

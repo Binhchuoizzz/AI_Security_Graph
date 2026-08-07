@@ -1,0 +1,39 @@
+// SENTINEL — kiến trúc tổng quát (hình tổng quan Chương 3).
+// Cố ý chỉ ở mức khối: không thuật toán, không con số. Mỗi khối được phóng to ở
+// đúng mục của nó, và nhãn ghi rõ mục nào. Render:
+//   dot -Tpdf arch_overview.dot -o arch_overview.pdf
+digraph arch_overview {
+    rankdir=TB;
+    bgcolor="white";
+    nodesep=0.45;
+    ranksep=0.55;
+    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=13,
+          margin="0.22,0.14", penwidth=1.6, color="#37474f"];
+    edge [fontname="Helvetica", fontsize=11, color="#546e7a", penwidth=1.4];
+
+    sources [label="Nguồn telemetry\nNGFW · IDS/IPS · EDR", shape=oval, fillcolor="#e3f2fd"];
+    queue   [label="Hàng đợi thu nhận Redis Stream", fillcolor="#eceff1"];
+
+    tier1 [label=<<b>TẦNG 1 — Bộ lọc tốc độ đường truyền</b><br/>Nền thống kê · Chữ ký tầng ứng dụng<br/>Cổng Học máy · Bộ đệm ngữ nghĩa<br/><i>chi tiết: Mục 3.3</i>>,
+           fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.2];
+
+    settled [label="Kết thúc tại Tầng 1\nBLOCK_IP · ALERT · AWAIT_HITL · DROP\n(không tốn lời gọi mô hình ngôn ngữ)",
+             fillcolor="#f5f5f5", color="#757575"];
+
+    tier2 [label=<<b>TẦNG 2 — Tác tử nhận thức</b><br/>Rào chắn · Truy xuất Dual-RAG<br/>Mô hình suy luận cục bộ · Kiểm định phán quyết<br/><i>chi tiết: Mục 3.4–3.6</i>>,
+           fillcolor="#fdecea", color="#c62828", penwidth=2.2];
+
+    response [label="Phản hồi và Dashboard SOC\nLuật tường lửa · Hàng đợi chuyên viên", fillcolor="#e3f2fd"];
+    audit    [label="Chuỗi kiểm toán HMAC-SHA256\ntoàn vẹn và phát hiện giả mạo", fillcolor="#ede7f6", color="#5e35b1"];
+
+    sources -> queue -> tier1;
+    tier1 -> settled [label="  phần lớn lưu lượng  "];
+    tier1 -> tier2   [label="  chỉ khi ESCALATE  ", penwidth=2.0, color="#c62828"];
+    tier2 -> response;
+    settled -> response [style=dashed];
+
+    { rank=same; settled; tier2; }
+
+    settled -> audit [style=dashed, arrowhead=open];
+    tier2   -> audit [style=dashed, arrowhead=open];
+}
