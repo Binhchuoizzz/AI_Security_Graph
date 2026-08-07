@@ -82,6 +82,8 @@ jobs:
       env:
         REDIS_URL: redis://localhost:6379/0
         MOCK_LLM: "1"
+        SENTINEL_FREEZE_DYNAMIC_RULES: "1"
+        SENTINEL_LOG_SECRET: "ci_secret_key_12345"
       run: |
         pytest --cov=src --cov-report=term-missing --cov-report=xml
 
