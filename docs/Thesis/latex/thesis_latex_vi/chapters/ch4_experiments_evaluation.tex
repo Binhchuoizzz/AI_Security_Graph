@@ -3,7 +3,7 @@
 
 Chương này trình bày toàn bộ kết quả đánh giá thực nghiệm định lượng hệ thống SENTINEL trên 3 khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ an ninh đối kháng AI kèm niêm phong kiểm toán mật mã, và chất lượng suy luận nhận thức tác tử. Hệ thống được đánh giá trên máy chủ cách ly mạng (Docker Compose, Intel Core i7, 32\,GB RAM, GPU NVIDIA cục bộ chạy CUDA \texttt{llama.cpp} với Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Theo phương pháp luận tại Mục~\ref{sec:methodology}, tỷ lệ xả tải được đo trực tiếp trên các luồng lưu lượng thực tế (Benchmark 25.649 sự kiện và SOC-like 99.717 sự kiện), trong khi chất lượng phân loại và rào chắn được đánh giá trên các tập dữ liệu chuẩn hóa (CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020}) cùng 823 mẫu đối kháng (AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023}, jackhhao~\cite{jackhhao2023}, Shen và cộng sự~\cite{shen2024dan}). Trong suốt quá trình đo đạc, các luật động được đóng băng và 50 mẫu do tác giả biên soạn trong \texttt{ground\_truth.json} được loại trừ hoàn toàn khỏi mọi tính toán tỷ lệ. Tất cả các thước đo thực nghiệm đều công khai mẫu số đo đạc tương ứng nhằm bảo đảm tính minh bạch và khả năng tái lập.
 
-\section{Xả tải và Kinh tế học Tầng lọc}
+\section{Hiệu năng Xả tải Lưu lượng và Kinh tế học Tầng lọc}
 \label{sec:tier1_performance}
 
 Một sự kiện được tính là đã gỡ tải thành công khi nó không phát sinh lời gọi mô hình ngôn ngữ nào (Mục~\ref{sec:architecture_overview}); việc chỉ đếm hành động \texttt{DROP} sẽ bỏ sót các phán quyết \texttt{BLOCK\_IP}, \texttt{ALERT} và \texttt{AWAIT\_HITL}, vốn cũng không tiêu tốn tài nguyên token.
@@ -76,7 +76,7 @@ H3: LLM đơn tầng (cùng dữ liệu, mô hình và prompt) & 0,19 sk/s \\
 
 Ngưỡng chặn nằm trên một vùng phẳng---0,70 tới 0,85 cho chất lượng tổng hợp trùng khít, chỉ từ 0,90 trở lên độ bao phủ mới tụt---nên chọn 0,85 mua được biên an toàn rộng nhất cho việc tự động chặn mà không mất gì đo được, và độ chính xác của phần tự chặn giữ 1,00 trên mọi cấu hình đã quét. Với các bất thường tổng hợp tiêm từ $2\sigma$ tới $100\sigma$ trên bảy đặc trưng luồng, mọi phép thử ở mọi biên độ đều được leo thang nên không có gì lọt qua trong im lặng; nhưng phần nhận biết thống kê thì chững lại, tăng từ 19,52\% ở $2\sigma$ lên 42,86\% ở $4\sigma$ rồi chỉ đạt 54,29\% ở $100\sigma$. Vượt quá khoảng bốn độ lệch chuẩn, giới hạn nằm ở tập đặc trưng chứ không ở ngưỡng, nên hành vi mới lạ tới được Tầng 2 nhờ leo thang chứ không nhờ nhận dạng---kiểu thất bại đúng đắn, nhưng không phải một tuyên bố về năng lực phát hiện.
 
-\section{RQ2: Rào chắn An ninh AI và Toàn vẹn Pháp y}
+\section{Rào chắn Đối kháng AI và Tính toàn vẹn Kiểm toán Mật mã}
 \label{sec:adversarial_security_hmac}
 
 RQ2 nêu tiêm nhiễm qua nền nhật ký là rủi ro \textit{điển hình} chứ không phải toàn bộ phạm vi, nên hai mặt tấn công khác hẳn nhau về cấu trúc đều được đánh giá: tấn công qua ngôn ngữ, nơi kháng được nghĩa là chỉ thị nhúng không làm đổi hành động của tác tử, và tấn công qua không gian đặc trưng, nơi kháng được nghĩa là mẫu bị bóp méo vẫn không bị lật thành lành. Ba giao ước làm cho các tỉ lệ đọc được. Phán quyết của lớp tĩnh là phép HOẶC của ba bộ dò ghi nhận riêng, để khi hỏng thì định vị được. Đối chứng âm trên 230 nhật ký lành là bắt buộc, bởi một lớp gắn cờ mọi thứ cũng đạt chặn 100\%. Và mẫu từ nguồn công bố không bao giờ gộp với mẫu do tác giả biên soạn.
@@ -137,7 +137,7 @@ Việc kiểm chứng tính lại toàn bộ chuỗi từ bản ghi khởi thu�
 
 Một phép đo đã phải chạy lại, và lý do thì khái quát được. Kết quả theo từng vị trí ban đầu chỉ dựa trên 79 phán quyết độc lập chứ không phải 100, vì khoá cache lớp hai bỏ sót \texttt{user\_\allowbreak agent} và gộp 23 mẫu User-Agent về hai dấu vân: hai phán quyết phát lại hai mươi mốt lần, đúng ở cột mà thí nghiệm sinh ra để kiểm. Một khiếm khuyết của dụng cụ đo và một mặt tấn công đầu độc cache đang sống ở đây là cùng một khiếm khuyết, bởi kẻ tấn công trong vận hành cũng có thể đổi riêng một trường vắng mặt trong khoá và nhận lại phán quyết đã lưu. Mở rộng khoá đưa số dấu vân về đúng 100; kết quả sau khi sửa trùng khít con số trước khi sửa, và đó chính là lý do mẫu số phải được kiểm chứ không được mặc định là đúng.
 
-\section{RQ3: Suy luận Có trạng thái và Quy kết Kỹ thuật}
+\section{Suy luận Nhận thức Tác tử và Quy kết Kỹ thuật Tấn công}
 \label{sec:tier2_accuracy_rag}
 
 Bốn khía cạnh của RQ3 (quy kết kỹ thuật, hiệu năng truy xuất, báo cáo minh bạch và giảm tải chuyên viên) được đánh giá độc lập.
