@@ -1,36 +1,7 @@
 \chapter{Experiments and Evaluation}
 \label{ch:experiments_evaluation}
 
-This chapter presents the comprehensive empirical evaluation of the SENTINEL system across three core dimensions: wire-speed stream offloading performance, adversarial AI security guardrails with cryptographic audit integrity, and stateful agentic reasoning quality. All metrics are stated alongside their respective measurement denominators to ensure empirical transparency and reproducibility.
-
-\section{Experimental Setup}
-\label{sec:experimental_setup}
-
-The system runs on a single air-gapped server, all microservices containerised via Docker Compose. Following Section~\ref{sec:methodology}, distribution-dependent metrics (offload rate) are measured on the live stream and classification quality on a class-balanced set; measuring offload on a forced 50/50 set would return an artificially low figure, because that set is not the distribution the system meets. Table~\ref{tab:experimental_setup} assigns each dataset its role. Two conventions hold throughout: dynamic rules are frozen during measurement, and the 50 author-composed samples inside \texttt{ground\_truth.json} are excluded from every ratio, since they are 16.7\% of the attribution set and all carry one answer.
-
-\begin{table}[htbp]
-\centering
-\caption{Experimental Configuration and Dataset Role Assignment}
-\label{tab:experimental_setup}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X}
-\toprule
-\textbf{Component} & \textbf{Specification} & \textbf{Role in the Measurement} \\
-\midrule
-Processor (CPU) & Intel Core i7 & Welford filtering and Redis streams \\
-System RAM & 32 GB DDR5 & Semantic Cache and FAISS indices \\
-Graphics Card (GPU) & NVIDIA Local GPU & \texttt{llama.cpp} CUDA, Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} \\
-Virtualization & Docker Compose & Air-gapped, reproducible environment \\
-\midrule
-\texttt{datatest.json} & 4,240 $\rightarrow$ 4,236 when scored, 51.8\% attack & ML Gate classification quality. Drawn from CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010} and DAPT 2020~\cite{dapt2020}. Not used for offload rate \\
-\texttt{ground\_truth.json} & 1,750 samples $\rightarrow$ 1,700 when scored & Ablation, reasoning quality. 50 author-composed samples excluded from all ratios \\
-\texttt{build\_stream()} & 25,799 (150 warm-up + 25,649 scored), 31.6\% attack & Offload rate, end-to-end \\
-SOC-like stream & 99,717 events, 9.8\% attack & Offload rate at a near-realistic base rate \\
-Adversarial set & 823 = 703 published + 80 author-composed + 40 cross-check & AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023}, and a jailbreak collection~\cite{jackhhao2023} whose prompts originate in the in-the-wild study of Shen \textit{et al.}~\cite{shen2024dan}. The three provenances are scored separately and never merged \\
-\bottomrule
-\end{tabularx}
-\end{table}
+This chapter presents the comprehensive empirical evaluation of the SENTINEL system across three core dimensions: wire-speed stream offloading performance, adversarial AI security guardrails with cryptographic audit integrity, and stateful agentic reasoning quality. Experiments were executed on an air-gapped server environment containerized via Docker Compose (Intel Core i7, 32\,GB RAM, local NVIDIA GPU running CUDA \texttt{llama.cpp} with Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Following Section~\ref{sec:methodology}, offloading performance is evaluated on live telemetry streams (25,649-event benchmark stream and 99,717-event SOC-like stream), while classification quality and security guardrails are assessed across benchmark datasets (CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020}) and 823 adversarial attack samples (AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023}, jackhhao~\cite{jackhhao2023}, Shen et al.~\cite{shen2024dan}). Dynamic rules were frozen during evaluation, and the 50 author-composed samples in \texttt{ground\_truth.json} were excluded from all ratio calculations. All metrics are reported with their respective measurement denominators to ensure empirical transparency and reproducibility.
 
 \section{RQ1 --- Offloading and Filtration Economics}
 \label{sec:tier1_performance}
@@ -201,7 +172,7 @@ Table~\ref{tab:rq3_attribution} does what an aggregate cannot: it locates the fa
     \label{fig:rq3_attribution}
 \end{figure}
 
-On the same slice of 243 escalated queries, Dual-RAG attains Recall@3 = 0.930 (95\% CI 0.891--0.956) and MRR 0.803, which sits comfortably above the attribution figures and closes the argument: retrieval is not what limits the 80.0\%. The unfavourable half is equally clear. Over the whole \texttt{ground\_truth} set of 1,305 queries, Recall@3 collapses to 0.385, because flow-only samples dominate that population and carry no application-layer text to match---\texttt{T1110} scores hit@3 of 0.00 across 236 queries. The two numbers describe different populations, and setting 0.385 against the 80.0\% would breach the principle of Section~\ref{sec:experimental_setup}.
+On the same slice of 243 escalated queries, Dual-RAG attains Recall@3 = 0.930 (95\% CI 0.891--0.956) and MRR 0.803, which sits comfortably above the attribution figures and closes the argument: retrieval is not what limits the 80.0\%. The unfavourable half is equally clear. Over the whole \texttt{ground\_truth} set of 1,305 queries, Recall@3 collapses to 0.385, because flow-only samples dominate that population and carry no application-layer text to match---\texttt{T1110} scores hit@3 of 0.00 across 236 queries. The two numbers describe different populations, and setting 0.385 against the 80.0\% would breach the principle of empirical measurement stated in the chapter introduction.
 
 Reading only final verdicts would score \textit{any} shield at zero hallucinations, including one that does nothing, so the measurement runs on traces recording the action before and after the shield: of 1,566 batches, 1,421 asserted a technique, and zero of those 1,421 were unanchored---zero even when relaxed to the parent technique. The shield is not inert while achieving this: it fired on 9.26\% of batches and in 76 of them downgraded \texttt{BLOCK\_IP} to \texttt{AWAIT\_HITL}, preventing 76 automatic permanent IP blocks whose justification could not be anchored. One limit is stated proactively: the score uses the strict criterion that the identifier appear among retrieved document IDs, whereas the deployed shield matches by regular expression across the full context, so zero is an upper bound on leakage rather than an exact count.
 

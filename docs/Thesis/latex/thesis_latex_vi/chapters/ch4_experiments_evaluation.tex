@@ -1,38 +1,9 @@
 \chapter{Thực nghiệm và Đánh giá}
 \label{ch:experiments_evaluation}
 
-Chương này trình bày toàn bộ kết quả đánh giá thực nghiệm định lượng hệ thống SENTINEL trên các khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ an ninh đối kháng AI kèm niêm phong kiểm toán mật mã, và chất lượng suy luận nhận thức tác tử. Tất cả các thước đo thực nghiệm đều được công khai mẫu số đo đạc tương ứng nhằm bảo đảm tính minh bạch và khả năng tái lập của nghiên cứu.
+Chương này trình bày toàn bộ kết quả đánh giá thực nghiệm định lượng hệ thống SENTINEL trên 3 khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ an ninh đối kháng AI kèm niêm phong kiểm toán mật mã, và chất lượng suy luận nhận thức tác tử. Hệ thống được đánh giá trên máy chủ cách ly mạng (Docker Compose, Intel Core i7, 32\,GB RAM, GPU NVIDIA cục bộ chạy CUDA \texttt{llama.cpp} với Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Theo phương pháp luận tại Mục~\ref{sec:methodology}, tỷ lệ xả tải được đo trực tiếp trên các luồng lưu lượng thực tế (Benchmark 25.649 sự kiện và SOC-like 99.717 sự kiện), trong khi chất lượng phân loại và rào chắn được đánh giá trên các tập dữ liệu chuẩn hóa (CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020}) cùng 823 mẫu đối kháng (AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023}, jackhhao~\cite{jackhhao2023}, Shen và cộng sự~\cite{shen2024dan}). Trong suốt quá trình đo đạc, các luật động được đóng băng và 50 mẫu do tác giả biên soạn trong \texttt{ground\_truth.json} được loại trừ hoàn toàn khỏi mọi tính toán tỷ lệ. Tất cả các thước đo thực nghiệm đều công khai mẫu số đo đạc tương ứng nhằm bảo đảm tính minh bạch và khả năng tái lập.
 
-\section{Môi trường Thực nghiệm}
-\label{sec:experimental_setup}
-
-Hệ thống được thử nghiệm trên một máy chủ cách ly mạng, toàn bộ các vi dịch vụ được đóng gói bằng Docker Compose. Theo định hướng tại Mục~\ref{sec:methodology}, chỉ số phụ thuộc phân bố lưu lượng (tỷ lệ xả tải) được đo đạc trực tiếp trên luồng sự kiện thực tế, trong khi chất lượng phân loại được đánh giá trên tập dữ liệu cân bằng lớp. Việc đánh giá tỷ lệ xả tải trên tập dữ liệu ép cân bằng 50/50 sẽ dẫn đến kết quả thấp hơn thực tế, do tập dữ liệu cân bằng không phản ánh đúng phân bố lưu lượng tự nhiên trong vận hành. Bảng~\ref{tab:experimental_setup} tóm tắt cấu hình môi trường và phân vai của các tập dữ liệu. Hai nguyên tắc được áp dụng nhất quán trong mọi phép đo: các luật động được đóng băng trong suốt quá trình đo đạc, và 50 mẫu do tác giả biên soạn trong tập \texttt{ground\_truth.json} được loại trừ hoàn toàn khỏi các tính toán tỷ lệ.
-
-\begin{table}[htbp]
-\centering
-\caption{Cấu hình Thực nghiệm và Phân vai Tập Dữ liệu}
-\label{tab:experimental_setup}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}X}
-\toprule
-\textbf{Thành phần} & \textbf{Thông số} & \textbf{Vai trò trong phép đo} \\
-\midrule
-Vi xử lý (CPU) & Intel Core i7 & Bộ lọc Welford và luồng Redis \\
-Bộ nhớ RAM & 32 GB DDR5 & Semantic Cache và chỉ mục FAISS \\
-Card đồ họa (GPU) & NVIDIA GPU (Cục bộ) & \texttt{llama.cpp} CUDA, Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} \\
-Ảo hóa & Docker Compose & Môi trường air-gapped, tái lập được \\
-\midrule
-\texttt{datatest.json} & 4.240 $\rightarrow$ 4.236 khi chấm, 51,8\% tấn công & Chất lượng phân loại Cổng ML. Trích từ CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010} và DAPT 2020~\cite{dapt2020}. Không dùng cho tỉ lệ xả tải \\
-\texttt{ground\_truth.json} & 1.750 mẫu $\rightarrow$ 1.700 khi chấm & Ablation, chất lượng lập luận. 50 mẫu tác giả biên soạn bị loại khỏi mọi tỉ lệ \\
-\texttt{build\_stream()} & 25.799 (150 khởi động + 25.649 chấm), 31,6\% tấn công & Tỉ lệ xả tải, toàn tuyến \\
-Luồng dạng SOC & 99.717 sự kiện, 9,8\% tấn công & Tỉ lệ xả tải ở base-rate gần thực tế \\
-Tập đối kháng & 823 = 703 công bố + 80 tự soạn + 40 kiểm chéo & AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023} và một tập jailbreak~\cite{jackhhao2023} có nguồn gốc từ nghiên cứu thực địa của Shen và cộng sự~\cite{shen2024dan}. Ba xuất xứ chấm tách bạch, không bao giờ gộp \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-\section{RQ1: Xả tải và Kinh tế học Tầng lọc}
+\section{Xả tải và Kinh tế học Tầng lọc}
 \label{sec:tier1_performance}
 
 Một sự kiện được tính là đã gỡ tải thành công khi nó không phát sinh lời gọi mô hình ngôn ngữ nào (Mục~\ref{sec:architecture_overview}); việc chỉ đếm hành động \texttt{DROP} sẽ bỏ sót các phán quyết \texttt{BLOCK\_IP}, \texttt{ALERT} và \texttt{AWAIT\_HITL}, vốn cũng không tiêu tốn tài nguyên token.
