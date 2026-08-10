@@ -3005,19 +3005,19 @@
 
 Em xin kính chào Quý Thầy Cô! Em tên là Nguyễn Đức Bình, Học viên cao học ngành Kỹ thuật Phần mềm (MSE) khóa 13183 tại Viện Quản trị và Công nghệ FSB, Đại học FPT.
 
-Hôm nay, em rất vinh dự được trình bày công trình nghiên cứu thạc sĩ của mình với đề tài: "SENTINEL: Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI Tác tử" (tên tiếng Anh: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI).
+Hôm nay, em rất vinh dự được đại diện nhóm nghiên cứu trình bày công trình luận văn thạc sĩ của mình với đề đề tài: "SENTINEL: Kiến trúc nhận thức hai tầng cho phát hiện và phản hồi mối đe dọa tự động sử dụng AI Tác tử" (tên tiếng Anh: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI).
 
-Công trình được thực hiện dưới sự hướng dẫn khoa học tận tình của TS. Bùi Văn Hiếu và TS. Đặng Văn Hiếu. Em xin phép được bắt đầu phần trình bày của mình.`,
+Công trình được thực hiện dưới sự hướng dẫn khoa học tận tình của TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Em xin phép được bắt đầu phần trình bày của mình.`,
 
     2: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG BẢO VỆ,
 
-Để hoàn thành công trình nghiên cứu này và đạt được học vị Thạc sĩ Kỹ thuật Phần mềm, em xin phép được bày tỏ lòng tri ân sâu sắc tới 4 điểm tựa quan trọng:
+Để hoàn thành công trình nghiên cứu này và hoàn thiện bản luận văn thạc sĩ hôm nay, em xin phép được bày tỏ lòng tri ân sâu sắc tới 4 điểm tựa quan trọng:
 
 Thứ nhất, em xin gửi lời biết ơn chân thành nhất tới hai Thầy hướng dẫn khoa học là TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác và tinh thần làm việc nghiêm túc, hai Thầy đã luôn kiên nhẫn định hướng tư duy phản biện, đưa ra những góp ý chuyên môn sắc bén và truyền cảm hứng nghiên cứu cho em trong suốt chặng đường thực hiện luận văn.
 
 Thứ hai, em xin trân trọng cảm ơn Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị & Công nghệ FSB cùng toàn thể Quý Thầy Cô Trường Đại học FPT đã truyền dạy nền tảng tri thức lý thuyết và thực tiễn vững chắc trong một môi trường nghiên cứu chuyên nghiệp và hiện đại.
 
-Thứ ba, em xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Cục C12 - Trung tâm Dữ liệu Quốc gia. Sự tin tưởng, điều kiện thuận lợi về thời gian cùng những kinh nghiệm thực chiến phong phú từ đơn vị đã đem lại cho em những góc nhìn thực tiễn sâu sắc, áp dụng trực tiếp vào quá trình thiết kế và thực nghiệm hệ thống SENTINEL.
+Thứ ba, em xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Trung tâm Dữ liệu Quốc gia. Sự tin tưởng, điều kiện thuận lợi về thời gian cùng những kinh nghiệm thực chiến phong phú từ đơn vị đã đem lại cho em những góc nhìn thực tiễn sâu sắc, áp dụng trực tiếp vào quá trình thiết kế và thực nghiệm hệ thống SENTINEL.
 
 Cuối cùng, em xin dành trọn tình yêu thương và lòng biết ơn sâu sắc nhất tới gia đình thân yêu, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn và nguồn động viên không ngừng nghỉ của gia đình trong những tháng ngày em miệt mài thực nghiệm xuyên đêm chính là điểm tựa vững chắc nhất giúp em hoàn thành công trình nghiên cứu này.`,
 
@@ -3025,26 +3025,23 @@ Cuối cùng, em xin dành trọn tình yêu thương và lòng biết ơn sâu 
 
 Báo cáo bảo vệ luận văn hôm nay của em được bố cục chặt chẽ theo 4 phần chính:
 
-PHẦN 1: ĐẶT VẤN ĐỀ VÀ MỤC TIÊU NGHIÊN CỨU — Phân tích nút thắt cổ chai SOC, khủng hoảng báo động giả và phát biểu 3 câu hỏi nghiên cứu (RQ1 - RQ3).
+PHẦN 1: ĐẶT VẤN ĐỀ VÀ MỤC TIÊU NGHIÊN CỨU — Phân tích 3 nút thắt cổ chai SOC vận hành thực tế, khủng hoảng độ trễ, nguy cơ an toàn AI và phát biểu 3 câu hỏi nghiên cứu (RQ1 - RQ3).
 
-PHẦN 2: KIẾN TRÚC VÀ THIẾT KẾ HỆ THỐNG SENTINEL — Trình bày chi tiết Kiến trúc Hai tầng (Two-Tier), thuật toán Welford O(1), Cổng ML LightGBM, Semantic Cache, Tác tử LangGraph, Dual-RAG và cơ chế kiểm toán HMAC.
+PHẦN 2: KIẾN TRÚC VÀ THIẾT KẾ HỆ THỐNG SENTINEL — Trình bày chi tiết Kiến trúc Lai Hai Tầng (Two-Tier), thuật toán Welford O(1), Cổng Machine Learning LightGBM, Semantic Cache Tầng 1.75, Tác tử LangGraph Tầng 2, Dual-RAG và cơ chế niêm phong kiểm toán HMAC-SHA256.
 
-PHẦN 3: KẾT QUẢ THỰC NGHIỆM VÀ ĐÁNH GIÁ 5D — Báo cáo các chỉ số thực nghiệm đột phá thu được trên 99.717 sự kiện luồng SOC stream và 949.535 mẫu NetFlow.
+PHẦN 3: KẾT QUẢ THỰC NGHIỆM VÀ ĐÁNH GIÁ 5D METRICS — Báo cáo các chỉ số thực nghiệm đột phá thu được trên 99.717 sự kiện luồng SOC stream thực tế và 949.535 mẫu NetFlow.
 
-PHẦN 4: THẢO LUẬN, HẠN CHẾ VÀ HƯỚNG PHÁT TRIỂN — Nêu rõ 5 giới hạn kỹ thuật hiện hữu và 5 hướng kỹ thuật mở rộng cho sản phẩm thương mại.`,
+PHẦN 4: THẢO LUẬN, HẠN CHẾ VÀ HƯỚNG PHÁT TRIỂN — Nêu rõ minh bạch 5 giới hạn kỹ thuật hiện hữu và 5 hướng kỹ thuật mở rộng cho sản phẩm thực tế.`,
 
     4: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG,
 
 Đi vào thực trạng vận hành an ninh mạng hiện nay, em xin trình bày 3 NÚT THẮT CỔ CHAI VẬN HÀNH CỐT LÕI mà các trung tâm SOC đang gặp phải:
 
-NÚT THẮT 1 — QUY MÔ LOG KHỔNG LỒ VÀ KHỦNG HOẢNG ĐỘ TRỄ:
-Mỗi ngày, một trung tâm SOC cỡ vừa phải tiếp nhận từ hàng trăm nghìn đến hàng triệu log sự kiện từ SIEM, Tường lửa và EDR. Do phụ thuộc vào chữ ký tĩnh, tỉ lệ báo động giả vượt quá 80%, gây ra hội chứng Alert Fatigue làm kiệt sức các chuyên gia SOC. Khi đưa AI vào xử lý trực tiếp luồng dữ liệu thô, độ trễ tính toán của AI gây tắc nghẽn toàn bộ đường truyền dữ liệu an ninh.
+NÚT THẮT 1 — QUY MÔ LOG KHỔNG LỒ VÀ KHỦNG HOẢNG ĐỘ TRỄ: Mỗi ngày, một trung tâm SOC cỡ vừa phải tiếp nhận từ hàng trăm nghìn đến hàng triệu log sự kiện từ SIEM, Tường lửa và EDR. Tỉ lệ báo động giả vượt quá 80%, gây ra hội chứng Alert Fatigue làm kiệt sức các chuyên gia SOC. Khi đưa AI vào xử lý trực tiếp luồng dữ liệu thô, độ trễ tính toán của AI gây tắc nghẽn toàn bộ đường truyền dữ liệu an ninh.
 
-NÚT THẮT 2 — BỀ MẶT TẤN CÔNG AI, ML EVASION VÀ NGUY CƠ GIẢ MẠO NHẬT KÝ:
-Ứng dụng AI tạo ra các bề mặt tấn công mới: kẻ tấn công cố ý chèn câu lệnh độc hại vào log thô (Log-substrate Prompt Injection) hoặc bóp méo đặc trưng dữ liệu để né tránh mô hình Học máy (Machine Learning Gate Evasion). Đồng thời, nhật ký sự cố sau khi thâm nhập có nguy cơ bị chỉnh sửa trái phép, làm mất tính chống chối bỏ pháp y. Do đó, cần cơ chế Guardrails cô lập dữ liệu và niêm phong vết kiểm toán.
+NÚT THẮT 2 — BỀ MẶT TẤN CÔNG AI, ML EVASION VÀ NGUY CƠ GIẢ MẠO NHẬT KÝ: Ứng dụng AI tạo ra các bề mặt tấn công mới: kẻ tấn công cố ý chèn câu lệnh độc hại vào log thô (Log-substrate Prompt Injection) hoặc bóp méo đặc trưng dữ liệu để né tránh mô hình Học máy (Machine Learning Gate Evasion). Đồng thời, nhật ký sự cố sau khi thâm nhập có nguy cơ bị chỉnh sửa trái phép. Do đó, cần cơ chế Guardrails cô lập dữ liệu và niêm phong vết kiểm toán.
 
-NÚT THẮT 3 — SOAR CỨNG NHẮC, ẢO GIÁC AI VÀ QUÁ TẢI CHUYÊN GIA:
-Các nền tảng SOAR dựa trên Playbook cố định hoàn toàn thất bại trước các biến thể tấn công APT mới. Ngược lại, nếu dùng AI tự do không có rào chắn thì mô hình dễ bị Ảo giác (Hallucination), tự bịa mã kỹ thuật tấn công và tự ý ra lệnh chặn IP vô căn cứ (Self-DoS). Bên cạnh đó, việc thiếu cơ chế phân loại cảnh báo (Triage) thông minh làm ngập hàng đợi bắt con người phải kiểm tra thủ công. Do đó, cần một Tác tử AI có rào chắn neo bằng chứng để suy luận chính xác, loại bỏ ảo giác và phân loại thông minh nhằm giảm thiểu tối đa khối lượng công việc cho chuyên gia con người.
+NÚT THẮT 3 — SOAR CỨNG NHẮC, ẢO GIÁC AI VÀ QUÁ TẢI CHUYÊN GIA: Các nền tảng SOAR dựa trên Playbook cố định thất bại trước các biến thể tấn công APT mới. Ngược lại, nếu dùng AI tự do không có rào chắn thì mô hình dễ bị Ảo giác (Hallucination), tự bịa mã kỹ thuật tấn công và tự ý ra lệnh chặn IP vô căn cứ (Self-DoS). Bên cạnh đó, việc thiếu cơ chế phân loại cảnh báo (Triage) thông minh làm ngập hàng đợi khiến con người phải kiểm tra thủ công. Do đó, cần một Tác tử AI có rào chắn neo bằng chứng để suy luận chính xác, loại bỏ ảo giác và phân loại thông minh nhằm giảm thiểu tối đa khối lượng công việc cho chuyên gia.
 
 Từ 3 nút thắt trên, bài toán đặt ra cho đề tài là: Thiết kế một kiến trúc SOC phân tầng hai lớp (Two-Tier), kết hợp bộ lọc tốc độ cao ở vành ngoài với AI Tác tử suy luận ngữ cảnh an toàn On-Premises ở bên trong?`,
 
@@ -3052,23 +3049,19 @@ Từ 3 nút thắt trên, bài toán đặt ra cho đề tài là: Thiết kế 
 
 Để giải quyết triệt để 3 nút thắt trên, nghiên cứu đặt ra 3 Mục tiêu và Câu hỏi Nghiên cứu chiến lược cùng Hướng giải quyết kỹ thuật tương ứng:
 
-RQ1 (Hiệu năng & Độ trễ): Đặt câu hỏi làm sao tự động xả tải luồng log nhiễu ở tốc độ đường truyền mà không làm giảm khả năng phát hiện mối đe dọa? -> Hướng giải quyết là thiết kế chặng lọc Tầng 1 hai lớp (Welford O(1), Cổng ML LightGBM và Semantic Cache Tầng 1.75) tuân theo nguyên lý "Phán quyết rẻ đứng trước phán quyết đắt".
+RQ1 (Hiệu năng & Độ trễ): Đặt câu hỏi làm sao tự động xả tải luồng log nhiễu ở tốc độ đường truyền mà không làm giảm khả năng phát hiện mối đe dọa? -> Hướng giải quyết là thiết kế chặng lọc Tầng 1 hai lớp (Welford O(1), Cổng Machine Learning LightGBM và Semantic Cache Tầng 1.75) tuân theo nguyên lý "Phán quyết rẻ đứng trước phán quyết đắt".
 
 RQ2 (An toàn AI & Kiểm toán Pháp y): Đặt câu hỏi về cơ chế vô hiệu hóa các tấn công tiêm nhiễm câu lệnh (Prompt Injection) và bảo đảm tính chống chối bỏ vết pháp y? -> Hướng giải quyết là áp dụng cơ chế Delimited Data Encapsulation cô lập payload thô bằng cấu trúc cứng, kết hợp niêm phong chuỗi băm HMAC-SHA256 liên vết.
 
-RQ3 (Suy luận Tác tử & Quy kết MITRE ATT&CK): Đặt câu hỏi làm sao để Tác tử AI suy luận ngữ cảnh chính xác, quy kết mã MITRE ATT&CK và giảm khối lượng công việc cho chuyên gia mà 0% ảo giác? -> Hướng giải quyết là xây dựng Đồ thị Tác tử LangGraph kết hợp Dual-RAG (FAISS + BM25) tri thức STIX/NIST và Lá chắn Neo bằng chứng (Grounding Guardrail).`,
+RQ3 (Suy luận Tác tử & Quy kết MITRE ATT&CK): Đặt câu hỏi làm sao để Tác tử AI suy luận ngữ cảnh chính xác, quy kết mã MITRE ATT&CK và giảm khối lượng công việc cho chuyên gia mà 0% mã bịa? -> Hướng giải quyết là xây dựng Đồ thị Tác tử LangGraph kết hợp Dual-RAG (FAISS + BM25) tri thức STIX/NIST và Lá chắn Neo bằng chứng (Grounding Guardrail).`,
 
     6: `KÍNH THƯA HỘI ĐỒNG,
 
 Khi tổng quan các hướng nghiên cứu hiện hữu trên thế giới, em nhận thấy một khoảng trống nghiên cứu (Research Gap) lớn:
 
-Các hệ thống SIEM/SOAR truyền thống (QRadar, Cortex XSOAR) xử lý rất nhanh (<1ms) nhưng thiếu khả năng suy luận ngữ cảnh trước các dạng tấn công mới.
+Các hệ thống SIEM/SOAR truyền thống xử lý rất nhanh nhưng thiếu khả năng suy luận ngữ cảnh trước các dạng tấn công mới. Các hệ thống AI Cloud suy luận thông minh nhưng độ trễ rất cao, vi phạm chủ quyền dữ liệu và ngốn VRAM lớn. Các tác tử tự chủ hiện tại đều là kiến trúc đơn tầng — 100% sự kiện phải đi qua LLM gây nghẽn mạch.
 
-Các hệ thống AI Cloud (Watchtower, CyberRAG) suy luận thông minh nhưng độ trễ rất cao (850ms - 26s), vi phạm chủ quyền dữ liệu và ngốn VRAM lớn (24GB).
-
-Các tác tử tự chủ (AutoBnB, LanG SOC, Policy-Guided SIEM) đã cải thiện suy luận nhưng đều là kiến trúc đơn tầng — 100% sự kiện phải đi qua LLM gây nghẽn mạch.
-
-SENTINEL là kiến trúc đầu tiên giải quyết đồng thời cả 3 yêu cầu: Xả tải Tầng 1 đạt 97,5% (đo tại tỷ lệ tấn công nền 38,3%) ở độ trễ trung vị 0.88 ms; Suy luận Tác tử Tầng 2 On-Premises trên 1 GPU 16GB VRAM; và Bảo vệ an toàn AI bằng rào chắn Delimited Data Encapsulation chặn toàn bộ 678 mẫu Prompt Injection trong phạm vi tập mẫu cùng chuỗi băm niêm phong HMAC-SHA256.`,
+SENTINEL là kiến trúc đầu tiên giải quyết đồng thời cả 3 yêu cầu: Xả tải Tầng 1 đạt 97,5% ở độ trễ trung vị 0.88 ms; Suy luận Tác tử Tầng 2 On-Premises trên 1 GPU 16GB VRAM; và Bảo vệ an toàn AI bằng rào chắn Delimited Data Encapsulation chặn Prompt Injection cùng chuỗi băm niêm phong HMAC-SHA256.`,
 
     7: `KÍNH THƯA HỘI ĐỒNG,
 
