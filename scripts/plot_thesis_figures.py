@@ -95,75 +95,6 @@ T1 = {
 }
 
 
-def fig_offload(lang):
-    s, d = load("offload_vs_baserate_stream.json"), load("offload_vs_baserate_demo.json")
-    if not (s and d):
-        return
-    t = T1[lang]
-    fmt = (lambda n: f"{n:,}") if lang == "en" else (lambda n: f"{n:,}".replace(",", "."))
-    pct = (
-        (lambda x: f"{100 * x:.1f}%")
-        if lang == "en"
-        else (lambda x: f"{100 * x:.1f}%".replace(".", ","))
-    )
-    labels = [
-        t["rows"][0].format(a=s["n_events"], p=pct(s["attack_rate_do_duoc"]))
-        if lang == "en"
-        else t["rows"][0].format(a=fmt(s["n_events"]), p=pct(s["attack_rate_do_duoc"])),
-        t["rows"][1].format(a=d["n_events"], p=pct(d["attack_rate_do_duoc"]))
-        if lang == "en"
-        else t["rows"][1].format(a=fmt(d["n_events"]), p=pct(d["attack_rate_do_duoc"])),
-    ]
-    data = (
-        np.array(
-            [
-                [s["ti_le_chan_tier1"], s["ti_le_chan_cong_ml"], s["ti_le_toi_llm"]],
-                [d["ti_le_chan_tier1"], d["ti_le_chan_cong_ml"], d["ti_le_toi_llm"]],
-            ]
-        )
-        * 100
-    )
-
-    fig, ax = plt.subplots(figsize=(6.6, 2.15))
-    colours = [INK, ACCENT2, ACCENT]
-    left = np.zeros(2)
-    y = np.arange(2)
-    for i, (tier, c) in enumerate(zip(t["tiers"], colours, strict=False)):
-        ax.barh(
-            y,
-            data[:, i],
-            left=left,
-            height=0.5,
-            color=c,
-            label=tier,
-            edgecolor="white",
-            linewidth=0.8,
-        )
-        for j in range(2):
-            if data[j, i] >= 6:
-                ax.text(
-                    left[j] + data[j, i] / 2,
-                    y[j],
-                    pct(data[j, i] / 100),
-                    ha="center",
-                    va="center",
-                    color="white",
-                    fontsize=8.5,
-                    fontweight="bold",
-                )
-        left += data[:, i]
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels)
-    ax.invert_yaxis()
-    ax.set_xlim(0, 100)
-    ax.set_xlabel(t["xlabel"])
-    ax.set_title(t["title"], pad=8)
-    ax.legend(ncol=3, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.35))
-    ax.grid(axis="x", color=GREY, alpha=0.35, linewidth=0.6)
-    ax.set_axisbelow(True)
-    save_one(fig, "fig_offload_funnel", lang)
-
-
 # ── Hình 2 — phân phối độ trễ, thang log ─────────────────────────────────────
 T2 = {
     "en": dict(
@@ -487,12 +418,13 @@ T6 = {
         title_a="Ablation: action accuracy (95% CI)",
         title_b="Reasoning quality (judge, 1–5)",
         xlabel_a="Action accuracy (%)",
-        note_a="A/F: n=1,700   ·   B--E: n=300, separate slice",
+        note_a="both configurations scored on the same n=1,700",
+        # B--E đã rút khỏi Ch4: C, D, E trùng khít tới từng chữ số nên không phân
+        # giải được cấu hình nào, và chúng chấm trên lát 300 mẫu riêng nên đặt cùng
+        # trục với A/F là so hai mẫu số khác nhau.
         rows_a=[
             ("A  Tier 1 only", "A"),
             ("F  Full two-tier", "F"),
-            ("B  LLM, no retrieval", "B"),
-            ("C/D/E  + retrieval", "C"),
         ],
         axes_b=[
             ("Answer relevancy", "answer_relevancy"),
@@ -507,12 +439,10 @@ T6 = {
         title_a="Bóc tách: đúng hành động (KTC 95%)",
         title_b="Chất lượng lập luận (chấm 1–5)",
         xlabel_a="Độ chính xác hành động (%)",
-        note_a="A/F: n=1.700   ·   B--E: n=300, lát mẫu riêng",
+        note_a="cả hai cấu hình chấm trên cùng n=1.700",
         rows_a=[
             ("A  Chỉ Tầng 1", "A"),
             ("F  Hai tầng đầy đủ", "F"),
-            ("B  LLM, không truy xuất", "B"),
-            ("C/D/E  + truy xuất", "C"),
         ],
         axes_b=[
             ("Độ liên quan câu trả lời", "answer_relevancy"),
@@ -535,7 +465,7 @@ def fig_ablation_quality(lang):
     pc = lambda v, nd=2: dec(f"{100 * v:.{nd}f}%")  # noqa: E731
     sc = lambda v: dec(f"{v:.2f}")  # noqa: E731
 
-    fig, (axa, axb) = plt.subplots(1, 2, figsize=(7.6, 3.0), gridspec_kw={"wspace": 0.95})
+    fig, (axa, axb) = plt.subplots(1, 2, figsize=(8.0, 3.6), gridspec_kw={"wspace": 0.95})
 
     cfg = ab["configs"]
     ys = list(range(len(t["rows_a"])))[::-1]
@@ -544,24 +474,33 @@ def fig_ablation_quality(lang):
         v = 100 * c["action_accuracy"]
         lo, hi = (100 * x for x in c["action_accuracy_ci95"])
         col = ACCENT if key == "F" else INK if key == "A" else ACCENT2
-        axa.barh(y, v, height=0.58, color=col, zorder=2)
+        axa.barh(y, v, height=0.55, color=col, zorder=2)
         axa.errorbar(
             v,
             y,
             xerr=[[v - lo], [hi - v]],
             fmt="none",
             ecolor="#3d4a4f",
-            elinewidth=1.2,
-            capsize=3,
+            elinewidth=1.4,
+            capsize=4,
             zorder=3,
         )
-        axa.text(hi + 1.6, y, pc(c["action_accuracy"]), va="center", fontsize=8.2, color=INK)
-    axa.axhline(1.5, color=GREY, lw=0.9, ls=":")
-    axa.set_yticks(ys, [r[0] for r in t["rows_a"]], fontsize=8.2)
-    axa.set_xlim(0, 58)
-    axa.set_xlabel(t["xlabel_a"])
-    axa.set_title(t["title_a"], loc="left", pad=6, fontsize=9)
-    axa.text(0, -0.42, t["note_a"], transform=axa.transAxes, fontsize=7.2, color="#6b7679")
+        axa.text(
+            hi + 1.8,
+            y,
+            pc(c["action_accuracy"]),
+            va="center",
+            fontsize=10.5,
+            fontweight="bold",
+            color=INK,
+        )
+
+    axa.set_yticks(ys, [r[0] for r in t["rows_a"]], fontsize=10.5)
+    axa.set_xlim(0, 60)
+    axa.set_xlabel(t["xlabel_a"], fontsize=10.5)
+    axa.tick_params(axis="x", labelsize=10.5)
+    axa.set_title(t["title_a"], loc="left", pad=8, fontsize=11.5, fontweight="bold")
+    axa.text(0, -0.45, t["note_a"], transform=axa.transAxes, fontsize=9.5, color="#505a5d")
     axa.grid(axis="x", color=GREY, lw=0.5, alpha=0.5, zorder=0)
     axa.set_axisbelow(True)
 
@@ -570,28 +509,28 @@ def fig_ablation_quality(lang):
     for y, (_label, key) in zip(ys, t["axes_b"], strict=True):
         v = agg[key]["mean"]
         col = ACCENT if key == "context_precision" else GREY
-        axb.barh(y, v, height=0.58, color=col, zorder=2)
-        axb.text(v + 0.12, y, sc(v), va="center", fontsize=8.2, color=INK)
-    axb.axvline(agg["overall_mean"], color=INK, lw=1.1, ls="--", zorder=3)
-    # nhãn trung bình đặt DƯỚI cột thấp nhất: đặt ở đỉnh thì nó đè lên tiêu đề ô
+        axb.barh(y, v, height=0.55, color=col, zorder=2)
+        axb.text(v + 0.12, y, sc(v), va="center", fontsize=10.5, fontweight="bold", color=INK)
+    axb.axvline(agg["overall_mean"], color=INK, lw=1.2, ls="--", zorder=3)
     axb.text(
         agg["overall_mean"] + 0.08,
-        -0.42,
+        -0.45,
         t["mean_b"].format(v=sc(agg["overall_mean"])),
-        fontsize=7.4,
+        fontsize=9.5,
         color=INK,
         va="center",
     )
-    axb.set_yticks(ys, [a[0] for a in t["axes_b"]], fontsize=8.2)
-    axb.set_xlim(0, 5)
+    axb.set_yticks(ys, [a[0] for a in t["axes_b"]], fontsize=10.5)
+    axb.set_xlim(0, 5.2)
     axb.set_xticks([0, 1, 2, 3, 4, 5])
-    axb.set_title(t["title_b"], loc="left", pad=6, fontsize=9)
+    axb.tick_params(axis="x", labelsize=10.5)
+    axb.set_title(t["title_b"], loc="left", pad=8, fontsize=11.5, fontweight="bold")
     axb.text(
         0,
-        -0.42,
+        -0.45,
         t["ground"].format(v=pc(agg["evidence_grounding"]["grounding_rate"], 1)),
         transform=axb.transAxes,
-        fontsize=7.2,
+        fontsize=9.5,
         color=ACCENT,
     )
     axb.grid(axis="x", color=GREY, lw=0.5, alpha=0.5, zorder=0)
@@ -606,7 +545,6 @@ def main():
     print("=" * 74)
     for lang in ("en", "vi"):
         print(f"\n── {lang.upper()} ──")
-        fig_offload(lang)
         fig_latency(lang)
         fig_guardrail(lang)
         fig_attribution(lang)

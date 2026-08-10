@@ -43,7 +43,7 @@ Tier 1 operates as a stateless wire-speed perimeter layer combining application-
 
 For high-volume repetitive traffic (DDoS, credential stuffing), the Tier 1.75 Semantic Cache hashes normalized query strings in RAM, reusing prior decisions in $<1$\,ms without recalculation overhead.
 
-Downstream, the LightGBM Machine Learning Gate~\cite{ke2017lightgbm} evaluates non-linear feature interactions, trained on 949,535 NetFlow telemetry records from the CSE-CIC-IDS2018 benchmark~\cite{ids2018} (664,674 training, 189,907 test). To counter evasion, the Gate clips $Z$-scores to $[-8, 8]\sigma$, imputes missing values with baseline means, and abstains to Tier 2 when distorted features exceed 30\%. Adjudications map via a 4-band confidence policy ($0.85$ / $0.65$ / $0.40$ for \texttt{BLOCK\_IP} / \texttt{ESCALATE} / \texttt{ALERT} / \texttt{LOG}), ensuring automated blocking executes only at highest confidence with signature concurrence.
+Downstream, the LightGBM Machine Learning Gate~\cite{ke2017lightgbm} evaluates non-linear feature interactions, trained on 664,674 and tested on 189,907 NetFlow telemetry records drawn from the 949,535-record CSE-CIC-IDS2018 benchmark~\cite{ids2018}. To counter evasion, the Gate clips $Z$-scores to $[-8, 8]\sigma$, imputes missing values with baseline means, and abstains to Tier 2 when distorted features exceed 30\%. Adjudications map via a 4-band confidence policy ($0.85$ / $0.65$ / $0.40$ for \texttt{BLOCK\_IP} / \texttt{ESCALATE} / \texttt{ALERT} / \texttt{LOG}), ensuring automated blocking executes only at highest confidence with signature concurrence.
 
 \section{Tier 2: LangGraph Cognitive Agent and Threat Memory}
 \label{sec:tier2_agent_fsm}
@@ -69,11 +69,11 @@ To eliminate hallucinations, Tier 2 retrieves over a knowledge base of 433 STIX 
 \begin{figure}[h!]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.12\textwidth]{images/dual_rag.pdf}}
-    \caption{Dual-RAG hybrid retrieval and output evidence-anchoring guardrail. (Source: Author)}
+    \caption{Dual-RAG hybrid retrieval and evidence-anchoring guardrail. (Source: Author)}
     \label{fig:dual_rag}
 \end{figure}
 
-Retrieved text is sanitized by Unicode normalization, markup stripping, and command neutralization to prevent indirect injection. At output, an evidence-anchoring guardrail cross-references proposed MITRE ATT\&CK codes against batch evidence. Unanchored codes are forced to \texttt{N/A} and deferred to \texttt{AWAIT\_HITL}, eliminating hallucination risks.
+Retrieved text is sanitized by Unicode normalization, markup stripping, and command neutralization to prevent indirect injection. At output, an evidence-anchoring guardrail cross-references proposed MITRE ATT\&CK codes against batch evidence. Unanchored codes are forced to \texttt{N/A} and deferred to \texttt{AWAIT\_HITL}, so that no identifier absent from the retrieved evidence is ever acted upon.
 
 \section{Adversarial AI Security and Cryptographic Audit Sealing}
 \label{sec:ai_security_hmac}
@@ -83,7 +83,7 @@ Log prompt injection attacks~\cite{promptinjection2023, owasp_llm2025} embed con
 \begin{figure}[h!]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.08\textwidth]{images/nonce_hmac.pdf}}
-    \caption{Input Nonce encapsulation and output HMAC audit chaining. (Source: Author)}
+    \caption{Input Nonce encapsulation and HMAC audit chaining. (Source: Author)}
     \label{fig:nonce_hmac}
 \end{figure}
 

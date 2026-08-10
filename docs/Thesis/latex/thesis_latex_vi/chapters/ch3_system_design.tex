@@ -13,12 +13,12 @@ Luận văn tiếp cận theo phương pháp Nghiên cứu Khoa học Thiết k�
     \item \textit{Trụ cột an ninh đối kháng}: Thiết lập ranh giới phòng thủ chắc chắn chống lại rủi ro tiêm nhiễm câu lệnh qua nhật ký~\cite{promptinjection2023, owasp_llm2025} và niêm phong vết chứng cứ bằng chuỗi mã hóa HMAC-SHA256~\cite{hmac1997}.
 \end{enumerate}
 
-Hiệu lực vận hành của kiến trúc SENTINEL được đánh giá định lượng trên 5 chiều đo lường cốt lõi: chất lượng phân loại sự cố, hiệu năng xử lý và thời gian phản hồi, khả năng kháng tấn công đối kháng, độ mạch lạc của lời giải thích an ninh (được chấm điểm độc lập bởi mô hình trọng tài), cùng tính toàn vẹn của hồ sơ kiểm toán pháp y. Toàn bộ các kết quả thực nghiệm, phân tích đối chứng và kiểm chứng giới hạn hệ thống sẽ được trình bày chi tiết tại Chương~\ref{ch:experiments_evaluation}.
+Hiệu lực vận hành của kiến trúc SENTINEL được đánh giá định lượng trên năm chiều đo lường cốt lõi: chất lượng phân loại sự cố, hiệu năng xử lý và thời gian phản hồi, khả năng kháng tấn công đối kháng, độ mạch lạc của lời giải thích an ninh (được chấm điểm độc lập bởi mô hình trọng tài), cùng tính toàn vẹn của hồ sơ kiểm toán pháp y. Toàn bộ các kết quả thực nghiệm, phân tích đối chứng và kiểm chứng giới hạn hệ thống sẽ được trình bày chi tiết tại Chương~\ref{ch:experiments_evaluation}.
 
 \section{Kiến trúc Tổng thể SENTINEL và Tích hợp Ngăn xếp SOC}
 \label{sec:architecture_overview}
 
-SENTINEL vận hành theo kiến trúc nhận thức hai tầng với nguyên lý cốt lõi là phân tách khối lượng công việc theo chi phí tính toán. Nhật ký thô từ các nguồn cảm biến vành ngoài được đẩy vào hàng đợi Redis Stream rồi chuyển tới Tầng 1. Tầng 1 đóng vai trò là chặng xử lý thống kê và học máy phi trạng thái, giải quyết phần lớn lưu lượng ở tốc độ đường truyền. Trong tập hành động của Tầng 1, chỉ duy nhất phán quyết \texttt{ESCALATE} được chuyển giao lên Tầng 2; các phán quyết còn lại (\texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{AWAIT\_HITL}, \texttt{DROP}) đều kết thúc xử lý ngay tại Tầng 1. Đây là căn cứ xác lập khái niệm tỷ lệ gỡ tải (offload rate) tại Chương~\ref{ch:experiments_evaluation}: một sự kiện được tính là gỡ tải thành công khi không kích hoạt bất kỳ lời gọi suy luận mô hình ngôn ngữ nào.
+SENTINEL vận hành theo kiến trúc nhận thức hai tầng với nguyên lý cốt lõi là phân tách khối lượng công việc theo chi phí tính toán. Nhật ký thô từ các nguồn cảm biến vành ngoài được đẩy vào hàng đợi Redis Stream rồi chuyển tới Tầng 1. Tầng 1 đóng vai trò là chặng xử lý thống kê và học máy phi trạng thái, giải quyết phần lớn lưu lượng ở tốc độ đường truyền. Trong tập hành động của Tầng 1, chỉ duy nhất phán quyết \texttt{ESCALATE} được chuyển giao lên Tầng 2; các phán quyết còn lại (\texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{AWAIT\_HITL}, \texttt{DROP}) đều kết thúc xử lý ngay tại Tầng 1. Đây là căn cứ xác lập khái niệm tỷ lệ xả tải (offload rate) tại Chương~\ref{ch:experiments_evaluation}: một sự kiện được tính là xả tải thành công khi không kích hoạt bất kỳ lời gọi suy luận mô hình ngôn ngữ nào.
 
 Tại Tầng 2, tác tử LangGraph~\cite{langgraph2024} tiến hành suy luận sâu theo ngữ cảnh trên mô hình chuyên biệt an ninh Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} (lượng tử hóa GGUF Q4\_K\_M), kết hợp trạng thái lịch sử từ Bộ nhớ Đe dọa và tri thức truy xuất từ Dual-RAG. Đầu ra được kiểm soát bởi rào chắn tất định giới hạn trong 3 trạng thái cho phép (\texttt{BLOCK\_IP}, \texttt{LOG}, \texttt{AWAIT\_HITL}), với mọi bản ghi từ cả hai tầng đều được niêm phong mật mã bằng chuỗi HMAC-SHA256~\cite{hmac1997}. Nhờ đó, SENTINEL đóng vai trò là tầng trung gian nhận thức (cognitive middleware) giữa SIEM và các giải pháp thực thi phòng thủ (NGFW/SOAR), giúp hấp thụ nhiễu lưu lượng ở Tầng 1 và giải thích minh bạch cho các sự kiện leo thang ở Tầng 2, bảo đảm chủ quyền dữ liệu khi vận hành cách ly mạng (air-gapped) trên GPU cục bộ~\cite{nist80207}. Sơ đồ luồng xử lý và mối liên kết giữa các thành phần được thể hiện chi tiết tại Hình~\ref{fig:arch_overview}.
 
@@ -43,12 +43,12 @@ Tầng 1 vận hành như vành ngoài phi trạng thái tốc độ đường t
 
 Đối với lưu lượng lặp lại khối lượng lớn (DDoS, dò quét mật khẩu), Bộ đệm Ngữ nghĩa Tầng 1.75 băm chuỗi truy vấn trong RAM để tái sử dụng phán quyết trong $<1$\,ms mà không cần tính toán lại.
 
-Tiếp nối là Cổng Học máy LightGBM~\cite{ke2017lightgbm}, phân tích tương tác đặc trưng phi tuyến trên 949.535 mẫu NetFlow trích từ bộ dữ liệu CSE-CIC-IDS2018~\cite{ids2018} (664.674 mẫu huấn luyện, 189.907 mẫu kiểm thử). Để chống né tránh đối kháng (anti-evasion), Cổng Học máy kẹp $Z$-score trong $[-8, 8]\sigma$, bù giá trị khuyết bằng trung bình đường nền, và tự động bỏ phiếu trắng (abstain) chuyển giao sự kiện lên Tầng 2 khi đặc trưng bị bóp méo vượt 30\%. Các phán quyết ánh xạ theo chính sách 4 dải tự tin ($0{,}85$ / $0{,}65$ / $0{,}40$ cho \texttt{BLOCK\_IP} / \texttt{ESCALATE} / \texttt{ALERT} / \texttt{LOG}), bảo đảm lệnh tự động chặn chỉ thi hành khi đạt độ tự tin cao nhất và có đồng thuận từ bộ lọc chữ ký.
+Tiếp nối là Cổng Học máy LightGBM~\cite{ke2017lightgbm}, phân tích tương tác đặc trưng phi tuyến, huấn luyện trên 664.674 mẫu và kiểm thử trên 189.907 mẫu NetFlow trích từ bộ dữ liệu CSE-CIC-IDS2018~\cite{ids2018} gồm 949.535 bản ghi. Để chống né tránh đối kháng (anti-evasion), Cổng Học máy kẹp $Z$-score trong $[-8, 8]\sigma$, bù giá trị khuyết bằng trung bình đường nền, và tự động bỏ phiếu trắng (abstain) chuyển giao sự kiện lên Tầng 2 khi đặc trưng bị bóp méo vượt 30\%. Các phán quyết ánh xạ theo chính sách 4 dải tự tin ($0{,}85$ / $0{,}65$ / $0{,}40$ cho \texttt{BLOCK\_IP} / \texttt{ESCALATE} / \texttt{ALERT} / \texttt{LOG}), bảo đảm lệnh tự động chặn chỉ thi hành khi đạt độ tự tin cao nhất và có đồng thuận từ bộ lọc chữ ký.
 
 \section{Tầng 2: Tác tử Nhận thức LangGraph và Bộ nhớ Đe dọa}
 \label{sec:tier2_agent_fsm}
 
-Tầng 2 vận hành mô hình an ninh Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} (GGUF Q4\_K\_M) phục vụ bởi engine llama.cpp biên dịch CUDA trên GPU cục bộ. Quy trình suy luận được điều phối bởi đồ thị LangGraph~\cite{langgraph2024} qua 5 trạm xử lý: kiểm tra rào chắn (\texttt{guardrails}), bồi đắp ngữ cảnh (\texttt{rag\_context}), phân loại sự cố (\texttt{llm\_triage}), ánh xạ kỹ thuật (\texttt{attack\_mapper}), và thi hành phán quyết (\texttt{action\_executor}) hoặc chuyển duyệt thủ công (\texttt{human\_in\_the\_loop}). Sơ đồ trạng thái tác tử thể hiện tại Hình~\ref{fig:tier2_graph}.
+Tầng 2 vận hành mô hình an ninh Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} (GGUF Q4\_K\_M) phục vụ bởi engine llama.cpp biên dịch CUDA trên GPU cục bộ. Quy trình suy luận được điều phối bởi đồ thị LangGraph~\cite{langgraph2024} qua các trạm xử lý: kiểm tra rào chắn (\texttt{guardrails}), bồi đắp ngữ cảnh (\texttt{rag\_context}), phân loại sự cố (\texttt{llm\_triage}), ánh xạ kỹ thuật (\texttt{attack\_mapper}), và thi hành phán quyết (\texttt{action\_executor}) hoặc chuyển duyệt thủ công (\texttt{human\_in\_the\_loop}). Sơ đồ trạng thái tác tử thể hiện tại Hình~\ref{fig:tier2_graph}.
 
 \begin{figure}[h!]
     \centering
@@ -69,13 +69,13 @@ Tại \texttt{attack\_mapper}, nếu thiếu chứng cứ tri thức, sự cố 
 \begin{figure}[h!]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.12\textwidth]{images/dual_rag.pdf}}
-    \caption{Sơ đồ truy xuất Dual-RAG và rào chắn neo bằng chứng đầu ra. (Nguồn: Tác giả)}
+    \caption{Sơ đồ truy xuất Dual-RAG và rào chắn neo bằng chứng. (Nguồn: Tác giả)}
     \label{fig:dual_rag}
 \end{figure}
 
-Văn bản truy xuất được bộ khử độc RAG chuẩn hóa Unicode, loại bỏ thẻ HTML/Markdown và mệnh lệnh nhằm chặn tiêm nhiễm gián tiếp. Ở đầu ra, rào chắn neo bằng chứng đối chiếu ngược mã MITRE ATT\&CK của mô hình với tài liệu trong lô. Nếu không xuất hiện trong chứng cứ, mã bị ép về \texttt{N/A} và chuyển sang hàng đợi \texttt{AWAIT\_HITL}, triệt tiêu hoàn toàn rủi ro hư cấu kỹ thuật.
+Văn bản truy xuất được bộ khử độc RAG chuẩn hóa Unicode, loại bỏ thẻ HTML/Markdown và mệnh lệnh nhằm chặn tiêm nhiễm gián tiếp. Ở đầu ra, rào chắn neo bằng chứng đối chiếu ngược mã MITRE ATT\&CK của mô hình với tài liệu trong lô. Nếu không xuất hiện trong chứng cứ, mã bị ép về \texttt{N/A} và chuyển sang hàng đợi \texttt{AWAIT\_HITL}, để không mã kỹ thuật nào vắng mặt trong tài liệu truy xuất được đem ra thi hành.
 
-\section{Kiến trúc An ninh AI và Niêm phong Kiểm toán Mật mã}
+\section{An ninh Đối kháng AI và Niêm phong Kiểm toán Mật mã}
 \label{sec:ai_security_hmac}
 
 Tấn công tiêm nhiễm câu lệnh qua nhật ký (Log Prompt Injection)~\cite{promptinjection2023, owasp_llm2025} nhúng chỉ thị điều khiển vào các trường nhật ký thô (User-Agent, URI). SENTINEL giải quyết bằng cơ chế Đóng gói Dữ liệu Phân định (Delimited Data Encapsulation) dùng chuỗi Nonce ngẫu nhiên sinh mới theo lô, ngăn chặn tấn công chèn ký tự thoát vùng bọc (Hình~\ref{fig:nonce_hmac}). Ba bộ thẩm định tất định bảo vệ ranh giới: Dữ liệu (loại nhật ký dị dạng), Quyết định (ép lược đồ Pydantic \texttt{LLMDecision}, từ chối chặn IP nội bộ), và Phản hồi (Zero Trust cho luật AI).
@@ -83,7 +83,7 @@ Tấn công tiêm nhiễm câu lệnh qua nhật ký (Log Prompt Injection)~\cit
 \begin{figure}[h!]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.08\textwidth]{images/nonce_hmac.pdf}}
-    \caption{Cơ chế đóng gói Nonce đầu vào và chuỗi niêm phong HMAC đầu ra. (Nguồn: Tác giả)}
+    \caption{Cơ chế đóng gói Nonce và chuỗi niêm phong HMAC. (Nguồn: Tác giả)}
     \label{fig:nonce_hmac}
 \end{figure}
 

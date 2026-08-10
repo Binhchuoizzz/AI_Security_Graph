@@ -185,7 +185,11 @@ def main() -> int:
             (
                 "MITRE ATT&CK",
                 n_mitre,
-                r"(\d[\d.,]*)\s*(?:STIX[^\s]*\s+)?(?:mục\s+)?(?:kỹ thuật\s+)?MITRE",
+                # `STIX` có thể đi kèm SỐ PHIÊN BẢN ("STIX 2.1 MITRE ATT&CK"). Số ấy là
+                # phiên bản chuẩn, không phải số mục trong kho, nên phải nuốt cả nó vào
+                # phần tuỳ chọn thay vì để nó rơi vào nhóm bắt. Không có `[\d.]*` ở đây
+                # thì câu "433 STIX 2.1 MITRE ATT&CK entries" bị đọc thành "21 mục MITRE".
+                r"(\d[\d.,]*)\s*(?:STIX[^\s]*\s+(?:[\d.]+\s+)?)?(?:mục\s+)?(?:kỹ thuật\s+)?MITRE",
             ),
             ("NIST SP 800-61", n_nist, r"(\d[\d.,]*)\s*(?:quy trình\s+)?NIST SP 800-61"),
         ):

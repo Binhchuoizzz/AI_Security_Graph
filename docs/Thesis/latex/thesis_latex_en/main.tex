@@ -180,7 +180,7 @@
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-In the era of digital transformation and burgeoning network traffic, modern Security Operations Centres (SOCs) face severe alert fatigue, as the volume of telemetry collected from monitoring systems far exceeds manual analysis capacity. Traditional defense tools exhibit clear limitations: static signature rules generate high false-positive rates due to a lack of context interpretation, while pre-programmed SOAR playbooks execute reliably only on anticipated scenarios. Transitioning to Large Language Models (LLMs) enables automated contextual reasoning in natural language; however, operational adoption remains constrained by latency bottlenecks, high computational costs, general adversarial risks (typically log-substrate prompt injections), and AI hallucinations. To address these challenges, this thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, designed on the principle of placing cheap decisions before expensive ones. Tier 1 combines a Welford $\mathcal{O}(1)$ statistical filter and a LightGBM Machine Learning Gate to settle stream noise at wire-speed, offloading 90.6\% to 97.5\% of telemetry without invoking LLM resources and reducing median end-to-end latency from 17,174.7\,ms to 0.88\,ms. Tier 2 executes a LangGraph agentic engine integrated with a Dual-RAG hybrid retrieval mechanism (FAISS + BM25 RRF $k=60$) over 433 MITRE ATT\&CK technique entries, while the AWAIT\_HITL deferral channel reduces analyst workload by 84.24\% while retaining a 95.0\% recall on genuine threats. Finally, Delimited Nonce Encapsulation provides structural guarantees to robustly withstand 678 adversarial attack samples (including log-substrate prompt injections), and HMAC-SHA256 signature chaining ensures effective tamper-detection for forensic audit trails.
+In the era of digital transformation and burgeoning network traffic, modern Security Operations Centers (SOCs) face severe alert fatigue, as the volume of telemetry collected from monitoring systems far exceeds manual analysis capacity. Traditional defense tools exhibit clear limitations: static signature rules generate high false-positive rates due to a lack of context interpretation, while pre-programmed SOAR playbooks execute reliably only on anticipated scenarios. Transitioning to Large Language Models (LLMs) enables automated contextual reasoning in natural language; however, operational adoption remains constrained by latency bottlenecks, high computational costs, general adversarial risks (typically log-substrate prompt injections), and AI hallucinations. To address these challenges, this thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, designed on the principle of placing cheap decisions before expensive ones. Tier 1 combines a Welford $\mathcal{O}(1)$ statistical filter and a LightGBM Machine Learning Gate to settle stream noise at wire-speed, offloading 97.5\% of telemetry without invoking LLM resources and reducing median end-to-end latency from 17,174.7\,ms to 0.88\,ms. Tier 2 executes a LangGraph agentic engine integrated with a Dual-RAG hybrid retrieval mechanism (FAISS + BM25 RRF $k=60$) over 433 MITRE ATT\&CK technique entries, while the AWAIT\_HITL deferral channel reduces analyst workload by 84.24\% while retaining a 95.0\% recall on genuine threats. Finally, Delimited Data Encapsulation provides structural guarantees to robustly withstand 678 adversarial attack samples (including log-substrate prompt injections), and HMAC-SHA256 signature chaining ensures effective tamper-detection for forensic audit trails.
 \end{spacing}
 
 % Acknowledgements Page
@@ -211,7 +211,8 @@ Finally, I dedicate my heartfelt gratitude to my beloved family, especially my c
 \addcontentsline{toc}{chapter}{\listfigurename}
 \listoffigures
 
-\vspace{1.2cm}
+\newpage
+\cleardoublepage
 \addcontentsline{toc}{chapter}{\listtablename}
 \listoftables
 
@@ -223,34 +224,26 @@ Finally, I dedicate my heartfelt gratitude to my beloved family, especially my c
 \end{center}
 \vspace{0.25cm}
 
-\begingroup\footnotesize % BỌC NHÓM: không bọc thì cỡ chữ rò xuống TOÀN BỘ thân bài (đo được: thân bài chạy ở 10pt thay vì 12pt)
+\begingroup\footnotesize
 \setlength{\LTpre}{0pt}\setlength{\LTpost}{0pt}
 \begin{longtable}{lp{0.74\textwidth}}
 \textbf{Abbreviation} & \textbf{Full Description} \\
 \midrule
-AI & Artificial Intelligence \\
-AUC-ROC & Area Under the Receiver Operating Characteristic Curve \\
 CTI & Cyber Threat Intelligence \\
-DSRM & Design Science Research Methodology \\
 ECDF & Empirical Cumulative Distribution Function \\
 FAISS & Facebook AI Similarity Search \\
-FNR & False Negative Rate \\
-FPR & False Positive Rate \\
-FSM & Finite State Machine \\
 GGUF & GPT-Generated Unified Format \\
 HITL & Human-in-the-Loop \\
 HMAC & Hash-based Message Authentication Code \\
 IDS / IPS & Intrusion Detection / Prevention System \\
-KV & Key-Value (LLM KV-Cache Mechanism) \\
 LLM & Large Language Model \\
 MITRE ATT\&CK & MITRE Adversarial Tactics, Techniques, and Common Knowledge \\
-NIST & National Institute of Standards and Technology \\
 RAG & Retrieval-Augmented Generation \\
+RAGAS & Retrieval-Augmented Generation Assessment \\
 RRF & Reciprocal Rank Fusion \\
 SIEM & Security Information and Event Management \\
 SOAR & Security Orchestration, Automation, and Response \\
 SOC & Security Operations Center \\
-TPR & True Positive Rate \\
 WAF & Web Application Firewall \\
 \bottomrule
 \end{longtable}
@@ -290,7 +283,7 @@ WAF & Web Application Firewall \\
 G. González-Granadillo, S. González-Zarzosa, and R. Diaz, ``Security Information and Event Management (SIEM): Analysis, Trends, and Usage in Critical Infrastructures,'' \textit{Sensors}, vol. 21, no. 14, art. 4759, 2021.
 
 \bibitem{alertfatigue2022}
-S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Security Operations Centres: Research Challenges and Opportunities,'' \textit{ACM Computing Surveys}, vol. 57, no. 9, art. 224, 2025.
+S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Security Operations Centers: Research Challenges and Opportunities,'' \textit{ACM Computing Surveys}, vol. 57, no. 9, art. 224, 2025.
 
 \bibitem{alahmadi2022}
 B. A. AlAhmadi, L. Axon, and I. Martinovic, ``99\% False Positives: A Qualitative Study of SOC Analysts' Perspectives on Security Alarms,'' in \textit{Proceedings of the 31st USENIX Security Symposium}, 2022, pp. 2783--2800.
@@ -299,7 +292,7 @@ B. A. AlAhmadi, L. Axon, and I. Martinovic, ``99\% False Positives: A Qualitativ
 Ismail, R. Kurnia, Z. A. Brata, G. A. Nelistiani, S. Heo, H. Kim, and H. Kim, ``Toward Robust Security Orchestration and Automated Response in Security Operations Centers with a Hyper-Automation Approach Using Agentic Artificial Intelligence,'' \textit{Information}, vol. 16, no. 5, art. 365, 2025.
 
 \bibitem{vaswani2017}
-A. Vaswani \textit{et al.}, ``Attention is All You Need,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, pp. 5998--6008, 2017.
+A. Vaswani \textit{et al.}, ``Attention is All You Need,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, 2017.
 
 \bibitem{promptinjection2023}
 K. Greshake, S. Abdelnabi, S. Mishra, A. Endres, T. Holz, and M. Fritz, ``More than you've asked for: A Comprehensive Analysis of Novel Prompt Injection Threats to Application-Integrated Large Language Models,'' \textit{arXiv preprint arXiv:2302.12173}, 2023.
@@ -308,22 +301,25 @@ K. Greshake, S. Abdelnabi, S. Mishra, A. Endres, T. Holz, and M. Fritz, ``More t
 S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,'' NIST Special Publication 800-207, National Institute of Standards and Technology, 2020.
 
 \bibitem{owasp_llm2025}
-OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
+OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/ [Accessed: Aug. 10, 2026].
 
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
 
 \bibitem{csic2010}
-C. Torrano-Giménez, A. Pérez-Villegas, and G. Álvarez Marañón, ``HTTP DATASET CSIC 2010,'' Information Security Institute, Spanish National Research Council (CSIC), 2010. [Online]. Available: https://www.isi.csic.es/dataset/HTTP
+C. Torrano-Giménez, A. Pérez-Villegas, and G. Álvarez Marañón, ``HTTP DATASET CSIC 2010,'' Information Security Institute, Spanish National Research Council (CSIC), 2010. [Online]. Available: https://www.isi.csic.es/dataset/HTTP [Accessed: Aug. 10, 2026].
+
+\bibitem{dapt2020}
+S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kang, ``DAPT 2020 -- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \textit{Deployable Machine Learning for Security Defense (MLHat 2020)}, Communications in Computer and Information Science, vol. 1271, Springer, 2020, pp. 138--163.
 
 \bibitem{advbench2023}
 A. Zou, Z. Wang, J. Z. Kolter, and M. Fredrikson, ``Universal and Transferable Adversarial Attacks on Aligned Language Models,'' \textit{arXiv preprint arXiv:2307.15043}, 2023.
 
 \bibitem{deepset2023}
-Deepset, ``Prompt Injections Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/deepset/prompt-injections
+Deepset, ``Prompt Injections Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/deepset/prompt-injections [Accessed: Aug. 10, 2026].
 
 \bibitem{jackhhao2023}
-jackhhao, ``Jailbreak Classification Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/jackhhao/jailbreak-classification
+jackhhao, ``Jailbreak Classification Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/jackhhao/jailbreak-classification [Accessed: Aug. 10, 2026].
 
 \bibitem{bigdata2019}
 R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterogeneous Data: A Survey,'' \textit{Journal of Big Data}, vol. 2, art. 3, 2015.
@@ -344,10 +340,10 @@ S. Weerawardhena, P. Kassianik, B. Nelson, B. Saglam \textit{et al.} (Cisco Foun
 P. Kassianik, B. Saglam \textit{et al.} (Cisco Foundation AI), ``Llama-3.1-FoundationAI-SecurityLLM-Base-8B Technical Report,'' \textit{arXiv preprint arXiv:2504.21039}, 2025.
 
 \bibitem{langgraph2024}
-LangChain AI, ``LangGraph: Multi-Actor, Stateful LLM Applications,'' \textit{GitHub repository}, 2024. [Online]. Available: https://github.com/langchain-ai/langgraph
+LangChain AI, ``LangGraph: Multi-Actor, Stateful LLM Applications,'' \textit{GitHub repository}, 2024. [Online]. Available: https://github.com/langchain-ai/langgraph [Accessed: Aug. 10, 2026].
 
 \bibitem{rag2020}
-P. Lewis \textit{et al.}, ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 33, pp. 9459--9474, 2020.
+P. Lewis \textit{et al.}, ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 33, 2020.
 
 \bibitem{faiss2019}
 J. Johnson, M. Douze, and H. Jégou, ``Billion-Scale Similarity Search with GPUs,'' \textit{IEEE Transactions on Big Data}, vol. 7, no. 3, pp. 535--547, 2021.
@@ -362,7 +358,7 @@ G. V. Cormack, C. L. A. Clarke, and S. Buettcher, ``Reciprocal Rank Fusion Outpe
 B. E. Strom, A. Applebaum, D. P. Miller, K. C. Nickels, A. G. Pennington, and C. B. Thomas, ``MITRE ATT\&CK: Design and Philosophy,'' The MITRE Corporation, Technical Report MP180360, 2018.
 
 \bibitem{nist80061}
-P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' NIST Special Publication 800-61 Revision 2, 2012.
+P. Cichonski, T. Millar, T. Grance, and K. Scarfone, ``Computer Security Incident Handling Guide,'' NIST Special Publication 800-61 Revision 2, National Institute of Standards and Technology, 2012.
 
 \bibitem{watchtower2026}
 R. Pandey and A. Bhujang, ``Poisoning the Watchtower: Prompt Injection Attacks Against LLM-Augmented Security Operations Through Adversarial Log Content,'' \textit{arXiv preprint arXiv:2605.24421}, 2026.
@@ -392,13 +388,10 @@ R. Sahay \textit{et al.}, ``Policy-Guided Threat Hunting: An LLM Enabled Framewo
 K. Peffers, T. Tuunanen, M. A. Rothenberger, and S. Chatterjee, ``A Design Science Research Methodology for Information Systems Research,'' \textit{Journal of Management Information Systems}, vol. 24, no. 3, pp. 45--77, 2007.
 
 \bibitem{owasp2021}
-OWASP Foundation, ``OWASP Top 10:2021 - The Ten Most Critical Web Application Security Risks,'' The OWASP Foundation, 2021. [Online]. Available: https://owasp.org/Top10/
+OWASP Foundation, ``OWASP Top 10:2021 - The Ten Most Critical Web Application Security Risks,'' The OWASP Foundation, 2021. [Online]. Available: https://owasp.org/Top10/ [Accessed: Aug. 10, 2026].
 
 \bibitem{reimers2019sentence}
 N. Reimers and I. Gurevych, ``Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks,'' in \textit{Proceedings of the Conference on Empirical Methods in Natural Language Processing (EMNLP)}, 2019.
-
-\bibitem{dapt2020}
-S. Myneni, A. Chowdhary, A. Sabur, S. Sengupta, G. Agrawal, D. Huang, and M. Kang, ``DAPT 2020 -- Constructing a Benchmark Dataset for Advanced Persistent Threats,'' in \textit{Deployable Machine Learning for Security Defense (MLHat 2020)}, Communications in Computer and Information Science, vol. 1271, Springer, 2020, pp. 138--163.
 
 \bibitem{shen2024dan}
 X. Shen, Z. Chen, M. Backes, Y. Shen, and Y. Zhang, ```Do Anything Now': Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models,'' in \textit{Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications Security (CCS)}, 2024, pp. 1671--1685.

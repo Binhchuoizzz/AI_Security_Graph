@@ -18,7 +18,7 @@ Operating at wire-speed imposes strict algorithmic constraints on Tier 1: proces
     \mu_k = \mu_{k-1} + \frac{x_k - \mu_{k-1}}{k}, \quad S_k = S_{k-1} + (x_k - \mu_{k-1})(x_k - \mu_k)
 \end{equation}
 
-Finally, Gradient Boosted Decision Tree (GBDT) machine learning models—exemplified by LightGBM~\cite{ke2017lightgbm}—provide rapid classification of multi-dimensional telemetry patterns. Combining deterministic rule filtering, $Z$-score statistical normalization, and machine learning classification creates a high-speed multi-stage defense line, ensuring high-throughput offloading while maintaining robustness against adversarial telemetry variants.
+Finally, Gradient Boosted Decision Tree (GBDT) machine learning models---exemplified by LightGBM~\cite{ke2017lightgbm}---provide rapid classification of multi-dimensional telemetry patterns. Combining deterministic rule filtering, $Z$-score statistical normalization, and machine learning classification creates a high-speed multi-stage defense line, ensuring high-throughput offloading while maintaining robustness against adversarial telemetry variants.
 
 \section{Local Large Language Models and Tier 2 Agentic Intelligence}
 \label{sec:local_llm}
@@ -35,7 +35,7 @@ enabling transparent cross-referencing of log telemetry against MITRE ATT\&CK te
 \section{Adversarial AI Security and Log Audit Cryptography}
 \label{sec:adversarial_theory}
 
-Integrating Large Language Models into security operations introduces log-substrate prompt injection risks~\cite{promptinjection2023, owasp_llm2025}. Because raw log content is adversary-controlled, content-matching filters or probabilistic keyword detectors remain vulnerable to novel adversarial variants~\cite{watchtower2026}. This theoretical foundation necessitates protecting the reasoning tier via deterministic structural isolation (Delimited Nonce Encapsulation), establishing an absolute boundary between control instructions and untrusted telemetry.
+Integrating Large Language Models into security operations introduces log-substrate prompt injection risks~\cite{promptinjection2023, owasp_llm2025}. Because raw log content is adversary-controlled, content-matching filters or probabilistic keyword detectors remain vulnerable to novel adversarial variants~\cite{watchtower2026}. This theoretical foundation necessitates protecting the reasoning tier via deterministic structural isolation (Delimited Data Encapsulation), establishing an absolute boundary between control instructions and untrusted telemetry.
 
 Regarding forensic audit integrity, evidence records are sealed in sequence using HMAC-SHA256 signature chaining~\cite{hmac1997} under a local secret key. Theoretical boundaries must be precisely stated: symmetric HMAC encryption guarantees tamper-evidence and modification detection, but does not provide non-repudiation, which requires asymmetric digital signature infrastructure.
 
@@ -49,11 +49,11 @@ The second group, retrieval-augmented classification agents such as CyberRAG~\ci
 
 The third group, multi-agent and governance-focused frameworks, includes AutoBnB-RAG~\cite{autobnb2025}, LanG~\cite{lang2026}, and Policy-Guided Threat Hunting~\cite{splunkllm2026}. AutoBnB-RAG evaluates multi-agent incident response in simulated tabletop environments (\textit{Backdoors \& Breaches}). LanG utilizes LangGraph with human-in-the-loop checkpoints and dual-layer defense (regex plus Llama Prompt Guard 2 achieving 98.1\% F1). Policy-Guided Threat Hunting employs reconstruction autoencoders and deep reinforcement learning prior to LLM contextual analysis.
 
-A precise research gap emerges: cost-tiering exists in Policy-Guided Threat Hunting, prompt defense exists in LanG, and local execution is demonstrated across systems. However, no single architecture unifies: (1) resolving the vast majority of telemetry at a statistical/ML tier with sub-millisecond latency and offload rates modeled by attack base rate; (2) stateful reasoning on a local GPU under strict retrieval grounding rules; and (3) structural prompt defense paired with HMAC-SHA256 forensic sealing. Table~\ref{tab:related_work_comparison} provides a detailed comparative analysis.
+A precise research gap emerges: cost-tiering exists in Policy-Guided Threat Hunting, prompt defense exists in LanG, and local execution is demonstrated across systems. However, no single architecture unifies: (1) resolving the vast majority of telemetry at a statistical/ML tier with sub-millisecond latency and offload rates reported against the attack base rate at which they were measured; (2) stateful reasoning on a local GPU under strict retrieval grounding rules; and (3) structural prompt defense paired with HMAC-SHA256 forensic sealing. Table~\ref{tab:related_work_comparison} provides a detailed comparative analysis.
 
 \begin{table}[htbp]
 \centering
-\caption{Comparative analysis between SENTINEL and existing security defense solutions}
+\caption[Comparative analysis with existing defense solutions]{Comparative analysis between SENTINEL and existing security defense solutions}
 \label{tab:related_work_comparison}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
@@ -63,9 +63,9 @@ A precise research gap emerges: cost-tiering exists in Policy-Guided Threat Hunt
 \midrule
 Core Technique & Static correlation rules, rigid Python/JS scripts & Agentic RAG, multi-agent orchestration, DRL pre-classification & Rule-based signatures + Welford $\mathcal{O}(1)$ + LightGBM T1, LangGraph Agent T2 \\
 Operational Goal & Centralized log aggregation and playbook response & Automated incident investigation via language reasoning & Resolve volume at cheap tier, reserve costly tier for complex cases \\
-Latency \& Cost Tiering & Single cheap tier, no context reasoning & Present in select works (DRL pre-classification); offload rate not modeled by attack rate & Two-tier: $\le 0.88$\,ms at T1; $90\%-97\%$ offloading before T2 \\
+Latency \& Cost Tiering & Single cheap tier, no context reasoning & Present in select works (DRL pre-classification); offload rate not reported against the attack base rate & Two-tier: 0.182\,ms mean at T1; 97.5\% offloaded before T2 at a 9.8\% attack base rate \\
 Data Sovereignty & On-premise local & Local deployment reported; hardware constraints not strictly bounded & 100\% Air-gapped on local GPU \\
-Prompt Defense & Not applicable & Probabilistic classifiers (LanG: regex + Prompt Guard 2, 98.1\% F1) & Structural Nonce guarantee, payload-wording independent \\
+Prompt Defense & Not applicable & Probabilistic classifiers (LanG: regex + Prompt Guard 2, 98.1\% F1) & Structural Delimited Data Encapsulation, independent of payload wording \\
 Forensic Audit & Standard text logs (susceptible to tampering) & Audit logs recorded (LanG: \texttt{mcp\_audit.db}); no cryptographic sealing & HMAC-SHA256 tamper-evident evidence chain \\
 \bottomrule
 \end{tabularx}

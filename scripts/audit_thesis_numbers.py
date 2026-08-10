@@ -115,14 +115,6 @@ CLAIMS = [
     ),
     ("auto-BLOCK số lệnh", "ml_gate_results.json", "classification.auto_block_n", num(0), ["ch4"]),
     ("cache tỉ lệ trúng", "cache_efficiency_results.json", "hit_rate", pct(1, 100), ["ch4"]),
-    ("vòng phản hồi số luật", "feedback_loop_results.json", "n_rules_approved", num(0), ["ch4"]),
-    (
-        "vòng phản hồi giảm leo thang",
-        "feedback_loop_results.json",
-        "delta.escalation_reduction_pct",
-        pct(2),
-        ["ch4"],
-    ),
     ("độ trễ TB hai tầng", "latency_benchmark.json", "two_tier_mean_ms", num(1), ["ch4"]),
     (
         "độ trễ trung vị đơn tầng",
@@ -139,14 +131,6 @@ CLAIMS = [
         ["ch4", "ch5", "main"],
     ),
     ("p95 hai tầng", "latency_benchmark.json", "two_tier_p95_ms", num(0), ["ch4"]),
-    (
-        "xả tải trong lượt đo độ trễ",
-        "latency_benchmark.json",
-        "stage_breakdown.offload_pct",
-        pct(1),
-        ["ch4"],
-    ),
-    # ── RQ2 ──
     (
         "né tránh Cổng ML chế độ khó",
         "ml_gate_results.json",
@@ -170,14 +154,6 @@ CLAIMS = [
         num(0),
         ["ch4", "ch5", "main"],
     ),
-    (
-        "tràn ngữ cảnh xấu nhất",
-        "context_stress_results.json",
-        "worst_compressed_tokens_diverse",
-        num(0),
-        ["ch4"],
-    ),
-    # ── RQ3 ──
     (
         "quy kết chỉ truy xuất",
         "attack_mapper_eval_rrf_payload.json",
@@ -381,50 +357,6 @@ CLAIMS = [
         "ablation_action_scores.json",
         "configs.F.autonomy_rate",
         pct(2, 100),
-        ["ch4"],
-    ),
-    (
-        "ablation B đúng hành động",
-        "ablation_action_scores.json",
-        "configs.B.action_accuracy",
-        pct(2, 100),
-        ["ch4"],
-    ),
-    (
-        "ablation C đúng hành động",
-        "ablation_action_scores.json",
-        "configs.C.action_accuracy",
-        pct(2, 100),
-        ["ch4"],
-    ),
-    # ── Zero-day: đường cong nhận biết theo k-sigma ──
-    (
-        "zero-day nhận biết 2 sigma",
-        "zeroday_graded_results.json",
-        "sweep.0.noticed_rate",
-        pct(2, 100),
-        ["ch4"],
-    ),
-    (
-        "zero-day nhận biết bão hoà",
-        "zeroday_graded_results.json",
-        "sweep.3.noticed_rate",
-        pct(2, 100),
-        ["ch4"],
-    ),
-    (
-        "zero-day nhận biết 100 sigma",
-        "zeroday_graded_results.json",
-        "sweep.10.noticed_rate",
-        pct(2, 100),
-        ["ch4"],
-    ),
-    # ── Đối chứng âm APT: nêu ở mức minh chứng khái niệm, CI phải đi kèm ──
-    (
-        "APT cận dưới KTC",
-        "apt_negative_control_results.json",
-        "recall_wilson95_ci.0",
-        dec(2),
         ["ch4"],
     ),
 ]

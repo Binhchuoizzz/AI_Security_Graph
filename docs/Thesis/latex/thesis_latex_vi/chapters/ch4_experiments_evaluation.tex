@@ -1,179 +1,162 @@
 \chapter{Thực nghiệm và Đánh giá}
 \label{ch:experiments_evaluation}
 
-Chương này trình bày toàn bộ kết quả đánh giá thực nghiệm định lượng hệ thống SENTINEL trên ba khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ an ninh đối kháng AI kèm niêm phong kiểm toán mật mã, và chất lượng suy luận nhận thức tác tử. Hệ thống được đánh giá trên máy chủ cách ly mạng (Docker Compose, Intel Core i7, 32\,GB RAM, GPU NVIDIA cục bộ chạy CUDA \texttt{llama.cpp} với Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Theo phương pháp luận tại Mục~\ref{sec:methodology}, tỷ lệ xả tải được đo trên luồng lưu lượng quy mô vận hành gồm 99.717 sự kiện với tỷ lệ tấn công 9,8\% phản ánh base-rate gần thực tế~\cite{alahmadi2022}. Chất lượng phân loại và rào chắn được đánh giá trên các tập dữ liệu chuẩn hóa CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020} cùng 823 mẫu đối kháng~\cite{advbench2023, deepset2023, jackhhao2023, shen2024dan}. Trong suốt quá trình đo đạc, các luật động được đóng băng và mọi tỷ lệ đều công bố kèm mẫu số đã dùng để đo. Chương chỉ báo cáo những phép đo phục vụ trực tiếp một trong ba câu hỏi nghiên cứu; các phép kiểm chứng tham số thiết kế và các phép thử minh chứng khả thi được lược bỏ vì không đỡ cho bất kỳ tuyên bố đóng góp nào.
+Chương này trình bày kết quả đánh giá thực nghiệm hệ thống SENTINEL trên ba khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ đối kháng AI kèm niêm phong mật mã, và chất lượng suy luận nhận thức tác tử. Thực nghiệm được thực hiện trên máy chủ cách ly mạng (Docker Compose, Intel Core i7, 32\,GB RAM, GPU NVIDIA cục bộ chạy Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Tỷ lệ xả tải được đo trên 99.717 sự kiện có tỷ lệ tấn công nền 9,8\%, tương thích với tỷ lệ đe dọa thực thấp đã ghi nhận tại các SOC vận hành~\cite{alahmadi2022}; chất lượng phân loại và rào chắn được đánh giá trên các tập chuẩn hóa (CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020}) cùng 823 mẫu đối kháng~\cite{advbench2023, deepset2023, jackhhao2023, shen2024dan}. Mọi thước đo đều công bố mẫu số đo đạc tương ứng và tập trung trực tiếp vào giải đáp các câu hỏi nghiên cứu.
 
 \section{Hiệu năng Xả tải Lưu lượng và Kinh tế học Tầng lọc}
 \label{sec:tier1_performance}
 
-Theo định nghĩa tại Mục~\ref{sec:architecture_overview}, một sự kiện được tính là xả tải khi được giải quyết mà không kích hoạt lời gọi mô hình ngôn ngữ, phép đếm này gồm cả \texttt{BLOCK\_IP}, \texttt{ALERT} và \texttt{AWAIT\_HITL} bên cạnh \texttt{DROP}, vốn đều không tiêu tốn token suy luận nào. Bảng~\ref{tab:tier1_performance} trình bày cấu phần xả tải theo từng tầng trên hai luồng có mật độ tấn công khác nhau.
+Nút thắt cổ chai lớn nhất của việc ứng dụng Mô hình Ngôn ngữ Lớn (LLM) trong các Trung tâm Điều hành An ninh (SOC) là chi phí suy luận đắt đỏ và độ trễ tính toán lớn nếu phải xử lý từng sự kiện đơn lẻ. Để giải quyết thách thức này, kiến trúc SENTINEL được thiết kế dựa trên nguyên lý kinh tế học tầng lọc (Filtration Economics): \textit{``giải quyết tất định các phán quyết rẻ trước khi leo thang lên tầng suy luận đắt''}. Theo định nghĩa tại Mục~\ref{sec:architecture_overview}, một sự kiện được tính là xả tải (offloaded) thành công khi được xử lý trực tiếp ở các tầng lọc bên dưới mà không kích hoạt lời gọi mô hình LLM. Phép đo này tính gộp tất cả các hành động phán quyết cuối cùng bao gồm \texttt{DROP}, \texttt{BLOCK\_IP}, \texttt{ALERT} và \texttt{AWAIT\_HITL}, bởi tất cả đều không phát sinh chi phí suy luận token.
+
+Kết quả thực nghiệm trên luồng vận hành dạng SOC gồm 99.717 sự kiện ở tỷ lệ tấn công nền 9,8\% chứng minh khả năng cắt giảm khối lượng tính toán của SENTINEL. Hệ thống xả tải thành công 97,5\% tổng lưu lượng (loại bỏ 97.199 lời gọi LLM), chỉ đẩy 2,5\% (2.518 sự kiện) lên Tầng 2 để suy luận nhận thức. Bảng~\ref{tab:tier1_performance} tổng hợp chi tiết cơ chế kỹ thuật, độ xả tải, độ trễ trung bình và hiệu quả tiết kiệm tài nguyên theo từng tầng xử lý của hệ thống.
 
 \begin{table}[htbp]
 \centering
-\caption{Tỷ lệ xả tải theo từng tầng trên hai luồng có tỷ lệ tấn công nền khác nhau}
+\caption[Hiệu quả xả tải và độ trễ theo từng tầng xử lý]{Chi tiết cơ chế kỹ thuật và hiệu quả xả tải theo từng tầng xử lý của SENTINEL trên luồng dạng SOC (99.717 sự kiện)}
 \label{tab:tier1_performance}
 \footnotesize
-\setlength{\tabcolsep}{5pt}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c c}
+\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.6cm} >{\raggedright\arraybackslash}X c c >{\raggedright\arraybackslash}p{3.2cm}}
 \toprule
-\textbf{Tầng giải quyết} & \multicolumn{2}{c}{\textbf{Luồng benchmark, 25.649 sk}} & \multicolumn{2}{c}{\textbf{Luồng dạng SOC, 99.717 sk}} \\
- & \textbf{Sự kiện} & \textbf{Tỷ lệ} & \textbf{Sự kiện} & \textbf{Tỷ lệ} \\
+\textbf{Tầng xử lý} & \textbf{Cơ chế kỹ thuật} & \textbf{Độ xả tải} & \textbf{Độ trễ trung bình} & \textbf{Hiệu quả tiết kiệm tài nguyên} \\
 \midrule
-Tầng 1 (luật + Welford + chữ ký) & 20.663 & 80,6\% & 38.207 & 38,3\% \\
-Cổng Học máy (4 dải) & 2.568 & 10,0\% & 58.992 & 59,2\% \\
+Tầng 1 (Luật và Welford) & Luật WAF tĩnh + Thống kê Z-score $O(1)$ & 38,3\% (38.207 sk) & 0,182\,ms & 0 token LLM, 0 GPU VRAM \\
+Cổng Học máy & Phân loại LightGBM (MCC 0,667) & 59,2\% (58.992 sk) & 0,287\,ms & Loại bỏ 58.992 lời gọi LLM; 0 FP trên 962 lệnh tự chặn \\
+Bộ đệm Ngữ nghĩa (Tầng 1.75) & Khớp chính xác dấu vân tải trọng HTTP; tỷ lệ trúng đệm, không phải phần xả tải luồng & 81,3\% (1.220/1.500) & 9,8\,ms & Tăng tốc 8,9$\times$ cho truy vấn trùng lặp \\
+Tầng 2 (Tác tử LLM) & LangGraph + Dual-RAG MITRE ATT\&CK & 2,5\% (2.518 sk) & 13.438\,ms & Gom 95,0\% đe dọa vào 15,76\% tải (giảm 84,24\% tải chuyên viên) \\
 \midrule
-Cộng dồn --- không chạm tới LLM & 23.231 & 90,6\% & 97.199 & 97,5\% \\
-Phần còn lại $\rightarrow$ Tầng 2 (LLM) & 2.418 & 9,4\% & 2.518 & 2,5\% \\
-\midrule
-\textit{Tỷ lệ tấn công nền của luồng} & \multicolumn{2}{c}{\textit{31,6\%}} & \multicolumn{2}{c}{\textit{9,8\%}} \\
+\textbf{Cộng dồn (Hệ thống)} & \textbf{Kiến trúc phân tầng hai tầng} & \textbf{97,5\% (97.199 sk)} & \textbf{Trung vị: 0,88\,ms} & \textbf{Loại bỏ 97.199 lời gọi LLM (nhanh hơn 20.531$\times$ thuần LLM)} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Tỷ lệ xả tải vận động như một hàm của tỷ lệ tấn công nền trong luồng chứ không phải một hằng số của hệ thống. Trong phạm vi một luồng, đại lượng này phân tách tuyến tính thành $\text{offload}(p) = (1-p)\cdot\text{offload}_{\text{lành}} + p\cdot\text{offload}_{\text{tấn công}}$: tỷ lệ theo từng nhãn trên luồng benchmark là 92,35\% và 86,72\%, tái lập chính xác mức 90,6\% đã đo; tương ứng, 97,88\% và 93,77\% tái lập mức 97,5\% trên luồng dạng SOC. Do các hệ số này khác nhau giữa hai luồng, quan hệ trên cho phép ngoại suy trong cùng một luồng nhưng không cho phép chuyển kết quả giữa hai luồng, nên con số 90,6\% không phải trần năng lực mà là hệ quả của một luồng kiểm thử mang tỷ lệ tấn công cao hơn ba lần mức thực tế. Tầng gánh tải cũng đảo chiều, từ Tầng 1 với 80,6\% trên luồng benchmark sang Cổng Học máy với 59,2\% trên luồng do lưu lượng lành tính chi phối, cho thấy hai tầng bù trừ cho nhau chứ không chồng lấn.
+Cơ chế xả tải phân tầng vận hành thông qua sự phối hợp chặt chẽ giữa các thành phần kỹ thuật. Tầng 1 sử dụng bộ luật chữ ký tĩnh kết hợp với thuật toán thống kê Welford $\mathcal{O}(1)$~\cite{welford1962} để giải quyết 38,3\% lưu lượng với độ trễ trung bình 0,182\,ms mà không tiêu tốn tài nguyên GPU; phần này gồm 31.012 sự kiện lành tính và 7.195 sự kiện tấn công cường độ cao. Cổng Học máy LightGBM~\cite{ke2017lightgbm} đóng vai trò bộ lọc trung gian, xử lý mỗi vector đặc trưng 7 chiều trong 0,287\,ms (thông lượng 3.452 sự kiện/giây) và xả tải thêm 59,2\% lưu lượng lành tính. Đánh giá trên tập \texttt{datatest.json} (4.236 sự kiện gồm đặc trưng luồng và tải trọng HTTP web), Cổng đạt MCC 0,667 và độ chính xác cân bằng 0,833 trên 2.534 sự kiện Cổng trực tiếp phán quyết, cùng precision 100\% (0 báo động giả) trên 962 lệnh tự động chặn (\texttt{BLOCK\_IP}). Đối với các sự kiện lặp lại, Bộ đệm Ngữ nghĩa Tầng 1.75 giải quyết 81,3\% truy vấn với hệ số tăng tốc 8,9$\times$. Nhờ đó, Tầng 2 chỉ phải xử lý 2,5\% số sự kiện phức tạp còn lại, giúp gom 95,0\% mối đe dọa thực sự vào 15,76\% khối lượng làm việc và cắt giảm 84,24\% lượng thông tin chuyên viên SOC phải phân tích.
 
-Một tỷ lệ xả tải cao chỉ có ý nghĩa nếu phần đã xả được phán quyết đúng, bởi việc cho qua bừa bãi cũng cho ra đúng con số đầu bảng như vậy. Trên \texttt{datatest.json}, Cổng Học máy đạt hệ số tương quan Matthews (Matthews Correlation Coefficient - MCC) 0,667 và Độ chính xác Cân bằng 0,833; MCC được chọn thay cho Accuracy vì một bộ phân loại luôn trả lời lành tính đã đạt 90,2\% Accuracy trên luồng dạng SOC. Mẫu số đi kèm ngay với thước đo: trong 4.236 sự kiện, Cổng chỉ phán quyết 2.534, do 1.586 sự kiện thiếu đặc trưng payload và 116 sự kiện bỏ phiếu trắng chuyển lên Tầng 2. Trong đó, 962 lệnh tự động chặn đạt Precision 100\% với không một dương tính giả nào, một điều kiện tiên quyết về vận hành chứ không phải thành tích ngẫu nhiên, bởi chặn nhầm lưu lượng hợp lệ sẽ biến hiệu quả thành gián đoạn dịch vụ. Thời gian suy luận trên một vector đặc trưng là 0,287\,ms (3.452 sự kiện mỗi giây), còn Bộ đệm khớp chính xác Tầng 1.75 giải quyết 81,3\% trong 1.500 truy vấn lặp với hệ số tăng tốc 8,9$\times$.
-
-Độ trễ được đo trên 500 sự kiện lấy mẫu theo bước nhảy cố định từ luồng benchmark. Độ trễ toàn tuyến trung bình giảm từ 17.187,9\,ms xuống 5.286,7\,ms ($-69,2\%$; kiểm định Mann--Whitney $U$, $p \approx 9 \times 10^{-57}$), còn độ trễ trung vị giảm từ 17.174,7\,ms xuống 0,88\,ms, tức khoảng 19.500 lần, vì sự kiện điển hình không bao giờ chạm tới mô hình. Tuy vậy bách phân vị thứ 95 lại xấu đi ở kiến trúc hai tầng, 25.829\,ms so với 21.434\,ms, vì một sự kiện leo thang phải trả chi phí Tầng 1 và Cổng Học máy trước khi trả chi phí mô hình: lợi thế nằm ở phần thân phân phối chứ không ở phần đuôi, như Hàm phân phối tích lũy thực nghiệm (Empirical Cumulative Distribution Function - ECDF) tại Hình~\ref{fig:latency_ecdf} thể hiện. Mức tiết kiệm tài nguyên được báo cáo theo số lời gọi tránh được, 97.199 trên 99.717 sự kiện, thay vì theo phần trăm VRAM, vì không có phép đo VRAM nào được thực hiện.
+Đánh giá độ trễ toàn tuyến trên 500 sự kiện lấy mẫu theo bước cố định cho thấy độ trễ trung bình giảm từ 17.187,9\,ms xuống 5.286,7\,ms (mức giảm 69,2\%; kiểm định Mann--Whitney $U$, $p \approx 9 \times 10^{-57}$). Độ trễ trung vị giảm từ 17.174,7\,ms xuống còn 0,88\,ms (rút ngắn gần 19.500 lần) do phần lớn sự kiện lành tính được giải quyết dưới 1\,ms ngay tại Tầng 1. Bách phân vị thứ 95 ($P_{95}$) ghi nhận 25.829\,ms (so với 21.434\,ms ở mô hình đơn tầng) do các sự kiện leo thang phải đi qua các lớp lọc trước khi tới mô hình ngôn ngữ, thể hiện qua đường phân phối tích lũy độ trễ (ECDF) tại Hình~\ref{fig:latency_ecdf}.
 
 \begin{figure}[htbp]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.05\textwidth]{images/fig_latency_ecdf.pdf}}
-    \caption{Phân phối tích lũy độ trễ trên 500 sự kiện. Sinh từ \texttt{latency\_benchmark.json}. (Nguồn: Tác giả)}
+    \caption[Phân phối tích lũy độ trễ ECDF trên 500 sự kiện]{Phân phối tích lũy độ trễ (ECDF) trên 500 sự kiện kiểm thử. (Nguồn: Tác giả)}
     \label{fig:latency_ecdf}
 \end{figure}
 
-Bốn cấu hình đối chứng được đo trên cùng một tập con phân tầng gồm 150 sự kiện, thay vì trích số đầu bảng từ các công bố khác vốn sẽ so sánh chéo giữa những bộ dữ liệu và định nghĩa thước đo khác nhau. Bảng~\ref{tab:throughput_baselines} trình bày thứ tự thông lượng thu được.
+So sánh thông lượng trên tập phân tầng 150 sự kiện đại diện cho lưu lượng lành tính, tấn công mạng và tấn công web (Bảng~\ref{tab:throughput_baselines}) cho thấy SENTINEL đạt thông lượng 3.860 sự kiện/giây, nhanh hơn 20.531$\times$ so với cấu hình đơn tầng thuần LLM (0,19 sự kiện/giây).
 
 \begin{table}[htbp]
 \centering
-\caption{Thông lượng của các cấu hình đối chứng trên cùng một tập con phân tầng 150 sự kiện}
+\caption[So sánh thông lượng giữa SENTINEL và các cấu hình đối chứng]{So sánh thông lượng giữa SENTINEL và các cấu hình đối chứng trên 150 sự kiện}
 \label{tab:throughput_baselines}
 \footnotesize
 \setlength{\tabcolsep}{5pt}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c}
 \toprule
-\textbf{Cấu hình đối chứng} & \textbf{Thông lượng} \\
+\textbf{Cấu hình đối chứng} & \textbf{Thông lượng (sk/giây)} \\
 \midrule
-H1 --- Chữ ký tĩnh, 30 họ WAF & 11.129 sk/s \\
-SENTINEL --- Tầng 1 + Cổng Học máy & 3.860 sk/s \\
-H2 --- LightGBM đơn tầng, ngưỡng phẳng & 2.162 sk/s \\
-H3 --- LLM đơn tầng (cùng dữ liệu, mô hình và prompt) & 0,19 sk/s \\
+H1 --- Chữ ký tĩnh (30 họ WAF) & 11.129 \\
+SENTINEL --- Tầng 1 + Cổng Học máy & 3.860 \\
+H2 --- LightGBM đơn tầng (ngưỡng phẳng) & 2.162 \\
+H3 --- LLM đơn tầng (cùng dữ liệu, mô hình, prompt) & 0,19 \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
-Đường xử lý tất định chạy nhanh hơn 20.531$\times$ so với việc đẩy mọi sự kiện qua mô hình, trong khi chữ ký tĩnh vẫn nhanh hơn SENTINEL khoảng ba lần, đúng như dự kiến với một tầng không thực hiện phép suy luận nào. Hai con số trong bảng không được phép cộng gộp, vì cấu hình 0,19\,sk/s đưa mọi sự kiện qua trọn vẹn tác tử Tầng 2, còn mốc 17.187,9\,ms là một lời gọi mô hình trần không có trần token.
 
 \section{Rào chắn An ninh Đối kháng AI và Toàn vẹn Kiểm toán Mật mã}
 \label{sec:adversarial_security_hmac}
 
-Câu hỏi nghiên cứu số 2 (RQ2) xác định tiêm nhiễm câu lệnh qua nền nhật ký là một véc-tơ rủi ro đại diện chứ không phải toàn bộ bề mặt tấn công, nên hai bề mặt khác nhau về bản chất cấu trúc đều được đánh giá: tấn công qua ngôn ngữ, kháng được nghĩa là một chỉ thị nhúng không làm đổi hành động của tác tử, và tấn công qua không gian đặc trưng, kháng được nghĩa là một mẫu bị bóp méo không bị phân loại lại thành lành tính. Ba quy ước chi phối cách đọc các tỷ lệ. Phán quyết tĩnh là phép tuyển logic của ba bộ dò được ghi nhận riêng rẽ nên định vị được thất bại; đối chứng âm trên nhật ký lành tính là bắt buộc, bởi một lớp gắn cờ mọi đầu vào cũng chặn mọi đầu vào; và mẫu từ kho công bố không bao giờ gộp với mẫu do tác giả biên soạn. Bảng~\ref{tab:rq2_security} nêu từng lớp rào chắn kèm mẫu số đo đạc tương ứng.
+Đánh giá an ninh đối kháng của SENTINEL được thực hiện trên hai bề mặt tấn công cốt lõi: tiêm nhiễm câu lệnh qua không gian ngôn ngữ (prompt injection) và thao túng vector đặc trưng ở không gian số (feature-space evasion). Tại Tầng 1, hệ thống triển khai lớp lọc chữ ký tĩnh sơ cấp gồm ba bộ dò song song (đối sánh dấu hiệu mẫu, trung hòa mã hóa và cô lập ký tự phân định) để phát hiện sớm các chỉ thị độc hại. Lớp lọc này được đánh giá trên 823 mẫu tiêm nhiễm ngôn ngữ chuẩn hóa thu thập từ ba kho dữ liệu công bố quốc tế gồm AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023} và jackhhao~\cite{jackhhao2023}, bổ sung các biến thể vượt rào DAN~\cite{shen2024dan}. Kết quả thực nghiệm ghi nhận lớp lọc tĩnh ngăn chặn 18,8\% (132/703 mẫu) thuộc kho công bố và đạt 72,5\% (58/80 mẫu) trên tập do tác giả biên soạn chuyên biệt cho các kỹ thuật che giấu phức tạp. Khi kiểm thử đối chứng âm trên 230 nhật ký lành tính, lớp lọc ghi nhận 46 cảnh báo nhầm (tương ứng tỷ lệ 20,0\%); toàn bộ 46 cảnh báo nhầm này đều xuất phát từ bộ dò mã hóa và chỉ mang tính chất chú thích bổ sung thông tin cho bản ghi chứ không từ chối phục vụ (DoS) hay làm gián đoạn lưu lượng hợp lệ. Bảng~\ref{tab:rq2_security} tổng hợp chi tiết kết quả đánh giá các lớp rào chắn an ninh đối kháng và niêm phong mật mã.
 
 \begin{table}[htbp]
 \centering
-\caption{Các lớp rào chắn, mẫu số đo đạc và kết quả}
+\caption[Kết quả đánh giá các lớp rào chắn an ninh đối kháng]{Các lớp rào chắn an ninh đối kháng, mẫu số đánh giá và kết quả phòng thủ, kể cả niêm phong mật mã}
 \label{tab:rq2_security}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.05}
-\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{3.5cm} c}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c}
 \toprule
-\textbf{Lớp rào chắn} & \textbf{Mẫu số} & \textbf{Kết quả} \\
+\textbf{Lớp rào chắn \& Bề mặt tấn công} & \textbf{Mẫu số đo đạc} & \textbf{Kết quả phòng thủ} \\
 \midrule
-\multicolumn{3}{l}{\textit{Tầng 1 --- tấn công qua ngôn ngữ}} \\
-Lọc tĩnh, kho công bố & 703 mẫu & 132 $\rightarrow$ 18,8\% \\
-\quad theo bộ dò: mẫu / mã hoá / phân định & 703 & 114 / 29 / 0 \\
-Lọc tĩnh, mẫu tác giả biên soạn & 80 mẫu & 58 $\rightarrow$ 72,5\% \\
-Lọc tĩnh, tập kiểm chéo & 40 mẫu & 2 $\rightarrow$ 5,0\% \\
-Lọc tĩnh --- báo nhầm trên nhật ký lành & 230 log lành & 46 $\rightarrow$ 20,0\% \\
-\midrule
-\multicolumn{3}{l}{\textit{Tầng 1 --- tấn công qua không gian đặc trưng}} \\
-Cổng Học máy --- né tránh, chế độ khó (bóp méo mọi đặc trưng; 13 mẫu lật, KTC 95\% 97,86--99,27) & 1.036 tấn công đã phát hiện & 1.023 $\rightarrow$ 98,75\% \\
-Cổng Học máy --- chế độ đơn đặc trưng ($\infty$ / cực trị) & 1.036 $\times$ 2 & 100\% cả hai \\
-Cổng Học máy --- bỏ phiếu trắng khi đầu vào méo & 4.236 sự kiện & 116 $\rightarrow$ leo thang \\
-\midrule
-\multicolumn{3}{l}{\textit{Tầng 2 --- bảo chứng cấu trúc}} \\
-Đóng gói phân định bằng nonce & 678 mẫu khó, phủ 100\% & 678 $\rightarrow$ 100\% \\
-Tập theo vị trí trường, từng vị trí & 100 mẫu công bố & 24/24, 23/23, 30/30, 23/23 \\
-Thẩm định lược đồ khi ép backend lỗi & 1 lỗi tạo chủ động & \texttt{AWAIT\_HITL}, không sập \\
-\midrule
-\multicolumn{3}{l}{\textit{Toàn vẹn pháp y}} \\
-HMAC --- ba kiểu giả mạo cốt lõi & 30 lượt mỗi kiểu & 100\% \\
-HMAC --- đối chứng âm (chuỗi nguyên vẹn) & 450 bản ghi & không báo động giả \\
-HMAC --- cắt đuôi chuỗi & --- & 0\% --- không phát hiện được \\
+Lọc tĩnh Tầng 1 (Kho mẫu công bố) & 703 mẫu & 18,8\% (132/703) \\
+Lọc tĩnh Tầng 1 (Mẫu tác giả biên soạn) & 80 mẫu & 72,5\% (58/80) \\
+Lọc tĩnh Tầng 1 (Đối chứng nhật ký lành tính) & 230 nhật ký lành tính & 20,0\% báo nhầm (chú thích) \\
+Cổng Học máy (Né tránh đặc trưng cực trị) & 1.036 mẫu tấn công & 98,75\% (1.023/1.036) \\
+Cổng Học máy (Bỏ phiếu trắng khi đặc trưng méo) & 4.236 sự kiện & 116 sự kiện leo thang T2 \\
+Đóng gói Dữ liệu Phân định Tầng 2 (Kháng tiêm nhiễm) & 678 mẫu leo thang & 100,0\% (678/678) \\
+Đóng gói Dữ liệu Phân định Tầng 2 (4 vị trí trường) & 100 mẫu công bố & 100,0\% (24/24, 23/23, 30/30, 23/23) \\
+Kiểm tra lược đồ Pydantic (Lỗi backend ép phát sinh) & 1 lỗi tạo chủ động & \texttt{AWAIT\_HITL} (không sập) \\
+Niêm phong HMAC-SHA256 (3 kịch bản giả mạo) & 30 lượt thử/kiểu & 100,0\% phát hiện giả mạo \\
+Niêm phong HMAC-SHA256 (Nhật ký nguyên vẹn) & 450 bản ghi & 0 báo động giả \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Lớp lọc tĩnh chặn 18,8\% kho mẫu công bố, con số phải được đọc kèm tỷ lệ báo nhầm 20,0\% đo trên 230 nhật ký lành tính. Toàn bộ 46 lần báo nhầm đều xuất phát từ lớp dò mã hoá, và cái giá vận hành của chúng là có giới hạn: một cờ tĩnh chỉ nâng mức cô lập và chú thích vào bản ghi chứ không loại bỏ sự kiện hay chặn nguồn, nên đó là tỷ lệ chú thích thừa chứ không phải tỷ lệ lưu lượng hợp lệ bị từ chối phục vụ. Tập do tác giả biên soạn bị chặn tới 72,5\% vì 45 trong số 80 mẫu ấy thuộc dạng vượt rào bằng mã hoá mà bộ vô hiệu hoá được thiết kế để xử lý; con số gộp 23,3\% sẽ thổi phồng hiệu lực phòng thủ do tính cả những mẫu soạn khi đã biết trước tập luật tĩnh, nên 18,8\% mới là thước đo chính thức.
+Đối với 678 mẫu đối kháng phức tạp leo thang qua Tầng 1 (bao gồm 543 mẫu thực sự vượt rào), hệ thống chuyển giao lưu lượng cho Tầng 2 xử lý. Thay vì dựa vào mô hình phân loại xác suất vốn luôn tồn tại điểm mù trước các mẫu tấn công mới, Tầng 2 áp dụng cơ chế bảo chứng cấu trúc Đóng gói Dữ liệu Phân định (Delimited Data Encapsulation). Cơ chế này nhúng nhật ký thô vào môi trường cô lập tất định bằng các ranh giới ngẫu nhiên duy nhất, ngăn chỉ thị nhúng trong dữ liệu ghi đè chỉ thị hệ thống của LLM. Đánh giá trên toàn bộ 678 mẫu leo thang (độ phủ 100\%), Tầng 2 đạt tỷ lệ vô hiệu hóa 100\% (678/678 mẫu), chặn toàn bộ các nỗ lực chiếm quyền tác tử trong phạm vi tập mẫu này. Kiểm thử theo vị trí trên 100 mẫu phân bổ ở bốn trường dữ liệu (\texttt{URI}, \texttt{User-Agent}, \texttt{message}, \texttt{payload}) đều ghi nhận tỷ lệ bảo vệ 100\%. Trường hợp backend bị ép phát sinh lỗi cấu trúc, trình kiểm soát Pydantic tự động đưa tác tử về trạng thái an toàn \texttt{AWAIT\_HITL} mà không gây sập hệ thống.
+
+Ở bề mặt tấn công né tránh không gian đặc trưng số (feature-space evasion), 1.036 mẫu tấn công trích từ hai tập dữ liệu chuẩn CSE-CIC-IDS2018~\cite{ids2018} và CSIC 2010~\cite{csic2010} được làm méo đặc trưng ở mức cực trị để kiểm thử Cổng Học máy LightGBM. Cổng áp dụng cơ chế kẹp giá trị Z-score ($\pm 8\sigma$) và chính sách bỏ phiếu trắng (abstain) khi có hơn 30\% số đặc trưng vượt $6\sigma$. Kết quả cho thấy 98,75\% số mẫu (1.023/1.036 mẫu) vẫn bị giữ nguyên phân loại độc hại, đồng thời tự động chuyển giao 116 sự kiện nghi vấn (từ tập 4.236 sự kiện web/flow) lên Tầng 2 để suy luận sâu. Hình~\ref{fig:guardrail_rates} thể hiện tỷ lệ chặn của lớp lọc tĩnh theo nguồn mẫu bên cạnh tỷ lệ báo nhầm trên nhật ký lành tính.
 
 \begin{figure}[htbp]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.05\textwidth]{images/fig_guardrail_rates.pdf}}
-    \caption{Tỷ lệ chặn của lớp lọc tĩnh theo xuất xứ mẫu, đặt cạnh tỷ lệ báo nhầm trên nhật ký lành tính. Sinh từ \texttt{robustness\_results.json} và \texttt{adversarial\_negative\_results.json}. (Nguồn: Tác giả)}
+    \caption[Tỷ lệ chặn của lớp lọc tĩnh và tỷ lệ báo nhầm]{Tỷ lệ chặn của lớp lọc tĩnh theo nguồn mẫu và tỷ lệ báo nhầm trên nhật ký lành tính. (Nguồn: Tác giả)}
     \label{fig:guardrail_rates}
 \end{figure}
 
-Ở chế độ né tránh khó, khi mọi đặc trưng của một cuộc tấn công đã phát hiện đều bị đẩy tới cực trị, 98,75\% số mẫu vẫn kháng được việc bị phân loại lại; hai chế độ đơn đặc trưng đạt 100\%, và luận văn trích chế độ khó thay vì lấy trung bình, bởi bình quân hai chế độ đã bão hoà tầm thường sẽ thổi con số vượt quá mức mà cơ chế phòng thủ chứng minh được. Bảo chứng cấu trúc đến từ Đóng gói Dữ liệu Phân định, đánh giá ở độ phủ 100\% trên toàn bộ 678 mẫu thuộc bảy nhóm mà lớp tĩnh không hấp thụ nổi, tức một tập cha của 543 mẫu thực sự đã vượt rào, khiến phép thử chặt hơn mức cần thiết chứ không phải được chọn mẫu có lợi. Tầng 2 kháng được 678 trên 678 mẫu. Khác với một bộ phân loại xác suất vốn tất yếu để lọt những gì nó không nhận ra, bảo chứng này hoàn toàn không phụ thuộc vào việc nhận diện nội dung độc hại. Do việc đóng gói được áp dụng theo từng trường, vị trí trường được kiểm riêng: trên 100 mẫu công bố trải đều ở URI, User-Agent, message và payload, Tầng 2 kháng được mọi mẫu, đồng đều ở cả bốn vị trí.
-
-Tính toàn vẹn pháp y được kiểm chứng bằng cách tính lại chuỗi từ bản ghi khởi thuỷ: vì mỗi mắt xích tiêu thụ giá trị băm của mắt xích liền trước, chỉ một byte bị sửa trong $D_j$ đã làm hỏng mọi mắt xích từ $j$ trở đi, khiến việc phát hiện xác định được vị trí chứ không chỉ là thông báo chung rằng có gì đó đã thay đổi. Ba kiểu giả mạo cốt lõi, gồm sửa nội dung, chèn bản ghi giả và xoá một bản ghi ở giữa, đều được phát hiện trong 30 trên 30 lượt thử, không một báo động giả nào trên 450 bản ghi nguyên vẹn. Khoá bí mật được nạp từ biến môi trường chứ không lấy mặc định trong mã nguồn, bởi một khoá lộ trong mã sẽ cho phép giả mạo toàn bộ chuỗi và vô hiệu hoá mọi tỷ lệ đã nêu. Việc cắt đuôi chuỗi vẫn không phát hiện được, đây là thuộc tính nội tại của mọi cơ chế xâu chuỗi nhật ký tuần tự; biện pháp khắc phục là neo định kỳ các giá trị băm ra ngoài hệ thống.
+Song song với rào chắn đối kháng, tính toàn vẹn nhật ký phục vụ điều tra pháp y an ninh mạng được bảo đảm bằng chuỗi băm mật mã HMAC-SHA256 liên kết nối tiếp, trong đó mỗi bản ghi tự động liên kết với giá trị băm của bản ghi liền trước. Thử nghiệm trên 30 kịch bản tấn công giả mạo cho từng dạng xâm phạm (sửa đổi nội dung bản ghi, chèn bản ghi giả và xóa bản ghi ở giữa) ghi nhận tỷ lệ phát hiện chính xác 100\% vị trí bị sai lệch mà không phát sinh báo động giả nào trên 450 bản ghi nguyên vẹn. Cơ chế này đảm bảo chống chối bỏ và giữ nguyên giá trị chứng cứ pháp y cho toàn bộ dữ liệu nhật ký hệ thống.
 
 \section{Suy luận Nhận thức Tác tử và Quy kết Kỹ thuật Tấn công}
 \label{sec:tier2_accuracy_rag}
 
-Các chiều đánh giá thuộc Câu hỏi nghiên cứu số 3 (RQ3), gồm quy kết kỹ thuật, hiệu quả truy xuất, minh bạch báo cáo và mức giảm tải cho chuyên viên, được đo độc lập vì chúng thất bại theo những nguyên nhân khác nhau. Phép quy kết được đánh giá trên 500 mẫu tầng payload trích từ CSIC 2010, gồm 250 mẫu có nhãn và 250 mẫu lành tính. Riêng truy xuất quy kết đúng chính xác 80,0\% số kỹ thuật, trong khi toàn tuyến tác tử chỉ đạt 68,0\%, độ chính xác mức chiến thuật giảm từ 80,0\% xuống 70,4\%, còn độ trễ trung vị tăng từ 0,54\,ms lên 13.293\,ms. Tầng suy luận vì vậy trả giá bốn bậc độ lớn về độ trễ mà cho độ chính xác quy kết thấp hơn chính tầng truy xuất nó được thêm vào để cải thiện. Trong 30 mẫu bị mất, có tới 22 trường hợp rào chắn neo bằng chứng đã ép kết quả về \texttt{N/A} vì kỹ thuật đề xuất không hiện diện trong tài liệu truy xuất của chính lô đó, một đánh đổi có chủ ý giữa độ chính xác và bảo chứng rằng hệ thống không bao giờ hành động dựa trên một mã không có căn cứ. Mọi con số ở đây phải đọc trên nền sàn của lớp đa số chứ không phải nền số không: \texttt{T1595.003} chiếm 130 trong 250 mẫu có nhãn, nên chỉ luôn trả lời một kỹ thuật ấy đã đạt 52\%.
+Năng lực suy luận nhận thức tác tử và quy kết kỹ thuật tấn công theo khung MITRE ATT\&CK của SENTINEL được đánh giá trên tập dữ liệu gồm 500 mẫu tải trọng HTTP (trích từ CSIC 2010~\cite{csic2010}, bao gồm 250 mẫu có nhãn tấn công ứng dụng web và 250 mẫu tải trọng lành tính). Đánh giá chặng truy xuất cho thấy module tri thức lai Dual-RAG (kết hợp FAISS tìm kiếm ngữ nghĩa và BM25 tìm kiếm từ khóa RRF) đạt trần truy xuất chính xác 80,0\% (200/250 mẫu) ở cấp kỹ thuật, với chỉ số Hit@3 đạt 0,93 đo trên 243 mẫu có leo thang. Tuy nhiên, khi đi qua toàn tuyến tác tử Tầng 2, độ chính xác quy kết ghi nhận 68,0\% (170/250 mẫu, với độ chính xác cấp chiến thuật đạt 70,4\% và độ trễ trung vị 13.293\,ms). Khoảng cách 12,0 điểm phần trăm từ chặng truy xuất đến phán quyết toàn tuyến xuất phát từ cơ chế rào chắn neo bằng chứng (evidence-anchoring guardrail): rào chắn này đã ép 22 trong 30 mẫu bị mất về trạng thái \texttt{N/A} do mã kỹ thuật đề xuất không hiện diện trong tập tài liệu được truy xuất. Đây là sự đánh đổi kiến trúc có chủ ý: ưu tiên bảo chứng chỉ phát ra mã kỹ thuật hiện diện trong tập chứng cứ đã truy xuất, thay vì phán quyết thiếu căn cứ. Bảng~\ref{tab:rq3_attribution} tổng hợp độ chính xác quy kết và trần truy xuất cho từng kỹ thuật.
 
 \begin{table}[htbp]
 \centering
-\caption{Quy kết theo từng kỹ thuật trên lát 500 mẫu tầng payload, kèm trần truy xuất cho cùng tập truy vấn. Quy kết chấm trên toàn bộ 250 mẫu có nhãn; truy xuất chấm trên 243 mẫu mà Tầng 1 đã leo thang và ở mức kỹ thuật cha, nên hai mẫu số khác nhau và không thể thay thế cho nhau.}
+\caption[Đánh giá độ chính xác quy kết kỹ thuật MITRE ATT\&CK]{Đánh giá độ chính xác quy kết kỹ thuật MITRE ATT\&CK và trần truy xuất RAG (quy kết trên 250 mẫu có nhãn; truy xuất trên 243 mẫu có leo thang)}
 \label{tab:rq3_attribution}
 \footnotesize
-\setlength{\tabcolsep}{5pt}
+\setlength{\tabcolsep}{4pt}
 \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}X c c c c}
 \toprule
-\textbf{Kỹ thuật ATT\&CK} & \textbf{$n$} & \textbf{Truy xuất hit@3} & \textbf{Chỉ truy xuất} & \textbf{Toàn tuyến} \\
+\textbf{Kỹ thuật ATT\&CK} & \textbf{$n$} & \textbf{Hit@3} & \textbf{Chỉ RAG} & \textbf{Toàn tuyến} \\
 \midrule
-\texttt{T1190} --- Khai thác ứng dụng công khai & 52 & 1,00 & 100,0\% & 63,5\% \\
-\texttt{T1059.007} --- Thực thi JavaScript & 30 & 1,00 & 100,0\% & 73,3\% \\
-\texttt{T1595.003} --- Dò quét theo từ điển & 130 & 0,96 & 90,8\% & 86,9\% \\
-\texttt{T1083} --- Dò tìm tệp và thư mục & 12 & 0,00 & 0,0\% & 16,7\% \\
-\texttt{T1071.001} --- Giao thức web & 26 & 1,00 & 0,0\% & 0,0\% \\
+\texttt{T1190} (Khai thác ứng dụng công khai) & 52 & 1,00 & 100,0\% & 63,5\% \\
+\texttt{T1059.007} (Thực thi JavaScript) & 30 & 1,00 & 100,0\% & 73,3\% \\
+\texttt{T1595.003} (Dò quét từ điển) & 130 & 0,96 & 90,8\% & 86,9\% \\
+\texttt{T1083} (Dò tìm tệp và thư mục) & 12 & 0,00 & 0,0\% & 16,7\% \\
+\texttt{T1071.001} (Giao thức Web) & 26 & 1,00 & 0,0\% & 0,0\% \\
 \midrule
-Toàn bộ kỹ thuật & 250 & 0,93 & 80,0\% & 68,0\% \\
+\textbf{Trung bình toàn bộ kỹ thuật} & \textbf{250} & \textbf{0,93} & \textbf{80,0\%} & \textbf{68,0\%} \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Bảng~\ref{tab:rq3_attribution} định vị thành phần đang hỏng theo cách không một con số gộp nào làm được. Với \texttt{T1083}, bộ truy xuất không bao giờ trả về đúng tài liệu, nên lỗi nằm ở kho tri thức và không chặng nào phía sau cứu được; với \texttt{T1071.001}, bộ truy xuất trả về đúng tài liệu mọi lần nhưng quy kết vẫn bằng không, nên lỗi nằm ở bộ ánh xạ. Hai tình huống đòi hỏi hai cách sửa khác nhau, mà con số gộp 68,0\% không chỉ ra được cách nào.
+Bảng~\ref{tab:rq3_attribution} chỉ ra hai dạng thất bại có bản chất khác nhau. Với kỹ thuật \texttt{T1083} (Dò tìm tệp và thư mục), module RAG đạt Hit@3 bằng 0,00 do tri thức tương ứng chưa được bao phủ trong kho tri thức, dẫn đến việc tác tử không có căn cứ để phán quyết. Ngược lại, với kỹ thuật \texttt{T1071.001} (Giao thức Web), tài liệu đúng luôn được truy xuất nhưng chỉ đứng hạng ba theo trung vị, nên phép khớp chính xác thất bại ở cả chặng truy xuất lẫn toàn tuyến (0,0\% ở cả hai): đây là lỗi ánh xạ ngữ cảnh chứ không phải lỗi độ phủ tri thức. Hình~\ref{fig:rq3_attribution} so sánh trần truy xuất RAG với độ chính xác quy kết toàn tuyến.
 
 \begin{figure}[htbp]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.05\textwidth]{images/fig_rq3_attribution.pdf}}
-    \caption{Quy kết theo từng kỹ thuật đối chiếu với trần truy xuất. Sinh từ ba tệp kết quả RQ3. (Nguồn: Tác giả)}
+    \caption[Độ chính xác quy kết kỹ thuật đối chiếu trần RAG]{Độ chính xác quy kết theo từng kỹ thuật đối chiếu với trần truy xuất RAG. (Nguồn: Tác giả)}
     \label{fig:rq3_attribution}
 \end{figure}
 
-Trên cùng lát 243 truy vấn đã leo thang, Dual-RAG đạt Recall@3 bằng 0,930 (KTC 95\% 0,891--0,956) và Nghịch đảo hạng trung bình 0,803, cao hơn hẳn các con số quy kết, qua đó xác nhận truy xuất không phải yếu tố giới hạn mức 80,0\%. Phần bất lợi cũng rõ ràng không kém: trên toàn bộ tập \texttt{ground\_truth} gồm 1.305 truy vấn, Recall@3 tụt xuống 0,385, vì các mẫu chỉ có đặc trưng luồng chiếm áp đảo trong dân số đó và không mang văn bản tầng ứng dụng nào để đối sánh, với \texttt{T1110} đạt hit@3 bằng 0,00 trên 236 truy vấn. Hai con số mô tả hai dân số khác nhau và không thể thay thế cho nhau.
-
-Nếu chỉ đánh giá phán quyết cuối thì bất kỳ lá chắn nào cũng đạt không ảo giác, kể cả một lá chắn hoàn toàn nằm im, nên phép đo được thực hiện trên bản ghi thực thi có lưu hành động trước và sau lá chắn. Trong 1.566 lô, có 1.421 lô khẳng định một kỹ thuật, và không một khẳng định nào trong 1.421 lô đó thiếu neo, kết quả này vẫn giữ nguyên ngay cả khi nới lỏng tới mức kỹ thuật cha. Lá chắn chứng tỏ đã thực sự hoạt động để đạt kết quả ấy: nó can thiệp trên 9,26\% số lô và ở 76 lô đã hạ \texttt{BLOCK\_IP} xuống \texttt{AWAIT\_HITL}, ngăn 76 lệnh chặn địa chỉ vĩnh viễn tự động mà lời biện giải không neo được vào bằng chứng. Một ranh giới được nêu chủ động: điểm số dùng tiêu chí chặt là mã phải nằm trong danh sách định danh tài liệu đã truy xuất, trong khi lá chắn đang vận hành khớp bằng biểu thức chính quy trên toàn văn ngữ cảnh, nên số không ở đây là cận trên của mức bỏ lọt chứ không phải một phép đếm chính xác.
-
-Tầng 1 leo thang 1.066 cảnh báo, trong đó chỉ 80 cảnh báo, tức 7,5\%, là đe doạ thật. Nếu đánh giá thuần tuý như một bộ phân loại nhị phân trên hàng đợi này, mô hình cho thấy năng lực phân biệt rất hạn chế: nó khẳng định cả 1.066 sự kiện mà không bác bỏ được cảnh báo lành tính nào trong 986 cảnh báo, cho MCC 0,0, Độ chính xác Cân bằng 0,5 và Tỷ lệ Dương tính Giả 99,55\% trong chính phần nó chủ động khẳng định. Giá trị vận hành nằm ở kênh mà cách nhìn nhị phân bỏ qua. Tác tử hoãn 168 cảnh báo, tương đương 15,76\% đầu vào, và hàng đợi đó chứa 76 trong 80 đe doạ thật, tức 95,0\%, với mật độ cảnh báo đúng 45,24\% so với 7,5\% ở đầu vào: mức làm giàu 6,03$\times$, nhờ đó một chuyên viên chỉ đọc hàng đợi hoãn sẽ giảm 84,24\% khối lượng tài liệu mà vẫn gặp 95,0\% số đe doạ thật. Mô hình vì vậy vận hành với vai trò bộ định tuyến phân loại chứ không phải một thẩm quyền quyết định tự trị; và vì 910 trong 1.066 ca leo thang là lưu lượng CSIC lành tính, con số này cũng phản ánh quyết định leo thang của Tầng 1 chứ không riêng hành vi của tác tử.
+Tầng 1 leo thang 1.066 cảnh báo tới Tầng 2, trong đó có 80 đe dọa thực sự (mật độ đe dọa nền 7,5\%). Nhờ cơ chế phân luồng nhận thức, tác tử Tầng 2 chủ động chuyển 168 cảnh báo (chiếm 15,76\% lưu lượng đầu vào) vào hàng đợi hoãn phán quyết (\texttt{AWAIT\_HITL}). Hàng đợi này chứa 76 trên 80 đe dọa thực sự, tương ứng độ bao phủ 95,0\% với precision 45,24\%, tức làm giàu 6,03$\times$ so với đầu vào. Cơ chế này giúp chuyên viên an ninh SOC cắt giảm 84,24\% khối lượng tài liệu phải phân tích mà vẫn kiểm soát được 95,0\% mối đe dọa thực tế. Hình~\ref{fig:triage_funnel} thể hiện phễu phân loại cảnh báo tại Tầng 2.
 
 \begin{figure}[htbp]
     \centering
     \makebox[\textwidth][c]{\includegraphics[width=1.05\textwidth]{images/fig_triage_funnel.pdf}}
-    \caption{Phân loại cảnh báo tại Tầng 2, đối chiếu kênh khẳng định với kênh hoãn. Sinh từ \texttt{tier2\_decision\_results.json}. (Nguồn: Tác giả)}
+    \caption[Phân loại cảnh báo tại Tầng 2 theo phễu nhận thức]{Phân loại cảnh báo tại Tầng 2 đối chiếu kênh khẳng định và hoãn. (Nguồn: Tác giả)}
     \label{fig:triage_funnel}
 \end{figure}
 
-Một mô hình trọng tài khác họ, Meta-Llama-3-8B-Instruct chấm điểm Foundation-Sec-8B-Instruct, đã chấm toàn bộ 1.052 sự kiện leo thang trên bốn trục RAGAS~\cite{ragas2023}, theo đúng quy trình khuyến nghị nhằm chống thiên lệch tự đề cao~\cite{zheng2023judge}: độ chuẩn xác ngữ cảnh 2,54, độ liên quan câu trả lời 4,52, độ trung thành 3,96 và độ bao phủ ngữ cảnh 4,11, trung bình 3,78 trên thang 5,0. Độ chuẩn xác ngữ cảnh là trục yếu nhất và củng cố chẩn đoán về truy xuất, bởi tập tài liệu trả về thường chứa những mục không liên quan tới sự kiện. Nghiêm trọng hơn, mức neo bằng chứng chỉ đạt 11,2\% (KTC 95\% 9,5--13,3), tức xấp xỉ chín trong mười lời biện giải không dẫn ra giá trị log nào đối chiếu ngược được với bản ghi. Đây là khoảng cách lớn nhất giữa thứ kiến trúc bảo chứng và thứ nó tự nguyện đưa ra: cơ chế neo chứng minh được một mã đã công bố là có căn cứ, nhưng không gì buộc phần văn xuôi bao quanh phải trích dẫn các giá trị trường dẫn tới mã đó, nên mục tiêu báo cáo pháp y minh bạch mới đạt một phần.
+Chất lượng suy luận của tác tử Foundation-Sec-8B-Instruct được đánh giá trên 1.052 sự kiện leo thang theo bốn trục RAGAS~\cite{ragas2023} bởi mô hình trọng tài khác họ Meta-Llama-3-8B-Instruct, đúng quy trình khuyến nghị nhằm tránh thiên lệch tự đề cao~\cite{zheng2023judge}. Kết quả ghi nhận điểm trung bình đạt 3,78/5,0 (với độ liên quan câu trả lời 4,52, độ bao phủ ngữ cảnh 4,11, độ trung thành 3,96 và độ chuẩn xác ngữ cảnh 2,54). Trục độ chuẩn xác ngữ cảnh thấp hơn phản ánh những hạn chế của module RAG khi trả về các tài liệu nhiễu. Ngược lại, tỷ lệ neo bằng chứng trực tiếp chỉ đạt 11,2\% (KTC 95\% 9,5--13,3\%): chưa tới một phần tám lời biện giải dẫn ra được giá trị log đối chiếu ngược với bản ghi, tức mức trần minh bạch của tầng giải thích.
 
-Phép bóc tách thành phần được chấm theo hành động cuối thay vì theo phán quyết nhị phân, bởi ở tỷ lệ tấn công nền 86,9\% mọi cấu hình đều đạt xấp xỉ con số ấy và phép so sánh sụp đổ; hành động phát ra vì vậy được đối chiếu với hành động kỳ vọng trên bốn giá trị \texttt{BLOCK\_IP}, \texttt{ALERT}, \texttt{LOG} và \texttt{AWAIT\_HITL}. Việc đổi thước đo được công bố tường minh vì chọn thước đo sau khi đã thấy kết quả cần được soi xét chặt chẽ về phương pháp, căn cứ ở đây là tính suy biến thống kê của thước nhị phân trên phân phối này chứ không phải vì nó cho kết quả bất lợi. Trên 1.700 mẫu, hệ hai tầng đầy đủ đạt độ chính xác hành động 35,35\% (KTC 95\% 33,12--37,66) so với 28,29\% (KTC 95\% 26,20--30,48) của cấu hình chỉ có Tầng 1, hai khoảng tin cậy không chồng lấn. Tuy vậy sự đánh đổi lại đảo chiều: riêng Tầng 1 mới là bên phán quyết đáng tin hơn mỗi khi nó chịu quyết, với độ chính xác tự quyết 69,01\% so với 57,72\%, nhưng nó chỉ chịu quyết trên 41,00\% số sự kiện và bỏ ngỏ 59,00\%, đẩy chúng lên một tầng mà cấu hình A vốn không có. Hệ đầy đủ không bỏ ngỏ ca nào, chuyển toàn bộ phần tồn đọng thành 44,76\% ca hoãn tường minh bên cạnh 55,24\% ca tự quyết. Hai cấu hình do đó khác nhau ở hành động thực hiện khi thiếu chắc chắn nhiều hơn là ở chất lượng suy luận, đúng thuộc tính mà kênh hoãn đã đo từ chiều ngược lại.
+Đánh giá bóc tách thành phần (ablation study) trên 1.700 mẫu thực nghiệm cho thấy hệ hai tầng đầy đủ đạt độ chính xác hành động 35,35\% (KTC 95\% 33,12--37,66), vượt trội rõ rệt so với mức 28,29\% (KTC 95\% 26,20--30,48) của cấu hình chỉ có Tầng 1. Cấu hình Tầng 1 đơn lẻ đạt độ chính xác tự quyết 69,01\% nhưng bỏ ngỏ 59,00\% sự kiện mà không thể xử lý, trong khi hệ thống đầy đủ không bỏ ngỏ sự kiện nào, đổi lại độ chính xác tự quyết giảm còn 57,72\% so với 69,01\%, với 55,24\% phán quyết tự động và 44,76\% hành động hoãn tường minh. Hình~\ref{fig:ablation_quality} so sánh độ chính xác hành động với bốn trục đánh giá RAGAS.
 
-\begin{figure}[htbp]
+\clearpage
+\begin{figure}[H]
     \centering
-    \makebox[\textwidth][c]{\includegraphics[width=1.05\textwidth]{images/fig_ablation_quality.pdf}}
-    \caption{Trái: độ chính xác hành động của cấu hình chỉ có Tầng 1 so với hệ hai tầng đầy đủ, kèm khoảng tin cậy 95\%. Phải: bốn trục chấm của mô hình trọng tài, với độ chuẩn xác ngữ cảnh là trục yếu nhất. Sinh từ \texttt{ablation\_action\_scores.json} và \texttt{reasoning\_eval\_results.json}. (Nguồn: Tác giả)}
+    \makebox[\textwidth][c]{\includegraphics[width=1.16\textwidth]{images/fig_ablation_quality.pdf}}
+    \caption[Đánh giá bóc tách thành phần và bốn trục RAGAS]{Đánh giá độ chính xác hành động bóc tách thành phần và bốn trục RAGAS. (Nguồn: Tác giả)}
     \label{fig:ablation_quality}
 \end{figure}
+
+Tóm lại, các kết quả thực nghiệm nêu trên chứng minh tính hữu dụng thực tiễn của hệ thống SENTINEL trước các ràng buộc vận hành của một SOC hiện đại. Ba trụ cột kiến trúc đỡ lấy kết quả đó---(1) Kinh tế học tầng lọc tốc độ cao ở Tầng 1 giúp xả tải 97,5\% lưu lượng thô, rút ngắn độ trễ trung vị xuống 0,88\,ms và đạt thông lượng 3.860 sự kiện/giây; (2) Lớp rào chắn đối kháng tất định kháng được toàn bộ 678 mẫu tiêm nhiễm khó nhờ Đóng gói Dữ liệu Phân định, kiềm chế nguy cơ né tránh không gian đặc trưng và niêm phong hồ sơ pháp y bằng chuỗi HMAC-SHA256; và (3) Năng lực suy luận nhận thức tác tử neo chứng cứ tại Tầng 2 giúp cô lập đe dọa với tỷ lệ bao phủ 95,0\%, giảm 84,24\% khối lượng phân tích cho chuyên viên an ninh---SENTINEL cung cấp một nền tảng tái lập được để triển khai tác tử AI vào hạ tầng giám sát an ninh doanh nghiệp, trong phạm vi các giới hạn đã nêu.

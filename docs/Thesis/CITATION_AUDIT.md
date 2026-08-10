@@ -35,6 +35,14 @@ Ký hiệu: ✅ đã tra, khớp · 🔧 đã tra, **phải sửa** · ➕ mục
 | `alahmadi2022` | Thay con số **">80% báo giả" không nguồn** đang gán cho QRadar. B. A. AlAhmadi, L. Axon, I. Martinovic, "99% False Positives: A Qualitative Study of SOC Analysts' Perspectives on Security Alarms," *Proc. 31st USENIX Security Symposium*, 2022, **pp. 2783–2800** |
 | `shen2024dan` | Nguồn thượng nguồn thật của tập jailbreak (xem `jackhhao2023`). X. Shen, Z. Chen, M. Backes, Y. Shen, Y. Zhang, *"Do Anything Now": Characterizing and Evaluating In-The-Wild Jailbreak Prompts on Large Language Models*, ACM CCS 2024, DOI 10.1145/3658644.3670388 |
 
+## ➕ Ba mục thêm lượt viết lại Ch1–Ch3 (tra ngày 10/08/2026)
+
+| khoá | xác nhận tận nguồn | ghi chú |
+| :-- | :-- | :-- |
+| `peffers2007` | K. Peffers, T. Tuunanen, M. A. Rothenberger, S. Chatterjee, *A Design Science Research Methodology for Information Systems Research*, **J. Manag. Inf. Syst. 24(3), pp. 45–77, 2007**, DOI 10.2753/MIS0742-1222240302 | khớp. Một số bản ghi thứ cấp (SCIRP) ghi 45–78; bản của nhà xuất bản Taylor & Francis và ACM DL đều ghi **45–77** |
+| `owasp2021` | OWASP Foundation, *OWASP Top 10:2021 — The Ten Most Critical Web Application Security Risks*, phát hành **24/09/2021**, `https://owasp.org/Top10/` | khớp |
+| `ke2017lightgbm` | G. Ke, Q. Meng, T. Finley, T. Wang, W. Chen, W. Ma, Q. Ye, T.-Y. Liu, *LightGBM: A Highly Efficient Gradient Boosting Decision Tree*, NeurIPS **30**, 2017 | ⚠️ **cố ý KHÔNG ghi số trang.** Kỷ yếu NeurIPS chính thức không đánh số trang cho tập 2017, còn hai nguồn thứ cấp mâu thuẫn: 3146–3154 và 3149–3157. Chọn một trong hai là đoán; bỏ trường trang thì vẫn tra ra bài. Tên tác giả cuối sửa `T. Y. Liu` → **`T.-Y. Liu`** (Tie-Yan) |
+
 ---
 
 ## ✅ Đã tra, khớp — không đụng
