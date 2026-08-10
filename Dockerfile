@@ -24,6 +24,12 @@ LABEL maintainer="Nguyen Duc Binh <binhchuoizzz@github>"
 LABEL description="SENTINEL SOC - Autonomous AI Security Agent"
 LABEL version="1.0.0"
 
+# pipefail: dòng RUN dưới đây tải KHOÁ GPG qua ống dẫn. Với `/bin/sh` mặc định, mã thoát
+# của cả ống chỉ lấy từ lệnh CUỐI (`gpg`), nên `wget` hỏng — mạng lỗi, repo đổi URL, proxy
+# trả trang HTML lỗi — vẫn cho ống "thành công" và build đi tiếp với khoá rác. Đó là lý do
+# hadolint DL4006 tồn tại, và ở đây nó cảnh báo đúng chỗ đau: khoá dùng để ký nguồn apt.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Install Trivy for Vulnerability Scanning (modern GPG key method)
 # --no-install-recommends: giảm attack surface + kích thước image (đồng bộ builder stage)
 RUN apt-get update && apt-get install -y --no-install-recommends wget apt-transport-https gnupg \

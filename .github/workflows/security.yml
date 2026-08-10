@@ -42,6 +42,17 @@ jobs:
         # PYSEC-2026-597 is nltk without a fix, PYSEC-2026-196 is pip which is updated by action runner itself.
         pip-audit --desc --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357 --ignore-vuln CVE-2025-3000 --ignore-vuln PYSEC-2026-597 --ignore-vuln PYSEC-2026-196 || true
 
+    # Gộp từ `security_scan.yml` (đã xoá). Workflow đó chạy đúng hai việc: pip-audit —
+    # trùng y hệt bước trên — và bandit. Hai workflow cùng tên gọi "Security Audit…" chạy
+    # song song trên mỗi lần push, tốn runner và khiến trang Checks khó đọc mà không thêm
+    # phạm vi kiểm nào.
+    - name: Run Bandit (SAST)
+      run: |
+        pip install bandit
+        # -ll -ii: chỉ báo mức nghiêm trọng/độ tin cậy trung bình trở lên.
+        # `|| true` giữ nguyên như trước: bandit ở đây là báo cáo, không phải cổng chặn.
+        bandit -r src/ -ll -ii || true
+
 
 
   secrets-scan:
@@ -51,10 +62,38 @@ jobs:
       with:
         fetch-depth: 0  # Full history for secret scanning
 
+    # Gọi thẳng image thay vì dùng `trufflesecurity/trufflehog@main`:
+    #
+    #  1. Action tự suy phạm vi quét theo loại sự kiện. Với `push` nó chỉ quét khoảng
+    #     commit nên xanh; với `schedule` không có base/head nên nó quét toàn bộ lịch sử
+    #     và đỏ. Cùng một cây mã cho hai kết quả khác nhau tuỳ cách kích hoạt — nêu đích
+    #     danh `git file:///repo` thì mọi sự kiện quét đúng một phạm vi.
+    #  2. `@main` là mốc trôi: một detector mới có thể làm đỏ CI qua đêm dù mã không đổi.
+    #     Ghim thẻ để lần chạy tái lập được; nâng phiên bản là thay đổi có chủ ý.
+    #
+    # `--exclude-detectors=Lob`: KHÔNG phải để giấu phát hiện. Khoá API của Lob có dạng
+    # `test_` + 35 ký tự, nên detector này khớp trúng TÊN HÀM PYTEST dài đúng 40 ký tự.
+    # Chín kết quả "verified" của lần chạy theo lịch 10/08 đều là hàm test có thật trong
+    # kho, đã đối chiếu từng cái với dòng `def` của nó:
+    #     test_accuracy_is_fooled_where_mcc_is_not   tests/unit/test_metrics_core.py:52
+    #     test_attack_terms_cover_all_waf_families   tests/unit/test_rag_query_build.py:88
+    #     test_context_includes_multiday_apt_chain   tests/unit/test_threat_memory.py:165
+    #     test_grounding_detects_verified_citation   tests/unit/test_metrics_core.py:218
+    #     test_log_transform_compresses_heavy_tail   tests/unit/test_baseline_scaling.py:40
+    #     test_loop_detector_catches_infinite_loop   tests/integration/test_end_to_end.py:140
+    #     test_same_ip_reasoning_is_left_untouched   tests/unit/test_response_feature_cache.py:92
+    #     test_unserializable_payload_never_raises   tests/unit/test_tier2_trace.py:268
+    # Cờ "verified" ở đây là giả: điểm cuối xác thực của Lob nhận cả chuỗi không phải khoá.
+    # Dự án KHÔNG dùng Lob (API gửi thư giấy) ở bất kỳ đâu, nên tắt riêng detector này
+    # không che mất gì; mọi detector khác vẫn chạy trên mọi tệp. Loại trừ theo ĐƯỜNG DẪN
+    # (bỏ qua `tests/`) mới là cách nguy hiểm — nó sẽ làm mù luôn khoá thật nếu lỡ commit
+    # vào thư mục test.
     - name: Scan for hardcoded secrets
-      uses: trufflesecurity/trufflehog@main
-      with:
-        extra_args: --only-verified
+      run: |
+        docker run --rm -v "$PWD:/repo:ro" \
+          ghcr.io/trufflesecurity/trufflehog:3.96.0 \
+          git file:///repo --only-verified --fail --no-update \
+          --exclude-detectors=Lob
 
   # ── Dockerfile best-practices lint (deterministic, non-redundant với ruff) ──
   dockerfile-lint:
@@ -68,6 +107,17 @@ jobs:
         dockerfile: Dockerfile
         # Chỉ chặn ở mức error (bỏ style/info) để không nhiễu pipeline defense
         failure-threshold: error
+        # DL3008 (ghim phiên bản cho apt-get install) bỏ qua CÓ CHỦ Ý: ghim
+        # build-essential/wget/gnupg/trivy theo phiên bản Debian sẽ làm image không dựng
+        # lại được ngay khi kho Debian xoá bản cũ — đổi một lỗi giả thành một build hỏng
+        # thật. Bản ghim thật sự quan trọng (requirements.txt, thẻ image nền) đã ghim rồi.
+        # DL4006 KHÔNG bỏ qua — đã sửa bằng `SHELL … -o pipefail` trong Dockerfile.
+        ignore: DL3008
+        # Không cho hadolint gắn nhãn ##[error] cho phát hiện dưới ngưỡng chặn: trước đây
+        # ba cảnh báo hiện lên như lỗi đỏ trong tab Checks dù job vẫn xanh, làm người đọc
+        # tưởng CI hỏng.
+        output-file: hadolint.txt
+        no-fail: false
 
   # ── IaC misconfig scan cho Dockerfile + docker-compose (Trivy config) ──────
   # Report-only: đẩy SARIF lên tab Security để trưng bày security posture

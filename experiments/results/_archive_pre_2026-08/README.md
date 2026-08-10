@@ -1,7 +1,15 @@
-# Kết quả mapper LỖI THỜI — không trích vào luận văn
+# Kết quả LỖI THỜI — không trích vào luận văn
 
-Bốn tệp trong thư mục này chạy **trước** đợt vá 2026-08 và **mâu thuẫn với nhau**.
-Giữ lại để lưu vết, KHÔNG dùng để bảo vệ.
+Thư mục có **sáu tệp dữ liệu**, chia ba nhóm, đều chạy **trước** các đợt vá 2026-08.
+Giữ lại để lưu vết, KHÔNG dùng để bảo vệ. Không script nào đọc chúng.
+
+| nhóm | tệp | mục ghi chú |
+| :-- | :-- | :-- |
+| mapper mâu thuẫn | 4 tệp `attack_mapper_eval_*` | ngay dưới |
+| độ trễ trước khi vá xả tải | `latency_benchmark_PRE_OFFLOAD_FIX.json` | cuối trang |
+| bóc tách thước nhị phân | `ablation_results_20260730.json` | cuối trang |
+
+## Bốn tệp mapper mâu thuẫn
 
 | tệp | tag | mode | n | exact match |
 | :-- | :-- | :-- | --: | --: |
@@ -51,3 +59,18 @@ Nhưng `subscriber.py:511` bọc toàn bộ nhánh Cổng ML/LLM trong `if actio
 
 Cùng họ với lỗi đã vá ở `evaluate_feedback_loop` (`BLOCK_IP` bị đếm là *leo thang*). **Không trích
 bất kỳ số nào trong tệp này.** Giữ lại chỉ để đối chiếu mức chênh trước/sau khi vá.
+
+## `ablation_results_20260730.json` — loại 30/07/2026
+
+Lượt bóc tách chạy **trước** khi mẫu số được vá. Cùng cấu trúc khoá với
+`experiments/results/ablation_results.json` hiện hành nên rất dễ nhầm là bản mới, nhưng
+số hoàn toàn khác: tệp này ghi `Config_A` đạt **33,26%** trên **n = 1750**, còn lượt hiện
+hành ghi **28,29%**. Chênh lệch đến từ mẫu số, không phải từ hệ thống.
+
+Trường `metric_health` trong chính tệp này đã tự cảnh báo lý do không dùng thước nhị phân:
+`attack_base_rate` **0,8686**, `is_base_rate_artifact` **true**, `binary_f1_trustworthy`
+**false** — F1/Accuracy nhị phân xấp xỉ tỉ lệ tấn công nền nên không phân biệt nổi các cấu
+hình. Đó là bằng chứng cho việc đổi sang chấm-theo-hành-động, và là lý do giữ tệp lại thay
+vì xoá: luận văn có nêu đã đổi thước đo, nên phải giữ được vết vì sao đổi.
+
+**Không trích bất kỳ số nào trong tệp này.**

@@ -23,9 +23,29 @@ from experiments.unified_dataset import build_sequence, build_stream, determine_
 from src.agent.threat_memory import ThreatMemoryStore
 
 
+def _built_or_skip(fn, *args, **kwargs):
+    """Gọi `build_stream`/`build_sequence`, đổi "máy chạy không có dữ liệu nguồn" thành SKIP.
+
+    `unified_dataset` cố tình NÉM `FileNotFoundError` thay vì trả rỗng, và phải giữ nguyên
+    như vậy: đã có lỗi thật vì trả rỗng lặng lẽ — `data/csic.json` ghi xong sau `demo.json`
+    hai giây nên luồng demo 99.867 sự kiện ra đời với đúng 0 bản ghi CSIC, không một cảnh
+    báo nào (xem chú thích trong `unified_dataset._load_csic`).
+
+    Nhưng mọi bộ dữ liệu nguồn đều gitignore vì quá lớn, nên CI cài sạch từ repo KHÔNG BAO
+    GIỜ có chúng. Để ngoại lệ ấy nổi lên thì mỗi lần chạy CI đều đỏ vì thiếu dữ liệu —
+    đúng cái bẫy mà `test_synthesized_ip_pools_are_disjoint_by_label` đã tránh cho nhánh
+    "luồng rỗng": nó biến "không có dữ liệu" thành "đỏ CI" và che mất hồi quy thật.
+    Ở đây chỉ dịch ngoại lệ sang skip, không đụng vào hành vi của thư viện.
+    """
+    try:
+        return fn(*args, **kwargs)
+    except FileNotFoundError as exc:
+        pytest.skip(f"chưa dựng dữ liệu nguồn — {str(exc).splitlines()[0]}")
+
+
 def test_stream_merges_real_sources_interleaved():
     """3 nguồn thật được gộp + trộn xen kẽ trong cùng một luồng."""
-    warmup, main, apt_truth, n_chains = build_stream()
+    warmup, main, apt_truth, n_chains = _built_or_skip(build_stream)
 
     sources = {ev["source"] for ev in main}
     assert {"cicids", "dapt", "zeroday"}.issubset(sources)
@@ -67,7 +87,7 @@ def test_stream_data_hygiene_no_missing_ip_no_nonfinite():
     StandardScaler của Cổng ML sẽ raise và Tier-1 Welford tính sai."""
     import math
 
-    warmup, main, _apt, _n = build_stream()
+    warmup, main, _apt, _n = _built_or_skip(build_stream)
     checked = 0
     for ev in list(warmup) + list(main):
         log = ev["log"]
@@ -113,7 +133,7 @@ def test_apt_detection_is_emergent_not_preseeded():
 def test_online_publisher_enriches_and_routes():
     """Publisher ONLINE phát CÙNG luồng gộp, enrich đủ metadata theo nguồn và định
     tuyến mọi event vào queue hợp lệ — điều kiện để subscriber ghi APT + agent xử lý."""
-    seq, warmup, main, apt_truth, n_chains = build_sequence()
+    seq, warmup, main, apt_truth, n_chains = _built_or_skip(build_sequence)
 
     srcs, queues = set(), set()
     dapt_attack_meta = 0
@@ -201,7 +221,7 @@ def test_synthesized_ip_pools_are_disjoint_by_label():
     host bị chiếm quyền gửi cả lưu lượng lành lẫn tấn công — đó là hành vi thật và chính
     là thứ mà liên kết chiến dịch phải bắt được.
     """
-    warmup, main, _apt, _n = build_stream()
+    warmup, main, _apt, _n = _built_or_skip(build_stream)
     by_source: dict[str, dict[bool, set]] = {}
     for ev in list(warmup) + list(main):
         src = ev.get("source", "")
@@ -242,7 +262,7 @@ def test_online_apt_recording_contract_matches_subscriber():
     """Mô phỏng đúng nhánh subscriber: ghi từng sự kiện DAPT-attack (mang metadata)
     của một IP vào bộ nhớ SẠCH theo thứ tự luồng -> bản án APT phải NỔI LÊN đúng
     thời điểm đủ đa-ngày (giống cơ chế offline, không nạp sẵn)."""
-    seq, *_ = build_sequence()
+    seq, *_ = _built_or_skip(build_sequence)
 
     # Chọn IP DAPT có sự kiện tấn công ở >= 2 ngày trong luồng
     by_ip_days = {}

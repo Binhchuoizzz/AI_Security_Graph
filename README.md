@@ -3,8 +3,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-green.svg)](https://www.python.org/)
 [![Docker: Ready](https://img.shields.io/badge/Docker-Compose-blue.svg)](docker-compose.yml)
-[![Tests: 15/15 PASS](https://img.shields.io/badge/Validation-15%2F15%20PASS-brightgreen.svg)](experiments/e2e_test_runner.py)
-[![LaTeX: Compiled](https://img.shields.io/badge/Thesis-LaTeX%20Compiled-purple.svg)](docs/Thesis/latex/)
+[![CI Pipeline](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/ci.yml/badge.svg)](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/ci.yml)
+[![Security Audit](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/security.yml/badge.svg)](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/security.yml)
+[![Tests: 582](https://img.shields.io/badge/pytest-582%20passed-brightgreen.svg)](tests/)
+[![Thesis: 35pp EN+VI](https://img.shields.io/badge/Thesis-35pp%20EN%20%2B%20VI-purple.svg)](docs/Thesis/latex/)
 [![Slides: 20-Slide Deck](https://img.shields.io/badge/Defense-20--Slide%20Deck-orange.svg)](docs/Thesis/slides/SENTINEL_defense_notebooklm.html)
 
 > **SENTINEL** is a **Cognitive Two-Tier Security Operations Center (SOC) Architecture** designed to resolve the three core bottlenecks of modern automated SOCs: **Alert Fatigue & Latency Crisis**, **SOAR Rigidity & LLM Hallucinations**, and **Adversarial AI Attacks (Prompt Injection / ML Evasion)**.
@@ -28,11 +30,11 @@ Below are the **100% verified, audited empirical results** across all 5 evaluati
 
 | Dimension (5D) | Key Metrics | Audited Value | Scientific Context & Benchmark Baseline |
 | :--- | :--- | :--- | :--- |
-| **1. Efficiency & Latency** | Offload Rate · Median Latency · ML Throughput | **90.6% – 97.5% · 0.88 ms · 3,452.4 eps** | Offloads 97.5% of noise logs at sub-millisecond median latency (<1ms). LightGBM ML Gate achieves **100.0% Auto-BLOCK Precision** (962/962, 0 FP). |
+| **1. Efficiency & Latency** | Offload Rate · Median Latency · ML Throughput | **90.6% – 97.5% · 0.88 ms · 3,452 eps** | Offloads 97.5% of noise logs at sub-millisecond median latency (<1ms). LightGBM ML Gate achieves **100.0% Auto-BLOCK Precision** (962/962, 0 FP). |
 | **2. AI Security & Integrity** | Prompt Inj. Defense · ML Evasion · HMAC Tamper | **100.0% · 98.75% · 100.0%** | Delimited Nonce Encapsulation blocks 678 hard adversarial samples; HMAC-SHA256 detects 100% log edits, insertions, or deletions. |
-| **3. ATT&CK Attribution & RAG** | RAG Recall@3 · RRF Match · Code Hallucination | **93.0% (Recall@3) · 80.0% · 0.0% Bad** | Dual-RAG (FAISS + BM25 RRF $k=60$). Grounding Guardrail intercepted **76 hallucinated `BLOCK_IP` actions** (`bad = 0 / 1,421` code assertions). |
-| **4. SOC Triage & HITL Queue** | Analyst Load Reduction · Threat Coverage | **-84.24% Load · 95.0% Threat Coverage** | SOC Analysts only need to inspect the Deferred (`AWAIT_HITL`) queue to catch 95.0% of real attacks, cutting 84.24% of manual review burden. |
-| **5. Reasoning & Judge Quality** | MT-Bench Judge · Relevancy Score | **3.78 / 5.0 · 4.52 / 5.0** | Independent cross-family evaluation (`Meta-Llama-3-8B-Instruct` judging `Foundation-Sec-8B`). |
+| **3. ATT&CK Attribution & RAG** | Attribution (retrieval-only · full pipeline) · Code Hallucination | **80.0% · 68.0% · 0 / 1,421 unanchored** | Dual-RAG (FAISS + BM25 RRF $k=60$) over 433 STIX ATT&CK entries. Attribution is **worse with the reasoning tier than without it** — reported as a limitation, not a win. Grounding guardrail fired on 9.26% of batches and blocked **76 ungroundable `BLOCK_IP` actions**. |
+| **4. SOC Triage & HITL Queue** | Analyst Load Reduction · Threat Coverage | **-84.24% Load · 95.0% Threat Coverage** | SOC Analysts only need to inspect the Deferred (`AWAIT_HITL`) queue to catch 95.0% of real attacks, cutting 84.24% of manual review burden (6.03× enrichment into 15.76% of volume). |
+| **5. Reasoning & Judge Quality** | Mean · best axis · worst axis | **3.78 / 5.0 · Relevancy 4.52 · Ctx-Precision 2.54** | Cross-family LLM-as-judge (`Meta-Llama-3-8B-Instruct` judging `Foundation-Sec-8B-Instruct`), n = 1,052 batches. Only **11.2%** of justifications cite a checkable log value — the weakest link in the system. |
 
 ---
 
@@ -54,14 +56,14 @@ Below are the **100% verified, audited empirical results** across all 5 evaluati
     DROP      LOG     BLOCK_IP   AWAIT_HITL  ALERT   ESCALATE
       │                                                 │
    (noise)                        ┌──────────────────────┴──────────┐
-                                  │ ML GATEWAY — LightGBM (1M samples)│
+                                  │ ML GATEWAY — LightGBM 1M samples│
                                   │ 3,452 eps · Auto-BLOCK (FP = 0) │
                                   └──────────────────┬──────────────┘
                                                      │ Escalation (~9.4%)
                                   ┌──────────────────┴──────────────┐
                                   │ TIER 1.75 — ExactMatch Cache    │
                                   │ SHA-256 (Payload + Headers)     │
-                                  │ 81.33% Hit Rate · 8.9x Speedup  │
+                                  │ 81.3% Hit Rate · 8.9x Speedup   │
                                   └──────────────────┬──────────────┘
                                                      │ Cache Miss (~2.5%)
                                   ┌──────────────────┴──────────────┐
@@ -72,8 +74,8 @@ Below are the **100% verified, audited empirical results** across all 5 evaluati
                                                      │
    ┌─────────────────────────────────────────────────┴──────────┐
    │ TIER 2 — LangGraph Cognitive Agent (5 Nodes, 1 GPU 16GB)   │
-   │   Foundation-Sec-8B-Instruct Q4_K_M via llama.cpp CUDA   │
-   │   Dual-RAG (FAISS + BM25 RRF k=60 · Recall@3 = 93.0%)      │
+   │   Foundation-Sec-8B-Instruct Q4_K_M via llama.cpp CUDA     │
+   │   Dual-RAG (FAISS + BM25 RRF k=60 · 433 ATT&CK entries)    │
    │   Threat Memory (SQLite synchronous=NORMAL · APT Linker)   │
    └─────────────────────────────────────────────────┬──────────┘
                                                      │
@@ -95,15 +97,15 @@ Below are the **100% verified, audited empirical results** across all 5 evaluati
 | # | Component | Layer | Technology Stack | Key Specification & Performance |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | **Rule Engine** | Tier 1 | Python + Redis Stream | $\mathcal{O}(1)$ streaming filter + Welford $Z$-score anomaly detection ($Z > 3.5\sigma$). |
-| 2 | **ML Gateway** | Tier 1 | LightGBM (`ml_gateway.py`) | Trained on 1M samples; 4-band policy; **3,452.4 eps**; **100.0% Auto-BLOCK Precision**. |
-| 3 | **ExactMatch Cache** | Tier 1.75 | SHA-256 + Python Dict | Bypasses LLM for duplicate attacks (**81.33% hit rate**, **8.9x speedup** 9.8ms vs 87.7ms). |
+| 2 | **ML Gateway** | Tier 1 | LightGBM (`ml_gateway.py`) | Trained on 1M samples; 4-band policy; **3,452 eps**; **100.0% Auto-BLOCK Precision**. |
+| 3 | **ExactMatch Cache** | Tier 1.75 | SHA-256 + Python Dict | Bypasses LLM for duplicate attacks (**81.3% hit rate**, **8.9x speedup** 9.8ms vs 87.7ms). |
 | 4 | **Guardrails & Nonce** | Security | Delimited Nonce + Regex | Encloses untrusted logs in random nonce tags; **100.0% Prompt Injection defense**. |
-| 5 | **Dual-RAG** | Tier 2 | FAISS + BM25 + RRF | Hybrid retrieval over 432 STIX MITRE ATT&CK codes (**Recall@3 = 93.0%**). |
-| 6 | **Cognitive Agent** | Tier 2 | LangGraph + `Foundation-Sec-8B` | 5-node conditional DAG executing local LLM inference (**7.2GB VRAM**). |
+| 5 | **Dual-RAG** | Tier 2 | FAISS + BM25 + RRF | Hybrid retrieval over 433 STIX MITRE ATT&CK entries (**Recall@3 = 0.930 ceiling · 0.385 on the full slice**). |
+| 6 | **Cognitive Agent** | Tier 2 | LangGraph + `Foundation-Sec-8B-Instruct` | 5-node conditional DAG executing local LLM inference (**7.2GB VRAM**). |
 | 7 | **Grounding Guardrail** | Tier 2 | Regex + MITRE Validator | Intercepts hallucinated actions; enforces **0.0% code hallucination rate** (`bad = 0 / 1,421`). |
 | 8 | **Threat Memory** | Storage | SQLite (`synchronous=NORMAL`) | Maintains host history & APT links (**No WAL mode** for Docker cross-UID stability). |
 | 9 | **HMAC Audit Chain** | Integrity | HMAC-SHA256 | Cryptographic hash chaining ($H_i = \text{HMAC}(D_i \parallel H_{i-1}, K)$); **100% tamper detection**. |
-| 10 | **Backpressure Manager**| Infrastructure | Redis Consumer Group | Manages stream ingestion by consumer group **`lag`** via `XREADGROUP` & `XACK`. |
+| 10 | **Backpressure Manager** | Infrastructure | Redis Consumer Group | Manages stream ingestion by consumer group **`lag`** via `XREADGROUP` & `XACK`. |
 | 11 | **SOC Dashboard** | UI | Streamlit (`src/ui/app.py`) | Real-time funnel visualizer, live log auditor, and **1-Click HITL approval queue**. |
 
 ---
@@ -132,7 +134,7 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # Build RAG indexes (FAISS + BM25)
-python src/rag/embedder.py
+python -m src.rag.embedder
 ```
 
 ### 2. Launch Full One-Command System Demo
@@ -146,17 +148,34 @@ Access the Streamlit SOC Dashboard at: **`http://localhost:8501`**
 ### 3. Run Deterministic E2E & Offline Benchmarks
 
 ```bash
-# Run 15/15 E2E validation test suite
+# Unit + integration suite (582 tests).
+# SENTINEL_FREEZE_DYNAMIC_RULES=1 is REQUIRED: without it the run writes ~1,400
+# learned rules into config/system_settings.yaml and dirties your working tree.
+SENTINEL_FREEZE_DYNAMIC_RULES=1 pytest
+
+# E2E validation harness (functional pass/fail checks, not metrics)
 python experiments/e2e_test_runner.py --offline
 
-# Run Unified Stream Benchmark
+# Unified Stream Benchmark
 python experiments/evaluate_unified_stream.py
 
-# Run Ablation Study
+# Ablation Study (action-based scoring; the binary metric saturates at an
+# 86.9% attack base rate and cannot separate configurations)
 python experiments/run_ablation.py --mode all
+```
 
-# Run Audit Script
-python scripts/audit_thesis_numbers.py
+Integration tests that need `data/csic.json` **skip** rather than fail when the dataset
+has not been built — the source corpora are too large to track in git. Build it first if
+you want them to run: `python scripts/build_csic_dataset.py --limit 4000`.
+
+### 4. Verify Every Number Before Trusting It
+
+Three audits keep the thesis and the code from drifting apart. All three must be green:
+
+```bash
+python scripts/audit_thesis_numbers.py       # 154 số ⇄ tệp kết quả, gương EN↔VI
+python scripts/audit_thesis_refs.py          # 38 mục tài liệu, thứ tự IEEE, nguồn dữ liệu
+python scripts/audit_metric_denominators.py  # mẫu số & chỉ số bão hoà (4 cờ có chủ đích)
 ```
 
 ---
