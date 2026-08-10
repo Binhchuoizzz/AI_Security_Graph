@@ -1,7 +1,7 @@
 \chapter{Experiments and Evaluation}
 \label{ch:experiments_evaluation}
 
-This chapter presents the comprehensive empirical evaluation of the SENTINEL system across three core dimensions: wire-speed stream offloading performance, adversarial AI security guardrails with cryptographic audit integrity, and stateful agentic reasoning quality. Experiments were executed on an air-gapped server environment containerized via Docker Compose (Intel Core i7, 32\,GB RAM, local NVIDIA GPU running CUDA \texttt{llama.cpp} with Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Following Section~\ref{sec:methodology}, offloading performance is evaluated on live telemetry streams (25,649-event benchmark stream and 99,717-event SOC-like stream), while classification quality and security guardrails are assessed across benchmark datasets (CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020}) and 823 adversarial attack samples (AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023}, jackhhao~\cite{jackhhao2023}, Shen et al.~\cite{shen2024dan}). Dynamic rules were frozen during evaluation, and the 50 author-composed samples in \texttt{ground\_truth.json} were excluded from all ratio calculations. All metrics are reported with their respective measurement denominators to ensure empirical transparency and reproducibility.
+This chapter presents the comprehensive empirical evaluation of the SENTINEL system across three core dimensions: wire-speed stream offloading performance, adversarial AI security guardrails with cryptographic audit integrity, and stateful agentic reasoning quality. Experiments were executed on an air-gapped server environment containerized via Docker Compose (Intel Core i7, 32\,GB RAM, local NVIDIA GPU running CUDA \texttt{llama.cpp} with Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Following Section~\ref{sec:methodology}, offloading performance is evaluated on an operational-scale telemetry stream of 99,717 events with a 9.8\% attack base rate reflecting near-realistic SOC conditions. Classification quality and security guardrails are assessed across benchmark datasets CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020} and 823 adversarial samples~\cite{advbench2023, deepset2023, jackhhao2023, shen2024dan}. Dynamic rules were frozen during all evaluations, and all metrics are reported with their respective measurement denominators to ensure empirical transparency and reproducibility.
 
 \section{Stream Offloading Performance and Filtration Economics}
 \label{sec:tier1_performance}
@@ -193,7 +193,7 @@ In the component ablation, the binary framing is unusable: at an 86.9\% attack b
 
 \begin{table}[htbp]
 \centering
-\caption{Ablation scored on the final action, with the 50 author-composed samples excluded. Configurations A and F are scored on all 1,700 remaining samples; B--E on a separate 300-sample slice and therefore not directly comparable with A and F. Generated from \texttt{ablation\_action\_scores.json}.}
+\caption{Ablation scored on the final action. Configurations A and F are scored on all 1,700 samples; B--E on a separate 300-sample slice and therefore not directly comparable with A and F. Generated from \texttt{ablation\_action\_scores.json}.}
 \label{tab:ablation_actions}
 \footnotesize
 \setlength{\tabcolsep}{4pt}

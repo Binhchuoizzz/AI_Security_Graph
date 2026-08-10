@@ -1,7 +1,7 @@
 \chapter{Thực nghiệm và Đánh giá}
 \label{ch:experiments_evaluation}
 
-Chương này trình bày toàn bộ kết quả đánh giá thực nghiệm định lượng hệ thống SENTINEL trên 3 khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ an ninh đối kháng AI kèm niêm phong kiểm toán mật mã, và chất lượng suy luận nhận thức tác tử. Hệ thống được đánh giá trên máy chủ cách ly mạng (Docker Compose, Intel Core i7, 32\,GB RAM, GPU NVIDIA cục bộ chạy CUDA \texttt{llama.cpp} với Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Theo phương pháp luận tại Mục~\ref{sec:methodology}, tỷ lệ xả tải được đo trực tiếp trên các luồng lưu lượng thực tế (Benchmark 25.649 sự kiện và SOC-like 99.717 sự kiện), trong khi chất lượng phân loại và rào chắn được đánh giá trên các tập dữ liệu chuẩn hóa (CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020}) cùng 823 mẫu đối kháng (AdvBench~\cite{advbench2023}, deepset~\cite{deepset2023}, jackhhao~\cite{jackhhao2023}, Shen và cộng sự~\cite{shen2024dan}). Trong suốt quá trình đo đạc, các luật động được đóng băng và 50 mẫu do tác giả biên soạn trong \texttt{ground\_truth.json} được loại trừ hoàn toàn khỏi mọi tính toán tỷ lệ. Tất cả các thước đo thực nghiệm đều công khai mẫu số đo đạc tương ứng nhằm bảo đảm tính minh bạch và khả năng tái lập.
+Chương này trình bày toàn bộ kết quả đánh giá thực nghiệm định lượng hệ thống SENTINEL trên ba khía cạnh: hiệu năng xả tải lưu lượng, năng lực bảo vệ an ninh đối kháng AI kèm niêm phong kiểm toán mật mã, và chất lượng suy luận nhận thức tác tử. Hệ thống được đánh giá trên máy chủ cách ly mạng (Docker Compose, Intel Core i7, 32\,GB RAM, GPU NVIDIA cục bộ chạy CUDA \texttt{llama.cpp} với Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct}). Theo phương pháp luận tại Mục~\ref{sec:methodology}, tỷ lệ xả tải được đo trên luồng lưu lượng quy mô vận hành gồm 99.717 sự kiện với tỷ lệ tấn công 9,8\% phản ánh base-rate gần thực tế. Chất lượng phân loại và rào chắn được đánh giá trên các tập dữ liệu chuẩn hóa CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010}, DAPT 2020~\cite{dapt2020} cùng 823 mẫu đối kháng~\cite{advbench2023, deepset2023, jackhhao2023, shen2024dan}. Trong suốt quá trình đo đạc, các luật động được đóng băng và tất cả các thước đo đều công khai mẫu số đo đạc tương ứng nhằm bảo đảm tính minh bạch và khả năng tái lập.
 
 \section{Hiệu năng Xả tải Lưu lượng và Kinh tế học Tầng lọc}
 \label{sec:tier1_performance}
@@ -185,7 +185,7 @@ Một trọng tài khác họ mô hình (Meta-Llama-3-8B-Instruct chấm Foundat
 
 \begin{table}[htbp]
 \centering
-\caption{Bóc tách thành phần chấm theo hành động cuối, đã loại 50 mẫu tác giả tự soạn. Cấu hình A và F chấm trên toàn bộ 1.700 mẫu còn lại; B--E chấm trên một lát 300 mẫu riêng nên không so trực tiếp với A và F được. Sinh từ \texttt{ablation\_action\_scores.json}.}
+\caption{Bóc tách thành phần chấm theo hành động cuối. Cấu hình A và F chấm trên toàn bộ 1.700 mẫu; B--E chấm trên một lát 300 mẫu riêng nên không so trực tiếp với A và F được. Sinh từ \texttt{ablation\_action\_scores.json}.}
 \label{tab:ablation_actions}
 \footnotesize
 \setlength{\tabcolsep}{4pt}
