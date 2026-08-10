@@ -1,43 +1,44 @@
-// SENTINEL Tier-2 agent state-graph (source of truth for Figure: agentic_fsm_workflow.png)
-// Mirrors src/agent/workflow.py exactly: 6 nodes, acyclic DAG, no loops.
-// Render: dot -Tpng -Gdpi=200 agentic_fsm_workflow.dot -o agentic_fsm_workflow.png
+// SENTINEL — Tier 2 Agent State-Graph (Section 3.4).
+// Optimized short lines + Huge 18pt font size.
+// Render: dot -Tpdf agentic_fsm_workflow.dot -o agentic_fsm_workflow.pdf
 digraph agentic_fsm {
     rankdir=TB;
     bgcolor="white";
-    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=12, margin="0.18,0.10"];
-    edge [fontname="DejaVu Serif", fontsize=10, color="#444444"];
+    pad="0.05";
+    nodesep=0.35;
+    ranksep=0.32;
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=18,
+          margin="0.25,0.16", penwidth=2.2, color="#2e7d32", fillcolor="#e8f5e9"];
+    edge [fontname="DejaVu Serif", fontsize=14, color="#37474f", penwidth=2.0];
 
-    start   [label="START\n(escalated event from Tier-1)", shape=oval, fillcolor="#cfe8ff"];
+    start   [label="Tier 1 Event (ESCALATE)", shape=oval, fillcolor="#e3f2fd", color="#1565c0", fontsize=18, penwidth=2.2];
 
-    guard   [label="guardrails\n(input validation + injection defense,\nDelimited Encapsulation)", fillcolor="#e8f5e9"];
-    rag     [label="rag_context\n(Dual-RAG: MITRE ATT&CK + NIST 800-61r2,\nFAISS + BM25 fused by RRF)", fillcolor="#e8f5e9"];
-    triage  [label="llm_triage\n(Foundation-Sec-8B Q4_K_M, temp 0.1\n-> structured JSON verdict)", fillcolor="#e8f5e9"];
+    guard   [label="1. Guardrail inspection\nInput filtering · Nonce packaging"];
+    rag     [label="2. rag_context retrieval\nDual-RAG (FAISS + BM25)"];
+    triage  [label="3. llm_triage classification\nFoundation-Sec-8B → Pydantic JSON"];
 
-    route1  [label="route_after_triage\n(threat & confidence > 0.7 ?)", shape=diamond, fillcolor="#fff3cd"];
-    mapper  [label="attack_mapper\n(structured MITRE ATT&CK enrichment\n+ evidence-anchoring guardrail)", fillcolor="#e8f5e9"];
-    route2  [label="route by action", shape=diamond, fillcolor="#fff3cd"];
+    route1  [label="Gate route_after_triage\nBelongs to MAPPABLE ?", fillcolor="#fff8e1", color="#f9a825", penwidth=2.5];
 
-    exec    [label="action_executor\n(firewall policy / report /\nforensic record)", fillcolor="#f8d7da"];
-    hitl    [label="human_in_the_loop\n(analyst approval queue)", fillcolor="#ffe0b2"];
+    mapper  [label="4. attack_mapper mapping\nMITRE ATT&CK + Evidence anchoring"];
 
-    done    [label="END", shape=oval, fillcolor="#e2e3e5"];
+    route2  [label="Gate route_triage_decision\nVerdict action routing", fillcolor="#fff8e1", color="#f9a825", penwidth=2.5];
 
-    // Linear backbone
+    exec    [label="5. action_executor\nBLOCK_IP / ALERT\nHMAC log sealing", fillcolor="#fdecea", color="#c62828", penwidth=2.5];
+    hitl    [label="human_in_the_loop\nAnalyst review queue\n(AWAIT_HITL)", fillcolor="#fff3e0", color="#ef6c00", penwidth=2.5];
+
+    done    [label="END CYCLE\nUpdate SQLite Threat Memory", shape=oval, fillcolor="#eceff1", color="#455a64", penwidth=2.2, fontsize=18];
+
     start -> guard -> rag -> triage -> route1;
+    route1 -> mapper [label="  Yes (MAPPABLE)  ", color="#2e7d32", penwidth=2.0];
+    route1 -> done   [label="  No (LOG / benign)  ", style=dashed, color="#757575"];
 
-    // Conditional routing after triage
-    route1 -> mapper [label="map"];
-    route1 -> exec   [label="execute_action"];
-    route1 -> hitl   [label="await_hitl"];
-    route1 -> done   [label="end_cycle (LOG / benign)"];
+    mapper -> route2 [color="#2e7d32", penwidth=2.0];
+    route2 -> exec [label="  BLOCK_IP / ALERT  ", color="#c62828", penwidth=2.0];
+    route2 -> hitl [label="  AWAIT_HITL  ", color="#ef6c00", penwidth=2.0];
+    route2 -> done [label="  LOG  ", style=dashed, color="#757575"];
 
-    // After MITRE enrichment, route by action
-    mapper -> route2;
-    route2 -> exec [label="execute_action"];
-    route2 -> hitl [label="await_hitl"];
-    route2 -> done [label="end_cycle"];
+    exec -> done [color="#c62828"];
+    hitl -> done [color="#ef6c00"];
 
-    // Terminal edges
-    exec -> done;
-    hitl -> done;
+    { rank=same; exec; hitl; }
 }

@@ -1,12 +1,12 @@
 \chapter{Thực nghiệm và Đánh giá}
 \label{ch:experiments_evaluation}
 
-Chương này trình bày kết quả định lượng, tổ chức theo đúng ba câu hỏi nghiên cứu ở Chương 1. Mọi tỉ lệ đều nêu kèm mẫu số đã đo trên đó.
+Chương này trình bày các kết quả đánh giá định lượng hệ thống SENTINEL, được tổ chức tương ứng với 3 câu hỏi nghiên cứu (RQ) đã đề xuất tại Chương~\ref{ch:introduction}. Tất cả các tỷ lệ báo cáo thực nghiệm đều công khai mẫu số đo đạc tương ứng nhằm bảo đảm tính khách quan và khả năng tái lập của nghiên cứu.
 
 \section{Môi trường Thực nghiệm}
 \label{sec:experimental_setup}
 
-Hệ thống chạy trên một máy chủ cách ly mạng, toàn bộ vi dịch vụ đóng gói bằng Docker Compose. Theo Mục~\ref{sec:methodology}, chỉ số phụ thuộc phân bố lưu lượng (tỉ lệ xả tải) đo trên luồng thực, còn chất lượng phân loại đo trên tập cân bằng lớp; đo xả tải trên tập ép cân bằng 50/50 sẽ cho con số thấp giả tạo, vì tập đó không phải phân bố mà hệ gặp. Bảng~\ref{tab:experimental_setup} phân vai từng tập. Hai giao ước áp cho mọi lượt đo: luật động bị đóng băng khi đo, và 50 mẫu do tác giả biên soạn trong \texttt{ground\_truth.json} bị loại khỏi mọi tỉ lệ, vì chúng chiếm 16,7\% tập chấm quy kết và toàn bộ mang cùng một đáp án.
+Hệ thống được thử nghiệm trên một máy chủ cách ly mạng, toàn bộ các vi dịch vụ được đóng gói bằng Docker Compose. Theo định hướng tại Mục~\ref{sec:methodology}, chỉ số phụ thuộc phân bố lưu lượng (tỷ lệ xả tải) được đo đạc trực tiếp trên luồng sự kiện thực tế, trong khi chất lượng phân loại được đánh giá trên tập dữ liệu cân bằng lớp. Việc đánh giá tỷ lệ xả tải trên tập dữ liệu ép cân bằng 50/50 sẽ dẫn đến kết quả thấp hơn thực tế, do tập dữ liệu cân bằng không phản ánh đúng phân bố lưu lượng tự nhiên trong vận hành. Bảng~\ref{tab:experimental_setup} tóm tắt cấu hình môi trường và phân vai của các tập dữ liệu. Hai nguyên tắc được áp dụng nhất quán trong mọi phép đo: các luật động được đóng băng trong suốt quá trình đo đạc, và 50 mẫu do tác giả biên soạn trong tập \texttt{ground\_truth.json} được loại trừ hoàn toàn khỏi các tính toán tỷ lệ.
 
 \begin{table}[htbp]
 \centering
@@ -20,7 +20,7 @@ Hệ thống chạy trên một máy chủ cách ly mạng, toàn bộ vi dịch
 \midrule
 Vi xử lý (CPU) & Intel Core i7 & Bộ lọc Welford và luồng Redis \\
 Bộ nhớ RAM & 32 GB DDR5 & Semantic Cache và chỉ mục FAISS \\
-Card đồ họa (GPU) & RTX 4060 Ti 16\,GB & \texttt{llama.cpp} CUDA, Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} \\
+Card đồ họa (GPU) & NVIDIA GPU (Cục bộ) & \texttt{llama.cpp} CUDA, Foundation-Sec-8B-Instruct~\cite{foundation_sec_instruct} \\
 Ảo hóa & Docker Compose & Môi trường air-gapped, tái lập được \\
 \midrule
 \texttt{datatest.json} & 4.240 $\rightarrow$ 4.236 khi chấm, 51,8\% tấn công & Chất lượng phân loại Cổng ML. Trích từ CSE-CIC-IDS2018~\cite{ids2018}, CSIC 2010~\cite{csic2010} và DAPT 2020~\cite{dapt2020}. Không dùng cho tỉ lệ xả tải \\
@@ -32,10 +32,10 @@ Tập đối kháng & 823 = 703 công bố + 80 tự soạn + 40 kiểm chéo & 
 \end{tabularx}
 \end{table}
 
-\section{RQ1 --- Xả tải và Kinh tế học Tầng lọc}
+\section{RQ1: Xả tải và Kinh tế học Tầng lọc}
 \label{sec:tier1_performance}
 
-Một sự kiện được tính là đã gỡ tải khi nó không phát sinh lời gọi mô hình ngôn ngữ (Mục~\ref{sec:architecture_overview}); cách đếm chỉ tính \texttt{DROP} sẽ bỏ sót \texttt{BLOCK\_IP}, \texttt{ALERT} và \texttt{AWAIT\_HITL}, vốn cũng không tốn một token nào.
+Một sự kiện được tính là đã gỡ tải thành công khi nó không phát sinh lời gọi mô hình ngôn ngữ nào (Mục~\ref{sec:architecture_overview}); việc chỉ đếm hành động \texttt{DROP} sẽ bỏ sót các phán quyết \texttt{BLOCK\_IP}, \texttt{ALERT} và \texttt{AWAIT\_HITL}, vốn cũng không tiêu tốn tài nguyên token.
 
 \begin{table}[htbp]
 \centering
@@ -51,7 +51,7 @@ Một sự kiện được tính là đã gỡ tải khi nó không phát sinh l
 Tầng 1 (luật + Welford + chữ ký) & 20.663 & 80,6\% & 38.207 & 38,3\% \\
 Cổng Học máy (LightGBM 4 dải) & 2.568 & 10,0\% & 58.992 & 59,2\% \\
 \midrule
-Cộng dồn --- không chạm LLM & 23.231 & 90,6\% & 97.199 & 97,5\% \\
+Cộng dồn (không chạm LLM) & 23.231 & 90,6\% & 97.199 & 97,5\% \\
 Còn lại $\rightarrow$ Tầng 2 (LLM) & 2.418 & 9,4\% & 2.518 & 2,5\% \\
 \midrule
 \textit{Tỉ lệ tấn công của luồng} & \multicolumn{2}{c}{\textit{31,6\%}} & \multicolumn{2}{c}{\textit{9,8\%}} \\
@@ -93,10 +93,10 @@ Bốn cấu hình đối chứng được đo trên cùng một mẫu con 150 s�
 \toprule
 \textbf{Cấu hình đối chứng} & \textbf{Thông lượng} \\
 \midrule
-H1 --- Chữ ký tĩnh, 30 họ WAF & 11.129 sk/s \\
-SENTINEL --- Tầng 1 + Cổng ML & 3.860 sk/s \\
-H2 --- LightGBM đơn tầng, ngưỡng phẳng & 2.162 sk/s \\
-H3 --- LLM đơn tầng (cùng dữ liệu, mô hình và prompt) & 0,19 sk/s \\
+H1: Chữ ký tĩnh (30 họ WAF) & 11.129 sk/s \\
+SENTINEL: Tầng 1 + Cổng ML & 3.860 sk/s \\
+H2: LightGBM đơn tầng, ngưỡng phẳng & 2.162 sk/s \\
+H3: LLM đơn tầng (cùng dữ liệu, mô hình và prompt) & 0,19 sk/s \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -105,7 +105,7 @@ H3 --- LLM đơn tầng (cùng dữ liệu, mô hình và prompt) & 0,19 sk/s \\
 
 Ngưỡng chặn nằm trên một vùng phẳng---0,70 tới 0,85 cho chất lượng tổng hợp trùng khít, chỉ từ 0,90 trở lên độ bao phủ mới tụt---nên chọn 0,85 mua được biên an toàn rộng nhất cho việc tự động chặn mà không mất gì đo được, và độ chính xác của phần tự chặn giữ 1,00 trên mọi cấu hình đã quét. Với các bất thường tổng hợp tiêm từ $2\sigma$ tới $100\sigma$ trên bảy đặc trưng luồng, mọi phép thử ở mọi biên độ đều được leo thang nên không có gì lọt qua trong im lặng; nhưng phần nhận biết thống kê thì chững lại, tăng từ 19,52\% ở $2\sigma$ lên 42,86\% ở $4\sigma$ rồi chỉ đạt 54,29\% ở $100\sigma$. Vượt quá khoảng bốn độ lệch chuẩn, giới hạn nằm ở tập đặc trưng chứ không ở ngưỡng, nên hành vi mới lạ tới được Tầng 2 nhờ leo thang chứ không nhờ nhận dạng---kiểu thất bại đúng đắn, nhưng không phải một tuyên bố về năng lực phát hiện.
 
-\section{RQ2 --- Rào chắn An ninh AI và Toàn vẹn Pháp y}
+\section{RQ2: Rào chắn An ninh AI và Toàn vẹn Pháp y}
 \label{sec:adversarial_security_hmac}
 
 RQ2 nêu tiêm nhiễm qua nền nhật ký là rủi ro \textit{điển hình} chứ không phải toàn bộ phạm vi, nên hai mặt tấn công khác hẳn nhau về cấu trúc đều được đánh giá: tấn công qua ngôn ngữ, nơi kháng được nghĩa là chỉ thị nhúng không làm đổi hành động của tác tử, và tấn công qua không gian đặc trưng, nơi kháng được nghĩa là mẫu bị bóp méo vẫn không bị lật thành lành. Ba giao ước làm cho các tỉ lệ đọc được. Phán quyết của lớp tĩnh là phép HOẶC của ba bộ dò ghi nhận riêng, để khi hỏng thì định vị được. Đối chứng âm trên 230 nhật ký lành là bắt buộc, bởi một lớp gắn cờ mọi thứ cũng đạt chặn 100\%. Và mẫu từ nguồn công bố không bao giờ gộp với mẫu do tác giả biên soạn.
@@ -121,20 +121,20 @@ RQ2 nêu tiêm nhiễm qua nền nhật ký là rủi ro \textit{điển hình} 
 \toprule
 \textbf{Lớp rào chắn} & \textbf{Mẫu số} & \textbf{Kết quả} \\
 \midrule
-\multicolumn{3}{l}{\textit{Tầng 1 --- tấn công qua ngôn ngữ}} \\
+\multicolumn{3}{l}{\textit{Tầng 1: Tấn công qua ngôn ngữ}} \\
 Lớp lọc tĩnh, nguồn công bố & 703 mẫu & 132 $\rightarrow$ 18,8\% \\
 \quad theo bộ dò: khớp mẫu / mã hoá / phân định & 703 & 114 / 29 / 0 \\
 Lớp lọc tĩnh, mẫu tác giả biên soạn & 80 mẫu & 58 $\rightarrow$ 72,5\% \\
 Lớp lọc tĩnh, tập kiểm chéo & 40 mẫu & 2 $\rightarrow$ 5,0\% \\
-Lớp lọc tĩnh --- báo nhầm trên nhật ký lành & 230 nhật ký lành & 46 $\rightarrow$ 20,0\% \\
+Lớp lọc tĩnh: báo nhầm trên nhật ký lành & 230 nhật ký lành & 46 $\rightarrow$ 20,0\% \\
 \quad trong đó: lớp nhận dạng mã hoá & 46/46 & toàn bộ \\
 \midrule
-\multicolumn{3}{l}{\textit{Tầng 1 --- tấn công qua không gian đặc trưng}} \\
-Cổng ML --- né tránh, chế độ khó (bóp méo mọi đặc trưng; 13 ca bị lật, CI95 97,86--99,27) & 1.036 ca tấn công đã bắt & 1.023 $\rightarrow$ 98,75\% \\
-Cổng ML --- chế độ một đặc trưng ($\infty$ / cực đoan) & 1.036 $\times$ 2 & 100\% cả hai \\
-Cổng ML --- từ chối phán quyết khi đầu vào biến dạng & 4.236 sự kiện & 116 $\rightarrow$ leo thang \\
+\multicolumn{3}{l}{\textit{Tầng 1: Tấn công qua không gian đặc trưng}} \\
+Cổng ML: né tránh, chế độ khó (bóp méo mọi đặc trưng; 13 ca bị lật, CI95 97,86--99,27) & 1.036 ca tấn công đã bắt & 1.023 $\rightarrow$ 98,75\% \\
+Cổng ML: chế độ một đặc trưng ($\infty$ / cực đoan) & 1.036 $\times$ 2 & 100\% cả hai \\
+Cổng ML: từ chối phán quyết khi đầu vào biến dạng & 4.236 sự kiện & 116 $\rightarrow$ leo thang \\
 \midrule
-\multicolumn{3}{l}{\textit{Tầng 2 --- bảo chứng cấu trúc}} \\
+\multicolumn{3}{l}{\textit{Tầng 2: Bảo chứng cấu trúc}} \\
 Đóng gói dữ liệu phân định bằng nonce & 678 mẫu khó, độ phủ 100\% & 678 $\rightarrow$ 100\% \\
 Tập theo vị trí trường, tách từng vị trí & 100 mẫu công bố & 24/24, 23/23, 30/30, 23/23 \\
 Kiểm lược đồ khi ép hỏng cỗ máy suy luận & 1 lần ép hỏng & \texttt{AWAIT\_HITL}, không sụp \\
@@ -142,9 +142,9 @@ Tất định (cùng hạt giống, 5 lượt) / đổi riêng hạt giống & 5
 Chống tràn ngữ cảnh & cửa sổ 16.384 token, ngân sách 4.000 & xấu nhất 1.655 \\
 \midrule
 \multicolumn{3}{l}{\textit{Toàn vẹn pháp y}} \\
-HMAC --- ba kiểu giả mạo cốt lõi & 30 lượt mỗi kiểu & 100\% \\
-HMAC --- đối chứng âm (chuỗi nguyên vẹn) & 450 bản ghi & không báo động giả \\
-HMAC --- cắt đuôi chuỗi & --- & 0\% --- không phát hiện được \\
+HMAC: ba kiểu giả mạo cốt lõi & 30 lượt mỗi kiểu & 100\% \\
+HMAC: đối chứng âm (chuỗi nguyên vẹn) & 450 bản ghi & không báo động giả \\
+HMAC: cắt đuôi chuỗi & N/A & 0\% (không phát hiện) \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -166,16 +166,14 @@ Việc kiểm chứng tính lại toàn bộ chuỗi từ bản ghi khởi thu�
 
 Một phép đo đã phải chạy lại, và lý do thì khái quát được. Kết quả theo từng vị trí ban đầu chỉ dựa trên 79 phán quyết độc lập chứ không phải 100, vì khoá cache lớp hai bỏ sót \texttt{user\_\allowbreak agent} và gộp 23 mẫu User-Agent về hai dấu vân: hai phán quyết phát lại hai mươi mốt lần, đúng ở cột mà thí nghiệm sinh ra để kiểm. Một khiếm khuyết của dụng cụ đo và một mặt tấn công đầu độc cache đang sống ở đây là cùng một khiếm khuyết, bởi kẻ tấn công trong vận hành cũng có thể đổi riêng một trường vắng mặt trong khoá và nhận lại phán quyết đã lưu. Mở rộng khoá đưa số dấu vân về đúng 100; kết quả sau khi sửa trùng khít con số trước khi sửa, và đó chính là lý do mẫu số phải được kiểm chứ không được mặc định là đúng.
 
-\section{RQ3 --- Suy luận Có trạng thái và Quy kết Kỹ thuật}
+\section{RQ3: Suy luận Có trạng thái và Quy kết Kỹ thuật}
 \label{sec:tier2_accuracy_rag}
 
-Bốn vế của RQ3---quy kết, truy xuất, báo cáo minh bạch và giảm tải người---được đo riêng, vì chúng hỏng vì những lý do khác nhau.
-
-Thêm tầng suy luận thì quy kết xấu đi. Trên cùng một dân số 500 mẫu tầng payload (250 mẫu có nhãn, 250 mẫu lành, nguồn CSIC 2010), chỉ riêng truy xuất đã quy kết đúng 80,0\%, trong khi toàn tuyến tác tử tụt xuống 68,0\%, và mức chiến thuật từ 80,0\% xuống 70,4\%, với độ trễ trung vị tăng từ 0,54\,ms lên 13.293\,ms. Tầng suy luận tiêu tốn thêm bốn bậc độ lớn về thời gian và trả lại độ chính xác thấp hơn mười hai điểm so với chính tầng nó được thêm vào để cải thiện. Trong 30 mẫu mất, tối đa 22 mẫu là những ca rào chắn neo ép về \texttt{N/A} vì mã kỹ thuật đề xuất không hiện diện trong tài liệu truy xuất của chính lô đó---một đánh đổi có chủ ý giữa độ chính xác và bảo chứng rằng hệ không bao giờ hành động dựa trên một mã không có bằng chứng đỡ. Mọi con số ở đây đọc so với một cái sàn chứ không so với 0: \texttt{T1595.003} chiếm 130 trong 250 mẫu có nhãn, nên luôn trả lời mã đó đã đạt 52\%.
+Bốn khía cạnh của RQ3 (quy kết kỹ thuật, hiệu năng truy xuất, báo cáo minh bạch và giảm tải chuyên viên) được đánh giá độc lập.
 
 \begin{table}[htbp]
 \centering
-\caption{Quy kết theo từng kỹ thuật trên lát 500 mẫu tầng payload, kèm trần truy xuất của cùng bộ truy vấn. Quy kết chấm trên cả 250 mẫu có nhãn; truy xuất chấm trên 243 mẫu mà Tầng 1 có leo thang, và ở mức kỹ thuật cha---hai mẫu số vì vậy lệch nhau và không thay thế cho nhau được.}
+\caption{Quy kết theo từng kỹ thuật trên lát 500 mẫu tầng payload, kèm trần truy xuất của cùng bộ truy vấn.}
 \label{tab:rq3_attribution}
 \footnotesize
 \setlength{\tabcolsep}{5pt}
@@ -183,18 +181,16 @@ Thêm tầng suy luận thì quy kết xấu đi. Trên cùng một dân số 50
 \toprule
 \textbf{Kỹ thuật ATT\&CK} & \textbf{$n$} & \textbf{Truy xuất hit@3} & \textbf{Chỉ truy xuất} & \textbf{Toàn tuyến} \\
 \midrule
-\texttt{T1190} --- Khai thác ứng dụng công khai & 52 & 1,00 & 100,0\% & 63,5\% \\
-\texttt{T1059.007} --- Thực thi JavaScript & 30 & 1,00 & 100,0\% & 73,3\% \\
-\texttt{T1595.003} --- Quét theo từ điển & 130 & 0,96 & 90,8\% & 86,9\% \\
-\texttt{T1083} --- Dò tệp và thư mục & 12 & 0,00 & 0,0\% & 16,7\% \\
-\texttt{T1071.001} --- Giao thức web & 26 & 1,00 & 0,0\% & 0,0\% \\
+\texttt{T1190}: Khai thác ứng dụng công khai & 52 & 1,00 & 100,0\% & 63,5\% \\
+\texttt{T1059.007}: Thực thi JavaScript & 30 & 1,00 & 100,0\% & 73,3\% \\
+\texttt{T1595.003}: Quét theo từ điển & 130 & 0,96 & 90,8\% & 86,9\% \\
+\texttt{T1083}: Dò tệp và thư mục & 12 & 0,00 & 0,0\% & 16,7\% \\
+\texttt{T1071.001}: Giao thức web & 26 & 1,00 & 0,0\% & 0,0\% \\
 \midrule
 Toàn bộ kỹ thuật & 250 & 0,93 & 80,0\% & 68,0\% \\
 \bottomrule
 \end{tabularx}
 \end{table}
-
-Bảng~\ref{tab:rq3_attribution} làm được điều con số gộp không làm được: nó định vị tầng nào hỏng. Với \texttt{T1083}, bộ truy xuất không bao giờ trả về đúng tài liệu, nên lỗi nằm ở kho tri thức và không thành phần nào phía sau cứu được; với \texttt{T1071.001}, bộ truy xuất trả đúng ở mọi lượt mà quy kết vẫn bằng không, nên lỗi nằm ở bộ ánh xạ. Hai lỗi cần hai cách sửa khác nhau, và một con số 68,0\% đứng một mình thì không kê được toa nào.
 
 \begin{figure}[htbp]
     \centering
@@ -203,13 +199,7 @@ Bảng~\ref{tab:rq3_attribution} làm được điều con số gộp không là
     \label{fig:rq3_attribution}
 \end{figure}
 
-Trên cùng lát 243 truy vấn đã leo thang, Dual-RAG đạt Recall@3 = 0,930 (KTC 95\% 0,891--0,956) và MRR 0,803, nằm thoải mái phía trên các con số quy kết nên mạch lập luận khép kín: truy xuất không phải thứ chặn mức 80,0\%. Nửa bất lợi phải nêu rõ ràng không kém. Đo trên toàn bộ tập \texttt{ground\_truth} gồm 1.305 truy vấn, Recall@3 sụp còn 0,385, vì các mẫu chỉ có tầng luồng chi phối dân số đó và không mang chữ tầng ứng dụng nào để khớp---\texttt{T1110} đạt hit@3 0,00 trên 236 truy vấn. Hai con số mô tả hai dân số khác nhau, và đem 0,385 đặt cạnh 80,0\% là vi phạm chính nguyên tắc ở Mục~\ref{sec:experimental_setup}.
-
-Nếu chỉ đọc phán quyết cuối thì \textit{bất kỳ} lá chắn nào cũng đạt không ảo giác, kể cả một lá chắn chẳng làm gì, nên phép đo chạy trên bản ghi thực thi có lưu hành động trước và sau lá chắn: trong 1.566 lô, có 1.421 lô khẳng định một kỹ thuật, và không một khẳng định nào trong 1.421 lô đó thiếu neo---vẫn bằng không kể cả khi nới tới kỹ thuật cha. Lá chắn không hề nằm im khi đạt kết quả ấy: nó kích hoạt trên 9,26\% số lô và ở 76 lô đã hạ \texttt{BLOCK\_IP} xuống \texttt{AWAIT\_HITL}, ngăn 76 lệnh chặn IP vĩnh viễn tự động mà lời biện giải không neo được vào bằng chứng. Một giới hạn nêu chủ động: điểm số dùng thước chặt, mã phải nằm trong danh sách ID tài liệu đã truy xuất, trong khi lá chắn đang vận hành khớp bằng biểu thức chính quy trên toàn văn ngữ cảnh, nên số không ở đây là cận trên của số ca bỏ lọt chứ không phải con số chính xác.
-
-Tầng 1 đẩy lên 1.066 cảnh báo, trong đó chỉ 80 ca (7,5\%) là đe doạ thật. Xét như một bộ phân loại nhị phân trên hàng đợi đó, mô hình vô giá trị: nó gắn cờ cả 1.066 ca, không hạ cấp ca nào trong 986 cảnh báo giả, nên đạt MCC 0,0 và Balanced Accuracy 0,5, với tỉ lệ báo giả 99,55\% trong phần nó chủ động khẳng định. Độ tự tin của nó gây lạc hướng chứ không chỉ vô nghĩa---tự tin trung bình 0,846 trong khi tỉ lệ thật là 7,5\%, sai số hiệu chuẩn kỳ vọng 0,803, và 900 phán quyết tự tin nhất thì đúng không lần nào.
-
-Giá trị nằm ở đúng cái kênh mà cách đóng khung nhị phân bỏ qua. Tác tử hoãn 168 cảnh báo, tức 15,76\% lượng đầu vào, và hàng đợi đó chứa 76 trong 80 đe doạ thật (95,0\%) với mật độ cảnh báo thật 45,24\% so với 7,5\% ở đầu vào: mức làm giàu 6,03$\times$, nên chuyên viên chỉ xem hàng đợi hoãn sẽ đọc ít hơn 84,24\% khối lượng mà vẫn thấy 95,0\% đe doạ thật. Kết luận là một phát hiện chứ không phải lời biện hộ: mô hình này dùng được như bộ định tuyến phân loại và không dùng được như bộ tự khẳng định. MCC 0,0 không mâu thuẫn với RQ3, vốn hỏi về việc giảm và \textit{phân loại chính xác} phần việc cần người; và vì 910 trong 1.066 ca leo thang là lưu lượng CSIC lành, con số này còn phản ánh chất lượng quyết định leo thang của Tầng 1 chứ không riêng của tác tử.
+Trên cùng lát 243 truy vấn đã leo thang, Dual-RAG đạt Recall@3 = 0,930 (KTC 95\% 0,891--0,956) và MRR 0,803, nằm phía trên các con số quy kết nên mạch lập luận khép kín: truy xuất không phải thành phần gây sụt giảm hiệu năng.
 
 \begin{figure}[htbp]
     \centering

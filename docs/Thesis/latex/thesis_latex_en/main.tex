@@ -180,7 +180,7 @@
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-Security Operations Centres are judged on whether a genuine intrusion is caught in time, yet the volume they must inspect far exceeds what the analysts on duty can read. Existing responses each solve part of the problem: signature rules decide quickly but cannot interpret intent, correlation platforms aggregate evidence yet still hand humans more candidates than they can work through, and automated playbooks execute reliably only on scenarios someone anticipated. What is left for the analyst---assembling context around an alert and judging it---is exactly the part that does not scale. This thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, which places cheap decisions before expensive ones so that reasoning is spent only where it is needed. Tier 1 is a wire-speed filter---deterministic rules, Welford anomaly scoring and a LightGBM gate---resolving baseline stream noise without invoking a language model. Surviving events reach Tier 2, a stateful agent running a locally hosted quantised model behind cryptographic guardrails, whose context is drawn from the raw log (request line, headers, payload, flow statistics) and compressed by log-template mining under an explicit token budget. Security knowledge is a retrieval corpus of 433 MITRE ATT\&CK technique entries with the incident-handling procedures of NIST SP 800-61r2, indexed as dense vectors for semantic similarity and as a sparse BM25 index for exact identifiers, the two rankings combined by Reciprocal Rank Fusion; an output-side check withholds for an analyst any technique absent from that batch's retrieved documents. Measured on benchmark intrusion datasets, Tier 1 and the ML Gate offload 90.6\% of the stream, cutting median end-to-end latency to 0.88\,ms from 17,174.7\,ms under a single-tier LLM baseline. Delimited nonce encapsulation neutralises prompt injection structurally rather than by content recognition, resisting all 678 adversarial samples the static pre-filter cannot absorb, while HMAC-SHA256 chaining detects every core tampering mode, guaranteeing audit-trail integrity and tamper-evidence though not, given its symmetric key, cryptographic non-repudiation.
+In the era of digital transformation and burgeoning network traffic, modern Security Operations Centres (SOCs) face severe alert fatigue, as the volume of telemetry collected from monitoring systems far exceeds manual analysis capacity. Traditional defense tools exhibit clear limitations: static signature rules generate high false-positive rates due to a lack of context interpretation, while pre-programmed SOAR playbooks execute reliably only on anticipated scenarios. Transitioning to Large Language Models (LLMs) enables automated contextual reasoning in natural language; however, operational adoption remains constrained by latency bottlenecks, high computational costs, general adversarial risks (typically log-substrate prompt injections), and AI hallucinations. To address these challenges, this thesis proposes SENTINEL, a cognitive two-tier security architecture operating fully air-gapped, designed on the principle of placing cheap decisions before expensive ones. Tier 1 combines a Welford $\mathcal{O}(1)$ statistical filter and a LightGBM Machine Learning Gate to settle stream noise at wire-speed, offloading 90.6\% to 97.5\% of telemetry without invoking LLM resources and reducing median end-to-end latency from 17,174.7\,ms to 0.88\,ms. Tier 2 executes a LangGraph agentic engine integrated with a Dual-RAG hybrid retrieval mechanism (FAISS + BM25 RRF $k=60$) over 433 MITRE ATT\&CK technique entries, while the AWAIT\_HITL deferral channel reduces analyst workload by 84.24\% while retaining a 95.0\% recall on genuine threats. Finally, Delimited Nonce Encapsulation provides structural guarantees to robustly withstand 678 adversarial attack samples (including log-substrate prompt injections), and HMAC-SHA256 signature chaining ensures effective tamper-detection for forensic audit trails.
 \end{spacing}
 
 % Acknowledgements Page
@@ -192,14 +192,13 @@ Security Operations Centres are judged on whether a genuine intrusion is caught 
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-The completion of this Master's thesis would not have been possible without the invaluable support and guidance of numerous individuals and institutions.
+The completion of this Master's thesis and the fulfillment of the requirements for the Master of Software Engineering degree would not have been possible without the invaluable support, guidance, and encouragement from my advisors, faculty members, colleagues, and family.
 
-First and foremost, I wish to express my deepest gratitude and profound respect to my academic supervisors, Dr. Bui Van Hieu and Dr. Dang Van Hieu. Through their scholarship, precise strategic orientation, and rigorous research ethics, they devoted their time to guiding my critical thinking, offering sharp professional critiques, and inspiring my scientific curiosity throughout this research. Their mentorship has shaped this thesis into a rigorous academic work and established a foundation for my future career in cybersecurity and artificial intelligence engineering.
+First and foremost, I express my deepest gratitude and utmost respect to my academic supervisors, Dr. Bùi Văn Hiệu and Dr. Đặng Văn Hiếu. Through their profound scholarly expertise, precise strategic guidance, and rigorous research standards, my supervisors patiently mentored my critical thinking and inspired my research methodology throughout this thesis journey. Their sharp professional insights have not only refined this work but also provided an invaluable intellectual foundation for my future research in cybersecurity and artificial intelligence.
 
-I am deeply grateful to the Board of Management, the leadership of the FSB School of Business and Technology, and the faculty of FPT University, whose dedicated teaching equipped me with strong theoretical and practical knowledge within a professional research environment. I also thank the Leadership and my colleagues at Department C12, the National Data Center, whose trust, flexible accommodation of my schedule, and operational insights directly informed the design and empirical validation of the SENTINEL system.
+I respectfully extend my sincere appreciation to the Board of Management and leadership of the FSB Institute of Management \& Technology, as well as the faculty of FPT University, for imparting solid theoretical and practical knowledge in a professional research environment. I also sincerely thank the leadership and colleagues at the C12 Department, National Data Center. Their trust, flexible accommodations, and rich practical domain expertise provided deep operational insights that substantially contributed to the design, experimentation, and validation of the SENTINEL system.
 
-Finally, and most cherished of all, I dedicate my deepest gratitude to my beloved family, especially my dear wife and our young child. Their silent sacrifices, patience, and constant encouragement during the countless late nights of system evaluation were my pillar of strength. While every effort has been made to conduct this research with rigor, limitations inevitably remain, and I welcome all constructive feedback from the examination committee and fellow researchers.
-
+Finally, I dedicate my heartfelt gratitude to my beloved family, especially my caring wife and young child. Their silent sacrifices, immense patience, and unwavering encouragement throughout late-night experimental sessions served as my strongest pillar of support. Despite my utmost efforts, limitations may remain; I welcome constructive feedback and guidance from the thesis evaluation committee and esteemed colleagues.
 \end{spacing}
 
 
@@ -230,14 +229,19 @@ Finally, and most cherished of all, I dedicate my deepest gratitude to my belove
 \textbf{Abbreviation} & \textbf{Full Description} \\
 \midrule
 AI & Artificial Intelligence \\
-APT & Advanced Persistent Threat \\
+AUC-ROC & Area Under the Receiver Operating Characteristic Curve \\
 CTI & Cyber Threat Intelligence \\
-DAPT & Dynamic Advanced Persistent Threat \\
+DSRM & Design Science Research Methodology \\
+ECDF & Empirical Cumulative Distribution Function \\
 FAISS & Facebook AI Similarity Search \\
+FNR & False Negative Rate \\
 FPR & False Positive Rate \\
+FSM & Finite State Machine \\
 GGUF & GPT-Generated Unified Format \\
 HITL & Human-in-the-Loop \\
 HMAC & Hash-based Message Authentication Code \\
+IDS / IPS & Intrusion Detection / Prevention System \\
+KV & Key-Value (LLM KV-Cache Mechanism) \\
 LLM & Large Language Model \\
 MITRE ATT\&CK & MITRE Adversarial Tactics, Techniques, and Common Knowledge \\
 NIST & National Institute of Standards and Technology \\
@@ -246,6 +250,8 @@ RRF & Reciprocal Rank Fusion \\
 SIEM & Security Information and Event Management \\
 SOAR & Security Orchestration, Automation, and Response \\
 SOC & Security Operations Center \\
+TPR & True Positive Rate \\
+WAF & Web Application Firewall \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -304,6 +310,9 @@ S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,''
 \bibitem{owasp_llm2025}
 OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
 
+\bibitem{owasp2021}
+OWASP Foundation, ``OWASP Top 10:2021 - The Ten Most Critical Web Application Security Risks,'' The OWASP Foundation, 2021. [Online]. Available: https://owasp.org/Top10/
+
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
 
@@ -327,6 +336,9 @@ R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterog
 
 \bibitem{welford1962}
 B. P. Welford, ``Note on a Method for Calculating Corrected Sums of Squares and Products,'' \textit{Technometrics}, vol. 4, no. 3, pp. 419--420, 1962.
+
+\bibitem{ke2017lightgbm}
+G. Ke, Q. Meng, T. Finley, T. Wang, W. Chen, W. Ma, Q. Ye, and T. Y. Liu, ``LightGBM: A Highly Efficient Gradient Boosting Decision Tree,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, pp. 3146--3154, 2017.
 
 \bibitem{quantization2021}
 A. Gholami \textit{et al.}, ``A Survey of Quantization Methods for Efficient Neural Network Inference,'' \textit{arXiv preprint arXiv:2103.13630}, 2021.
@@ -393,6 +405,9 @@ S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluat
 
 \bibitem{zheng2023judge}
 L. Zheng \textit{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 36, 2023.
+
+\bibitem{peffers2007}
+K. Peffers, T. Tuunanen, M. A. Rothenberger, and S. Chatterjee, ``A Design Science Research Methodology for Information Systems Research,'' \textit{Journal of Management Information Systems}, vol. 24, no. 3, pp. 45--77, 2007.
 
 \end{thebibliography}
 

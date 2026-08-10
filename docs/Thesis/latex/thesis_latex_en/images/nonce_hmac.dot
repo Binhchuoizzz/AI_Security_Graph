@@ -1,51 +1,39 @@
-// SENTINEL — the two cryptographic controls (Section 3.6): per-batch nonce
-// encapsulation on the way in, HMAC chaining on the way out.
-// The tail-truncation blind spot is drawn, not hidden: it is a property of the
-// construction and is reported as such in Chapter 4.
+// SENTINEL — Nonce encapsulation and HMAC-SHA256 audit chaining (Section 3.6).
+// Uniform single-column layout with 20pt font size for large A4 display.
 // Render: dot -Tpdf nonce_hmac.dot -o nonce_hmac.pdf
 digraph nonce_hmac {
     rankdir=TB;
     bgcolor="white";
-    nodesep=0.40;
-    ranksep=0.45;
-    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=12,
-          margin="0.20,0.12", penwidth=1.6, color="#37474f", fillcolor="#eceff1"];
-    edge [fontname="DejaVu Serif", fontsize=10, color="#546e7a", penwidth=1.3];
+    pad="0.05";
+    nodesep=0.35;
+    ranksep=0.32;
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=20,
+          width=5.2, margin="0.25,0.16", penwidth=2.4, color="#37474f", fillcolor="#eceff1"];
+    edge [fontname="DejaVu Serif", fontsize=15, color="#37474f", penwidth=2.0];
 
     subgraph cluster_in {
-        label="Input boundary — Delimited Data Encapsulation";
-        fontname="DejaVu Serif"; fontsize=12; fontcolor="#2e7d32";
+        label="1. Input Boundary — Dynamic Nonce Encapsulation";
+        fontname="DejaVu Serif"; fontsize=18; fontcolor="#2e7d32";
         style="dashed,rounded"; color="#2e7d32"; bgcolor="#f1f8e9";
 
-        raw   [label="Raw telemetry field\nURI · User-Agent · message · payload\n(attacker-authored content)",
-               shape=oval, fillcolor="#fdecea", color="#c62828"];
-        nonce [label="Generate a fresh nonce\nfor THIS batch", fillcolor="#e8f5e9", color="#2e7d32"];
-        wrap  [label="[nonce] … raw content … [nonce]\nmodel instruction: treat as passive data",
-               fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.0];
+        raw   [label="Raw Telemetry Log\n(URI / User-Agent / Syslog)", shape=oval, fillcolor="#fdecea", color="#c62828", width=4.8, fontsize=20, penwidth=2.4];
+        wrap  [label="Dynamic Random Nonce Encapsulation\n[nonce] ... raw log ... [nonce]", fillcolor="#e8f5e9", color="#2e7d32", width=4.8, penwidth=2.4];
     }
 
-    reason [label="Reasoning and decision validation", fillcolor="#fdecea", color="#c62828"];
+    reason [label="2. Agent Reasoning & Guardrail Inspection", fillcolor="#fff8e1", color="#f9a825", penwidth=2.5];
 
     subgraph cluster_out {
-        label="Output boundary — HMAC-SHA256 chaining";
-        fontname="DejaVu Serif"; fontsize=12; fontcolor="#5e35b1";
+        label="3. Output Boundary — HMAC-SHA256 Audit Chaining";
+        fontname="DejaVu Serif"; fontsize=18; fontcolor="#5e35b1";
         style="dashed,rounded"; color="#5e35b1"; bgcolor="#f3e5f5";
 
-        h1 [label="record D₁\nH₁ = HMAC(D₁ ‖ H₀, K)", fillcolor="#ede7f6", color="#5e35b1"];
-        h2 [label="record D₂\nH₂ = HMAC(D₂ ‖ H₁, K)", fillcolor="#ede7f6", color="#5e35b1"];
-        hn [label="record Dₙ\nHₙ = HMAC(Dₙ ‖ Hₙ₋₁, K)", fillcolor="#ede7f6", color="#5e35b1"];
-        h1 -> h2 -> hn [label=" chains ", color="#5e35b1"];
+        h1 [label="H₁ = HMAC(D₁ ‖ H₀, K)", fillcolor="#ede7f6", color="#5e35b1", width=2.4];
+        h2 [label="H₂ = HMAC(D₂ ‖ H₁, K)", fillcolor="#ede7f6", color="#5e35b1", width=2.4];
+        h1 -> h2 [label=" Chained ", color="#5e35b1"];
     }
 
-    key [label="Key K loaded from the environment,\nnever from source", shape=note, fillcolor="#fff8e1", color="#f9a825"];
+    detect [label="Tamper Evident: Detects edit / insert / delete", fillcolor="#e8f5e9", color="#2e7d32", width=4.8, penwidth=2.5];
 
-    detect [label="DETECTED by recomputation\ncontent edit · forged insertion · middle deletion",
-            fillcolor="#e8f5e9", color="#2e7d32"];
-    blind  [label="NOT DETECTED\ntruncation of the tail leaves no\nsubsequent link to verify against",
-            fillcolor="#fdecea", color="#c62828", penwidth=2.0];
-
-    raw -> nonce -> wrap -> reason -> h1;
-    key -> h1 [style=dashed, arrowhead=open];
-    hn -> detect;
-    hn -> blind [style=dashed, color="#c62828"];
+    raw -> wrap -> reason -> h1;
+    h2 -> detect [color="#2e7d32", penwidth=2.0];
 }

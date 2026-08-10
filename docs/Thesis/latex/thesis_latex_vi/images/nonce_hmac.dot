@@ -1,51 +1,39 @@
-// SENTINEL — hai cơ chế mật mã (Mục 3.6): đóng gói nonce theo lô ở đầu vào,
-// chuỗi HMAC ở đầu ra.
-// Điểm mù cắt đuôi được VẼ RA chứ không giấu: đó là tính chất của chính cấu trúc và
-// được báo cáo đúng như vậy ở Chương 4.
+// SENTINEL — Cơ chế đóng gói Nonce và niêm phong chuỗi HMAC-SHA256 (Mục 3.6).
+// Bố cục đơn cột dọc chuẩn 20pt phông chữ SIÊU TO LẤP ĐẦY TRANG A4.
 // Render: dot -Tpdf nonce_hmac.dot -o nonce_hmac.pdf
 digraph nonce_hmac {
     rankdir=TB;
     bgcolor="white";
-    nodesep=0.40;
-    ranksep=0.45;
-    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=12,
-          margin="0.20,0.12", penwidth=1.6, color="#37474f", fillcolor="#eceff1"];
-    edge [fontname="DejaVu Serif", fontsize=10, color="#546e7a", penwidth=1.3];
+    pad="0.05";
+    nodesep=0.35;
+    ranksep=0.32;
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=20,
+          width=5.2, margin="0.25,0.16", penwidth=2.4, color="#37474f", fillcolor="#eceff1"];
+    edge [fontname="DejaVu Serif", fontsize=15, color="#37474f", penwidth=2.0];
 
     subgraph cluster_in {
-        label="Biên đầu vào — Đóng gói Dữ liệu Phân định";
-        fontname="DejaVu Serif"; fontsize=12; fontcolor="#2e7d32";
+        label="1. Biên đầu vào — Đóng gói Nonce chống tiêm nhiễm";
+        fontname="DejaVu Serif"; fontsize=18; fontcolor="#2e7d32";
         style="dashed,rounded"; color="#2e7d32"; bgcolor="#f1f8e9";
 
-        raw   [label="Trường telemetry thô\nURI · User-Agent · message · payload\n(nội dung do kẻ tấn công soạn)",
-               shape=oval, fillcolor="#fdecea", color="#c62828"];
-        nonce [label="Sinh nonce mới\ncho CHÍNH lô này", fillcolor="#e8f5e9", color="#2e7d32"];
-        wrap  [label="[nonce] … nội dung thô … [nonce]\nchỉ thị cho mô hình: xử lý như dữ liệu thụ động",
-               fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.0];
+        raw   [label="Nhật ký thô\n(URI / User-Agent / Syslog)", shape=oval, fillcolor="#fdecea", color="#c62828", width=4.8, fontsize=20, penwidth=2.4];
+        wrap  [label="Đóng gói Nonce ngẫu nhiên động\n[nonce] ... dữ liệu thô ... [nonce]", fillcolor="#e8f5e9", color="#2e7d32", width=4.8, penwidth=2.4];
     }
 
-    reason [label="Suy luận và kiểm định phán quyết", fillcolor="#fdecea", color="#c62828"];
+    reason [label="2. Suy luận tác tử & Kiểm định rào chắn", fillcolor="#fff8e1", color="#f9a825", penwidth=2.5];
 
     subgraph cluster_out {
-        label="Biên đầu ra — Chuỗi HMAC-SHA256";
-        fontname="DejaVu Serif"; fontsize=12; fontcolor="#5e35b1";
+        label="3. Biên đầu ra — Niêm phong chuỗi HMAC-SHA256";
+        fontname="DejaVu Serif"; fontsize=18; fontcolor="#5e35b1";
         style="dashed,rounded"; color="#5e35b1"; bgcolor="#f3e5f5";
 
-        h1 [label="bản ghi D₁\nH₁ = HMAC(D₁ ‖ H₀, K)", fillcolor="#ede7f6", color="#5e35b1"];
-        h2 [label="bản ghi D₂\nH₂ = HMAC(D₂ ‖ H₁, K)", fillcolor="#ede7f6", color="#5e35b1"];
-        hn [label="bản ghi Dₙ\nHₙ = HMAC(Dₙ ‖ Hₙ₋₁, K)", fillcolor="#ede7f6", color="#5e35b1"];
-        h1 -> h2 -> hn [label=" nối xích ", color="#5e35b1"];
+        h1 [label="H₁ = HMAC(D₁ ‖ H₀, K)", fillcolor="#ede7f6", color="#5e35b1", width=2.4];
+        h2 [label="H₂ = HMAC(D₂ ‖ H₁, K)", fillcolor="#ede7f6", color="#5e35b1", width=2.4];
+        h1 -> h2 [label=" Nối xích ", color="#5e35b1"];
     }
 
-    key [label="Khoá K nạp từ biến môi trường,\nkhông bao giờ từ mã nguồn", shape=note, fillcolor="#fff8e1", color="#f9a825"];
+    detect [label="Phát hiện ngay khi sửa / chèn / xóa bản ghi", fillcolor="#e8f5e9", color="#2e7d32", width=4.8, penwidth=2.5];
 
-    detect [label="PHÁT HIỆN ĐƯỢC bằng tính lại\nsửa nội dung · chèn dòng giả · xoá dòng giữa",
-            fillcolor="#e8f5e9", color="#2e7d32"];
-    blind  [label="KHÔNG PHÁT HIỆN ĐƯỢC\ncắt đuôi chuỗi không để lại mắt xích\nnào phía sau để đối chiếu",
-            fillcolor="#fdecea", color="#c62828", penwidth=2.0];
-
-    raw -> nonce -> wrap -> reason -> h1;
-    key -> h1 [style=dashed, arrowhead=open];
-    hn -> detect;
-    hn -> blind [style=dashed, color="#c62828"];
+    raw -> wrap -> reason -> h1;
+    h2 -> detect [color="#2e7d32", penwidth=2.0];
 }

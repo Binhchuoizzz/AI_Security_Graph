@@ -1,60 +1,49 @@
-// SENTINEL — Dual-RAG retrieval and the evidence-anchoring guardrail (Section 3.5).
-// The anchoring check is drawn on the OUTPUT side on purpose: it constrains what the
-// model may assert, not what the retriever may return.
-//
-// LAYOUT NOTE: this graph is deliberately TOP-DOWN. An earlier left-to-right version
-// rendered 2188 x 308 pt — a ribbon whose text shrank to ~2.8 pt once scaled to the
-// text width. Keep the aspect ratio near portrait so the figure stays legible in print.
+// SENTINEL — Dual-RAG retrieval and evidence anchoring (Section 3.5).
+// Uniform single-column layout with 20pt font size for large A4 display.
 // Render: dot -Tpdf dual_rag.dot -o dual_rag.pdf
 digraph dual_rag {
     rankdir=TB;
     bgcolor="white";
-    nodesep=0.40;
-    ranksep=0.45;
-    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=13,
-          margin="0.20,0.14", penwidth=1.6, color="#37474f", fillcolor="#eceff1"];
-    edge [fontname="DejaVu Serif", fontsize=11, color="#546e7a", penwidth=1.3];
+    pad="0.05";
+    nodesep=0.35;
+    ranksep=0.32;
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=20,
+          width=5.2, margin="0.25,0.16", penwidth=2.4, color="#37474f", fillcolor="#eceff1"];
+    edge [fontname="DejaVu Serif", fontsize=15, color="#37474f", penwidth=2.0];
 
-    query [label="Normalised query\nservice · port · observed technique", shape=oval,
-           fillcolor="#e3f2fd", color="#1565c0"];
+    query [label="Sanitized Log Query", shape=oval, fillcolor="#e3f2fd", color="#1565c0", width=4.8, fontsize=20, penwidth=2.4];
 
     subgraph cluster_kb {
-        label="Knowledge base";
-        fontname="DejaVu Serif"; fontsize=13; fontcolor="#37474f";
+        label="Cybersecurity Knowledge Store";
+        fontname="DejaVu Serif"; fontsize=18; fontcolor="#37474f";
         style="dashed,rounded"; color="#90a4ae"; bgcolor="#fafafa";
-        kb1 [label="MITRE ATT&CK\nSTIX 2.1 entries", fillcolor="#e8eaf6"];
-        kb2 [label="NIST SP 800-61r2\nincident handling", fillcolor="#e8eaf6"];
+        kb1 [label="MITRE ATT&CK (STIX 2.1)", fillcolor="#e8eaf6", width=2.5, fontsize=18];
+        kb2 [label="NIST SP 800-61r2", fillcolor="#e8eaf6", width=2.5, fontsize=18];
     }
 
-    faiss [label="FAISS dense search\nSentence-BERT embeddings\nsemantic intent",
-           fillcolor="#e8f5e9", color="#2e7d32"];
-    bm25  [label="BM25 sparse search\nexact identifiers\nCVE · ports · registry keys",
-           fillcolor="#e8f5e9", color="#2e7d32"];
+    faiss [label="1. FAISS (Sentence-BERT)\nDense Vector Search", width=2.55, fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.4];
+    bm25  [label="2. BM25\nSparse Keyword Match", width=2.55, fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.4];
 
-    rrf    [label="Reciprocal Rank Fusion   k = 60", shape=diamond, height=1.1,
-            fillcolor="#fff8e1", color="#f9a825"];
-    prompt [label="Retrieved context injected at rag_context", fillcolor="#eceff1"];
-    llm    [label="Reasoning model\nemits a technique identifier",
-            fillcolor="#fdecea", color="#c62828"];
+    rrf    [label="3. RRF Fusion (k = 60)", fillcolor="#fff8e1", color="#f9a825", penwidth=2.5];
+    prompt [label="4. Context Enrichment rag_context", fillcolor="#eceff1", penwidth=2.4];
+    llm    [label="5. LLM Reasoning Model", fillcolor="#fdecea", color="#c62828", penwidth=2.4];
 
-    anchor [label="EVIDENCE-ANCHORING GUARDRAIL\nis the identifier present in\nTHIS batch's retrieved documents?",
-            shape=box, style="filled", fillcolor="#ede7f6", color="#5e35b1", penwidth=2.4];
+    anchor [label="EVIDENCE ANCHOR GATE\nEvidence Present in Batch ?", fillcolor="#ede7f6", color="#5e35b1", penwidth=2.5];
 
-    keep [label="Assert the technique", fillcolor="#e8f5e9", color="#2e7d32"];
-    drop [label="Force N/A\nroute to AWAIT_HITL", fillcolor="#fff3e0", color="#ef6c00", penwidth=2.0];
+    keep [label="Technique Confirmed", width=2.55, fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.4];
+    drop [label="Force N/A · AWAIT_HITL", width=2.55, fillcolor="#fff3e0", color="#ef6c00", penwidth=2.5];
 
+    { rank=same; kb1; kb2; }
     { rank=same; faiss; bm25; }
     { rank=same; keep; drop; }
 
     query -> faiss;
     query -> bm25;
-    kb1 -> faiss [style=dashed, arrowhead=open];
-    kb2 -> bm25  [style=dashed, arrowhead=open];
-    kb1 -> bm25  [style=dashed, arrowhead=open, constraint=false];
-    kb2 -> faiss [style=dashed, arrowhead=open, constraint=false];
+    kb1 -> faiss [style=dashed, color="#78909c"];
+    kb2 -> bm25  [style=dashed, color="#78909c"];
     faiss -> rrf;
     bm25  -> rrf;
     rrf -> prompt -> llm -> anchor;
-    anchor -> keep [label="  yes  "];
-    anchor -> drop [label="  no  ", color="#ef6c00", penwidth=1.8];
+    anchor -> keep [label="  Yes  ", color="#2e7d32", penwidth=2.0];
+    anchor -> drop [label="  No  ", color="#ef6c00", penwidth=2.0];
 }

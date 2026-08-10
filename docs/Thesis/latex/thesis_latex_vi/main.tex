@@ -181,7 +181,7 @@
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-Trung tâm Điều hành An ninh được đánh giá ở chỗ một cuộc xâm nhập thật có bị bắt kịp lúc hay không, thế nhưng khối lượng phải soi xét lại vượt xa những gì các chuyên viên trực ca đọc nổi. Các hướng đối phó hiện hành mỗi hướng chỉ giải quyết được một phần: luật chữ ký quyết định rất nhanh nhưng không diễn giải được ý đồ, nền tảng tương quan gom được bằng chứng nhưng vẫn trao cho con người nhiều ứng viên hơn mức họ xử lý xuể, còn kịch bản tự động chỉ chạy đáng tin trên đúng những tình huống đã có người lường trước. Phần đọng lại cho chuyên viên---dựng ngữ cảnh quanh một cảnh báo rồi phán đoán nó---đúng là phần không mở rộng quy mô được. Luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành cục bộ hoàn toàn (air-gapped), đặt quyết định rẻ đứng trước quyết định đắt để năng lực suy luận chỉ tiêu tốn ở nơi thật sự cần. Tầng 1 là bộ lọc tốc độ đường truyền---luật xác định, chấm bất thường Welford và cổng LightGBM---giải quyết nhiễu nền của luồng mà không phải gọi tới mô hình ngôn ngữ. Sự kiện sống sót mới tới Tầng 2, một tác tử có trạng thái vận hành mô hình lượng tử hoá đặt tại chỗ phía sau các rào chắn mật mã, với ngữ cảnh dựng từ chính nhật ký thô (dòng yêu cầu, tiêu đề, payload, thống kê luồng) và nén lại bằng kỹ thuật gom khuôn mẫu nhật ký dưới một ngân sách token tường minh. Tri thức an ninh là kho truy xuất gồm 433 mục kỹ thuật MITRE ATT\&CK cùng các quy trình xử lý sự cố của NIST SP 800-61r2, lập chỉ mục vừa dạng véc-tơ dày cho tương đồng ngữ nghĩa vừa dạng chỉ mục thưa BM25 cho các định danh chính xác, hai bảng hạng hợp nhất bằng Hợp nhất Hạng Nghịch đảo; một phép kiểm ở đầu ra giữ lại chờ chuyên viên mọi kỹ thuật vắng mặt trong tập tài liệu truy xuất của chính lô đó. Đo trên các bộ dữ liệu xâm nhập chuẩn, Tầng 1 cùng Cổng Học máy gỡ tải 90,6\% lưu lượng, kéo độ trễ toàn tuyến ở mức trung vị còn 0,88\,ms so với 17.174,7\,ms của đường LLM đơn tầng. Cơ chế đóng gói nonce phân định vô hiệu hoá tiêm nhiễm câu lệnh bằng cấu trúc chứ không bằng nhận dạng nội dung, kháng được toàn bộ 678 mẫu đối kháng mà lớp lọc tĩnh không hấp thụ được; chuỗi niêm phong HMAC-SHA256 phát hiện mọi kiểu giả mạo cốt lõi, bảo đảm tính toàn vẹn và khả năng phát hiện giả mạo của nhật ký kiểm toán, song do dùng khoá đối xứng thì không cấu thành chống chối bỏ theo nghĩa mật mã học.
+Trong kỷ nguyên chuyển đổi số và bùng nổ lưu lượng mạng, các Trung tâm Điều hành An ninh (SOC) hiện đại đang đối mặt với tình trạng quá tải cảnh báo (Alert Fatigue) nghiêm trọng, khi khối lượng nhật ký thu thập từ các hệ thống giám sát vượt xa năng lực phân tích thủ công của nhân sự trực ca. Các giải pháp phòng thủ truyền thống bộc lộ rõ hạn chế: bộ lọc chữ ký tĩnh phát sinh tỷ lệ báo động giả rất cao do thiếu khả năng phân tích ngữ cảnh, trong khi các kịch bản SOAR lập trình sẵn chỉ đáp ứng được các tình huống định trước. Việc dịch chuyển sang ứng dụng Mô hình Ngôn ngữ Lớn (LLM) mở ra tiềm năng tự động hóa suy luận an ninh theo ngữ cảnh tự nhiên; tuy nhiên, hướng tiếp cận này hiện chưa thể triển khai rộng rãi do rào cản về độ trễ xử lý, chi phí tính toán lớn, các nguy cơ đối kháng nói chung (điển hình như tiêm nhiễm câu lệnh qua nhật ký - Log Prompt Injection) và rủi ro ảo giác AI. Để giải quyết các thách thức trên, luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành hoàn toàn cục bộ (air-gapped), thiết kế theo nguyên lý đặt phán quyết rẻ đứng trước phán quyết đắt. Tầng 1 kết hợp bộ lọc thống kê Welford $\mathcal{O}(1)$ và Cổng Học máy LightGBM nhằm xử lý nhiễu nền ở tốc độ đường truyền, gỡ tải từ 90,6\% đến 97,5\% lưu lượng mà không tiêu tốn tài nguyên LLM, giúp giảm độ trễ trung vị toàn tuyến từ 17.174,7\,ms xuống còn 0,88\,ms. Tầng 2 vận hành cỗ máy tác tử LangGraph kết hợp cơ chế truy xuất lai Dual-RAG (FAISS + BM25 RRF $k=60$) trên 433 mục tri thức MITRE ATT\&CK, trong khi kênh hoãn AWAIT\_HITL giúp giảm 84,24\% tải công việc cho chuyên viên mà vẫn đảm bảo phủ 95,0\% mối đe dọa thật. Cuối cùng, cơ chế Đóng gói Nonce phân định bảo chứng cấu trúc đạt khả năng kháng triệt để trước 678 mẫu tấn công đối kháng (bao gồm tiêm nhiễm câu lệnh qua nhật ký), và chuỗi HMAC-SHA256 bảo đảm khả năng phát hiện hiệu quả các hành vi giả mạo vết kiểm toán pháp y.
 \end{spacing}
 
 % Acknowledgements Page
@@ -193,14 +193,13 @@ Trung tâm Điều hành An ninh được đánh giá ở chỗ một cuộc xâ
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-Để hoàn thành công trình nghiên cứu này và đạt được học vị Thạc sĩ Kỹ thuật Phần mềm, tôi đã nhận được sự hỗ trợ, động viên và dìu dắt quý báu từ rất nhiều cá nhân và tập thể.
+Để hoàn thành công trình nghiên cứu này và đạt được học vị Thạc sĩ Kỹ thuật Phần mềm, tôi đã nhận được sự hỗ trợ, động viên và dìu dắt quý báu từ quý Thầy Cô, đồng nghiệp cùng gia đình.
 
-Trước hết, tôi xin bày tỏ lòng biết ơn chân thành và kính trọng sâu sắc nhất tới hai thầy hướng dẫn khoa học của tôi, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác, sự định hướng chiến lược chuẩn xác và tinh thần làm việc nghiêm túc, quý thầy đã luôn dành thời gian kiên nhẫn chỉ bảo, định hướng tư duy phản biện và truyền cảm hứng nghiên cứu cho tôi trong suốt chặng đường thực hiện luận văn. Những góp ý chuyên môn sắc bén của quý thầy không chỉ giúp tôi hoàn thiện công trình này mà còn là hành trang tri thức vô giá cho sự nghiệp nghiên cứu an toàn thông tin và trí tuệ nhân tạo của tôi sau này.
+Trước hết, tôi xin bày tỏ lòng biết ơn chân thành và sự kính trọng sâu sắc nhất tới hai thầy hướng dẫn khoa học, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác, sự định hướng chiến lược chuẩn xác và tinh thần làm việc nghiêm túc, quý Thầy đã luôn dành thời gian kiên nhẫn chỉ bảo, định hướng tư duy phản biện và truyền cảm hứng nghiên cứu cho tôi trong suốt chặng đường thực hiện luận văn. Những góp ý chuyên môn sắc bén của quý Thầy không chỉ giúp tôi hoàn thiện công trình này mà còn là hành trang tri thức vô giá cho sự nghiệp nghiên cứu an toàn thông tin và trí tuệ nhân tạo của tôi trong tương lai.
 
-Tôi xin trân trọng gửi lời tri ân tới Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị \& Công nghệ FSB cùng toàn thể quý thầy cô Trường Đại học FPT đã truyền dạy nền tảng tri thức lý thuyết và thực tiễn vững chắc trong một môi trường nghiên cứu chuyên nghiệp, hiện đại. Tôi cũng xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Cục C12, Trung tâm Dữ liệu Quốc gia---sự tin tưởng, điều kiện thuận lợi về thời gian cùng những kinh nghiệm thực chiến phong phú từ đơn vị đã đem lại góc nhìn thực tiễn sâu sắc, áp dụng trực tiếp vào quá trình thiết kế, thực nghiệm và kiểm chứng hệ thống SENTINEL.
+Tôi xin trân trọng gửi lời tri ân tới Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị \& Công nghệ FSB cùng toàn thể quý Thầy Cô Trường Đại học FPT đã truyền dạy nền tảng tri thức lý thuyết và thực tiễn vững chắc trong một môi trường nghiên cứu chuyên nghiệp. Tôi cũng xin chân thành cảm ơn Ban Lãnh đạo cùng toàn thể đồng nghiệp tại Cục C12, Trung tâm Dữ liệu Quốc gia. Sự tin tưởng, điều kiện thuận lợi về thời gian cùng những kinh nghiệm thực chiến phong phú từ đơn vị đã đem lại góc nhìn thực tiễn sâu sắc, góp phần quan trọng vào quá trình thiết kế, thực nghiệm và hoàn thiện hệ thống SENTINEL.
 
-Cuối cùng, và cũng là niềm tự hào lớn lao nhất, tôi xin dành trọn lòng tri ân sâu sắc nhất tới gia đình thân yêu, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn vô bờ bến và nguồn động viên không ngừng nghỉ của vợ và con trong những tháng ngày tôi miệt mài với các đợt thực nghiệm kéo dài xuyên đêm chính là điểm tựa vững chắc nhất giúp tôi hoàn thành công trình này. Mặc dù đã rất cố gắng, luận văn khó tránh khỏi hạn chế; tôi rất mong nhận được sự chỉ dẫn và đóng góp quý báu từ quý thầy cô trong Hội đồng chấm luận văn cùng các đồng nghiệp.
-
+Cuối cùng, tôi xin dành trọn lòng tri ân sâu sắc nhất tới gia đình thân yêu, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn và nguồn động viên không ngừng nghỉ của gia đình trong suốt quá trình tôi miệt mài thực hiện nghiên cứu chính là điểm tựa vững chắc nhất giúp tôi hoàn thành luận văn này. Mặc dù đã nỗ lực hết mình, luận văn khó tránh khỏi những thiếu sót nhất định; tôi rất mong nhận được sự chỉ dẫn và đóng góp quý báu từ quý Thầy Cô trong Hội đồng cùng quý độc giả.
 \end{spacing}
 
 
@@ -231,14 +230,19 @@ Cuối cùng, và cũng là niềm tự hào lớn lao nhất, tôi xin dành tr
 \textbf{Từ viết tắt} & \textbf{Định nghĩa đầy đủ} \\
 \midrule
 AI & Artificial Intelligence (Trí tuệ nhân tạo) \\
-APT & Advanced Persistent Threat (Mối đe dọa thường trực nâng cao) \\
+AUC-ROC & Area Under the Receiver Operating Characteristic Curve (Diện tích dưới đường cong đặc tính hoạt động của bộ thu) \\
 CTI & Cyber Threat Intelligence (Tình báo mối đe dọa mạng) \\
-DAPT & Dynamic Advanced Persistent Threat (Tấn công APT động) \\
+DSRM & Design Science Research Methodology (Phương pháp luận nghiên cứu khoa học thiết kế) \\
+ECDF & Empirical Cumulative Distribution Function (Hàm phân phối tích lũy thực nghiệm) \\
 FAISS & Facebook AI Similarity Search (Cỗ máy tìm kiếm tương đồng FAISS) \\
+FNR & False Negative Rate (Tỷ lệ bỏ sót báo động) \\
 FPR & False Positive Rate (Tỷ lệ báo động giả) \\
+FSM & Finite State Machine (Máy trạng thái hữu hạn) \\
 GGUF & GPT-Generated Unified Format (Định dạng hợp nhất GGUF) \\
 HITL & Human-in-the-Loop (Con người trong vòng lặp) \\
 HMAC & Hash-based Message Authentication Code (Mã xác thực thông điệp dựa trên hàm băm) \\
+IDS / IPS & Intrusion Detection / Prevention System (Hệ thống phát hiện và ngăn ngừa xâm nhập) \\
+KV & Key-Value (Khóa - Giá trị trong cơ chế bộ nhớ đệm KV-Cache) \\
 LLM & Large Language Model (Mô hình ngôn ngữ lớn) \\
 MITRE ATT\&CK & MITRE Adversarial Tactics, Techniques, and Common Knowledge (Khung tri thức chiến thuật và kỹ thuật tấn công MITRE) \\
 NIST & National Institute of Standards and Technology (Viện Tiêu chuẩn và Công nghệ Quốc gia Hoa Kỳ) \\
@@ -247,6 +251,8 @@ RRF & Reciprocal Rank Fusion (Tổng hợp xếp hạng nghịch đảo) \\
 SIEM & Security Information and Event Management (Quản lý thông tin và sự kiện an ninh) \\
 SOAR & Security Orchestration, Automation, and Response (Điều phối, tự động hóa và phản hồi an ninh) \\
 SOC & Security Operations Center (Trung tâm điều hành an ninh mạng) \\
+TPR & True Positive Rate (Tỷ lệ phát hiện đúng) \\
+WAF & Web Application Firewall (Tường lửa ứng dụng Web) \\
 \bottomrule
 \end{longtable}
 \endgroup
@@ -305,6 +311,9 @@ S. Rose, O. Borchert, S. Mitchell, and S. Connelly, ``Zero Trust Architecture,''
 \bibitem{owasp_llm2025}
 OWASP GenAI Security Project, ``OWASP Top 10 for Large Language Model Applications,'' Version 2025, The OWASP Foundation, 2025. [Online]. Available: https://genai.owasp.org/
 
+\bibitem{owasp2021}
+OWASP Foundation, ``OWASP Top 10:2021 - The Ten Most Critical Web Application Security Risks,'' The OWASP Foundation, 2021. [Online]. Available: https://owasp.org/Top10/
+
 \bibitem{ids2018}
 I. Sharafaldin, A. H. Lashkari, and A. A. Ghorbani, ``Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization,'' in \textit{Proceedings of the 4th International Conference on Information Systems Security and Privacy (ICISSP)}, 2018, pp. 108--116.
 
@@ -328,6 +337,9 @@ R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterog
 
 \bibitem{welford1962}
 B. P. Welford, ``Note on a Method for Calculating Corrected Sums of Squares and Products,'' \textit{Technometrics}, vol. 4, no. 3, pp. 419--420, 1962.
+
+\bibitem{ke2017lightgbm}
+G. Ke, Q. Meng, T. Finley, T. Wang, W. Chen, W. Ma, Q. Ye, and T. Y. Liu, ``LightGBM: A Highly Efficient Gradient Boosting Decision Tree,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 30, pp. 3146--3154, 2017.
 
 \bibitem{quantization2021}
 A. Gholami \textit{et al.}, ``A Survey of Quantization Methods for Efficient Neural Network Inference,'' \textit{arXiv preprint arXiv:2103.13630}, 2021.
@@ -394,6 +406,9 @@ S. Es, J. James, L. Espinosa-Anke, and S. Schockaert, ``RAGAS: Automated Evaluat
 
 \bibitem{zheng2023judge}
 L. Zheng \textit{et al.}, ``Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena,'' in \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 36, 2023.
+
+\bibitem{peffers2007}
+K. Peffers, T. Tuunanen, M. A. Rothenberger, and S. Chatterjee, ``A Design Science Research Methodology for Information Systems Research,'' \textit{Journal of Management Information Systems}, vol. 24, no. 3, pp. 45--77, 2007.
 
 \end{thebibliography}
 

@@ -1,60 +1,49 @@
 // SENTINEL — Truy xuất Dual-RAG và rào chắn neo bằng chứng (Mục 3.5).
-// Phép kiểm neo được vẽ ở PHÍA ĐẦU RA có chủ ý: nó ràng buộc thứ mô hình được phép
-// khẳng định, không phải thứ bộ truy xuất được phép trả về.
-//
-// GHI CHÚ BỐ CỤC: đồ thị này cố ý xếp TỪ TRÊN XUỐNG. Bản trái-sang-phải trước đó
-// render ra 2188 x 308 pt — một dải ruy-băng, co về bề ngang trang thì chữ chỉ còn
-// ~2,8 pt. Giữ tỉ lệ gần khổ dọc để hình còn đọc được khi in.
+// Bố cục đơn cột dọc chuẩn tỉ lệ 5:7 với phông chữ 20pt SIÊU TO LẤP ĐẦY TRANG A4.
 // Render: dot -Tpdf dual_rag.dot -o dual_rag.pdf
 digraph dual_rag {
     rankdir=TB;
     bgcolor="white";
-    nodesep=0.40;
-    ranksep=0.45;
-    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=13,
-          margin="0.20,0.14", penwidth=1.6, color="#37474f", fillcolor="#eceff1"];
-    edge [fontname="DejaVu Serif", fontsize=11, color="#546e7a", penwidth=1.3];
+    pad="0.05";
+    nodesep=0.35;
+    ranksep=0.32;
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=20,
+          width=5.2, margin="0.25,0.16", penwidth=2.4, color="#37474f", fillcolor="#eceff1"];
+    edge [fontname="DejaVu Serif", fontsize=15, color="#37474f", penwidth=2.0];
 
-    query [label="Truy vấn đã chuẩn hoá\ndịch vụ · cổng · kỹ thuật quan sát được", shape=oval,
-           fillcolor="#e3f2fd", color="#1565c0"];
+    query [label="Truy vấn nhật ký đã chuẩn hóa", shape=oval, fillcolor="#e3f2fd", color="#1565c0", width=4.8, fontsize=20, penwidth=2.4];
 
     subgraph cluster_kb {
-        label="Kho tri thức";
-        fontname="DejaVu Serif"; fontsize=13; fontcolor="#37474f";
+        label="Kho tri thức an ninh mạng";
+        fontname="DejaVu Serif"; fontsize=18; fontcolor="#37474f";
         style="dashed,rounded"; color="#90a4ae"; bgcolor="#fafafa";
-        kb1 [label="MITRE ATT&CK\nmục chuẩn STIX 2.1", fillcolor="#e8eaf6"];
-        kb2 [label="NIST SP 800-61r2\nquy trình xử lý sự cố", fillcolor="#e8eaf6"];
+        kb1 [label="MITRE ATT&CK (STIX 2.1)", fillcolor="#e8eaf6", width=2.5, fontsize=18];
+        kb2 [label="NIST SP 800-61r2", fillcolor="#e8eaf6", width=2.5, fontsize=18];
     }
 
-    faiss [label="Tìm kiếm dày FAISS\nnhúng Sentence-BERT\nngữ nghĩa theo ý đồ",
-           fillcolor="#e8f5e9", color="#2e7d32"];
-    bm25  [label="Tìm kiếm thưa BM25\nđịnh danh chính xác\nCVE · cổng · khoá registry",
-           fillcolor="#e8f5e9", color="#2e7d32"];
+    faiss [label="1. FAISS (Sentence-BERT)\nTìm kiếm véc-tơ dày", width=2.55, fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.4];
+    bm25  [label="2. BM25\nKhớp từ khóa thưa", width=2.55, fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.4];
 
-    rrf    [label="Hợp nhất hạng RRF   k = 60", shape=diamond, height=1.1,
-            fillcolor="#fff8e1", color="#f9a825"];
-    prompt [label="Ngữ cảnh truy xuất đưa vào tại rag_context", fillcolor="#eceff1"];
-    llm    [label="Mô hình suy luận\nphát ra một mã kỹ thuật",
-            fillcolor="#fdecea", color="#c62828"];
+    rrf    [label="3. Hợp nhất RRF (k = 60)", fillcolor="#fff8e1", color="#f9a825", penwidth=2.5];
+    prompt [label="4. Bồi đắp ngữ cảnh rag_context", fillcolor="#eceff1", penwidth=2.4];
+    llm    [label="5. Suy luận mô hình LLM", fillcolor="#fdecea", color="#c62828", penwidth=2.4];
 
-    anchor [label="RÀO CHẮN NEO BẰNG CHỨNG\nmã có hiện diện trong tài liệu\ntruy xuất của CHÍNH LÔ NÀY không?",
-            shape=box, style="filled", fillcolor="#ede7f6", color="#5e35b1", penwidth=2.4];
+    anchor [label="CỔNG NEO BẰNG CHỨNG\nCó chứng cứ trong lô ?", fillcolor="#ede7f6", color="#5e35b1", penwidth=2.5];
 
-    keep [label="Khẳng định kỹ thuật", fillcolor="#e8f5e9", color="#2e7d32"];
-    drop [label="Ép về N/A\nchuyển AWAIT_HITL", fillcolor="#fff3e0", color="#ef6c00", penwidth=2.0];
+    keep [label="Khẳng định kỹ thuật", width=2.55, fillcolor="#e8f5e9", color="#2e7d32", penwidth=2.4];
+    drop [label="Ép N/A · AWAIT_HITL", width=2.55, fillcolor="#fff3e0", color="#ef6c00", penwidth=2.5];
 
+    { rank=same; kb1; kb2; }
     { rank=same; faiss; bm25; }
     { rank=same; keep; drop; }
 
     query -> faiss;
     query -> bm25;
-    kb1 -> faiss [style=dashed, arrowhead=open];
-    kb2 -> bm25  [style=dashed, arrowhead=open];
-    kb1 -> bm25  [style=dashed, arrowhead=open, constraint=false];
-    kb2 -> faiss [style=dashed, arrowhead=open, constraint=false];
+    kb1 -> faiss [style=dashed, color="#78909c"];
+    kb2 -> bm25  [style=dashed, color="#78909c"];
     faiss -> rrf;
     bm25  -> rrf;
     rrf -> prompt -> llm -> anchor;
-    anchor -> keep [label="  có  "];
-    anchor -> drop [label="  không  ", color="#ef6c00", penwidth=1.8];
+    anchor -> keep [label="  Có  ", color="#2e7d32", penwidth=2.0];
+    anchor -> drop [label="  Không  ", color="#ef6c00", penwidth=2.0];
 }
