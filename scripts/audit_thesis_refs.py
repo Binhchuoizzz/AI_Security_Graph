@@ -160,7 +160,47 @@ def main() -> int:
     else:
         print(f"  ✓ cả {len(DATASETS)} bộ dữ liệu đều được dẫn nguồn")
 
-    # ── 5: đã có người tra nguồn gốc chưa ────────────────────────────────────
+    # ── 5: số lượng mục kho tri thức phải khớp kho THẬT ──────────────────────
+    # Bắt được lỗi thật ngày 07/08: tóm tắt ghi "107 quy trình NIST SP 800-61r2" trong khi
+    # kho chỉ có 13 control (193 đoạn đã lập chỉ mục). Con số 107 KHÔNG có nguồn ở bất kỳ đâu
+    # trong repo — nó trôi vào từ một ghi chú cũ. Kho tri thức nằm ngoài `experiments/results/`
+    # nên bộ kiểm số không với tới; phải canh ở đây.
+    print("\n── Số mục kho tri thức trong luận văn ⇄ kho thật ──")
+    kb = os.path.join(ROOT, "knowledge_base")
+    try:
+        import json
+
+        with open(os.path.join(kb, "mitre_attack.json"), encoding="utf-8") as fh:
+            n_mitre = len(json.load(fh))
+        with open(os.path.join(kb, "nist_800_61r2.json"), encoding="utf-8") as fh:
+            n_nist = len(json.load(fh)["controls"])
+    except (OSError, KeyError, ValueError) as exc:
+        fail += 1
+        print(f"  ✗ không đọc được kho tri thức: {exc}")
+    else:
+        blob = "\n".join(v for lang in LANGS for v in sources(lang).values())
+        # Mọi số đứng ngay trước "MITRE ATT&CK" / "NIST SP 800-61" đều phải là số thật.
+        bad = []
+        for label, truth, pattern in (
+            (
+                "MITRE ATT&CK",
+                n_mitre,
+                r"(\d[\d.,]*)\s*(?:STIX[^\s]*\s+)?(?:mục\s+)?(?:kỹ thuật\s+)?MITRE",
+            ),
+            ("NIST SP 800-61", n_nist, r"(\d[\d.,]*)\s*(?:quy trình\s+)?NIST SP 800-61"),
+        ):
+            for m in re.finditer(pattern, blob):
+                got = int(m.group(1).replace(".", "").replace(",", ""))
+                if got != truth:
+                    bad.append(f"{label}: luận văn ghi {got}, kho thật có {truth}")
+        if bad:
+            fail += 1
+            for b in sorted(set(bad)):
+                print(f"  ✗ {b}")
+        else:
+            print(f"  ✓ MITRE {n_mitre} · NIST {n_nist} control — mọi số nêu đều khớp kho")
+
+    # ── 6: đã có người tra nguồn gốc chưa ────────────────────────────────────
     print("\n── Đối chiếu sổ tra nguồn gốc ──")
     if not os.path.exists(LEDGER):
         fail += 1
@@ -175,11 +215,52 @@ def main() -> int:
         else:
             print(f"  ✓ cả {len(en)} mục đều có trong sổ tra")
 
+    # ── 7: danh mục phải xếp theo THỨ TỰ TRÍCH LẦN ĐẦU (kiểu số IEEE) ────────
+    # Phép kiểm này sinh ra sau một lần hỏng thật: nén lại văn ở các chương làm
+    # đổi chỗ lần trích đầu tiên, và 25/38 vị trí lệch đi mà không có gì báo.
+    print("\n── Thứ tự danh mục ⇄ thứ tự trích lần đầu (IEEE) ──")
+    order_files = (
+        "main.tex",
+        "ch1_introduction.tex",
+        "ch2_theoretical_background.tex",
+        "ch3_system_design.tex",
+        "ch4_experiments_evaluation.tex",
+        "ch5_conclusion.tex",
+    )
+    for lang in LANGS:
+        docs = sources(lang)
+        entries, _ = per_lang[lang]
+        listed = [k for k, _ in entries]
+        first: list[str] = []
+        for fname in order_files:
+            text = docs.get(fname, "")
+            # main.tex: chỉ phần TRƯỚC danh mục mới tính là trích trong thân bài
+            if fname == "main.tex":
+                text = text.split(r"\begin{thebibliography}", 1)[0]
+            for group in RE_CITE.findall(text):
+                for key in (k.strip() for k in group.split(",")):
+                    if key and key not in first:
+                        first.append(key)
+        # strict=False có chủ ý: nếu hai danh sách lệch độ dài thì đó là mục mồ côi
+        # hoặc tham chiếu treo, và phép kiểm 1-2 ở trên đã báo rõ ràng hơn nhiều so
+        # với một ValueError ném ra từ đây.
+        off = [i for i, (a, b) in enumerate(zip(listed, first, strict=False), 1) if a != b]
+        if off:
+            fail += 1
+            i = off[0]
+            print(f"  ✗ {lang}: {len(off)}/{len(listed)} vị trí lệch — đầu tiên ở số [{i}]:")
+            print(f"      danh mục ghi '{listed[i - 1]}' nhưng nơi trích trước là '{first[i - 1]}'")
+        else:
+            print(f"  ✓ {lang}: {len(listed)} mục đúng thứ tự trích lần đầu")
+
     print("\n" + "=" * 78)
     if fail:
         print(f"{fail} nhóm phép kiểm KHÔNG ĐẠT — xem chi tiết ở trên.")
     else:
-        print("TẤT CẢ ĐẠT: 0 mồ côi · 0 treo · 0 lệch gương · 0 dữ liệu thiếu nguồn · 0 chưa tra")
+        print(
+            "TẤT CẢ ĐẠT: 0 mồ côi · 0 treo · 0 lệch gương · 0 dữ liệu thiếu nguồn "
+            "· 0 chưa tra · 0 lệch thứ tự IEEE"
+        )
     print("=" * 78)
     return 1 if fail else 0
 

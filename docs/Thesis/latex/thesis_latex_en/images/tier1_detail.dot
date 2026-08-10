@@ -6,14 +6,14 @@ digraph tier1_detail {
     bgcolor="white";
     nodesep=0.40;
     ranksep=0.45;
-    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12,
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=12,
           margin="0.20,0.12", penwidth=1.6, color="#2e7d32", fillcolor="#e8f5e9"];
-    edge [fontname="Helvetica", fontsize=10, color="#546e7a", penwidth=1.3];
+    edge [fontname="DejaVu Serif", fontsize=10, color="#546e7a", penwidth=1.3];
 
     inp [label="Normalised event from the ingestion queue", shape=oval, fillcolor="#e3f2fd", color="#1565c0"];
 
     welford [label="Welford O(1) online statistics\nrolling Z-score against the per-key baseline"];
-    sig     [label="Application signature set\n29 web attack families, OWASP CRS-style\nmulti-round decoding before matching"];
+    sig     [label="Application signature set\n30 web attack families, OWASP CRS-style\nmulti-round decoding before matching"];
     cache   [label="Tier 1.75 semantic cache\nhash of the normalised query string"];
     mlgate  [label="LightGBM Machine Learning Gate\nZ-score clipping ±8σ · baseline imputation"];
 

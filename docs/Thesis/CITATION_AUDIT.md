@@ -3,8 +3,15 @@
 Mục đích: mỗi mục trong `thebibliography` được **tra tận nguồn gốc** (trang xuất bản, DOI, hoặc
 trang arXiv), không tin bản ghi cũ. Lần sau muốn kiểm thì đọc bảng này thay vì tra lại từ đầu.
 
-Ngày rà: **06/08/2026** · Số mục: **38** (34 cũ + 4 mới) · Công cụ kiểm tự động:
-`scripts/audit_thesis_refs.py`
+Ngày rà: **06/08/2026**, rà lại **10/08/2026** · Số mục: **38** (34 cũ + 4 mới) · Công cụ kiểm
+tự động: `scripts/audit_thesis_refs.py`
+
+## 🔧 Lượt rà lại 10/08/2026 — hai mục còn sai
+
+| khoá | bản trước ghi | sự thật (nguồn) | mức |
+| :-- | :-- | :-- | :-- |
+| `faiss2019` | *IEEE Trans. Big Data*, **7**(3), pp. 535–547, **2019** | Tập 7 số 3 in **tháng 7–9/2021** (DBLP: 7(1) = tháng 3/2021). Ghép số tập 2021 với năm 2019 là mâu thuẫn nội tại; **2019** chỉ là năm early access nằm trong chuỗi DOI. Sửa năm thành **2021** | 🟡 năm không khớp số tập |
+| `jackhhao2023` | **J. Hao**, "Jailbreak Classification Dataset," Hugging Face | Trang tập dữ liệu **không công bố tên thật nào**, chỉ có định danh tài khoản `jackhhao`. Suy "J. Hao" từ định danh là **tự đặt tên cho một người có thật** — đúng loại lỗi đã sửa cho chính khoá này lượt trước. Ghi thẳng định danh làm tác giả (thông lệ IEEE cho kho mã/dữ liệu chỉ có handle) | 🔴 quy sai tác giả (lần 2) |
 
 Ký hiệu: ✅ đã tra, khớp · 🔧 đã tra, **phải sửa** · ➕ mục mới thêm lượt này
 
@@ -52,7 +59,7 @@ Ký hiệu: ✅ đã tra, khớp · 🔧 đã tra, **phải sửa** · ➕ mục
 | `splunkllm2026` | Sahay et al. · arXiv:**2603.23966**, 25/03/2026 |
 | `vaswani2017` | NeurIPS **30**, pp. 5998–6008, 2017 |
 | `quantization2021` | Gholami et al. · arXiv:2103.13630 |
-| `faiss2019` | Johnson, Douze, Jégou · *IEEE Trans. Big Data* **7**(3), pp. 535–547 · DOI 10.1109/TBDATA.2019.2921572 |
+| `faiss2019` | Johnson, Douze, Jégou · *IEEE Trans. Big Data* **7**(3), pp. 535–547, **2021** · DOI 10.1109/TBDATA.2019.2921572 (xem lượt rà 10/08 — DOI mang 2019 là năm early access, số 7(3) in tháng 7–9/2021) |
 | `he2017drain` | He, Zhu, He, Li, Lyu · ICWS 2017, pp. 33–40 |
 | `strom2018mitre` | MITRE, Technical Report MP180360, 2018 |
 | `reimers2019sentence` | EMNLP 2019 |
@@ -67,17 +74,18 @@ Ký hiệu: ✅ đã tra, khớp · 🔧 đã tra, **phải sửa** · ➕ mục
 
 ---
 
-## 🔴 §2.5 — bốn khẳng định về công trình người khác KHÔNG đứng được
+## 🔴 §2.5 — năm khẳng định về công trình người khác KHÔNG đứng được
 
 Đây là loại lỗi nặng nhất trong rà trích nguồn: **trích đúng bài, nhưng nói sai bài đó làm gì.**
 Giám khảo mở bài gốc ra là thấy ngay. (Cùng họ lỗi đã sửa ở §1.6, commit 80e93de.)
 
 | §2.5 khẳng định | bài gốc thật sự nói |
 | :-- | :-- |
-| "Watchtower truyền telemetry thô lên LLM đám mây thương mại, độ trễ $\mathcal{O}(N^2)$ **4–26 giây/sự kiện**, vi phạm Zero-Trust" | **Lỗi phạm trù.** `watchtower2026` là **bài tấn công**, không phải hệ thống SOC. Nó tiêm nhiễm qua nội dung log vào trợ lý SOC dùng **gpt-4o-mini** và báo tỉ lệ áp chế: ghi đè trực tiếp (S1) **0%**, cướp nhân cách **68%**, tóm tắt **96%** khi không phòng thủ / **38%** khi có. **Không có "4–26 s" trong bài.** |
+| "Watchtower truyền telemetry thô lên LLM đám mây thương mại, độ trễ $\mathcal{O}(N^2)$ **4–26 giây/sự kiện**, vi phạm Zero-Trust" | **Lỗi phạm trù.** `watchtower2026` là **bài tấn công**, không phải hệ thống SOC. Nó tiêm nhiễm qua nội dung log vào trợ lý SOC dùng **gpt-4o-mini** và báo tỉ lệ áp chế: ghi đè trực tiếp (S1) **0% RIÊNG Ở TÁC VỤ PHÂN LOẠI** (tóm tắt 0,07/0,05/**0,15**/0,00; khắc phục 0,09/0,04/0,08/0,01 — bài gốc dành chữ *"fail completely"* cho **S4**, không phải S1), cướp nhân cách **68% khi CHƯA phòng thủ** (nhắc có cấu trúc còn 15%, ràng buộc đầu ra bật lại 33% — không giảm đơn điệu), tóm tắt **96%** khi không phòng thủ / **38%** khi có. **Không có "4–26 s" trong bài.** |
 | "AutoBnB, LanG, Policy-Guided SIEM … đơn tầng, mọi sự kiện đều qua nút LLM; độ trễ đã công bố **480–520 ms** trên **16–24 GB VRAM**" | **480–520 ms và 16–24 GB không có trong bài nào cả ba.** LanG báo **≈21 ms** suy luận, MTTD **1,58 s**. |
 | "…đều đơn tầng, mọi sự kiện đều qua nút suy luận LLM" | **Sai với `splunkllm2026`**: nó **có** tầng lọc phi-LLM trước LLM (autoencoder tái dựng + DRL hai lớp phân loại sơ bộ). Và **sai phạm trù với `autobnb2025`**: đó là mô phỏng trên trò chơi bàn *Backdoors & Breaches*, không phải tuyến xử lý sự kiện. |
 | Bảng: SOTA Agents "bộ lọc ngữ nghĩa xác suất (né được)" | **Đúng về bản chất nhưng phải nói rõ là gì**: LanG có đường rào **hai lớp** regex + **Llama Prompt Guard 2** (F1 **98,1%**). Viết như thể họ không có phòng thủ nào là sai. |
+| Bảng, ô *"Kiểm toán Pháp y"* cột hệ tác tử: **"Không thấy công bố"** | **Sai — và do chính lượt sửa này gây ra** (commit 09f655c đổi từ *"Không hỗ trợ niêm phong mật mã"* sang *"Không thấy công bố"*). LanG **có** công bố nhật ký kiểm toán: CSDL SQLite `mcp_audit.db`, có hẳn Bảng VI mô tả lược đồ. Thứ họ **không** có là niêm phong mật mã (bài không nhắc hmac / hash chain / chữ ký số lần nào). Đã sửa lại thành *"Có công bố nhật ký kiểm toán; không niêm phong bằng mật mã"* |
 | QRadar "tỉ lệ báo giả **>80%**" | **Không có trong `siem2021` lẫn `soar2025`.** Thay bằng `alahmadi2022` (USENIX Sec '22) và phát biểu về **SOC nói chung**, không gán cho một sản phẩm cụ thể. |
 
 **Hướng sửa:** chuyển `watchtower2026` sang §2.4 (đó mới đúng chỗ — nó là chứng cứ mạnh nhất cho

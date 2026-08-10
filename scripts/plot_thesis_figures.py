@@ -33,7 +33,10 @@ OUT = {
 # DejaVu Sans có đủ dấu tiếng Việt; Helvetica/Arial trên máy này thì không chắc.
 plt.rcParams.update(
     {
-        "font.family": "DejaVu Sans",
+        # Thân bài luận văn chạy Times (mathptmx). Chữ trong hình phải CÙNG HỌ serif,
+        # không thì mỗi trang có hình lại lộ ra hai kiểu chữ. DejaVu Serif đi kèm
+        # matplotlib và có đủ dấu tiếng Việt; Times thật thì không chắc máy nào cũng có.
+        "font.family": "DejaVu Serif",
         "font.size": 9,
         "axes.titlesize": 10,
         "axes.labelsize": 9,
@@ -476,6 +479,127 @@ def fig_triage(lang):
     save_one(fig, "fig_triage_funnel", lang)
 
 
+# ── Hình 6 — bóc tách thành phần + chất lượng lập luận ───────────────────────
+# Hai khối kết quả này trước đây chỉ có bảng và chữ. Vẽ ra để đọc được bằng mắt:
+# trái là đóng góp từng tầng (kèm KTC 95%), phải là bốn trục chấm lập luận.
+T6 = {
+    "en": dict(
+        title_a="Ablation: action accuracy (95% CI)",
+        title_b="Reasoning quality (judge, 1–5)",
+        xlabel_a="Action accuracy (%)",
+        note_a="A/F: n=1,700   ·   B--E: n=300, separate slice",
+        rows_a=[
+            ("A  Tier 1 only", "A"),
+            ("F  Full two-tier", "F"),
+            ("B  LLM, no retrieval", "B"),
+            ("C/D/E  + retrieval", "C"),
+        ],
+        axes_b=[
+            ("Answer relevancy", "answer_relevancy"),
+            ("Context recall", "context_recall"),
+            ("Faithfulness", "faithfulness"),
+            ("Context precision", "context_precision"),
+        ],
+        mean_b="mean {v}",
+        ground="Evidence grounding {v} of justifications cite a checkable log value",
+    ),
+    "vi": dict(
+        title_a="Bóc tách: đúng hành động (KTC 95%)",
+        title_b="Chất lượng lập luận (chấm 1–5)",
+        xlabel_a="Độ chính xác hành động (%)",
+        note_a="A/F: n=1.700   ·   B--E: n=300, lát mẫu riêng",
+        rows_a=[
+            ("A  Chỉ Tầng 1", "A"),
+            ("F  Hai tầng đầy đủ", "F"),
+            ("B  LLM, không truy xuất", "B"),
+            ("C/D/E  + truy xuất", "C"),
+        ],
+        axes_b=[
+            ("Độ liên quan câu trả lời", "answer_relevancy"),
+            ("Độ bao phủ ngữ cảnh", "context_recall"),
+            ("Độ trung thành ngữ cảnh", "faithfulness"),
+            ("Độ chính xác ngữ cảnh", "context_precision"),
+        ],
+        mean_b="trung bình {v}",
+        ground="Neo bằng chứng {v} lời biện giải dẫn được giá trị log kiểm chứng lại",
+    ),
+}
+
+
+def fig_ablation_quality(lang):
+    ab, rq = load("ablation_action_scores.json"), load("reasoning_eval_results.json")
+    if not (ab and rq):
+        return
+    t = T6[lang]
+    dec = (lambda s: s) if lang == "en" else (lambda s: s.replace(".", ","))
+    pc = lambda v, nd=2: dec(f"{100 * v:.{nd}f}%")  # noqa: E731
+    sc = lambda v: dec(f"{v:.2f}")  # noqa: E731
+
+    fig, (axa, axb) = plt.subplots(1, 2, figsize=(7.6, 3.0), gridspec_kw={"wspace": 0.95})
+
+    cfg = ab["configs"]
+    ys = list(range(len(t["rows_a"])))[::-1]
+    for y, (_label, key) in zip(ys, t["rows_a"], strict=True):
+        c = cfg[key]
+        v = 100 * c["action_accuracy"]
+        lo, hi = (100 * x for x in c["action_accuracy_ci95"])
+        col = ACCENT if key == "F" else INK if key == "A" else ACCENT2
+        axa.barh(y, v, height=0.58, color=col, zorder=2)
+        axa.errorbar(
+            v,
+            y,
+            xerr=[[v - lo], [hi - v]],
+            fmt="none",
+            ecolor="#3d4a4f",
+            elinewidth=1.2,
+            capsize=3,
+            zorder=3,
+        )
+        axa.text(hi + 1.6, y, pc(c["action_accuracy"]), va="center", fontsize=8.2, color=INK)
+    axa.axhline(1.5, color=GREY, lw=0.9, ls=":")
+    axa.set_yticks(ys, [r[0] for r in t["rows_a"]], fontsize=8.2)
+    axa.set_xlim(0, 58)
+    axa.set_xlabel(t["xlabel_a"])
+    axa.set_title(t["title_a"], loc="left", pad=6, fontsize=9)
+    axa.text(0, -0.42, t["note_a"], transform=axa.transAxes, fontsize=7.2, color="#6b7679")
+    axa.grid(axis="x", color=GREY, lw=0.5, alpha=0.5, zorder=0)
+    axa.set_axisbelow(True)
+
+    agg = rq["aggregate"]
+    ys = list(range(len(t["axes_b"])))
+    for y, (_label, key) in zip(ys, t["axes_b"], strict=True):
+        v = agg[key]["mean"]
+        col = ACCENT if key == "context_precision" else GREY
+        axb.barh(y, v, height=0.58, color=col, zorder=2)
+        axb.text(v + 0.12, y, sc(v), va="center", fontsize=8.2, color=INK)
+    axb.axvline(agg["overall_mean"], color=INK, lw=1.1, ls="--", zorder=3)
+    # nhãn trung bình đặt DƯỚI cột thấp nhất: đặt ở đỉnh thì nó đè lên tiêu đề ô
+    axb.text(
+        agg["overall_mean"] + 0.08,
+        -0.42,
+        t["mean_b"].format(v=sc(agg["overall_mean"])),
+        fontsize=7.4,
+        color=INK,
+        va="center",
+    )
+    axb.set_yticks(ys, [a[0] for a in t["axes_b"]], fontsize=8.2)
+    axb.set_xlim(0, 5)
+    axb.set_xticks([0, 1, 2, 3, 4, 5])
+    axb.set_title(t["title_b"], loc="left", pad=6, fontsize=9)
+    axb.text(
+        0,
+        -0.42,
+        t["ground"].format(v=pc(agg["evidence_grounding"]["grounding_rate"], 1)),
+        transform=axb.transAxes,
+        fontsize=7.2,
+        color=ACCENT,
+    )
+    axb.grid(axis="x", color=GREY, lw=0.5, alpha=0.5, zorder=0)
+    axb.set_axisbelow(True)
+
+    save_one(fig, "fig_ablation_quality", lang)
+
+
 def main():
     print("=" * 74)
     print("SINH HÌNH KẾT QUẢ CHƯƠNG 4 — mọi số đọc từ experiments/results/*.json")
@@ -487,6 +611,7 @@ def main():
         fig_guardrail(lang)
         fig_attribution(lang)
         fig_triage(lang)
+        fig_ablation_quality(lang)
     print("\n[+] Xong. Biên dịch lại luận văn để hình mới vào PDF.")
     return 0
 

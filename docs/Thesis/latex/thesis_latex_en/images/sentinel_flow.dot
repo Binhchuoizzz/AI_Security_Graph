@@ -7,8 +7,8 @@ digraph sentinel_flow {
     nodesep=0.55;
     ranksep=0.6;
 
-    node [shape=box, style="rounded,filled", fontname="Arial Bold", fontsize=15, margin="0.25,0.18", penwidth=2.0];
-    edge [fontname="Arial Bold", fontsize=13, color="#1A252C", penwidth=1.8];
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif Bold", fontsize=15, margin="0.25,0.18", penwidth=2.0];
+    edge [fontname="DejaVu Serif Bold", fontsize=13, color="#1A252C", penwidth=1.8];
 
     // Inputs
     start    [label="Raw Network Telemetry Stream\n(NGFW, IDS/IPS, EDR -> Redis Stream)", shape=oval, fillcolor="#D6EAF8", color="#1B4F72", fontsize=16];
@@ -19,7 +19,7 @@ digraph sentinel_flow {
         style = "dashed,rounded";
         color = "#1E8449";
         bgcolor = "#EAFAF1";
-        fontname = "Arial Bold";
+        fontname = "DejaVu Serif Bold";
         fontsize = 18;
         fontcolor = "#145A32";
 
@@ -40,7 +40,7 @@ digraph sentinel_flow {
         style = "dashed,rounded";
         color = "#B03A2E";
         bgcolor = "#FDEDEC";
-        fontname = "Arial Bold";
+        fontname = "DejaVu Serif Bold";
         fontsize = 18;
         fontcolor = "#641E16";
 

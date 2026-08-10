@@ -4,8 +4,8 @@
 digraph agentic_fsm {
     rankdir=TB;
     bgcolor="white";
-    node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12, margin="0.18,0.10"];
-    edge [fontname="Helvetica", fontsize=10, color="#444444"];
+    node [shape=box, style="rounded,filled", fontname="DejaVu Serif", fontsize=12, margin="0.18,0.10"];
+    edge [fontname="DejaVu Serif", fontsize=10, color="#444444"];
 
     start   [label="BẮT ĐẦU\n(sự kiện leo thang từ Tầng 1)", shape=oval, fillcolor="#cfe8ff"];
 

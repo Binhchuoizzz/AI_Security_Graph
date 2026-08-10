@@ -9,7 +9,7 @@
 \usepackage[T5]{fontenc} % Keep T5 for any occasional Vietnamese names
 \usepackage[vietnamese]{babel}
 \addto\captionsvietnamese{\renewcommand{\bibname}{Tài liệu tham khảo}}
-\usepackage{times} % Times New Roman font
+\usepackage{mathptmx} % Times cho CẢ chữ lẫn công thức (times cũ để công thức ở Computer Modern)
 \usepackage{geometry}
 \geometry{top=2.54cm, bottom=2.54cm, left=3.0cm, right=2.8cm} % Margin rules
 \usepackage{graphicx}
@@ -181,7 +181,7 @@
 \vspace{0.5cm}
 
 \begin{spacing}{1.667}
-Trung tâm Điều hành An ninh được đánh giá ở chỗ một cuộc xâm nhập thật có bị bắt kịp lúc hay không, thế nhưng khối lượng hoạt động phải soi xét lại vượt xa những gì các chuyên viên trực ca đọc nổi. Các hướng đối phó hiện hành mỗi hướng chỉ giải quyết được một phần: luật chữ ký quyết định rất nhanh nhưng không diễn giải được ý đồ, nền tảng tương quan gom được bằng chứng nhưng vẫn trao cho con người nhiều ứng viên hơn mức họ xử lý xuể, còn kịch bản tự động chỉ chạy đáng tin trên đúng những tình huống đã có người lường trước. Phần đọng lại cho chuyên viên---dựng ngữ cảnh quanh một cảnh báo rồi phán đoán nó---đúng là phần không mở rộng quy mô được. Luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành cục bộ hoàn toàn (air-gapped), đặt quyết định rẻ đứng trước quyết định đắt để năng lực suy luận chỉ tiêu tốn ở nơi thật sự cần. Tầng 1 là bộ lọc tốc độ đường truyền---luật xác định, chấm bất thường Welford và cổng LightGBM---giải quyết nhiễu nền của luồng mà không phải gọi tới mô hình ngôn ngữ. Sự kiện sống sót mới tới Tầng 2, một tác tử suy luận có trạng thái vận hành mô hình lượng tử hoá đặt tại chỗ, phía sau các rào chắn mật mã. Ngữ cảnh của nó được dựng từ chính sự kiện (dòng yêu cầu, tiêu đề, payload, thống kê luồng), nén lại bằng kỹ thuật gom khuôn mẫu nhật ký dưới một ngân sách token tường minh; tri thức an ninh được biểu diễn thành kho truy xuất gồm 433 mục MITRE ATT\&CK và 107 quy trình NIST SP 800-61r2, lập chỉ mục vừa dạng véc-tơ dày cho tương đồng ngữ nghĩa vừa dạng chỉ mục thưa BM25 cho các định danh chính xác, hai bảng hạng hợp nhất bằng Hợp nhất Hạng Nghịch đảo. Một phép kiểm ở đầu ra buộc mọi kỹ thuật mà tác tử khẳng định phải có mặt trong tập tài liệu truy xuất của chính lô đó, nếu không phán quyết được giữ lại chờ chuyên viên. Kết quả thực nghiệm trên các bộ dữ liệu xâm nhập chuẩn cho thấy hiệu quả của SENTINEL. Tầng 1 cùng Cổng Học máy tự động gỡ tải \textbf{90,6\%} lưu lượng đầu vào. Vì sự kiện điển hình không bao giờ chạm tới mô hình, độ trễ toàn tuyến ở mức trung vị giảm còn \textbf{0,88\,ms} so với \textbf{17.174,7\,ms} của đường LLM đơn tầng. Cơ chế đóng gói Nonce vô hiệu hoá tiêm nhiễm câu lệnh bằng cấu trúc chứ không bằng nhận dạng nội dung, kháng được toàn bộ \textbf{678} mẫu đối kháng mà lớp lọc tĩnh không hấp thụ được; chuỗi niêm phong HMAC-SHA256 phát hiện mọi kiểu giả mạo cốt lõi, qua đó bảo đảm tính toàn vẹn và khả năng phát hiện giả mạo của nhật ký kiểm toán---song do dùng khoá đối xứng, không cấu thành chống chối bỏ theo nghĩa mật mã học---toàn bộ vận hành trên một máy trạm local. SENTINEL chứng minh kiến trúc lai hai tầng là một mô hình phòng thủ đáng tin cậy và hiệu quả cho SOC hiện đại.
+Trung tâm Điều hành An ninh được đánh giá ở chỗ một cuộc xâm nhập thật có bị bắt kịp lúc hay không, thế nhưng khối lượng phải soi xét lại vượt xa những gì các chuyên viên trực ca đọc nổi. Các hướng đối phó hiện hành mỗi hướng chỉ giải quyết được một phần: luật chữ ký quyết định rất nhanh nhưng không diễn giải được ý đồ, nền tảng tương quan gom được bằng chứng nhưng vẫn trao cho con người nhiều ứng viên hơn mức họ xử lý xuể, còn kịch bản tự động chỉ chạy đáng tin trên đúng những tình huống đã có người lường trước. Phần đọng lại cho chuyên viên---dựng ngữ cảnh quanh một cảnh báo rồi phán đoán nó---đúng là phần không mở rộng quy mô được. Luận văn đề xuất SENTINEL, một kiến trúc an ninh nhận thức hai tầng vận hành cục bộ hoàn toàn (air-gapped), đặt quyết định rẻ đứng trước quyết định đắt để năng lực suy luận chỉ tiêu tốn ở nơi thật sự cần. Tầng 1 là bộ lọc tốc độ đường truyền---luật xác định, chấm bất thường Welford và cổng LightGBM---giải quyết nhiễu nền của luồng mà không phải gọi tới mô hình ngôn ngữ. Sự kiện sống sót mới tới Tầng 2, một tác tử có trạng thái vận hành mô hình lượng tử hoá đặt tại chỗ phía sau các rào chắn mật mã, với ngữ cảnh dựng từ chính nhật ký thô (dòng yêu cầu, tiêu đề, payload, thống kê luồng) và nén lại bằng kỹ thuật gom khuôn mẫu nhật ký dưới một ngân sách token tường minh. Tri thức an ninh là kho truy xuất gồm 433 mục kỹ thuật MITRE ATT\&CK cùng các quy trình xử lý sự cố của NIST SP 800-61r2, lập chỉ mục vừa dạng véc-tơ dày cho tương đồng ngữ nghĩa vừa dạng chỉ mục thưa BM25 cho các định danh chính xác, hai bảng hạng hợp nhất bằng Hợp nhất Hạng Nghịch đảo; một phép kiểm ở đầu ra giữ lại chờ chuyên viên mọi kỹ thuật vắng mặt trong tập tài liệu truy xuất của chính lô đó. Đo trên các bộ dữ liệu xâm nhập chuẩn, Tầng 1 cùng Cổng Học máy gỡ tải 90,6\% lưu lượng, kéo độ trễ toàn tuyến ở mức trung vị còn 0,88\,ms so với 17.174,7\,ms của đường LLM đơn tầng. Cơ chế đóng gói nonce phân định vô hiệu hoá tiêm nhiễm câu lệnh bằng cấu trúc chứ không bằng nhận dạng nội dung, kháng được toàn bộ 678 mẫu đối kháng mà lớp lọc tĩnh không hấp thụ được; chuỗi niêm phong HMAC-SHA256 phát hiện mọi kiểu giả mạo cốt lõi, bảo đảm tính toàn vẹn và khả năng phát hiện giả mạo của nhật ký kiểm toán, song do dùng khoá đối xứng thì không cấu thành chống chối bỏ theo nghĩa mật mã học.
 \end{spacing}
 
 % Acknowledgements Page
@@ -287,6 +287,9 @@ G. González-Granadillo, S. González-Zarzosa, and R. Diaz, ``Security Informati
 \bibitem{alertfatigue2022}
 S. Tariq, M. Baruwal Chhetri, S. Nepal, and C. Paris, ``Alert Fatigue in Security Operations Centres: Research Challenges and Opportunities,'' \textit{ACM Computing Surveys}, vol. 57, no. 9, art. 224, 2025.
 
+\bibitem{alahmadi2022}
+B. A. AlAhmadi, L. Axon, and I. Martinovic, ``99\% False Positives: A Qualitative Study of SOC Analysts' Perspectives on Security Alarms,'' in \textit{Proceedings of the 31st USENIX Security Symposium}, 2022, pp. 2783--2800.
+
 \bibitem{soar2025}
 Ismail, R. Kurnia, Z. A. Brata, G. A. Nelistiani, S. Heo, H. Kim, and H. Kim, ``Toward Robust Security Orchestration and Automated Response in Security Operations Centers with a Hyper-Automation Approach Using Agentic Artificial Intelligence,'' \textit{Information}, vol. 16, no. 5, art. 365, 2025.
 
@@ -318,7 +321,7 @@ A. Zou, Z. Wang, J. Z. Kolter, and M. Fredrikson, ``Universal and Transferable A
 Deepset, ``Prompt Injections Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/deepset/prompt-injections
 
 \bibitem{jackhhao2023}
-J. Hao, ``Jailbreak Classification Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/jackhhao/jailbreak-classification
+jackhhao, ``Jailbreak Classification Dataset,'' \textit{Hugging Face repository}, 2023. [Online]. Available: https://huggingface.co/datasets/jackhhao/jailbreak-classification
 
 \bibitem{bigdata2019}
 R. Zuech, T. M. Khoshgoftaar, and R. Wald, ``Intrusion Detection and Big Heterogeneous Data: A Survey,'' \textit{Journal of Big Data}, vol. 2, art. 3, 2015.
@@ -329,11 +332,11 @@ B. P. Welford, ``Note on a Method for Calculating Corrected Sums of Squares and 
 \bibitem{quantization2021}
 A. Gholami \textit{et al.}, ``A Survey of Quantization Methods for Efficient Neural Network Inference,'' \textit{arXiv preprint arXiv:2103.13630}, 2021.
 
-\bibitem{foundation_sec_2024}
-P. Kassianik, B. Saglam \textit{et al.} (Cisco Foundation AI), ``Llama-3.1-FoundationAI-SecurityLLM-Base-8B Technical Report,'' \textit{arXiv preprint arXiv:2504.21039}, 2025.
-
 \bibitem{foundation_sec_instruct}
 S. Weerawardhena, P. Kassianik, B. Nelson, B. Saglam \textit{et al.} (Cisco Foundation AI), ``Llama-3.1-FoundationAI-SecurityLLM-8B-Instruct Technical Report,'' \textit{arXiv preprint arXiv:2508.01059}, 2025.
+
+\bibitem{foundation_sec_2024}
+P. Kassianik, B. Saglam \textit{et al.} (Cisco Foundation AI), ``Llama-3.1-FoundationAI-SecurityLLM-Base-8B Technical Report,'' \textit{arXiv preprint arXiv:2504.21039}, 2025.
 
 \bibitem{langgraph2024}
 LangChain AI, ``LangGraph: Multi-Actor, Stateful LLM Applications,'' \textit{GitHub repository}, 2024. [Online]. Available: https://github.com/langchain-ai/langgraph
@@ -342,7 +345,7 @@ LangChain AI, ``LangGraph: Multi-Actor, Stateful LLM Applications,'' \textit{Git
 P. Lewis \textit{et al.}, ``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,'' \textit{Advances in Neural Information Processing Systems (NeurIPS)}, vol. 33, pp. 9459--9474, 2020.
 
 \bibitem{faiss2019}
-J. Johnson, M. Douze, and H. Jégou, ``Billion-Scale Similarity Search with GPUs,'' \textit{IEEE Transactions on Big Data}, vol. 7, no. 3, pp. 535--547, 2019.
+J. Johnson, M. Douze, and H. Jégou, ``Billion-Scale Similarity Search with GPUs,'' \textit{IEEE Transactions on Big Data}, vol. 7, no. 3, pp. 535--547, 2021.
 
 \bibitem{bm25_2009}
 S. Robertson and H. Zaragoza, ``The Probabilistic Relevance Framework: BM25 and Beyond,'' \textit{Foundations and Trends in Information Retrieval}, vol. 3, no. 4, pp. 333--389, 2009.
@@ -358,9 +361,6 @@ H. Krawczyk, M. Bellare, and R. Canetti, ``HMAC: Keyed-Hashing for Message Authe
 
 \bibitem{llmsec_survey2025}
 J. Zhang \textit{et al.}, ``When LLMs Meet Cybersecurity: A Systematic Literature Review,'' \textit{Cybersecurity}, vol. 8, 2025.
-
-\bibitem{alahmadi2022}
-B. A. AlAhmadi, L. Axon, and I. Martinovic, ``99\% False Positives: A Qualitative Study of SOC Analysts' Perspectives on Security Alarms,'' in \textit{Proceedings of the 31st USENIX Security Symposium}, 2022, pp. 2783--2800.
 
 \bibitem{cyberrag2025}
 F. Blefari, C. Cosentino, F. A. Pironti, A. Furfaro, and F. Marozzo, ``CyberRAG: An Agentic RAG cyber attack classification and reporting tool,'' \textit{Future Generation Computer Systems}, vol. 176, art. 108186, 2026.
