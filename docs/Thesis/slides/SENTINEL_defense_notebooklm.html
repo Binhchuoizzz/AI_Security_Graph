@@ -1611,7 +1611,7 @@
             <div>
                 <div style="font-size: 1.45rem; font-weight: 800; color: #059669; margin-bottom: 8px;">PHẦN III: THỰC NGHIỆM &amp; ĐÁNH GIÁ 5D METRICS</div>
                 <p style="font-size: 1.15rem; color: var(--text-main); line-height: 1.7;">
-                    Kết quả đột phá (Offload 97.5%, Median 0.88ms, Prompt Inj 100%), Ablation Study, MT-Bench Judge &amp; Streamlit Dashboard HITL.
+                    Kết quả đột phá (Offload 97.5%, Median 0.88ms, Prompt Inj 100%), Ablation Study, chấm RAGAS bằng trọng tài khác họ &amp; Streamlit Dashboard HITL.
                 </p>
             </div>
         </div>
@@ -1622,7 +1622,7 @@
             <div>
                 <div style="font-size: 1.45rem; font-weight: 800; color: #D97706; margin-bottom: 8px;">PHẦN IV: ĐÓNG GÓP, HẠN CHẾ &amp; HƯỚNG PHÁT TRIỂN</div>
                 <p style="font-size: 1.15rem; color: var(--text-main); line-height: 1.7;">
-                    4 Đóng góp lý thuyết &amp; thực tiễn, Các giới hạn kỹ thuật hiện hữu, Hướng phát triển tương lai &amp; Thảo luận Q&amp;A.
+                    Các đóng góp lý thuyết &amp; thực tiễn, Các giới hạn kỹ thuật hiện hữu, Hướng phát triển tương lai &amp; Thảo luận Q&amp;A.
                 </p>
             </div>
         </div>
@@ -1649,7 +1649,7 @@
                 </h3>
                 <ul style="font-size: 1.08rem; color: var(--text-muted); line-height: 1.7; padding-left: 20px;">
                     <li style="margin-bottom: 10px;">Tiếp nhận <strong>từ hàng trăm nghìn đến hàng triệu log/ngày</strong> từ SIEM, Firewall, EDR.</li>
-                    <li style="margin-bottom: 10px;">Báo động giả <strong>>80%</strong> do chữ ký tĩnh làm kiệt sức chuyên gia (Alert Fatigue).</li>
+                    <li style="margin-bottom: 10px;">Phần lớn cảnh báo trong hàng đợi là hoạt động lành tính, gây quá tải chuyên gia (Alert Fatigue) [AlAhmadi et al., USENIX Sec '22].</li>
                     <li>Đẩy 100% log thô qua AI gây <strong>khủng hoảng độ trễ</strong>, tắc nghẽn toàn luồng SOC.</li>
                 </ul>
             </div>
@@ -1813,8 +1813,8 @@
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                     <td style="padding: 14px 20px; font-weight: 800; color: #0F172A; font-size: 1.15rem;">Độ Trễ, Xả Tải &amp; Báo Động Giả</td>
-                    <td style="padding: 14px 20px; color: #DC2626; font-size: 1.12rem;">⚡ &lt;1ms (Báo giả &gt;80%)</td>
-                    <td style="padding: 14px 20px; color: #DC2626; font-size: 1.12rem;">⏳ Nghẽn 850ms - 26s (Báo giả &gt;15%)</td>
+                    <td style="padding: 14px 20px; color: #DC2626; font-size: 1.12rem;">⚡ Một tầng rẻ, nhanh · tỷ lệ báo giả cao vì không suy luận ngữ cảnh</td>
+                    <td style="padding: 14px 20px; color: #DC2626; font-size: 1.12rem;">⏳ Suy luận LLM cho từng sự kiện — độ trễ hàng giây</td>
                     <td style="padding: 14px 20px; background: #ECFDF5; border-left: 3px solid #10B981; font-weight: 700; color: #064E3B; font-size: 1.15rem;">
                         🚀 <strong style="color: #0284C7;">T1 trung bình 0.182ms</strong> | <strong style="color: #047857;">Xả tải 97.5%</strong> | 🎯 <strong style="color: #047857;">Báo giả Auto-BLOCK = 0%</strong>
                     </td>
@@ -1830,7 +1830,7 @@
                 <tr style="background: #FFFFFF;">
                     <td style="padding: 14px 20px; font-weight: 800; color: #0F172A; font-size: 1.15rem;">Kiểm Toán &amp; Phần Cứng</td>
                     <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">Log thô (Dễ bị sửa xóa)</td>
-                    <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">Đòi Cloud / GPU lớn (24GB+)</td>
+                    <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">Triển khai cục bộ nhưng không ấn định giới hạn phần cứng</td>
                     <td style="padding: 14px 20px; background: #ECFDF5; border-left: 3px solid #10B981; font-weight: 700; color: #064E3B; font-size: 1.15rem;">
                         🔒 <strong style="color: #6D28D9;">HMAC 100%</strong> | <strong style="color: #047857;">On-Prem 1 GPU 16GB</strong>
                     </td>
@@ -1904,19 +1904,19 @@
             <rect x="20" y="60" width="160" height="120" rx="14" fill="#0F172A" stroke="#38BDF8" stroke-width="2.5" />
             <text x="100" y="95" text-anchor="middle" fill="#38BDF8" font-weight="800" font-size="14">UNIFIED STREAM</text>
             <text x="100" y="120" text-anchor="middle" fill="#E2E8F0" font-weight="700" font-size="13">IDS2018 + CSIC2010</text>
-            <text x="100" y="145" text-anchor="middle" fill="#94A3B8" font-weight="600" font-size="12">Luồng 100k+ events</text>
+            <text x="100" y="145" text-anchor="middle" fill="#94A3B8" font-weight="600" font-size="12">Luồng 99.717 sự kiện</text>
 
             <!-- Node 2: Tier 1 Fast Path -->
             <rect x="230" y="60" width="180" height="120" rx="14" fill="url(#blueGrad)" filter="url(#glow)" />
             <text x="320" y="95" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">TIER 1 (FAST PATH)</text>
             <text x="320" y="120" text-anchor="middle" fill="#E0F2FE" font-weight="700" font-size="13.5">Welford Z-Score O(1)</text>
-            <text x="320" y="145" text-anchor="middle" fill="#BAE6FD" font-weight="600" font-size="12.5">Set Port Lookup O(1)</text>
+            <text x="320" y="145" text-anchor="middle" fill="#BAE6FD" font-weight="600" font-size="12.5">Xả tải 38,3% · 0,182 ms</text>
 
             <!-- Node 3: ML Gateway -->
             <rect x="460" y="60" width="180" height="120" rx="14" fill="url(#emeraldGrad)" filter="url(#glow)" />
             <text x="550" y="95" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">ML GATEWAY</text>
             <text x="550" y="120" text-anchor="middle" fill="#D1FAE5" font-weight="700" font-size="13.5">LightGBM (3,452 eps)</text>
-            <text x="550" y="145" text-anchor="middle" fill="#A7F3D0" font-weight="600" font-size="12.5">Xả tải 97.5%</text>
+            <text x="550" y="145" text-anchor="middle" fill="#A7F3D0" font-weight="600" font-size="12.5">Xả tải 59,2% · 0,287 ms</text>
 
             <!-- Node 4: Tier 1.75 Semantic Cache -->
             <rect x="690" y="60" width="180" height="120" rx="14" fill="url(#purpleGrad)" filter="url(#glow)" />
@@ -1943,7 +1943,7 @@
                     <div style="font-size: 1.4rem; font-weight: 800; color: #38BDF8;">Tầng 1: Lọc Tốc Độ Đường Truyền $\mathcal{O}(1)$</div>
                 </div>
                 <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
-                    Đảm nhận vai trò "Tấm lưới lọc siêu tốc", xử lý 100% dữ liệu thô trên đường truyền ở <strong>độ trễ &lt; 0.4ms</strong>. Kết hợp Welford $\mathcal{O}(1)$, Machine Learning Gate (LightGBM) và Semantic Cache để <strong>xả tải 97.5% log nhiễu lành tính</strong> (đo tại tỷ lệ tấn công nền 38,3%) mà KHÔNG tiêu tốn tài nguyên GPU.
+                    Đảm nhận vai trò "Tấm lưới lọc siêu tốc": lớp luật xử lý 100% dữ liệu thô ở <strong>trung bình 0,182 ms</strong>, đưa độ trễ trung vị toàn tuyến về <strong>0,88 ms</strong>. Kết hợp Welford $\mathcal{O}(1)$, Machine Learning Gate (LightGBM) và Semantic Cache để <strong>xả tải 97.5% lưu lượng</strong> (đo trên luồng 99.717 sự kiện, tỷ lệ tấn công nền 9,8%) mà KHÔNG tiêu tốn tài nguyên GPU.
                 </p>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 10px 16px; border-radius: 8px; font-size: 1.05rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
@@ -1960,7 +1960,7 @@
                     <div style="font-size: 1.4rem; font-weight: 800; color: #A78BFA;">Tầng 2: Tác Tử Nhận Thức On-Premises</div>
                 </div>
                 <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
-                    Chỉ tiếp nhận <strong>2.5% - 9.5% sự kiện bất thường</strong> đã qua sàng lọc. Đồ thị LangGraph điều phối mô hình <code>Foundation-Sec 8B Q4_K_M</code> kết hợp Dual-RAG (433 mã MITRE ATT&CK), Threat Memory và Rào chắn Data Encapsulation + HMAC-SHA256 để ra phán quyết an toàn On-Premises.
+                    Chỉ tiếp nhận <strong>2,5% sự kiện</strong> (2.518/99.717) đã qua sàng lọc. Đồ thị LangGraph điều phối mô hình <code>Foundation-Sec 8B Q4_K_M</code> kết hợp Dual-RAG (433 mã MITRE ATT&CK), Threat Memory và Rào chắn Data Encapsulation + HMAC-SHA256 để ra phán quyết an toàn On-Premises.
                 </p>
             </div>
             <div style="background: rgba(139, 92, 246, 0.12); padding: 10px 16px; border-radius: 8px; font-size: 1.05rem; font-weight: 700; color: #7C3AED; margin-top: 14px;">
@@ -2004,7 +2004,7 @@
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                ⏱️ Thời gian &amp; bộ nhớ hằng số $\mathcal{O}(1)$ — Phản hồi tức thì &lt; 0.01ms.
+                ⏱️ Thời gian &amp; bộ nhớ hằng số $\mathcal{O}(1)$ — Tầng 1 xử lý ở trung bình 0,182 ms.
             </div>
         </div>
 
@@ -2086,8 +2086,8 @@
             <!-- Audited Metric Boxes -->
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                 <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 16px; padding: 22px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.05);">
-                    <div style="font-size: 3.0rem; font-weight: 800; color: #059669; line-height: 1.1;">97.5%</div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted); margin-top: 8px;">Tỷ Lệ Xả Tải Tầng 1</div>
+                    <div style="font-size: 3.0rem; font-weight: 800; color: #059669; line-height: 1.1;">59.2%</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted); margin-top: 8px;">Xả Tải Riêng Cổng ML (58.992 sk)</div>
                 </div>
                 <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 16px; padding: 22px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.05);">
                     <div style="font-size: 3.0rem; font-weight: 800; color: #0284C7; line-height: 1.1;">3,452 eps</div>
@@ -2113,7 +2113,7 @@
                     </ul>
                 </div>
                 <div style="background: rgba(245, 158, 11, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #D97706; margin-top: 14px;">
-                    🛡️ Kháng 98.75% tấn công né tránh ML — An toàn tuyệt đối trước nhiễu đối kháng.
+                    🛡️ Kháng 98,75% (1.023/1.036) ở chế độ né tránh khó nhất — 13 mẫu vẫn lọt.
                 </div>
             </div>
 
@@ -2148,7 +2148,7 @@
 \rightarrow$ Cache Lookup
                     </div>
                     <div style="font-size: 1.05rem; color: #E2E8F0; margin-top: 8px; font-weight: 600;">
-                        ⚡ Trả phán quyết tức thì <strong style="color: #38BDF8;">&lt; 0.05 ms</strong> (Bypass LLM hoàn toàn)
+                        ⚡ Trả phán quyết ở <strong style="color: #38BDF8;">9,8 ms</strong> thay vì 87,7 ms (Bypass LLM hoàn toàn)
                     </div>
                 </div>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.8; padding-left: 22px;">
@@ -2157,7 +2157,7 @@
                 </ul>
             </div>
             <div style="background: rgba(139, 92, 246, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #7C3AED; margin-top: 14px;">
-                ⚡ Bypass LLM 100% cho các mẫu truy vấn trùng lặp — Tiết kiệm tài nguyên GPU tối đa.
+                ⚡ Mỗi ca trúng đệm bỏ qua hoàn toàn LLM — 81,3% truy vấn trùng lặp không chạm GPU.
             </div>
         </div>
 
@@ -2256,7 +2256,7 @@
                     <div style="font-size: 1.55rem; font-weight: 800; color: #A78BFA;">Đồ Thị Trạng Thái FSM LangGraph</div>
                 </div>
                 <p style="font-size: 1.2rem; color: var(--text-main); line-height: 1.75; margin-bottom: 16px;">
-                    Phục vụ mô hình <code>Foundation-Sec 8B Q4_K_M</code> cục bộ qua <code>llama.cpp</code> CUDA server (cửa sổ 32,768 tokens, <code>temp=0.1</code>):
+                    Phục vụ mô hình <code>Foundation-Sec 8B Q4_K_M</code> cục bộ qua <code>llama.cpp</code> CUDA server (cửa sổ 16.384 tokens, <code>temp=0.1</code>):
                 </p>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.8; padding-left: 22px;">
                     <li style="margin-bottom: 12px;">
@@ -2292,7 +2292,7 @@
                         <strong>Static System Prompt:</strong> Giữ nguyên System Prompt chỉ thị an ninh tĩnh để <code>llama.cpp</code> tái sử dụng KV-Cache tiền tố (<code>LLAMA_ARG_CACHE_REUSE=256</code>).
                     </li>
                     <li style="margin-bottom: 14px;">
-                        <strong>Volatile User Context:</strong> Đẩy toàn bộ dữ liệu biến đổi (payload, RAG context) vào User Message, cắt giảm tới 50% thời gian xử lý tiền tố.
+                        <strong>Volatile User Context:</strong> Đẩy toàn bộ dữ liệu biến đổi (payload, RAG context) vào User Message, giữ tiền tố tĩnh để llama.cpp tái dùng KV-Cache thay vì tính lại mỗi lượt.
                     </li>
                     <li>
                         <strong>Cắt Giảm Lượt Gọi LLM Thứ 2:</strong> Tại nút <code>attack_mapper</code>, nếu không có mã kỹ thuật khớp rõ ràng, đồ thị chuyển thẳng <code>AWAIT_HITL</code> để tiết kiệm tài nguyên.
@@ -2300,7 +2300,7 @@
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                ⚡ Tiết kiệm VRAM từ 18GB xuống 7-8GB (>50% savings) — TTFT siêu nhanh.
+                ⚡ Lượng tử hóa Q4_K_M giữ mô hình ở 7-8GB VRAM — vừa 1 GPU 16GB.
             </div>
         </div>
 
@@ -2361,7 +2361,7 @@
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                🎯 Recall@3 = 93.0% — Mọi mã MITRE phải có chứng cứ RAG (0% mã bịa).
+                🎯 Recall@3 = 93,0% trên 243 truy vấn lát payload (toàn tập 1.305 truy vấn: 38,5%) — mã MITRE phải có chứng cứ RAG.
             </div>
         </div>
 
@@ -2380,7 +2380,7 @@
                         <strong>Cấu hình SQLite An Toàn:</strong> Thiết lập <code>synchronous=NORMAL</code> + Indexes. <strong>TUYỆT ĐỐI KHÔNG DÙNG WAL</strong> để tránh xung đột file <code>-wal</code>, <code>-shm</code> gây crash phân quyền cross-UID trong Docker.
                     </li>
                     <li style="margin-bottom: 14px;">
-                        <strong>Hàm Suy Giảm Uy Tín IP Theo Thời Gian:</strong> Điểm uy tín $S_{ext{new}} = S_{ext{old}} \cdot (1 - \lambda)^t$ tự động giảm dần khi IP im lặng, tránh chặn vĩnh viễn IP đã sạch.
+                        <strong>Hàm Suy Giảm Uy Tín IP Theo Thời Gian:</strong> Điểm uy tín $S_{\text{new}} = S_{\text{old}} \cdot (1 - \lambda)^t$ tự động giảm dần khi IP im lặng, tránh chặn vĩnh viễn IP đã sạch.
                     </li>
                     <li style="margin-bottom: 14px;">
                         <strong>Chế Độ Block-on-Sight (Chặn Tức Thì):</strong> IP đạt điểm nguy hiểm tối đa ($S = 100$) bị Tầng 1 chặn lập tức ở $\mathcal{O}(1)$ mà không cần gọi lại Tầng 2.
@@ -2485,8 +2485,8 @@
                     <div style="font-size: 1.5rem; font-weight: 800; color: #38BDF8;">Hạ Tầng GPU Cục Bộ</div>
                 </div>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75; padding-left: 20px;">
-                    <li style="margin-bottom: 10px;"><strong>Phần cứng:</strong> NVIDIA RTX 4060 Ti (16GB VRAM), CPU 16 cores.</li>
-                    <li style="margin-bottom: 10px;"><strong>Local LLM Server:</strong> <code>llama.cpp</code> CUDA, Quantization Q4_K_M (7.2GB VRAM).</li>
+                    <li style="margin-bottom: 10px;"><strong>Phần cứng:</strong> NVIDIA RTX 4060 Ti (16GB VRAM), Intel Core i7-14700KF, 32GB DDR5.</li>
+                    <li style="margin-bottom: 10px;"><strong>Local LLM Server:</strong> <code>llama.cpp</code> CUDA, Q4_K_M (trọng số 4,6GB; 7&ndash;8GB VRAM khi nạp ngữ cảnh).</li>
                     <li><strong>Containerization:</strong> Docker Compose khép kín, Redis Stream &amp; SQLite.</li>
                 </ul>
             </div>
@@ -2506,11 +2506,11 @@
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75; padding-left: 20px;">
                     <li style="margin-bottom: 10px;"><strong>CSE-CIC-IDS2018:</strong> Tập log xâm nhập mạng chuẩn quốc tế (DDoS, Botnet, Infiltration).</li>
                     <li style="margin-bottom: 10px;"><strong>CSIC 2010 Web Attack:</strong> Tập dữ liệu tấn công ứng dụng Web (SQLi, XSS, Path Traversal).</li>
-                    <li><strong>Real SOC Stream:</strong> Luồng 100,000+ sự kiện kiểm chứng tải thực tế.</li>
+                    <li><strong>Real SOC Stream:</strong> Luồng 99.717 sự kiện, tỷ lệ tấn công nền 9,8%.</li>
                 </ul>
             </div>
             <div style="background: rgba(16, 185, 129, 0.12); padding: 10px 16px; border-radius: 8px; font-size: 1.05rem; font-weight: 700; color: #047857; margin-top: 12px;">
-                📊 Gán nhãn Ground Truth 1,700 mẫu bởi Chuyên gia SOC.
+                📊 Ground Truth 1.700 mẫu: nhãn ánh xạ tự động từ nhãn gốc IDS2018 &amp; CSIC 2010, mã ATT&amp;CK gán theo họ tấn công.
             </div>
         </div>
 
@@ -2523,7 +2523,7 @@
                     <div style="font-size: 1.5rem; font-weight: 800; color: #A78BFA;">Kiểm Chứng Đa Chiều</div>
                 </div>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75; padding-left: 20px;">
-                    <li style="margin-bottom: 10px;"><strong>Benchmark 5 Chiều:</strong> Tỷ lệ xả tải, Độ trễ, Độ chính xác, Kháng Prompt Inj., Tiết kiệm VRAM.</li>
+                    <li style="margin-bottom: 10px;"><strong>Benchmark 5 Chiều:</strong> Tỷ lệ xả tải, Độ trễ, Độ chính xác, Kháng Prompt Inj., Chi phí tài nguyên (0 GPU VRAM ở Tầng 1).</li>
                     <li style="margin-bottom: 10px;"><strong>So sánh Đối chứng:</strong> Đưa lên bàn cân với SIEM/SOAR và LLM Đơn tầng (CyberRAG, LanG).</li>
                     <li><strong>LLM-as-a-Judge:</strong> Đánh giá định tính chất lượng lập luận bằng mô hình chấm độc lập.</li>
                 </ul>
@@ -2546,7 +2546,7 @@
         <div style="background: rgba(30, 64, 175, 0.06); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 16px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
             <div style="font-size: 1.1rem; color: #0284C7; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">Tỷ Lệ Xả Tải Tầng 1</div>
             <div style="font-size: 2.8rem; font-weight: 800; color: #0284C7; line-height: 1.1;">97.5%</div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Đo tại tỷ lệ tấn công nền 38,3%</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Đo trên luồng 99.717 sự kiện, tỷ lệ tấn công nền 9,8%</div>
         </div>
 
         <div style="background: rgba(16, 185, 129, 0.06); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
@@ -2571,7 +2571,7 @@
     <!-- Detailed 5D Performance Table (Large Crisp Text) -->
     <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 16px; padding: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
         <h4 style="font-size: 1.25rem; font-weight: 800; color: #0F172A; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
-            <i class="fa-solid fa-chart-line" style="color: #0284C7;"></i> Bảng Tổng Hop Chỉ Số Kiểm Chứng Thực Nghiệm 5D (Audited Results)
+            <i class="fa-solid fa-chart-line" style="color: #0284C7;"></i> Bảng Tổng Hợp Chỉ Số Kiểm Chứng Thực Nghiệm 5D (Audited Results)
         </h4>
         <table style="width: 100%; border-collapse: collapse; font-size: 1.05rem; text-align: left;">
             <thead>
@@ -2587,7 +2587,7 @@
                     <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">1. Hiệu Năng &amp; Độ Trễ</td>
                     <td style="padding: 10px 14px; color: #334155;">Offload Rate · Latency Median · Stage Latencies</td>
                     <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">97.5% · 0.88 ms · T1 0.182ms / T2 13.438s</td>
-                    <td style="padding: 10px 14px; color: #475569;">Xả tải 97.5% log nhiễu; ML Gate Auto-BLOCK 0 FP (962 ca tại C &gt;= 0.85).</td>
+                    <td style="padding: 10px 14px; color: #475569;">Xả tải 97.5% lưu lượng; ML Gate Auto-BLOCK 0 FP (962 ca tại C &gt;= 0.85).</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #7C3AED;">2. An Toàn AI &amp; Mật Mã</td>
@@ -2598,7 +2598,7 @@
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #059669;">3. Quy Kết ATT&amp;CK &amp; RAG</td>
                     <td style="padding: 10px 14px; color: #334155;">RAG Recall@3 · RRF Match · Grounding Guard</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #059669;">93.0% (Recall@3) · 80.0% · 0% Mã Bịa</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #059669;">93,0% (Recall@3, lát payload n=243) · 80,0% · 0/1.421</td>
                     <td style="padding: 10px 14px; color: #475569;">Grounding Guardrail đánh chặn 76 ca ảo giác, ép 100% mã MITRE phải có trích dẫn.</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
@@ -2609,7 +2609,7 @@
                 </tr>
                 <tr style="background: #FFFFFF;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">5. Suy Luận &amp; Giảm Ảo Giác</td>
-                    <td style="padding: 10px 14px; color: #334155;">MT-Bench Judge · Tỷ lệ ảo giác mã (`bad`)</td>
+                    <td style="padding: 10px 14px; color: #334155;">RAGAS 4 trục (LLM-as-Judge) · Tỷ lệ ảo giác mã (`bad`)</td>
                     <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">3.78 / 5.0 · 0.0% (bad = 0 / 1,421)</td>
                     <td style="padding: 10px 14px; color: #475569;">Trọng tài LLM độc lập chấm Relevancy 4.52/5; Grounding Guardrail giữ giảm thiểu ảo giác.</td>
                 </tr>
@@ -2635,7 +2635,7 @@
                     <div style="font-size: 1.55rem; font-weight: 800; color: #A78BFA;">Ablation Study (So Sánh Cấu Hình)</div>
                 </div>
                 <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.7; margin-bottom: 14px;">
-                    Phân tích hiệu năng giữa Cấu hình A (LLM Đơn tầng) và Cấu hình F (SENTINEL Hoàn chỉnh) trên 1,700 mẫu:
+                    Phân tích hiệu năng giữa Cấu hình A (chỉ Tầng 1, không có LLM) và Cấu hình F (SENTINEL hai tầng hoàn chỉnh) trên 1.700 mẫu:
                 </p>
                 <table style="width: 100%; border-collapse: collapse; font-size: 1.1rem; text-align: left; margin-bottom: 14px;">
                     <thead>
@@ -2648,14 +2648,14 @@
                     </thead>
                     <tbody>
                         <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
-                            <td style="padding: 10px; font-weight: 700;">Config A (LLM Only)</td>
-                            <td style="padding: 10px; color: #E11D48; font-weight: 800;">28.29%</td>
+                            <td style="padding: 10px; font-weight: 700;">Config A (chỉ Tầng 1)</td>
+                            <td style="padding: 10px; color: #E11D48; font-weight: 800;">28,29%<br><span style="font-size:0.82rem;font-weight:600;color:#64748B;">KTC 26,20&ndash;30,48</span></td>
                             <td style="padding: 10px;">0.00%</td>
                             <td style="padding: 10px; color: #E11D48; font-weight: 800;">59.00%</td>
                         </tr>
                         <tr style="background: #F0FDF4;">
                             <td style="padding: 10px; font-weight: 800; color: #059669;">Config F (SENTINEL)</td>
-                            <td style="padding: 10px; color: #059669; font-weight: 800;">35.35%</td>
+                            <td style="padding: 10px; color: #059669; font-weight: 800;">35,35%<br><span style="font-size:0.82rem;font-weight:600;color:#64748B;">KTC 33,12&ndash;37,66</span></td>
                             <td style="padding: 10px; color: #D97706; font-weight: 800;">44.76%</td>
                             <td style="padding: 10px; color: #059669; font-weight: 800;">0.00%</td>
                         </tr>
@@ -2681,7 +2681,7 @@
                 </div>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.8; padding-left: 22px;">
                     <li style="margin-bottom: 12px;">
-                        <strong>MT-Bench Overall Score:</strong> Đạt <strong style="color: #0284C7;">3.78 / 5.0</strong> (Relevancy: <strong>4.52</strong>, Faithfulness: <strong>3.96</strong>, Context-Recall: <strong>4.11</strong>).
+                        <strong>Điểm RAGAS trung bình 4 trục:</strong> Đạt <strong style="color: #0284C7;">3.78 / 5.0</strong> (Relevancy: <strong>4.52</strong>, Context-Recall: <strong>4.11</strong>, Faithfulness: <strong>3.96</strong>, Context-Precision: <strong>2.54</strong> &mdash; trục thấp nhất, do truy xuất còn tài liệu nhiễu).
                     </li>
                     <li style="margin-bottom: 12px;">
                         <strong>Tỷ Lệ Ảo Giác Mã (`bad`):</strong> Đạt <strong style="color: #059669;">0.0%</strong> (0 / 1,421 ca khẳng định mã kỹ thuật MITRE).
@@ -2690,12 +2690,12 @@
                         <strong>Tác Động Lá Chắn Neo:</strong> Đã đánh chặn <strong style="color: #D97706;">76 lệnh `BLOCK_IP` ảo giác</strong> từ LLM, tự động hạ cấp an toàn về <code>AWAIT_HITL</code>.
                     </li>
                     <li>
-                        <strong>Quy Kết Kỹ Thuật RRF:</strong> Đạt <strong style="color: #0284C7;">80.0% exact match</strong> ở tầng payload (Recall@3 = <strong>93.0%</strong>).
+                        <strong>Quy Kết Kỹ Thuật:</strong> Trần truy xuất RRF <strong style="color: #0284C7;">80,0%</strong> (200/250) nhưng toàn tuyến chỉ <strong style="color: #D97706;">68,0%</strong> (170/250) &mdash; 12,0 điểm phần trăm là cái giá của rào chắn neo chứng cứ.
                     </li>
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                🎯 Trọng tài LLM độc lập khẳng định suy luận chuẩn xác &amp; 0% mã bịa.
+                🎯 Trọng tài khác họ mô hình chấm 3,78/5,0; 0/1.421 mã kỹ thuật thiếu neo bằng chứng (cận trên).
             </div>
         </div>
 
@@ -2725,7 +2725,7 @@
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                📊 Minh bạch 100% quá trình suy luận &amp; bằng chứng trích dẫn RAG.
+                📊 Hiển thị trọn vẹn chuỗi suy luận &amp; tài liệu RAG đã truy xuất của từng ca.
             </div>
         </div>
 
@@ -2755,7 +2755,7 @@
         <!-- SLIDE 18: LIMITATIONS (Section 5.3) -->
         <section class="slide" data-slide="18">
     <div class="slide-tag" style="font-size: 1.35rem; font-weight: 800;">Tổng kết Luận văn</div>
-    <h2 class="slide-title" style="font-size: 2.7rem; margin-bottom: 22px;">4 Đóng Góp Khoa Học &amp; Giá Trị Thực Tiễn Của SENTINEL</h2>
+    <h2 class="slide-title" style="font-size: 2.7rem; margin-bottom: 22px;">Đóng Góp Khoa Học &amp; Giá Trị Thực Tiễn Của SENTINEL</h2>
 
     <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; flex: 1; align-items: stretch;">
 
@@ -2770,7 +2770,7 @@
                 </div>
                 <ul style="font-size: 1.12rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
                     <li style="margin-bottom: 8px;">Giải quyết triệt để nút thắt độ trễ bằng nguyên lý <em>"Phán quyết rẻ đứng trước phán quyết đắt"</em>.</li>
-                    <li>Xả tải <strong>97.5%</strong> log nhiễu ở độ trễ <strong>&lt; 1ms (0.88ms)</strong> mà KHÔNG làm nghẽn GPU (đo tại tỷ lệ tấn công nền 38,3%).</li>
+                    <li>Xả tải <strong>97.5%</strong> lưu lượng ở độ trễ <strong>&lt; 1ms (0.88ms)</strong> mà KHÔNG làm nghẽn GPU (đo tại tỷ lệ tấn công nền 9,8%).</li>
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 8px 14px; border-radius: 8px; font-size: 1.02rem; font-weight: 700; color: #0284C7; margin-top: 10px;">
@@ -2807,7 +2807,7 @@
                     <div style="font-size: 1.4rem; font-weight: 800; color: #10B981;">3. Rào Chắn Neo Bằng Chứng &amp; RAG</div>
                 </div>
                 <ul style="font-size: 1.12rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
-                    <li style="margin-bottom: 8px;">Dual-RAG (FAISS + BM25 RRF) truy xuất 433 mã MITRE ATT&amp;CK đạt <strong>Recall@3 = 93.0%</strong>.</li>
+                    <li style="margin-bottom: 8px;">Dual-RAG (FAISS + BM25 RRF) trên 433 mã MITRE ATT&amp;CK đạt trần truy xuất <strong>80,0%</strong>; quy kết toàn tuyến <strong>68,0%</strong> (170/250).</li>
                     <li>Grounding Guardrail đánh chặn <strong>76 ca ảo giác</strong>, duy trì tỷ lệ mã bịa <strong>`bad` = 0.0%</strong> (0/1,421 ca).</li>
                 </ul>
             </div>
@@ -2823,7 +2823,7 @@
                     <div style="width: 42px; height: 42px; background: rgba(139, 92, 246, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; color: #A78BFA;">
                         <i class="fa-solid fa-users-gear"></i>
                     </div>
-                    <div style="font-size: 1.4rem; font-weight: 800; color: #A78BFA;">4. Phân Loại SOC &amp; Hợp Tác HITL</div>
+                    <div style="font-size: 1.4rem; font-weight: 800; color: #A78BFA;">Sản phẩm thực tiễn: Phân Loại SOC &amp; HITL</div>
                 </div>
                 <ul style="font-size: 1.12rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
                     <li style="margin-bottom: 8px;">Rút ngắn <strong>-84.24%</strong> khối lượng cảnh báo cho Analyst; hàng đợi Hoãn bao phủ <strong>95.0%</strong> đe dọa thật.</li>
@@ -3037,7 +3037,7 @@ PHẦN 4: THẢO LUẬN, HẠN CHẾ VÀ HƯỚNG PHÁT TRIỂN — Nêu rõ min
 
 Đi vào thực trạng vận hành an ninh mạng hiện nay, em xin trình bày 3 NÚT THẮT CỔ CHAI VẬN HÀNH CỐT LÕI mà các trung tâm SOC đang gặp phải:
 
-NÚT THẮT 1 — QUY MÔ LOG KHỔNG LỒ VÀ KHỦNG HOẢNG ĐỘ TRỄ: Mỗi ngày, một trung tâm SOC cỡ vừa phải tiếp nhận từ hàng trăm nghìn đến hàng triệu log sự kiện từ SIEM, Tường lửa và EDR. Tỉ lệ báo động giả vượt quá 80%, gây ra hội chứng Alert Fatigue làm kiệt sức các chuyên gia SOC. Khi đưa AI vào xử lý trực tiếp luồng dữ liệu thô, độ trễ tính toán của AI gây tắc nghẽn toàn bộ đường truyền dữ liệu an ninh.
+NÚT THẮT 1 — QUY MÔ LOG KHỔNG LỒ VÀ KHỦNG HOẢNG ĐỘ TRỄ: Mỗi ngày, một trung tâm SOC cỡ vừa phải tiếp nhận từ hàng trăm nghìn đến hàng triệu log sự kiện từ SIEM, Tường lửa và EDR. Phần lớn cảnh báo trong hàng đợi lại là hoạt động lành tính, gây ra hội chứng Alert Fatigue làm kiệt sức các chuyên gia SOC (AlAhmadi và cộng sự, USENIX Security 2022). Khi đưa AI vào xử lý trực tiếp luồng dữ liệu thô, độ trễ tính toán của AI gây tắc nghẽn toàn bộ đường truyền dữ liệu an ninh.
 
 NÚT THẮT 2 — BỀ MẶT TẤN CÔNG AI, ML EVASION VÀ NGUY CƠ GIẢ MẠO NHẬT KÝ: Ứng dụng AI tạo ra các bề mặt tấn công mới: kẻ tấn công cố ý chèn câu lệnh độc hại vào log thô (Log-substrate Prompt Injection) hoặc bóp méo đặc trưng dữ liệu để né tránh mô hình Học máy (Machine Learning Gate Evasion). Đồng thời, nhật ký sự cố sau khi thâm nhập có nguy cơ bị chỉnh sửa trái phép. Do đó, cần cơ chế Guardrails cô lập dữ liệu và niêm phong vết kiểm toán.
 
@@ -3053,15 +3053,15 @@ RQ1 (Hiệu năng & Độ trễ): Đặt câu hỏi làm sao tự động xả t
 
 RQ2 (An toàn AI & Kiểm toán Pháp y): Đặt câu hỏi về cơ chế vô hiệu hóa các tấn công tiêm nhiễm câu lệnh (Prompt Injection) và bảo đảm tính chống chối bỏ vết pháp y? -> Hướng giải quyết là áp dụng cơ chế Delimited Data Encapsulation cô lập payload thô bằng cấu trúc cứng, kết hợp niêm phong chuỗi băm HMAC-SHA256 liên vết.
 
-RQ3 (Suy luận Tác tử & Quy kết MITRE ATT&CK): Đặt câu hỏi làm sao để Tác tử AI suy luận ngữ cảnh chính xác, quy kết mã MITRE ATT&CK và giảm khối lượng công việc cho chuyên gia mà 0% mã bịa? -> Hướng giải quyết là xây dựng Đồ thị Tác tử LangGraph kết hợp Dual-RAG (FAISS + BM25) tri thức STIX/NIST và Lá chắn Neo bằng chứng (Grounding Guardrail).`,
+RQ3 (Suy luận Tác tử & Quy kết MITRE ATT&CK): Đặt câu hỏi làm sao để Tác tử AI suy luận ngữ cảnh chính xác, quy kết mã MITRE ATT&CK và giảm khối lượng công việc cho chuyên gia mà không phát ra mã kỹ thuật thiếu chứng cứ? -> Hướng giải quyết là xây dựng Đồ thị Tác tử LangGraph kết hợp Dual-RAG (FAISS + BM25) tri thức STIX/NIST và Lá chắn Neo bằng chứng (Grounding Guardrail).`,
 
     6: `KÍNH THƯA HỘI ĐỒNG,
 
 Khi tổng quan các hướng nghiên cứu hiện hữu trên thế giới, em nhận thấy một khoảng trống nghiên cứu (Research Gap) lớn:
 
-Các hệ thống SIEM/SOAR truyền thống xử lý rất nhanh nhưng thiếu khả năng suy luận ngữ cảnh trước các dạng tấn công mới. Các hệ thống AI Cloud suy luận thông minh nhưng độ trễ rất cao, vi phạm chủ quyền dữ liệu và ngốn VRAM lớn. Các tác tử tự chủ hiện tại đều là kiến trúc đơn tầng — 100% sự kiện phải đi qua LLM gây nghẽn mạch.
+Các hệ thống SIEM/SOAR truyền thống xử lý rất nhanh nhưng thiếu khả năng suy luận ngữ cảnh trước các dạng tấn công mới. Các hệ thống AI Cloud suy luận thông minh nhưng độ trễ rất cao, vi phạm chủ quyền dữ liệu và ngốn VRAM lớn. Ở nhóm tác tử tự chủ, từng mảnh ghép đã xuất hiện riêng lẻ: Policy-Guided Threat Hunting có tiền phân loại bằng học tăng cường, LanG có phòng thủ tiêm nhiễm hai lớp, một số công trình đã chạy cục bộ. Nhưng chưa công trình nào công bố tỷ lệ xả tải kèm tỷ lệ tấn công nền của luồng đo, cũng chưa hợp nhất cả ba yêu cầu trong một kiến trúc.
 
-SENTINEL là kiến trúc đầu tiên giải quyết đồng thời cả 3 yêu cầu: Xả tải Tầng 1 đạt 97,5% ở độ trễ trung vị 0.88 ms; Suy luận Tác tử Tầng 2 On-Premises trên 1 GPU 16GB VRAM; và Bảo vệ an toàn AI bằng rào chắn Delimited Data Encapsulation chặn Prompt Injection cùng chuỗi băm niêm phong HMAC-SHA256.`,
+SENTINEL hợp nhất cả ba yêu cầu trong một kiến trúc: Xả tải Tầng 1 đạt 97,5% ở độ trễ trung vị 0.88 ms; Suy luận Tác tử Tầng 2 On-Premises trên 1 GPU 16GB VRAM; và Bảo vệ an toàn AI bằng rào chắn Delimited Data Encapsulation chặn Prompt Injection cùng chuỗi băm niêm phong HMAC-SHA256.`,
 
     7: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3069,7 +3069,7 @@ Về tổng quan kiến trúc, SENTINEL thực thi nguyên lý TÁCH CÔNG VIỆ
 
 TIER 1 (Wire-speed Filter & Machine Learning Gate): Xử lý phi trạng thái trên đường truyền. Nhận dữ liệu thô từ Redis Stream, dùng thuật toán Welford O(1) tính Z-score bất thường, kết hợp Cổng Machine Learning LightGBM và Tier 1.75 Semantic Cache để xả tải 97,5% lưu lượng lành tính mà KHÔNG tiêu tốn tài nguyên GPU.
 
-TIER 2 (Cognitive Agent Engine): Chỉ tiếp nhận ~9.4% các sự kiện bất thường đã qua sàng lọc. Đồ thị LangGraph điều phối mô hình Foundation-Sec-8B-Instruct Q4_K_M, kết hợp Dual-RAG (FAISS + BM25) và SQLite Threat Memory để đưa ra phán quyết chính xác (BLOCK_IP, LOG, AWAIT_HITL) và niêm phong kiểm toán HMAC-SHA256.`,
+TIER 2 (Cognitive Agent Engine): Chỉ tiếp nhận 2,5% sự kiện (2.518/99.717) đã qua sàng lọc. Đồ thị LangGraph điều phối mô hình Foundation-Sec-8B-Instruct Q4_K_M, kết hợp Dual-RAG (FAISS + BM25) và SQLite Threat Memory để đưa ra phán quyết chính xác (BLOCK_IP, LOG, AWAIT_HITL) và niêm phong kiểm toán HMAC-SHA256.`,
 
     8: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3078,11 +3078,11 @@ TIER 2 (Cognitive Agent Engine): Chỉ tiếp nhận ~9.4% các sự kiện bấ
 mu_k = mu_{k-1} + (x_k - mu_{k-1}) / k
 S_k = S_{k-1} + (x_k - mu_{k-1})(x_k - mu_k)
 
-Từ đó tính toán độ lệch chuẩn sigma_k và chỉ số Z-score = (x - mu) / sigma cho từng thuộc tính NetFlow (packet rate, flow volume, connection duration). Các luồng dữ liệu tuân theo phân bố chuẩn sẽ được loại bỏ tức thì ở độ trễ dưới 0.01ms.`,
+Từ đó tính toán độ lệch chuẩn sigma_k và chỉ số Z-score = (x - mu) / sigma cho từng thuộc tính NetFlow (packet rate, flow volume, connection duration). Các luồng dữ liệu tuân theo phân bố chuẩn sẽ được loại bỏ ngay tại Tầng 1, ở độ trễ trung bình 0,182 ms.`,
 
     9: `KÍNH THƯA HỘI ĐỒNG,
 
-Tiếp nối lọc thống kê là Cổng ML LightGBM (ml_gateway.py) được huấn luyện trên tập dữ liệu 1 Triệu mẫu (tier_2_model_1m.pkl).
+Tiếp nối lọc thống kê là Cổng ML LightGBM (ml_gateway.py) được huấn luyện trên 949.535 mẫu NetFlow (tier_2_model_1m.pkl).
 
 Cổng ML đạt chỉ số phân loại MCC = 0.6667, F1 = 0.8248, Precision = 0.9088 và đạt ĐỘ CHÍNH XÁC AUTO-BLOCK TUYỆT ĐỐI 100% (962/962 lệnh chặn tự động, 0 Báo động giả - FP) tại ngưỡng cao >= 0.85.
 
@@ -3098,7 +3098,7 @@ Kết quả thực nghiệm trên 1,500 truy vấn đạt TỈ LỆ TRÚNG CACHE
 
     11: `KÍNH THƯA HỘI ĐỒNG,
 
-Tại Tier 2, mô hình Foundation-Sec-8B-Instruct Q4_K_M chạy On-Premises qua llama.cpp CUDA trên duy nhất 1 card GPU RTX 4060 Ti 16GB, tiết kiệm VRAM từ 18GB xuống còn 7-8GB (>50% memory savings).
+Tại Tier 2, mô hình Foundation-Sec-8B-Instruct Q4_K_M chạy On-Premises qua llama.cpp CUDA trên duy nhất 1 card GPU RTX 4060 Ti 16GB, với lượng tử hóa Q4_K_M mô hình chiếm 7-8GB VRAM, vừa đủ chỗ cho bộ đệm ngữ cảnh và chỉ mục truy xuất.
 
 Luồng suy luận được điều phối bởi đồ thị LangGraph DAG qua 5 nút: guardrails -> rag_context -> llm_triage -> attack_mapper -> action_executor / human_in_loop.
 
@@ -3108,7 +3108,7 @@ Hệ thống tối ưu KV-Caching bằng cách tĩnh hóa System Prompt. Tại n
 
 Về tri thức và bộ nhớ đe dọa:
 
-Hệ thống Dual-RAG dung hợp truy xuất véc-tơ FAISS (Sentence-BERT) và từ khóa BM25 qua thuật toán Reciprocal Rank Fusion (RRF, k=60). Kết quả đạt RAG Recall@3 = 93.0% (0.930) trên lát dữ liệu payload từ 433 mã MITRE ATT&CK chuẩn STIX 2.1 và tài liệu NIST SP 800-61r2.
+Hệ thống Dual-RAG dung hợp truy xuất véc-tơ FAISS (Sentence-BERT) và từ khóa BM25 qua thuật toán Reciprocal Rank Fusion (RRF, k=60). Kết quả đạt RAG Recall@3 = 93.0% trên lát dữ liệu payload gồm 243 truy vấn (trên toàn tập 1.305 truy vấn con số này là 38.5%), truy xuất từ 433 mã MITRE ATT&CK chuẩn STIX 2.1 và tài liệu NIST SP 800-61r2.
 
 Bộ nhớ đe dọa Threat Memory chạy trên SQLite tối ưu (synchronous=NORMAL, tuyệt đối không dùng WAL mode để tránh lỗi lock file trong Docker). Điểm uy tín IP giảm dần theo thời gian S_new = S_old * (1-lambda)^t. Khi IP chạm S=100, hệ thống chuyển sang chế độ Block-on-sight vĩnh viễn tại Tier 1. Whitelist cứng bảo vệ IP hạ tầng (10.0.0.99).`,
 
@@ -3118,7 +3118,7 @@ Về an toàn AI và kiểm toán pháp y:
 
 SENTINEL áp dụng cơ chế Delimited Data Encapsulation, dùng thẻ nonce mật mã ngẫu nhiên cô lập dữ liệu thô («<DATA_HASH...>»). Kết quả chặn toàn bộ 678 mẫu đối kháng khó và 100 mẫu field injection trong phạm vi tập mẫu.
 
-Về kiểm toán, chuỗi băm HMAC-SHA256 liên kết (H_i = HMAC(D_i || H_{i-1}, K)) đạt TỈ LỆ PHÁT HIỆN GIAN LẬN 100% đối với ba dạng xâm phạm cốt lõi (sửa nội dung, chèn bản ghi giả, xóa bản ghi ở giữa), bảo đảm tính chống chối bỏ pháp y tuyệt đối.`,
+Về kiểm toán, chuỗi băm HMAC-SHA256 liên kết (H_i = HMAC(D_i || H_{i-1}, K)) đạt TỈ LỆ PHÁT HIỆN GIAN LẬN 100% đối với ba dạng xâm phạm cốt lõi (sửa nội dung, chèn bản ghi giả, xóa bản ghi ở giữa), bảo đảm tính chống chối bỏ cho vết pháp y. Giới hạn còn lại: khóa đối xứng phải giữ cục bộ, và kẻ có quyền root vẫn có thể cắt đuôi chuỗi — hướng khắc phục là chữ ký bất đối xứng Ed25519 kèm neo băm định kỳ.`,
 
     14: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3132,11 +3132,11 @@ Bộ dữ liệu đánh giá kết hợp 5 nguồn chuẩn: datatest (4,236 mẫ
 
 Em xin báo cáo BẢNG KẾT QUẢ THỰC NGHIỆM ĐỘT PHÁ 5D METRICS:
 
-1. XẢ TẢI: Đạt 97.5% (đo tại tỷ lệ tấn công nền 38,3%).
+1. XẢ TẢI: Đạt 97.5% trên luồng 99.717 sự kiện có tỷ lệ tấn công nền 9,8%.
 2. ĐỘ TRỄ: Giảm độ trễ trung bình 69.24% (từ 17,187ms xuống 5,286.7ms); ĐỘ TRỄ TRUNG VỊ ĐẠT MỨC DƯỚI 1MS (0.88ms) - rút ngắn 19.500 lần ở mức trung vị. Thông lượng Cổng Machine Learning đạt 3,452 sự kiện/s.
 3. BẢO MẬT AI: Kháng Prompt Injection 100%, kháng Evasion 98.75%, phát hiện gian lận HMAC 100%.
-4. QUY KẾT MITRE: RAG Recall@3 đạt 93.0%, quy kết RRF đạt 80.0%, quy kết toàn tuyến E2E đạt 68.0%.
-5. PHÂN LOẠI CẢNH BÁO: Kênh hoãn AWAIT_HITL gom được 95.0% mối đe dọa thật, GIẢM 84.24% KHỐI LƯỢNG CÔNG VIỆC CHO ANALYST. Trọng tài MT-Bench chấm điểm lập luận 3.78/5.0 và ẢO GIÁC MÃ KỸ THUẬT ĐẠT ĐÚNG 0% (bad = 0/1,421).`,
+4. QUY KẾT MITRE: RAG Recall@3 đạt 93.0% trên lát payload n=243, quy kết RRF đạt 80.0%, quy kết toàn tuyến E2E đạt 68.0%.
+5. PHÂN LOẠI CẢNH BÁO: Kênh hoãn AWAIT_HITL gom được 95.0% mối đe dọa thật, GIẢM 84.24% KHỐI LƯỢNG CÔNG VIỆC CHO ANALYST. Trọng tài khác họ mô hình (Meta-Llama-3-8B) chấm 4 trục RAGAS trung bình 3.78/5.0 trên 1.052 ca leo thang và ẢO GIÁC MÃ KỸ THUẬT ĐẠT ĐÚNG 0% (bad = 0/1,421).`,
 
     16: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3144,7 +3144,7 @@ Em xin báo cáo BẢNG KẾT QUẢ THỰC NGHIỆM ĐỘT PHÁ 5D METRICS:
 
 Thử nghiệm Ablation chấm theo hành động xác nhận Cấu hình F (SENTINEL hoàn chỉnh) đạt độ chính xác hành động 35.35%, hoãn 44.76% và bỏ ngỏ 0%, vượt trội so với Cấu hình A (28.29% accuracy, bỏ ngỏ 59.0%).
 
-Đặc biệt, Lá chắn Neo bằng chứng (Grounding Guardrail) đã đánh chặn thành công 76 lệnh BLOCK_IP ảo giác do LLM tự đoán mà không có căn cứ RAG, tự động hạ cấp về AWAIT_HITL. Điều này lý giải tại sao độ chính xác E2E (68%) thấp hơn RRF thuần (80%) — đây là sự đánh đổi CÓ CHỦ Ý giữa độ chính xác quy kết và sự an toàn tuyệt đối của hệ thống.`,
+Đặc biệt, Lá chắn Neo bằng chứng (Grounding Guardrail) đã đánh chặn thành công 76 lệnh BLOCK_IP ảo giác do LLM tự đoán mà không có căn cứ RAG, tự động hạ cấp về AWAIT_HITL. Điều này lý giải tại sao độ chính xác E2E (68%) thấp hơn RRF thuần (80%) — đây là sự đánh đổi CÓ CHỦ Ý: thà bỏ trống phán quyết còn hơn phát ra mã kỹ thuật không có chứng cứ truy xuất.`,
 
     17: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3157,7 +3157,7 @@ Giao diện cung cấp cho chuyên gia hình ảnh trực quan theo thời gian 
 Về tổng kết, luận văn mang lại 4 đóng góp cốt lõi:
 
 VỀ MẶT KHOA HỌC:
-(1) Đề xuất và bảo chứng mô hình Kinh tế học Tầng lọc (Filtration Economics) trong giám sát an ninh mạng, xả tải 97,5% lưu lượng (đo tại tỷ lệ tấn công nền 38,3%), giảm độ trễ trung vị xuống 0,88 ms.
+(1) Đề xuất và bảo chứng mô hình Kinh tế học Tầng lọc (Filtration Economics) trong giám sát an ninh mạng, xả tải 97,5% lưu lượng ở tỷ lệ tấn công nền 9,8%, giảm độ trễ trung vị xuống 0,88 ms.
 (2) Thiết lập rào chắn an ninh đối kháng tất định (Delimited Data Encapsulation) chặn toàn bộ 678 mẫu tiêm nhiễm câu lệnh qua log trong phạm vi tập mẫu và niêm phong kiểm toán HMAC-SHA256.
 (3) Xây dựng mô hình suy luận nhận thức tác tử LangGraph kết hợp Dual-RAG và Grounding Guardrail — chỉ phát ra mã kỹ thuật hiện diện trong tập chứng cứ.
 
@@ -3184,7 +3184,7 @@ HƯỚNG PHÁT TRIỂN TƯƠNG LAI:
 
     20: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG,
 
-SENTINEL đã chứng minh rằng một kiến trúc lai hai tầng thông minh hoàn toàn có thể mang lại khả năng tự động hóa an ninh mạng tin cậy, tốc độ cao và bảo mật tuyệt đối ngay trên hạ tầng phần cứng thương mại sẵn có.
+SENTINEL đã chứng minh rằng một kiến trúc lai hai tầng thông minh hoàn toàn có thể mang lại khả năng tự động hóa an ninh mạng tin cậy, tốc độ cao và có bảo chứng an ninh ngay trên hạ tầng phần cứng thương mại sẵn có.
 
 Em xin chân thành cảm ơn Quý Thầy Cô trong Hội đồng đã chú ý theo dõi bài trình bày của em!
 
