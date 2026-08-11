@@ -1,4 +1,4 @@
-# 🛡️ SENTINEL: Cognitive Two-Tier SOC Architecture for Automated Threat Detection & Contextual Response
+# 🛡️ SENTINEL: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-green.svg)](https://www.python.org/)
