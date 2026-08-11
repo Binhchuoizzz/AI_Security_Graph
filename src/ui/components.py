@@ -893,13 +893,32 @@ def render_metrics_header(
     _bt = blocks_by_tier if isinstance(blocks_by_tier, dict) else {}
     ml_count = int(_bt.get(TIER_ML, 0) or 0)
     llm_count = int(_bt.get(TIER_LLM, 0) or 0)
-    # Tier-1 gánh = tổng luồng trừ phần nó đẩy tiếp cho Cổng ML/LLM.
+    # Luật Tier-1 tự xử = tổng luồng trừ phần nó đẩy tiếp cho Cổng ML.
+    #
+    # NHÃN PHẢI NÓI ĐÚNG NÓ ĐẾM GÌ. Trước đây thẻ ghi "Tier-1 xử lý", mà con số lại là phần
+    # LUẬT tĩnh giải quyết TRƯỚC khi Cổng ML vào cuộc. Với `tier1.ml_gate_all_events` bật —
+    # mọi sự kiện đi qua Cổng ML — con số đó tụt còn ~38% luồng, đứng ngay cạnh tiêu đề
+    # "Xả tải LLM 98,3%". Hai số đúng, đặt cạnh nhau thì trông như một số sai.
     t1_count = max(0, int(total_raw_logs or 0) - _oc_int("action:ESCALATE"))
 
     # Xả tải LLM = phần KHÔNG tốn một token nào. Khác hẳn `noise_reduction` ở trên.
+    #
+    # `escalated_to_llm` đếm sự kiện RỜI Cổng ML về phía Tier-2 — KHÔNG phải sự kiện thật sự
+    # tốn token. Hai chốt chặn nằm SAU bộ đếm đó và cắt phần lớn:
+    #   `tier2_skipped_flow_only` — lô chỉ có đặc trưng luồng, dừng ở ALERT (xem subscriber);
+    #   `tier2_suppressed`        — IP đang có lô chạy dở (`pending_ai`, TTL 60 giây).
+    # Bỏ qua hai khoản này thì màn hình BÁO THIẾU chính chỉ số nó dùng làm tiêu đề. Đo tại mốc
+    # 128.369 sự kiện: 1.907 rời Cổng ML nhưng 1.718 bị chặn lại, chỉ ~189 tới LLM — màn hình
+    # in 98,5% trong khi con số thật là 99,85%.
     llm_offload = None
+    reached_llm = max(
+        0, escalated_to_llm - _oc_int("tier2_skipped_flow_only") - _oc_int("tier2_suppressed")
+    )
+    # CỐ Ý KHÔNG in phần "Cổng ML gánh" (= `action:ESCALATE` − `reached_llm`) lên thẻ này:
+    # đó là bộ đếm SỰ KIỆN ĐI QUA, không so được với nhật ký chặn, và từng khiến 1.881 đứng
+    # cạnh một nhật ký 210 dòng. `tests/unit/test_ui_badges.py` canh đúng điều đó.
     if total_raw_logs > 0 and _oc:
-        llm_offload = (1 - escalated_to_llm / total_raw_logs) * 100
+        llm_offload = (1 - reached_llm / total_raw_logs) * 100
 
     if not (TIER_ML in _bt or TIER_LLM in _bt):
         # Sổ kiểm toán chưa có bản ghi nào mang cột `tier` (dữ liệu tạo TRƯỚC lần thêm cột)
@@ -955,7 +974,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #FF5252;">'
         f'    <div class="kpi-val" style="color: #FF5252;">{offload_str}</div>'
-        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Tier-1 xử lý {t1_count:,}</span></div>'
+        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Luật Tier-1 tự xử {t1_count:,}</span></div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #3B82F6;">'
         f'    <div class="kpi-val" style="color: #60A5FA;">{ml_count:,}</div>'

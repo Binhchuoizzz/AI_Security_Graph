@@ -122,11 +122,13 @@ threat_memory:
 tier1:
   demo_escalate_waf_prefixes:
   - 198.19.
+  - 198.18.
   dynamic_rules: []
   golden_baseline:
     enabled: true
     path: config/golden_baseline.json
   max_fwd_packets: 1000
+  ml_gate_all_events: false
   risk_threshold: 15
   sensitive_ports:
   - 21
@@ -149,3 +151,5 @@ tier1:
 tier2:
   attack_mapper:
     llm_select: true
+  require_application_evidence: false
+  skip_llm_for_flow_only: false

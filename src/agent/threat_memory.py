@@ -41,6 +41,10 @@ MEMORY_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "
 # song song. Đơn luồng (production/test) không tranh chấp = chi phí ~0, hành vi Y HỆT như trước.
 _write_lock = threading.Lock()
 
+# Khoá RIÊNG cho bộ đệm `blocked_hits` trong RAM. Tách khỏi `_write_lock` là có chủ đích: mục
+# đích của bộ đệm là để đường nóng KHÔNG phải xếp hàng sau các giao dịch SQLite dài.
+_hits_lock = threading.Lock()
+
 
 def _parse_utc(ts: str) -> datetime | None:
     """Đọc timestamp ISO về datetime AWARE-UTC, chịu được dữ liệu CŨ dạng naive.
@@ -67,6 +71,7 @@ class ThreatMemoryStore:
 
     def __init__(self, db_path: str = MEMORY_DB_PATH):
         self.db_path = db_path
+        self._pending_hits: dict[str, int] = {}
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
@@ -134,6 +139,27 @@ class ThreatMemoryStore:
             _cols = [col[1] for col in c.fetchall()]
             if "blocked_hits" not in _cols:
                 c.execute("ALTER TABLE ip_reputation ADD COLUMN blocked_hits INTEGER DEFAULT 0")
+
+            # Cột `last_incident`: mốc thời gian của SỰ CỐ MỚI gần nhất — khác `last_seen`, vốn
+            # là mốc LẦN CUỐI THẤY GÓI TIN (kể cả gói đã bị chặn on-sight).
+            #
+            # BẾ TẮC ĐÃ SỬA: `decay_reputation()` lọc `WHERE last_seen < now - 7 ngày`, trong khi
+            # nhánh `>= 100` của `mark_ip_blocked` lại đặt `last_seen = now` cho MỌI gói đến từ IP
+            # đang bị chặn. Nghĩa là chính việc bị chặn làm mới cái đồng hồ mà suy giảm phụ thuộc
+            # vào -> một IP còn gửi lưu lượng thì KHÔNG BAO GIỜ đủ điều kiện suy giảm, dù nó đã
+            # sạch từ lâu. Lối thoát duy nhất là Analyst gỡ tay. Đo được trên luồng demo 496.885
+            # sự kiện: 2.830/3.044 IP nằm ở điểm 100 và 73,7% tổng lưu lượng bị chặn theo danh
+            # tiếng, phần lớn là lưu lượng LÀNH của những IP mà CICIDS2018 dùng chung cho cả hai
+            # loại. Lời hứa "điểm suy giảm dần khi IP im lặng, tránh chặn vĩnh viễn IP đã sạch"
+            # vì thế không đúng với bất kỳ IP nào còn hoạt động.
+            #
+            # Tách mốc riêng là cách sửa đúng bản chất: lưu lượng mà CHÍNH HỆ chặn không phải là
+            # bằng chứng IP vẫn đang xấu, nên nó không được quyền kéo dài bản án của chính nó.
+            if "last_incident" not in _cols:
+                c.execute("ALTER TABLE ip_reputation ADD COLUMN last_incident TEXT")
+                # Bản ghi cũ chưa có mốc sự cố -> lấy `last_seen` làm mốc khởi điểm để không IP
+                # nào bỗng dưng đủ điều kiện suy giảm ngay lần chạy đầu sau khi nâng cấp.
+                c.execute("UPDATE ip_reputation SET last_incident = last_seen")
 
             # Bảng 2: Known Entities — tools/services hợp pháp nội bộ
             c.execute("""
@@ -211,21 +237,30 @@ class ThreatMemoryStore:
     # DANH TIẾNG IP
     # =========================================================================
 
-    def record_incident(self, ip: str, action: str, mitre_technique: str = ""):
+    def record_incident(
+        self, ip: str, action: str, mitre_technique: str = "", score_delta: float | None = None
+    ):
         """
         Ghi nhận một sự cố liên quan đến IP.
         Tự động tăng reputation score dựa trên mức độ nghiêm trọng (severity).
+
+        `score_delta` cho phép NGƯỜI GỌI hạ trọng số khi bằng chứng yếu hơn mức mà bảng mặc
+        định giả định. Bảng dưới đây ngầm định mỗi `BLOCK_IP` là một phán quyết có nội dung
+        (chữ ký/luật đã duyệt/quyết định Tier-2) nên cho thẳng 50 điểm; một lệnh chặn suy ra
+        THUẦN TUÝ từ đặc trưng luồng thì không xứng trọng số đó. Xem `_persist_block_evidence`
+        trong `src/streaming/subscriber.py`.
         """
         ip = output_sanitizer.sanitize(ip)
         action = output_sanitizer.sanitize(action)
         mitre_technique = output_sanitizer.sanitize(mitre_technique)
         now = datetime.now(timezone.utc).isoformat()
-        score_delta = {
-            "BLOCK_IP": 50.0,
-            "ALERT": 10.0,
-            "AWAIT_HITL": 5.0,
-            "LOG": 1.0,
-        }.get(action, 0.0)
+        if score_delta is None:
+            score_delta = {
+                "BLOCK_IP": 50.0,
+                "ALERT": 10.0,
+                "AWAIT_HITL": 5.0,
+                "LOG": 1.0,
+            }.get(action, 0.0)
 
         with _write_lock, self._connect() as conn:
             c = conn.cursor()
@@ -273,6 +308,45 @@ class ThreatMemoryStore:
 
             conn.commit()
 
+    def note_blocked_hit(self, ip: str) -> None:
+        """Đếm một gói đến từ IP ĐANG bị chặn — GOM TRONG RAM, chưa chạm đĩa.
+
+        LÝ DO THÔNG LƯỢNG. Đường cũ gọi `mark_ip_blocked` cho từng gói bị chặn on-sight, mà
+        mỗi lượt gọi là một giao dịch SQLite trọn vẹn dưới khoá ghi TOÀN CỤC: đo được
+        **1,469 ms/lượt**. Lượt chạy 2026-08-11 có 153.868 gói như vậy — tức **730 giây** chỉ
+        để cộng một biến đếm hiển thị. Ở luồng 500k sự kiện, đây là khoản tốn lớn nhất của cả
+        đường nóng, lớn hơn cả Cổng ML chấm toàn bộ luồng (237 giây).
+
+        Không có gì phải bền theo từng gói ở đây: `blocked_hits` là số đếm cho Dashboard, và
+        phán quyết chặn thì đã nằm sẵn ở `reputation_score`. Gom rồi ghi một lượt là đủ đúng.
+        """
+        ip = output_sanitizer.sanitize(ip)
+        if not ip or ip == "unknown":
+            return
+        with _hits_lock:
+            self._pending_hits[ip] = self._pending_hits.get(ip, 0) + 1
+
+    def flush_blocked_hits(self) -> int:
+        """Đổ bộ đệm `note_blocked_hit` xuống đĩa trong MỘT giao dịch. Trả về số IP đã ghi."""
+        with _hits_lock:
+            if not self._pending_hits:
+                return 0
+            batch = self._pending_hits
+            self._pending_hits = {}
+        now = datetime.now(timezone.utc).isoformat()
+        try:
+            with _write_lock, self._connect() as conn:
+                conn.executemany(
+                    "UPDATE ip_reputation SET blocked_hits = blocked_hits + ?, last_seen = ? "
+                    "WHERE ip = ?",
+                    [(n, now, ip) for ip, n in batch.items()],
+                )
+                conn.commit()
+        except Exception:
+            # Mất số đếm hiển thị thì chấp nhận được; KHÔNG được để đường nóng chết vì nó.
+            return 0
+        return len(batch)
+
     def mark_ip_blocked(self, ip: str, mitre_technique: str = "") -> None:
         """Đánh dấu IP là KNOWN-BAD DỨT KHOÁT: đặt reputation_score = 100 (>= ngưỡng block 70
         của Tier-1) để LẦN SAU Tier-1 CHẶN NGAY on-sight, **VĨNH VIỄN** cho tới khi Analyst gỡ
@@ -293,14 +367,20 @@ class ThreatMemoryStore:
             if row is None:
                 c.execute(
                     "INSERT INTO ip_reputation (ip, total_incidents, total_blocks, total_alerts, "
-                    "first_seen, last_seen, reputation_score, last_mitre_technique, blocked_hits) "
-                    "VALUES (?, 1, 1, 0, ?, ?, 100.0, ?, 0)",
-                    (ip, now, now, mitre_technique),
+                    "first_seen, last_seen, reputation_score, last_mitre_technique, blocked_hits, "
+                    "last_incident) VALUES (?, 1, 1, 0, ?, ?, 100.0, ?, 0, ?)",
+                    (ip, now, now, mitre_technique, now),
                 )
             elif float(row[0] or 0.0) >= 100.0:
                 # ĐÃ bị chặn từ trước -> KHÔNG có "lần chặn thứ hai". Gói này chỉ là lưu lượng
                 # đến từ một IP đang nằm trong danh sách đen; ghi vào `blocked_hits` và cập nhật
                 # `last_seen`, KHÔNG đụng `total_blocks`/`total_incidents`.
+                #
+                # VÀ TUYỆT ĐỐI KHÔNG ĐỘNG `last_incident`. Đây là mắt xích của bế tắc đã sửa:
+                # `decay_reputation` đo "IP im lặng bao lâu rồi", mà lưu lượng bị chặn on-sight
+                # lại vẫn chảy vào đây. Nếu nó cũng đẩy mốc suy giảm lên, thì chính việc bị chặn
+                # sẽ gia hạn bản án của mình — IP không bao giờ được tha, kể cả khi đã sạch.
+                # `last_seen` vẫn cập nhật vì Dashboard cần biết lần cuối thấy gói tin.
                 #
                 # LỖI ĐÃ SỬA: bản cũ cộng dồn vô điều kiện, nên `198.51.100.38` hiện
                 # `total_blocks = 24` trong khi sổ kiểm toán có ĐÚNG 0 lệnh chặn cho nó — con số
@@ -317,8 +397,8 @@ class ThreatMemoryStore:
                 c.execute(
                     "UPDATE ip_reputation SET reputation_score = 100.0, "
                     "total_blocks = total_blocks + 1, total_incidents = total_incidents + 1, "
-                    "last_seen = ?, last_mitre_technique = ? WHERE ip = ?",
-                    (now, mitre_technique, ip),
+                    "last_seen = ?, last_incident = ?, last_mitre_technique = ? WHERE ip = ?",
+                    (now, now, mitre_technique, ip),
                 )
             conn.commit()
 
@@ -361,11 +441,16 @@ class ThreatMemoryStore:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
         with self._connect() as conn:
             c = conn.cursor()
+            # Neo vào `last_incident` (SỰ CỐ MỚI gần nhất), KHÔNG phải `last_seen` (gói tin gần
+            # nhất, kể cả gói đã bị chặn on-sight). Xem chú thích cột `last_incident` ở phần
+            # khởi tạo lược đồ: dùng `last_seen` thì lưu lượng bị chặn tự gia hạn bản án của
+            # chính nó và không IP nào từng đủ điều kiện suy giảm.
+            # COALESCE cho bản ghi cũ chưa kịp có `last_incident`.
             c.execute(
                 """
                 UPDATE ip_reputation
                 SET reputation_score = reputation_score * ?
-                WHERE last_seen < ? AND reputation_score > 1.0
+                WHERE COALESCE(last_incident, last_seen) < ? AND reputation_score > 1.0
             """,
                 (decay_rate, cutoff),
             )

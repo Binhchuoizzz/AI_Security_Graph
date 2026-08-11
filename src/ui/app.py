@@ -41,8 +41,8 @@ from src.response.executor import (
 # Caching DB / I/O để tối ưu hiệu năng (Anti-Lag)
 # ---------------------------------------------------------------------------
 @st.cache_data(ttl=2)
-def cached_get_audit_trail(limit=50):
-    return get_audit_trail(limit)
+def cached_get_audit_trail(limit=50, tier=None):
+    return get_audit_trail(limit, tier)
 
 
 @st.cache_data(ttl=2)
@@ -86,6 +86,27 @@ def cached_get_audit_trail_for_ip(ip, limit=50):
 @st.cache_data(ttl=2)
 def cached_get_tier1_blocks(show=12):
     return _get_tier1_blocks(show)
+
+
+# HAI PHÉP KIỂM TOÀN VẸN DUYỆT TRỌN CHUỖI HMAC — phải cache, TTL dài.
+#
+# Cả hai băm lại từng dòng của `audit_trail` để dò đứt chuỗi, nên chi phí tăng TUYẾN TÍNH theo
+# độ dài sổ. Đo trên 35.856 dòng: `verify_audit_trail_integrity` 197,1 ms và
+# `get_tampered_audit_ids` 201,0 ms — gần **0,4 giây cho MỖI lượt vẽ lại**, mà Streamlit vẽ lại
+# toàn bộ trang mỗi 2 giây. Đó là phần lớn cảm giác giật, và ở luồng 500k nó thành hàng giây.
+#
+# TTL 30 giây là đúng bản chất việc: đây là kiểm tra pháp y trên sổ ĐÃ ghi, không phải chỉ số
+# thời gian thực. Giả mạo bị phát hiện chậm nhất nửa phút — vẫn là phát hiện.
+@st.cache_data(ttl=30)
+def cached_verify_audit_integrity():
+    return verify_audit_trail_integrity()
+
+
+@st.cache_data(ttl=30)
+def cached_get_tampered_audit_ids():
+    from src.response.executor import get_tampered_audit_ids
+
+    return get_tampered_audit_ids()
 
 
 @st.cache_data(ttl=5)
@@ -357,7 +378,7 @@ def render_demo_overview(
         apt_events = []
     apt_ips = sorted({s for e in apt_events if (s := e.get("src_ip"))})
     try:
-        integ_valid, _integ_msg = verify_audit_trail_integrity()
+        integ_valid, _integ_msg = cached_verify_audit_integrity()
     except Exception:
         integ_valid = True
 
@@ -880,7 +901,7 @@ def main_dashboard():
             "🛡️ Kiểm tra tính toàn vẹn Logs (HMAC Audit)",
             help="Xác minh chuỗi băm HMAC Ledger để phát hiện giả mạo dữ liệu",
         ):
-            is_valid, msg = verify_audit_trail_integrity()
+            is_valid, msg = cached_verify_audit_integrity()
             if is_valid:
                 st.success(msg)
             else:
@@ -965,17 +986,27 @@ def main_dashboard():
 
     # Fetch tampered IDs early for filtering and rendering
     try:
-        from src.response.executor import get_tampered_audit_ids
-
-        tampered_ids = get_tampered_audit_ids()
+        tampered_ids = cached_get_tampered_audit_ids()
     except Exception:
         tampered_ids = set()
 
     # Render KPI
+    # Trần áp RIÊNG cho TỪNG TẦNG, không áp một lần cho cả sổ.
+    #
+    # Ba tab bên dưới chia theo tầng ra quyết định. Lấy chung 2.000 dòng mới nhất rồi mới tách
+    # thì tầng ghi nhiều nuốt sạch hạn mức: đo ở lượt 11/08/2026, toàn bộ 2.000 dòng mới nhất
+    # là ALERT của Tier-1, nên tab Tier-2 hiện "Không có sự cố nào" trong khi thẻ chỉ số ngay
+    # trên đầu vẫn ghi 67 lệnh chặn của LLM. Hai con số mâu thuẫn nhau trên cùng màn hình.
     _ALERT_CAP = 2000
-    all_alerts = [
-        a for a in cached_get_audit_trail(limit=_ALERT_CAP) if a.get("action") != "AWAIT_HITL"
-    ]
+    _seen_ids: set = set()
+    all_alerts = []
+    for _t in (TIER_RULE, TIER_ML, TIER_LLM, TIER_MANUAL, ""):
+        for a in cached_get_audit_trail(limit=_ALERT_CAP, tier=_t):
+            if a.get("action") == "AWAIT_HITL" or a.get("id") in _seen_ids:
+                continue
+            _seen_ids.add(a.get("id"))
+            all_alerts.append(a)
+    all_alerts.sort(key=lambda a: a.get("id") or 0, reverse=True)
     # Các tab nhật ký đọc danh sách BỊ TRẦN này, còn hàng chỉ số đọc COUNT(*) không trần. Khi
     # sổ vượt trần, hai bên lệch nhau MÀ KHÔNG BÁO GÌ — người xem chỉ thấy tab ít hơn chỉ số
     # và tưởng có số bịa. Phát cảnh báo tại đúng thời điểm đó.
@@ -1215,10 +1246,10 @@ def main_dashboard():
 
             if _alerts_capped:
                 st.warning(
-                    f"⚠️ Sổ kiểm toán đã vượt {_ALERT_CAP:,} dòng — các tab dưới đây chỉ hiển "
-                    f"thị {_ALERT_CAP:,} sự cố MỚI NHẤT. Số ở hàng chỉ số phía trên là COUNT(*) "
-                    "trên toàn sổ nên sẽ LỚN HƠN tổng ba tab. Đây là giới hạn hiển thị, không "
-                    "phải số liệu lệch."
+                    f"⚠️ Sổ kiểm toán đã vượt {_ALERT_CAP:,} dòng — mỗi tab dưới đây hiển thị "
+                    f"{_ALERT_CAP:,} sự cố MỚI NHẤT **của riêng tầng đó**. Số ở hàng chỉ số phía "
+                    "trên là COUNT(*) trên toàn sổ nên sẽ LỚN HƠN tổng ba tab. Đây là giới hạn "
+                    "hiển thị, không phải số liệu lệch."
                 )
 
             t1_tab, ml_gate_tab, t2_llm_tab = st.tabs(

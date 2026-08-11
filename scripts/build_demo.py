@@ -18,6 +18,59 @@ from experiments.unified_dataset import BENCHMARK_DAYS, build_stream, enrich
 # mà không có gì báo.
 DEMO_DAYS = BENCHMARK_DAYS
 
+# ─────────────────────────────────────────────────────────────────────────────
+# NGÂN SÁCH TIER-2: hai lát dàn dựng dưới đây quyết định BAO NHIÊU LÔ tới LLM.
+#
+# ĐƠN VỊ LÀ LÔ, KHÔNG PHẢI SỰ KIỆN. Tier-2 gom 10 log cùng IP thành một lô và tốn MỘT lượt gọi
+# LLM cho cả lô, nên `số lô ≈ số sự kiện / 10` — độc lập với việc rải trên bao nhiêu IP, miễn
+# mỗi IP nhận bội số của 10. Mốc 1.000 lô vì thế cần ~10.000 sự kiện tới Tier-2.
+#
+# Chi phí: ~18,3 giây/lô, 2 khe song song -> 1.000 lô ≈ 2,5 giờ suy luận. Đây là ngân sách
+# thời gian thật, không phải con số tuỳ thích.
+#
+# Cả hai lát chỉ đổi ĐÍCH ĐẾN (chặn -> leo thang) theo tiền tố IP. KHÔNG đụng payload, KHÔNG
+# đụng nhãn, KHÔNG đụng mã kỹ thuật. Phần dữ liệu không dàn dựng vẫn để Tier-1 chặn bằng chữ
+# ký, nên cả hai năng lực cùng diễn trong một lượt chạy.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# CSIC 2010 — payload HTTP thật. Nguồn bằng chứng tầng ứng dụng chính, ~900 lô.
+#
+# Ưu tiên mẫu CÓ mã kỹ thuật (3.238 mẫu) rồi mới lấy tiếp phần còn lại. Phần không mã vẫn là
+# tấn công web THẬT với payload thật — Tier-2 vẫn kết luận được là độc hại, chỉ trả `N/A` ở ô
+# kỹ thuật thay vì đoán bừa. Kho CSIC có 18.000 mẫu bất thường nên dàn dựng 9.000 vẫn để lại
+# một nửa cho Tier-1 chặn bằng chữ ký.
+N_STAGED = 9_000
+STAGED_IP_PREFIX = "198.19."
+N_STAGED_IPS = 90  # 9.000 / 90 = 100 mẫu mỗi IP -> 10 lô đầy mỗi IP
+
+# Tiêm nhiễm câu lệnh / jailbreak — kho công khai deepset + jackhhao.
+#
+# VÌ SAO PHẢI DÀN DỰNG CẢ NHÓM NÀY. Luật Tier-1 kiểm chữ ký WAF TRƯỚC chữ ký tiêm nhiễm, mà
+# payload jailbreak thường mang cả chuỗi giống SQL/script — nên chúng bị chặn ở Tier-1 và hàng
+# rào chống tiêm nhiễm của Tier-2 không bao giờ được diễn. Đo ở lượt chạy 11/08/2026: chỉ 8/12
+# IP tiêm nhiễm tới được Tier-2. Thêm tiền tố này vào `tier1.demo_escalate_waf_prefixes` thì
+# cả nhóm leo thang, và AML.T0051 mới hiện lên bảng quy kết.
+N_INJECTION_STAGED = 650
+INJECTION_IP_PREFIX = "198.18."
+N_INJECTION_IPS = 65  # 650 / 65 = 10 mẫu mỗi IP -> đúng 1 lô đầy mỗi IP
+
+# Phần tiêm nhiễm KHÔNG dàn dựng đi dải riêng để Tier-1 xử theo đường mặc định — giữ được cả
+# hai mặt: năng lực chặn sớm bằng chữ ký, và năng lực suy luận của Tier-2.
+INJECTION_UNSTAGED_PREFIX = "198.20."
+N_INJECTION_UNSTAGED_IPS = 8
+
+# NGÂN SÁCH TỔNG, tính bằng LÔ:
+#   CSIC dàn dựng      9.000 / 10 =  900 lô
+#   Tiêm nhiễm dàn dựng  650 / 10 =   65 lô
+#   Dư âm zero-day/DAPT           ≈  25 lô
+#                                 ─────────
+#                                 ≈  990 lô  ·  ~18,3 s/lô ÷ 2 khe ≈ 2,5 giờ
+
+# Phần khối benign dành làm ĐỆM THUẦN ở đầu luồng (không xen một sự kiện tấn công nào).
+# 0,80 = 80% lượng benign chạy trước; 20% benign còn lại được trộn đều với TOÀN BỘ tấn công.
+# Đặt 1,0 thì thành tách đôi cứng — xem chú thích khối sắp xếp bên dưới để biết vì sao không nên.
+BENIGN_LEADIN_FRAC = 0.80
+
 
 def main():
     print("[*] Dựng luồng demo ~500k sự kiện (data THẬT, đa-ngày CICIDS)...")
@@ -66,6 +119,121 @@ def main():
     # -> Tier-2 ánh xạ ĐA DẠNG kỹ thuật. CHỈ luồng demo, KHÔNG ảnh hưởng benchmark datatest.json.
     enriched_logs = [enrich(ev, demo_signals=True) for ev in stream]
 
+    # ------------------------------------------------------------------ #
+    # LÁT DÀN DỰNG — CHỈ ĐỂ DIỄN, PHẢI NÓI RÕ KHI TRÌNH BÀY
+    # ------------------------------------------------------------------ #
+    # VẤN ĐỀ ĐO ĐƯỢC (300 lô đầu, luồng 496.885 sự kiện): Tier-2 nhận 94% lô là NetFlow thuần
+    # và trả AWAIT_HITL 88,3%, BLOCK_IP chỉ 3,9%. Lô có payload thì ngược lại — BLOCK_IP 38,9%.
+    # Nguyên nhân: 3.238 mẫu CSIC mang mã kỹ thuật đều dính chữ ký WAF nên bị Tier-1 CHẶN
+    # trước, Tier-2 không bao giờ thấy một ca payload nào nó quy kết nổi.
+    #
+    # Lát này đổi IP nguồn của N mẫu CSIC CÓ mã kỹ thuật sang dải 198.19.0.0/16 (RFC 2544,
+    # dành riêng cho benchmark). Cùng `tier1.demo_escalate_waf_prefixes`, đúng dải đó được
+    # LEO THANG thay vì chặn -> Tier-2 có bằng chứng tầng ứng dụng để neo RAG và ra phán quyết
+    # tự tin. KHÔNG sửa payload, KHÔNG sửa nhãn, KHÔNG sửa mã kỹ thuật — chỉ đổi ĐÍCH ĐẾN.
+    # Cờ `demo_staged=True` để hậu kiểm tách nhóm này ra khỏi mọi phép đo.
+    #
+    # Dải phải sạch với CẢ dữ liệu LẪN bộ test: bản đầu dùng 203.0.113.0/24 (TEST-NET-3) và
+    # đụng `tests/test_tier1_filter.py`, làm demo ghi 202 luật động đè lên dải test -> 4 test
+    # danh tiếng đổ. 198.19.x không xuất hiện ở đâu khác.
+    # GOM VỀ MỘT NHÚM IP, KHÔNG RẢI MỖI MẪU MỘT IP.
+    #
+    # Tier-2 gộp lô THEO IP NGUỒN (`batch_size=10`, hoặc xả sớm sau 5 giây im lặng). Bản đầu
+    # cấp cho mỗi mẫu dàn dựng một IP riêng, nên 1.500 mẫu thành 1.500 LÔ MỘT-PHẦN-TỬ: mỗi lô
+    # một lượt gọi LLM ~13 giây, tức ~2,8 giờ GPU cho đúng cái lát này. Đo trên tệp đã dựng:
+    # 2.385/2.647 IP mang bằng chứng ứng dụng chỉ có ĐÚNG một sự kiện.
+    #
+    # Gom vào `N_STAGED_IPS` IP thì cùng số mẫu ấy thành các lô đầy 10 — chi phí LLM giảm gần
+    # 10 lần, và quan trọng hơn: một lô 10 request cùng nguồn mới đúng hình dạng dữ liệu mà
+    # Tier-2 sinh ra để đọc (nhiều bằng chứng cùng một kẻ), thay vì bắt nó phán trên 1 dòng.
+    # ƯU TIÊN mẫu CÓ mã kỹ thuật, rồi mới lấy tiếp phần CSIC bất thường còn lại cho đủ ngân sách.
+    _csic_atk = [
+        e
+        for e in enriched_logs
+        if e.get("unified_source") == "csic"
+        and str(e.get("gt_label") or "Benign") not in ("Benign", "None")
+    ]
+    _with_tech = [e for e in _csic_atk if str(e.get("wa_mitre") or "").strip()]
+    _no_tech = [e for e in _csic_atk if not str(e.get("wa_mitre") or "").strip()]
+    staged = (_with_tech + _no_tech)[:N_STAGED]
+
+    # DẢI LIÊN TIẾP, KHÔNG RẢI VÒNG TRÒN.
+    #
+    # Đây là điểm quyết định số LÔ. Bản trước dùng `k % N_IPS`, tức hai mẫu liền nhau đi hai IP
+    # khác nhau — mỗi IP nhận nhỏ giọt, và bộ đệm bị timeout xả trước khi gom đủ 10. Đo lượt
+    # 11/08/2026: 1.451 sự kiện tới Tier-2 mà thành **491 lô, trung bình 2,95 log/lô** — tức tốn
+    # gấp hơn ba lần số lượt gọi LLM cần thiết cho cùng lượng bằng chứng.
+    #
+    # Chia theo `k // _per_ip` thì mỗi IP nhận một dải liên tiếp; sau khi trộn vào luồng, các
+    # mẫu ấy vẫn nằm sát nhau về thời gian nên bộ đệm đầy 10 trước khi timeout kịp chạm.
+    _per_ip = max(1, N_STAGED // N_STAGED_IPS)
+    for k, ev in enumerate(staged):
+        _slot = min(k // _per_ip, N_STAGED_IPS - 1)
+        ev["Source IP"] = f"{STAGED_IP_PREFIX}{_slot // 254}.{_slot % 254 + 1}"
+        ev["demo_staged"] = True
+
+    # Tiêm nhiễm: chia HAI nhóm có chủ đích.
+    #
+    #   `198.18.` — DÀN DỰNG, leo thang lên Tier-2 để hàng rào chống tiêm nhiễm được diễn và
+    #               AML.T0051 hiện lên bảng quy kết.
+    #   `198.20.` — KHÔNG dàn dựng, để Tier-1 xử theo đường mặc định (chữ ký bắt sớm).
+    #
+    # Giữ cả hai vì mỗi nhóm chứng minh một năng lực khác nhau, và vì gộp hết vào Tier-2 thì
+    # riêng nhóm này đã ngốn trọn ngân sách 1.000 sự kiện.
+    _inj = [e for e in enriched_logs if e.get("unified_source") == "adv_llm"]
+    _inj_per_ip = max(1, N_INJECTION_STAGED // N_INJECTION_IPS)
+    for k, ev in enumerate(_inj):
+        if k < N_INJECTION_STAGED:
+            _slot = min(k // _inj_per_ip, N_INJECTION_IPS - 1)  # dải liên tiếp, xem trên
+            ev["Source IP"] = f"{INJECTION_IP_PREFIX}{_slot // 254}.{_slot % 254 + 1}"
+            ev["demo_staged"] = True
+        else:
+            _slot = (k - N_INJECTION_STAGED) % N_INJECTION_UNSTAGED_IPS
+            ev["Source IP"] = f"{INJECTION_UNSTAGED_PREFIX}{_slot // 254}.{_slot % 254 + 1}"
+
+    # ------------------------------------------------------------------ #
+    # SẮP LẠI: NẠP ĐỆM BENIGN TRƯỚC, RỒI TRỘN ĐỀU PHẦN CÒN LẠI
+    # ------------------------------------------------------------------ #
+    # Mục đích vận hành: Tier-1 nuốt trọn khối benign ở tốc độ đường truyền nên Dashboard có
+    # số xả tải ngay, và hàng đợi LLM không bị chen ngang trong lúc Welford còn học nền.
+    #
+    # VÌ SAO KHÔNG TÁCH ĐÔI CỨNG: bản đầu chỉ `sorted(body, key=_is_attack)` — đo được sự kiện
+    # tấn công ĐẦU TIÊN rơi xuống vị trí #470.866, tức 94,8% luồng. Hệ quả: demo trống trơn
+    # (không cảnh báo, không MITRE, không APT) suốt gần hết lượt chạy, rồi toàn bộ 26.019 ca
+    # tấn công dồn vào 5% cuối thành một bức tường. Nghẽn LLM không biến mất, chỉ bị dời chỗ và
+    # trở nên tệ hơn vì mất luôn khả năng tự điều tiết.
+    #
+    # Cách dùng ở đây: dành `BENIGN_LEADIN_FRAC` khối benign đầu làm đệm thuần, phần benign còn
+    # lại TRỘN ĐỀU với toàn bộ tấn công theo tỉ lệ cố định. Vừa có mở đầu sạch và nhanh, vừa
+    # rải đều tải LLM trên quãng còn lại thay vì dồn cục.
+    #
+    # KHÔNG phá chuỗi APT: `check_apt_chain` đếm `DISTINCT apt_day` trong bảng `threat_events`
+    # theo `src_ip` — mốc ngày nằm TRONG dữ liệu sự kiện, không phải thứ tự đến. Đảo thứ tự
+    # đẩy vì thế không đụng tới 9 chuỗi kill-chain đa ngày.
+    def _is_attack(ev: dict) -> bool:
+        return bool(ev.get("expected_threat") or ev.get("apt_is_attack"))
+
+    n_warm = len(warmup)
+    head, body = enriched_logs[:n_warm], enriched_logs[n_warm:]
+    benign = [e for e in body if not _is_attack(e)]  # giữ nguyên thứ tự thời gian gốc
+    attacks = [e for e in body if _is_attack(e)]
+
+    cut = int(len(benign) * BENIGN_LEADIN_FRAC)
+    lead, rest = benign[:cut], benign[cut:]
+
+    # Trộn `rest` với `attacks` theo tỉ lệ đều: cứ `step` benign thì chèn 1 tấn công.
+    mixed: list = []
+    step = max(1, len(rest) // max(len(attacks), 1))
+    ai = 0
+    for i, ev in enumerate(rest):
+        mixed.append(ev)
+        if ai < len(attacks) and (i + 1) % step == 0:
+            mixed.append(attacks[ai])
+            ai += 1
+    mixed.extend(attacks[ai:])  # phần dư nếu benign hết trước
+
+    enriched_logs = head + lead + mixed
+
     out_file = os.path.join(ROOT, "data", "demo.json")
     # Ghi COMPACT (không indent) — file ~500k event, indent=2 sẽ phình gấp đôi. Máy đọc thôi.
     with open(out_file, "w") as f:
@@ -84,6 +252,32 @@ def main():
         f"benign (Tier-1 drop): {n - n_attack:,} ({100 * (n - n_attack) / n:.2f}%)"
     )
     print(f"    Số lớp tấn công phân biệt được: {n_class}")
+    # Tách hai lát khi báo cáo: gộp lại thì con số không nói được lát nào đóng góp bao nhiêu
+    # vào ngân sách Tier-2, mà đó chính là thứ cần điều tiết.
+    n_st_csic = sum(
+        1 for e in enriched_logs if e.get("demo_staged") and e.get("unified_source") == "csic"
+    )
+    n_st_inj = sum(
+        1 for e in enriched_logs if e.get("demo_staged") and e.get("unified_source") == "adv_llm"
+    )
+    n_inj_un = sum(
+        1
+        for e in enriched_logs
+        if e.get("unified_source") == "adv_llm" and not e.get("demo_staged")
+    )
+    first_atk = next((i for i, e in enumerate(enriched_logs) if _is_attack(e)), n)
+    print(
+        f"    Lát dàn dựng -> Tier-2: {n_st_csic:,} CSIC ({STAGED_IP_PREFIX}x) "
+        f"+ {n_st_inj:,} tiêm nhiễm ({INJECTION_IP_PREFIX}x) = {n_st_csic + n_st_inj:,} mẫu"
+    )
+    print(
+        f"    Tiêm nhiễm KHÔNG dàn dựng (Tier-1 chặn sớm, {INJECTION_UNSTAGED_PREFIX}x): "
+        f"{n_inj_un:,} mẫu"
+    )
+    print(
+        f"    Thứ tự: benign chạy trước, sự kiện tấn công đầu tiên ở vị trí #{first_atk:,} "
+        f"({100 * first_atk / n:.1f}% luồng)"
+    )
     print(f"    Chuỗi APT đa-ngày: {n_chains} (mốc chân lý: {len(apt_truth)} IP)")
 
 

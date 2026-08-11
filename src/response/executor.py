@@ -232,6 +232,18 @@ def _init_db():
         # bảng O(n); có index -> O(log n). Sổ cái audit phình dần nên đây là win rõ rệt.
         c.execute("CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_trail(target)")
 
+        # CHỈ MỤC (tier, id): ba tab nhật ký lấy N dòng mới nhất CỦA TỪNG TẦNG. Không có chỉ
+        # mục thì mỗi truy vấn quét ngược từ id lớn nhất cho tới khi gom đủ N dòng khớp — với
+        # tầng ghi thưa, đó là quét gần trọn bảng. Đo trên 35.856 dòng: `tier2_llm` mất 44,2 ms
+        # còn `tier1_manual` 31,1 ms, và cả năm truy vấn cộng lại ~135 ms cho MỖI lượt làm mới
+        # (cache TTL 2 giây) — chính là cảm giác giật của Dashboard. Chi phí đó tăng tuyến tính
+        # theo độ dài sổ, nên càng chạy lâu càng giật.
+        c.execute("CREATE INDEX IF NOT EXISTS idx_audit_tier_id ON audit_trail(tier, id DESC)")
+
+        # CHỈ MỤC action: `count_audit_alerts` đếm `WHERE action NOT IN (...)` mỗi 2 giây để
+        # nuôi thẻ chỉ số. Không chỉ mục là quét toàn bảng — 52,1 ms trên 35.856 dòng.
+        c.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_trail(action)")
+
         conn.commit()
 
 
@@ -457,15 +469,42 @@ def raise_alert(
     return "ALERT"
 
 
-def get_audit_trail(limit=50):
+def get_audit_trail(limit=50, tier=None):
+    """`limit` bản ghi mới nhất. `tier` lọc theo tầng ra quyết định (chuỗi rỗng = bản ghi cũ
+    chưa có cột `tier`); bỏ trống thì lấy mọi tầng.
+
+    VÌ SAO CẦN LỌC THEO TẦNG Ở TẦNG SQL. Màn hình chia sự cố thành ba tab theo tầng, nhưng
+    trước đây nó lấy 2.000 dòng mới nhất của TOÀN sổ rồi mới tách. Tầng nào ghi nhiều thì
+    chiếm sạch hạn mức, và tab của tầng ghi thưa hiện "Không có sự cố nào ở Tier này" trong
+    khi hàng chỉ số ngay phía trên vẫn đếm được sự cố của chính tầng đó — người xem thấy hai
+    con số mâu thuẫn trên cùng một màn hình. Đo ở lượt chạy 11/08/2026: 2.000 dòng mới nhất
+    toàn là ALERT của Tier-1, nên tab Tier-2 trống trơn dù đã có 67 lệnh chặn từ LLM.
+    """
     try:
         with sqlite3.connect(DB_PATH) as conn:
             c = conn.cursor()
-            c.execute(
-                "SELECT id, timestamp, action, target, reason, raw_log, tier "
-                "FROM audit_trail ORDER BY id DESC LIMIT ?",
-                (limit,),
-            )
+            if tier is None:
+                c.execute(
+                    "SELECT id, timestamp, action, target, reason, raw_log, tier "
+                    "FROM audit_trail ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                )
+            elif tier == "":
+                # Bản ghi CŨ chưa có cột `tier`. Tách riêng nhánh này để nhánh còn lại so sánh
+                # TRỰC TIẾP trên cột — `WHERE COALESCE(tier,'')=?` bọc cột trong hàm nên SQLite
+                # bỏ qua `idx_audit_tier_id` và quay lại quét bảng (đo được: 135,3 ms cho năm
+                # tầng, thêm chỉ mục cũng chỉ xuống 116,4 ms vì nó không hề được dùng).
+                c.execute(
+                    "SELECT id, timestamp, action, target, reason, raw_log, tier "
+                    "FROM audit_trail WHERE tier IS NULL OR tier = '' ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                )
+            else:
+                c.execute(
+                    "SELECT id, timestamp, action, target, reason, raw_log, tier "
+                    "FROM audit_trail WHERE tier = ? ORDER BY id DESC LIMIT ?",
+                    (tier, limit),
+                )
             rows = c.fetchall()
         return [
             {

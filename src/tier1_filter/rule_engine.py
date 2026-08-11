@@ -422,6 +422,65 @@ _WAF_PATTERNS = {
     ),
 }
 
+# Trường mà chữ ký WAF được phép soi. Giữ MỘT danh sách để Tier-1 và Tier-2 không trôi khỏi nhau.
+_WAF_TARGET_FIELDS: tuple[str, ...] = (
+    "payload",
+    "uri",
+    "user_agent",
+    "User-Agent",
+    "headers",
+    "message",
+    "command",
+    "process",
+)
+
+
+def match_waf_family(log_entry: dict) -> str | None:
+    """Soi một log qua toàn bộ chữ ký WAF, trả chuỗi lý do (hoặc None).
+
+    Ở MỨC MODULE, không phải phương thức, vì có HAI nơi cần đúng phép so khớp này:
+      1. Tier-1 `_check_waf_signatures` — đường nóng, quyết định chặn/leo thang.
+      2. Tier-2 `build_rag_queries` — lấy TÊN HỌ làm từ vựng truy xuất MITRE.
+
+    Vì sao Tier-2 phải soi lại thay vì đọc `tier1_reasons`: một log có thể leo thang qua
+    đường z-score (Welford) mà KHÔNG đi qua nhánh chữ ký, nên `tier1_reasons` chỉ có
+    "tần suất cao" và truy vấn RAG mất sạch từ vựng tấn công. Đo trên lượt chạy 11/08/2026:
+    257/336 lô (76,5%) gửi cho RAG một truy vấn không mang tín hiệu tấn công nào, RAG chỉ
+    trả về được kỹ thuật tầng mạng, và T1571 "Non-Standard Port" chiếm 42,5% toàn bộ quy
+    kết — kể cả cho SQL Injection và XSS có payload rõ ràng.
+
+    Đo trên 6.000 bản ghi CSIC đầu: 0 báo nhầm trên 3.049 bản ghi lành, và bắt đủ 100% các
+    lớp có tên (SQLi 110/110 · XSS 50/50 · CRLF 75/75 · Path Traversal 26/26 · Dò tệp
+    239/239). Lớp "Anomalous (unclassified)" trượt 83,8% — đó là giới hạn thật của chữ ký,
+    và chính vì vậy Tier-2 KHÔNG được khẳng định kỹ thuật cho nhóm đó (xem
+    `batch_attack_vocabulary` bên phía agent).
+    """
+    # Kết quả CHUNG chung được giữ lại làm phương án cuối, KHÔNG trả ngay.
+    #
+    # REGRESSION ĐÃ VÁ (do chính bản vá giải mã sinh ra): sau khi giải mã, mẫu "Mã hoá né
+    # tránh" khớp gần như MỌI payload mã hoá URL, và vì nó được duyệt trước các chữ ký cụ
+    # thể ở một số trường, nó CHE MẤT họ tấn công thật. Đo được: XSS mã hoá và CRLF mã hoá
+    # đều bị gán "Mã hoá né tránh", nên truy vấn RAG mất từ vựng đặc hiệu và quy kết kỹ
+    # thuật về 0%. Tên họ ở đây không chỉ để hiển thị — nó là NGUỒN từ vựng MITRE tiếng Anh.
+    generic_hit: str | None = None
+    for field in _WAF_TARGET_FIELDS:
+        val = log_entry.get(field) or log_entry.get(field.lower())
+        if not (val and isinstance(val, str)):
+            continue
+        # Khớp trên CẢ bản gốc LẪN các biến thể đã giải mã — xem `normalize_for_signature`.
+        # Khớp nguyên văn thôi thì mọi tấn công web mã hoá URL (tức gần như toàn bộ tấn
+        # công thật qua query string) đều lọt.
+        for cand in normalize_for_signature(val):
+            for attack_type, pattern in _WAF_PATTERNS.items():
+                if not pattern.search(cand):
+                    continue
+                hit = f"WAF: Phát hiện {attack_type} trong '{field}'"
+                if attack_type in _GENERIC_WAF_FAMILIES:
+                    generic_hit = generic_hit or hit
+                else:
+                    return hit
+    return generic_hit
+
 
 def load_config() -> dict[str, Any]:
     try:
@@ -832,44 +891,11 @@ class RuleEngine:
         """
         Bộ lọc Signature WAF siêu nhẹ để phát hiện nhanh các dấu hiệu SQLi, XSS, Path Traversal
         ngay tại Tier-1 nhằm bảo vệ Tier-2 khỏi bị nghẽn (Resource Starvation).
+
+        Thân hàm nằm ở `match_waf_family` (mức module) vì Tier-2 cũng cần đúng phép so khớp
+        này — xem giải thích ở đó.
         """
-        # _WAF_PATTERNS is compiled at module level for ultra-fast matching
-        target_fields = [
-            "payload",
-            "uri",
-            "user_agent",
-            "User-Agent",
-            "headers",
-            "message",
-            "command",
-            "process",
-        ]
-        # Kết quả CHUNG chung được giữ lại làm phương án cuối, KHÔNG trả ngay.
-        #
-        # REGRESSION ĐÃ VÁ (do chính bản vá giải mã ở trên sinh ra): sau khi giải mã, mẫu
-        # "Mã hoá né tránh" khớp gần như MỌI payload mã hoá URL, và vì nó được duyệt trước
-        # các chữ ký cụ thể ở một số trường, nó CHE MẤT họ tấn công thật. Đo được: XSS mã hoá
-        # và CRLF mã hoá đều bị gán "Mã hoá né tránh", nên truy vấn RAG mất từ vựng đặc hiệu
-        # và quy kết kỹ thuật về 0%. Tên họ ở đây không chỉ để hiển thị — nó là NGUỒN từ vựng
-        # MITRE tiếng Anh cho `build_rag_queries`.
-        generic_hit: str | None = None
-        for field in target_fields:
-            val = log_entry.get(field) or log_entry.get(field.lower())
-            if not (val and isinstance(val, str)):
-                continue
-            # Khớp trên CẢ bản gốc LẪN các biến thể đã giải mã — xem `normalize_for_signature`.
-            # Khớp nguyên văn thôi thì mọi tấn công web mã hoá URL (tức gần như toàn bộ tấn
-            # công thật qua query string) đều lọt.
-            for cand in normalize_for_signature(val):
-                for attack_type, pattern in _WAF_PATTERNS.items():
-                    if not pattern.search(cand):
-                        continue
-                    hit = f"WAF: Phát hiện {attack_type} trong '{field}'"
-                    if attack_type in _GENERIC_WAF_FAMILIES:
-                        generic_hit = generic_hit or hit
-                    else:
-                        return hit
-        return generic_hit
+        return match_waf_family(log_entry)
 
     def _check_injection_signatures(self, log_entry: dict) -> str | None:
         """
@@ -1119,6 +1145,7 @@ class RuleEngine:
             # Tiền sử NGUY HIỂM (reputation >= ngưỡng block): CHẶN NGAY, ĐỘC LẬP với điểm
             # gói hiện tại — kẻ đã bị chứng minh xấu không cần escalate lại, không tốn LLM.
             log_entry["tier1_action"] = "BLOCK_IP"
+            log_entry["tier1_block_evidence"] = "reputation"
         elif score >= self.risk_threshold:
             dest_port_val = 0
             try:
@@ -1140,6 +1167,7 @@ class RuleEngine:
                 # IP đã được Analyst DUYỆT chặn (HITL -> luật ACTIVE): Tier-1 TỰ CHẶN ngay,
                 # KHÔNG tốn LLM. Ưu tiên CAO NHẤT — kẻ tái phạm không cần leo thang lại.
                 log_entry["tier1_action"] = "BLOCK_IP"
+                log_entry["tier1_block_evidence"] = "dynamic_rule"
             elif (
                 self.demo_escalate_prefixes
                 and has_waf_match
@@ -1161,12 +1189,23 @@ class RuleEngine:
                 reasons.append("[DÀN DỰNG DEMO] chữ ký WAF -> leo thang thay vì chặn")
             elif has_waf_match:
                 log_entry["tier1_action"] = "BLOCK_IP"
+                log_entry["tier1_block_evidence"] = "waf_signature"
             elif has_injection_match:
                 # Prompt Injection / Jailbreak: gửi lên Tier-2 xử lý
                 log_entry["tier1_action"] = "ESCALATE"
             elif dest_port_val in self.sensitive_ports and fwd_pkts_val < 200:
                 # BruteForce: port nhạy cảm, packet count trung bình → block IP
+                #
+                # BẰNG CHỨNG YẾU — CHỈ SUY TỪ LUỒNG. Nhánh này không đọc nội dung gói: nó chỉ
+                # thấy "cổng nhạy cảm + số gói vừa phải". Trong một mạng LAN thật thì SMB (445),
+                # SSH (22), RDP (3389), MSSQL (1433) là lưu lượng nội bộ BÌNH THƯỜNG, nên nhánh
+                # này bắn nhầm vào máy trạm lành là chuyện thường tình, không phải ngoại lệ.
+                #
+                # Vì vậy phán quyết ở đây là NGĂN CHẶN TẠM THỜI (blacklist Redis TTL 1 giờ),
+                # KHÔNG được nâng thành hồ sơ danh tiếng vĩnh viễn. `subscriber` đọc nhãn này
+                # để phân biệt; xem chú thích tại nhánh BLOCK_IP ở đó.
                 log_entry["tier1_action"] = "BLOCK_IP"
+                log_entry["tier1_block_evidence"] = "heuristic_flow_port"
             elif fwd_pkts_val > self.max_fwd_packets:
                 # DoS/DDoS: volumetric → alert không block (có thể distributed)
                 log_entry["tier1_action"] = "ALERT"

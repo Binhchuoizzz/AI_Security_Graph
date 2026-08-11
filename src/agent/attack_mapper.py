@@ -81,6 +81,33 @@ LOW_CONFIDENCE_THRESHOLD = 0.5
 # vẫn GIỮ technique dự đoán trong reasoning (đúng "vẫn dự đoán + trả HITL"). Mở rộng khi cần.
 OVERLY_GENERIC_TECHNIQUES: frozenset[str] = frozenset({"T1571"})
 
+# Bằng chứng DUY NHẤT biện minh được cho T1571: dấu hiệu kênh điều khiển. Một số cổng thì
+# không — xem `_corroborates_c2`.
+#
+# CỐ Ý KHÔNG có "non-standard port" trong danh sách: đó là TÊN của chính T1571, nên nhận nó
+# làm bằng chứng thì lá chắn tự phản — model chỉ cần nêu tên kỹ thuật là tự chứng minh cho
+# mình. Bằng chứng phải ĐỘC LẬP với kết luận.
+_C2_EVIDENCE_RE = re.compile(
+    r"(?i)(command[ -]and[ -]control|\bc2\b|\bc&c\b|beacon|callback|exfiltrat|tunnel"
+    r"|reverse shell|infiltrat)"
+)
+
+
+def _corroborates_c2(attack_type: str, payload: str = "") -> bool:
+    """Đầu vào có dấu hiệu KÊNH ĐIỀU KHIỂN không (ở phân loại HOẶC ở payload)?
+
+    T1571 (Non-Standard Port) là kỹ thuật COMMAND AND CONTROL. Nó chỉ đúng khi có dấu hiệu
+    kênh điều khiển; một con số cổng thì không bao giờ đủ, và `prompts.py` đã dặn thẳng LLM
+    điều đó ("If a non-standard port is the ONLY signal you have, you MUST choose
+    AWAIT_HITL"). Ở đây là chỗ THI HÀNH lời dặn ấy thay vì tin model tự tuân thủ.
+
+    Xét NỘI DUNG payload chứ không xét payload CÓ TỒN TẠI hay không: một payload beacon là
+    bằng chứng ủng hộ, một payload SQLi là bằng chứng CHỐNG LẠI cách đọc C2. Điều kiện cũ
+    ("có payload là đủ") không phân biệt được hai thứ đối lập ấy.
+    """
+    return bool(_C2_EVIDENCE_RE.search(f"{attack_type or ''} {payload or ''}"))
+
+
 FRAMEWORK_ATTACK = "MITRE ATT&CK Enterprise"
 FRAMEWORK_ATLAS = "MITRE ATLAS"
 
@@ -854,14 +881,23 @@ def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
             f"-> giữ id nhưng hạ xuống low_confidence (chuyển người xác minh)."
         )
 
-    # LÁ CHẮN "quá tổng quát": nếu neo vào kỹ thuật chỉ-dựa-cổng (T1571...) mà KHÔNG có
-    # bằng chứng bổ trợ app-layer (payload/message) -> hạ về low_confidence để buộc con
-    # người xác minh (cổng lạ này có thực sự là C2 hay chỉ là dịch vụ hợp lệ?). Vẫn giữ
-    # technique dự đoán -> "dự đoán + AWAIT_HITL".
+    # LÁ CHẮN "quá tổng quát": neo vào kỹ thuật chỉ-dựa-cổng (T1571...) mà KHÔNG có dấu
+    # hiệu kênh điều khiển -> hạ về low_confidence để buộc con người xác minh (cổng lạ này
+    # có thực sự là C2 hay chỉ là dịch vụ hợp lệ?). Vẫn giữ technique dự đoán -> "dự đoán +
+    # AWAIT_HITL".
+    #
+    # LỖI ĐÃ SỬA 11/08/2026 — điều kiện cũ là `not payload.strip()`, tức lá chắn CHỈ bắn khi
+    # payload RỖNG. Nhưng chế độ hỏng thật lại ngược hẳn: payload CÓ, giàu, là một đòn tấn
+    # công web rõ ràng, và model vẫn bỏ qua nó để bám vào số cổng. Đo trên lượt chạy
+    # 11/08/2026: T1571 chiếm 139/327 quy kết (42,5%), TẤT CẢ đều có payload nên lá chắn
+    # chưa bao giờ bắn, và 136 trong số đó ra lệnh chặn ở độ tin cậy 0,93 — gồm 4/5 ca SQL
+    # Injection và 2/2 ca XSS. Payload không phải là bằng chứng bổ trợ cho C2; một payload
+    # SQLi trên cổng 8080 là bằng chứng CHỐNG LẠI cách đọc C2. Nay hỏi đúng câu cần hỏi:
+    # phân loại có nói tới kênh điều khiển không?
     parent_id = tid.split(".")[0]
-    if (tid in OVERLY_GENERIC_TECHNIQUES or parent_id in OVERLY_GENERIC_TECHNIQUES) and not (
-        inp.payload or ""
-    ).strip():
+    if (
+        tid in OVERLY_GENERIC_TECHNIQUES or parent_id in OVERLY_GENERIC_TECHNIQUES
+    ) and not _corroborates_c2(inp.attack_type, inp.payload):
         conf = min(conf, 0.40)
 
     sub_id = tid if "." in tid else None

@@ -23,6 +23,7 @@ Chạy:
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -37,6 +38,7 @@ load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 LLM_API_BASE = os.getenv("LLM_API_BASE", "http://localhost:5000/v1")
 SUBSCRIBER_PATTERN = "main.py --mode server"
+PRODUCER_PATTERN = "scripts/demo.py"
 STREAMS = ["queue_waf", "queue_firewall", "queue_sysmon", "queue_decisions", "queue_hitl"]
 
 
@@ -66,6 +68,75 @@ def _count_subscribers() -> int:
         if "python" in exe and "main.py" in joined and "--mode" in joined and "server" in joined:
             count += 1
     return count
+
+
+def _count_producers() -> int:
+    """Đếm tiến trình ĐẨY LUỒNG thật (python chạy scripts/demo.py), xác thực qua /proc."""
+    out = subprocess.run(
+        ["pgrep", "-f", PRODUCER_PATTERN], capture_output=True, text=True, check=False
+    )
+    count = 0
+    for pid in out.stdout.split():
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as f:
+                argv = [p.decode(errors="replace") for p in f.read().split(b"\x00") if p]
+        except OSError:
+            continue
+        if not argv:
+            continue
+        if "python" in os.path.basename(argv[0]).lower() and any("demo.py" in a for a in argv):
+            count += 1
+    return count
+
+
+def stop_producers(dry_run: bool = False) -> None:
+    """Dừng MỌI tiến trình đẩy luồng trước khi reset.
+
+    LỖI ĐÃ GẶP 11/08/2026. Reset chỉ dừng subscriber, không dừng producer. Một lượt đẩy cũ
+    sống sót qua reset và chạy song song với lượt mới: cả hai cùng đẩy trọn 496.885 sự kiện,
+    subscriber đếm được **516.885/496.885 = 104%** và Dashboard hiện một con số vô lý. Tệ hơn
+    con số: mỗi IP nhận lưu lượng NHÂN ĐÔI, nên mọi tỉ lệ đo trong lượt đó đều vô giá trị mà
+    không có gì báo.
+
+    Giết theo PID xác thực qua /proc, KHÔNG dùng `pkill -f 'scripts/demo\\.py'`: mẫu đó khớp
+    cả dòng lệnh của chính shell đang gọi, nên shell tự sát giữa chừng (exit 144) và vòng lặp
+    chết trước khi giết được tiến trình cần giết — đúng cách mà lỗi trên đã lọt qua.
+    """
+    n = _count_producers()
+    print(f"[0/3] DỪNG producer (đẩy luồng) — đang chạy: {n}")
+    if dry_run or n == 0:
+        if n == 0:
+            print("      (không có tiến trình nào để dừng)")
+        return
+    out = subprocess.run(
+        ["pgrep", "-f", PRODUCER_PATTERN], capture_output=True, text=True, check=False
+    )
+    me = {os.getpid(), os.getppid()}
+    for pid in out.stdout.split():
+        try:
+            ipid = int(pid)
+            if ipid in me:
+                continue
+            with open(f"/proc/{ipid}/cmdline", "rb") as f:
+                argv = [p.decode(errors="replace") for p in f.read().split(b"\x00") if p]
+            if argv and "python" in os.path.basename(argv[0]).lower():
+                os.kill(ipid, signal.SIGTERM)
+        except (OSError, ValueError):
+            continue
+    for _ in range(12):
+        time.sleep(0.5)
+        if _count_producers() == 0:
+            break
+    for pid in subprocess.run(
+        ["pgrep", "-f", PRODUCER_PATTERN], capture_output=True, text=True, check=False
+    ).stdout.split():
+        try:
+            ipid = int(pid)
+            if ipid not in me and _count_producers():
+                os.kill(ipid, signal.SIGKILL)
+        except (OSError, ValueError):
+            continue
+    print(f"      -> còn lại: {_count_producers()} (kỳ vọng 0)")
 
 
 def stop_subscribers(dry_run: bool = False) -> None:
@@ -281,6 +352,9 @@ def main():
     args = ap.parse_args()
 
     print("=== SENTINEL reset_all ===" + (" [DRY-RUN]" if args.dry_run else ""))
+    # Producer TRƯỚC subscriber: một lượt đẩy còn sống sẽ bơm sự kiện vào giữa lúc đang xoá
+    # bảng, và nếu nó sống qua cả reset thì chạy song song với lượt sau (xem `stop_producers`).
+    stop_producers(args.dry_run)
     stop_subscribers(args.dry_run)
     clear_data(args.dry_run, keep_trace=args.keep_trace)
     if args.no_restart:

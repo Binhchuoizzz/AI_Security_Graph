@@ -121,11 +121,25 @@ services:
     container_name: sentinel_redis
     ports:
       - "127.0.0.1:6379:6379"    # Security: Bind to localhost only
+    # CHÍNH SÁCH BỘ NHỚ: `noeviction`, KHÔNG PHẢI `allkeys-lru`.
+    #
+    # Redis ở đây là HÀNG ĐỢI CÔNG VIỆC, không phải cache. `allkeys-lru` cho phép đuổi bất kỳ
+    # khoá nào khi chạm trần — kể cả stream đang được tiêu thụ. Khoá stream ra đi thì consumer
+    # group ra đi cùng, và XREADGROUP ném NOGROUP vĩnh viễn.
+    #
+    # Sự cố 2026-08-11: `queue_decisions` (danh sách không giới hạn, nay đã chặn trần) phình
+    # 412 MB, chạm trần 512 MB, LRU đuổi trúng `queue_firewall`. Đường ống chết ở mốc
+    # 195.300/496.885 sự kiện mà tiến trình vẫn sống nên không cảnh báo nào nổ.
+    #
+    # Với `noeviction`, chạm trần thì XADD BÁO LỖI cho producer — hỏng ồn ào, đúng cách.
+    #
+    # LƯU Ý CÚ PHÁP: `command: >` gộp mọi dòng thành MỘT dòng lệnh, nên không được đặt chú
+    # thích `#` bên trong khối đó — Redis sẽ nhận nguyên văn làm tham số và chết khi khởi động.
     command: >
       redis-server
       --requirepass "${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}"
       --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy noeviction
       --rename-command FLUSHALL ""
       --rename-command FLUSHDB ""
       --rename-command CONFIG ""

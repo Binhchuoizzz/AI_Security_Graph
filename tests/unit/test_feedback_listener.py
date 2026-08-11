@@ -27,12 +27,31 @@ def tmp_config(tmp_path, monkeypatch):
     return cfg
 
 
-def test_freeze_flag_blocks_rule_writes(tmp_config, monkeypatch):
-    """Cờ đóng băng phải THẬT SỰ chặn ghi — đây là thứ giữ config sạch suốt lượt đo."""
+def test_freeze_flag_blocks_active_rule_writes(tmp_config, monkeypatch):
+    """Cờ đóng băng phải chặn luật ACTIVE — đây là thứ giữ config sạch suốt lượt đo."""
     monkeypatch.setenv("SENTINEL_FREEZE_DYNAMIC_RULES", "1")
-    res = fl.FeedbackListener().receive_new_rule("Source IP", "203.0.113.77", score=50)
+    res = fl.FeedbackListener().receive_new_rule(
+        "Source IP", "203.0.113.77", score=100, status="ACTIVE"
+    )
     assert res["status"] == "FROZEN_FOR_BENCHMARK"
-    assert _rules(tmp_config) == [], "luật vẫn lọt vào config dù đã đóng băng"
+    assert _rules(tmp_config) == [], "luật ACTIVE vẫn lọt vào config dù đã đóng băng"
+
+
+def test_freeze_flag_does_not_swallow_hitl_tickets(tmp_config, monkeypatch):
+    """Đóng băng KHÔNG được nuốt phiếu chờ duyệt — đó là hàng đợi của analyst, không phải luật.
+
+    LỖI GHÉP NHẦM ĐÃ SỬA: `node_human_in_the_loop` đẩy phiếu HITL qua chính hàm này với
+    `status` mặc định PENDING_APPROVAL. Khi cờ đóng băng chặn mọi lượt gọi, Tier-2 vẫn kết
+    luận "cần con người xem" và vẫn ghi sổ kiểm toán, nhưng KHÔNG phiếu nào tới bàn analyst.
+    Đo ở lượt chạy 11/08/2026: 39 bản ghi AWAIT_HITL trong sổ, thẻ "Chờ duyệt (HITL)" = 0.
+
+    Phiếu PENDING không thể làm nhiễu ablation vì `reload_dynamic_rules` chỉ nạp luật ACTIVE.
+    """
+    monkeypatch.setenv("SENTINEL_FREEZE_DYNAMIC_RULES", "1")
+    res = fl.FeedbackListener().receive_new_rule("Source IP", "203.0.113.78", score=50)
+    assert res["status"] != "FROZEN_FOR_BENCHMARK", "phiếu HITL bị nuốt mất"
+    patterns = [r.get("pattern") for r in _rules(tmp_config)]
+    assert "203.0.113.78" in patterns, "phiếu chờ duyệt không tới được hàng đợi analyst"
 
 
 def _rules(cfg):

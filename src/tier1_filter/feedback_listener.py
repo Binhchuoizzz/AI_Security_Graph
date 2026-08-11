@@ -162,7 +162,20 @@ class FeedbackListener:
         # Đóng băng chứ không xoá: tập luật đã được người duyệt vẫn còn hiệu lực cho cả hai
         # cấu hình như nhau, chỉ chặn việc SINH THÊM giữa lượt đo. Vòng phản hồi vẫn chạy
         # bình thường ở chế độ vận hành thật (biến này không đặt).
-        if os.getenv("SENTINEL_FREEZE_DYNAMIC_RULES") == "1":
+        # PHẠM VI ĐÓNG BĂNG: CHỈ luật ACTIVE. Phiếu chờ duyệt vẫn phải đi qua.
+        #
+        # LỖI GHÉP NHẦM ĐÃ SỬA. Bản trước chặn MỌI lượt gọi, mà `node_human_in_the_loop` dùng
+        # đúng hàm này để đẩy phiếu cho analyst (`status` mặc định = PENDING_APPROVAL). Hệ quả:
+        # bật cờ lên là **toàn bộ hàng đợi HITL biến mất** — Tier-2 vẫn kết luận "cần con người
+        # xem", vẫn ghi vào sổ kiểm toán, nhưng không phiếu nào tới bàn analyst. Đo ở lượt chạy
+        # 11/08/2026: sổ có 39 bản ghi AWAIT_HITL trong khi thẻ "Chờ duyệt (HITL)" đứng ở 0 và
+        # tab phê duyệt trống trơn. Vòng lặp người-trong-vòng — một đóng góp của luận văn — im
+        # lặng biến mất chỉ vì một biến môi trường đặt cho mục đích hoàn toàn khác.
+        #
+        # Lý do đóng băng (bên dưới) chỉ đúng với luật ACTIVE: `reload_dynamic_rules` CHỈ nạp
+        # luật đã duyệt, nên phiếu PENDING không thể đổi hành vi của bất kỳ cấu hình ablation
+        # nào. Chặn chúng là chặn quá tay.
+        if os.getenv("SENTINEL_FREEZE_DYNAMIC_RULES") == "1" and status == "ACTIVE":
             logger.debug("[Feedback] Đóng băng luật động (đang đo ablation): bỏ qua '%s'", pattern)
             return {
                 "status": "FROZEN_FOR_BENCHMARK",

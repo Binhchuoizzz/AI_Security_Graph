@@ -161,6 +161,139 @@ def primary_offload_mechanism(evaluated_log: dict) -> str:
     return classify_offload_mechanisms(evaluated_log)[0]
 
 
+# CỔNG ML CHẤM MỌI SỰ KIỆN, không chỉ phần Tier-1 leo thang.
+#
+# MẶC ĐỊNH TẮT TRONG MÃ — và phải giữ như vậy. Toàn bộ số xả tải RQ1 của luận văn đo trên
+# kiến trúc PHỄU: `experiments/measure_offload_vs_baserate.py` chỉ gọi Cổng ML cho sự kiện mà
+# luật Tier-1 đã leo thang, nên "Cổng ML xả 59,2%" có mẫu số là phần Tier-1 chuyển lên. Bật
+# cờ này lên là đổi mẫu số đó; muốn báo cáo theo kiến trúc mới thì phải ĐO LẠI RQ1.
+#
+# Bật cho buổi diễn qua `tier1.ml_gate_all_events` trong config.
+_ML_GATE_ALL = bool((_config.get("tier1", {}) or {}).get("ml_gate_all_events", False))
+
+# Những lý do khiến Cổng ML trả None mà KHÔNG phải vì phân vân — nó chưa chấm được bản ghi.
+# Phân biệt với dải 0,65–0,85 (phân vân thật, đáng đẩy lên Tier-2). Xem chỗ dùng.
+_ML_CANNOT_JUDGE = frozenset(
+    {"no_model", "no_numeric_features", "low_feature_coverage", "scale_error"}
+)
+
+# Tier-2 chỉ nhận lô có bằng chứng tầng ứng dụng. Mặc định TẮT — xem chú thích tại nơi dùng.
+_TIER2_NEED_APP_EVIDENCE = bool(
+    (_config.get("tier2", {}) or {}).get("require_application_evidence", False)
+)
+
+
+def _evidence_layer(log: dict) -> str:
+    """`application` nếu có payload/URI/User-Agent, ngược lại `flow`.
+
+    Mượn thẳng định nghĩa của Tier-2 (`src.agent.nodes.evidence_layer_of`) thay vì chép lại:
+    hai bản sao của cùng một khái niệm là hai bản sẽ trôi khỏi nhau.
+    """
+    from src.agent.nodes import evidence_layer_of
+
+    return evidence_layer_of([log])
+
+
+# `queue_decisions` — nhật ký quyết định phục vụ thống kê ablation. KHÔNG có tiến trình nào
+# đọc nó, không TTL, không ai cắt. Phải tự chặn trần, nếu không nó ăn sạch RAM của Redis.
+_DECISIONS_MAX = int(os.getenv("SENTINEL_DECISIONS_MAXLEN", "20000"))
+_DECISIONS_TRIM_EVERY = 1000
+_decisions_pushed = 0
+
+
+def _record_decision(r, evaluated_log: dict) -> None:
+    """Ghi một quyết định vào `queue_decisions` và GIỮ TRẦN cho danh sách đó.
+
+    LỖI ĐÃ SỬA — rò rỉ bộ nhớ làm SẬP CẢ ĐƯỜNG ỐNG. Bốn chỗ trong hàm này `rpush` bản ghi
+    ĐẦY ĐỦ (~2.639 byte: toàn bộ ~80 đặc trưng CICIDS + lý do Tier-1) vào một LIST không giới
+    hạn, không TTL, và KHÔNG AI TIÊU THỤ.
+
+    Chuỗi sập, đo trên lượt chạy 2026-08-11: thác đổ danh tiếng đẩy số lệnh BLOCK_IP lên
+    156.111 -> `queue_decisions` phình 412 MB -> chạm trần `maxmemory 512mb` -> chính sách
+    `allkeys-lru` đuổi khoá để lấy chỗ, và nó đuổi TRÚNG `queue_firewall`, tức chính hàng đợi
+    công việc -> consumer group biến mất theo -> XREADGROUP ném NOGROUP vô tận. Toàn bộ hệ
+    thống chết ở mốc 195.300/496.885 sự kiện nhưng tiến trình vẫn sống, nên không cảnh báo
+    nào nổ; 2 giờ 26 phút sau, dấu hiệu duy nhất là `logs/subscriber.log` nặng 25 GB.
+
+    Nếu đẩy trọn 496.885 sự kiện thì riêng danh sách này cần 1.311 MB — gấp 2,5 lần trần.
+    """
+    global _decisions_pushed
+    r.rpush("queue_decisions", json.dumps(evaluated_log))
+    _decisions_pushed += 1
+    if _decisions_pushed % _DECISIONS_TRIM_EVERY == 0:
+        try:
+            r.ltrim("queue_decisions", -_DECISIONS_MAX, -1)
+        except Exception:
+            pass
+
+
+# Bằng chứng nào đủ mạnh để BIẾN một lệnh chặn thành hồ sơ danh tiếng VĨNH VIỄN.
+#
+# `waf_signature` đọc NỘI DUNG gói và khớp một họ tấn công cụ thể; `dynamic_rule` là luật do
+# Analyst DUYỆT; `reputation` là IP vốn đã nằm trong sổ đen (đi vào đây chỉ để cộng
+# `blocked_hits` cho Dashboard, KHÔNG tạo sự cố mới). Mọi nhãn khác — đặc biệt là suy luận
+# thuần tuý từ đặc trưng luồng — chỉ được ngăn chặn TẠM THỜI.
+_STRONG_BLOCK_EVIDENCE = frozenset({"waf_signature", "dynamic_rule", "ml_gate", "reputation"})
+
+# Điểm cộng cho một lần chặn bằng chứng YẾU. Ngưỡng chặn theo danh tiếng là 70, nên 25 điểm
+# nghĩa là phải TÁI PHẠM ở 3 khung giờ KHÁC NHAU mới thành hồ sơ bền — đúng nghĩa "tái phạm",
+# không phải "một lần lỡ".
+_WEAK_BLOCK_SCORE_DELTA = 25.0
+
+# Thời hạn sổ đen Redis theo độ mạnh bằng chứng (giây).
+_STRONG_BLOCK_TTL_SEC = 3600
+_WEAK_BLOCK_TTL_SEC = 60
+
+
+def _persist_block_evidence(
+    memory, src_ip: str, evidence: str, already_listed: bool = False
+) -> None:
+    """Quyết định một lệnh chặn Tier-1 có được ghi thành danh tiếng VĨNH VIỄN hay không.
+
+    LỖI ĐÃ SỬA — thác đổ danh tiếng. Bản trước gọi `mark_ip_blocked` cho MỌI lệnh BLOCK_IP của
+    Tier-1, mà `mark_ip_blocked` đặt thẳng `reputation_score = 100` (>= ngưỡng 70). Hệ quả: MỘT
+    lần khớp nhánh suy luận-luồng là IP bị cấm vĩnh viễn, và từ đó mọi gói của nó bị chặn
+    on-sight trước cả khi được chấm điểm.
+
+    Đo trên lượt chạy 2026-08-11 (luồng 496.885 sự kiện, 94,76% lành, tấn công chỉ bắt đầu ở
+    vị trí #376.725): tại mốc 195.300 sự kiện — tức vẫn còn trong đoạn đệm THUẦN LÀNH — đã có
+    1.907/1.907 IP nằm ở điểm 100, trong đó 1.653 IP thuộc dải nội bộ CICIDS `192.168.x`.
+    `total_incidents` của chúng là 1: đúng một lần khớp, án chung thân. Chi phí: 153.868 lệnh
+    chặn theo danh tiếng = 78,8% toàn bộ lưu lượng, gần như toàn bộ là lưu lượng LÀNH. Đường
+    cong theo phút cho thấy đây là lỗi khởi động nguội — 938 IP bị cấm trong phút đầu, 386 phút
+    thứ hai, 126 phút thứ ba, rồi lắng còn ~10/phút khi baseline đã có thống kê. Nói cách khác
+    hệ thống ĐÓNG BĂNG VĨNH VIỄN chính những sai số của giai đoạn nó chưa biết gì.
+
+    Phép đo benchmark đã ghi nhận cùng hiện tượng ở quy mô nhỏ hơn:
+    `unified_stream_results.json` -> `ip_containment.synthetic_ips_other.benign_ip_false_block_rate`
+    = 0,3342 (1.149/3.438 IP lành, KTC95 0,3186–0,3502).
+
+    Cách vá: tách BẰNG CHỨNG khỏi HÀNH ĐỘNG. Chặn tạm thời (blacklist Redis TTL 1h) vẫn xảy ra
+    cho mọi BLOCK_IP — phần ngăn chặn không đổi. Nhưng chỉ bằng chứng đủ mạnh mới được nâng
+    thành hồ sơ bền; bằng chứng yếu đi vào đường CỘNG DỒN có sẵn (`record_incident`), nên kẻ
+    tái phạm thật vẫn leo tới ngưỡng, còn máy trạm lành lỡ một nhịp thì không.
+
+    `already_listed` chống cộng điểm trùng: khi IP còn trong blacklist 1h thì mọi gói tiếp theo
+    là HỆ QUẢ của cùng một lần chặn, không phải sự cố mới.
+
+    KHÔNG ảnh hưởng số liệu luận văn: `measure_offload_vs_baserate.py` (nguồn của
+    `offload_vs_baserate_*.json`, tức mọi con số xả tải RQ1) đặt `reputation_enforcement = False`
+    và không đi qua subscriber; `unified_stream_results.json` không được đăng ký claim nào
+    trong `scripts/audit_thesis_numbers.py`.
+    """
+    if not src_ip:
+        return
+    if evidence in ("reputation", "blacklist_memory"):
+        # IP vốn đã nằm trong sổ đen: không có "lần chặn thứ hai", chỉ là thêm một gói bị chặn
+        # on-sight. Gom trong RAM thay vì mở một giao dịch SQLite cho mỗi gói (1,469 ms/lượt —
+        # xem `ThreatMemoryStore.note_blocked_hit`).
+        memory.note_blocked_hit(src_ip)
+    elif evidence in _STRONG_BLOCK_EVIDENCE:
+        memory.mark_ip_blocked(src_ip)
+    elif not already_listed:
+        memory.record_incident(src_ip, "BLOCK_IP", score_delta=_WEAK_BLOCK_SCORE_DELTA)
+
+
 def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bool) -> str:
     """TRÍ NHỚ Tier-1 (Redis blacklist, TTL 1h): IP đã bị chặn gần đây (bởi Tier-1 HOẶC
     Tier-2) -> Tier-1 CHẶN NGAY lần tái phạm, KHÔNG leo thang Tier-2 lại. Đây là cơ chế
@@ -175,6 +308,7 @@ def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bo
         and action not in ("BLOCK_IP", "WHITELIST_DROP")
     ):
         evaluated_log["tier1_action"] = "BLOCK_IP"
+        evaluated_log["tier1_block_evidence"] = "blacklist_memory"
         evaluated_log["tier1_reasons"] = (evaluated_log.get("tier1_reasons") or []) + [
             "TRÍ NHỚ Tier-1: IP đã bị chặn gần đây (blacklist TTL 1h) — chặn ngay, "
             "KHÔNG leo thang Tier-2 lại"
@@ -183,14 +317,29 @@ def _apply_blacklist_memory(action: str, evaluated_log: dict, is_blacklisted: bo
     return action
 
 
-def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_workers=1):
+def start_listening(
+    on_batch_ready=None, batch_size=10, timeout_sec=5, agent_workers=1, read_count=None
+):
     """
     on_batch_ready: Hàm callback được gọi khi đủ batch size hoặc hết timeout.
+    read_count: số message lấy về MỖI lượt `xreadgroup`. Mặc định `SENTINEL_READ_COUNT` (500).
+
+        TÁCH KHỎI `batch_size` LÀ CÓ CHỦ ĐÍCH. Trước đây một tham số gánh hai khái niệm không
+        liên quan: kích thước lô ĐỌC Redis (thuần thông lượng) và kích thước lô PHÂN TÍCH của
+        Tier-2 (ảnh hưởng thẳng vào nội dung prompt, tức mọi số Tier-2 của luận văn). Muốn
+        tăng thông lượng thì buộc phải đổi luôn ngữ nghĩa phép đo — nên trước giờ không ai
+        tăng, và vòng đọc phải chịu một vòng khứ hồi Redis cho mỗi 10 sự kiện.
+
+        Ở luồng 496.885 sự kiện, đó là ~49.700 vòng khứ hồi. Nâng riêng `read_count` lên 500
+        còn ~1.000 vòng, mà lô Tier-2 vẫn đúng 10 log như mọi phép đo đã công bố.
     agent_workers: số worker nền xử lý Tier-2 (LLM). >=1 => DECOUPLE khỏi vòng đọc Redis
         (vòng đọc + Tier-1 + thống kê KHÔNG bị chặn bởi LLM chậm -> Dashboard cập nhật tức
         thì). >=2 => chạy nhiều lô SONG SONG, tận dụng các slot llama.cpp (-np). =0 => gọi
         đồng bộ trong vòng đọc (hành vi CŨ, giữ để tương thích/kiểm thử).
     """
+    if read_count is None:
+        read_count = int(os.getenv("SENTINEL_READ_COUNT", "500"))
+    read_count = max(int(read_count), 1)
     print(f"[*] Connecting Subscriber to Redis: {_redact_redis_url(REDIS_URL)}")
     try:
         r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
@@ -203,15 +352,24 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
     # Khởi tạo Consumer Group cho từng Stream
     GROUP_NAME = "sentinel_group"
     CONSUMER_NAME = "sentinel_consumer_1"
-    for q in QUEUES:
-        try:
-            r.xgroup_create(q, GROUP_NAME, id="0", mkstream=True)
-            print(f"[+] Consumer group '{GROUP_NAME}' created/verified for stream '{q}'")
-        except redis.exceptions.ResponseError as e:  # type: ignore[attr-defined]
-            if "BUSYGROUP" in str(e):
-                pass
-            else:
-                print(f"[!] Warning: failed to create consumer group for {q}: {e}")
+
+    def _ensure_groups(quiet: bool = False) -> None:
+        """Tạo/xác nhận consumer group trên MỌI stream. Gọi lại được, an toàn khi lặp."""
+        for _q in QUEUES:
+            try:
+                r.xgroup_create(_q, GROUP_NAME, id="0", mkstream=True)
+                if not quiet:
+                    print(f"[+] Consumer group '{GROUP_NAME}' created/verified for stream '{_q}'")
+            except redis.exceptions.ResponseError as _e:  # type: ignore[attr-defined]
+                if "BUSYGROUP" not in str(_e):
+                    print(f"[!] Warning: failed to create consumer group for {_q}: {_e}")
+
+    _ensure_groups()
+
+    # Chống bão log: gộp lỗi giống hệt nhau và lùi dần thay vì in mỗi vòng lặp.
+    _last_err_msg: str = ""
+    _err_repeat: int = 0
+    _err_backoff: float = 0.0
 
     # Ghi nhận limitation phục vụ thesis defense
     print(
@@ -412,10 +570,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
         try:
             # XREADGROUP lắng nghe trên nhiều stream cùng lúc.
             # Trả về: [[stream_name, [(msg_id, {field: value}), ...]], ...]
-            # Tối ưu hóa throughput bằng cách lấy `count=batch_size` thay vì 1
+            # `read_count`, KHÔNG phải `batch_size`: đây là kích thước lô ĐỌC (thông lượng),
+            # không phải kích thước lô PHÂN TÍCH của Tier-2. Xem docstring `start_listening`.
             response = cast(
                 Any,
-                r.xreadgroup(GROUP_NAME, CONSUMER_NAME, streams_dict, count=batch_size, block=1000),
+                r.xreadgroup(GROUP_NAME, CONSUMER_NAME, streams_dict, count=read_count, block=1000),
             )
             if response:
                 for stream_name, messages in response:
@@ -491,6 +650,81 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     _is_bl = False
                                 action = _apply_blacklist_memory(action, evaluated_log, _is_bl)
 
+                            # ── CỔNG ML CHẤM TRƯỚC, TIER-2 SAU ───────────────────────────
+                            # Khi bật `tier1.ml_gate_all_events`: mọi sự kiện mà luật Tier-1
+                            # KHÔNG chốt bằng bằng chứng nội dung đều đi qua bộ phân loại
+                            # trước, và chính Cổng ML quyết ai được lên Tier-2.
+                            #
+                            # Vì sao đáng làm: nhánh chốt của luật tĩnh ("cổng nhạy cảm + số
+                            # gói vừa phải") suy đoán thuần từ đặc trưng luồng và bắn nhầm rất
+                            # nặng vào lưu lượng LAN lành — xem `_persist_block_evidence`.
+                            # LightGBM 76 đặc trưng thì có xác suất hiệu chuẩn và 4 dải ngưỡng,
+                            # nên để nó cầm lái phần suy-luận-từ-luồng là đúng vai hơn.
+                            #
+                            # KHÔNG đụng phán quyết đã có BẰNG CHỨNG: chữ ký WAF, luật Analyst
+                            # đã duyệt, tiền sử, trí nhớ blacklist, và WHITELIST_DROP.
+                            #
+                            # NHƯNG lệnh chặn `heuristic_flow_port` thì CÓ đụng. Nó chỉ là
+                            # phỏng đoán từ đặc trưng luồng, mà chính đặc trưng luồng là thứ
+                            # Cổng ML đọc tốt hơn hẳn. Đo trên lượt chạy 14:44 — trong đoạn
+                            # đệm THUẦN LÀNH, luật tĩnh chốt BLOCK_IP cho **46,1%** lưu lượng;
+                            # cùng dữ liệu ấy Cổng ML chỉ chặn ~1% và cho qua 81%. Để nhánh
+                            # phỏng đoán chốt cứng trước Cổng ML là đặt phán quyết yếu lên
+                            # trên phán quyết mạnh.
+                            _ml_cached: tuple | None = None
+                            _weak_block = (
+                                action == "BLOCK_IP"
+                                and evaluated_log.get("tier1_block_evidence")
+                                == "heuristic_flow_port"
+                            )
+                            if _ML_GATE_ALL and (action in ("DROP", "LOG", "ALERT") or _weak_block):
+                                _mla, _mlr, _mlc, _mlsec = ml_gateway.evaluate_detailed(raw_log)
+                                _ml_cached = (_mla, _mlr, _mlc)
+                                offload_counts["ml_gate_all_seen"] = (
+                                    offload_counts.get("ml_gate_all_seen", 0) + 1
+                                )
+                                if _mla is None and _mlsec.get("reason") in _ML_CANNOT_JUDGE:
+                                    # "KHÔNG ĐỌC ĐƯỢC" KHÁC VỚI "KHÔNG CHẮC".
+                                    #
+                                    # Cổng ML trả None vì hai lý do hoàn toàn khác nhau: hoặc
+                                    # xác suất rơi vào dải 0,65–0,85 (đúng là phân vân, đáng
+                                    # hỏi Tier-2), hoặc bản ghi không đủ đặc trưng NetFlow để
+                                    # chấm (`low_feature_coverage`) — nghĩa là nó chưa hề đưa
+                                    # ra ý kiến nào.
+                                    #
+                                    # Gộp hai thứ đó làm một là mở van cho Tier-2 ngập. Đo tại
+                                    # mốc 184.238 sự kiện: mọi bản ghi CSIC (request HTTP, gần
+                                    # như không có đặc trưng NetFlow) đều rơi vào nhánh này —
+                                    # **34.500 sự kiện**, phần lớn là request LÀNH, xếp hàng
+                                    # chờ LLM ~19,2 giây mỗi lô. Riêng nhóm đó là hơn 9 giờ
+                                    # suy luận cho thứ mà luật Tier-1 đã kết luận là vô hại.
+                                    #
+                                    # Khi Cổng ML không có ý kiến, phán quyết thuộc về tầng
+                                    # ĐÃ xem được bằng chứng: giữ nguyên kết luận của luật
+                                    # Tier-1 (chữ ký WAF, tiêm nhiễm, điểm rủi ro).
+                                    offload_counts["ml_gate_cannot_judge"] = (
+                                        offload_counts.get("ml_gate_cannot_judge", 0) + 1
+                                    )
+                                elif _mla is None:
+                                    # Dải 0,65–0,85: bộ phân loại KHÔNG đủ tự tin -> Tier-2.
+                                    action = "ESCALATE"
+                                elif _mla != action:
+                                    offload_counts["ml_gate_all_overrode"] = (
+                                        offload_counts.get("ml_gate_all_overrode", 0) + 1
+                                    )
+                                    action = _mla
+                                    # Nhãn bằng chứng phải đi theo phán quyết CUỐI, nếu không
+                                    # hậu kiểm đọc nhầm nguồn gốc của lệnh chặn.
+                                    if _mla == "BLOCK_IP":
+                                        evaluated_log["tier1_block_evidence"] = "ml_gate"
+                                    else:
+                                        evaluated_log.pop("tier1_block_evidence", None)
+                                if _ml_cached[1]:
+                                    evaluated_log["tier1_reasons"] = (
+                                        evaluated_log.get("tier1_reasons") or []
+                                    ) + [_ml_cached[1]]
+                                evaluated_log["tier1_action"] = action
+
                             # ── PHÂN BỔ GIẢM TẢI ────────────────────────────────────────
                             # Đếm ở ĐÂY vì đây là điểm `action` của Tier-1 đã CHỐT (sau cả
                             # APT lẫn trí nhớ blacklist) nhưng CHƯA rẽ sang Cổng ML/LLM —
@@ -516,7 +750,34 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                 )
 
                                 # ── TIER-1 ML GATEWAY (CỔNG ML) ──
-                                ml_action, ml_reasoning, ml_conf = ml_gateway.evaluate(raw_log)
+                                # Dùng lại kết quả nếu vòng `ml_gate_all_events` đã chấm sự
+                                # kiện này rồi — chấm hai lần vừa tốn vừa làm phồng mẫu số.
+                                if _ml_cached is not None:
+                                    ml_action, ml_reasoning, ml_conf = _ml_cached
+                                else:
+                                    ml_action, ml_reasoning, ml_conf = ml_gateway.evaluate(raw_log)
+
+                                # CỔNG ML KHÔNG ĐƯỢC PHỦ QUYẾT BẰNG CHỨNG NÓ KHÔNG NHÌN THẤY.
+                                #
+                                # Bộ phân loại đọc 76 đặc trưng NetFlow. Khi Tier-1 leo thang vì
+                                # NỘI DUNG — chữ ký tiêm nhiễm, payload đáng ngờ — thì lý do leo
+                                # thang nằm ngoài tầm nhìn của nó, nên một phán quyết DROP ở đây
+                                # là bỏ qua bằng chứng chứ không phải xác nhận vô hại.
+                                #
+                                # Đo trên 600 mẫu tiêm nhiễm của tệp demo: Cổng ML trả DROP cho
+                                # **83,0%**. Nghĩa là 4/5 lần tấn công vào chính lớp AI bị vứt
+                                # lặng lẽ ở Tier-1, và Tier-2 — nơi có hàng rào chống tiêm nhiễm
+                                # — không bao giờ được nhìn thấy chúng.
+                                if (
+                                    _TIER2_NEED_APP_EVIDENCE
+                                    and ml_action == "DROP"
+                                    and _evidence_layer(evaluated_log) == "application"
+                                ):
+                                    offload_counts["ml_drop_overridden_app_evidence"] = (
+                                        offload_counts.get("ml_drop_overridden_app_evidence", 0) + 1
+                                    )
+                                    ml_action = None
+
                                 # Ranh giới cuối trước LLM: Cổng ML tự quyết (ml_action có
                                 # giá trị) hay phải nhờ Tier-2. Đây là mẫu số của "tỉ lệ gỡ
                                 # tải khỏi LLM" nên phải đếm tại chỗ, không suy ngược từ log.
@@ -587,6 +848,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     evaluated_log["tier1_reasons"] = (
                                         evaluated_log.get("tier1_reasons") or []
                                     ) + [ml_reasoning]
+                                    if ml_action == "BLOCK_IP":
+                                        # Bằng chứng MẠNH dù chỉ có đặc trưng luồng: đây là phán
+                                        # quyết của bộ phân loại đã hiệu chuẩn ở dải C >= 0,85,
+                                        # khác hẳn nhánh suy luận cổng của luật tĩnh.
+                                        evaluated_log["tier1_block_evidence"] = "ml_gate"
                                     # CHỈ BLOCK_IP. Bản cũ nhận cả `WHITELIST_DROP` — mà
                                     # whitelist drop là CHO QUA, không phải lệnh chặn; để lẫn
                                     # thì bảng "đã chặn" đếm luôn cả lưu lượng được đặc cách.
@@ -606,8 +872,37 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     except Exception:
                                         pass
 
-                                    r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                    _record_decision(r, evaluated_log)
                                     continue  # Bỏ qua vòng đẩy lên queue LLM
+
+                                # ── TIER-2 CHỈ NHẬN VIỆC NÓ LÀM ĐƯỢC ────────────────────
+                                # Khi bật `tier2.require_application_evidence`: sự kiện KHÔNG
+                                # có payload/URI/User-Agent thì dừng ở ALERT, không lên LLM.
+                                #
+                                # Đo trên 300 lô Tier-2 của lượt 2026-08-11: 282 lô chỉ có đặc
+                                # trưng luồng -> 88,3% kết thúc ở AWAIT_HITL, chỉ 3,9% ra lệnh
+                                # chặn, mà ngốn 2.981 giây = 89% toàn bộ thời gian suy luận.
+                                # 18 lô có payload -> 38,9% ra lệnh chặn trong 356 giây. Chính
+                                # mô hình nói lý do trong phần biện giải: "không có dữ liệu
+                                # tầng ứng dụng, bằng chứng yếu -> chuyển chuyên gia".
+                                #
+                                # Nói cách khác: gửi lô chỉ-có-luồng lên LLM là mua một phiếu
+                                # chuyển-người-thật với giá 10 giây GPU. Chặn ở đây thì hàng
+                                # đợi chuyên viên mỏng đi và Tier-2 dành trọn cho ca quy kết
+                                # được. MẶC ĐỊNH TẮT trong mã: mọi số Tier-2 của luận văn đo
+                                # khi lô chỉ-có-luồng VẪN đi qua LLM.
+                                if _TIER2_NEED_APP_EVIDENCE and _evidence_layer(evaluated_log) != (
+                                    "application"
+                                ):
+                                    offload_counts["tier2_skipped_flow_only"] = (
+                                        offload_counts.get("tier2_skipped_flow_only", 0) + 1
+                                    )
+                                    evaluated_log["tier1_action"] = "ALERT"
+                                    evaluated_log["tier1_reasons"] = (
+                                        evaluated_log.get("tier1_reasons") or []
+                                    ) + ["Chỉ có đặc trưng luồng, không đủ bằng chứng cho Tier-2"]
+                                    _record_decision(r, evaluated_log)
+                                    continue
 
                                 # CƠ CHẾ SUPPRESSION (ỨC CHẾ SPAM LLM)
                                 _suppressed = False
@@ -628,7 +923,7 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
 
                                 if _suppressed:
                                     # Ghi nhận thầm lặng, không đẩy lên queue LLM để tránh spam
-                                    r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                    _record_decision(r, evaluated_log)
                                 else:
                                     alert_msg = f"[!] ESCALATE TO AI | Source: {stream_name} | Risk: {evaluated_log.get('tier1_score')} | Vi phạm: {evaluated_log.get('tier1_reasons')}"
                                     print(alert_msg)
@@ -673,13 +968,37 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                 )
                                 if src_ip:
                                     print(f"[*] routing BLOCK_IP -> Blacklist: {src_ip}")
-                                    r.setex(f"blacklist:{src_ip}", 3600, "1")
-                                    # KHO KNOWN-BAD BỀN: Tier-1 signature-block cũng nhớ VĨNH VIỄN
-                                    # (reputation=100) -> lần sau chặn on-sight, không chỉ 1h TTL.
+                                    _ev = evaluated_log.get("tier1_block_evidence", "")
+                                    _was_listed = False
                                     try:
-                                        memory.mark_ip_blocked(src_ip)
+                                        _was_listed = bool(r.exists(f"blacklist:{src_ip}"))
+                                    except Exception:
+                                        pass
+                                    # THỜI HẠN SỔ ĐEN ĐI THEO ĐỘ MẠNH CỦA BẰNG CHỨNG.
+                                    #
+                                    # Cùng một thác đổ như bên danh tiếng, chỉ đổi chỗ chứa: một
+                                    # lệnh chặn suy-từ-luồng cấp cho IP bản án 1 giờ, và
+                                    # `_apply_blacklist_memory` biến mọi gói sau đó thành BLOCK
+                                    # mà không cần chấm lại. Đo lượt 14:44: `t1_blacklist_memory`
+                                    # chiếm 35,2% lưu lượng — vẫn trong đoạn đệm THUẦN LÀNH.
+                                    #
+                                    # Bằng chứng yếu chỉ đáng một khoảng lặng ngắn: đủ để dập
+                                    # một cơn bùng phát, không đủ để giam một máy trạm lành.
+                                    _ttl = (
+                                        _WEAK_BLOCK_TTL_SEC
+                                        if _ev == "heuristic_flow_port"
+                                        else _STRONG_BLOCK_TTL_SEC
+                                    )
+                                    r.setex(f"blacklist:{src_ip}", _ttl, "1")
+                                    try:
+                                        _persist_block_evidence(
+                                            memory,
+                                            src_ip,
+                                            _ev,
+                                            already_listed=_was_listed,
+                                        )
                                     except Exception as _e:
-                                        print(f"[!] mark_ip_blocked lỗi {src_ip}: {_e}")
+                                        print(f"[!] ghi danh tiếng lỗi {src_ip}: {_e}")
                                     # Lưu block Tier-1 (kèm lý do) cho Dashboard đọc qua file
                                     tier1_recent_blocks.append(
                                         _tier1_block_record(src_ip, evaluated_log)
@@ -687,11 +1006,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
                                     if len(tier1_recent_blocks) > 200:
                                         del tier1_recent_blocks[:-100]
                                 # Ghi nhận vào log quyết định để phục vụ ablation study
-                                r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                _record_decision(r, evaluated_log)
 
                             elif action in ("ALERT", "LOG"):
                                 # Chỉ ghi nhận vào ablation log phục vụ thống kê nghiên cứu
-                                r.rpush("queue_decisions", json.dumps(evaluated_log))
+                                _record_decision(r, evaluated_log)
                                 if action == "ALERT":
                                     src_ip = evaluated_log.get("Source IP") or evaluated_log.get(
                                         "src_ip", ""
@@ -796,6 +1115,11 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
             # Được gọi ở ĐÂY để dù không có log mới (idle), Dashboard vẫn thấy Queue giảm dần
             _flush_stats()
             _flush_tier1_blocks()
+            # Đổ bộ đệm đếm gói-bị-chặn xuống đĩa MỘT LƯỢT ở nhịp này (xem `note_blocked_hit`).
+            memory.flush_blocked_hits()
+            # Nhật ký audit cũng gom giao dịch — đổ ở đây để Dashboard không đọc phải dữ liệu
+            # cũ trong lúc luồng đang chạy chậm (xem `AuditLogger.log_event`).
+            audit_logger.flush()
             _maybe_decay_reputation()
 
         except KeyboardInterrupt:
@@ -807,7 +1131,37 @@ def start_listening(on_batch_ready=None, batch_size=10, timeout_sec=5, agent_wor
         except json.JSONDecodeError:
             print("[!] Malformed JSON Log received via Redis. Skipping.")
         except Exception as e:
-            print(f"[!] Unexpected error in stream processing: {e}")
+            _msg = str(e)
+
+            # NOGROUP — TỰ HỒI PHỤC, KHÔNG ĐƯỢC CHẾT ÂM THẦM.
+            #
+            # Redis ở đây chạy `maxmemory 512mb` + `maxmemory-policy allkeys-lru`. Chính sách
+            # đó cho phép Redis đuổi BẤT KỲ khoá nào khi chạm trần — kể cả stream đang được
+            # dùng làm hàng đợi công việc. Khoá bị đuổi thì consumer group đi theo, và
+            # XREADGROUP ném NOGROUP mãi mãi.
+            #
+            # Sự cố thật 2026-08-11: giữa lượt đẩy 496.885 sự kiện, `queue_firewall` bị đuổi ở
+            # mốc ~195.300. Nhánh `except Exception` cũ chỉ in rồi lặp lại NGAY, không ngủ,
+            # không dựng lại nhóm. Kết quả: pipeline đứng im 2 giờ 26 phút trong khi
+            # `logs/subscriber.log` phình lên **24 GB** cùng một dòng lỗi — hỏng hoàn toàn
+            # nhưng tiến trình vẫn "đang chạy", nên không cảnh báo nào nổ.
+            if "NOGROUP" in _msg:
+                print(f"[!] NOGROUP: stream/group đã biến mất ({_msg}). Dựng lại rồi chạy tiếp.")
+                _ensure_groups(quiet=True)
+                time.sleep(1.0)
+                continue
+
+            # Lỗi lặp lại: gộp log + lùi dần. Một điều kiện kẹt KHÔNG bao giờ được phép ghi
+            # đầy đĩa; đây là chốt chặn cuối cùng cho MỌI lỗi chưa lường trước.
+            if _msg == _last_err_msg:
+                _err_repeat += 1
+                _err_backoff = min(_err_backoff * 2 if _err_backoff else 0.5, 30.0)
+                if _err_repeat in (10, 100, 1000) or _err_repeat % 5000 == 0:
+                    print(f"[!] Lỗi trên lặp {_err_repeat} lần, đang lùi {_err_backoff:.0f}s.")
+                time.sleep(_err_backoff)
+            else:
+                _last_err_msg, _err_repeat, _err_backoff = _msg, 1, 0.0
+                print(f"[!] Unexpected error in stream processing: {e}")
 
     # ── Dừng SẠCH worker pool khi thoát vòng lặp (KeyboardInterrupt) ──
     if agent_q is not None:

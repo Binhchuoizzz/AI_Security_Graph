@@ -240,6 +240,23 @@ def test_csic_dataset_never_leaks_answer_into_event():
         pytest.skip("chưa dựng data/csic.json — chạy scripts/build_csic_dataset.py")
     rows = json.loads(path.read_text(encoding="utf-8"))
     assert rows, "bộ mẫu rỗng"
+
+    # Các trường mang NGUYÊN VĂN request do người dùng gửi. Nội dung của chúng là dữ liệu bắt
+    # được, không phải thứ hệ thống tự viết ra, nên có thể chứa bất kỳ từ nào của tiếng người.
+    #
+    # BÀI TEST TỪNG BÁO NHẦM Ở ĐÂY. Nó quét từ "mitre" trên TOÀN BỘ sự kiện, mà CSIC 2010 là
+    # bộ dữ liệu Tây Ban Nha: 5/36.000 request có trường địa chỉ
+    # `direccion=ronda+del+general+mitre+s%2fn` — "Ronda del General Mitre" là một con phố ở
+    # Barcelona. Đó là dữ liệu thật, không phải đáp án rò rỉ, và chốt chống gian lận mà kêu
+    # oan thì lần sau người ta tắt nó đi.
+    #
+    # Ranh giới đúng: MÃ kỹ thuật (`T1190`) và TÊN KHOÁ đáp án thì soi khắp nơi — payload tự
+    # khai `T1190` đúng là gian lận. Riêng danh từ chung "mitre" chỉ soi phần siêu dữ liệu do
+    # bộ dựng sinh ra, vì chỉ ở đó nó mới có thể là đáp án.
+    _VERBATIM_FIELDS = ("payload", "uri", "URI", "user_agent", "message")
+    _EVERYWHERE = ("att&ck", "expected_mitre", "wa_mitre")
+    _METADATA_ONLY = ("mitre",)
+
     for r in rows:
         # `_label` là ĐÁP ÁN, cố ý nằm ngoài sự kiện — `_build_csic` tách nó ra trước khi
         # đưa vào luồng. Chỉ soi phần THÂN sự kiện, đúng thứ thật sự đi tới hệ thống.
@@ -249,8 +266,14 @@ def test_csic_dataset_never_leaks_answer_into_event():
             f"csic#{r.get('csic_index')}: mã ATT&CK nằm trong sự kiện"
         )
         low = blob.lower()
-        for w in ("mitre", "att&ck", "expected_mitre", "wa_mitre"):
+        for w in _EVERYWHERE:
             assert w not in low, f"csic#{r.get('csic_index')}: từ khoá đáp án '{w}' trong sự kiện"
+        meta = {k: v for k, v in event.items() if k not in _VERBATIM_FIELDS}
+        meta_low = json.dumps(meta, ensure_ascii=False).lower()
+        for w in _METADATA_ONLY:
+            assert w not in meta_low, (
+                f"csic#{r.get('csic_index')}: từ khoá đáp án '{w}' trong siêu dữ liệu sự kiện"
+            )
         fam = str((r.get("_label") or {}).get("gt_label", "")).lower()
         # Nhãn "Benign"/"Anomalous (unclassified)" không phải tên họ tấn công -> bỏ qua.
         if fam and fam not in ("benign", "anomalous (unclassified)"):

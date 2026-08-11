@@ -372,19 +372,77 @@ def test_await_hitl_verdict_is_cached():
     assert "response_cache.set(raw_logs_str" in src
 
 
-def test_repeat_hitl_escalates_to_alert():
-    """IP đã từng chuyển người xử lý mà quay lại phải LEO THANG, không đẻ phiếu HITL mới.
+def _run_hitl_node(monkeypatch, *, total_incidents: int):
+    """Chạy `node_human_in_the_loop` với mọi tác dụng phụ bị bắt lại, trả về nhật ký gọi."""
+    import src.agent.nodes as N
+    import src.response.executor as EX
+    import src.tier1_filter.feedback_listener as FL
 
-    Lần ĐẦU giữ nguyên AWAIT_HITL (không cướp quyền quyết định của người); lần TÁI PHẠM
-    nâng lên ALERT để rơi vào đúng đường repeat-offender sẵn có của `raise_alert`
-    (ALERT lần 2 -> tự chuyển BLOCK_IP). Không có bước này, `AWAIT_HITL` chỉ +5 điểm nên
-    cần 14 lần lặp mới chạm ngưỡng chặn 70 — thực tế IP quay lại mãi mà không bao giờ hội tụ.
-    """
-    import pathlib as _pl
+    calls: dict = {"db": [], "alert": [], "ticket": [], "incident": []}
 
-    src = (_pl.Path(__file__).resolve().parents[2] / "src" / "agent" / "nodes.py").read_text()
-    assert "_repeat_hitl" in src, "thiếu nhánh phát hiện tái phạm HITL"
-    assert 'latest_decision["action"] = "ALERT"' in src, "tái phạm chưa leo thang lên ALERT"
-    assert '_handle_threat_memory_incident(target, "AWAIT_HITL"' in src, (
-        "lần ĐẦU vẫn phải là AWAIT_HITL"
+    monkeypatch.setattr(
+        N.threat_memory, "get_ip_reputation", lambda ip: {"total_incidents": total_incidents}
     )
+    monkeypatch.setattr(
+        N, "_handle_threat_memory_incident", lambda t, a, m, c: calls["incident"].append(a)
+    )
+    monkeypatch.setattr(
+        EX, "_log_to_db", lambda a, t, r, raw_log="", *_a, **_k: calls["db"].append(a)
+    )
+    monkeypatch.setattr(
+        EX,
+        "raise_alert",
+        lambda t, r, raw_log="", confidence=None, tier="": calls["alert"].append(t) or "BLOCK_IP",
+    )
+    monkeypatch.setattr(
+        FL.FeedbackListener,
+        "receive_new_rule",
+        lambda self, *a, **k: calls["ticket"].append(a[:2]),
+    )
+
+    decision = {
+        "action": "AWAIT_HITL",
+        "target": "203.0.113.9",
+        "confidence": 0.42,
+        "mitre_technique": "N/A",
+        "reasoning": "không đủ căn cứ",
+        "hitl_reason": "llm_abstained",
+    }
+    state = N.SentinelState(
+        current_batch_logs=[{"Source IP": "203.0.113.9", "payload": "idA=2"}],
+        decisions=[decision],
+    )
+    N.node_human_in_the_loop(state)
+    return calls, decision
+
+
+def test_first_time_hitl_creates_ticket_and_logs_await_hitl(monkeypatch):
+    """Lần ĐẦU: ghi AWAIT_HITL, đẻ đúng một phiếu, KHÔNG gọi choke-point cảnh báo."""
+    calls, decision = _run_hitl_node(monkeypatch, total_incidents=0)
+    assert calls["db"] == ["AWAIT_HITL"]
+    assert len(calls["ticket"]) == 1
+    assert calls["alert"] == []
+    assert calls["incident"] == ["AWAIT_HITL"]
+    assert decision["action"] == "AWAIT_HITL"
+
+
+def test_repeat_hitl_escalates_and_does_not_duplicate_ticket(monkeypatch):
+    """TÁI PHẠM: đi vào `raise_alert`, KHÔNG đẻ phiếu trùng, và ghi ĐÚNG hành động đã làm.
+
+    LỖI ĐÃ SỬA 11/08/2026 — bản trước chỉ gán `latest_decision["action"] = "ALERT"` rồi rơi
+    thẳng xuống `_log_to_db("AWAIT_HITL", ...)` ghi cứng và vẫn đẻ phiếu. Ba hệ quả đo được:
+    20/336 lô trong `tier2_trace.jsonl` ghi ALERT trong khi hệ thống làm AWAIT_HITL; phiếu
+    HITL trùng vẫn sinh ra; và `raise_alert` không bao giờ được gọi nên đường "ALERT lần 2
+    -> tự BLOCK" không tồn tại.
+
+    Test cũ chỉ kiểm `'latest_decision["action"] = "ALERT"' in source` nên vẫn xanh suốt —
+    lý do nó phải được thay bằng test hành vi.
+    """
+    calls, decision = _run_hitl_node(monkeypatch, total_incidents=3)
+    assert calls["alert"] == ["203.0.113.9"], "tái phạm phải đi qua choke-point cảnh báo"
+    assert calls["ticket"] == [], "KHÔNG được đẻ phiếu HITL trùng khi đã leo thang"
+    assert calls["db"] == [], "raise_alert tự ghi audit — không ghi thêm dòng AWAIT_HITL"
+    assert decision["action"] == "BLOCK_IP", (
+        "phải ghi SỰ THẬT raise_alert đã thực thi, không ghi ý định"
+    )
+    assert calls["incident"] == ["BLOCK_IP"]

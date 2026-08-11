@@ -10,7 +10,19 @@ import argparse
 import logging
 import os
 
-from dotenv import load_dotenv  # type: ignore
+# PHẢI ĐẶT TRƯỚC MỌI IMPORT NẶNG. Thư viện nền (LightGBM/OpenMP, NumPy/BLAS) đọc các biến này
+# ĐÚNG MỘT LẦN lúc nạp; đặt sau `import` là không có tác dụng.
+#
+# Vì sao cần: nhóm luồng OpenMP mặc định bằng số lõi máy và QUAY BẬN giữa các lượt dự đoán.
+# Đường nóng ở đây là suy luận TỪNG DÒNG, chia cho 13 luồng không nhanh hơn — đo được subscriber
+# ăn **1328% CPU** mà chỉ chạy **75 sự kiện/giây**, vì vòng đọc Redis bị chính nhóm luồng ấy
+# tranh mất lõi. Xem `MLGateway._force_single_thread`.
+#
+# `setdefault` để người vận hành vẫn ghi đè được từ ngoài khi thật sự cần.
+for _var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ.setdefault(_var, "1")
+
+from dotenv import load_dotenv  # type: ignore  # noqa: E402
 
 load_dotenv()  # Nạp các biến môi trường (Tăng cường bảo mật)
 
@@ -127,12 +139,26 @@ def main():
     # Mặc định 2 (khớp llama.cpp -np 2). Đặt SENTINEL_AGENT_WORKERS=1 để chạy an toàn tối đa
     # (1 luồng agent, vẫn decoupled) hoặc =0 để về hành vi ĐỒNG BỘ cũ.
     agent_workers = int(os.getenv("SENTINEL_AGENT_WORKERS", "2"))
-    logger.info(f"[MAIN] Starting Tier 1 Subscriber Loop (agent_workers={agent_workers})...")
+
+    # Thời gian một IP được im lặng trước khi lô đang gom bị XẢ SỚM (dù chưa đủ `batch_size`).
+    #
+    # Mặc định 5 giây giữ nguyên cho mọi phép đo đã công bố. Nhưng ở luồng lớn, sự kiện của
+    # cùng một IP đến THƯA, nên 5 giây xả ra toàn lô lẻ: đo tại mốc 184.238 sự kiện — 1.551 sự
+    # kiện tới Tier-2 mà thành **981 lô**, tức 1,6 sự kiện mỗi lô. Mỗi lô là một lượt gọi LLM
+    # ~19,2 giây, nên riêng cái đó nhân chi phí suy luận lên hơn 6 lần so với lô đầy 10.
+    #
+    # Nới thời gian chờ KHÔNG đổi `batch_size` (vẫn 10 log/lô như mọi số Tier-2 đã đo), chỉ
+    # cho lô có cơ hội đầy trước khi bị xả.
+    batch_timeout = int(os.getenv("SENTINEL_BATCH_TIMEOUT", "5"))
+    logger.info(
+        f"[MAIN] Starting Tier 1 Subscriber Loop "
+        f"(agent_workers={agent_workers}, batch_timeout={batch_timeout}s)..."
+    )
     try:
         start_listening(
             on_batch_ready=handle_escalated_batch,
             batch_size=10,
-            timeout_sec=5,
+            timeout_sec=batch_timeout,
             agent_workers=agent_workers,
         )
     except KeyboardInterrupt:

@@ -53,6 +53,43 @@ class MLGateway:
     (low-coverage / OOD-abstain / clamp) nếu không sẽ escalate LLM.
     """
 
+    @staticmethod
+    def _force_single_thread(pipeline) -> None:
+        """Ép LightGBM/sklearn suy luận MỘT LUỒNG. Không phải vi tối ưu — là sửa lỗi hiệu năng.
+
+        LightGBM dựng một nhóm luồng OpenMP bằng số lõi máy, và giữa các lượt dự đoán các
+        luồng thợ **quay bận** (`OMP_WAIT_POLICY` mặc định là active) chứ không ngủ. Với suy
+        luận theo TỪNG DÒNG — đúng hình dạng của một cổng lọc luồng thời gian thực — chúng
+        gần như chỉ quay: chia một cây quyết định cho 13 luồng không nhanh hơn, mà chi phí
+        đồng bộ thì có thật.
+
+        Đo trên máy này (2026-08-11), subscriber đang đẩy luồng demo:
+          * `%CPU` của tiến trình = **1328%** (13 lõi bận) trong khi chỉ xử lý **75 sự
+            kiện/giây**, tức ~177 ms CPU cho mỗi sự kiện có ~1,5 ms việc thật;
+          * 13 luồng đứng đầu bảng đều tên `python` và tiêu tốn CPU NGANG NHAU (~148 giây
+            mỗi luồng) — dấu hiệu của nhóm luồng quay bận, không phải công việc thật;
+          * vòng đọc Redis nằm cùng tiến trình nên bị chính nhóm luồng ấy tranh mất lõi.
+
+        Đo riêng Cổng ML: 1,684 ms/sự kiện khi để mặc định, **1,405 ms khi ép một luồng** —
+        một luồng vừa nhanh hơn vừa trả lại 12 lõi cho phần còn lại của hệ.
+        """
+        if not isinstance(pipeline, dict):
+            return
+        for obj in pipeline.values():
+            try:
+                if hasattr(obj, "set_params"):
+                    obj.set_params(n_jobs=1)
+            except Exception:
+                pass
+            # CHỈ sửa `params` của booster. KHÔNG gọi `reset_parameter()`: trên booster khôi
+            # phục từ pickle, lệnh đó làm tiến trình **segfault** (đo được: exit 139).
+            booster = getattr(obj, "booster_", None)
+            if booster is not None:
+                try:
+                    booster.params["num_threads"] = 1
+                except Exception:
+                    pass
+
     def __init__(self):
         self.pipeline = self._load_pipeline()
         # Ngưỡng lấy từ chính sách THỐNG NHẤT (chung với LLM) — 1 nguồn sự thật.
@@ -80,7 +117,9 @@ class MLGateway:
                 logger.warning(f"[TIER-1 ML GATE] Không tìm thấy model tại {model_path}")
                 return None
             with open(model_path, "rb") as f:
-                return pickle.load(f)
+                model = pickle.load(f)
+            MLGateway._force_single_thread(model)
+            return model
         except ModuleNotFoundError as e:
             # Nguyên nhân THƯỜNG GẶP NHẤT: thiếu scikit-learn/lightgbm (model được pickle
             # từ 2 thư viện này). Trước đây chỉ log 1 dòng chung chung nên Cổng ML TẮT ÂM
