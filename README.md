@@ -208,6 +208,6 @@ python scripts/audit_metric_denominators.py  # mẫu số & chỉ số bão hoà
 
 Distributed under the **MIT License** — see [`LICENSE`](LICENSE).
 
-- **Author:** Nguyễn Đức Bình (MSSV: `MSE13183`)
+- **Author:** Nguyễn Đức Bình (MSHV: `24MSE13183` — Lớp: `MSE23HN`)
 - **Institution:** Master of Software Engineering (MSE) — FSB Institute of Management & Technology, FPT University.
 - **Scientific Advisors:** Dr. Bùi Văn Hiệu & Dr. Đặng Văn Hiếu.
