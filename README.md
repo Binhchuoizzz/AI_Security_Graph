@@ -17,9 +17,10 @@
 
 ## 📑 Master's Thesis & Defense Presentation
 
-- 📖 **Vietnamese Thesis (LaTeX PDF):** [`docs/Thesis/latex/thesis_latex_vi/main.pdf`](docs/Thesis/latex/thesis_latex_vi/main.pdf)
-- 📖 **English Thesis (LaTeX PDF):** [`docs/Thesis/latex/thesis_latex_en/main.pdf`](docs/Thesis/latex/thesis_latex_en/main.pdf)
-- 🖥️ **Interactive Defense Slide Deck:** [`docs/Thesis/slides/SENTINEL_defense_notebooklm.html`](docs/Thesis/slides/SENTINEL_defense_notebooklm.html) *(Press `N` for speaker notes)*
+- 📄 **Official Master Thesis Submission PDF:** [`docs/Thesis/MSE23HN_NguyenDucBinh_24MSE13183.pdf`](docs/Thesis/MSE23HN_NguyenDucBinh_24MSE13183.pdf)
+- 📖 **English Thesis Source (LaTeX PDF):** [`docs/Thesis/latex/thesis_latex_en/main.pdf`](docs/Thesis/latex/thesis_latex_en/main.pdf)
+- 📖 **Vietnamese Thesis Source (LaTeX PDF):** [`docs/Thesis/latex/thesis_latex_vi/main.pdf`](docs/Thesis/latex/thesis_latex_vi/main.pdf)
+- 🖥️ **Live Defense Presentation Slides (GitHub Pages):** [https://binhchuoizzz.github.io/AI_Security_Graph/docs/Thesis/slides/](https://binhchuoizzz.github.io/AI_Security_Graph/docs/Thesis/slides/) *(Press `N` for speaker notes, `O` for agenda)*
 - 🔍 **Audited Metrics Benchmark Reference:** [`experiments/results/thesis_number_audit.json`](experiments/results/thesis_number_audit.json)
 
 ---
