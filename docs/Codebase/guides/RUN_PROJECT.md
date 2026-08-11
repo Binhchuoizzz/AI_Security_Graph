@@ -1,185 +1,107 @@
 # Chạy & Demo SENTINEL
 
-> Cập nhật 31/07/2026. Chỉ số đo đạc xem [DEMO_BY_RQ.md](DEMO_BY_RQ.md); tệp này là **cách vận hành**.
+> Cập nhật 11/08/2026. Tệp này là **cách vận hành từ đầu tới cuối**.
+> Chỉ số đo đạc xem [DEMO_BY_RQ.md](DEMO_BY_RQ.md); luồng nghiệp vụ xem [DEMO_FLOWS.md](DEMO_FLOWS.md).
 
 ---
 
-## 0. Cài một lần
+## 1. Cài một lần
 
 ```bash
-uv venv && uv pip install -r requirements.txt      # hoặc python -m venv .venv
-cp .env.example .env                               # điền SENTINEL_LOG_SECRET, NEO4J_PASSWORD
+uv venv && uv pip install -r requirements.txt
+cp .env.example .env          # điền SENTINEL_LOG_SECRET, NEO4J_PASSWORD
+python -m src.rag.embedder    # dựng chỉ mục FAISS + BM25
 ```
 
-`.env` phải có `SENTINEL_LOG_SECRET`. Thiếu nó thì chuỗi HMAC ký bằng khoá mặc định công khai
-— vẫn chạy, nhưng chỉ chứng minh **tính nhất quán**, không phải chống giả mạo.
-
-Model mặc định: **Foundation-Sec-8B-Instruct Q4_K_M**, `LLAMA_ARG_CTX_SIZE=32768` với `-np 2`
-→ **16.384 token/khe**. Trùng khớp `llm.max_context_tokens` trong `config/system_settings.yaml`.
+`.env` **phải** có `SENTINEL_LOG_SECRET`. Thiếu nó thì chuỗi HMAC ký bằng khoá mặc định công
+khai — vẫn chạy, nhưng chỉ chứng minh *tính nhất quán*, không phải *chống giả mạo*.
 
 ---
 
-## 1. Demo đầy đủ — MỘT lệnh
+## 2. Chạy demo — MỘT lệnh
+
+`data/demo.json` nặng ~830 MB nên không track git. Chưa có thì dựng trước, **đúng thứ tự** —
+`build_demo.py` đọc `data/csic.json`, chạy ngược thì luồng ra đời với 0 bản ghi CSIC:
 
 ```bash
-./scripts/run_demo.sh --fresh --small     # ~5.000 sự kiện, xong Tier-1 tức thì, Tier-2 chạy dần
-./scripts/run_demo.sh --fresh             # luồng đầy đủ (~100k sự kiện)
+.venv/bin/python scripts/build_csic_dataset.py --limit 36000   # ~1 phút
+.venv/bin/python scripts/build_demo.py                         # ~4 phút, ~4 GB RAM
 ```
+
+Rồi:
+
+```bash
+./scripts/run_demo.sh --fresh
+```
+
+Lệnh này dựng hạ tầng Docker → chờ LLM cục bộ → `reset_all` → bật Dashboard → đẩy luồng.
+Mở **<http://localhost:8501>**, đăng nhập `manager`.
 
 | cờ | tác dụng |
 | :-- | :-- |
-| `--fresh` | chạy `reset_all.py` — dọn uy tín IP, luật động, blacklist, stream. **Bắt buộc** khi so hai lượt |
-| `--small` | đẩy `demo_small.json` thay vì luồng đầy đủ |
-| `--no-push` | chỉ dựng hạ tầng + UI |
-| `SENTINEL_LITE=0` | cấu hình đầy đủ: ctx 32768, 2 parallel, bật Neo4j |
+| `--fresh` | `reset_all` trước khi đẩy: dọn danh tiếng IP, chuỗi APT, luật động, Redis stream |
+| `--small` | đẩy `data/demo_small.json` (~10.000 sự kiện) thay vì luồng đầy đủ |
+| `--no-push` | chỉ dựng hạ tầng + UI, không đẩy |
+| `SENTINEL_LITE=0` | ctx 32.768 / 2 khe (đúng cấu hình đã đo) thay vì 16.384 / 1 khe |
 
-Mặc định `SENTINEL_LITE=1` dùng **cùng model, cùng 16.384 token/khe** như lượt đo — chỉ khác
-thông lượng (1 parallel, tắt Neo4j). Demo và số liệu luôn mô tả cùng một hệ.
+Đẩy một lát ngắn để soi UI nhanh:
 
-Sau khi chạy: `http://localhost:8501`, đăng nhập `manager`.
+```bash
+UNIFIED_STREAM_LIMIT=20000 .venv/bin/python scripts/demo.py
+```
+
+Tắt để giải phóng RAM:
+
+```bash
+pkill -f "main.py --mode server" ; pkill -f "streamlit run" ; docker-compose stop
+```
+
+Tier-1 và Cổng ML tiêu thụ luồng ở tốc độ đường truyền; nút cổ chai là Tier-2 (mỗi lô LLM
+~13 giây, 2 worker song song). Producer **tự điều tiết**: `demo.py` tạm dừng đẩy khi độ trễ
+consumer-group vượt 5.000 hoặc backlog LLM vượt 2.000. Cứ để chạy nền, Dashboard điền dần.
 
 ---
 
-## 2. Demo từng RQ
+## 3. Phân bổ dữ liệu tập demo
 
-### RQ1 — Xả tải và độ trễ
+`data/demo.json` — **496.885 sự kiện, 100% bản ghi THẬT** (không sinh dữ liệu giả).
 
-**Xem ở đâu:** Dashboard → thẻ *Phân bổ cơ chế xả tải* (điểm tĩnh · Cổng ML · tiền sử IP ·
-Z-score · chữ ký WAF · blacklist).
+### Theo nguồn
 
-```bash
-.venv/bin/python experiments/run_cache_efficiency.py     # bộ đệm Tầng 1.75
-.venv/bin/python experiments/measure_latency_baseline.py # hai tầng vs LLM-only
-```
+| Nguồn | Sự kiện | Tấn công | Vai trò trong demo |
+| :-- | --: | --: | :-- |
+| `cicids_max` — CSE-CIC-IDS2018, 10 ngày | 456.849 | 6.304 | Nền NetFlow. Phần lớn benign để Tier-1 xử lý tại chỗ |
+| `csic` — CSIC 2010 HTTP | 36.000 | 18.000 | **Tầng bằng chứng ứng dụng**: payload thật để chấm quy kết kỹ thuật |
+| `dapt_max` — DAPT2020 khối lượng | 1.500 | 345 | Nền chiến dịch |
+| `cicids` — lát ground_truth | 1.250 | 1.170 | Phủ đủ 15 lớp CICIDS có nhãn |
+| `adv_llm` — deepset + jackhhao | 730 | 730 | Tiêm nhiễm câu lệnh / jailbreak công khai (AML.T0051) |
+| `dapt` — chuỗi DAPT2020 thật | 402 | 324 | **9 chuỗi APT đa ngày** cho panel kill-chain |
+| `zeroday` — real-derived | 150 | 150 | Probe không chữ ký, Welford bắt |
+| `adversarial` — OWASP | 4 | 4 | Payload đối kháng gốc |
+| **Tổng** | **496.885** | **26.019** | **5,24% tấn công · 94,76% benign** |
 
-Câu chuyện kể: đẩy luồng → phần lớn sự kiện chết ở Tier-1 với chi phí dưới mili-giây, chỉ
-~10% chạm LLM. `stage_breakdown` trong `latency_benchmark.json` cho biết mỗi chặng chặn bao nhiêu.
+### Theo lớp tấn công (24 nhãn phân biệt)
 
-### RQ2 — Rào chắn AI và toàn vẹn pháp y
-
-**Xem ở đâu:** Dashboard → thẻ cảnh báo có nhãn `[NEO BẰNG CHỨNG]` và lý do `technique_not_in_rag`.
-
-```bash
-.venv/bin/python experiments/evaluate_adversarial.py --mode all   # tĩnh 120 mẫu + Tier-2 75 mẫu
-.venv/bin/python experiments/run_audit_tamper.py                  # giả mạo chuỗi HMAC
-.venv/bin/python -c "import sys;sys.path.insert(0,'.');from src.response.executor import verify_audit_trail_integrity as v;print(v())"
-```
-
-Câu chuyện kể: payload tiêm nhiễm bị đóng gói bằng nonce nên LLM không đọc nó như chỉ dẫn;
-mọi hành động ghi vào chuỗi HMAC, sửa một dòng là phát hiện ngay.
-
-### RQ3 — Tác tử có trạng thái và quy kết ATT&CK
-
-**Xem ở đâu:** Dashboard → huy hiệu kỹ thuật trên thẻ cảnh báo · trang *Threat Memory (APT)*.
-
-```bash
-export SENTINEL_TRACE=1                                          # đã bật sẵn trong .env
-.venv/bin/python scripts/eval_attack_mapper.py --mode rrf --evidence-layer payload
-.venv/bin/python scripts/eval_attack_mapper.py --mode e2e --evidence-layer payload
-```
-
-Câu chuyện kể: RAG kép lấy tài liệu ATT&CK, RRF chọn kỹ thuật, và **mọi mã hệ công bố đều
-phải có neo trong tài liệu của chính lô đó** — không có neo thì trả `N/A` + chuyển người.
-
-Bằng chứng sống, đọc từ `logs/tier2_trace.jsonl`:
-
-```bash
-.venv/bin/python -c "
-import json,re
-TECH=re.compile(r'\bT\d{4}(?:\.\d{3})?\b')
-rows=[json.loads(l) for l in open('logs/tier2_trace.jsonl') if l.strip()]
-bad=0
-for r in rows:
-    a=r.get('attack_mapper') or {}; fin=a.get('final_technique_id') or ''
-    if not fin: continue
-    ids=set(TECH.findall(json.dumps(r.get('rag') or {},ensure_ascii=False)))
-    if ids and fin not in ids: bad+=1
-print(f'{len(rows)} lô | quy kết KHÔNG neo trong RAG: {bad}')"
-```
-
-Kỳ vọng **0**. Đây là bất biến cốt lõi của hệ.
-
----
-
-## 3. Chạy thủ công từng phần
-
-```bash
-docker-compose up -d redis llm mlflow agent_ui          # hạ tầng (bỏ neo4j nếu thiếu RAM)
-.venv/bin/python scripts/reset_all.py                   # dọn sạch + bật đúng 1 subscriber
-.venv/bin/python main.py --mode server                  # Tier-1 + Cổng ML + Agent
-.venv/bin/python scripts/demo.py                        # phát luồng vào Redis
-```
-
-Đẩy riêng một nguồn: `scripts/push_flow.py --source {cicids|dapt|zeroday|adversarial} --limit N`
-
----
-
-## 4. Kết quả xem ở đâu
-
-| thứ cần xem | ở đâu |
+| Nhóm | Các lớp |
 | :-- | :-- |
-| Cảnh báo, huy hiệu kỹ thuật, hàng đợi HITL | `http://localhost:8501` |
-| Vết suy luận Tier-2 từng lô | `logs/tier2_trace.jsonl` |
-| Vết kiểm toán có ký HMAC | `config/audit_trail.db` |
-| Số liệu thô từng phép đo | `experiments/results/*.json` |
-| Báo cáo gộp | `.venv/bin/python scripts/export_final_report.py` → `reports/KET_QUA_CHOT_<ngày>.md` |
-| So sánh ablation | MLflow `http://localhost:5001` |
----
+| Web (CSIC 2010) | Anomalous unclassified 14.762 · Backup/Source File Probing 1.545 · SQL Injection 648 · Cross-Site Scripting 396 · CRLF Injection 390 · Path Traversal 145 · Forced Browsing 114 |
+| Mạng (CICIDS2018) | Bot · FTP-BruteForce · SSH-Bruteforce · Infilteration · Brute Force -Web · Brute Force -XSS · SQL Injection · DoS GoldenEye/Hulk/Slowloris/SlowHTTPTest · DDoS LOIC-HTTP/LOIC-UDP/HOIC — mỗi lớp 80 ca |
+| Đối kháng AI | Adversarial 50 · prompt injection + jailbreak 730 |
+| Chưa nhãn lớp | DAPT 402 (mang nhãn giai đoạn kill-chain thay vì lớp tấn công) |
 
-## 5. Kịch bản bảo vệ (~15 phút)
+### Ba điều cần biết trước khi demo
 
-1. `./scripts/run_demo.sh --fresh --small` — mở Dashboard, chỉ luồng chảy vào.
-2. **RQ1**: thẻ phân bổ xả tải — phần lớn sự kiện chết ở Tier-1.
-3. **RQ2**: mở một thẻ có `[NEO BẰNG CHỨNG]` — hệ từ chối khẳng định kỹ thuật không có bằng chứng.
-4. **RQ3**: mở một thẻ có huy hiệu kỹ thuật, đối chiếu với `logs/tier2_trace.jsonl`.
-5. Chạy `run_audit_tamper.py` tại chỗ — sửa một dòng log, chuỗi HMAC báo ngay.
-6. Mở `reports/KET_QUA_CHOT_<ngày>.md` cho câu hỏi về số liệu.
+**CSIC xuất hiện từ vị trí ~92.000.** Luồng sắp theo thời gian thật và CSIC nằm ở ngày 2–5,
+nên cắt lát đầu (`UNIFIED_STREAM_LIMIT` nhỏ) sẽ **không thấy web attack nào**. Muốn xem tầng
+ứng dụng nhanh thì dùng `--small` — `data/demo_small.json` là tập con phân tầng giữ đủ cả 8
+nguồn lẫn chuỗi APT.
 
-Câu hỏi sâu → mở đúng bằng chứng:
+**Trần dữ liệu đã chạm.** CSIC 2010 còn 36.000 normal / 25.065 anomalous nên 36.000 là mức cao
+nhất giữ được cân bằng 50/50. Kho tiêm nhiễm có đúng 730 mẫu (203 deepset + 527 jackhhao) và
+`_build_adv_llm` không lặp lại mẫu — xin nhiều hơn cũng chỉ nhận về 730.
 
-| hỏi | mở |
-| :-- | :-- |
-| "Zero-day nhạy tới đâu?" | `zeroday_graded_results.json` |
-| "F1 cao có phải do base-rate?" | `ablation_balanced_results.json` |
-| "Tràn ngữ cảnh thì sao?" | `context_stress_results.json` (báo **cả hai** pool) |
-| "Cổng ML gỡ tải bao nhiêu?" | `ablation_mlgate_results.json` |
-| "RAG kép đóng góp gì?" | `ablation_bcde_results.json` → `attribution_scores` |
-
----
-
-## 6. Cổng và endpoint (đều bind `127.0.0.1`)
-
-| dịch vụ | endpoint |
-| :-- | :-- |
-| LLM (llama.cpp) | `http://localhost:5000/v1/models` · `/v1/chat/completions` |
-| Dashboard HITL | `http://localhost:8501` |
-| MLflow | `http://localhost:5001` |
-| Redis | `localhost:6379` |
-| Neo4j Browser | `http://localhost:7474` |
-
----
-
-## 7. Sự cố hay gặp
-
-| triệu chứng | nguyên nhân |
-| :-- | :-- |
-| LLM không lên | `docker logs sentinel_llm`. Đổi model phải `--force-recreate --no-deps llm` |
-| Đổi model trong `.env` không ăn | docker-compose **ưu tiên biến môi trường** hơn tệp — phải `export` |
-| Dashboard trống | subscriber chưa chạy → `scripts/reset_all.py` |
-| Lượt 2 khác lượt 1 | thiếu `--fresh` — Tier-1 còn nhớ IP của lượt trước |
-| Số luật động phình sau khi chạy test | thiếu `SENTINEL_FREEZE_DYNAMIC_RULES=1` |
-| Tier-1 loại 100% kể cả tấn công | truyền cả vỏ bọc `ev` thay vì `ev["log"]` vào `engine.evaluate()` |
-
----
-
-## 8. Cheat sheet
-
-```bash
-docker-compose up -d                                    # hạ tầng
-./scripts/run_demo.sh --fresh --small                   # demo 1 lệnh
-.venv/bin/python scripts/reset_all.py                   # reset sạch
-SENTINEL_FREEZE_DYNAMIC_RULES=1 .venv/bin/pytest tests/ -q
-.venv/bin/ruff check . && uvx pyrefly check --python-interpreter-path .venv/bin/python
-.venv/bin/python scripts/export_final_report.py         # gom báo cáo
-docker-compose down                                     # tắt
-```
+**Chặn nhiều hơn drop là bình thường trên tập này.** Đo ở lượt chạy 11/08/2026: `BLOCK_IP` vượt
+`DROP` vì trong 100.000 sự kiện đầu có 4.319 IP riêng biệt mà **1.792 IP (41%) từng có ít nhất
+một sự kiện tấn công**. CICIDS2018 dùng chung dải IP cho cả lưu lượng lành lẫn tấn công, nên
+block-on-sight theo danh tiếng chặn luôn lưu lượng lành sau đó của cùng IP. Tỷ lệ xả tải vẫn
+đúng vì cả `BLOCK_IP` lẫn `DROP` đều không tốn token — nhưng nên chủ động nói ra khi trình bày.

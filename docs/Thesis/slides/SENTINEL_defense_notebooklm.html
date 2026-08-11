@@ -2136,7 +2136,7 @@
                     <div style="font-size: 1.55rem; font-weight: 800; color: #10B981;">Mô Hình &amp; Chính Sách 4 Dải Độ Tin Cậy</div>
                 </div>
                 <p style="font-size: 1.2rem; color: var(--text-main); line-height: 1.75; margin-bottom: 16px;">
-                    Mô hình LightGBM (<code>ml_gateway.py</code>) được huấn luyện trên <strong>~1 Triệu mẫu</strong> (MCC = <strong>0.6667</strong>, F1 = <strong>0.8248</strong> trên 2.534 sự kiện Cổng trực tiếp phán quyết), đóng vai trò phân loại tự động tại Tầng 1:
+                    Mô hình LightGBM (<code>ml_gateway.py</code>) được huấn luyện trên <strong>949.535 mẫu NetFlow</strong> với <strong>76 đặc trưng</strong> (MCC = <strong>0.6667</strong>, F1 = <strong>0.8248</strong> trên 2.534 sự kiện Cổng trực tiếp phán quyết), đóng vai trò phân loại tự động tại Tầng 1:
                 </p>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.8; list-style: none; padding-left: 0; margin-bottom: 16px;">
                     <li style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
@@ -2292,41 +2292,47 @@
 
     <!-- FSM Diagram SVG (High Contrast Light Background) -->
     <div style="width:100%; background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 18px; padding: 20px; margin-bottom: 22px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center;">
-        <svg viewBox="0 0 1000 120" style="width: 100%; height: auto; font-family: var(--font-body);">
+        <svg viewBox="0 0 1000 124" style="width: 100%; height: auto; font-family: var(--font-body);">
             <defs>
                 <marker id="purpleArrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill="#7C3AED"/>
                 </marker>
             </defs>
-            <path d="M 170 60 L 232 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
-            <path d="M 390 60 L 452 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
-            <path d="M 610 60 L 672 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
-            <path d="M 830 60 L 892 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
+            <path d="M 158 60 L 202 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
+            <path d="M 348 60 L 392 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
+            <path d="M 538 60 L 582 60" stroke="#7C3AED" stroke-width="3.5" marker-end="url(#purpleArrow)" />
+            <path d="M 728 60 L 752 60 L 752 26 L 792 26" stroke="#7C3AED" stroke-width="3" fill="none" marker-end="url(#purpleArrow)" />
+            <path d="M 728 60 L 752 60 L 752 94 L 792 94" stroke="#7C3AED" stroke-width="3" fill="none" marker-end="url(#purpleArrow)" />
 
-            <!-- Node 1: Guardrails -->
-            <rect x="20" y="20" width="150" height="80" rx="12" fill="#7C3AED" />
-            <text x="95" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="14">GUARDRAILS</text>
-            <text x="95" y="74" text-anchor="middle" fill="#EDE9FE" font-weight="600" font-size="12.5">Nonce &amp; Whitelist</text>
+            <!-- Nút 1: guardrails -->
+            <rect x="8" y="20" width="150" height="80" rx="12" fill="#7C3AED" />
+            <text x="83" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="13.5">GUARDRAILS</text>
+            <text x="83" y="74" text-anchor="middle" fill="#EDE9FE" font-weight="600" font-size="12">Nonce &amp; Whitelist</text>
 
-            <!-- Node 2: RAG Context -->
-            <rect x="240" y="20" width="150" height="80" rx="12" fill="#2563EB" />
-            <text x="315" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="14">RAG CONTEXT</text>
-            <text x="315" y="74" text-anchor="middle" fill="#BAE6FD" font-weight="600" font-size="12.5">FAISS + BM25 RRF</text>
+            <!-- Nút 2: rag_context -->
+            <rect x="198" y="20" width="150" height="80" rx="12" fill="#2563EB" />
+            <text x="273" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="13.5">RAG CONTEXT</text>
+            <text x="273" y="74" text-anchor="middle" fill="#BAE6FD" font-weight="600" font-size="12">FAISS + BM25 RRF</text>
 
-            <!-- Node 3: LLM Triage -->
-            <rect x="460" y="20" width="150" height="80" rx="12" fill="#6D28D9" />
-            <text x="535" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="14">LLM TRIAGE</text>
-            <text x="535" y="74" text-anchor="middle" fill="#EDE9FE" font-weight="600" font-size="12">Foundation-Sec 8B</text>
+            <!-- Nút 3: llm_triage -->
+            <rect x="388" y="20" width="150" height="80" rx="12" fill="#6D28D9" />
+            <text x="463" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="13.5">LLM TRIAGE</text>
+            <text x="463" y="74" text-anchor="middle" fill="#EDE9FE" font-weight="600" font-size="11.5">Foundation-Sec 8B</text>
 
-            <!-- Node 4: Attack Mapper -->
-            <rect x="680" y="20" width="150" height="80" rx="12" fill="#059669" />
-            <text x="755" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="14">ATTACK MAPPER</text>
-            <text x="755" y="74" text-anchor="middle" fill="#A7F3D0" font-weight="600" font-size="12.5">STIX MITRE TTP</text>
+            <!-- Nút 4: attack_mapper -->
+            <rect x="578" y="20" width="150" height="80" rx="12" fill="#059669" />
+            <text x="653" y="52" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="13.5">ATTACK MAPPER</text>
+            <text x="653" y="74" text-anchor="middle" fill="#A7F3D0" font-weight="600" font-size="12">STIX MITRE TTP</text>
 
-            <!-- Node 5: Decision -->
-            <rect x="900" y="20" width="90" height="80" rx="12" fill="#0F172A" />
-            <text x="945" y="52" text-anchor="middle" fill="#38BDF8" font-weight="800" font-size="13.5">DECISION</text>
-            <text x="945" y="74" text-anchor="middle" fill="#94A3B8" font-weight="600" font-size="11.5">BLOCK/HITL</text>
+            <!-- Nút 5: action_executor (nhánh tự quyết) -->
+            <rect x="798" y="2" width="194" height="46" rx="10" fill="#0F172A" stroke="#38BDF8" stroke-width="2" />
+            <text x="895" y="21" text-anchor="middle" fill="#38BDF8" font-weight="800" font-size="12.5">ACTION EXECUTOR</text>
+            <text x="895" y="38" text-anchor="middle" fill="#94A3B8" font-weight="600" font-size="11">BLOCK_IP có chữ ký HMAC</text>
+
+            <!-- Nút 6: human_in_the_loop (nhánh hoãn) -->
+            <rect x="798" y="72" width="194" height="46" rx="10" fill="#0F172A" stroke="#F59E0B" stroke-width="2" />
+            <text x="895" y="91" text-anchor="middle" fill="#F59E0B" font-weight="800" font-size="12.5">HUMAN IN THE LOOP</text>
+            <text x="895" y="108" text-anchor="middle" fill="#94A3B8" font-weight="600" font-size="11">AWAIT_HITL chờ chuyên gia</text>
         </svg>
     </div>
 
@@ -3187,7 +3193,7 @@ Kết quả thực nghiệm trên 1,500 truy vấn đạt TỈ LỆ TRÚNG CACHE
 
 Tại Tier 2, mô hình Foundation-Sec-8B-Instruct Q4_K_M chạy On-Premises qua llama.cpp CUDA trên duy nhất 1 card GPU RTX 4060 Ti 16GB, với lượng tử hóa Q4_K_M mô hình chiếm 7-8GB VRAM, vừa đủ chỗ cho bộ đệm ngữ cảnh và chỉ mục truy xuất.
 
-Luồng suy luận được điều phối bởi đồ thị LangGraph DAG qua 5 nút: guardrails -> rag_context -> llm_triage -> attack_mapper -> action_executor / human_in_loop.
+Luồng suy luận được điều phối bởi đồ thị LangGraph DAG qua 6 nút: guardrails -> rag_context -> llm_triage -> attack_mapper, rồi rẽ nhánh sang action_executor HOẶC human_in_the_loop.
 
 Hệ thống tối ưu KV-Caching bằng cách tĩnh hóa System Prompt. Tại nút attack_mapper, nếu không có mã kỹ thuật khớp rõ ràng, đồ thị sẽ chuyển thẳng trạng thái AWAIT_HITL, bỏ qua lượt gọi LLM thứ 2 để tiết kiệm chi phí tính toán.`,
 
