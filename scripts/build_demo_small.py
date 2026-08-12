@@ -125,7 +125,28 @@ def main() -> None:
 
     with open(SRC_FILE) as f:
         events = json.load(f)
-    print(f"[*] Nguồn: {len(events):,} sự kiện THẬT từ data/demo.json")
+    _n_src = len(events)
+
+    # BỎ hai nhóm tầng ỨNG DỤNG khỏi rổ lấy mẫu — bước 8 dựng LẠI chúng từ nguồn gốc.
+    #
+    # Khi script này ra đời, `demo.json` chưa có bản ghi CSIC lẫn đối kháng LLM nào, nên lấy
+    # mẫu từ nó rồi dựng thêm ở bước 8 là an toàn. Nay `demo.json` đã mang 36.000 bản ghi CSIC
+    # và 650 bản ghi `adv_llm`, nên bước phân tầng theo (nguồn × lớp) hút chúng vào `subset`
+    # rồi bước 8 nối thêm một bản nữa: bản ghi bị NHÂN ĐÔI, và chốt chống đụng IP báo động
+    # giả vì nhóm đối kháng "đụng" chính nó (đo 12/08/2026: 8 IP `198.18.0.x`, cả 8 đều là
+    # `adv_llm`, và script chết trước khi ghi tệp).
+    #
+    # Lọc ở ĐÂY chứ không nới chốt: chốt đang bảo vệ đúng thứ nó tuyên bố — IP của nhóm đối
+    # kháng phải rời hẳn MỌI NGUỒN KHÁC — nên thứ phải sửa là rổ đầu vào, không phải chốt.
+    # Tỉ lệ tấn công của luồng ĐẦY ĐỦ phải chốt TRƯỚC khi lọc — nó là mốc đối chiếu in ra
+    # cuối script, và tính trên rổ đã lọc thì mẫu số mất 36.730 bản ghi (đo: 5,2% -> 1,6%).
+    _src_ratio = 100 * sum(1 for e in events if _is_attack(e)) / len(events)
+    _REBUILT_AT_STEP_8 = {"csic", "adv_llm"}
+    events = [e for e in events if e.get("unified_source") not in _REBUILT_AT_STEP_8]
+    print(
+        f"[*] Nguồn: {_n_src:,} sự kiện THẬT từ data/demo.json "
+        f"(bỏ {_n_src - len(events):,} bản ghi csic/adv_llm — dựng lại ở bước 8)"
+    )
 
     # --- 1. Các IP APT ĐA-NGÀY: lấy TRỌN để chuỗi chắc chắn kích hoạt ------- #
     days_by_ip = defaultdict(set)
@@ -225,10 +246,40 @@ def main() -> None:
 
     # --- 8b. LÁT DÀN DỰNG: đổi IP để Tier-1 leo thang thay vì chặn ---------- #
     # Chỉ ĐỔI IP NGUỒN. Payload, URI, nhãn, mã kỹ thuật giữ nguyên 100%.
-    staged = [e for e in csic_logs if str(e.get("wa_mitre") or "").strip()][:n_staged]
+    # GOM THEO HỌ rồi CẤP 10 MẪU MỖI IP — giống hệt `build_demo.py`.
+    #
+    # Bản trước cấp MỖI MẪU MỘT IP (`k // 254`, `k % 254` chạy hết dải), nên 250 mẫu dàn dựng
+    # thành 250 IP và Tier-2 gộp ra 250 lô MỘT-LOG. Đo lượt chạy 12/08/2026 trên lát nhỏ:
+    # 746/750 lô có đúng 1 log. Một log thì tác tử gần như không có ngữ cảnh, nên lát nhỏ đo
+    # ra thứ KHÁC HẲN lát đầy (549 IP × 10 log) và hai bên không so được với nhau — đúng cái
+    # bẫy mà `RUN_PROJECT.md` đã cảnh báo cho lát đầy nhưng chưa vá ở đây.
+    #
+    # Gom theo họ để mỗi lô THUẦN một kỹ thuật (lô trộn thì không tồn tại đáp án đúng duy
+    # nhất), rồi bỏ phần dư < 10 của từng họ thay vì dồn sang họ khác.
+    _PER_IP = 10
+    _by_tech: dict[str, list] = {}
+    for e in csic_logs:
+        if t := str(e.get("wa_mitre") or "").strip():
+            _by_tech.setdefault(t, []).append(e)
+    # CHIA VÒNG TRÒN từng lô 10, KHÔNG lấp đầy theo họ đông nhất trước. Lấp tuần tự thì họ
+    # lớn nhất nuốt trọn ngân sách: đo được 250/250 mẫu dàn dựng đều là T1595.003, và bảng
+    # quy kết của lát nhỏ chỉ còn đúng một kỹ thuật — vô dụng cho cả demo lẫn hậu kiểm.
+    _pools = {t: list(v) for t, v in _by_tech.items() if len(v) >= _PER_IP}
+    _budget = n_staged // _PER_IP  # số lô
+    staged: list = []
+    while _budget > 0 and _pools:
+        for _t in sorted(_pools):
+            if _budget <= 0:
+                break
+            staged.extend(_pools[_t][:_PER_IP])
+            _pools[_t] = _pools[_t][_PER_IP:]
+            _budget -= 1
+        _pools = {t: v for t, v in _pools.items() if len(v) >= _PER_IP}
     for k, ev in enumerate(staged):
-        # /16 nên cần hai octet — mỗi mẫu một IP riêng, không quấn vòng đè lên nhau.
-        ev["Source IP"] = f"{STAGED_IP_PREFIX}{(k // 254) % 254}.{k % 254}"
+        # DẢI LIÊN TIẾP: 10 mẫu kề nhau -> cùng một IP, nên bộ đệm Tier-2 đầy 10 trước khi
+        # timeout kịp chạm. /16 nên cần hai octet.
+        _slot = k // _PER_IP
+        ev["Source IP"] = f"{STAGED_IP_PREFIX}{_slot // 254}.{_slot % 254 + 1}"
         ev["demo_staged"] = True  # cờ CÔNG KHAI để hậu kiểm tách nhóm này ra
     if staged:
         print(
@@ -291,7 +342,7 @@ def main() -> None:
 
     # --- Báo cáo phân bổ THẬT để đối chiếu --------------------------------- #
     n_atk = sum(1 for e in subset if _is_attack(e))
-    src_ratio = 100 * sum(1 for e in events if _is_attack(e)) / len(events)
+    src_ratio = _src_ratio
     print(f"\n[✓] Đã lưu {len(subset):,} sự kiện -> {OUT_FILE}")
     # Tập nhỏ được PHÂN TẦNG cho phủ panel, nên tỉ lệ tấn công CAO HƠN luồng đầy đủ theo
     # thiết kế. In cả hai cạnh nhau để không ai trích tỉ lệ của tập nhỏ như thể đó là hồ

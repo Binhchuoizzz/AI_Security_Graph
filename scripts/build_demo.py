@@ -8,6 +8,7 @@ sys.path.append(ROOT)
 
 # enrich + build_stream dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
 from experiments.unified_dataset import BENCHMARK_DAYS, build_stream, enrich
+from src.tier1_filter.rule_engine import match_waf_family
 
 # 10 ngày CICIDS2018 THẬT — phủ ĐỦ 15 loại tấn công + benign khắp nơi (nguồn khối lượng cho
 # demo 100k). Mỗi ngày build_stream lấy ~25% tấn công / 75% benign (nhiều benign để drop).
@@ -39,9 +40,18 @@ DEMO_DAYS = BENCHMARK_DAYS
 # tấn công web THẬT với payload thật — Tier-2 vẫn kết luận được là độc hại, chỉ trả `N/A` ở ô
 # kỹ thuật thay vì đoán bừa. Kho CSIC có 18.000 mẫu bất thường nên dàn dựng 9.000 vẫn để lại
 # một nửa cho Tier-1 chặn bằng chữ ký.
-N_STAGED = 9_000
+N_STAGED = 5_500
 STAGED_IP_PREFIX = "198.19."
-N_STAGED_IPS = 90  # 9.000 / 90 = 100 mẫu mỗi IP -> 10 lô đầy mỗi IP
+# 9.000 / 900 = ĐÚNG 10 mẫu mỗi IP -> đúng 1 lô đầy mỗi IP.
+#
+# VÌ SAO KHÔNG GOM ÍT IP HƠN. Có một TRẦN CỨNG không hiển nhiên: khi một IP xả lô, subscriber
+# cắm cờ `pending_ai:{ip}` sống 60 giây và MỌI sự kiện tiếp theo của IP ấy bị nén thẳng, không
+# vào bộ đệm. Nên số lô tối đa của một đợt dồn = SỐ IP, không phải số mẫu ÷ 10.
+#
+# Đo ở lượt chạy 11/08/2026 với 90 IP × 100 mẫu: chỉ ra 91 lô (không phải 900) và 8.166 mẫu bị
+# nén im lặng. Cùng lượt đó, nhóm tiêm nhiễm 65 IP × đúng 10 mẫu ra trọn 64 lô, không mẫu nào
+# bị nén — chính là công thức đúng, nay áp cho cả lát CSIC.
+N_STAGED_IPS = 550
 
 # Tiêm nhiễm câu lệnh / jailbreak — kho công khai deepset + jackhhao.
 #
@@ -60,11 +70,17 @@ INJECTION_UNSTAGED_PREFIX = "198.20."
 N_INJECTION_UNSTAGED_IPS = 8
 
 # NGÂN SÁCH TỔNG, tính bằng LÔ:
-#   CSIC dàn dựng      9.000 / 10 =  900 lô
+#   CSIC dàn dựng      5.500 / 10 =  550 lô
 #   Tiêm nhiễm dàn dựng  650 / 10 =   65 lô
 #   Dư âm zero-day/DAPT           ≈  25 lô
 #                                 ─────────
-#                                 ≈  990 lô  ·  ~18,3 s/lô ÷ 2 khe ≈ 2,5 giờ
+#                                 ≈  640 lô  ·  ~18 s/lô ÷ 2 khe ≈ 1,6 giờ
+#
+# VÌ SAO KHÔNG PHẢI 1.000. Trần không nằm ở ngân sách mà ở DỮ LIỆU: chỉ 5.510/18.000 bản ghi
+# CSIC tấn công (30,6%) mang chữ ký WAF, và chỉ nhóm đó mới thật sự leo thang được lên Tier-2.
+# Muốn cán 1.000 lô thì phải dàn dựng thêm ~3.500 bản ghi KHÔNG có bằng chứng — tức cố tình
+# đẩy lưu lượng không quy kết được lên LLM, đúng thứ đã sinh ra 229 lệnh chặn nhầm ở lượt
+# 11/08/2026. Con số lô là hệ quả của chất lượng bằng chứng, không phải mục tiêu tự thân.
 
 # Phần khối benign dành làm ĐỆM THUẦN ở đầu luồng (không xen một sự kiện tấn công nào).
 # 0,80 = 80% lượng benign chạy trước; 20% benign còn lại được trộn đều với TOÀN BỘ tấn công.
@@ -146,16 +162,62 @@ def main():
     # Gom vào `N_STAGED_IPS` IP thì cùng số mẫu ấy thành các lô đầy 10 — chi phí LLM giảm gần
     # 10 lần, và quan trọng hơn: một lô 10 request cùng nguồn mới đúng hình dạng dữ liệu mà
     # Tier-2 sinh ra để đọc (nhiều bằng chứng cùng một kẻ), thay vì bắt nó phán trên 1 dòng.
-    # ƯU TIÊN mẫu CÓ mã kỹ thuật, rồi mới lấy tiếp phần CSIC bất thường còn lại cho đủ ngân sách.
+    # CHỌN THEO "CÓ CHỮ KÝ WAF", KHÔNG THEO "LÀ BẢN GHI TẤN CÔNG".
+    #
+    # LỖI ĐÃ SỬA 12/08/2026. Bản trước lấy mọi bản ghi CSIC mang nhãn tấn công. Nhưng nhóm
+    # `Anomalous (unclassified)` phần lớn bất thường ở những chỗ KHÔNG nằm trong các trường đã
+    # trích (header dị dạng, giá trị sai kiểu), nên Tier-1 chấm 0 điểm và DROP thẳng — chúng
+    # không bao giờ tới được Tier-2. Đo trên luồng đã dựng: bản ghi dàn dựng
+    # `198.19.1.70 /tienda1/publico/pagar.jsp` -> `match_waf_family` trả None -> DROP score 0.
+    #
+    # Hệ quả nếu cứ dàn dựng chúng: 70% ngân sách lô bốc hơi ở Tier-1, và phần LỌT lên Tier-2
+    # lại là phần KHÔNG có bằng chứng quy kết — đúng nhóm sinh ra 229 lệnh chặn nhầm ở lượt
+    # 11/08/2026 (xem `batch_attack_vocabulary`).
+    #
+    # Đo trên toàn kho: 5.510/18.000 bản ghi tấn công (30,6%) mang chữ ký, và chữ ký khớp
+    # 0 bản ghi lành. Nên đây vừa là tiêu chí ĐÚNG (chỉ dàn dựng thứ Tier-1 thật sự leo thang
+    # được), vừa là TRẦN THẬT của số lô chất lượng: 551 lô, không phải 900.
     _csic_atk = [
         e
         for e in enriched_logs
         if e.get("unified_source") == "csic"
         and str(e.get("gt_label") or "Benign") not in ("Benign", "None")
     ]
-    _with_tech = [e for e in _csic_atk if str(e.get("wa_mitre") or "").strip()]
-    _no_tech = [e for e in _csic_atk if not str(e.get("wa_mitre") or "").strip()]
-    staged = (_with_tech + _no_tech)[:N_STAGED]
+    _sig = [e for e in _csic_atk if match_waf_family(e)]
+    # Trong nhóm có chữ ký, ưu tiên tiếp mẫu CÓ mã kỹ thuật để bảng quy kết giàu hơn.
+    _with_tech = [e for e in _sig if str(e.get("wa_mitre") or "").strip()]
+    _no_tech = [e for e in _sig if not str(e.get("wa_mitre") or "").strip()]
+
+    # GOM THEO HỌ KỸ THUẬT TRƯỚC KHI CẮT LÔ.
+    #
+    # Tier-2 phát ĐÚNG MỘT kỹ thuật cho cả lô. Nếu lô chứa nhiều họ thì không tồn tại đáp án
+    # đúng duy nhất, và phép đo quy kết mất nghĩa. Đo lượt chạy 12/08/2026 trên thứ tự cũ
+    # (nguyên thứ tự tệp CSIC): 313/550 lô dàn dựng TRỘN 3–5 họ — ví dụ 198.19.0.1 gồm 3 dò
+    # tệp + 3 SQLi + 2 XSS + 2 CRLF. Tệ hơn: 237 lô "thuần" còn lại đều là `Anomalous
+    # (unclassified)`, tức KHÔNG có kỹ thuật thật, nên **không một lô nào chấm được theo luật
+    # chặt**. Chấm nới ("kỹ thuật gán có nằm trong tập kỹ thuật của lô") cho 43/44 = 97,7%,
+    # nhưng lô 4 họ thì luật ấy tặng sẵn 4 cơ hội — không dùng làm bằng chứng năng lực được.
+    #
+    # Gom theo `wa_mitre` cũng SÁT THỰC TẾ hơn: một IP tấn công thường chạy một chiến dịch,
+    # không rải bốn họ khai thác khác nhau trong mười yêu cầu liên tiếp.
+    _by_tech: dict[str, list] = {}
+    for e in _with_tech:
+        _by_tech.setdefault(str(e.get("wa_mitre")).strip(), []).append(e)
+    # Họ đông xếp trước để lấp đầy ngân sách bằng các lô nguyên vẹn 10 log; phần dư < 10 của
+    # mỗi họ bị bỏ chứ không dồn sang họ khác — dồn là tái tạo đúng lô trộn vừa loại bỏ.
+    _grouped: list = []
+    for _tech in sorted(_by_tech, key=lambda t: -len(_by_tech[t])):
+        _evs = _by_tech[_tech]
+        _grouped.extend(_evs[: len(_evs) // 10 * 10])
+    _dropped = len(_with_tech) - len(_grouped)
+    if _dropped:
+        print(f"    [i] bỏ {_dropped} mẫu dư lẻ (< 10) để mọi lô dàn dựng THUẦN một họ kỹ thuật")
+    staged = (_grouped + _no_tech)[:N_STAGED]
+    if len(staged) < N_STAGED:
+        print(
+            f"    [!] chỉ có {len(staged):,} mẫu CSIC mang chữ ký (ngân sách {N_STAGED:,}) — "
+            f"số lô dàn dựng sẽ là {len(staged) // 10}"
+        )
 
     # DẢI LIÊN TIẾP, KHÔNG RẢI VÒNG TRÒN.
     #

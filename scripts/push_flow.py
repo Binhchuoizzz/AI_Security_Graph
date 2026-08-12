@@ -53,6 +53,21 @@ load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 DEMO_FILE = os.path.join(ROOT, "data", "demo.json")
 ADV_GLOB = os.path.join(ROOT, "experiments", "adversarial", "*", "samples.json")
+
+# Năm bộ do `scripts/build_adversarial_suite.py` SINH RA bằng template Python tất định — tức
+# do tác giả tự soạn, không phải lưu lượng thu thập được. Ba bộ còn lại là dữ liệu THẬT công
+# khai: `advbench_gcg` (AdvBench), `jailbreak_hf` (jackhhao), `prompt_injection_hf` (deepset),
+# nạp qua `scripts/ingest_adversarial_datasets.py`. Tỉ lệ: 603 thật / 120 tự soạn.
+#
+# VÌ SAO CẦN TÁCH. `_adversarial_logs` nạp theo `sorted(glob)` rồi cắt TIỀN TỐ, nên `--limit`
+# lấy gì phụ thuộc thứ tự chữ cái của tên thư mục chứ không phụ thuộc xuất xứ. Tài liệu demo
+# từng ghi `--limit 120` = "encoding 45 · structural 20 · semantic 20 · jailbreak 20 ·
+# rag_poison 15" — đúng ở thời điểm chỉ có 120 mẫu tự soạn, nhưng sau khi thêm 603 mẫu thật
+# thì `advbench_gcg` sắp lên đầu và `--limit 120` thực ra lấy trọn 120 mẫu AdvBench. Số cũ
+# không đỏ lên ở đâu cả. `--real-only` cho phép chọn theo XUẤT XỨ thay vì theo thứ tự.
+_AUTHORED_ADV_SETS = frozenset(
+    {"encoding_bypass", "structural_attacks", "semantic_confusion", "jailbreak", "rag_poisoning"}
+)
 MAX_QUEUE_SIZE = 10_000
 
 # user-facing source -> giá trị unified_source trong demo.json.
@@ -101,10 +116,16 @@ def _unified_logs(source: str, limit: int, warmup: int):
         yield determine_queue(log), log
 
 
-def _adversarial_logs(limit: int):
-    """(queue, log) cho 723 payload adversarial — mỗi mẫu 1 IP TEST-NET riêng."""
+def _adversarial_logs(limit: int, real_only: bool = False):
+    """(queue, log) cho 723 payload adversarial — mỗi mẫu 1 IP TEST-NET riêng.
+
+    `real_only=True` bỏ 120 mẫu do `build_adversarial_suite.py` tự sinh, chỉ giữ 603 mẫu từ
+    AdvBench / jackhhao / deepset — xem `_AUTHORED_ADV_SETS`.
+    """
     samples: list[dict] = []
     for path in sorted(glob.glob(ADV_GLOB)):
+        if real_only and os.path.basename(os.path.dirname(path)) in _AUTHORED_ADV_SETS:
+            continue
         with open(path, encoding="utf-8") as f:
             samples.extend(json.load(f))
     if limit and limit > 0:
@@ -152,10 +173,16 @@ def main():
     ap.add_argument(
         "--dry-run", action="store_true", help="Chỉ đếm phân bố queue, KHÔNG đẩy Redis."
     )
+    ap.add_argument(
+        "--real-only",
+        action="store_true",
+        help="Chỉ dùng 603 mẫu đối kháng THẬT (AdvBench/jackhhao/deepset), "
+        "bỏ 120 mẫu do build_adversarial_suite.py tự sinh.",
+    )
     args = ap.parse_args()
 
     gen = (
-        _adversarial_logs(args.limit)
+        _adversarial_logs(args.limit, args.real_only)
         if args.source == "adversarial"
         else _unified_logs(args.source, args.limit, args.warmup)
     )
