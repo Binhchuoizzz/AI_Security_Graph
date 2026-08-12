@@ -15,6 +15,15 @@ TIER_RULE = "tier1_rule"  # bộ máy luật Tier-1 (chữ ký, Welford, luật 
 TIER_ML = "tier1_ml"  # Cổng ML (LightGBM) — vẫn thuộc Tier-1
 TIER_LLM = "tier2_llm"  # tác tử LangGraph Tier-2
 TIER_MANUAL = "manual"  # analyst thao tác tay trên Dashboard
+# Dòng do CHÍNH bộ tự kiểm ghi ra (`scripts/audit_ui_functions.py`), không phải sự kiện thật.
+#
+# VÌ SAO CẦN MỘT NHÃN RIÊNG. Bộ tự kiểm phải gọi đúng `block_ip` thật thì mới kiểm được đường
+# thật, nên nó ĐỂ LẠI dòng trong `audit_trail`. Mà `audit_trail` là sổ móc xích HMAC — xoá một
+# dòng là gãy chuỗi, nên không dọn được. Đo ngày 12/08/2026: sau một lượt tự kiểm, Dashboard
+# có 2 lệnh `BLOCK_IP` của IP thử nghiệm 203.0.113.254 nằm lẫn với lệnh chặn thật, không thẻ
+# nào đếm chúng nên tổng trên thẻ phễu lệch tổng trong sổ. Gắn nhãn thì dòng vẫn còn (chuỗi
+# nguyên vẹn) nhưng không còn giả dạng một lệnh chặn thật.
+TIER_SELFTEST = "selftest"
 
 KEY_ALIASES = {
     "src_ip": "Source IP",

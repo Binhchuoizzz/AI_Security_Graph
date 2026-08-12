@@ -225,3 +225,70 @@ def test_weak_alert_still_recorded_in_audit_trail():
     raise_alert(ip, "cảnh báo yếu cần analyst thấy", confidence=0.42)
     trail = get_audit_trail_for_ip(ip, limit=5)
     assert trail and trail[0]["action"] == "ALERT"
+
+
+# ==============================================================================
+# TÁI PHẠM — cộng dồn phỏng đoán VÔ CĂN CỨ không được thành lệnh chặn
+# ==============================================================================
+def test_evidence_free_alert_never_escalates_however_many_times():
+    """Lô không có từ vựng tấn công đặc trưng: lặp bao nhiêu lần cũng chỉ ra ALERT.
+
+    HỒI QUY LỖI THẬT (lượt chạy 12/08/2026). Trần tự-tin Tier-2 đỗ độ tin cậy tại 0,84 — cố
+    ý sát dưới ngưỡng chặn 0,85. Nhưng 0,84 > REPEAT_OFFENDER_MIN_CONF (0,65), nên luật tái
+    phạm đọc số thấy "cảnh báo mạnh" và hiểu NGƯỢC ý của trần: 9 lệnh chặn Tier-2 đầu tiên
+    đều là `escalated_alert_to_block` trên lô `shield_has_attack_evidence=false`, quy kết
+    sai (T1505.003 Web Shell, T1571) vào lưu lượng không mang chữ ký nào.
+    """
+    ip = "203.0.113.94"
+    for i in range(5):
+        assert (
+            raise_alert(ip, f"vô căn cứ lần {i + 1}", confidence=0.84, evidence_backed=False)
+            == "ALERT"
+        )
+
+    import src.agent.threat_memory as tm_mod
+
+    rep = tm_mod.threat_memory.get_ip_reputation(ip)
+    assert rep is None or int(rep["total_alerts"]) == 0
+
+
+def test_evidence_backed_alert_still_escalates_on_repeat():
+    """Có bằng chứng thì luật tái phạm PHẢI còn nguyên tác dụng — bản vá không được làm cùn."""
+    ip = "203.0.113.95"
+    assert raise_alert(ip, "có chữ ký lần 1", confidence=0.84, evidence_backed=True) == "ALERT"
+    assert raise_alert(ip, "có chữ ký lần 2", confidence=0.84, evidence_backed=True) == "BLOCK_IP"
+
+
+def test_known_bad_without_batch_evidence_alerts_instead_of_reblocking():
+    """IP đã known-bad + lô KHÔNG bằng chứng -> ALERT, KHÔNG phát lệnh chặn thứ hai.
+
+    HỒI QUY LỖI THẬT (lượt chạy 12/08/2026). Bản trước chừa nhánh `prior_score >= 100` với
+    lý lẽ "danh tiếng 100 là bằng chứng ngoài lô". Đo thật cho thấy lý lẽ đó sai: 18 lệnh
+    leo thang lọt qua đúng nhánh này, và **cả 18 đều tái-chặn IP ĐÃ bị chặn sẵn** — không
+    thêm được chút ngăn chặn nào, vì `reputation >= 100` đã khiến Tier-1 chặn on-sight vĩnh
+    viễn (ngưỡng 70, độc lập với TTL 1h của sổ đen Redis). Cái giá là 18 dòng `BLOCK_IP`
+    mang quy kết bịa lẫn vào bảng thống kê.
+
+    Kiểm HÀNH VI chứ không kiểm điều kiện: IP vẫn phải nằm trong kho known-bad sau lời gọi
+    — ALERT ở đây là "không chặn LẠI", không phải "thả ra".
+    """
+    import src.agent.threat_memory as tm_mod
+
+    ip = "203.0.113.96"
+    tm_mod.threat_memory.mark_ip_blocked(ip, mitre_technique="T1190")
+    assert raise_alert(ip, "quay lại sau khi bị chặn", confidence=0.84, evidence_backed=False) == (
+        "ALERT"
+    )
+    rep = tm_mod.threat_memory.get_ip_reputation(ip)
+    assert rep and float(rep["reputation_score"]) >= 100.0, "IP phải VẪN bị giam bởi danh tiếng"
+
+
+def test_known_bad_with_batch_evidence_still_blocks():
+    """Cùng IP known-bad nhưng lô CÓ bằng chứng -> vẫn phải chặn. Bản vá không được làm cùn."""
+    import src.agent.threat_memory as tm_mod
+
+    ip = "203.0.113.97"
+    tm_mod.threat_memory.mark_ip_blocked(ip, mitre_technique="T1190")
+    assert raise_alert(ip, "quay lại và tấn công tiếp", confidence=0.84, evidence_backed=True) == (
+        "BLOCK_IP"
+    )

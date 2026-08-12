@@ -27,6 +27,7 @@ import logging  # noqa: E402
 
 logging.disable(logging.WARNING)
 
+from src.guardrails.constants import TIER_SELFTEST  # noqa: E402
 from src.response.executor import (  # noqa: E402
     audit_key_is_default,
     block_ip,
@@ -127,7 +128,7 @@ def main() -> int:
         "Source IP", TEST_IP, score=95, source="manual_audit", reason="quét chức năng"
     )
     fb.approve_rule(TEST_IP, "Source IP")
-    block_ip(TEST_IP, "[Tier-1 Filter] quét chức năng tự động")
+    block_ip(TEST_IP, "[Tier-1 Filter] quét chức năng tự động", tier=TIER_SELFTEST)
 
     check("sink Redis: blacklist:<ip> tồn tại", _blacklisted(TEST_IP))
     st = _rule_status(TEST_IP)
@@ -168,7 +169,7 @@ def main() -> int:
     fb.approve_rule(TEST_IP, "Source IP")
     check("Phê duyệt → ACTIVE", _rule_status(TEST_IP) == "ACTIVE")
 
-    block_ip(TEST_IP, "[Tier-1 Filter] mô phỏng thi hành sau phê duyệt")
+    block_ip(TEST_IP, "[Tier-1 Filter] mô phỏng thi hành sau phê duyệt", tier=TIER_SELFTEST)
     fb.reject_rule(TEST_IP, "Source IP")
     unblock_ip(TEST_IP)
     st4 = _rule_status(TEST_IP)

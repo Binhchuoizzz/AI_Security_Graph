@@ -95,13 +95,22 @@ def _cfg_tier2() -> dict[str, Any]:
 #
 # Khoá tra là chuỗi con VIẾT THƯỜNG của tên họ trong `_WAF_PATTERNS`, nên khớp trực tiếp
 # với chuỗi lý do mà `_check_waf_signatures` sinh ra.
+#
+# CẤM ĐƯA TÊN CỦA MỘT KỸ THUẬT KHÁC VÀO CỤM. Cụm đi thẳng vào truy vấn vector, nên mỗi từ
+# thừa đều kéo kết quả về phía kỹ thuật mang từ đó. Bản trước ánh xạ XSS thành "cross-site
+# scripting XSS **drive-by compromise** web client exploit" — mà "Drive-by Compromise" đúng
+# là TÊN của T1189. Đo 12/08/2026: truy vấn đó trả về [T1189, T1608.004, T1190, T1203, T1571]
+# và **không có** T1059.007; bỏ hai từ ấy thì T1059.007 lên hạng 1. Hậu quả trên lượt chạy:
+# 0/16 lô XSS được quy kết đúng, phần lớn bị gán T1189 — tức hệ thống trả về đúng thứ mà
+# truy vấn đã tự khai. Cùng một cái bẫy với lá chắn T1571 từng tự chứng minh bằng chính tên
+# mình. Viết cụm bằng NGỮ NGHĨA của đòn tấn công, không bằng tên kỹ thuật hàng xóm.
 _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
     # ── Tiêm nhiễm web kinh điển ──
     ("sql injection", "SQL injection exploit public-facing application web vulnerability"),
     ("sqli", "SQL injection exploit public-facing application web vulnerability"),
     ("nosql injection", "NoSQL injection exploit public-facing application database query"),
-    ("cross-site scripting", "cross-site scripting XSS drive-by compromise web client exploit"),
-    ("xss", "cross-site scripting XSS drive-by compromise web client exploit"),
+    ("cross-site scripting", "cross-site scripting XSS web client script injection"),
+    ("xss", "cross-site scripting XSS web client script injection"),
     (
         "dò tệp sao lưu/mã nguồn",
         "active scanning wordlist scanning content discovery probing for backup and source "
@@ -394,6 +403,18 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
     # Từ vựng XÁC THỰC: chỉ thêm khi có LẶP LẠI, vì một lần gửi biểu mẫu đăng nhập là hành
     # vi bình thường của mọi ứng dụng web — chính chỗ này từng biến 70 lô lành thành "brute
     # force". Ba lần trở lên trong cùng một lô (cùng một IP) mới là tín hiệu hành vi.
+    #
+    # VÀ CHỈ KHI LÔ KHÔNG CÓ CHỮ KÝ CỤ THỂ. "Lặp lại gửi thông tin xác thực" là tín hiệu HÀNH
+    # VI, cùng hạng với các cụm ngưỡng ở `_GENERIC_TERMS`: nó mô tả nhịp độ, không mô tả đòn
+    # tấn công. Nối nó cạnh một chữ ký cụ thể thì nó KÉO TỤT chữ ký ấy, đúng cơ chế mà chú
+    # thích của `_canonical_attack_terms` đã cảnh báo cho nhóm ngưỡng.
+    #
+    # Đo trên lượt chạy 12/08/2026, quy kết luật CHẶT theo lớp: hai lớp mà payload nằm NGOÀI
+    # tham số đăng nhập đạt gần tuyệt đối (T1595.003 132/138 · T1190 64/64), còn ba lớp mà
+    # CSIC nhúng payload VÀO chính form đăng ký thì trượt sạch — T1071.001 0/39, T1059.007
+    # 0/16, T1083 0/14 — và phần lớn bị gán T1110.x. Truy vấn của một lô CRLF cho thấy rõ:
+    # "HTTP response splitting header injection … **repeated authentication attempts brute
+    # force password guessing** … " — chữ ký đúng đứng đầu nhưng vẫn thua.
     _auth_logs = sum(
         1
         for lg in logs
@@ -405,8 +426,9 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
             re.IGNORECASE,
         )
     )
+    _has_specific_signature = any(t not in _GENERIC_TERMS for t in parts)
     p_terms: list[str] = []
-    if _auth_logs >= 3:
+    if _auth_logs >= 3 and not _has_specific_signature:
         p_terms.append("repeated authentication attempts brute force password guessing")
 
     for pt in p_terms:
@@ -1040,21 +1062,25 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     # đặc trưng: hệ thống không hề nắm bằng chứng nào phân biệt 67 ca đúng với 69 ca sai,
     # nên 67 lệnh chặn kia đúng do may chứ không do năng lực. 45/69 ca sai mang nhãn T1571.
     #
-    # Hạ trần xuống dải ALERT thay vì AWAIT_HITL: ALERT không chặn, không chất thêm việc
-    # cho người, và `raise_alert` vẫn TỰ leo thang lên BLOCK_IP nếu IP đó quay lại — nên
-    # kẻ tấn công thật vẫn bị chặn, chỉ là sau bằng chứng thứ hai thay vì phỏng đoán đầu.
-    if action == "BLOCK_IP" and not validated_decision.get("_critical_shield"):
-        if not batch_attack_vocabulary(state.current_batch_logs or []):
-            _capped = min(float(confidence or 0.0), decision_policy.LLM_BLOCK_CONF - 0.01)
-            if trace.enabled():
-                trace.add(
-                    "policy",
-                    confidence_capped_from=float(confidence or 0.0),
-                    confidence_capped_to=_capped,
-                    cap_reason="no_specific_attack_vocabulary",
-                )
-            confidence = _capped
-            validated_decision["confidence"] = _capped
+    # Hạ trần xuống dải ALERT thay vì AWAIT_HITL: ALERT không chặn và không chất thêm việc
+    # cho người. Cảnh báo này KHÔNG được phép tự tích luỹ thành lệnh chặn ở lần sau — xem
+    # `_batch_has_attack_evidence` ngay dưới đây.
+    _batch_has_attack_evidence = bool(batch_attack_vocabulary(state.current_batch_logs or []))
+    if (
+        action == "BLOCK_IP"
+        and not validated_decision.get("_critical_shield")
+        and not _batch_has_attack_evidence
+    ):
+        _capped = min(float(confidence or 0.0), decision_policy.LLM_BLOCK_CONF - 0.01)
+        if trace.enabled():
+            trace.add(
+                "policy",
+                confidence_capped_from=float(confidence or 0.0),
+                confidence_capped_to=_capped,
+                cap_reason="no_specific_attack_vocabulary",
+            )
+        confidence = _capped
+        validated_decision["confidence"] = _capped
 
     # ── CHÍNH SÁCH ĐỘ-TIN-CẬY THỐNG NHẤT (chung Cổng ML + LLM) ────────────────────
     # Confidence LÁI action thay vì để LLM tự chọn (sửa lỗi "0.75 + T1571 chung chung -> BLOCK").
@@ -1490,16 +1516,37 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         bool(_final_tech_id) and not _is_aml and bool(_rag_ids) and _final_tech_id not in _rag_ids
     ) or bool(_ungrounded_candidate)
     _shield_target = _final_tech_id or _ungrounded_candidate
+
+    # ĐÍCH ĐẾN CỦA HAI LÁ CHẮN DƯỚI ĐÂY: người xử lý, hay chỉ là cảnh báo?
+    #
+    # Cả hai lá chắn đều trả lời cùng một câu: "không khẳng định được kỹ thuật". Nhưng câu đó
+    # có hai nghĩa rất khác nhau, và trước đây cả hai cùng đổ vào hàng đợi HITL:
+    #   * Lô CÓ bằng chứng tấn công (chữ ký WAF khớp) mà không đặt tên được kỹ thuật -> đây là
+    #     tấn công thật chưa phân loại được. Người PHẢI xem.
+    #   * Lô KHÔNG có bằng chứng tấn công nào -> thứ duy nhất hệ thống biết là "nhịp độ bất
+    #     thường", còn mã kỹ thuật chỉ là phỏng đoán. Đẻ một phiếu HITL cho mỗi lô như vậy
+    #     chính là nạn ngập hàng đợi mà đề tài này đặt ra để giải quyết.
+    #
+    # Đo trên lượt chạy 12/08/2026, 49 lô đầu (toàn bộ nằm ở vùng lưu lượng LÀNH trước mốc
+    # tấn công): 23 lô vào HITL, trong đó 14 do `technique_not_in_rag` và 8 do lá chắn ảo
+    # giác — không lô nào có bằng chứng tấn công. Tỉ lệ HITL 47% cho một cửa sổ 100% lành.
+    _has_attack_evidence = bool(batch_attack_vocabulary(state.current_batch_logs or []))
+    _shield_action = "AWAIT_HITL" if _has_attack_evidence else "ALERT"
+
     if trace.enabled():
-        trace.add("attack_mapper", technique_grounded_in_rag=not _ungrounded)
+        trace.add(
+            "attack_mapper",
+            technique_grounded_in_rag=not _ungrounded,
+            shield_has_attack_evidence=_has_attack_evidence,
+        )
     if _ungrounded:
         _was_block = decision.get("action") == "BLOCK_IP"
         logger.warning(
             f"[NEO BẰNG CHỨNG] {_shield_target} KHÔNG có trong ngữ cảnh RAG của lô này — "
             f"đặt kỹ thuật về N/A và chuyển người xử lý (đúng hợp đồng prompt)."
         )
-        decision["action"] = "AWAIT_HITL"
-        decision["hitl_reason"] = "technique_not_in_rag"
+        decision["action"] = _shield_action
+        decision["hitl_reason"] = "technique_not_in_rag" if _has_attack_evidence else ""
         decision["mitre_technique"] = "N/A"
         decision["mitre_technique_id"] = ""
         decision["mitre_technique_name_verified"] = False
@@ -1532,12 +1579,19 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     ):
         logger.warning(
             f"[ATT&CK MAPPER] Dấu hiệu tự chém/không match kỹ thuật rõ ràng "
-            f"(status={mapping.mapping_status}). Ép action về AWAIT_HITL."
+            f"(status={mapping.mapping_status}). Ép action về {_shield_action}."
         )
         if trace.enabled():
             trace.add("attack_mapper", hallucination_shield=True)
-        decision["action"] = "AWAIT_HITL"
-        decision.setdefault("hitl_reason", "technique_unmappable")
+        decision["action"] = _shield_action
+        # `setdefault` KHÔNG ghi đè chuỗi rỗng — khoá đã tồn tại với giá trị "" thì nó im lặng
+        # bỏ qua. Đo được 8/23 lô AWAIT_HITL không có mã lý do, phá đúng bất biến mà chú thích
+        # ở `node_llm_triage` tuyên bố ("MỌI đường tới AWAIT_HITL phải mang một mã máy đọc
+        # được"). Gán tường minh khi giá trị hiện tại rỗng.
+        if _shield_action == "AWAIT_HITL" and not decision.get("hitl_reason"):
+            decision["hitl_reason"] = "technique_unmappable"
+        elif _shield_action != "AWAIT_HITL":
+            decision["hitl_reason"] = ""
         if "[WARNING]" not in str(decision.get("reasoning", "")):
             decision["reasoning"] = (
                 f"[WARNING: Unable to confidently map technique, potential hallucination risk] {decision.get('reasoning', '')}"
@@ -1720,6 +1774,11 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     # Cờ: block ĐÃ thực thi bên trong raise_alert (repeat-offender) -> KHÔNG chặn lại ở dưới.
     _alert_escalated_block = False
 
+    # Tính LẠI ở đây thay vì mang biến từ node chính sách sang: `batch_attack_vocabulary` là
+    # hàm THUẦN trên chính lô log, chi phí vài nghìn phép regex — không đáng kể cạnh một lượt
+    # gọi LLM ~20 giây, và tránh thêm một trường trạng thái có thể lệch giữa hai node.
+    _batch_has_attack_evidence = bool(batch_attack_vocabulary(state.current_batch_logs or []))
+
     # ALERT: raise_alert là CHOKE-POINT THỐNG NHẤT (chung với Cổng ML) — ghi ALERT, và nếu IP
     # TÁI PHẠM (đã cảnh báo trước) / known-bad thì TỰ leo thang -> BLOCK ngay bên trong.
     if action == "ALERT":
@@ -1732,6 +1791,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
             raw_log=raw_log_json,
             confidence=float(confidence or 0.0),
             tier=TIER_LLM,
+            evidence_backed=_batch_has_attack_evidence,
         )
         # Tín hiệu APT (persistent-IP / multi-day) — đọc incident vừa ghi, KHÔNG record trùng.
         _check_apt_signal(target, mitre_tech, confidence)
@@ -1750,6 +1810,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
             "execution",
             action_in=str(latest_decision.get("action", "")),
             escalated_alert_to_block=_alert_escalated_block,
+            evidence_backed=_batch_has_attack_evidence,
             target=target,
         )
 
@@ -1881,6 +1942,7 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
             raw_log=raw_log_json,
             confidence=float(conf or 0.0),
             tier=TIER_LLM,
+            evidence_backed=bool(batch_attack_vocabulary(state.current_batch_logs or [])),
         )
         # Ghi SỰ THẬT đã thực thi, không ghi ý định: `raise_alert` trả "ALERT" hoặc
         # "BLOCK_IP" tuỳ lịch sử của IP.

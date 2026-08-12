@@ -181,3 +181,61 @@ def test_gate_separates_attack_from_benign_on_real_csic():
 
     assert keep_rate(ben) == 0.0, "lô toàn lành KHÔNG được sinh từ vựng tấn công"
     assert keep_rate(atk) >= 0.90, "lô tấn công phải giữ được quyền quy kết"
+
+
+# ==============================================================================
+# TRUY VẤN RAG — hai lỗi làm chệch vector, đo trên lượt chạy 12/08/2026
+# ==============================================================================
+def test_auth_vocabulary_suppressed_when_batch_has_specific_signature():
+    """Lô CÓ chữ ký cụ thể thì KHÔNG được nhét thêm cụm brute-force.
+
+    HỒI QUY LỖI THẬT. "Lặp lại gửi thông tin xác thực" là tín hiệu HÀNH VI, cùng hạng với các
+    cụm ngưỡng: nối nó cạnh một chữ ký cụ thể thì nó kéo tụt chữ ký ấy. CSIC nhúng payload
+    CRLF/XSS vào chính form đăng ký nên `login=`/`password=` xuất hiện ở cả 10 log của lô,
+    cụm brute-force luôn được thêm, và truy xuất trả về họ T1110. Quy kết luật CHẶT của ba
+    lớp đó: T1071.001 0/39 · T1059.007 0/16 · T1083 0/14.
+    """
+    from src.agent.nodes import build_rag_queries
+
+    logs = [
+        {
+            "Source IP": "203.0.113.5",
+            "service": "http",
+            "uri": f"/app/registro.jsp?modo=registro%0d%0aSet-cookie:+X=1&login=u{i}&password=p{i}",
+            "payload": "",
+            "tier1_reasons": ["WAF: Phát hiện CRLF / Response Splitting trong 'uri'"],
+        }
+        for i in range(10)
+    ]
+    q = build_rag_queries(logs)
+    tq = str(q[0] if isinstance(q, (list, tuple)) else q).lower()
+    assert "response splitting" in tq, "phải giữ chữ ký cụ thể của lô"
+    assert "brute force" not in tq, (
+        "cụm brute-force phải bị chặn khi lô đã có chữ ký cụ thể — nó kéo truy xuất sang T1110"
+    )
+
+
+def test_no_attack_term_names_a_different_technique():
+    """Cụm từ vựng không được chứa NGUYÊN TÊN của kỹ thuật KHÁC với đáp án của chính nó.
+
+    HỒI QUY LỖI THẬT. Cụm XSS từng là "cross-site scripting XSS **drive-by compromise** web
+    client exploit" — "Drive-by Compromise" là tên của T1189. Truy vấn đó trả về
+    [T1189, T1608.004, T1190, T1203, T1571], KHÔNG có T1059.007; bỏ hai từ ấy thì T1059.007
+    lên hạng 1. Cùng cái bẫy với lá chắn T1571 từng tự chứng minh bằng chính tên mình.
+
+    Test khoá ĐÚNG các cặp đã đo, không quét cả bảng: nhiều cụm CỐ Ý mang tên kỹ thuật đáp án
+    của chúng (cụm SQLi chứa "exploit public-facing application" vì T1190 chính là đáp án).
+    """
+    from src.agent.nodes import _ATTACK_TERMS
+
+    terms = dict(_ATTACK_TERMS)
+    cam = {
+        "xss": "drive-by compromise",
+        "cross-site scripting": "drive-by compromise",
+    }
+    for khoa, cum_cam in cam.items():
+        assert khoa in terms, f"mất khoá từ vựng {khoa!r}"
+        assert cum_cam not in terms[khoa].lower(), (
+            f"cụm {khoa!r} chứa tên kỹ thuật khác ({cum_cam!r}) -> truy xuất sẽ trả về "
+            f"chính kỹ thuật đó thay vì đáp án"
+        )

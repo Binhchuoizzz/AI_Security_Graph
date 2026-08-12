@@ -27,6 +27,27 @@ from src.agent.attack_mapper import (
 
 SCHEMA_KEYS = set(MitreMapping.model_fields.keys())
 
+
+@pytest.fixture(autouse=True)
+def _reset_loop_guard():
+    """Trả bộ đếm loop-guard về 0 TRƯỚC MỖI test.
+
+    Các test dưới đây gọi thẳng `node_attack_mapper` thay vì qua `agent_app.invoke`, nên
+    không có ai reset hộ. Bộ đếm cộng dồn theo TIẾN TRÌNH: sau `max_iterations`(=10) lần
+    thăm node, mọi lần sau đều FORCE_STOP -> `RuntimeError`, và test đỏ ở một chỗ hoàn toàn
+    không liên quan tới thứ nó đang kiểm.
+
+    Đây KHÔNG phải giả thiết: chính lỗi quên reset này đã làm 631/651 ca của
+    `evaluate_tier2_decision.py` crash và cho recall giả 1,00 lọt vào Ch4 (xem
+    `test_tier2_eval_loop_guard.py`). Thêm test gọi node là chạm trần — nên chặn ở fixture.
+    """
+    from src.guardrails import loop_detector
+
+    loop_detector.reset()
+    yield
+    loop_detector.reset()
+
+
 # (attack_type đầu vào, tactic, tactic_id, technique_id, framework)
 WEB_ATTACK_CASES = [
     ("SQLi", "Initial Access", "TA0001", "T1190", FRAMEWORK_ATTACK),
@@ -379,12 +400,21 @@ def test_parse_json_object_handles_select_schema():
 # vĩnh viễn một IP dựa trên kỹ thuật mà bộ truy xuất chưa từng đưa ra.
 
 
-def _mapper_state(technique: str, rag_ctx: str, action: str = "BLOCK_IP"):
+def _mapper_state(technique: str, rag_ctx: str, action: str = "BLOCK_IP", *, attack_evidence=False):
+    """`attack_evidence=True` cho lô một payload khớp chữ ký WAF của Tier-1.
+
+    Đích đến của hai lá chắn PHỤ THUỘC vào điều này: lô có bằng chứng tấn công mà không đặt
+    tên được kỹ thuật thì người phải xem (AWAIT_HITL); lô không có bằng chứng nào thì mã kỹ
+    thuật chỉ là phỏng đoán và đẻ phiếu HITL cho nó chính là nạn ngập hàng đợi (-> ALERT).
+    """
     from src.agent.state import SentinelState
 
     s = SentinelState()
     s.rag_mitre_context = rag_ctx
-    s.current_batch_logs = [{"Source IP": "10.0.0.5", "service": "HTTP"}]
+    log = {"Source IP": "10.0.0.5", "service": "HTTP"}
+    if attack_evidence:
+        log["payload"] = "id=1' UNION SELECT password FROM users--"
+    s.current_batch_logs = [log]
     s.decisions = [
         {
             "action": action,
@@ -397,14 +427,46 @@ def _mapper_state(technique: str, rag_ctx: str, action: str = "BLOCK_IP"):
     return s
 
 
-def test_block_is_downgraded_when_technique_absent_from_rag():
+def test_block_never_survives_an_ungrounded_technique():
+    """BẤT BIẾN AN TOÀN: kỹ thuật ngoài ngữ cảnh RAG thì KHÔNG được tự động chặn.
+
+    Đích hạ cấp phụ thuộc bằng chứng (xem test kế), nhưng `BLOCK_IP` thì không bao giờ được
+    sống sót ở cả hai nhánh — đó mới là điều lá chắn tồn tại để bảo đảm.
+    """
     from src.agent.nodes import node_attack_mapper
 
-    st = _mapper_state("T1030 - Data Transfer Size Limits", "T1498 Network Denial of Service")
-    out = node_attack_mapper(st)
-    d = out["decisions"][-1]
-    assert d["action"] == "AWAIT_HITL", "chặn tự động bằng kỹ thuật ngoài RAG vẫn lọt"
-    assert "NEO BẰNG CHỨNG" in d["reasoning"]
+    for evidence in (False, True):
+        st = _mapper_state(
+            "T1030 - Data Transfer Size Limits",
+            "T1498 Network Denial of Service",
+            attack_evidence=evidence,
+        )
+        d = node_attack_mapper(st)["decisions"][-1]
+        assert d["action"] != "BLOCK_IP", (
+            f"chặn tự động bằng kỹ thuật ngoài RAG vẫn lọt (attack_evidence={evidence})"
+        )
+        assert "NEO BẰNG CHỨNG" in d["reasoning"]
+
+
+def test_ungrounded_shield_routes_by_attack_evidence():
+    """Lô CÓ bằng chứng tấn công -> người xem; lô KHÔNG có -> chỉ cảnh báo.
+
+    VÌ SAO TÁCH. Cả hai nhánh đều nói "không khẳng định được kỹ thuật", nhưng chỉ nhánh đầu
+    là một cuộc tấn công thật chưa phân loại được. Đo trên lượt chạy 12/08/2026, 49 lô đầu
+    (toàn bộ nằm ở vùng lưu lượng LÀNH): 23 lô bị đẩy sang HITL, không lô nào có bằng chứng
+    tấn công — tỉ lệ HITL 47% cho một cửa sổ 100% lành, đúng nạn ngập hàng đợi mà đề tài đặt
+    ra để giải quyết.
+    """
+    from src.agent.nodes import node_attack_mapper
+
+    ctx = "T1498 Network Denial of Service"
+    d_no = node_attack_mapper(_mapper_state("T1030", ctx, attack_evidence=False))["decisions"][-1]
+    d_yes = node_attack_mapper(_mapper_state("T1030", ctx, attack_evidence=True))["decisions"][-1]
+
+    assert d_no["action"] == "ALERT", "lô không có bằng chứng tấn công KHÔNG được đẻ phiếu HITL"
+    assert not d_no.get("hitl_reason"), "không vào HITL thì không được mang mã lý do HITL"
+    assert d_yes["action"] == "AWAIT_HITL", "lô CÓ bằng chứng tấn công phải để người xem"
+    assert d_yes["hitl_reason"] == "technique_not_in_rag"
 
 
 def test_block_is_kept_when_technique_is_grounded():
@@ -419,19 +481,22 @@ def test_block_is_kept_when_technique_is_grounded():
 
 
 def test_ungrounded_technique_becomes_NA_not_a_plausible_guess():
-    """Thi hành hợp đồng của chính prompt: không khớp RAG -> N/A + AWAIT_HITL.
+    """Thi hành hợp đồng của chính prompt: không khớp RAG -> kỹ thuật về N/A.
 
     Đo thật: model chỉ tự trả 'N/A' 2/136 lần (1,5%); còn lại nó chọn một kỹ thuật nghe
-    hợp lý. Nhật ký kiểm toán không được khẳng định điều bằng chứng không đỡ.
+    hợp lý. Nhật ký kiểm toán không được khẳng định điều bằng chứng không đỡ. Phần này đúng
+    ở CẢ HAI nhánh định tuyến — việc xoá mã kỹ thuật không phụ thuộc vào ai xử lý tiếp.
     """
     from src.agent.nodes import node_attack_mapper
 
-    st = _mapper_state("T1030", "T1498 Network Denial of Service", action="ALERT")
-    d = node_attack_mapper(st)["decisions"][-1]
-    assert d["action"] == "AWAIT_HITL"
-    assert d["mitre_technique"] == "N/A", "vẫn khẳng định một kỹ thuật không có neo"
-    assert d["mitre_technique_id"] == ""
-    assert d["mapping_status"] == "ungrounded_in_rag"
+    for evidence in (False, True):
+        st = _mapper_state(
+            "T1030", "T1498 Network Denial of Service", action="ALERT", attack_evidence=evidence
+        )
+        d = node_attack_mapper(st)["decisions"][-1]
+        assert d["mitre_technique"] == "N/A", "vẫn khẳng định một kỹ thuật không có neo"
+        assert d["mitre_technique_id"] == ""
+        assert d["mapping_status"] == "ungrounded_in_rag"
 
 
 def _fake_mapping(technique_id: str, technique: str):
@@ -499,9 +564,13 @@ def test_attribution_never_leaves_the_rag_context(monkeypatch):
     monkeypatch.setattr(
         nodes, "map_attack", lambda *a, **k: _fake_mapping("T1055", "Process Injection")
     )
-    st = _mapper_state("T1030", "T1498 Network Denial of Service", action="ALERT")
-    d = nodes.node_attack_mapper(st)["decisions"][-1]
+    for evidence, expect_action in ((False, "ALERT"), (True, "AWAIT_HITL")):
+        st = _mapper_state(
+            "T1030", "T1498 Network Denial of Service", action="ALERT", attack_evidence=evidence
+        )
+        d = nodes.node_attack_mapper(st)["decisions"][-1]
 
-    assert d["mitre_technique_id"] == ""
-    assert d["mapping_status"] == "ungrounded_in_rag"
-    assert d["action"] == "AWAIT_HITL"
+        assert d["mitre_technique_id"] == ""
+        assert d["mapping_status"] == "ungrounded_in_rag"
+        # Đích đến theo bằng chứng; bất biến ở TRÊN (mã quy kết rỗng) đúng ở cả hai nhánh.
+        assert d["action"] == expect_action

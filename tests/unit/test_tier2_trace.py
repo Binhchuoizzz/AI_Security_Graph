@@ -392,7 +392,7 @@ def _run_hitl_node(monkeypatch, *, total_incidents: int):
     monkeypatch.setattr(
         EX,
         "raise_alert",
-        lambda t, r, raw_log="", confidence=None, tier="": calls["alert"].append(t) or "BLOCK_IP",
+        lambda t, r, **_k: calls["alert"].append((t, _k.get("evidence_backed"))) or "BLOCK_IP",
     )
     monkeypatch.setattr(
         FL.FeedbackListener,
@@ -439,7 +439,11 @@ def test_repeat_hitl_escalates_and_does_not_duplicate_ticket(monkeypatch):
     lý do nó phải được thay bằng test hành vi.
     """
     calls, decision = _run_hitl_node(monkeypatch, total_incidents=3)
-    assert calls["alert"] == ["203.0.113.9"], "tái phạm phải đi qua choke-point cảnh báo"
+    assert calls["alert"] == [("203.0.113.9", False)], (
+        "tái phạm phải đi qua choke-point cảnh báo, và phải KHAI BÁO lô có bằng chứng hay "
+        "không — lô rỗng ở đây thì `evidence_backed=False`, nếu không luật tái phạm sẽ chặn "
+        "dựa trên lịch sử của chính những phỏng đoán vô căn cứ trước đó"
+    )
     assert calls["ticket"] == [], "KHÔNG được đẻ phiếu HITL trùng khi đã leo thang"
     assert calls["db"] == [], "raise_alert tự ghi audit — không ghi thêm dòng AWAIT_HITL"
     assert decision["action"] == "BLOCK_IP", (

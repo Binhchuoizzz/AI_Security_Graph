@@ -401,6 +401,7 @@ def raise_alert(
     raw_log: str = "",
     confidence: float | None = None,
     tier: str = "",
+    evidence_backed: bool = True,
 ) -> str:
     """Ghi CẢNH BÁO — CHOKE-POINT chung cho cả Cổng ML (Tier-1) và LLM (Tier-2).
 
@@ -413,6 +414,18 @@ def raise_alert(
     thật cho thấy dải ALERT yếu của Cổng ML chỉ chính xác 5,21%, nạp vào luật tái phạm thì
     biến nhiễu thành lệnh chặn (0/10 đúng). None = không rõ -> giữ hành vi cũ (vẫn tính), để
     caller chưa cập nhật không bị âm thầm đổi ngữ nghĩa.
+
+    `evidence_backed=False`: lô KHÔNG suy ra được từ vựng tấn công đặc trưng nào, thứ duy
+    nhất hệ thống nắm là "khối lượng/nhịp độ bất thường". Cảnh báo loại này vừa **không được
+    leo thang**, vừa **không vào bộ đếm tái phạm**.
+
+    VÌ SAO KHÔNG DÙNG RIÊNG `confidence` ĐỂ LỌC. Trần tự-tin ở Tier-2 đỗ độ tin cậy tại
+    LLM_BLOCK_CONF-0.01 = 0,84 — cố ý sát dưới ngưỡng chặn để hạ đúng một bậc dải. 0,84 lại
+    vượt xa REPEAT_OFFENDER_MIN_CONF (0,65), nên luật tái phạm đọc số thấy "cảnh báo mạnh" và
+    hiểu NGƯỢC hẳn ý của trần. Đo lượt chạy 12/08/2026: 9 lệnh chặn Tier-2 đầu tiên đều mang
+    `escalated_alert_to_block=true` trên lô `shield_has_attack_evidence=false` — cả chuỗi cap
+    -> hạ dải -> lá chắn đều chạy đúng rồi bị bước cuối lật lại. Cộng dồn N cảnh báo vô căn
+    cứ vẫn ra vô căn cứ, nên tín hiệu phải đi bằng CỜ chứ không bằng con số.
 
     Trả về action THẬT đã thực thi: "ALERT" (lần đầu) hoặc "BLOCK_IP" (tái phạm)."""
     ip = _validator.sanitize_target(msg)
@@ -435,8 +448,24 @@ def raise_alert(
     except Exception as e:
         logger.warning(f"[ALERT] get_ip_reputation lỗi cho {ip}: {e}")
 
-    # Tái phạm (đã ALERT >=1 lần) hoặc known-bad -> leo thang BLOCK ngay.
-    if prior_alerts >= 1 or prior_score >= 100.0:
+    # Tái phạm (đã ALERT >=1 lần) hoặc known-bad -> leo thang BLOCK ngay. Lô KHÔNG có bằng
+    # chứng tấn công thì miễn trừ HOÀN TOÀN, kể cả khi IP đã là known-bad.
+    #
+    # BẢN TRƯỚC CHỪA NHÁNH `prior_score >= 100` với lý lẽ "danh tiếng 100 là bằng chứng NGOÀI
+    # lô (Analyst hoặc một lệnh chặn có căn cứ)". Lý lẽ đó SAI ở hai điểm, đo trên lượt chạy
+    # 12/08/2026 (18 lệnh leo thang lọt qua đúng nhánh này):
+    #
+    #   1. `mark_ip_blocked` được gọi từ MỌI lệnh chặn, gồm cả Cổng ML chấm theo thống kê
+    #      luồng — tức 100 điểm KHÔNG chứng minh có bằng chứng tấn công.
+    #   2. Quan trọng hơn: `reputation >= 100` nghĩa là Tier-1 ĐÃ chặn on-sight IP đó VĨNH
+    #      VIỄN (ngưỡng 70, không phụ thuộc TTL 1h của sổ đen Redis). Nên lệnh chặn thứ hai
+    #      của Tier-2 KHÔNG tăng thêm chút ngăn chặn nào — cả 18/18 ca đều tái-chặn IP đã bị
+    #      chặn sẵn. Đổi lại, mỗi ca ghi vào sổ một dòng `BLOCK_IP` mang quy kết bịa (T1571
+    #      kèm đúng chữ "Unable to confidently map technique"), làm hỏng cả bảng thống kê
+    #      chặn lẫn bảng chấm quy kết.
+    #
+    # Không có bằng chứng thì ghi ALERT: IP vẫn bị giam bởi danh tiếng, còn sổ thì sạch.
+    if evidence_backed and (prior_alerts >= 1 or prior_score >= 100.0):
         logger.warning(
             f" [SIEM MOCK] ALERT->BLOCK (tái phạm): {ip} đã cảnh báo {prior_alerts} lần "
             f"(score={prior_score:.0f}) -> tự động CHẶN."
@@ -458,6 +487,12 @@ def raise_alert(
         logger.info(
             f"[ALERT] {ip}: độ tin cậy {confidence:.2f} < {REPEAT_OFFENDER_MIN_CONF:.2f} "
             f"-> KHÔNG tính vào bộ đếm tái phạm (tránh nhiễu tự leo thang thành chặn)."
+        )
+        return "ALERT"
+    if not evidence_backed:
+        logger.info(
+            f"[ALERT] {ip}: lô không có từ vựng tấn công đặc trưng -> KHÔNG tính vào bộ đếm "
+            f"tái phạm (cộng dồn phỏng đoán không thành bằng chứng)."
         )
         return "ALERT"
     try:

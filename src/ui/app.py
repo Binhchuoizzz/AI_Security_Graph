@@ -763,8 +763,15 @@ def main_dashboard():
     # Force pure Cyber Dark Mode theme
     render_theme_styles("dark")
 
-    # Auto-refresh UI mỗi 4000ms (4s) - mượt mà, phản hồi nhanh, tiết kiệm CPU
-    count = st_autorefresh(interval=4000, limit=10000, key="siem_dashboard_refresh")
+    # Auto-refresh UI mỗi 4000ms (4s) - mượt mà, phản hồi nhanh, tiết kiệm CPU.
+    #
+    # `limit=None` = KHÔNG giới hạn (đúng giá trị canh mà thư viện ghi trong tài liệu; `0` là
+    # suy đoán, không dùng). Bản trước đặt `limit=10000`, tức 10.000 × 4s ≈ **11,1 giờ**
+    # rồi tự-làm-mới DỪNG HẲN — không có thông báo nào. Từ giây phút đó Dashboard hiện số
+    # ĐÔNG CỨNG trông y hệt số sống: một buổi demo dài hoặc một màn hình treo tường qua đêm
+    # sẽ báo cáo trạng thái của nhiều giờ trước mà không ai biết. Đó là chế độ hỏng tệ nhất
+    # với một bảng điều khiển an ninh — sai mà trông như đúng.
+    count = st_autorefresh(interval=4000, limit=None, key="siem_dashboard_refresh")
 
     # Sidebar
     with st.sidebar:
