@@ -116,6 +116,28 @@ mkdir -p ~/demo_snapshot && cp config/audit_trail.db config/threat_memory.db \
 SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --no-push
 ```
 
+### Số đo tham chiếu — lượt 12/08/2026
+
+Đo ở mốc 41% lượt chạy ($n=79$ lô dàn dựng đã chấm). Hai cờ demo bật, 2 worker Tier-2,
+`SENTINEL_FREEZE_DYNAMIC_RULES=1`.
+
+| chỉ số | giá trị |
+| :-- | --: |
+| leo thang vô căn cứ | **0/469 lô** |
+| quy kết luật CHẶT (khớp chính xác mã) | **64/79 = 81,0%** |
+| — T1595.003 · T1190 · T1059.007 | **100%** mỗi lớp |
+| — T1071.001 · T1083 | 0% |
+
+Hai lớp trượt là **bất đồng giữa hai bảng ánh xạ**, không phải hệ thống hỏng. Payload CSIC ở
+hai lớp này thuộc nhiều họ cùng lúc — ví dụ `<!--#exec cmd="rm -rf /;cat /etc/passwd" -->`
+vừa là command injection vừa nhắc `/etc/passwd` — và **cả bảng đáp án lẫn Tier-1 đều chọn họ
+đầu tiên theo thứ tự mẫu**. Chỉnh thứ tự cho khớp đáp án là tinh chỉnh theo bài giải, nên
+không làm. Trên ba lớp mà đáp án không mập mờ: **64/64**.
+
+Riêng T1071.001 còn một nghi vấn về chính đáp án: ATT&CK định nghĩa nó là *"Application Layer
+Protocol: Web Protocols"* — một kỹ thuật **kênh điều khiển (C2)** — nên gán cho HTTP Response
+Splitting là khiên cưỡng.
+
 **Xem ở đâu:** tab **🎬 Executive Overview** cho phễu xả tải (bao nhiêu sự kiện vào, bao nhiêu
 thật sự tốn một lượt gọi LLM) · tab **📊 SIEM Logs & Audit Trail** cho từng phán quyết kèm lý
 do và kỹ thuật MITRE đã gán.
