@@ -88,9 +88,46 @@ của **tập dữ liệu**, không phải của hệ thống, và trình bày t
 
 ## 2. Kịch bản demo trước hội đồng
 
-Mỗi luồng chạy **độc lập**: chạy → xem → xoá → chạy luồng kế. Không chồng hai luồng lên nhau,
-vì Tier-1 nhớ mặt IP của lượt trước (danh tiếng ≥70 là chặn thẳng, không lên LLM) nên lượt
-sau sẽ không tái hiện được hành vi lượt đầu.
+### 2.0. Khởi động từ trạng thái SẠCH — đọc trước tiên
+
+Máy đang được để **sạch hoàn toàn** (dọn 14/08/2026): mọi container đã dừng, 0 tiến trình
+host, Redis 0 khoá, `audit_trail`/`threat_memory` rỗng và đã `VACUUM` (143 MB → 36 KB),
+`logs/*.log` + `logs/*.jsonl` đã xoá, `config/system_settings.yaml` sạch (0 luật động, ba cờ
+demo `false`). Chạy tay từ đây:
+
+```bash
+cd ~/Projects/Thesis/AI_Security_Graph
+SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --fresh      # dựng hạ tầng + đẩy trọn luồng
+```
+
+Một lệnh đó lo hết: bật 4 container, chờ LLM sẵn sàng, `reset_all`, bật đúng 1 subscriber,
+bật Dashboard, rồi đẩy 496.885 sự kiện. Mở <http://localhost:8501>, đăng nhập `manager`.
+
+**Muốn xem lại lượt 14/08 mà KHÔNG chạy lại 3,5 giờ** — khôi phục ảnh chụp:
+
+```bash
+SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --no-push    # chỉ dựng hạ tầng
+cp ~/demo_snapshot/audit_trail.db ~/demo_snapshot/threat_memory.db config/
+cp ~/demo_snapshot/pipeline_stats.json config/
+cp ~/demo_snapshot/guardrails_audit.db ~/demo_snapshot/tier2_trace.jsonl logs/
+cp ~/demo_snapshot/system_settings.yaml.demo config/system_settings.yaml   # 145 phiếu HITL
+SENTINEL_FREEZE_DYNAMIC_RULES=1 SENTINEL_TIER2_APP_EVIDENCE_ONLY=1 \
+  nohup .venv/bin/python main.py --mode server --log-level INFO >> logs/subscriber.log 2>&1 &
+```
+
+`system_settings.yaml.demo` là bản **cố ý bẩn**: nó giữ 145 phiếu HITL chờ duyệt, thiếu nó
+thì tab "Phê duyệt Luật" trống trơn. Bản đã commit thì sạch — đừng commit bản demo.
+
+> **Redis có lưu đĩa (`/data/dump.rdb`).** Khởi động lại container có thể nạp lại trạng thái
+> của lượt trước. Đã gặp: 603 entry của lượt đối kháng sống sót qua nhiều lần `reset_all`.
+> Chúng đã `ack` (lag 0) nên không được xử lý lại và không làm sai số nào, nhưng nếu thấy
+> khoá lạ thì chạy `reset_all` rồi kiểm bằng `redis-cli dbsize` — phải ra **0**.
+
+### Mỗi luồng chạy độc lập
+
+Chạy → xem → xoá → chạy luồng kế. Không chồng hai luồng lên nhau, vì Tier-1 nhớ mặt IP của
+lượt trước (danh tiếng ≥70 là chặn thẳng, không lên LLM) nên lượt sau sẽ không tái hiện được
+hành vi lượt đầu.
 
 > **Đặt `SENTINEL_FREEZE_DYNAMIC_RULES=1` cho MỌI lệnh chạy dưới đây.** Không đặt thì Cổng ML
 > ghi luật động thẳng vào `config/system_settings.yaml` — đo lượt 12/08/2026 trên lát 10.000
