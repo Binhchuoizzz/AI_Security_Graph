@@ -1773,7 +1773,7 @@
                     SOAR Cứng Nhắc, Ảo Giác &amp; Tải Chuyên Gia
                 </h3>
                 <ul style="font-size: 1.08rem; color: var(--text-muted); line-height: 1.7; padding-left: 20px;">
-                    <li style="margin-bottom: 10px;">Playbook cố định <strong>thất bại trước biến thể APT mới</strong> của kẻ tấn công.</li>
+                    <li style="margin-bottom: 10px;">Playbook cố định <strong>không thể hình thành phán quyết ngữ cảnh</strong> trước hành vi bất thường mới.</li>
                     <li style="margin-bottom: 10px;">AI tự do dễ bị <strong>Ảo giác (Hallucination)</strong>, tự bịa mã kỹ thuật &amp; chặn vô căn cứ.</li>
                     <li>Thiếu phân loại Triage thông minh làm <strong>ngập hàng đợi xử lý thủ công</strong>.</li>
                 </ul>
@@ -3134,7 +3134,7 @@ NÚT THẮT 1 — QUY MÔ LOG KHỔNG LỒ VÀ KHỦNG HOẢNG ĐỘ TRỄ: Mỗ
 
 NÚT THẮT 2 — BỀ MẶT TẤN CÔNG AI, ML EVASION VÀ NGUY CƠ GIẢ MẠO NHẬT KÝ: Ứng dụng AI tạo ra các bề mặt tấn công mới: kẻ tấn công cố ý chèn câu lệnh độc hại vào log thô (Log-substrate Prompt Injection) hoặc bóp méo đặc trưng dữ liệu để né tránh mô hình Học máy (Machine Learning Gate Evasion). Đồng thời, nhật ký sự cố sau khi thâm nhập có nguy cơ bị chỉnh sửa trái phép. Do đó, cần cơ chế Guardrails cô lập dữ liệu và niêm phong vết kiểm toán.
 
-NÚT THẮT 3 — SOAR CỨNG NHẮC, ẢO GIÁC AI VÀ QUÁ TẢI CHUYÊN GIA: Các nền tảng SOAR dựa trên Playbook cố định thất bại trước các biến thể tấn công APT mới. Ngược lại, nếu dùng AI tự do không có rào chắn thì mô hình dễ bị Ảo giác (Hallucination), tự bịa mã kỹ thuật tấn công và tự ý ra lệnh chặn IP vô căn cứ (Self-DoS). Bên cạnh đó, việc thiếu cơ chế phân loại cảnh báo (Triage) thông minh làm ngập hàng đợi khiến con người phải kiểm tra thủ công. Do đó, cần một Tác tử AI có rào chắn neo bằng chứng để suy luận chính xác, loại bỏ ảo giác và phân loại thông minh nhằm giảm thiểu tối đa khối lượng công việc cho chuyên gia.
+NÚT THẮT 3 — SOAR CỨNG NHẮC, ẢO GIÁC AI VÀ QUÁ TẢI CHUYÊN GIA: Các nền tảng SOAR dựa trên Playbook cố định không thể hình thành phán quyết ngữ cảnh trước các hành vi bất thường mới. Ngược lại, nếu dùng AI tự do không có rào chắn thì mô hình dễ bị Ảo giác (Hallucination), tự bịa mã kỹ thuật tấn công và tự ý ra lệnh chặn IP vô căn cứ (Self-DoS). Bên cạnh đó, việc thiếu cơ chế phân loại cảnh báo (Triage) thông minh làm ngập hàng đợi khiến con người phải kiểm tra thủ công. Do đó, cần một Tác tử AI có rào chắn neo bằng chứng để suy luận chính xác, loại bỏ ảo giác và phân loại thông minh nhằm giảm thiểu tối đa khối lượng công việc cho chuyên gia.
 
 Từ 3 nút thắt trên, bài toán đặt ra cho đề tài là: Thiết kế một kiến trúc SOC phân tầng hai lớp (Two-Tier), kết hợp bộ lọc tốc độ cao ở vành ngoài với AI Tác tử suy luận ngữ cảnh an toàn On-Premises ở bên trong?`,
 

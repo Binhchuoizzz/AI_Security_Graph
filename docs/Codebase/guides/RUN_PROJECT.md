@@ -1,8 +1,14 @@
 # Chạy & Demo SENTINEL
 
-> Cập nhật 12/08/2026. Tệp này là **phân bổ dữ liệu** + **kịch bản demo**.
+> Cập nhật 14/08/2026. Tệp này là **phân bổ dữ liệu** + **kịch bản demo**.
 > Chỉ số đo đạc xem [DEMO_BY_RQ.md](DEMO_BY_RQ.md); chạy tay từng luồng xem
 > [DEMO_FLOWS.md](DEMO_FLOWS.md).
+>
+> **CẤU HÌNH NÀO SINH RA SỐ NÀO — đọc trước khi trích bất cứ con số nào ở đây.**
+> `run_demo.sh` bật `SENTINEL_TIER2_APP_EVIDENCE_ONLY=1` (Tier-2 chỉ nhận lô có bằng chứng
+> tầng ứng dụng). Số §2.1 đo **14/08 với cờ BẬT**. Số §2.2 và §2.3 đo **13/08 khi cờ còn
+> TẮT** — chạy lại hôm nay sẽ ra khác, chủ yếu ít lô hơn và tỉ lệ HITL thấp hơn. Chưa đo lại
+> vì hai kịch bản đó dùng để chứng minh *hệ thống chạy được*, không phải để lấy chỉ số.
 
 ---
 
@@ -19,7 +25,7 @@
 | `dapt_max` — DAPT2020 khối lượng | 1.500 | 345 | Nền chiến dịch |
 | `cicids` — lát ground_truth | 1.250 | 1.170 | Phủ đủ 15 lớp CICIDS có nhãn |
 | `adv_llm` — deepset + jackhhao | 730 | 730 | Tiêm nhiễm câu lệnh / jailbreak công khai (AML.T0051) |
-| `dapt` — chuỗi DAPT2020 thật | 402 | 0 | **9 chuỗi APT đa ngày**; bản án `is_apt` nổi lên từ Threat Memory khi một IP xuất hiện ở ≥2 ngày, không từ nhãn từng sự kiện |
+| `dapt` — chuỗi DAPT2020 thật | 402 | 0 | **3 chuỗi APT đa ngày**; bản án nổi lên từ Threat Memory khi một IP mang giai đoạn tấn công ở ≥2 ngày, không từ nhãn từng sự kiện |
 | `zeroday` — real-derived | 150 | 150 | Probe không chữ ký, Welford bắt |
 | `adversarial` — OWASP | 4 | 4 | Payload đối kháng gốc |
 | **Tổng** | **496.885** | **25.695** | **5,17% tấn công · 94,83% benign** |
@@ -100,8 +106,18 @@ SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --fresh
 grep -oP 'qsize~\K[0-9]+' logs/subscriber.log | tail -1     # đợi về 0 mới xong
 ```
 
-Đẩy trọn 496.885 sự kiện qua Tier-1 → Cổng ML → Tier-2. Đẩy xong ~25 phút, nhưng hàng đợi
-Tier-2 còn tiêu hoá tiếp nên **tổng ~3,3 giờ** — đó là lý do không chạy live.
+Đẩy trọn 496.885 sự kiện qua Tier-1 → Cổng ML → Tier-2. Đo lượt 14/08/2026: **đẩy 51 phút**,
+hàng đợi Tier-2 tiêu hoá **1.025 lô**, **tổng 3 giờ 30 phút** — vẫn quá dài để chạy live.
+
+> **`run_demo.sh` đặt sẵn `SENTINEL_TIER2_APP_EVIDENCE_ONLY=1`** — Tier-2 chỉ nhận lô có
+> payload/URI/User-Agent; NetFlow thuần dừng ở ALERT tại Tier-1 (Cổng ML vẫn chặn bình thường).
+> Đo lượt 13/08 khi cờ này TẮT: 2.650 lô, trong đó 1.802 lô NetFlow thuần đóng góp **38/560**
+> lệnh chặn nhưng sinh **468/519** phiếu HITL. Bật cờ: còn 1.025 lô, tỉ lệ đảo từ
+> **BLOCK≈HITL** thành **BLOCK gấp 3,6 lần HITL**.
+>
+> Cờ đặt bằng BIẾN MÔI TRƯỜNG, `config/system_settings.yaml` giữ nguyên cả ba cờ demo `false`,
+> vì mọi số Tier-2 của luận văn đo ở cấu hình đó. Muốn tái lập benchmark:
+> `SENTINEL_TIER2_APP_EVIDENCE_ONLY=0 ./scripts/run_demo.sh --fresh`.
 
 Xong thì sao lưu lại, để lỡ nghịch hỏng giữa buổi thì khôi phục trong 10 giây:
 
@@ -116,23 +132,80 @@ mkdir -p ~/demo_snapshot && cp config/audit_trail.db config/threat_memory.db \
 SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --no-push
 ```
 
-### Số đo tham chiếu — lượt 12/08/2026
+> **Bẫy: khôi phục snapshot xong thì ĐỪNG chạy `reset_all`.** `--no-push` dừng lại nếu chưa có
+> subscriber và nhắc chạy `reset_all.py` — nhưng lệnh đó **xoá sạch đúng cái snapshot vừa khôi
+> phục**. `reset_all` không có cờ "chỉ bật lại". Bật thẳng subscriber:
+>
+> ```bash
+> cp ~/demo_snapshot/*.db config/ && cp ~/demo_snapshot/tier2_trace.jsonl logs/
+> SENTINEL_FREEZE_DYNAMIC_RULES=1 nohup .venv/bin/python main.py --mode server \
+>     --log-level INFO >> logs/subscriber.log 2>&1 &
+> ```
+>
+> Rồi kiểm bằng `ps -eo pid,cmd | grep 'main[.]py --mode server' | grep -v grep` — phải ra
+> **đúng 1 dòng**. Đừng dùng `pgrep -cf` hay `grep -c`: mẫu tìm nằm trong chính dòng lệnh của
+> tiến trình đi tìm, nên nó tự đếm mình và báo 2–3 subscriber trong khi thực tế có 1.
 
-Đo ở mốc 41% lượt chạy ($n=79$ lô dàn dựng đã chấm). Hai cờ demo bật, 2 worker Tier-2,
-`SENTINEL_FREEZE_DYNAMIC_RULES=1`.
+### Số đo tham chiếu — lượt 14/08/2026 (CHẠY TRỌN, cổng bằng chứng ứng dụng BẬT)
+
+2 worker Tier-2, `SENTINEL_FREEZE_DYNAMIC_RULES=1`, `SENTINEL_TIER2_APP_EVIDENCE_ONLY=1`.
+Toàn bộ 1.025/1.025 lô, 100% mang bằng chứng tầng ứng dụng.
 
 | chỉ số | giá trị |
 | :-- | --: |
-| leo thang vô căn cứ | **0/469 lô** |
-| quy kết luật CHẶT (khớp chính xác mã) | **64/79 = 81,0%** |
-| — T1595.003 · T1190 · T1059.007 | **100%** mỗi lớp |
-| — T1071.001 · T1083 | 0% |
+| **BLOCK / HITL của Tier-2** | **522 / 145 = 3,6:1** |
+| leo thang vô căn cứ | **0/1.025 lô** |
+| lô lỗi parse JSON · lô `status != ok` | **0 · 0** |
+| tràn ngữ cảnh | **0** |
+| sổ kiểm toán | 3.462 dòng, chuỗi HMAC **toàn vẹn** |
+| chuỗi APT đa-ngày | **3/3** |
 
-Hai lớp trượt là **bất đồng giữa hai bảng ánh xạ**, không phải hệ thống hỏng. Payload CSIC ở
-hai lớp này thuộc nhiều họ cùng lúc — ví dụ `<!--#exec cmd="rm -rf /;cat /etc/passwd" -->`
-vừa là command injection vừa nhắc `/etc/passwd` — và **cả bảng đáp án lẫn Tier-1 đều chọn họ
-đầu tiên theo thứ tự mẫu**. Chỉnh thứ tự cho khớp đáp án là tinh chỉnh theo bài giải, nên
-không làm. Trên ba lớp mà đáp án không mập mờ: **64/64**.
+**Phễu giảm tải — con số đáng đưa lên slide nhất:**
+
+| chặng | số lượng | tỉ lệ |
+| :-- | --: | --: |
+| sự kiện vào luồng | 496.885 | 100% |
+| rời Cổng ML về phía Tier-2 | 8.666 | 1,74% |
+| — bị cổng bằng chứng chặn lại (NetFlow thuần) | −1.755 | |
+| — bị nén vì IP đang có lô chạy (`pending_ai`) | −496 | |
+| **thật sự vào Tier-2** | **6.415** | **1,29%** |
+| lô Tier-2 | 1.025 | |
+| lượt gọi LLM **thật** (còn lại trúng cache đặc trưng) | **851** | **0,17%** |
+
+**Trên 98% sự kiện không tốn một token nào** (đo được 98,71%). Chặn theo tầng: Cổng ML
+**1.894** · Tier-2 LLM **522** · luật Tier-1 81 cảnh báo.
+
+**Quy kết luật CHẶT — phải đọc theo NGUỒN, con số gộp gây hiểu lầm:**
+
+| nguồn | đúng/tổng | tỉ lệ |
+| :-- | --: | --: |
+| `csic` (payload web thật) | 240/310 | **77,4%** |
+| — T1190 SQLi | 64/65 | **98,5%** |
+| — T1595.003 dò tệp | 143/154 | **92,9%** |
+| — T1059.007 XSS | 33/39 | **84,6%** |
+| `adv_llm` (tiêm nhiễm) | 39/70 | 55,7% |
+| `dapt` | 10/18 | 55,6% |
+| `zeroday` | 5/132 | **3,8%** |
+| **gộp** | **294/531** | **55,4%** |
+| **bỏ `zeroday`** | **289/399** | **72,4%** |
+
+`zeroday` kéo con số gộp xuống 17 điểm. Nhãn `zd_mitre` của nhóm này là **T1498 · T1048 ·
+T1572 · T1030 · T1095 · T1573** — DoS, rò rỉ qua giao thức thay thế, đường hầm giao thức —
+**không suy ra được từ một probe HTTP đơn lẻ**. Đây là đáp án đặt quá tay, không phải hệ
+thống hỏng. Lượt 13/08 (cổng TẮT) ra 72,7% trên mẫu số 352 vì 114 lô zero-day khi đó bị
+`pending_ai` nén mất; **72,4% (bỏ zeroday) so với 72,7% cho thấy không hồi quy**.
+
+Hai lớp trượt sạch là **bất đồng giữa hai bảng ánh xạ**. Payload CSIC ở T1071.001 và T1083
+thuộc nhiều họ cùng lúc — ví dụ `<!--#exec cmd="rm -rf /;cat /etc/passwd" -->` vừa là command
+injection vừa nhắc `/etc/passwd` — và **cả bảng đáp án lẫn Tier-1 đều chọn họ đầu tiên theo
+thứ tự mẫu**. Chỉnh thứ tự cho khớp đáp án là tinh chỉnh theo bài giải, nên không làm.
+
+> **Lá chắn neo bằng chứng — phải hiểu đúng trước khi bị hỏi.** Tier-2 chỉ ra lệnh chặn khi
+> trong lô **có từ vựng tấn công cụ thể**; thiếu thì confidence bị kẹp ở 0,84 = trần
+> `LLM_BLOCK_CONF − 0,01` và lệnh chặn thành `ALERT`. Lượt này lá chắn hạ **170/692** lệnh
+> chặn. Tra nhãn thật của log trong 170 lô đó: **136 log LÀNH · 220 log tấn công**. Tức lá
+> chắn đổi 220 lệnh chặn thành cảnh báo (vẫn hiện trên Dashboard, **không bỏ sót**) để tránh
+> chặn nhầm 136 gói lành. Đây là đánh đổi thiên về an toàn và nên nói thẳng khi bị hỏi.
 
 Riêng T1071.001 còn một nghi vấn về chính đáp án: ATT&CK định nghĩa nó là *"Application Layer
 Protocol: Web Protocols"* — một kỹ thuật **kênh điều khiển (C2)** — nên gán cho HTTP Response
@@ -189,12 +262,20 @@ T1059.007 25 · T1083 18).
 
 **Vì sao KHÔNG lấy đúng tỉ lệ luồng đầy.** Đây là **tập con phân tầng**, không phải mẫu ngẫu
 nhiên. Ép đúng tỉ lệ trên 10.000 sự kiện thì còn **8 sự kiện DAPT · 3 zero-day · 15 đối
-kháng** — chuỗi APT cần một IP xuất hiện ở ≥2 ngày nên 9 chuỗi biến mất và ba panel trống
-trơn. Các lớp hiếm được bơm thừa **có chủ đích**.
+kháng** — chuỗi APT cần một IP mang giai đoạn tấn công ở ≥2 ngày nên cả 3 chuỗi biến mất và
+ba panel trống trơn. Các lớp hiếm được bơm thừa **có chủ đích**.
 
 Hệ quả phải nói ra nếu bị hỏi: tỉ lệ tấn công của tập nhỏ là **30,8%** so với **5,2%** của
 luồng đầy. Con số đại diện cho **hồ sơ tải thật** nằm ở luồng đầy, không phải ở đây — script
 in cả hai cạnh nhau ở dòng cuối chính vì lý do đó.
+
+**Số đo lượt 13/08/2026 — và một cái bẫy phải tránh.** 144 lô, 0 lỗi, cả **3/3 chuỗi APT**
+đều hiện lên, sổ kiểm toán toàn vẹn. Nhưng quy kết luật chặt chỉ **30/68 = 44,1%**, thấp hơn
+hẳn 72,7% của luồng đầy — **đừng trích con số này**. Lý do: tập nhỏ bơm `adv_llm` lên 5,0%
+(so với 0,15% ở luồng đầy), nên 36/68 lô chấm được là tiêm nhiễm `AML.T0051`, đúng lớp hệ
+thống yếu nhất (14/36 = 38,9%; hay nhầm sang T1571). Năm lớp CSIC vẫn tuyệt đối:
+**T1595.003 5/5 · T1190 5/5 · T1059.007 5/5 · T1087 1/1**. Lát nhỏ dùng để chứng minh
+*hệ thống chạy lại được*, không phải để lấy chỉ số chất lượng.
 
 ### 2.3. Đối kháng — tấn công vào chính LLM
 
@@ -233,6 +314,21 @@ Hai tệp kết quả này đo trên **đúng 120 mẫu tự soạn**, không ph
 để đo *từng lớp phòng thủ* trên các vector được thiết kế riêng cho lớp đó. Lượt demo
 `--real-only` là phép thử **độc lập** trên dữ liệu thật; đừng trộn hai con số vào một câu.
 
+**Số đo lượt 13/08/2026 trên 603 mẫu THẬT.** 603 payload → **220 lô** tới Tier-2 (phần còn lại
+Tier-1 DROP trước, xem cảnh báo dưới). Kết quả:
+
+| chỉ số | giá trị |
+| :-- | --: |
+| lô bị ép thành lành (`LOG`/`DROP`) | **0/220** |
+| mức cô lập nâng lên `CRITICAL` · `HIGH` | 82 · 8 |
+| guardrail bắt: jailbreak · tiêm nhiễm | 82 · 47 |
+| quy kết đúng `AML.T0051` | 92 lô |
+| lô lỗi parse · tràn ngữ cảnh | **0 · 0** |
+
+"Kháng 100%" ở đây có nghĩa hẹp: **không payload nào ép được Tier-2 kết luận lưu lượng là
+lành tính**. Nó không đo bóp méo quy kết, gây chặn nhầm, hay tiêm luật vào vòng phản hồi.
+Phát biểu kèm phạm vi, đừng nói trống.
+
 > **Phải nói thẳng khi demo end-to-end:** một phần payload bị Tier-1 **DROP** trước khi tới
 > Guardrail — lọt bằng cách bị bỏ qua, không phải bị chặn có chủ đích. Con số kháng tiêm nhiễm
 > đo bằng cách nạp **thẳng** vào đường ống, và phải nói rõ như vậy.
@@ -255,12 +351,25 @@ cp ~/demo_snapshot/audit_trail.db config/
 ```
 
 Sửa dòng **giữa sổ** chứ đừng sửa dòng đầu — nó chứng minh chuỗi chỉ ĐÚNG vị trí bị đụng,
-mạnh hơn hẳn việc chỉ báo "có gì đó sai". Kiểm 12/08/2026 trên bản sao 36.169 dòng: sửa
-`id=18087` thì thông báo trả về đúng ID đó, kèm mốc thời gian và giá trị đã bị thay.
+mạnh hơn hẳn việc chỉ báo "có gì đó sai". Kiểm 13/08/2026 trên sổ 5.434 dòng: sửa `id=2718`
+thì thông báo trả về đúng ID đó, kèm mốc thời gian và giá trị đã bị thay.
 
 Mỗi dòng ký HMAC và **móc vào chữ ký dòng trước**, nên sửa một dòng làm hỏng mọi dòng sau.
 Khoá lấy từ `SENTINEL_LOG_SECRET` trong `.env`, không nằm trong mã. Giới hạn phải tự nêu:
 chuỗi bắt được **sửa** và **chèn**, nhưng **cắt đuôi** thì không.
+
+> **PHẠM VI CỦA SỔ — phải nói đúng, nếu không sẽ bị bắt bẻ.** Sổ ghi quyết định của **Cổng ML
+> và của tác tử LLM**, KHÔNG ghi lệnh chặn do luật tĩnh Tier-1. Đo lượt 13/08/2026:
+> `threat_memory` có **4.890 IP** từng bị chặn, sổ chỉ có **2.454** — thiếu **49,8%**, dồn vào
+> dải `192.168` (1.778 IP trong bộ nhớ, 42 IP trong sổ). Nguyên nhân ở
+> `src/streaming/subscriber.py:992`: khi Tier-1 chốt `BLOCK_IP` nó ghi Redis blacklist +
+> `threat_memory` nhưng không đi qua đường ghi sổ. Sổ không có một dòng `tier1_rule|BLOCK_IP`
+> nào (chỉ có 81 dòng `tier1_rule|ALERT`).
+>
+> Nên phát biểu là *"bằng chứng pháp y cho quyết định của Cổng ML và tác tử"* — đúng phạm vi
+> đang phủ, và cũng đúng phần luận văn đóng góp. Nói *"mọi hành động cưỡng chế"* thì sai, và
+> Dashboard sẽ tự tố: nó hiện 388.092 sự kiện mang hành động `BLOCK_IP` cạnh một cuốn sổ
+> 2.462 dòng.
 
 ### 2.5. Xoá giữa hai luồng
 

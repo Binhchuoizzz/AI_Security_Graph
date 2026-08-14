@@ -112,9 +112,16 @@ Script **luôn** kèm 150 benign warmup — bỏ warmup thì Z-score vô nghĩa 
 ## 4. Adversarial — tấn công vào chính LLM
 
 ```bash
-.venv/bin/python scripts/push_flow.py --source adversarial --limit 120
-# 120 payload gốc: encoding 45 · structural 20 · semantic 20 · jailbreak 20 · rag_poison 15
+.venv/bin/python scripts/push_flow.py --source adversarial --real-only
+# 603 payload THẬT: AdvBench 200 · jackhhao 200 · deepset 203
 ```
+
+> **ĐỪNG dùng `--limit 120`** (lệnh cũ ở đây). Bộ nạp `sorted(glob)` rồi cắt tiền tố, nên
+> `--limit` chọn theo thứ tự chữ cái của tên thư mục chứ không theo xuất xứ. Chú thích cũ ghi
+> "encoding 45 · structural 20 · semantic 20 · jailbreak 20 · rag_poison 15" — đúng khi kho
+> mới chỉ có 120 mẫu tự soạn, nhưng sau khi thêm 603 mẫu thật thì `advbench_gcg` sắp lên đầu
+> và `--limit 120` thực ra lấy trọn 120 mẫu AdvBench. `--real-only` chọn theo XUẤT XỨ: bỏ
+> 120 mẫu do `build_adversarial_suite.py` tự sinh, giữ 603 mẫu từ ba tập công khai.
 
 Mỗi payload là một IP TEST-NET riêng (`198.51.100.x`) tải một đòn tầng ứng dụng. Mọi log đi qua TẤT CẢ các lớp Tier-1, không tách theo loại.
 
