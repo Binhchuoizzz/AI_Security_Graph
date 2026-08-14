@@ -1506,7 +1506,8 @@ def main_dashboard():
                         hitl_type = "🛑 BLOCK_IP (System recommendation for blocking)"
                         hitl_color = "#ff4d4f"
                     else:
-                        hitl_type = f"🔧 MANUAL ({src})"
+                        # `src` đọc từ luật động trong YAML -> thoát trước khi nhúng vào HTML.
+                        hitl_type = f"🔧 MANUAL ({html.escape(str(src))})"
                         hitl_color = "#1890ff"
 
                     with st.expander(
@@ -1534,6 +1535,14 @@ def main_dashboard():
                         gr_badge, is_gr = ui_components.build_grounding_badge(
                             raw_reason_hitl, mitre_tech_hitl
                         )
+                        # CHỐNG STORED XSS. `parse_mitre_technique` trả về NGUYÊN VĂN cụm
+                        # trong `[MITRE: ...]`, mà chuỗi reason do LLM sinh ra sau khi đã ĐỌC
+                        # payload của kẻ tấn công — nên nội dung đó là dữ liệu KHÔNG tin cậy.
+                        # `render_alert_card` đã thoát chuỗi này (components.py), nhưng bảng
+                        # HITL ở đây thì chưa: cùng một hàm, hai nơi dùng, chỉ một nơi có rào.
+                        # Chỉ thoát cho phần HIỂN THỊ; các hàm dựng huy hiệu vẫn nhận bản thô
+                        # vì chúng so khớp chuỗi (và tự thoát khi cần in ra).
+                        safe_mitre_tech_hitl = html.escape(mitre_tech_hitl)
                         st.markdown(
                             '<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,0.03);'
                             'border-radius:6px;border:1px solid rgba(255,255,255,0.08);">'
@@ -1543,7 +1552,7 @@ def main_dashboard():
                             f"{ui_components.build_threat_memory_badge(raw_reason_hitl, cached_get_ip_reputation(str(rule.get('pattern') or '')))}"
                             "</div>"
                             '<div class="soc-reasoning-section" style="color:#D3ADF7;margin-top:4px;'
-                            f'font-size:0.83rem;">🎯 MITRE ATT&CK Mapping: <code>{mitre_tech_hitl}</code></div>'
+                            f'font-size:0.83rem;">🎯 MITRE ATT&CK Mapping: <code>{safe_mitre_tech_hitl}</code></div>'
                             f"{ui_components._build_mitre_hierarchy_html(mitre_tech_hitl)}"
                             f"{ui_components.build_technique_codes_html(raw_reason_hitl)}"
                             f"{ui_components.build_guardrail_note(is_gr, mitre_tech_hitl, 'AWAIT_HITL')}"
@@ -1832,10 +1841,15 @@ def main_dashboard():
                 safe_last_seen = (
                     html.escape(_fmt_local_ts(ip_rep.get("last_seen", "N/A"))) if ip_rep else "N/A"
                 )
+                # KHÔNG độn mã thay khi kho uy tín chưa có quy kết. Bản cũ mặc định "T1190"
+                # ở CẢ HAI nhánh, nên mọi IP chưa được quy kết đều hiện "Kỹ thuật MITRE cuối
+                # cùng: T1190" — màn hình công bố một kết luận hệ chưa hề đưa ra. Đây đúng
+                # họ lỗi đã dọn ở thẻ cảnh báo (xem tests/unit/test_ui_badges.py), chỉ còn
+                # sót lại ở panel hồ sơ đối tượng. N/A là kết quả thật.
                 safe_last_mitre = (
-                    html.escape(str(ip_rep.get("last_mitre_technique") or "T1190"))
+                    html.escape(str(ip_rep.get("last_mitre_technique") or "N/A"))
                     if ip_rep
-                    else "T1190"
+                    else "N/A"
                 )
 
                 if ip_rep:

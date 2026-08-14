@@ -5,7 +5,7 @@
 [![Docker: Ready](https://img.shields.io/badge/Docker-Compose-blue.svg)](docker-compose.yml)
 [![CI Pipeline](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/ci.yml/badge.svg)](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/ci.yml)
 [![Security Audit](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/security.yml/badge.svg)](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/security.yml)
-[![Tests: 582](https://img.shields.io/badge/pytest-582%20collected-brightgreen.svg)](tests/)
+[![Tests: 608](https://img.shields.io/badge/pytest-608%20collected-brightgreen.svg)](tests/)
 [![Thesis: 40pp EN+VI](https://img.shields.io/badge/Thesis-40pp%20EN%20%2B%20VI-purple.svg)](docs/Thesis/latex/)
 [![Slides: 20-Slide Deck](https://img.shields.io/badge/Defense-20--Slide%20Deck-orange.svg)](docs/Thesis/slides/SENTINEL_defense_notebooklm.html)
 
@@ -154,7 +154,8 @@ Access the Streamlit SOC Dashboard at: **`http://localhost:8501`** (login `manag
 Use `--small` for a ~10,000-event stratified subset if you want the UI populated in minutes.
 
 **Demo stream composition** — 496,885 events, 100% real records, 5.24% attack / 94.76% benign,
-24 distinct attack classes, 9 multi-day APT chains:
+24 distinct attack classes, 9 DAPT2020 chain records of which **3 attacker IPs carry attack-phase
+activity on ≥ 2 days** — those 3 are the APT ground truth the emergent detector can reach (3/3 found):
 
 | Source | Events | Attacks | Role |
 | :--- | ---: | ---: | :--- |
@@ -173,7 +174,7 @@ which `_build_adv_llm` does not repeat. Full details in
 ### 3. Run Deterministic E2E & Offline Benchmarks
 
 ```bash
-# Unit + integration suite (582 tests).
+# Unit + integration suite (608 tests; 4 skip when Redis is not running).
 # SENTINEL_FREEZE_DYNAMIC_RULES=1 is REQUIRED: without it the run writes ~1,400
 # learned rules into config/system_settings.yaml and dirties your working tree.
 SENTINEL_FREEZE_DYNAMIC_RULES=1 pytest

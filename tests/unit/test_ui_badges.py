@@ -48,6 +48,43 @@ def test_khong_ma_thi_khong_duoc_doan_thanh_t1190():
         assert "T1190" not in C.parse_mitre_technique(reason)
 
 
+def test_parse_mitre_tra_ve_nguyen_van_chu_khong_lam_sach():
+    """Hàm này là bộ BÓC TÁCH, KHÔNG phải bộ lọc HTML — nơi gọi phải tự thoát chuỗi.
+
+    Chuỗi reason do LLM sinh ra SAU KHI đã đọc payload của kẻ tấn công, nên mọi thứ nằm
+    trong `[MITRE: ...]` đều là dữ liệu không tin cậy. Khoá hành vi ở đây để test dưới
+    (`test_ma_mitre_khong_duoc_nhung_tho_vao_html`) có nghĩa thật.
+    """
+    doc = "[MITRE: <img src=x onerror=alert(1)>]"
+    assert C.parse_mitre_technique(doc) == "<img src=x onerror=alert(1)>"
+
+
+# ── Chống Stored XSS trên màn hình SOC ─────────────────────────────────────────────
+# `<script>` chèn qua innerHTML thì trình duyệt KHÔNG chạy, nhưng thuộc tính bắt sự kiện
+# (`onerror`, `onload`) thì CÓ. Nên "không thấy thẻ script" không phải là bằng chứng an toàn.
+_NHUNG_VAO_CODE = re.compile(r"<code[^>]*>\{(?P<ten>[A-Za-z_][A-Za-z0-9_]*)\}</code>")
+
+
+@pytest.mark.parametrize("ten_tep", ["app.py", "components.py"])
+def test_ma_mitre_khong_duoc_nhung_tho_vao_html(ten_tep):
+    """Mã kỹ thuật chỉ được vào HTML sau khi thoát chuỗi.
+
+    Hồi quy thật: `render_alert_card` đã thoát (`components.py`), nhưng bảng HITL trong
+    `app.py` dùng CÙNG hàm bóc tách mà quên rào — một payload khiến LLM viết
+    `[MITRE: <img src=x onerror=...>]` vào reason là đủ để chạy mã trong trình duyệt của
+    analyst khi họ mở thẻ. Cùng một hàm, hai nơi dùng, chỉ một nơi có rào.
+    """
+    text = (SRC_DIR / ten_tep).read_text(encoding="utf-8")
+    for m in _NHUNG_VAO_CODE.finditer(text):
+        ten = m.group("ten")
+        # Phép gán có thể xuống dòng trong ngoặc: `x = (\n  html.escape(...)`
+        da_thoat = re.search(rf"\b{ten}\s*=\s*\(?\s*html(?:_lib)?\.escape\(", text)
+        assert ten.startswith("safe_") or da_thoat, (
+            f"{ten_tep}: `{ten}` nhúng thô vào <code>…</code> dưới unsafe_allow_html. "
+            "Thoát bằng html.escape() rồi đặt tên bắt đầu bằng `safe_` như phần còn lại của tệp."
+        )
+
+
 # ── build_threat_memory_badge ──────────────────────────────────────────────────────
 def test_threat_memory_khong_co_du_lieu_thi_noi_la_khong_co():
     html = C.build_threat_memory_badge("Agent: cảnh báo thường, không có lịch sử")

@@ -40,6 +40,10 @@ jobs:
         # Audit project dependencies, ignoring pip itself (tooling, not project dep)
         # CVE-2025-3000 is ignored as torch.jit.script is not utilized in SENTINEL (transitive dependency of sentence-transformers)
         # PYSEC-2026-597 is nltk without a fix, PYSEC-2026-196 is pip which is updated by action runner itself.
+        # CVE-2026-3219 and CVE-2026-6357: NO recorded rationale. They are suppressed here
+        # without a written justification, which is exactly how a suppression outlives the
+        # reason for it. Re-check both and either document why they do not apply to SENTINEL
+        # or drop them from this list. Flagged rather than silently kept.
         pip-audit --desc --ignore-vuln CVE-2026-3219 --ignore-vuln CVE-2026-6357 --ignore-vuln CVE-2025-3000 --ignore-vuln PYSEC-2026-597 --ignore-vuln PYSEC-2026-196 || true
 
     # Gộp từ `security_scan.yml` (đã xoá). Workflow đó chạy đúng hai việc: pip-audit —

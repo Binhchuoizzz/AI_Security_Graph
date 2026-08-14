@@ -271,7 +271,7 @@ def main():
     #
     # KHÔNG phá chuỗi APT: `check_apt_chain` đếm `DISTINCT apt_day` trong bảng `threat_events`
     # theo `src_ip` — mốc ngày nằm TRONG dữ liệu sự kiện, không phải thứ tự đến. Đảo thứ tự
-    # đẩy vì thế không đụng tới 9 chuỗi kill-chain đa ngày.
+    # đẩy vì thế không đụng tới các chuỗi kill-chain đa ngày.
     def _is_attack(ev: dict) -> bool:
         return bool(ev.get("expected_threat") or ev.get("apt_is_attack"))
 
@@ -340,7 +340,13 @@ def main():
         f"    Thứ tự: benign chạy trước, sự kiện tấn công đầu tiên ở vị trí #{first_atk:,} "
         f"({100 * first_atk / n:.1f}% luồng)"
     )
-    print(f"    Chuỗi APT đa-ngày: {n_chains} (mốc chân lý: {len(apt_truth)} IP)")
+    # HAI SỐ KHÁC NHAU, ĐỪNG GỘP. `n_chains` = số BẢN GHI chuỗi trong
+    # `data/processed/dapt2020_chains.jsonl` (9). Còn bản án APT của hệ đòi một IP mang
+    # giai đoạn TẤN CÔNG ở >=2 ngày — lọc `BENIGN_PHASES` xong chỉ còn 3 IP đạt. Dòng cũ in
+    # `n_chains` dưới nhãn "đa-ngày", nên README chép sang thành "9 multi-day APT chains"
+    # trong khi hệ chỉ có thể nổi lên 3. Nhãn nay nói đúng thứ đang đếm.
+    print(f"    Chuỗi DAPT2020 trong tệp nguồn: {n_chains}")
+    print(f"    IP có giai đoạn tấn công >=2 ngày (mốc chân lý APT): {len(apt_truth)}")
 
 
 if __name__ == "__main__":
