@@ -323,7 +323,7 @@
             transition: width 0.3s ease;
         }
 
-        /* Slide Stage Container — Zero Horizontal Scroll */
+        /* Slide Stage Container — 100% Full Bleed Edge-To-Edge Presentation */
         .slide-stage {
             position: relative;
             z-index: 10;
@@ -331,65 +331,68 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 16px 28px;
+            padding: 0;
             overflow: hidden;
             width: 100%;
-            height: calc(100vh - 124px);
+            height: calc(100vh - 108px);
             perspective: 1400px;
             transform-style: preserve-3d;
             box-sizing: border-box;
         }
 
-        /* Slide Container — 100% Fluid Box Fit (No Horizontal Overflow) */
+        /* Slide Container — 100% Full Page Hardware Accelerated */
         .slide {
             position: absolute;
-            width: calc(100% - 56px);
-            height: calc(100% - 32px);
+            width: 100%;
+            height: 100%;
             background: var(--bg-card);
             backdrop-filter: blur(28px);
-            border: 1px solid var(--border-glass);
-            border-radius: 20px;
-            padding: 36px 52px;
+            border: none;
+            border-radius: 0;
+            padding: 32px 56px;
             display: flex;
             flex-direction: column;
             opacity: 0;
             visibility: hidden;
-            transform: translateX(40px) scale(0.97) rotateY(-3deg);
-            transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0.35s;
-            box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.7), 0 0 35px rgba(15, 23, 42, 0.5);
+            transform: translate3d(24px, 0, 0);
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        visibility 0s 0.25s;
+            box-shadow: none;
             overflow-y: auto;
             overflow-x: hidden;
-            transform-style: preserve-3d;
             box-sizing: border-box;
+            contain: content;
+            will-change: transform, opacity;
+            backface-visibility: hidden;
         }
 
         .slide.active {
             opacity: 1;
             visibility: visible;
-            transform: translateX(0) scale(1) rotateY(0deg);
-            transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+            transform: translate3d(0, 0, 0);
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
                         visibility 0s 0s;
+            contain: none;
         }
 
         .slide.exit-left {
             opacity: 0;
             visibility: hidden;
-            transform: translateX(-40px) scale(0.97) rotateY(3deg);
-            transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0.35s;
+            transform: translate3d(-24px, 0, 0);
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        visibility 0s 0.25s;
         }
 
         .slide.exit-right {
             opacity: 0;
             visibility: hidden;
-            transform: translateX(40px) scale(0.97) rotateY(-3deg);
-            transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0.35s;
+            transform: translate3d(24px, 0, 0);
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                        visibility 0s 0.25s;
         }
 
         /* Slide Background Watermark Pattern */
@@ -589,20 +592,9 @@
             letter-spacing: 1.5px;
             color: var(--blue);
             margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            display: inline-block;
             position: relative;
             z-index: 2;
-        }
-        .slide-tag::before {
-            content: '';
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            background: var(--blue);
-            border-radius: 50%;
-            box-shadow: 0 0 12px var(--blue);
         }
 
         .slide-title {
@@ -1035,21 +1027,31 @@
         .nav-btn-group {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
         .nav-btn {
             background: rgba(0, 0, 0, 0.04);
             border: 1px solid var(--border-glass);
             color: var(--text-main);
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
+            height: 38px;
+            padding: 0 14px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 8px;
             cursor: pointer;
-            font-size: 19px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: var(--font-body);
+            white-space: nowrap;
             transition: all 0.2s ease;
+        }
+        .nav-btn.icon-only {
+            width: 38px;
+            min-width: 38px;
+            padding: 0;
+            font-size: 16px;
         }
         body.theme-dark .nav-btn { background: rgba(255, 255, 255, 0.05); }
         .nav-btn:hover {
@@ -1057,6 +1059,12 @@
             border-color: var(--blue);
             color: #FFFFFF;
             box-shadow: 0 4px 12px var(--blue-glow);
+            transform: translateY(-1px);
+        }
+        .nav-btn.active {
+            background: var(--cyan);
+            border-color: var(--cyan);
+            color: #FFFFFF;
         }
 
         /* Slide Menu Overlay Drawer — Fullscreen Elevated */
@@ -1420,6 +1428,26 @@
             background: rgba(56, 189, 248, 0.45);
         }
 
+        /* ==========================================================================
+           Comprehensive Universal Responsive System (4K, Laptop, Tablet, Mobile)
+           ========================================================================== */
+
+        /* Smooth Custom Scrollbar for Slide Content */
+        .slide::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .slide::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .slide::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.25);
+            border-radius: 6px;
+        }
+        .slide::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.45);
+        }
+
         /* 1. Ultra Large Screens & 4K Projectors (min-width: 1920px) */
         @media (min-width: 1920px) {
             html { font-size: 19px !important; }
@@ -1446,8 +1474,8 @@
             html { font-size: 14px !important; }
             header.app-header { height: 54px !important; padding: 0 16px !important; }
             .brand-title { display: none !important; }
-            .slide-stage { height: calc(100vh - 110px) !important; padding: 10px 12px !important; }
-            .slide { width: 100% !important; height: 100% !important; padding: 20px 22px !important; border-radius: 14px !important; }
+            .slide-stage { height: calc(100vh - 108px) !important; padding: 0 !important; }
+            .slide { width: 100% !important; height: 100% !important; padding: 24px 28px !important; border-radius: 0 !important; border: none !important; }
 
             /* Universal Grid Reflow for Tablets */
             .grid-2, .grid-3, .grid-4,
@@ -1460,21 +1488,42 @@
             .slide-title { font-size: 1.85rem !important; margin-bottom: 12px !important; }
             .card-title { font-size: 1.25rem !important; margin-bottom: 8px !important; }
             .card { padding: 18px 20px !important; border-radius: 14px !important; }
-            footer.app-footer { height: 54px !important; padding: 0 16px !important; }
-            footer.app-footer > div:first-child { display: none !important; }
+            footer.app-footer { height: 54px !important; padding: 0 16px !important; justify-content: flex-end !important; }
+            .footer-shortcuts { display: none !important; }
         }
 
         /* 4. Tablets Portrait & Large Phones (max-width: 768px) */
         @media (max-width: 768px) {
             html { font-size: 13px !important; }
-            header.app-header { height: 48px !important; padding: 0 10px !important; }
-            .brand-badge { font-size: 12px !important; padding: 4px 8px !important; }
-            .header-controls { gap: 6px !important; }
-            .ctrl-btn { padding: 4px 8px !important; font-size: 12px !important; }
-            .timer-display, .slide-counter { font-size: 12px !important; padding: 4px 8px !important; }
+            header.app-header {
+                height: 50px !important;
+                padding: 0 10px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+            }
+            .header-brand { flex-shrink: 0 !important; }
+            .brand-badge {
+                font-size: 12px !important;
+                padding: 4px 8px !important;
+                white-space: nowrap !important;
+                letter-spacing: 0.2px !important;
+            }
+            .brand-title { display: none !important; }
+            .header-controls { gap: 6px !important; flex-shrink: 0 !important; }
+            .ctrl-btn { padding: 4px 8px !important; font-size: 12px !important; height: 32px !important; white-space: nowrap !important; }
+            .timer-display, .slide-counter { font-size: 12px !important; padding: 4px 8px !important; white-space: nowrap !important; }
 
-            .slide-stage { height: calc(100vh - 100px) !important; padding: 6px !important; }
-            .slide { width: 100% !important; height: 100% !important; padding: 16px 16px !important; border-radius: 12px !important; overflow-y: auto !important; }
+            .slide-stage { height: calc(100vh - 98px) !important; padding: 0 !important; }
+            .slide {
+                width: 100% !important;
+                height: 100% !important;
+                padding: 16px 14px !important;
+                border-radius: 0 !important;
+                border: none !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+            }
 
             /* Single Column Layouts on Mobile */
             .grid-2, .grid-3, .grid-4,
@@ -1482,31 +1531,48 @@
             div[style*="display: grid"] {
                 grid-template-columns: 1fr !important;
                 gap: 12px !important;
+                width: 100% !important;
             }
 
-            .slide-title { font-size: 1.45rem !important; line-height: 1.3 !important; margin-bottom: 10px !important; }
-            .slide-tag { font-size: 0.9rem !important; padding: 4px 10px !important; margin-bottom: 8px !important; }
-            .card { padding: 14px 16px !important; border-radius: 12px !important; }
+            .slide-title { font-size: 1.45rem !important; line-height: 1.3 !important; margin-bottom: 10px !important; word-break: break-word !important; }
+            .slide-tag { font-size: 0.85rem !important; padding: 4px 8px !important; margin-bottom: 8px !important; display: inline-block !important; }
+            .card { padding: 14px 14px !important; border-radius: 12px !important; margin-bottom: 8px !important; }
             .card-title { font-size: 1.15rem !important; margin-bottom: 6px !important; }
             .card-text, p, li { font-size: 0.95rem !important; line-height: 1.5 !important; }
-            .metric-val { font-size: 38px !important; }
-            .metric-lbl { font-size: 14px !important; }
+            .metric-val { font-size: 34px !important; }
+            .metric-lbl { font-size: 13px !important; }
 
             /* Tables on Mobile */
-            table th, table td { padding: 8px 8px !important; font-size: 0.85rem !important; }
+            table th, table td { padding: 8px 6px !important; font-size: 0.85rem !important; }
 
             .slide-drawer { width: 88% !important; max-width: 320px !important; }
-            .notes-panel { width: 94% !important; right: 3% !important; bottom: 60px !important; }
+            .notes-panel { width: 94% !important; right: 3% !important; bottom: 56px !important; }
+
+            /* Mobile Clean Footer */
+            footer.app-footer { height: 48px !important; padding: 0 10px !important; justify-content: center !important; }
+            .footer-shortcuts { display: none !important; }
+            .nav-btn-group { width: 100% !important; justify-content: space-around !important; gap: 6px !important; }
+            .nav-btn { padding: 5px 12px !important; font-size: 12px !important; }
         }
 
-        /* 5. Support Ultra-low Height & Landscape Mobile Displays */
+        /* 5. Ultra Narrow Phones (max-width: 520px) - Auto Hide Text Labels */
+        @media (max-width: 520px) {
+            .btn-lbl { display: none !important; }
+            .brand-badge { font-size: 11px !important; padding: 3px 6px !important; }
+            .timer-display { padding: 4px 6px !important; font-size: 11px !important; }
+            .slide-counter { padding: 4px 6px !important; font-size: 11px !important; }
+            .ctrl-btn { width: 32px !important; padding: 0 !important; justify-content: center !important; }
+            .nav-btn { min-width: 36px !important; padding: 0 8px !important; }
+        }
+
+        /* 6. Support Ultra-low Height & Landscape Mobile Displays */
         @media (max-height: 620px) and (orientation: landscape) {
-            header.app-header, footer.app-footer { height: 42px !important; }
-            .slide-stage { height: calc(100vh - 84px) !important; padding: 4px 8px !important; }
-            .slide { padding: 12px 18px !important; overflow-y: auto !important; }
-            .slide-title { font-size: 1.35rem !important; margin-bottom: 8px !important; }
+            header.app-header, footer.app-footer { height: 40px !important; }
+            .slide-stage { height: calc(100vh - 80px) !important; padding: 4px 8px !important; }
+            .slide { padding: 12px 16px !important; overflow-y: auto !important; }
+            .slide-title { font-size: 1.3rem !important; margin-bottom: 6px !important; }
             .grid-2, .grid-3, .grid-4,
-            div[style*="grid-template-columns: repeat("] { gap: 10px !important; }
+            div[style*="grid-template-columns: repeat("] { gap: 8px !important; }
         }
 
     </style>
@@ -1536,7 +1602,7 @@
     <!-- Header Controls -->
     <header class="app-header">
         <div class="header-brand">
-            <div class="brand-badge">VIỆN QUẢN TRỊ & CÔNG NGHỆ FSB</div>
+            <div class="brand-badge" title="Viện Quản trị & Công nghệ FSB">FSB · SENTINEL</div>
             <div class="brand-title">Báo cáo Luận văn Thạc sĩ Kỹ thuật Phần mềm (MSE)</div>
         </div>
 
@@ -1550,24 +1616,12 @@
                 SLIDE <span id="currentSlideNum" style="color: var(--blue); font-weight:800;">1</span> / <span id="totalSlideNum">20</span>
             </div>
 
-            <button class="ctrl-btn" id="btnThemeToggle" title="Đổi Giao diện Sáng/Tối">
-                <i class="fa-solid fa-moon"></i> Theme
+            <button class="ctrl-btn" id="btnDrawer" title="Mục lục Slide (Phím O)">
+                <i class="fa-solid fa-list-ul"></i> <span class="btn-lbl">Mục lục</span>
             </button>
 
-            <button class="ctrl-btn" id="btnNotes">
-                <i class="fa-solid fa-note-sticky"></i> Kịch bản nói (N)
-            </button>
-
-            <button class="ctrl-btn" id="btnDrawer">
-                <i class="fa-solid fa-list-ul"></i> Mục lục (O)
-            </button>
-
-            <button class="ctrl-btn" id="btnExportPDF" title="Tải Slide PDF (P)">
-                <i class="fa-solid fa-file-pdf"></i> Tải PDF (P)
-            </button>
-
-            <button class="ctrl-btn" id="btnFullscreen">
-                <i class="fa-solid fa-expand"></i> Fullscreen (F)
+            <button class="ctrl-btn" id="btnFullscreen" title="Toàn màn hình (Phím F)">
+                <i class="fa-solid fa-expand"></i> <span class="btn-lbl">Fullscreen</span>
             </button>
         </div>
 
@@ -1688,7 +1742,7 @@
     </div>
 
     <!-- Student Author Footer Info Banner -->
-    <div style="padding: 14px 24px; background: rgba(15, 23, 42, 0.06); border: 1px solid var(--border-glass); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 1.0rem; color: var(--text-muted);">
+    <div style="padding: 14px 20px; background: rgba(15, 23, 42, 0.06); border: 1px solid var(--border-glass); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 1.0rem; color: var(--text-muted); flex-wrap: wrap; gap: 10px;">
         <div><strong>Học viên thực hiện:</strong> Nguyễn Đức Bình (MSHV: <strong>24MSE13183</strong> — Lớp: <strong>MSE23HN</strong>)</div>
         <div><strong>Chương trình:</strong> Thạc sĩ Kỹ thuật Phần mềm (MSE) — Viện Quản trị &amp; Công nghệ FSB, ĐH FPT</div>
     </div>
@@ -3111,27 +3165,29 @@
     <div class="slide-drawer" id="slideDrawer">
         <div class="drawer-header">
             <div class="drawer-title">Mục Lục Báo Cáo (20 Slides)</div>
-            <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px;" id="btnCloseDrawer">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <button class="ctrl-btn" id="btnExportPDF" title="Tải Slide PDF (Phím P)" style="padding: 4px 10px; font-size: 13px;">
+                    <i class="fa-solid fa-file-pdf"></i> In / Tải PDF
+                </button>
+                <button style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:18px;" id="btnCloseDrawer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
         </div>
         <div class="drawer-list" id="drawerList"></div>
     </div>
 
     <!-- Bottom Controls Footer -->
     <footer class="app-footer">
-        <div style="font-size: 19px; font-weight: 500; color: var(--text-dim); display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-keyboard"></i> Phím <strong>&larr; &rarr;</strong> / <strong>Space</strong> (Chuyển Slide) | <strong>N</strong> (Lời thoại) | <strong>O</strong> (Mục lục) | <strong>P</strong> (Tải PDF) | <strong>F</strong> (Fullscreen)
+        <div class="footer-shortcuts" style="font-size: 14.5px; font-weight: 500; color: var(--text-dim); display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-keyboard"></i> Phím <strong>&larr; &rarr;</strong> / <strong>Space</strong> (Chuyển Slide) | <strong>N</strong> (Lời thoại) | <strong>O</strong> (Mục lục) | <strong>P</strong> (PDF) | <strong>F</strong> (Fullscreen)
         </div>
 
         <div class="nav-btn-group">
-            <button class="nav-btn" id="btnPrev" title="Slide Trước"><i class="fa-solid fa-chevron-left"></i></button>
-            <button class="nav-btn" id="btnNext" title="Sang Slide Tiếp"><i class="fa-solid fa-chevron-right"></i></button>
-            <button class="nav-btn" id="btnNotes" title="Kịch bản Lời thoại (N)"><i class="fa-solid fa-microphone"></i></button>
-            <button class="nav-btn" id="btnDrawer" title="Mục lục Slide (O)"><i class="fa-solid fa-list-ul"></i></button>
-            <button class="nav-btn" id="btnExportPDFFooter" title="Tải Slide PDF (P)"><i class="fa-solid fa-file-pdf"></i> PDF</button>
-            <button class="nav-btn" id="btnFullscreen" title="Toàn màn hình (F)"><i class="fa-solid fa-expand"></i></button>
-            <button class="nav-btn" id="btnThemeToggle" title="Đổi giao diện Sáng/Tối"><i class="fa-solid fa-moon"></i> Theme</button>
+            <button class="nav-btn icon-only" id="btnPrev" title="Slide Trước (Phím &larr;)"><i class="fa-solid fa-chevron-left"></i></button>
+            <button class="nav-btn icon-only" id="btnNext" title="Sang Slide Tiếp (Phím &rarr;)"><i class="fa-solid fa-chevron-right"></i></button>
+            <button class="nav-btn" id="btnNotes" title="Kịch bản Lời thoại (Phím N)"><i class="fa-solid fa-microphone"></i> <span class="btn-lbl">Lời thoại</span></button>
+            <button class="nav-btn" id="btnThemeToggle" title="Đổi giao diện Sáng/Tối"><i class="fa-solid fa-moon"></i> <span class="btn-lbl">Theme</span></button>
         </div>
     </footer>
 
@@ -3514,7 +3570,7 @@ Em rất mong nhận được những nhận xét, góp ý quý báu và các c�
         function toggleTheme() {
             document.body.classList.toggle('theme-dark');
             const isDark = document.body.classList.contains('theme-dark');
-            btnThemeToggle.innerHTML = isDark ? `<i class="fa-solid fa-sun"></i> Theme` : `<i class="fa-solid fa-moon"></i> Theme`;
+            btnThemeToggle.innerHTML = isDark ? `<i class="fa-solid fa-sun"></i> <span class="btn-lbl">Theme</span>` : `<i class="fa-solid fa-moon"></i> <span class="btn-lbl">Theme</span>`;
         }
 
         // Modal & Drawer Controls
