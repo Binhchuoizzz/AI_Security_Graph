@@ -21,12 +21,16 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # docs/Thesis/slides/assets/ là mã BÊN THỨ BA đã vendor (KaTeX, Font Awesome, font
+      # Google). Sửa định dạng của nó vừa vô nghĩa vừa làm khó đối chiếu với bản gốc
+      # thượng nguồn khi cần nâng phiên bản. Để nguyên byte như lúc tải về.
       - id: trailing-whitespace
+        exclude: ^docs/Thesis/slides/assets/
       - id: end-of-file-fixer
         # knowledge_base/ bị LOẠI TRỪ: `checksums.sha256` ghi sha256 của CHÍNH nội dung
         # tệp, nên thêm một ký tự xuống dòng là đổi mã băm và làm hỏng phép kiểm toàn vẹn
         # KHO (`verify_kb_against_mitre.py`). Ràng buộc toàn vẹn thắng quy ước định dạng.
-        exclude: ^knowledge_base/
+        exclude: ^(knowledge_base/|docs/Thesis/slides/assets/)
       - id: check-merge-conflict
       - id: check-added-large-files
         # 6MB: đủ chỗ cho PDF luận văn (~4.3MB, không LFS) nhưng vẫn chặn vô tình

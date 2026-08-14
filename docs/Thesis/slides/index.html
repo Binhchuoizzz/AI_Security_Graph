@@ -22,16 +22,24 @@
         })();
     </script>
     <title>SENTINEL — Slide Bảo vệ Luận văn Thạc sĩ | Viện Quản trị & Công nghệ FSB | Nguyễn Đức Bình - MSHV: 24MSE13183 - Lớp MSE23HN</title>
-    <!-- Google Fonts optimized for Vietnamese typography (Be Vietnam Pro & Plus Jakarta Sans) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&family=JetBrains+Mono:wght@400;500;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Favicon: Cyber Security Shield with AI Glow (100% Offline Vector SVG) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2338BDF8'/%3E%3Cstop offset='100%25' stop-color='%238B5CF6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='%230B132B'/%3E%3Cpath d='M16 4L6 8v8c0 6.5 4.3 12.3 10 14 5.7-1.7 10-7.5 10-14V8L16 4z' fill='url(%23g)' stroke='%2338BDF8' stroke-width='1.2'/%3E%3Cpath d='M16 10a3 3 0 0 0-3 3v2h-1v6h8v-6h-1v-2a3 3 0 0 0-3-3zm0 2a1 1 0 0 1 1 1v2h-2v-2a1 1 0 0 1 1-1z' fill='%230B132B'/%3E%3Ccircle cx='16' cy='18' r='1.2' fill='%2338BDF8'/%3E%3C/svg%3E">
+    <!-- ================================================================
+         MỌI TÀI NGUYÊN ĐỀU CỤC BỘ — KHÔNG GỌI RA MẠNG.
+         Bản cũ nạp 6 thứ từ CDN (Google Fonts, Font Awesome, KaTeX ×3). Phòng bảo vệ mất
+         mạng hoặc chặn CDN là: 40 công thức hiện nguyên `$\mathcal{O}(1)$` giữa slide, 65
+         icon thành ô trống, và chữ Việt rơi về font hệ thống. Toàn bộ đã vendor vào
+         `assets/` (1,4 MB) nên deck chạy được từ USB, từ máy chiếu không mạng, từ bất kỳ
+         đâu. Khi thêm tài nguyên mới, vendor tiếp — đừng trỏ CDN.
+         ================================================================ -->
+    <!-- Font chữ Việt (Be Vietnam Pro · Plus Jakarta Sans · JetBrains Mono) — subset vietnamese+latin -->
+    <link rel="stylesheet" href="assets/fonts/fonts.css">
     <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/fontawesome/css/all.min.css">
     <!-- KaTeX cho hiển thị Công thức Toán học chuẩn High-Precision -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    <link rel="stylesheet" href="assets/katex/katex.min.css">
+    <script defer src="assets/katex/katex.min.js"></script>
+    <script defer src="assets/katex/auto-render.min.js"
         onload="renderMathInElement(document.body, {
             delimiters: [
                 {left: '$$', right: '$$', display: true},
@@ -1393,81 +1401,112 @@
 
 
         /* ==========================================================================
-           Comprehensive Responsive Breakpoints (Desktop, Laptop, Tablet, Mobile)
+           Comprehensive Universal Responsive System (4K, Laptop, Tablet, Mobile)
            ========================================================================== */
 
-        /* 1. Ultra Large Screens & Projectors (4K, 2K) */
+        /* Smooth Custom Scrollbar for Slide Content */
+        .slide::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .slide::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .slide::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.25);
+            border-radius: 6px;
+        }
+        .slide::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.45);
+        }
+
+        /* 1. Ultra Large Screens & 4K Projectors (min-width: 1920px) */
         @media (min-width: 1920px) {
-            html { font-size: 20px !important; }
+            html { font-size: 19px !important; }
+            .slide { padding: 42px 64px !important; }
         }
 
-        /* 2. Standard Laptops & Tablets Landscape (1024px - 1440px) */
-        @media (max-width: 1440px) {
-            html { font-size: 16px !important; }
-            .slide { padding: 28px 36px !important; }
-            .slide-title { font-size: 2.2rem !important; margin-bottom: 18px !important; }
-        }
-
-        /* 3. Tablets Portrait & Small Laptops (768px - 1023px) */
-        @media (max-width: 1023px) {
-            html { font-size: 14.5px !important; }
-            header.app-header { height: 56px !important; padding: 0 16px !important; }
-            .brand-title { display: none !important; }
-            .slide-stage { height: calc(100vh - 116px) !important; padding: 12px 14px !important; }
-            .slide { width: 100% !important; height: 100% !important; padding: 22px 24px !important; border-radius: 14px !important; }
-
-            /* Reflow Grids for Tablets */
-            .grid-2, .grid-3, .grid-4 {
-                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+        /* 2. Standard Laptops, 1366x768 & Scaled 1080p Displays (max-width: 1366px) */
+        @media (max-width: 1366px) {
+            html { font-size: 15px !important; }
+            .slide { padding: 24px 34px !important; }
+            .slide-title { font-size: 2.1rem !important; margin-bottom: 16px !important; }
+            div[style*="grid-template-columns: repeat(4,"] {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 14px !important;
+            }
+            div[style*="grid-template-columns: repeat(3,"] {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
                 gap: 16px !important;
             }
-            .slide-title { font-size: 1.9rem !important; margin-bottom: 14px !important; }
-            .card-title { font-size: 1.3rem !important; margin-bottom: 10px !important; }
-            .card { padding: 20px 22px !important; border-radius: 14px !important; }
-            footer.app-footer { height: 56px !important; padding: 0 16px !important; }
+        }
+
+        /* 3. Small Laptops, iPad Pro & Tablets Landscape (max-width: 1024px) */
+        @media (max-width: 1024px) {
+            html { font-size: 14px !important; }
+            header.app-header { height: 54px !important; padding: 0 16px !important; }
+            .brand-title { display: none !important; }
+            .slide-stage { height: calc(100vh - 110px) !important; padding: 10px 12px !important; }
+            .slide { width: 100% !important; height: 100% !important; padding: 20px 22px !important; border-radius: 14px !important; }
+
+            /* Universal Grid Reflow for Tablets */
+            .grid-2, .grid-3, .grid-4,
+            div[style*="grid-template-columns: repeat(4,"],
+            div[style*="grid-template-columns: repeat(3,"],
+            div[style*="grid-template-columns: repeat(2,"] {
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)) !important;
+                gap: 14px !important;
+            }
+            .slide-title { font-size: 1.85rem !important; margin-bottom: 12px !important; }
+            .card-title { font-size: 1.25rem !important; margin-bottom: 8px !important; }
+            .card { padding: 18px 20px !important; border-radius: 14px !important; }
+            footer.app-footer { height: 54px !important; padding: 0 16px !important; }
             footer.app-footer > div:first-child { display: none !important; }
         }
 
-        /* 4. Mobile Devices (320px - 767px) */
-        @media (max-width: 767px) {
+        /* 4. Tablets Portrait & Large Phones (max-width: 768px) */
+        @media (max-width: 768px) {
             html { font-size: 13px !important; }
-            header.app-header { height: 50px !important; padding: 0 10px !important; }
-            .brand-badge { font-size: 13px !important; padding: 4px 8px !important; }
+            header.app-header { height: 48px !important; padding: 0 10px !important; }
+            .brand-badge { font-size: 12px !important; padding: 4px 8px !important; }
             .header-controls { gap: 6px !important; }
-            .ctrl-btn { padding: 5px 8px !important; font-size: 13px !important; }
+            .ctrl-btn { padding: 4px 8px !important; font-size: 12px !important; }
             .timer-display, .slide-counter { font-size: 12px !important; padding: 4px 8px !important; }
 
-            .slide-stage { height: calc(100vh - 104px) !important; padding: 6px !important; }
-            .slide { width: 100% !important; height: 100% !important; padding: 16px 16px !important; border-radius: 10px !important; overflow-y: auto !important; }
+            .slide-stage { height: calc(100vh - 100px) !important; padding: 6px !important; }
+            .slide { width: 100% !important; height: 100% !important; padding: 16px 16px !important; border-radius: 12px !important; overflow-y: auto !important; }
 
             /* Single Column Layouts on Mobile */
-            .grid-2, .grid-3, .grid-4 {
+            .grid-2, .grid-3, .grid-4,
+            div[style*="grid-template-columns: repeat("],
+            div[style*="display: grid"] {
                 grid-template-columns: 1fr !important;
                 gap: 12px !important;
             }
 
-            .slide-title { font-size: 1.5rem !important; line-height: 1.3 !important; margin-bottom: 12px !important; }
-            .slide-tag { font-size: 0.95rem !important; padding: 4px 10px !important; margin-bottom: 8px !important; }
-            .card { padding: 16px 16px !important; border-radius: 12px !important; }
-            .card-title { font-size: 1.2rem !important; margin-bottom: 8px !important; }
-            .card-text, p, li { font-size: 1.0rem !important; line-height: 1.55 !important; }
-            .metric-val { font-size: 42px !important; }
-            .metric-lbl { font-size: 15px !important; }
+            .slide-title { font-size: 1.45rem !important; line-height: 1.3 !important; margin-bottom: 10px !important; }
+            .slide-tag { font-size: 0.9rem !important; padding: 4px 10px !important; margin-bottom: 8px !important; }
+            .card { padding: 14px 16px !important; border-radius: 12px !important; }
+            .card-title { font-size: 1.15rem !important; margin-bottom: 6px !important; }
+            .card-text, p, li { font-size: 0.95rem !important; line-height: 1.5 !important; }
+            .metric-val { font-size: 38px !important; }
+            .metric-lbl { font-size: 14px !important; }
 
             /* Tables on Mobile */
-            table th, table td { padding: 8px 10px !important; font-size: 0.9rem !important; }
+            table th, table td { padding: 8px 8px !important; font-size: 0.85rem !important; }
 
-            .slide-drawer { width: 85% !important; max-width: 320px !important; }
-            .notes-panel { width: 92% !important; right: 4% !important; bottom: 65px !important; }
+            .slide-drawer { width: 88% !important; max-width: 320px !important; }
+            .notes-panel { width: 94% !important; right: 3% !important; bottom: 60px !important; }
         }
 
-        /* 5. Support Dynamic Zooming & Landscape Modes */
-        @media (max-height: 600px) and (orientation: landscape) {
-            header.app-header, footer.app-footer { height: 44px !important; }
-            .slide-stage { height: calc(100vh - 88px) !important; padding: 4px !important; }
+        /* 5. Support Ultra-low Height & Landscape Mobile Displays */
+        @media (max-height: 620px) and (orientation: landscape) {
+            header.app-header, footer.app-footer { height: 42px !important; }
+            .slide-stage { height: calc(100vh - 84px) !important; padding: 4px 8px !important; }
             .slide { padding: 12px 18px !important; overflow-y: auto !important; }
-            .slide-title { font-size: 1.4rem !important; margin-bottom: 8px !important; }
-            .grid-2, .grid-3, .grid-4 { gap: 10px !important; }
+            .slide-title { font-size: 1.35rem !important; margin-bottom: 8px !important; }
+            .grid-2, .grid-3, .grid-4,
+            div[style*="grid-template-columns: repeat("] { gap: 10px !important; }
         }
 
     </style>
@@ -1690,7 +1729,7 @@
             <div>
                 <div style="font-size: 1.45rem; font-weight: 800; color: #059669; margin-bottom: 8px;">PHẦN III: THỰC NGHIỆM &amp; ĐÁNH GIÁ 5D METRICS</div>
                 <p style="font-size: 1.15rem; color: var(--text-main); line-height: 1.7;">
-                    Kết quả đột phá (Offload 97.5%, Median 0.88ms, Prompt Inj 100%), Ablation Study, chấm RAGAS bằng trọng tài khác họ &amp; Streamlit Dashboard HITL.
+                    Kết quả đột phá (Offload 97,5%, Median 0,88ms, Prompt Inj 100%), Ablation Study, chấm RAGAS bằng trọng tài khác họ &amp; Streamlit Dashboard HITL.
                 </p>
             </div>
         </div>
@@ -1895,13 +1934,13 @@
                     <td style="padding: 14px 20px; color: #DC2626; font-size: 1.12rem;">⚡ Một tầng rẻ, nhanh · tỷ lệ báo giả cao vì không suy luận ngữ cảnh</td>
                     <td style="padding: 14px 20px; color: #DC2626; font-size: 1.12rem;">⏳ Suy luận LLM cho từng sự kiện — độ trễ hàng giây</td>
                     <td style="padding: 14px 20px; background: #ECFDF5; border-left: 3px solid #10B981; font-weight: 700; color: #064E3B; font-size: 1.15rem;">
-                        🚀 <strong style="color: #0284C7;">T1 trung bình 0.182ms</strong> | <strong style="color: #047857;">Xả tải 97.5%</strong> | 🎯 <strong style="color: #047857;">Báo giả Auto-BLOCK = 0%</strong>
+                        🚀 <strong style="color: #0284C7;">T1 trung bình 0,182ms</strong> | <strong style="color: #047857;">Xả tải 97,5%</strong> | 🎯 <strong style="color: #047857;">Báo giả Auto-BLOCK = 0%</strong>
                     </td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
                     <td style="padding: 14px 20px; font-weight: 800; color: #0F172A; font-size: 1.15rem;">Chống Prompt Injection</td>
                     <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">❌ Không hỗ trợ</td>
-                    <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">⚠️ Checkpoint thủ công + Llama Prompt Guard 2 (F1 98.1%)</td>
+                    <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">⚠️ Checkpoint thủ công + Llama Prompt Guard 2 (F1 98,1%)</td>
                     <td style="padding: 14px 20px; background: #F0FDF4; border-left: 3px solid #10B981; font-weight: 700; color: #064E3B; font-size: 1.15rem;">
                         🛡️ <strong style="color: #E11D48;">Kháng 100%</strong> (Delimited Data)
                     </td>
@@ -1997,14 +2036,14 @@
             <!-- Node 3: ML Gateway -->
             <rect x="460" y="60" width="180" height="120" rx="14" fill="url(#emeraldGrad)" filter="url(#glow)" />
             <text x="550" y="95" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">ML GATEWAY</text>
-            <text x="550" y="120" text-anchor="middle" fill="#D1FAE5" font-weight="700" font-size="13.5">LightGBM (3,452 eps)</text>
+            <text x="550" y="120" text-anchor="middle" fill="#D1FAE5" font-weight="700" font-size="13.5">LightGBM (3.452 eps)</text>
             <text x="550" y="145" text-anchor="middle" fill="#A7F3D0" font-weight="600" font-size="12.5">Xả tải 59,2% · 0,287 ms</text>
 
             <!-- Node 4: Tier 1.75 Semantic Cache -->
             <rect x="690" y="60" width="180" height="120" rx="14" fill="url(#purpleGrad)" filter="url(#glow)" />
             <text x="780" y="95" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">TIER 1.75 CACHE</text>
             <text x="780" y="120" text-anchor="middle" fill="#EDE9FE" font-weight="700" font-size="13.5">ExactMatch SHA-256</text>
-            <text x="780" y="145" text-anchor="middle" fill="#DDD6FE" font-weight="600" font-size="12.5">Hit Rate 81.3% (8.9x)</text>
+            <text x="780" y="145" text-anchor="middle" fill="#DDD6FE" font-weight="600" font-size="12.5">Hit Rate 81,3% (8.9x)</text>
 
             <!-- Node 5: Tier 2 Cognitive Agent -->
             <rect x="920" y="60" width="160" height="120" rx="14" fill="#0F172A" stroke="#A78BFA" stroke-width="2.5" />
@@ -2025,7 +2064,7 @@
                     <div style="font-size: 1.4rem; font-weight: 800; color: #38BDF8;">Tầng 1: Lọc Tốc Độ Đường Truyền $\mathcal{O}(1)$</div>
                 </div>
                 <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
-                    Đảm nhận vai trò "Tấm lưới lọc siêu tốc": lớp luật xử lý 100% dữ liệu thô ở <strong>trung bình 0,182 ms</strong>, đưa độ trễ trung vị toàn tuyến về <strong>0,88 ms</strong>. Kết hợp Welford $\mathcal{O}(1)$, Machine Learning Gate (LightGBM) và Semantic Cache để <strong>xả tải 97.5% lưu lượng</strong> (đo trên luồng 99.717 sự kiện, tỷ lệ tấn công nền 9,8%) mà KHÔNG tiêu tốn tài nguyên GPU.
+                    Đảm nhận vai trò "Tấm lưới lọc siêu tốc": lớp luật xử lý 100% dữ liệu thô ở <strong>trung bình 0,182 ms</strong>, đưa độ trễ trung vị toàn tuyến về <strong>0,88 ms</strong>. Kết hợp Welford $\mathcal{O}(1)$, Machine Learning Gate (LightGBM) và Semantic Cache để <strong>xả tải 97,5% lưu lượng</strong> (đo trên luồng 99.717 sự kiện, tỷ lệ tấn công nền 9,8%) mà KHÔNG tiêu tốn tài nguyên GPU.
                 </p>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 10px 16px; border-radius: 8px; font-size: 1.05rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
@@ -2168,12 +2207,12 @@
             <!-- Audited Metric Boxes -->
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
                 <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 16px; padding: 22px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.05);">
-                    <div style="font-size: 3.0rem; font-weight: 800; color: #059669; line-height: 1.1;">59.2%</div>
+                    <div style="font-size: 3.0rem; font-weight: 800; color: #059669; line-height: 1.1;">59,2%</div>
                     <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted); margin-top: 8px;">Xả Tải Riêng Cổng ML (58.992 sk)</div>
                 </div>
                 <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 16px; padding: 22px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.05);">
-                    <div style="font-size: 3.0rem; font-weight: 800; color: #0284C7; line-height: 1.1;">3,452 eps</div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted); margin-top: 8px;">Thông Lượng ML (0.287ms)</div>
+                    <div style="font-size: 3.0rem; font-weight: 800; color: #0284C7; line-height: 1.1;">3.452 eps</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-muted); margin-top: 8px;">Thông Lượng ML (0,287ms)</div>
                 </div>
             </div>
 
@@ -2256,11 +2295,11 @@
                 <!-- 2 Audited Metric Boxes -->
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-bottom: 18px;">
                     <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
-                        <div style="font-size: 2.8rem; font-weight: 800; color: #7C3AED; line-height: 1.1;">81.3%</div>
-                        <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Hit Rate (1,220/1,500)</div>
+                        <div style="font-size: 2.8rem; font-weight: 800; color: #7C3AED; line-height: 1.1;">81,3%</div>
+                        <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Hit Rate (1.220/1.500)</div>
                     </div>
                     <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
-                        <div style="font-size: 2.8rem; font-weight: 800; color: #0284C7; line-height: 1.1;">9.8 ms</div>
+                        <div style="font-size: 2.8rem; font-weight: 800; color: #0284C7; line-height: 1.1;">9,8 ms</div>
                         <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Độ Trễ Trúng Đệm (8.9x)</div>
                     </div>
                 </div>
@@ -2270,15 +2309,15 @@
                         <strong>Cấu trúc Bounded LRU Cache:</strong> Quản lý bộ đệm theo chính sách LRU (<code>OrderedDict</code>) trong RAM với sức chứa tối đa <strong>500 mục</strong>.
                     </li>
                     <li style="margin-bottom: 10px;">
-                        <strong>Thời gian sống TTL (1,800 giây):</strong> Tự động loại bỏ phán quyết cũ sau 30 phút để cập nhật ngữ cảnh đe dọa mới.
+                        <strong>Thời gian sống TTL (1.800 giây):</strong> Tự động loại bỏ phán quyết cũ sau 30 phút để cập nhật ngữ cảnh đe dọa mới.
                     </li>
                     <li>
-                        <strong>Tỷ Lệ Trúng Đệm Truy Vấn Trùng Lặp:</strong> Đạt <strong>81.3% (1,220/1,500)</strong> ở độ trễ trung bình <strong>9.8 ms</strong> *(phạm vi đo trên luồng truy vấn trùng lặp, không phải phần xả tải luồng thô)*.
+                        <strong>Tỷ Lệ Trúng Đệm Truy Vấn Trùng Lặp:</strong> Đạt <strong>81,3% (1.220/1.500)</strong> ở độ trễ trung bình <strong>9,8 ms</strong> *(phạm vi đo trên luồng truy vấn trùng lặp, không phải phần xả tải luồng thô)*.
                     </li>
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                🚀 Giúp giảm 8.9 lần độ trễ phán quyết (9.8ms vs 87.7ms) cho luồng trùng lặp — Loại bỏ triệt để nghẽn GPU.
+                🚀 Giúp giảm 8.9 lần độ trễ phán quyết (9,8ms vs 87,7ms) cho luồng trùng lặp — Loại bỏ triệt để nghẽn GPU.
             </div>
         </div>
 
@@ -2638,26 +2677,32 @@
     <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 20px;">
         <div style="background: rgba(30, 64, 175, 0.06); border: 1.5px solid rgba(56, 189, 248, 0.4); border-radius: 16px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
             <div style="font-size: 1.1rem; color: #0284C7; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">Tỷ Lệ Xả Tải Tầng 1</div>
-            <div style="font-size: 2.8rem; font-weight: 800; color: #0284C7; line-height: 1.1;">97.5%</div>
+            <div style="font-size: 2.8rem; font-weight: 800; color: #0284C7; line-height: 1.1;">97,5%</div>
             <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Đo trên luồng 99.717 sự kiện, tỷ lệ tấn công nền 9,8%</div>
+            <!-- HAI ĐIỂM ĐO, KHÔNG PHẢI MỘT HẰNG SỐ. Nếu chỉ trưng 97,5% thì câu hỏi hiển
+                 nhiên của hội đồng — "trên mạng của chúng tôi có giữ được không?" — không có
+                 chỗ nào trên slide trả lời. Con số thứ hai chính là đóng góp của luận văn:
+                 xả tải là thuộc tính của HỖN HỢP lưu lượng. Nguồn: offload_vs_baserate_
+                 demo.json (0,9747) và offload_vs_baserate_stream.json (0,9057). -->
+            <div style="font-size: 0.9rem; font-weight: 700; color: var(--cyan); margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border-glass);">Nền tấn công 31,56% &rarr; <span style="font-weight: 800;">90,6%</span><br><span style="font-weight: 600; color: var(--text-dim);">Xả tải phụ thuộc hỗn hợp lưu lượng</span></div>
         </div>
 
         <div style="background: rgba(16, 185, 129, 0.06); border: 1.5px solid rgba(16, 185, 129, 0.4); border-radius: 16px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
             <div style="font-size: 1.1rem; color: #059669; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">Độ Trễ Trung Vị (Median)</div>
-            <div style="font-size: 2.8rem; font-weight: 800; color: #059669; line-height: 1.1;">0.88 ms</div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Sub-millisecond! (Mean: 5.28s vs 17.18s)</div>
+            <div style="font-size: 2.8rem; font-weight: 800; color: #059669; line-height: 1.1;">0,88 ms</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Sub-millisecond! (Mean: 5,28s vs 17,18s)</div>
         </div>
 
         <div style="background: rgba(139, 92, 246, 0.06); border: 1.5px solid rgba(139, 92, 246, 0.4); border-radius: 16px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
             <div style="font-size: 1.1rem; color: #7C3AED; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">Bảo Mật AI &amp; Prompt Inj.</div>
-            <div style="font-size: 2.8rem; font-weight: 800; color: #7C3AED; line-height: 1.1;">100.0%</div>
+            <div style="font-size: 2.8rem; font-weight: 800; color: #7C3AED; line-height: 1.1;">100,0%</div>
             <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">678 mẫu đối kháng &amp; 100 field injection</div>
         </div>
 
         <div style="background: rgba(245, 158, 11, 0.06); border: 1.5px solid rgba(245, 158, 11, 0.4); border-radius: 16px; padding: 20px 16px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,0.04);">
             <div style="font-size: 1.1rem; color: #D97706; font-weight: 800; text-transform: uppercase; margin-bottom: 4px;">Giảm Khối Lượng Analyst</div>
-            <div style="font-size: 2.8rem; font-weight: 800; color: #D97706; line-height: 1.1;">-84.24%</div>
-            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Hàng đợi Hoãn chứa 95.0% đe dọa thật</div>
+            <div style="font-size: 2.8rem; font-weight: 800; color: #D97706; line-height: 1.1;">-84,24%</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Hàng đợi Hoãn chứa 95,0% đe dọa thật</div>
         </div>
     </div>
 
@@ -2679,13 +2724,13 @@
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">1. Hiệu Năng &amp; Độ Trễ</td>
                     <td style="padding: 10px 14px; color: #334155;">Offload Rate · Latency Median · Stage Latencies</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">97.5% · 0.88 ms · T1 0.182ms / T2 13.438s</td>
-                    <td style="padding: 10px 14px; color: #475569;">Xả tải 97.5% lưu lượng; ML Gate Auto-BLOCK 0 FP (962 ca tại C &gt;= 0.85).</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">97,5% · 0,88 ms · T1 0,182ms / T2 13,438s</td>
+                    <td style="padding: 10px 14px; color: #475569;">Xả tải 97,5% lưu lượng; ML Gate Auto-BLOCK 0 FP (962 ca tại C &gt;= 0.85).</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #7C3AED;">2. An Toàn AI &amp; Mật Mã</td>
                     <td style="padding: 10px 14px; color: #334155;">Prompt Inj · Anti-Evasion · HMAC Integrity</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #7C3AED;">100.0% · 98.75% · 100.0%</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #7C3AED;">100,0% · 98,75% · 100,0%</td>
                     <td style="padding: 10px 14px; color: #475569;">Delimited Data chặn toàn bộ 678 mẫu khó; HMAC bắt 100% 3 dạng xâm phạm cốt lõi.</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
@@ -2697,14 +2742,14 @@
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #D97706;">4. Phân Loại Triage SOC</td>
                     <td style="padding: 10px 14px; color: #334155;">Giảm khối lượng Analyst · Độ phủ đe dọa</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #D97706;">-84.24% khối lượng · 95.0% đe dọa</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #D97706;">-84,24% khối lượng · 95,0% đe dọa</td>
                     <td style="padding: 10px 14px; color: #475569;">Chuyên gia SOC chỉ cần xem hàng đợi Hoãn (AWAIT_HITL) là bắt 95% đe dọa thật.</td>
                 </tr>
                 <tr style="background: #FFFFFF;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">5. Suy Luận &amp; Giảm Ảo Giác</td>
                     <td style="padding: 10px 14px; color: #334155;">RAGAS 4 trục (LLM-as-Judge) · Tỷ lệ ảo giác mã (`bad`)</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">3.78 / 5.0 · 0.0% (bad = 0 / 1,421)</td>
-                    <td style="padding: 10px 14px; color: #475569;">Trọng tài LLM độc lập chấm Relevancy 4.52/5; Grounding Guardrail giữ giảm thiểu ảo giác.</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">3.78 / 5.0 · 0,0% (bad = 0 / 1.421)</td>
+                    <td style="padding: 10px 14px; color: #475569;">Trọng tài LLM độc lập chấm Relevancy 4,52/5; Grounding Guardrail giữ giảm thiểu ảo giác.</td>
                 </tr>
             </tbody>
         </table>
@@ -2743,19 +2788,19 @@
                         <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
                             <td style="padding: 10px; font-weight: 700;">Config A (chỉ Tầng 1)</td>
                             <td style="padding: 10px; color: #E11D48; font-weight: 800;">28,29%<br><span style="font-size:0.82rem;font-weight:600;color:#64748B;">KTC 26,20&ndash;30,48</span></td>
-                            <td style="padding: 10px;">0.00%</td>
-                            <td style="padding: 10px; color: #E11D48; font-weight: 800;">59.00%</td>
+                            <td style="padding: 10px;">0,00%</td>
+                            <td style="padding: 10px; color: #E11D48; font-weight: 800;">59,00%</td>
                         </tr>
                         <tr style="background: #F0FDF4;">
                             <td style="padding: 10px; font-weight: 800; color: #059669;">Config F (SENTINEL)</td>
                             <td style="padding: 10px; color: #059669; font-weight: 800;">35,35%<br><span style="font-size:0.82rem;font-weight:600;color:#64748B;">KTC 33,12&ndash;37,66</span></td>
-                            <td style="padding: 10px; color: #D97706; font-weight: 800;">44.76%</td>
-                            <td style="padding: 10px; color: #059669; font-weight: 800;">0.00%</td>
+                            <td style="padding: 10px; color: #D97706; font-weight: 800;">44,76%</td>
+                            <td style="padding: 10px; color: #059669; font-weight: 800;">0,00%</td>
                         </tr>
                     </tbody>
                 </table>
                 <ul style="font-size: 1.15rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
-                    <li><strong>Triệt Tiêu Rủi Ro Bỏ Ngỏ:</strong> Config F loại bỏ 100% rủi ro bỏ ngỏ, chuyển 44.76% ca nghi ngờ sang hàng đợi hoãn an toàn.</li>
+                    <li><strong>Triệt Tiêu Rủi Ro Bỏ Ngỏ:</strong> Config F loại bỏ 100% rủi ro bỏ ngỏ, chuyển 44,76% ca nghi ngờ sang hàng đợi hoãn an toàn.</li>
                 </ul>
             </div>
             <div style="background: rgba(139, 92, 246, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #7C3AED; margin-top: 14px;">
@@ -2777,7 +2822,7 @@
                         <strong>Điểm RAGAS trung bình 4 trục:</strong> Đạt <strong style="color: #0284C7;">3.78 / 5.0</strong> (Relevancy: <strong>4.52</strong>, Context-Recall: <strong>4.11</strong>, Faithfulness: <strong>3.96</strong>, Context-Precision: <strong>2.54</strong> &mdash; trục thấp nhất, do truy xuất còn tài liệu nhiễu).
                     </li>
                     <li style="margin-bottom: 12px;">
-                        <strong>Tỷ Lệ Ảo Giác Mã (`bad`):</strong> Đạt <strong style="color: #059669;">0.0%</strong> (0 / 1,421 ca khẳng định mã kỹ thuật MITRE).
+                        <strong>Tỷ Lệ Ảo Giác Mã (`bad`):</strong> Đạt <strong style="color: #059669;">0,0%</strong> (0 / 1.421 ca khẳng định mã kỹ thuật MITRE).
                     </li>
                     <li style="margin-bottom: 12px;">
                         <strong>Tác Động Lá Chắn Neo:</strong> Đã đánh chặn <strong style="color: #D97706;">76 lệnh `BLOCK_IP` ảo giác</strong> từ LLM, tự động hạ cấp an toàn về <code>AWAIT_HITL</code>.
@@ -2834,7 +2879,7 @@
                     <li style="margin-bottom: 12px;"><strong>Phản Hồi An Toàn (Default to Safe):</strong> Chuyển về <code>AWAIT_HITL</code> khi gặp ca nghi ngờ zero-day hoặc mâu thuẫn RAG.</li>
                     <li style="margin-bottom: 12px;"><strong>Giao Diện Duyệt Lệnh 1-Click:</strong> Cho phép Chuyên gia SOC phê duyệt hoặc bác bỏ đề xuất chặn IP chỉ với 1 cú click.</li>
                     <li style="margin-bottom: 12px;"><strong>Khép Kín Vòng Phản Hồi (Active Learning):</strong> Quyết định của chuyên gia tự động cập nhật lại uy tín IP trong Threat Memory.</li>
-                    <li><strong>Giải Phóng Áp Lực SOC:</strong> Rút ngắn -84.24% khối lượng cảnh báo phải xử lý thủ công.</li>
+                    <li><strong>Giải Phóng Áp Lực SOC:</strong> Rút ngắn -84,24% khối lượng cảnh báo phải xử lý thủ công.</li>
                 </ul>
             </div>
             <div style="background: rgba(139, 92, 246, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #7C3AED; margin-top: 14px;">
@@ -2863,7 +2908,7 @@
                 </div>
                 <ul style="font-size: 1.12rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
                     <li style="margin-bottom: 8px;">Giải quyết triệt để nút thắt độ trễ bằng nguyên lý <em>"Phán quyết rẻ đứng trước phán quyết đắt"</em>.</li>
-                    <li>Xả tải <strong>97.5%</strong> lưu lượng ở độ trễ <strong>&lt; 1ms (0.88ms)</strong> mà KHÔNG làm nghẽn GPU (đo tại tỷ lệ tấn công nền 9,8%).</li>
+                    <li>Xả tải <strong>97,5%</strong> lưu lượng ở độ trễ <strong>&lt; 1ms (0,88ms)</strong> mà KHÔNG làm nghẽn GPU (đo tại tỷ lệ tấn công nền 9,8%).</li>
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 8px 14px; border-radius: 8px; font-size: 1.02rem; font-weight: 700; color: #0284C7; margin-top: 10px;">
@@ -2901,7 +2946,7 @@
                 </div>
                 <ul style="font-size: 1.12rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
                     <li style="margin-bottom: 8px;">Dual-RAG (FAISS + BM25 RRF) trên 433 mã MITRE ATT&amp;CK đạt trần truy xuất <strong>80,0%</strong>; quy kết toàn tuyến <strong>68,0%</strong> (170/250).</li>
-                    <li>Grounding Guardrail đánh chặn <strong>76 ca ảo giác</strong>, duy trì tỷ lệ mã bịa <strong>`bad` = 0.0%</strong> (0/1,421 ca).</li>
+                    <li>Grounding Guardrail đánh chặn <strong>76 ca ảo giác</strong>, duy trì tỷ lệ mã bịa <strong>`bad` = 0,0%</strong> (0/1.421 ca).</li>
                 </ul>
             </div>
             <div style="background: rgba(16, 185, 129, 0.12); padding: 8px 14px; border-radius: 8px; font-size: 1.02rem; font-weight: 700; color: #047857; margin-top: 10px;">
@@ -2919,7 +2964,7 @@
                     <div style="font-size: 1.4rem; font-weight: 800; color: #A78BFA;">Sản phẩm thực tiễn: Phân Loại SOC &amp; HITL</div>
                 </div>
                 <ul style="font-size: 1.12rem; color: var(--text-main); line-height: 1.7; padding-left: 20px;">
-                    <li style="margin-bottom: 8px;">Rút ngắn <strong>-84.24%</strong> khối lượng cảnh báo cho Analyst; hàng đợi Hoãn bao phủ <strong>95.0%</strong> đe dọa thật.</li>
+                    <li style="margin-bottom: 8px;">Rút ngắn <strong>-84,24%</strong> khối lượng cảnh báo cho Analyst; hàng đợi Hoãn bao phủ <strong>95,0%</strong> đe dọa thật.</li>
                     <li>Dashboard Streamlit 1-Click HITL &amp; điều tiết tải bằng <strong>Redis Consumer Group Lag</strong>.</li>
                 </ul>
             </div>
@@ -3154,7 +3199,7 @@ Khi tổng quan các hướng nghiên cứu hiện hữu trên thế giới, em 
 
 Các hệ thống SIEM/SOAR truyền thống xử lý rất nhanh nhưng thiếu khả năng suy luận ngữ cảnh trước các dạng tấn công mới. Các hệ thống AI Cloud suy luận thông minh nhưng độ trễ rất cao, vi phạm chủ quyền dữ liệu và ngốn VRAM lớn. Ở nhóm tác tử tự chủ, từng mảnh ghép đã xuất hiện riêng lẻ: Policy-Guided Threat Hunting có tiền phân loại bằng học tăng cường, LanG có phòng thủ tiêm nhiễm hai lớp, một số công trình đã chạy cục bộ. Nhưng chưa công trình nào công bố tỷ lệ xả tải kèm tỷ lệ tấn công nền của luồng đo, cũng chưa hợp nhất cả ba yêu cầu trong một kiến trúc.
 
-SENTINEL hợp nhất cả ba yêu cầu trong một kiến trúc: Xả tải Tầng 1 đạt 97,5% ở độ trễ trung vị 0.88 ms; Suy luận Tác tử Tầng 2 On-Premises trên 1 GPU 16GB VRAM; và Bảo vệ an toàn AI bằng rào chắn Delimited Data Encapsulation chặn Prompt Injection cùng chuỗi băm niêm phong HMAC-SHA256.`,
+SENTINEL hợp nhất cả ba yêu cầu trong một kiến trúc: Xả tải Tầng 1 đạt 97,5% ở độ trễ trung vị 0,88 ms; Suy luận Tác tử Tầng 2 On-Premises trên 1 GPU 16GB VRAM; và Bảo vệ an toàn AI bằng rào chắn Delimited Data Encapsulation chặn Prompt Injection cùng chuỗi băm niêm phong HMAC-SHA256.`,
 
     7: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3179,7 +3224,7 @@ Tiếp nối lọc thống kê là Cổng ML LightGBM (ml_gateway.py) được h
 
 Cổng ML đạt chỉ số phân loại MCC = 0.6667, F1 = 0.8248, Precision = 0.9088 và đạt ĐỘ CHÍNH XÁC AUTO-BLOCK TUYỆT ĐỐI 100% (962/962 lệnh chặn tự động, 0 Báo động giả - FP) tại ngưỡng cao >= 0.85.
 
-Thông lượng xử lý đạt 3,452.4 sự kiện/giây (độ trễ 0.287ms/véc-tơ). Cổng ML tích hợp cơ chế Anti-Evasion: kẹp Z-score trong khoảng ±8sigma, điền mean cho giá trị thiếu, và tự động Abstain đẩy lên LLM nếu >30% đặc trưng bị biến dạng vượt 6sigma.`,
+Thông lượng xử lý đạt 3.452,4 sự kiện/giây (độ trễ 0,287ms/véc-tơ). Cổng ML tích hợp cơ chế Anti-Evasion: kẹp Z-score trong khoảng ±8sigma, điền mean cho giá trị thiếu, và tự động Abstain đẩy lên LLM nếu >30% đặc trưng bị biến dạng vượt 6sigma.`,
 
     10: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3187,7 +3232,7 @@ Cơ chế thứ ba của Tier 1 là Bộ đệm Ngữ nghĩa Tầng 1.75 (ExactM
 
 Bộ đệm sử dụng thuật toán băm SHA-256 ép TẤT CẢ các trường tầng ứng dụng (message, payload, uri, user_agent, headers) vào khóa băm. Việc bổ sung đầy đủ user_agent và headers giúp ngăn chặn triệt để tấn công Cache Poisoning và đảm bảo tính độc lập của phép đo.
 
-Kết quả thực nghiệm trên 1,500 truy vấn đạt TỈ LỆ TRÚNG CACHE 81.33% (1,220/1,500 hits), mang lại HỆ SỐ TĂNG TỐC 8.9 LẦN (9.8ms cho ca trúng cache so với 87.7ms cho ca trượt).`,
+Kết quả thực nghiệm trên 1.500 truy vấn đạt TỈ LỆ TRÚNG CACHE 81,33% (1.220/1.500 hits), mang lại HỆ SỐ TĂNG TỐC 8.9 LẦN (9,8ms cho ca trúng cache so với 87,7ms cho ca trượt).`,
 
     11: `KÍNH THƯA HỘI ĐỒNG,
 
@@ -3201,7 +3246,7 @@ Hệ thống tối ưu KV-Caching bằng cách tĩnh hóa System Prompt. Tại n
 
 Về tri thức và bộ nhớ đe dọa:
 
-Hệ thống Dual-RAG dung hợp truy xuất véc-tơ FAISS (Sentence-BERT) và từ khóa BM25 qua thuật toán Reciprocal Rank Fusion (RRF, k=60). Kết quả đạt RAG Recall@3 = 93.0% trên lát dữ liệu payload gồm 243 truy vấn (trên toàn tập 1.305 truy vấn con số này là 38.5%), truy xuất từ 433 mã MITRE ATT&CK chuẩn STIX 2.1 và tài liệu NIST SP 800-61r2.
+Hệ thống Dual-RAG dung hợp truy xuất véc-tơ FAISS (Sentence-BERT) và từ khóa BM25 qua thuật toán Reciprocal Rank Fusion (RRF, k=60). Kết quả đạt RAG Recall@3 = 93,0% trên lát dữ liệu payload gồm 243 truy vấn (trên toàn tập 1.305 truy vấn con số này là 38,5%), truy xuất từ 433 mã MITRE ATT&CK chuẩn STIX 2.1 và tài liệu NIST SP 800-61r2.
 
 Bộ nhớ đe dọa Threat Memory chạy trên SQLite tối ưu (synchronous=NORMAL, tuyệt đối không dùng WAL mode để tránh lỗi lock file trong Docker). Điểm uy tín IP giảm dần theo thời gian S_new = S_old * (1-lambda)^t. Khi IP chạm S=100, hệ thống chuyển sang chế độ Block-on-sight vĩnh viễn tại Tier 1. Whitelist cứng bảo vệ IP hạ tầng (10.0.0.99).`,
 
@@ -3219,23 +3264,23 @@ Về môi trường thực nghiệm và dữ liệu:
 
 Hệ thống được đóng gói hoàn chỉnh qua Docker Compose trên máy chủ Intel Core i7-14700KF, RTX 4060 Ti 16GB VRAM, 32GB DDR5 RAM, hoạt động hoàn toàn Air-Gapped.
 
-Bộ dữ liệu đánh giá kết hợp 5 nguồn chuẩn: datatest (4,236 mẫu), build_stream (25,649 events, 31.56% attack), demo stream (99,717 events dạng SOC thật, 9.77% attack), ground_truth (1,700 mẫu), và tập đối kháng 823 mẫu.`,
+Bộ dữ liệu đánh giá kết hợp 5 nguồn chuẩn: datatest (4.236 mẫu), build_stream (25.649 events, 31,56% attack), demo stream (99.717 events dạng SOC thật, 9,77% attack), ground_truth (1.700 mẫu), và tập đối kháng 823 mẫu.`,
 
     15: `KÍNH THƯA HỘI ĐỒNG,
 
 Em xin báo cáo BẢNG KẾT QUẢ THỰC NGHIỆM ĐỘT PHÁ 5D METRICS:
 
-1. XẢ TẢI: Đạt 97.5% trên luồng 99.717 sự kiện có tỷ lệ tấn công nền 9,8%.
-2. ĐỘ TRỄ: Giảm độ trễ trung bình 69.24% (từ 17,187ms xuống 5,286.7ms); ĐỘ TRỄ TRUNG VỊ ĐẠT MỨC DƯỚI 1MS (0.88ms) - rút ngắn 19.500 lần ở mức trung vị. Thông lượng Cổng Machine Learning đạt 3,452 sự kiện/s.
-3. BẢO MẬT AI: Kháng Prompt Injection 100%, kháng Evasion 98.75%, phát hiện gian lận HMAC 100%.
-4. QUY KẾT MITRE: RAG Recall@3 đạt 93.0% trên lát payload n=243, quy kết RRF đạt 80.0%, quy kết toàn tuyến E2E đạt 68.0%.
-5. PHÂN LOẠI CẢNH BÁO: Kênh hoãn AWAIT_HITL gom được 95.0% mối đe dọa thật, GIẢM 84.24% KHỐI LƯỢNG CÔNG VIỆC CHO ANALYST. Trọng tài khác họ mô hình (Meta-Llama-3-8B) chấm 4 trục RAGAS trung bình 3.78/5.0 trên 1.052 ca leo thang và ẢO GIÁC MÃ KỸ THUẬT ĐẠT ĐÚNG 0% (bad = 0/1,421).`,
+1. XẢ TẢI: Đạt 97,5% trên luồng 99.717 sự kiện có tỷ lệ tấn công nền 9,8%.
+2. ĐỘ TRỄ: Giảm độ trễ trung bình 69,24% (từ 17,187ms xuống 5.286,7ms); ĐỘ TRỄ TRUNG VỊ ĐẠT MỨC DƯỚI 1MS (0,88ms) - rút ngắn 19.500 lần ở mức trung vị. Thông lượng Cổng Machine Learning đạt 3.452 sự kiện/s.
+3. BẢO MẬT AI: Kháng Prompt Injection 100%, kháng Evasion 98,75%, phát hiện gian lận HMAC 100%.
+4. QUY KẾT MITRE: RAG Recall@3 đạt 93,0% trên lát payload n=243, quy kết RRF đạt 80,0%, quy kết toàn tuyến E2E đạt 68,0%.
+5. PHÂN LOẠI CẢNH BÁO: Kênh hoãn AWAIT_HITL gom được 95,0% mối đe dọa thật, GIẢM 84,24% KHỐI LƯỢNG CÔNG VIỆC CHO ANALYST. Trọng tài khác họ mô hình (Meta-Llama-3-8B) chấm 4 trục RAGAS trung bình 3,78/5.0 trên 1.052 ca leo thang và ẢO GIÁC MÃ KỸ THUẬT ĐẠT ĐÚNG 0% (bad = 0/1.421).`,
 
     16: `KÍNH THƯA HỘI ĐỒNG,
 
 Đi sâu vào phân tích chuyên sâu:
 
-Thử nghiệm Ablation chấm theo hành động xác nhận Cấu hình F (SENTINEL hoàn chỉnh) đạt độ chính xác hành động 35.35%, hoãn 44.76% và bỏ ngỏ 0%, vượt trội so với Cấu hình A (28.29% accuracy, bỏ ngỏ 59.0%).
+Thử nghiệm Ablation chấm theo hành động xác nhận Cấu hình F (SENTINEL hoàn chỉnh) đạt độ chính xác hành động 35,35%, hoãn 44,76% và bỏ ngỏ 0%, vượt trội so với Cấu hình A (28,29% accuracy, bỏ ngỏ 59,0%).
 
 Đặc biệt, Lá chắn Neo bằng chứng (Grounding Guardrail) đã đánh chặn thành công 76 lệnh BLOCK_IP ảo giác do LLM tự đoán mà không có căn cứ RAG, tự động hạ cấp về AWAIT_HITL. Điều này lý giải tại sao độ chính xác E2E (68%) thấp hơn RRF thuần (80%) — đây là sự đánh đổi CÓ CHỦ Ý: thà bỏ trống phán quyết còn hơn phát ra mã kỹ thuật không có chứng cứ truy xuất.`,
 

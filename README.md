@@ -7,7 +7,7 @@
 [![Security Audit](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/security.yml/badge.svg)](https://github.com/Binhchuoizzz/AI_Security_Graph/actions/workflows/security.yml)
 [![Tests: 608](https://img.shields.io/badge/pytest-608%20collected-brightgreen.svg)](tests/)
 [![Thesis: 40pp EN+VI](https://img.shields.io/badge/Thesis-40pp%20EN%20%2B%20VI-purple.svg)](docs/Thesis/latex/)
-[![Slides: 20-Slide Deck](https://img.shields.io/badge/Defense-20--Slide%20Deck-orange.svg)](docs/Thesis/slides/SENTINEL_defense_notebooklm.html)
+[![Slides: 20-Slide Deck](https://img.shields.io/badge/Defense-20--Slide%20Deck-orange.svg)](docs/Thesis/slides/index.html)
 
 > **SENTINEL** is a **Cognitive Two-Tier Security Operations Center (SOC) Architecture** designed to resolve the three core bottlenecks of modern automated SOCs: **Alert Fatigue & Latency Crisis**, **SOAR Rigidity & LLM Hallucinations**, and **Adversarial AI Attacks (Prompt Injection / ML Evasion)**.
 >
