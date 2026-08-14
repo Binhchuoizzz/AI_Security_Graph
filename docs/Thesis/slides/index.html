@@ -1222,247 +1222,6 @@
             line-height: 1.35;
         }
 
-        /* High-Precision Landscape PDF Export Rules — Executive 20-Page A4 Landscape */
-        @media print {
-            @page {
-                size: 297mm 210mm;
-                margin: 0;
-            }
-
-            * {
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-                box-sizing: border-box !important;
-            }
-
-            html, body {
-                background: var(--bg-main) !important;
-                color: var(--text-main) !important;
-                overflow: visible !important;
-                height: auto !important;
-                min-height: 100% !important;
-                width: 297mm !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                font-size: 11pt !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            .ambient-bg, .app-header, .app-footer, .notes-panel, .slide-drawer, .drawer-overlay, #fullscreenHud, .progress-bar-container {
-                display: none !important;
-            }
-
-            .slide-stage {
-                display: block !important;
-                position: static !important;
-                overflow: visible !important;
-                height: auto !important;
-                width: 297mm !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                perspective: none !important;
-                transform: none !important;
-                flex: none !important;
-            }
-
-            .slide,
-            .slide.active,
-            .slide.exit-left,
-            .slide.exit-right {
-                display: flex !important;
-                flex-direction: column !important;
-                justify-content: space-between !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                transform: none !important;
-                position: relative !important;
-                top: auto !important;
-                left: auto !important;
-                width: 297mm !important;
-                height: 210mm !important;
-                max-width: 297mm !important;
-                max-height: 210mm !important;
-                min-height: 210mm !important;
-                overflow: hidden !important;
-                margin: 0 !important;
-                padding: 16mm 20mm !important;
-                box-sizing: border-box !important;
-                background: var(--bg-main) !important;
-                border-radius: 0 !important;
-                border: none !important;
-                box-shadow: none !important;
-                page-break-before: always !important;
-                break-before: page !important;
-                page-break-after: always !important;
-                break-after: page !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                contain: strict !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            .slide:first-child {
-                page-break-before: avoid !important;
-                break-before: avoid !important;
-            }
-
-            /* Responsive print typography scaling to fit 210mm height 100% cleanly */
-            .slide-title {
-                font-size: 20pt !important;
-                line-height: 1.25 !important;
-                margin-bottom: 10px !important;
-            }
-
-            .slide-tag {
-                font-size: 10.5pt !important;
-                margin-bottom: 8px !important;
-                padding: 4px 12px !important;
-            }
-
-            .card, .agenda-card, .metric-box {
-                background: var(--bg-card) !important;
-                border-color: var(--border-glass) !important;
-                color: var(--text-main) !important;
-                box-shadow: var(--shadow-card) !important;
-                padding: 14px 20px !important;
-                margin: 0 !important;
-                -webkit-print-color-adjust: exact !important;
-                print-color-adjust: exact !important;
-            }
-
-            .card-title {
-                font-size: 14pt !important;
-                margin-bottom: 8px !important;
-            }
-
-            .card-text, p, li {
-                font-size: 11pt !important;
-                line-height: 1.4 !important;
-            }
-
-            .styled-list {
-                font-size: 11pt !important;
-                line-height: 1.4 !important;
-                margin-top: 8px !important;
-            }
-
-            .styled-list li {
-                margin-bottom: 4px !important;
-            }
-
-            .grid-2, .grid-3, .grid-4 {
-                gap: 12px !important;
-            }
-
-            .math-box {
-                padding: 8px 12px !important;
-                margin: 6px 0 !important;
-            }
-
-            .math-formula {
-                font-size: 1.05rem !important;
-            }
-        }
-
-        /* Global High-Readability Large Typography Rules */
-        .slide-title { font-size: 2.3rem !important; line-height: 1.3 !important; margin-bottom: 22px !important; font-weight: 800 !important; }
-        .slide-tag { font-size: 1.15rem !important; letter-spacing: 1px !important; font-weight: 700 !important; }
-        .card-title { font-size: 1.4rem !important; line-height: 1.35 !important; font-weight: 800 !important; }
-        .card-text, p, li { font-size: 1.1rem !important; line-height: 1.75 !important; }
-        td, th { font-size: 1.05rem !important; padding: 10px 14px !important; }
-        .badge { font-size: 1.05rem !important; padding: 8px 14px !important; }
-        .styled-list li { font-size: 1.1rem !important; line-height: 1.75 !important; margin-bottom: 10px !important; }
-
-
-        /* SUPER-SCALE HIGH READABILITY PRESENTATION TYPOGRAPHY (SYNCHRONIZED ACROSS ALL 20 SLIDES) */
-        html { font-size: 18px !important; }
-        .slide-title { font-size: 2.8rem !important; line-height: 1.25 !important; margin-bottom: 24px !important; font-weight: 800 !important; color: var(--text-main) !important; }
-        .slide-tag { font-size: 1.3rem !important; letter-spacing: 1.2px !important; font-weight: 800 !important; text-transform: uppercase !important; }
-        .card-title { font-size: 1.6rem !important; line-height: 1.35 !important; font-weight: 800 !important; }
-        .card-text, p, li, div { font-size: 1.2rem; line-height: 1.75; }
-        .styled-list li { font-size: 1.25rem !important; line-height: 1.75 !important; margin-bottom: 12px !important; }
-        td, th { font-size: 1.15rem !important; padding: 12px 16px !important; }
-        .badge { font-size: 1.15rem !important; padding: 8px 16px !important; font-weight: 700 !important; }
-        .code-snippet, pre, code { font-size: 1.15rem !important; line-height: 1.6 !important; }
-
-
-        /* Enhanced Aesthetic & Readability Polish */
-        .slide-tag {
-            display: inline-block !important;
-            padding: 6px 18px !important;
-            background: rgba(56, 189, 248, 0.12) !important;
-            color: #0284C7 !important;
-            border: 1px solid rgba(56, 189, 248, 0.3) !important;
-            border-radius: 30px !important;
-            font-size: 1.2rem !important;
-            font-weight: 800 !important;
-            letter-spacing: 0.03em !important;
-            text-transform: uppercase !important;
-            margin-bottom: 12px !important;
-        }
-        body.theme-dark .slide-tag {
-            background: rgba(56, 189, 248, 0.18) !important;
-            color: #38BDF8 !important;
-            border-color: rgba(56, 189, 248, 0.4) !important;
-        }
-        .slide-title {
-            font-size: 2.6rem !important;
-            font-weight: 800 !important;
-            letter-spacing: -0.02em !important;
-            line-height: 1.25 !important;
-            margin-bottom: 22px !important;
-        }
-        .card {
-            border-radius: 16px !important;
-            transition: transform 0.2s ease, box-shadow 0.2s ease !important;
-        }
-        .card:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06) !important;
-        }
-        table {
-            border-collapse: separate !important;
-            border-spacing: 0 !important;
-            border-radius: 12px !important;
-            overflow: hidden !important;
-        }
-        table th {
-            font-weight: 800 !important;
-            letter-spacing: 0.01em !important;
-        }
-        table tbody tr {
-            transition: background 0.15s ease !important;
-        }
-        table tbody tr:hover {
-            background: rgba(56, 189, 248, 0.05) !important;
-        }
-        ul.styled-list li, ul li {
-            line-height: 1.72 !important;
-        }
-
-
-        /* ==========================================================================
-           Comprehensive Universal Responsive System (4K, Laptop, Tablet, Mobile)
-           ========================================================================== */
-
-        /* Smooth Custom Scrollbar for Slide Content */
-        .slide::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        .slide::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .slide::-webkit-scrollbar-thumb {
-            background: rgba(56, 189, 248, 0.25);
-            border-radius: 6px;
-        }
-        .slide::-webkit-scrollbar-thumb:hover {
-            background: rgba(56, 189, 248, 0.45);
-        }
-
         /* ==========================================================================
            Comprehensive Universal Responsive System (4K, Laptop, Tablet, Mobile)
            ========================================================================== */
@@ -1486,13 +1245,13 @@
         /* 1. Ultra Large Screens & 4K Projectors (min-width: 1920px) */
         @media (min-width: 1920px) {
             html { font-size: 19px !important; }
-            .slide { padding: 42px 64px !important; }
+            .slide { padding: 36px 60px !important; }
         }
 
         /* 2. Standard Laptops, 1366x768 & Scaled 1080p Displays (max-width: 1366px) */
         @media (max-width: 1366px) {
             html { font-size: 15px !important; }
-            .slide { padding: 24px 34px !important; }
+            .slide { padding: 22px 32px !important; }
             .slide-title { font-size: 2.1rem !important; margin-bottom: 16px !important; }
             div[style*="grid-template-columns: repeat(4,"] {
                 grid-template-columns: repeat(2, 1fr) !important;
@@ -1509,8 +1268,8 @@
             html { font-size: 14px !important; }
             header.app-header { height: 54px !important; padding: 0 16px !important; }
             .brand-title { display: none !important; }
-            .slide-stage { height: calc(100vh - 108px) !important; padding: 0 !important; }
-            .slide { width: 100% !important; height: 100% !important; padding: 24px 28px !important; border-radius: 0 !important; border: none !important; }
+            .slide-stage { height: calc(100vh - 106px) !important; padding: 0 !important; }
+            .slide { width: 100% !important; height: 100% !important; padding: 20px 24px !important; border-radius: 0 !important; border: none !important; }
 
             /* Universal Grid Reflow for Tablets */
             .grid-2, .grid-3, .grid-4,
@@ -1522,8 +1281,8 @@
             }
             .slide-title { font-size: 1.85rem !important; margin-bottom: 12px !important; }
             .card-title { font-size: 1.25rem !important; margin-bottom: 8px !important; }
-            .card { padding: 18px 20px !important; border-radius: 14px !important; }
-            footer.app-footer { height: 54px !important; padding: 0 16px !important; justify-content: flex-end !important; }
+            .card { padding: 16px 18px !important; border-radius: 12px !important; }
+            footer.app-footer { height: 52px !important; padding: 0 16px !important; justify-content: flex-end !important; }
             .footer-shortcuts { display: none !important; }
         }
 
@@ -1608,6 +1367,175 @@
             .slide-title { font-size: 1.3rem !important; margin-bottom: 6px !important; }
             .grid-2, .grid-3, .grid-4,
             div[style*="grid-template-columns: repeat("] { gap: 8px !important; }
+        }
+
+        /* ==========================================================================
+           7. High-Precision Landscape PDF Export Rules — Exact 20-Page A4 Landscape
+           ========================================================================== */
+        @media print {
+            @page {
+                size: 297mm 210mm;
+                margin: 0;
+            }
+
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                box-sizing: border-box !important;
+            }
+
+            html, body {
+                background: #FFFFFF !important;
+                color: #0F172A !important;
+                overflow: visible !important;
+                height: auto !important;
+                width: 297mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                font-size: 9.5pt !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .ambient-bg, .app-header, .app-footer, .notes-panel, .slide-drawer, .drawer-overlay, #fullscreenHud, .progress-bar-container {
+                display: none !important;
+            }
+
+            .slide-stage {
+                display: block !important;
+                position: static !important;
+                overflow: visible !important;
+                height: auto !important;
+                width: 297mm !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                perspective: none !important;
+                transform: none !important;
+                flex: none !important;
+            }
+
+            .slide,
+            .slide.active,
+            .slide.exit-left,
+            .slide.exit-right {
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: flex-start !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                transform: none !important;
+                position: relative !important;
+                top: auto !important;
+                left: auto !important;
+                width: 297mm !important;
+                height: 210mm !important;
+                max-width: 297mm !important;
+                max-height: 210mm !important;
+                min-height: 210mm !important;
+                overflow: hidden !important;
+                margin: 0 !important;
+                padding: 14mm 20mm !important;
+                box-sizing: border-box !important;
+                background: #FFFFFF !important;
+                border-radius: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                page-break-before: always !important;
+                break-before: page !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                contain: strict !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .slide:first-child {
+                page-break-before: avoid !important;
+                break-before: avoid !important;
+            }
+            .slide:last-child {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+
+            .slide-title {
+                font-size: 18pt !important;
+                line-height: 1.25 !important;
+                margin-bottom: 10px !important;
+                padding-bottom: 6px !important;
+                border-bottom: 1.5pt solid #0284C7 !important;
+                color: #0F172A !important;
+            }
+
+            .slide-tag {
+                font-size: 8.5pt !important;
+                margin-bottom: 6px !important;
+                padding: 3px 10px !important;
+                background: rgba(2, 132, 199, 0.08) !important;
+                border: 1pt solid #0284C7 !important;
+                color: #0284C7 !important;
+                border-radius: 12px !important;
+            }
+
+            .card, .agenda-card, .metric-box {
+                background: #FFFFFF !important;
+                border: 1pt solid #CBD5E1 !important;
+                color: #0F172A !important;
+                box-shadow: none !important;
+                padding: 10px 14px !important;
+                margin: 0 !important;
+                border-radius: 8px !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .card-title {
+                font-size: 11.5pt !important;
+                margin-bottom: 6px !important;
+                font-weight: 800 !important;
+            }
+
+            .card-text, p, li {
+                font-size: 9pt !important;
+                line-height: 1.4 !important;
+                color: #1E293B !important;
+            }
+
+            .styled-list {
+                font-size: 9pt !important;
+                line-height: 1.4 !important;
+                margin-top: 6px !important;
+            }
+
+            .styled-list li {
+                margin-bottom: 3px !important;
+            }
+
+            .grid-2, .grid-3, .grid-4,
+            div[style*="display: grid"],
+            div[style*="grid-template-columns"] {
+                gap: 10px !important;
+            }
+
+            table {
+                width: 100% !important;
+                font-size: 8pt !important;
+            }
+            th, td {
+                padding: 5px 8px !important;
+                font-size: 8pt !important;
+            }
+
+            .math-box {
+                padding: 6px 10px !important;
+                margin: 4px 0 !important;
+            }
+
+            .math-formula {
+                font-size: 9.5pt !important;
+            }
         }
 
     </style>
