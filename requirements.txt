@@ -66,14 +66,13 @@ filelock>=3.25.2
 ruff>=0.9.0
 
 # ==========================================
-# 6c. TELEMETRY
+# 6c. TELEMETRY — ĐÃ GỠ
 # ==========================================
-# `src/streaming/metrics.py` import thẳng (không bọc try). Thiếu ở đây thì `pyright src`
-# đỏ với reportMissingImports và CI hỏng — đúng kiểu lỗi đã xảy ra với sklearn/lightgbm:
-# môi trường ảo cục bộ có sẵn nên không ai thấy, còn CI cài SẠCH từ tệp này nên gãy.
-# LƯU Ý: module đó hiện CHƯA được nối vào đâu (không tệp nào import, không tài liệu nào
-# nhắc). Hoặc nối vào subscriber để có số liệu Prometheus thật, hoặc xoá module đi.
-prometheus_client>=0.21.0
+# `prometheus_client` ở đây CHỈ để phục vụ `src/streaming/metrics.py`. Chú thích cũ ngay
+# chỗ này đã ghi rõ module đó chưa nối vào đâu và nêu hai lối ra: nối vào subscriber, hoặc
+# xoá. Chọn lối thứ hai — module tự giới thiệu là "Prometheus Telemetry & SOC Observability
+# Exporter" cho "Grafana", trong khi repo không có Grafana và không tệp nào import nó.
+# Xoá cả module lẫn gói phụ thuộc, thay vì để lại một tính năng chỉ tồn tại trong docstring.
 
 # ==========================================
 # 7. CVE PATCHES (Transitive Dependency Overrides)

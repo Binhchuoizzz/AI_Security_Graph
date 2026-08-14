@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
+"""Bộ thử đối kháng LLM chạy TAY (cần LLM sống). KHÔNG thuộc bộ pytest.
+
+`testpaths = ["tests"]` trong pyproject nên pytest không thu tệp này, nhưng tiền tố `test_`
+vẫn là bẫy: `pytest scripts/` sẽ thu và chạy nó vào LLM thật.
+"""
+
 import json
 import os
 import sys
 
-sys.path.append("/home/binhchuoiz/Projects/Thesis/AI_Security_Graph")
+# Gốc repo suy từ vị trí tệp, KHÔNG ghi cứng. Bản cũ nối thẳng
+# "/home/binhchuoiz/Projects/Thesis/AI_Security_Graph" nên mọi bản clone khác máy đều
+# ImportError ngay dòng import đầu tiên.
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.agent.state import SentinelState
 from src.agent.workflow import agent_app

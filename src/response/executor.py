@@ -51,16 +51,21 @@ def _log_secret() -> bytes:
     return os.getenv("SENTINEL_LOG_SECRET", _FALLBACK_LOG_SECRET).encode()
 
 
-def generate_action_token(action: str, target: str, timestamp_str: str) -> str:
-    """Tạo Cryptographic Signed Token (HMAC-SHA256) cho phép thực thi hạ tầng (OWASP LLM06 Excessive Agency Defense)."""
-    msg = f"{action}:{target}:{timestamp_str}".encode()
-    return hmac.new(_log_secret(), msg, hashlib.sha256).hexdigest()
-
-
-def verify_action_token(action: str, target: str, timestamp_str: str, token: str) -> bool:
-    """Xác thực Token chữ ký hành động xem có hợp lệ và được tạo từ khóa bí mật SENTINEL không."""
-    expected_token = generate_action_token(action, target, timestamp_str)
-    return hmac.compare_digest(expected_token, token)
+# ĐÃ GỠ: `generate_action_token` / `verify_action_token`.
+#
+# Cặp hàm này mang docstring "OWASP LLM06 Excessive Agency Defense" nhưng KHÔNG NƠI NÀO
+# GỌI — `verify_action_token` có 0 tham chiếu trên toàn repo, `generate_action_token` chỉ
+# được gọi từ trong chính `verify_action_token`. Mã bảo mật chết mà tự xưng là một lớp
+# phòng vệ thì tệ hơn không có mã: người đọc (và hội đồng) tin rằng có một chốt kiểm mà
+# thực tế đường thực thi không đi qua.
+#
+# VÀ NÓ KHÔNG ĐÁNG ĐỂ NỐI VÀO. Token chỉ có giá trị khi vượt một ranh giới tin cậy. Ở đây
+# tác tử và bộ thực thi nằm CÙNG một tiến trình, ký bằng CÙNG một khóa: thứ gì gọi được
+# `block_ip` thì cũng gọi được `generate_action_token`. Thêm token không chặn được gì.
+#
+# Chốt chặn excessive-agency THẬT của hệ, đang chạy: lá chắn neo bằng chứng (bác lệnh
+# BLOCK_IP không truy được về tài liệu đã truy xuất), `sanitize_target`, đối chiếu
+# whitelist trong `block_ip`, và hàng đợi HITL. Đó mới là thứ nên trích khi nói về LLM06.
 
 
 def audit_key_is_default() -> bool:

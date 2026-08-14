@@ -1,8 +1,12 @@
-import typing
-
 """
 SENTINEL - Main SOC Dashboard (v2.5 Premium Audit UI)
 Khởi chạy bằng lệnh: streamlit run src/ui/app.py
+
+CHUỖI NÀY PHẢI ĐỨNG ĐẦU TỆP. Trước đây `import typing` nằm trên nó, nên nó KHÔNG còn là
+docstring mà là một biểu thức trần cấp module — và "magic" của Streamlit in mọi biểu thức
+trần ra trang. Kết quả: dòng "SENTINEL - Main SOC Dashboard (v2.5 Premium Audit UI) Khởi
+chạy bằng lệnh: streamlit run src/ui/app.py" hiện ngay đầu dashboard, trên cả màn đăng nhập.
+Đừng chèn bất cứ câu lệnh nào lên trên khối này.
 """
 
 import math
@@ -10,6 +14,7 @@ import os
 import re
 import sys
 import time
+import typing
 
 import pandas as pd  # type: ignore
 

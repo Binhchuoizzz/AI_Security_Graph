@@ -579,3 +579,25 @@ def test_khong_dan_nhan_FPR_cho_ti_le_analyst_bac_bo():
     finally:
         C.st.markdown = goc  # type: ignore[assignment]
     assert "0.0%" not in ghi.get("html", ""), "chưa đo được thì phải hiện '—', không hiện 0.0%"
+
+
+# ── Streamlit "magic": biểu thức trần cấp module bị IN RA TRANG ────────────────────
+@pytest.mark.parametrize("ten_tep", ["app.py", "components.py"])
+def test_khong_co_bieu_thuc_tran_cap_module(ten_tep):
+    """Streamlit in MỌI biểu thức trần ở cấp module ra trang như nội dung.
+
+    Hồi quy thật: `import typing` từng nằm TRÊN chuỗi mô tả đầu `app.py`, nên chuỗi đó
+    không còn là docstring mà thành biểu thức trần — và dòng "SENTINEL - Main SOC Dashboard
+    (v2.5 Premium Audit UI) Khởi chạy bằng lệnh: streamlit run src/ui/app.py" hiện ngay đầu
+    dashboard, trên cả màn đăng nhập. Docstring chỉ hợp lệ khi đứng ở câu lệnh ĐẦU TIÊN.
+    """
+    cay = ast.parse((SRC_DIR / ten_tep).read_text(encoding="utf-8"))
+    for i, nut in enumerate(cay.body):
+        if not isinstance(nut, ast.Expr) or isinstance(nut.value, ast.Call):
+            continue
+        if i == 0 and isinstance(nut.value, ast.Constant) and isinstance(nut.value.value, str):
+            continue  # docstring đúng vị trí
+        raise AssertionError(
+            f"{ten_tep}:{nut.lineno} có biểu thức trần cấp module — Streamlit sẽ in nó ra "
+            "trang. Docstring phải là câu lệnh đầu tiên của tệp."
+        )
