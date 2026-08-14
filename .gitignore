@@ -154,3 +154,8 @@ data/demo_small.json
 # bị trích nhầm thành số liệu luận văn: ba tệp từng nằm đó cho ra 70% (n=10), 76% (n=50) và
 # 55% (n=20) — chênh nhau 21 điểm chỉ vì cỡ mẫu quá nhỏ.
 experiments/results/_scratch/
+
+# Ảnh render TỪNG TRANG PDF — công cụ soi bố cục lúc sửa LaTeX, KHÔNG phải tài sản luận văn.
+# Đã dọn 49 tệp/11 MB ngày 14/08/2026; chúng không được `.tex` nào tham chiếu (luận văn chỉ
+# dùng ảnh PDF trong `images/`). Chặn ở đây để lần soi bố cục sau không commit lại vào repo.
+docs/Thesis/latex/thesis_latex_*/*.png
