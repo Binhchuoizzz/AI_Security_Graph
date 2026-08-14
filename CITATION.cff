@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use SENTINEL in your research or cite the Master's Thesis, please cite it as below."
+authors:
+  - family-names: "Nguyen"
+    given-names: "Duc Binh"
+    affiliation: "FSB Institute of Management & Technology, FPT University"
+    email: "binhnd.work@gmail.com"
+title: "SENTINEL: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI"
+version: "2.0.0"
+date-released: "2026-08-14"
+url: "https://github.com/Binhchuoizzz/AI_Security_Graph"
+repository-code: "https://github.com/Binhchuoizzz/AI_Security_Graph"
+license: "MIT"
+keywords:
+  - "ai-security"
+  - "agentic-ai"
+  - "two-tier-soc"
+  - "langgraph"
+  - "prompt-injection"
+  - "machine-learning"
+  - "mitre-att-ck"
+  - "rag"
+  - "cybersecurity"
+preferred-citation:
+  type: mastersthesis
+  authors:
+    - family-names: "Nguyen"
+      given-names: "Duc Binh"
+  title: "SENTINEL: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI"
+  school: "FSB Institute of Management & Technology, FPT University"
+  year: 2026
+  address: "Hanoi, Vietnam"
+  month: 8
