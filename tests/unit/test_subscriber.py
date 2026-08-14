@@ -242,5 +242,42 @@ def test_moi_dau_hieu_offload_deu_con_ton_tai_trong_rule_engine():
     assert not missing, f"dấu hiệu không còn khớp mã nguồn: {missing}"
 
 
+def test_cong_bang_chung_ung_dung_bat_duoc_bang_bien_moi_truong(monkeypatch):
+    """`SENTINEL_TIER2_APP_EVIDENCE_ONLY=1` phải bật cổng mà KHÔNG cần sửa tệp cấu hình.
+
+    VÌ SAO CẦN TEST. Buổi demo chạy cấu hình vận hành (Tier-2 chỉ nhận lô có bằng chứng tầng
+    ứng dụng) trong khi `config/system_settings.yaml` đã commit phải giữ nguyên cấu hình mà
+    mọi số Tier-2 của luận văn đã đo trên đó. Nếu ai đó gộp hai thứ lại — đặt cờ thành `true`
+    rồi commit — thì lần chạy benchmark kế tiếp ra một bộ số khác và không có gì đỏ lên.
+    Test này khoá cả hai chiều: biến bật được cổng, và tệp cấu hình vẫn để cả ba cờ TẮT.
+    """
+    import importlib
+
+    import yaml  # type: ignore
+
+    import src.streaming.subscriber as sub
+
+    monkeypatch.setenv("SENTINEL_TIER2_APP_EVIDENCE_ONLY", "1")
+    importlib.reload(sub)
+    assert sub._TIER2_NEED_APP_EVIDENCE is True, "biến môi trường không bật được cổng"
+
+    monkeypatch.delenv("SENTINEL_TIER2_APP_EVIDENCE_ONLY", raising=False)
+    importlib.reload(sub)
+    assert sub._TIER2_NEED_APP_EVIDENCE is False, (
+        "cấu hình đã commit phải để cổng TẮT — mọi số Tier-2 của luận văn đo ở trạng thái này"
+    )
+
+    cfg = yaml.safe_load(open("config/system_settings.yaml", encoding="utf-8"))
+    _committed = {
+        f"tier2.{k}": (cfg.get("tier2") or {}).get(k, False)
+        for k in ("require_application_evidence", "skip_llm_for_flow_only")
+    }
+    _committed["tier1.ml_gate_all_events"] = (cfg.get("tier1") or {}).get(
+        "ml_gate_all_events", False
+    )
+    _bat = [k for k, v in _committed.items() if v]
+    assert not _bat, f"cờ demo phải TẮT trong cấu hình đã commit, đang bật: {_bat}"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

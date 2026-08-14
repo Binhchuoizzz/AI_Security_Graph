@@ -337,10 +337,17 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         0.85,
         framework=FRAMEWORK_ATLAS,
     ),
+    # TÊN PHẢI ĐI VỚI ĐÚNG MÃ. Hai mục dưới từng ghi tên của kỹ thuật CHA cạnh mã của kỹ
+    # thuật CON ("T1595.003 - Active Scanning", "T1071.001 - Application Layer Protocol").
+    # `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` và KHÔNG đi qua
+    # `verify_technique_label`, nên nhãn sai đi thẳng ra Dashboard. Đo lượt 14/08/2026:
+    # 2/939 lô hiện "T1595.003 - Active Scanning" trong khi tên chính thức của T1595.003 là
+    # "Wordlist Scanning". Dùng quy ước "Cha: Con" y như mục `xss` — giữ được cả ngữ cảnh cha
+    # lẫn danh tính con. `test_curated_map_ten_khop_ma` khoá bất biến này.
     "active_scan": _entry(
         "Active Scanning: Wordlist Scanning",
         "T1595.003",
-        "Active Scanning",
+        "Active Scanning: Wordlist Scanning",
         "Reconnaissance",
         "TA0043",
         0.90,
@@ -350,7 +357,7 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
     "c2_web": _entry(
         "Application Layer Protocol: Web Protocols",
         "T1071.001",
-        "Application Layer Protocol",
+        "Application Layer Protocol: Web Protocols",
         "Command and Control",
         "TA0011",
         0.85,

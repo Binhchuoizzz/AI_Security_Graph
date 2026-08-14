@@ -162,6 +162,36 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
     # ── Truy cập thông tin xác thực / tệp nhạy cảm ──
     ("đánh cắp thông tin xác thực", "OS credential dumping LSASS memory DCSync Kerberoasting"),
     ("sensitive file access", "unsecured credentials credentials in files configuration discovery"),
+    # ── Tấn công tầng LLM (chữ ký `rule_engine` tự sinh) ───────────────────────────
+    # LỖ HỔNG ĐÃ VÁ. Bảng này phủ 29 họ chữ ký WAF nhưng KHÔNG có mục nào cho tấn công tầng
+    # LLM, trong khi `rule_engine` vẫn ghi ra `tier1_reasons` mang đúng hai chữ ký dưới đây.
+    # Hệ quả: lô mang chữ ký tiêm nhiễm cho từ vựng RỖNG -> `shield_has_attack_evidence=False`
+    # -> lá chắn neo bằng chứng kẹp lệnh chặn xuống 0,84 -> Tier-2 không chặn được tiêm nhiễm
+    # dù Tier-1 đã nhận diện chắc chắn.
+    #
+    # PHẠM VI THẬT, đo trên `data/demo.json` ngày 14/08/2026 — nêu ra để không ai trích quá
+    # tay: bản vá đổi kết quả cho **0/730** mẫu `adv_llm` của tập demo. 196/730 mẫu vốn ĐÃ có
+    # từ vựng qua chữ ký WAF khác, số còn lại không kích hoạt chữ ký injection của Tier-1
+    # (toàn luồng 496.885 sự kiện chỉ ghi nhận 38 lần `t1_injection_signature`). Đây là vá
+    # một đường đi có thật nhưng kịch bản demo hiện tại không chạm tới.
+    #
+    # CẢNH BÁO CHẨN ĐOÁN SAI đã mắc: đừng suy nguồn dữ liệu từ TIỀN TỐ IP. `push_flow.py` cấp
+    # dải TEST-NET `198.51.100.x` cho luồng đối kháng, nhưng trong `demo.json` `198.51` là
+    # 30.514 bản ghi CSIC (phần lớn nhãn Benign); mẫu tiêm nhiễm nằm ở `198.18`/`198.20`.
+    # 108 lệnh chặn bị lá chắn hạ ở lượt đo từng bị quy oan cho lỗ hổng này — tra nhãn thật
+    # thì cả 35/35 log trong các lô đó đều là **Benign**, tức lá chắn làm ĐÚNG.
+    #
+    # Khoá phải khớp SUBSTRING của lý do Tier-1 ("Prompt Injection Pattern: Phát hiện ...").
+    # Cụm viết theo NGỮ NGHĨA, KHÔNG nhắc mã kỹ thuật nào — cùng luật với cả bảng: để bộ
+    # truy xuất tự quyết, đừng để truy vấn tự khai đáp án rồi đọc lại lời mình.
+    (
+        "prompt injection",
+        "adversarial instruction override embedded in untrusted input LLM prompt manipulation",
+    ),
+    (
+        "jailbreak",
+        "safety guardrail bypass persona roleplay override of model operating instructions",
+    ),
     # ── Né tránh ──
     ("mã hoá né tránh", "obfuscated files or information encoding evasion defense evasion"),
     ("encoding evasion", "obfuscated files or information encoding evasion defense evasion"),

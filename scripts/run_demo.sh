@@ -74,6 +74,22 @@ else
 fi
 export LLM_MODEL_FILE LLAMA_ARG_CTX_SIZE LLAMA_ARG_N_PARALLEL SENTINEL_AGENT_WORKERS SENTINEL_ENABLE_NEO4J
 
+# TIER-2 CHỈ NHẬN LÔ CÓ BẰNG CHỨNG TẦNG ỨNG DỤNG (mặc định của buổi DEMO).
+#
+# Đo lượt 13/08/2026 khi cờ này TẮT — 2.650 lô Tier-2, tách theo tầng bằng chứng:
+#     có payload   848 lô -> BLOCK_IP 61,6% · ALERT 32,4% · AWAIT_HITL  6,0%
+#     NetFlow thuần 1.802 lô -> BLOCK_IP  2,1% · ALERT 71,9% · AWAIT_HITL 26,0%
+# NetFlow thuần chiếm 68% số lô, đóng góp 38/560 lệnh chặn, và sinh 468/519 phiếu HITL. Đếm
+# gói không phân biệt được DoS / C2 / rò rỉ nên lá chắn neo bằng chứng chặn mọi lệnh chặn
+# dựa trên chúng — LLM tiêu một lượt suy luận để trả về đúng cái kết luận đã biết trước.
+# Chặn NetFlow là việc của Cổng ML (1.902 lệnh ở cùng lượt đo), không phải của tác tử.
+#
+# ĐẶT QUA BIẾN MÔI TRƯỜNG, KHÔNG sửa `config/system_settings.yaml`: mọi số Tier-2 của luận
+# văn đo với cấu hình cờ TẮT, nên tệp cấu hình đã commit phải giữ nguyên cấu hình đó.
+# Muốn chạy đúng cấu hình đã đo (ví dụ để tái lập benchmark): SENTINEL_TIER2_APP_EVIDENCE_ONLY=0
+: "${SENTINEL_TIER2_APP_EVIDENCE_ONLY:=1}"
+export SENTINEL_TIER2_APP_EVIDENCE_ONLY
+
 if [ "$SENTINEL_ENABLE_NEO4J" = "1" ]; then
   echo "▶ [1/5] Hạ tầng: Redis + LLM (llama.cpp) + MLflow + Dashboard + Neo4j containers…"
   $DC up -d >/dev/null

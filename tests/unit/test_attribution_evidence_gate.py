@@ -239,3 +239,70 @@ def test_no_attack_term_names_a_different_technique():
             f"cụm {khoa!r} chứa tên kỹ thuật khác ({cum_cam!r}) -> truy xuất sẽ trả về "
             f"chính kỹ thuật đó thay vì đáp án"
         )
+
+
+def test_chu_ky_tan_cong_tang_llm_duoc_tinh_la_bang_chung():
+    """Chữ ký tiêm nhiễm / jailbreak của Tier-1 PHẢI sinh từ vựng tấn công.
+
+    LỖ HỔNG THẬT ĐÃ VÁ. `_ATTACK_TERMS` phủ 29 họ chữ ký WAF nhưng không có mục nào cho tấn
+    công tầng LLM, trong khi `rule_engine` vẫn ghi `tier1_reasons` mang đúng hai chữ ký này.
+    Lô mang chữ ký tiêm nhiễm vì thế cho từ vựng RỖNG -> `shield_has_attack_evidence` False
+    -> lá chắn kẹp confidence xuống 0,84 -> Tier-2 không chặn được tiêm nhiễm dù Tier-1 đã
+    nhận diện chắc chắn.
+
+    PHẠM VI: đo trên `data/demo.json` ngày 14/08/2026, bản vá đổi kết quả cho 0/730 mẫu
+    `adv_llm` — chúng không kích hoạt chữ ký injection của Tier-1. Test này giữ ĐƯỜNG ĐI cho
+    đúng, không phải để chống lưng cho một con số nào trong luận văn.
+
+    Chuỗi lý do dưới đây lấy NGUYÊN VĂN khuôn mà `rule_engine.py` sinh ra; nếu ai đó sửa lời
+    chữ ký mà quên bảng từ vựng thì test này đỏ thay vì lỗi âm thầm quay lại.
+    """
+    from src.agent.nodes import batch_attack_vocabulary
+
+    for ly_do in (
+        "Prompt Injection Pattern: Phát hiện 'ignore previous instructions' trong 'message'",
+        "Jailbreak Pattern: Phát hiện 'DAN mode' trong 'message'",
+    ):
+        got = batch_attack_vocabulary([{"message": "x", "tier1_reasons": [ly_do]}])
+        assert got, f"chữ ký {ly_do.split(':')[0]!r} không sinh bằng chứng -> Tier-2 mất quyền chặn"
+
+
+def test_lo_chi_vuot_nguong_van_khong_co_bang_chung_dac_trung():
+    """Chống vá quá tay: thêm mục LLM KHÔNG được làm lô ngưỡng thuần bỗng có bằng chứng.
+
+    Một ngưỡng bị vượt chỉ chứng minh khối lượng bất thường — DoS, C2 beaconing và rò rỉ dữ
+    liệu khớp như nhau. Đây là bất biến mà cả lá chắn dựa vào; nới nó ra là cho phép chặn
+    NetFlow theo phỏng đoán, đúng thứ lá chắn sinh ra để cấm.
+    """
+    from src.agent.nodes import batch_attack_vocabulary
+
+    got = batch_attack_vocabulary(
+        [{"message": "x", "tier1_reasons": ["Phát hiện dị biệt thống kê Zero-day [vượt ngưỡng]"]}]
+    )
+    assert got == [], f"lô ngưỡng thuần không được coi là có bằng chứng đặc trưng: {got}"
+
+
+def test_curated_map_ten_khop_ma():
+    """Mọi mục trong `WEB_ATTACK_MAP`: TÊN phải đi với đúng MÃ của chính nó.
+
+    LỖI THẬT ĐÃ VÁ (đo lượt 14/08/2026). `active_scan` ghi mã CON `T1595.003` cạnh tên của
+    kỹ thuật CHA "Active Scanning"; `c2_web` ghi `T1071.001` cạnh "Application Layer
+    Protocol". `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` mà KHÔNG
+    đi qua `verify_technique_label`, nên nhãn sai đi thẳng ra Dashboard — 2/939 lô hiện
+    "T1595.003 - Active Scanning" trong khi tên chính thức là "Wordlist Scanning".
+
+    Chấp nhận HAI dạng: tên trùng khít tên chuẩn, hoặc dạng "Cha: Con" có chứa tên chuẩn
+    (quy ước của mục `xss`: "Command and Scripting Interpreter: JavaScript" cho T1059.007).
+    Cấm đúng một thứ: tên KHÔNG chứa danh tính của mã con.
+    """
+    from src.agent.attack_mapper import WEB_ATTACK_MAP, canonical_technique_name
+
+    lech = []
+    for khoa, e in WEB_ATTACK_MAP.items():
+        tid, ten = e["technique_id"], e["technique"]
+        chuan = canonical_technique_name(tid)
+        if not chuan:
+            continue
+        if chuan.strip().lower() not in ten.strip().lower():
+            lech.append(f"{khoa}: {tid} ghi '{ten}' nhưng tên chuẩn là '{chuan}'")
+    assert not lech, "tên kỹ thuật không khớp mã:\n  " + "\n  ".join(lech)

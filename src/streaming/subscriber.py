@@ -178,7 +178,13 @@ _ML_CANNOT_JUDGE = frozenset(
 )
 
 # Tier-2 chỉ nhận lô có bằng chứng tầng ứng dụng. Mặc định TẮT — xem chú thích tại nơi dùng.
-_TIER2_NEED_APP_EVIDENCE = bool(
+#
+# BẬT ĐƯỢC BẰNG BIẾN MÔI TRƯỜNG, và đó là cách buổi demo nên dùng. Đặt cờ thành `true` trong
+# `config/system_settings.yaml` rồi commit là đổi luôn cấu hình mà MỌI số Tier-2 của luận văn
+# đã đo trên đó — lần chạy benchmark kế tiếp sẽ ra một bộ số khác mà không ai biết vì sao.
+# Biến môi trường cho phép buổi diễn chạy cấu hình vận hành trong khi tệp cấu hình đã commit
+# vẫn giữ nguyên cấu hình đã đo. `scripts/run_demo.sh` đặt sẵn biến này.
+_TIER2_NEED_APP_EVIDENCE = os.getenv("SENTINEL_TIER2_APP_EVIDENCE_ONLY") == "1" or bool(
     (_config.get("tier2", {}) or {}).get("require_application_evidence", False)
 )
 
