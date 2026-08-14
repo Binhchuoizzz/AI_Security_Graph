@@ -199,19 +199,13 @@
         .glow-orb {
             position: absolute;
             border-radius: 50%;
-            filter: blur(140px);
-            opacity: 0.28;
-            animation: floatOrb 25s infinite ease-in-out alternate;
+            filter: blur(100px);
+            opacity: 0.18;
+            pointer-events: none;
         }
-        .orb-1 { width: 750px; height: 750px; background: #38BDF8; top: -200px; left: -100px; }
-        .orb-2 { width: 850px; height: 850px; background: #818CF8; bottom: -250px; right: -100px; animation-delay: -7s; }
-        .orb-3 { width: 650px; height: 650px; background: #34D399; top: 25%; left: 35%; animation-delay: -14s; }
-
-        @keyframes floatOrb {
-            0% { transform: translate(0, 0) scale(1); }
-            50% { transform: translate(40px, 30px) scale(1.08); }
-            100% { transform: translate(-30px, -20px) scale(0.95); }
-        }
+        .orb-1 { width: 600px; height: 600px; background: #38BDF8; top: -180px; left: -80px; }
+        .orb-2 { width: 600px; height: 600px; background: #818CF8; bottom: -200px; right: -80px; }
+        .orb-3 { width: 450px; height: 450px; background: #34D399; top: 30%; left: 40%; opacity: 0.12; }
 
         /* Header Styling — Executive Dark Console Theme */
         header.app-header {
@@ -346,18 +340,15 @@
             overflow: hidden;
             width: 100%;
             height: calc(100vh - 108px);
-            perspective: 1400px;
-            transform-style: preserve-3d;
             box-sizing: border-box;
         }
 
-        /* Slide Container — 100% Full Page Hardware Accelerated */
+        /* Slide Container — Unified, Ultra-Lightweight & Smooth Slide Transition */
         .slide {
             position: absolute;
             width: 100%;
             height: 100%;
             background: var(--bg-card);
-            backdrop-filter: blur(28px);
             border: none;
             border-radius: 0;
             padding: 32px 56px;
@@ -365,45 +356,27 @@
             flex-direction: column;
             opacity: 0;
             visibility: hidden;
-            transform: translate3d(24px, 0, 0);
-            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0.25s;
+            transform: translateY(6px);
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0.2s;
             box-shadow: none;
             overflow-y: auto;
             overflow-x: hidden;
             box-sizing: border-box;
-            contain: content;
-            will-change: transform, opacity;
-            backface-visibility: hidden;
         }
 
         .slide.active {
             opacity: 1;
             visibility: visible;
-            transform: translate3d(0, 0, 0);
-            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0s;
-            contain: none;
+            transform: translateY(0);
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0s;
         }
 
-        .slide.exit-left {
-            opacity: 0;
-            visibility: hidden;
-            transform: translate3d(-24px, 0, 0);
-            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0.25s;
-        }
-
+        .slide.exit-left,
         .slide.exit-right {
             opacity: 0;
             visibility: hidden;
-            transform: translate3d(24px, 0, 0);
-            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-                        visibility 0s 0.25s;
+            transform: translateY(-6px);
+            transition: opacity 0.2s ease, transform 0.2s ease, visibility 0s 0.2s;
         }
 
         /* Slide Background Watermark Pattern */
@@ -650,39 +623,17 @@
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 26px; width: 100%; position: relative; z-index: 2; }
         .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; width: 100%; position: relative; z-index: 2; }
 
-        /* Ultra Modern 3D Card Component - Eye-Soothing Glassmorphism & Roomy Padding */
+        /* Clean, Lightweight 2D Card Component — Zero GPU Overhead & Smooth Hover */
         .card, .agenda-card, .metric-box, .arch-node, .code-snippet, .math-box {
-            transform-style: preserve-3d;
-            backface-visibility: hidden;
-            will-change: transform, box-shadow;
-            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        border-color 0.35s ease,
-                        background 0.35s ease;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
             position: relative;
-        }
-
-        /* Glass Top-Edge Shimmer */
-        .card::before, .agenda-card::before, .metric-box::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            padding: 1px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.02) 60%, rgba(255, 255, 255, 0.08));
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            mask-composite: exclude;
-            pointer-events: none;
-            z-index: 3;
         }
 
         .card {
             background: var(--bg-card-hover);
             border: 1px solid var(--border-glass);
-            border-radius: 20px;
-            padding: 32px 36px;
+            border-radius: 16px;
+            padding: 28px 32px;
             display: flex;
             flex-direction: column;
             box-shadow: var(--shadow-card);
@@ -690,17 +641,8 @@
         }
         .card:hover {
             border-color: var(--border-active);
-            transform: translateY(-7px) translateZ(14px) rotateX(2deg) rotateY(-1.2deg);
-            box-shadow: 0 28px 55px -12px rgba(0, 0, 0, 0.75),
-                        0 0 30px var(--blue-glow),
-                        inset 0 1px 2px rgba(255, 255, 255, 0.3);
-        }
-        .card:hover .card-icon,
-        .card:hover .card-title,
-        .card:hover .badge,
-        .agenda-card:hover .agenda-num {
-            transform: translateZ(15px);
-            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            transform: translateY(-3px);
+            box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.12), 0 0 16px var(--blue-glow);
         }
 
         .card-cyan { border-top: 4px solid var(--cyan); }
@@ -718,9 +660,8 @@
             align-items: center;
             justify-content: center;
             font-size: 26px;
-            margin-bottom: 18px;
-            transform-style: preserve-3d;
-            transition: transform 0.3s ease;
+            margin-bottom: 14px;
+            transition: transform 0.2s ease;
         }
         .icon-cyan { background: var(--cyan-glow); color: var(--cyan); }
         .icon-purple { background: var(--purple-glow); color: var(--purple); }
@@ -731,55 +672,49 @@
 
         .card-title {
             font-family: var(--font-title);
-            font-size: 32px !important;
+            font-size: 30px !important;
             font-weight: 800;
-            margin-bottom: 18px;
+            margin-bottom: 14px;
             color: var(--text-main);
             line-height: 1.35;
             letter-spacing: -0.2px;
-            transform-style: preserve-3d;
-            transition: transform 0.3s ease;
+            transition: color 0.2s ease;
         }
         .card-text {
-            font-size: 24px !important;
+            font-size: 22px !important;
             color: var(--text-muted);
-            line-height: 1.78;
+            line-height: 1.75;
             font-weight: 500;
             letter-spacing: -0.05px;
         }
 
-        /* Metric Box High-Visibility 3D Pop-out */
+        /* Metric Box High-Visibility Clean 2D Component */
         .metric-box {
             background: var(--bg-card-hover);
             border: 1px solid var(--border-glass);
-            border-radius: 20px;
-            padding: 28px 24px;
+            border-radius: 16px;
+            padding: 24px 20px;
             text-align: center;
             box-shadow: var(--shadow-card);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .metric-box:hover {
-            transform: translateY(-6px) translateZ(18px) rotateX(2.5deg);
+            transform: translateY(-3px);
             border-color: var(--cyan);
-            box-shadow: 0 25px 48px -10px rgba(0, 0, 0, 0.7), 0 0 25px var(--cyan-glow);
-        }
-        .metric-box:hover .metric-val {
-            transform: translateZ(20px);
-            transition: transform 0.35s ease;
+            box-shadow: 0 14px 28px -6px rgba(15, 23, 42, 0.12), 0 0 16px var(--cyan-glow);
         }
         .metric-val {
             font-family: var(--font-title);
-            font-size: 68px !important;
+            font-size: 64px !important;
             font-weight: 800;
             color: var(--blue);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             letter-spacing: -0.5px;
-            transform-style: preserve-3d;
-            transition: transform 0.3s ease;
         }
         .metric-val-green { color: var(--emerald); }
         .metric-val-purple { color: var(--purple); }
         .metric-lbl {
-            font-size: 22px !important;
+            font-size: 20px !important;
             color: var(--text-muted);
             font-weight: 700;
         }
@@ -789,14 +724,14 @@
             list-style: none;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 18px;
         }
         ul.styled-list li {
             position: relative;
-            padding-left: 40px;
-            font-size: 24px !important;
+            padding-left: 36px;
+            font-size: 22px !important;
             color: var(--text-muted);
-            line-height: 1.78;
+            line-height: 1.75;
             font-weight: 500;
             letter-spacing: -0.05px;
         }
@@ -821,7 +756,7 @@
         /* Code Snippet & High Contrast Boxes */
         .code-snippet {
             font-family: var(--font-mono);
-            font-size: 16.5px;
+            font-size: 16px;
             background: #0F172A;
             border: 1px solid #334155;
             border-radius: 14px;
@@ -835,20 +770,19 @@
         .badge {
             display: inline-block;
             font-family: var(--font-title);
-            font-size: 19px;
+            font-size: 18px;
             padding: 5px 12px;
             border-radius: 6px;
             font-weight: 800;
             margin-right: 6px;
-            transform-style: preserve-3d;
-            transition: transform 0.3s ease;
+            transition: all 0.2s ease;
         }
         .badge-cyan { background: var(--cyan-glow); color: var(--cyan); border: 1px solid var(--cyan); }
         .badge-purple { background: var(--purple-glow); color: var(--purple); border: 1px solid var(--purple); }
         .badge-emerald { background: var(--emerald-glow); color: var(--emerald); border: 1px solid var(--emerald); }
         .badge-blue { background: var(--blue-glow); color: var(--blue); border: 1px solid var(--blue); }
 
-        /* 3D Flow Architecture Graphic */
+        /* Flow Architecture Graphic */
         .arch-diagram {
             display: flex;
             align-items: center;
@@ -857,8 +791,8 @@
             width: 100%;
             background: rgba(0, 0, 0, 0.03);
             border: 1px solid var(--border-glass);
-            border-radius: 18px;
-            padding: 22px;
+            border-radius: 16px;
+            padding: 20px;
             margin-top: 10px;
         }
         body.theme-dark .arch-diagram { background: rgba(0, 0, 0, 0.3); }
@@ -866,17 +800,16 @@
             flex: 1;
             background: var(--bg-card-hover);
             border: 1px solid var(--border-glass);
-            border-radius: 14px;
-            padding: 16px;
+            border-radius: 12px;
+            padding: 14px;
             text-align: center;
             box-shadow: var(--shadow-card);
-            transform-style: preserve-3d;
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .arch-node:hover {
-            transform: translateY(-5px) translateZ(14px);
+            transform: translateY(-3px);
             border-color: var(--blue);
-            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6), 0 0 22px var(--blue-glow);
+            box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.12), 0 0 16px var(--blue-glow);
         }
         .arch-node-active {
             border-color: var(--blue);
