@@ -91,26 +91,28 @@
             font-size: 1.08em !important;
         }
         :root {
-            /* High-Contrast Premium Light Theme (Default fallback) */
-            --bg-main: #F8FAFC;
+            /* High-Contrast Modern Academic Light Theme */
+            --bg-main: #F1F5F9;
             --bg-stage: #E2E8F0;
-            --bg-card: rgba(255, 255, 255, 0.98);
+            --bg-card: #FFFFFF;
             --bg-card-hover: #FFFFFF;
             --border-glass: #CBD5E1;
-            --border-active: #2563EB;
+            --border-active: #0284C7;
 
-            --blue: #1E40AF;
-            --blue-glow: rgba(30, 64, 175, 0.14);
-            --cyan: #0284C7;
-            --cyan-glow: rgba(2, 132, 199, 0.14);
-            --emerald: #047857;
-            --emerald-glow: rgba(4, 120, 87, 0.14);
-            --purple: #6D28D9;
-            --purple-glow: rgba(109, 40, 217, 0.14);
-            --amber: #B45309;
-            --rose: #BE123C;
+            --blue: #0284C7;
+            --blue-glow: rgba(2, 132, 199, 0.16);
+            --cyan: #0EA5E9;
+            --cyan-glow: rgba(14, 165, 233, 0.16);
+            --emerald: #059669;
+            --emerald-glow: rgba(5, 150, 105, 0.16);
+            --purple: #7C3AED;
+            --purple-glow: rgba(124, 58, 237, 0.16);
+            --amber: #D97706;
+            --amber-glow: rgba(217, 119, 6, 0.16);
+            --rose: #E11D48;
+            --rose-glow: rgba(225, 29, 72, 0.16);
 
-            --text-main: #0F172A;
+            --text-main: #0B132B;
             --text-muted: #1E293B;
             --text-dim: #475569;
 
@@ -119,28 +121,34 @@
             --font-body: 'Be Vietnam Pro', sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
 
-            --shadow-card: 0 12px 28px -6px rgba(15, 23, 42, 0.1), 0 8px 12px -6px rgba(15, 23, 42, 0.05);
-            --shadow-hover: 0 22px 40px -10px rgba(30, 64, 175, 0.2), 0 10px 15px -5px rgba(15, 23, 42, 0.1);
+            --shadow-card: 0 10px 25px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+            --shadow-hover: 0 20px 35px -8px rgba(2, 132, 199, 0.22), 0 8px 16px -4px rgba(15, 23, 42, 0.08);
         }
 
-        /* Dark Theme Toggle Class — Executive Academic Cyber Dark (Default Serious Tone) */
+        /* Dark Theme Toggle Class — Executive Academic Cyber Dark */
         body.theme-dark {
-            --bg-main: #060911;
-            --bg-stage: #0D1322;
-            --bg-card: rgba(15, 23, 42, 0.96);
-            --bg-card-hover: rgba(26, 36, 56, 0.98);
-            --border-glass: rgba(255, 255, 255, 0.16);
+            --bg-main: #070D1E;
+            --bg-stage: #0B132B;
+            --bg-card: rgba(15, 23, 42, 0.95);
+            --bg-card-hover: rgba(22, 33, 62, 0.98);
+            --border-glass: rgba(56, 189, 248, 0.2);
             --border-active: #38BDF8;
 
-            --blue: #3B82F6;
-            --cyan: #06B6D4;
-            --emerald: #10B981;
-            --purple: #8B5CF6;
-            --amber: #F59E0B;
-            --rose: #F43F5E;
+            --blue: #38BDF8;
+            --blue-glow: rgba(56, 189, 248, 0.2);
+            --cyan: #22D3EE;
+            --cyan-glow: rgba(34, 211, 238, 0.2);
+            --emerald: #34D399;
+            --emerald-glow: rgba(52, 211, 153, 0.2);
+            --purple: #A78BFA;
+            --purple-glow: rgba(167, 139, 250, 0.2);
+            --amber: #FBBF24;
+            --amber-glow: rgba(251, 191, 36, 0.2);
+            --rose: #FB7185;
+            --rose-glow: rgba(251, 113, 133, 0.2);
 
-            --text-main: #FFFFFF;
-            --text-muted: #E2E8F0;
+            --text-main: #F8FAFC;
+            --text-muted: #CBD5E1;
             --text-dim: #94A3B8;
 
             --shadow-card: 0 20px 40px rgba(0, 0, 0, 0.7);
@@ -1369,6 +1377,35 @@
             div[style*="grid-template-columns: repeat("] { gap: 8px !important; }
         }
 
+        /* Print Preparation State */
+        body.is-printing .slide-stage {
+            display: block !important;
+            overflow: visible !important;
+            height: auto !important;
+            width: 297mm !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            transform: none !important;
+        }
+        body.is-printing .slide {
+            display: flex !important;
+            flex-direction: column !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: none !important;
+            position: relative !important;
+            top: auto !important;
+            left: auto !important;
+            width: 297mm !important;
+            height: 210mm !important;
+            max-height: 210mm !important;
+            overflow: hidden !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
         /* ==========================================================================
            7. High-Precision Landscape PDF Export Rules — Exact 20-Page A4 Landscape
            ========================================================================== */
@@ -1392,7 +1429,7 @@
                 width: 297mm !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                font-size: 9.5pt !important;
+                font-size: 8pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -1434,7 +1471,7 @@
                 min-height: 210mm !important;
                 overflow: hidden !important;
                 margin: 0 !important;
-                padding: 14mm 20mm !important;
+                padding: 10mm 15mm !important;
                 box-sizing: border-box !important;
                 background: #FFFFFF !important;
                 border-radius: 0 !important;
@@ -1460,23 +1497,50 @@
                 break-after: avoid !important;
             }
 
+            /* CRITICAL: FORCE ALL GRIDS TO BE HORIZONTAL IN PRINT (NEVER 1-COLUMN!) */
+            .grid-2,
+            div[style*="grid-template-columns: repeat(2,"],
+            div[style*="grid-template-columns: 1fr 1fr"] {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .grid-3,
+            div[style*="grid-template-columns: repeat(3,"],
+            div[style*="grid-template-columns: 1fr 1fr 1fr"] {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr 1fr !important;
+                gap: 10px !important;
+                width: 100% !important;
+            }
+
+            .grid-4,
+            div[style*="grid-template-columns: repeat(4,"] {
+                display: grid !important;
+                grid-template-columns: repeat(4, 1fr) !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+
             .slide-title {
-                font-size: 18pt !important;
-                line-height: 1.25 !important;
-                margin-bottom: 10px !important;
-                padding-bottom: 6px !important;
+                font-size: 16pt !important;
+                line-height: 1.2 !important;
+                margin-bottom: 8px !important;
+                padding-bottom: 4px !important;
                 border-bottom: 1.5pt solid #0284C7 !important;
                 color: #0F172A !important;
             }
 
             .slide-tag {
-                font-size: 8.5pt !important;
+                font-size: 8pt !important;
                 margin-bottom: 6px !important;
-                padding: 3px 10px !important;
+                padding: 2px 10px !important;
                 background: rgba(2, 132, 199, 0.08) !important;
                 border: 1pt solid #0284C7 !important;
                 color: #0284C7 !important;
-                border-radius: 12px !important;
+                border-radius: 10px !important;
             }
 
             .card, .agenda-card, .metric-box {
@@ -1484,57 +1548,66 @@
                 border: 1pt solid #CBD5E1 !important;
                 color: #0F172A !important;
                 box-shadow: none !important;
-                padding: 10px 14px !important;
+                padding: 8px 12px !important;
                 margin: 0 !important;
-                border-radius: 8px !important;
+                border-radius: 6px !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
             .card-title {
-                font-size: 11.5pt !important;
-                margin-bottom: 6px !important;
+                font-size: 10.5pt !important;
+                margin-bottom: 4px !important;
                 font-weight: 800 !important;
             }
 
+            .card-icon {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 14px !important;
+                margin-bottom: 4px !important;
+            }
+
             .card-text, p, li {
-                font-size: 9pt !important;
-                line-height: 1.4 !important;
+                font-size: 8pt !important;
+                line-height: 1.35 !important;
                 color: #1E293B !important;
             }
 
             .styled-list {
-                font-size: 9pt !important;
-                line-height: 1.4 !important;
-                margin-top: 6px !important;
+                font-size: 8pt !important;
+                line-height: 1.35 !important;
+                margin-top: 4px !important;
             }
 
             .styled-list li {
-                margin-bottom: 3px !important;
-            }
-
-            .grid-2, .grid-3, .grid-4,
-            div[style*="display: grid"],
-            div[style*="grid-template-columns"] {
-                gap: 10px !important;
+                margin-bottom: 2px !important;
             }
 
             table {
                 width: 100% !important;
-                font-size: 8pt !important;
+                font-size: 7.5pt !important;
             }
             th, td {
-                padding: 5px 8px !important;
-                font-size: 8pt !important;
+                padding: 4px 6px !important;
+                font-size: 7.5pt !important;
+            }
+
+            .metric-val {
+                font-size: 22pt !important;
+                margin-bottom: 2px !important;
+            }
+            .metric-lbl {
+                font-size: 7.5pt !important;
             }
 
             .math-box {
-                padding: 6px 10px !important;
-                margin: 4px 0 !important;
+                padding: 4px 8px !important;
+                margin: 3px 0 !important;
             }
 
             .math-formula {
-                font-size: 9.5pt !important;
+                font-size: 9pt !important;
             }
         }
 
@@ -3626,27 +3699,11 @@ Em rất mong nhận được những nhận xét, góp ý quý báu và các c�
 
         // PDF Export Engine (Landscape 16:9 Print Mode)
         function preparePrintLayout() {
-            slides.forEach(s => {
-                s.style.setProperty('visibility', 'visible', 'important');
-                s.style.setProperty('opacity', '1', 'important');
-                s.style.setProperty('display', 'flex', 'important');
-                s.style.setProperty('transform', 'none', 'important');
-                s.style.setProperty('position', 'relative', 'important');
-                s.style.setProperty('top', 'auto', 'important');
-                s.style.setProperty('left', 'auto', 'important');
-            });
+            document.body.classList.add('is-printing');
         }
 
         function restoreNormalLayout() {
-            slides.forEach(s => {
-                s.style.removeProperty('visibility');
-                s.style.removeProperty('opacity');
-                s.style.removeProperty('display');
-                s.style.removeProperty('transform');
-                s.style.removeProperty('position');
-                s.style.removeProperty('top');
-                s.style.removeProperty('left');
-            });
+            document.body.classList.remove('is-printing');
             updateSlideUI(false);
         }
 
@@ -3654,7 +3711,7 @@ Em rất mong nhận được những nhận xét, góp ý quý báu và các c�
             preparePrintLayout();
             setTimeout(() => {
                 window.print();
-            }, 100);
+            }, 150);
         }
 
         window.addEventListener('beforeprint', preparePrintLayout);
