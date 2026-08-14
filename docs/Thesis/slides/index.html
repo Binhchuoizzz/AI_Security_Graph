@@ -205,19 +205,19 @@
             100% { transform: translate(-30px, -20px) scale(0.95); }
         }
 
-        /* Header Control Bar */
+        /* Header Styling — Executive Dark Console Theme */
         header.app-header {
             position: relative;
             z-index: 50;
-            height: 64px;
-            background: var(--bg-card);
-            backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border-glass);
+            height: 58px;
+            background: #0B132B;
+            border-bottom: 2px solid #0284C7;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 28px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            color: #F8FAFC;
             transition: all 0.3s ease;
         }
 
@@ -228,64 +228,67 @@
         }
 
         .brand-badge {
-            background: linear-gradient(135deg, var(--blue), var(--cyan));
+            background: linear-gradient(135deg, #0284C7, #38BDF8);
             color: #FFFFFF;
             font-weight: 800;
             font-family: var(--font-title);
-            font-size: 19px;
-            padding: 5px 12px;
+            font-size: 17px;
+            padding: 4px 12px;
             border-radius: 6px;
             letter-spacing: 0.5px;
-            box-shadow: 0 2px 8px var(--cyan-glow);
+            box-shadow: 0 2px 10px rgba(2, 132, 199, 0.4);
+            white-space: nowrap;
         }
         .brand-title {
             font-family: var(--font-title);
-            font-weight: 700;
-            font-size: 16.5px;
-            color: var(--text-main);
+            font-weight: 600;
+            font-size: 15px;
+            color: #94A3B8;
             letter-spacing: -0.2px;
+            white-space: nowrap;
         }
 
         .header-controls {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .slide-counter {
             font-family: var(--font-mono);
-            font-size: 14.5px;
+            font-size: 14px;
             font-weight: 700;
-            color: var(--text-muted);
-            background: rgba(0, 0, 0, 0.04);
+            color: #F8FAFC;
+            background: rgba(255, 255, 255, 0.08);
             padding: 6px 14px;
             border-radius: 20px;
-            border: 1px solid var(--border-glass);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            white-space: nowrap;
         }
-        body.theme-dark .slide-counter { background: rgba(255, 255, 255, 0.05); }
 
         .timer-display {
             font-family: var(--font-mono);
-            font-size: 14.5px;
+            font-size: 14px;
             font-weight: 700;
-            color: var(--cyan);
-            background: var(--cyan-glow);
+            color: #38BDF8;
+            background: rgba(56, 189, 248, 0.14);
             padding: 6px 14px;
             border-radius: 20px;
-            border: 1px solid var(--cyan);
+            border: 1px solid #38BDF8;
             display: flex;
             align-items: center;
             gap: 8px;
             cursor: pointer;
+            white-space: nowrap;
         }
 
         .ctrl-btn {
-            background: rgba(0, 0, 0, 0.04);
-            border: 1px solid var(--border-glass);
-            color: var(--text-main);
-            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #F8FAFC;
+            padding: 7px 14px;
             border-radius: 8px;
-            font-size: 15.5px;
+            font-size: 14px;
             font-weight: 600;
             font-family: var(--font-body);
             cursor: pointer;
@@ -293,17 +296,17 @@
             align-items: center;
             gap: 8px;
             transition: all 0.2s ease;
+            white-space: nowrap;
         }
-        body.theme-dark .ctrl-btn { background: rgba(255, 255, 255, 0.05); }
         .ctrl-btn:hover {
-            background: var(--blue);
+            background: #0284C7;
             color: #FFFFFF;
-            border-color: var(--blue);
+            border-color: #0284C7;
             transform: translateY(-1px);
         }
         .ctrl-btn.active {
-            background: var(--cyan);
-            border-color: var(--cyan);
+            background: #0284C7;
+            border-color: #0284C7;
             color: #FFFFFF;
         }
 
@@ -583,30 +586,46 @@
             transform: scale(1.1);
         }
 
-        /* Slide Header Typography - Scaled Up & Roomy Spacing */
+        /* Slide Header Typography — Distinct Visual Partition */
         .slide-tag {
             font-family: var(--font-title);
-            font-size: 17px;
+            font-size: 13.5px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: var(--blue);
+            letter-spacing: 1.2px;
+            color: #0284C7;
+            background: rgba(2, 132, 199, 0.08);
+            border: 1.5px solid rgba(2, 132, 199, 0.28);
+            padding: 6px 16px;
+            border-radius: 20px;
             margin-bottom: 12px;
             display: inline-block;
+            width: fit-content;
             position: relative;
             z-index: 2;
+        }
+        body.theme-dark .slide-tag {
+            color: #38BDF8;
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.35);
         }
 
         .slide-title {
             font-family: var(--font-title);
-            font-size: 40px;
+            font-size: 2.6rem;
             font-weight: 800;
-            color: var(--text-main);
-            line-height: 1.3;
-            margin-bottom: 28px;
+            color: #0F172A;
+            line-height: 1.25;
+            margin-bottom: 22px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid rgba(2, 132, 199, 0.18);
             letter-spacing: -0.4px;
             position: relative;
             z-index: 2;
+        }
+        body.theme-dark .slide-title {
+            color: #F8FAFC;
+            border-bottom-color: rgba(56, 189, 248, 0.22);
         }
 
         .slide-content {
@@ -1009,19 +1028,36 @@
             color: var(--text-main);
         }
 
-        /* Bottom Controls Footer */
+        /* Bottom Controls Footer — Executive Dark Console Theme */
         footer.app-footer {
             position: relative;
             z-index: 50;
-            height: 60px;
-            background: var(--bg-card);
-            backdrop-filter: blur(16px);
-            border-top: 1px solid var(--border-glass);
+            height: 52px;
+            background: #0B132B;
+            border-top: 1px solid #1E293B;
             display: flex;
             align-items: center;
             justify-content: space-between;
             padding: 0 28px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.2);
+            color: #F8FAFC;
             transition: all 0.3s ease;
+        }
+
+        .footer-shortcuts {
+            font-size: 13px;
+            color: #94A3B8;
+            font-weight: 500;
+        }
+        .footer-shortcuts kbd {
+            background: rgba(255, 255, 255, 0.1);
+            color: #CBD5E1;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            margin: 0 2px;
         }
 
         .nav-btn-group {
@@ -1030,10 +1066,10 @@
             gap: 10px;
         }
         .nav-btn {
-            background: rgba(0, 0, 0, 0.04);
-            border: 1px solid var(--border-glass);
-            color: var(--text-main);
-            height: 38px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #F8FAFC;
+            height: 36px;
             padding: 0 14px;
             border-radius: 8px;
             display: flex;
@@ -1041,29 +1077,28 @@
             justify-content: center;
             gap: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13.5px;
             font-weight: 600;
             font-family: var(--font-body);
             white-space: nowrap;
             transition: all 0.2s ease;
         }
         .nav-btn.icon-only {
-            width: 38px;
-            min-width: 38px;
+            width: 36px;
+            min-width: 36px;
             padding: 0;
-            font-size: 16px;
+            font-size: 15px;
         }
-        body.theme-dark .nav-btn { background: rgba(255, 255, 255, 0.05); }
         .nav-btn:hover {
-            background: var(--blue);
-            border-color: var(--blue);
+            background: #0284C7;
+            border-color: #0284C7;
             color: #FFFFFF;
-            box-shadow: 0 4px 12px var(--blue-glow);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
             transform: translateY(-1px);
         }
         .nav-btn.active {
-            background: var(--cyan);
-            border-color: var(--cyan);
+            background: #0284C7;
+            border-color: #0284C7;
             color: #FFFFFF;
         }
 
@@ -1638,41 +1673,57 @@
             <div class="slide-tag">
                 Thạc sĩ Kỹ thuật Phần mềm (MSE) — Viện Quản trị &amp; Công nghệ FSB
             </div>
-            <h1 class="slide-title" style="font-size: 3.3rem; line-height: 1.25; margin-bottom: 22px;">
+            <h1 class="slide-title" style="font-size: 3.1rem; line-height: 1.25; margin-bottom: 16px;">
                 SENTINEL: KIẾN TRÚC NHẬN THỨC HAI TẦNG CHO PHÁT HIỆN VÀ PHẢN HỒI MỐI ĐE DỌA TỰ ĐỘNG SỬ DỤNG AI TÁC TỬ
             </h1>
-            <p style="color: var(--cyan); font-family: var(--font-mono); font-size: 20px; font-weight:700; margin-bottom: 36px;">
+            <p style="color: var(--cyan); font-family: var(--font-mono); font-size: 21px; font-weight:700; margin-bottom: 22px;">
                 A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI
             </p>
 
+            <!-- Executive Key Highlights Badges -->
+            <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 30px;">
+                <div style="background: rgba(2, 132, 199, 0.08); border: 1.5px solid rgba(2, 132, 199, 0.3); padding: 8px 18px; border-radius: 10px; font-size: 1.15rem; font-weight: 700; color: #0284C7; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-layer-group"></i> Hai Tầng Lọc (Two-Tier SOC)
+                </div>
+                <div style="background: rgba(4, 120, 87, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.35); padding: 8px 18px; border-radius: 10px; font-size: 1.15rem; font-weight: 700; color: #047857; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-bolt"></i> Xả Tải 97,5% &amp; Latency Trung Vị 0,88ms
+                </div>
+                <div style="background: rgba(109, 40, 217, 0.08); border: 1.5px solid rgba(139, 92, 246, 0.35); padding: 8px 18px; border-radius: 10px; font-size: 1.15rem; font-weight: 700; color: #6D28D9; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-diagram-project"></i> Tác Tử Nhận Thức LangGraph + Dual-RAG
+                </div>
+                <div style="background: rgba(190, 18, 60, 0.08); border: 1.5px solid rgba(244, 63, 94, 0.35); padding: 8px 18px; border-radius: 10px; font-size: 1.15rem; font-weight: 700; color: #BE123C; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-shield-halved"></i> Kháng Đối Kháng AI &amp; Sổ Cái HMAC
+                </div>
+            </div>
+
             <div class="grid-3" style="margin-top: auto;">
-                <div class="card card-blue" style="padding: 30px 34px;">
-                    <div class="card-icon icon-blue" style="width: 64px; height: 64px; font-size: 28px; margin-bottom: 16px;"><i class="fa-solid fa-user-shield"></i></div>
-                    <div class="card-title" style="font-size: 25px; margin-bottom: 12px;">Tác giả Luận văn</div>
-                    <div class="card-text" style="font-size: 21px; line-height: 1.7;">
-                        <strong>Nguyễn Đức Bình</strong><br>
-                        <span style="color: var(--blue); font-weight:700; font-family:var(--font-mono);">MSHV: 24MSE13183 — Lớp: MSE23HN</span><br>
+                <div class="card card-blue" style="padding: 28px 32px;">
+                    <div class="card-icon icon-blue" style="width: 58px; height: 58px; font-size: 26px; margin-bottom: 14px;"><i class="fa-solid fa-user-shield"></i></div>
+                    <div class="card-title" style="font-size: 1.45rem; margin-bottom: 10px; color: var(--blue);">Tác giả Luận văn</div>
+                    <div class="card-text" style="font-size: 1.2rem; line-height: 1.65;">
+                        <strong style="font-size: 1.35rem; color: var(--text-main);">Nguyễn Đức Bình</strong><br>
+                        <span style="color: var(--blue); font-weight:700; font-family:var(--font-mono); font-size: 1.15rem;">MSHV: 24MSE13183 — Lớp: MSE23HN</span><br>
                         Học viên Cao học MSE (Kỹ thuật Phần mềm)<br>
-                        Viện Quản trị &amp; Công nghệ FSB
+                        Viện Quản trị &amp; Công nghệ FSB, ĐH FPT
                     </div>
                 </div>
 
-                <div class="card card-purple" style="padding: 30px 34px;">
-                    <div class="card-icon icon-purple" style="width: 64px; height: 64px; font-size: 28px; margin-bottom: 16px;"><i class="fa-solid fa-graduation-cap"></i></div>
-                    <div class="card-title" style="font-size: 25px; margin-bottom: 12px;">Giảng viên Hướng dẫn</div>
-                    <div class="card-text" style="font-size: 21px; line-height: 1.7;">
-                        <strong>TS. Bùi Văn Hiệu</strong><br>
-                        <strong>TS. Đặng Văn Hiếu</strong><br>
-                        Viện Quản trị &amp; Công nghệ FSB
+                <div class="card card-purple" style="padding: 28px 32px;">
+                    <div class="card-icon icon-purple" style="width: 58px; height: 58px; font-size: 26px; margin-bottom: 14px;"><i class="fa-solid fa-graduation-cap"></i></div>
+                    <div class="card-title" style="font-size: 1.45rem; margin-bottom: 10px; color: var(--purple);">Cán Bộ Hướng Dẫn</div>
+                    <div class="card-text" style="font-size: 1.2rem; line-height: 1.65;">
+                        <strong style="font-size: 1.28rem; color: var(--text-main);">TS. Bùi Văn Hiệu</strong><br>
+                        <strong style="font-size: 1.28rem; color: var(--text-main);">TS. Đặng Văn Hiếu</strong><br>
+                        Viện Quản trị &amp; Công nghệ FSB, ĐH FPT
                     </div>
                 </div>
 
-                <div class="card card-emerald" style="padding: 30px 34px;">
-                    <div class="card-icon icon-emerald" style="width: 64px; height: 64px; font-size: 28px; margin-bottom: 16px;"><i class="fa-solid fa-microchip"></i></div>
-                    <div class="card-title" style="font-size: 25px; margin-bottom: 12px;">Môi trường Thực nghiệm</div>
-                    <div class="card-text" style="font-size: 21px; line-height: 1.7;">
-                        <strong>Local Air-gapped GPU</strong><br>
-                        NVIDIA RTX 4060 Ti 16GB<br>
+                <div class="card card-emerald" style="padding: 28px 32px;">
+                    <div class="card-icon icon-emerald" style="width: 58px; height: 58px; font-size: 26px; margin-bottom: 14px;"><i class="fa-solid fa-microchip"></i></div>
+                    <div class="card-title" style="font-size: 1.45rem; margin-bottom: 10px; color: var(--emerald);">Môi trường Thực nghiệm</div>
+                    <div class="card-text" style="font-size: 1.2rem; line-height: 1.65;">
+                        <strong style="font-size: 1.28rem; color: var(--text-main);">Local Air-gapped GPU</strong><br>
+                        NVIDIA RTX 4060 Ti 16GB VRAM<br>
                         Mô hình Foundation-Sec 8B Q4_K_M
                     </div>
                 </div>
@@ -1681,60 +1732,60 @@
 
         <!-- SLIDE 2: DEDICATED ACKNOWLEDGEMENTS / LỜI CẢM ƠN (BEFORE TABLE OF CONTENTS!) -->
         <section class="slide" data-slide="2">
-    <div class="slide-tag" style="font-size: 1.15rem; font-weight: 700;">Tri Ân &amp; Lời Cảm Ơn</div>
-    <h2 class="slide-title" style="font-size: 2.3rem; margin-bottom: 22px;">Lời Cảm Ơn Từ Tác Giả Luận Văn</h2>
+    <div class="slide-tag">Tri Ân &amp; Lời Cảm Ơn</div>
+    <h2 class="slide-title">Lời Cảm Ơn Từ Tác Giả Luận Văn</h2>
 
     <!-- 4 Structured Acknowledgment Cards Grid (Matching Thesis Acknowledgments Exactly) -->
-    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; flex: 1; align-items: stretch; margin-bottom: 18px;">
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; flex: 1; align-items: stretch; margin-bottom: 20px;">
 
         <!-- Card 1: Academic Supervisors -->
-        <div class="card card-emerald" style="padding: 26px 30px; background: rgba(4, 120, 87, 0.05); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 14px;">
+        <div class="card card-emerald" style="padding: 26px 30px; background: rgba(4, 120, 87, 0.05); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 14px;">
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
                 <div style="width: 48px; height: 48px; background: rgba(16, 185, 129, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #10B981;">
                     <i class="fa-solid fa-chalkboard-user"></i>
                 </div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: var(--emerald);">Cán Bộ Hướng Dẫn Khoa Học</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: var(--emerald);">Cán Bộ Hướng Dẫn Khoa Học</div>
             </div>
-            <p style="font-size: 1.05rem; color: var(--text-main); line-height: 1.7;">
+            <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
                 Trân trọng gửi lời biết ơn chân thành nhất tới <strong>TS. Bùi Văn Hiệu</strong> và <strong>TS. Đặng Văn Hiếu</strong> — những người Thầy uyên bác đã định hướng chiến lược chuẩn xác, tận tình dìu dắt tư duy phản biện và truyền cảm hứng nghiên cứu xuyên suốt chặng đường thực hiện luận văn.
             </p>
         </div>
 
         <!-- Card 2: FSB &amp; FPT University -->
-        <div class="card card-blue" style="padding: 26px 30px; background: rgba(30, 64, 175, 0.05); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 14px;">
+        <div class="card card-blue" style="padding: 26px 30px; background: rgba(30, 64, 175, 0.05); border: 1.5px solid rgba(56, 189, 248, 0.35); border-radius: 14px;">
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
-                <div style="width: 48px; height: 48px; background: rgba(56, 189, 248, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #38BDF8;">
+                <div style="width: 48px; height: 48px; background: rgba(56, 189, 248, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #0284C7;">
                     <i class="fa-solid fa-graduation-cap"></i>
                 </div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: #38BDF8;">Viện Đào Tạo &amp; Nhà Trường</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #0284C7;">Viện Đào Tạo &amp; Nhà Trường</div>
             </div>
-            <p style="font-size: 1.05rem; color: var(--text-main); line-height: 1.7;">
+            <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
                 Xin gửi lời tri ân sâu sắc tới Ban Giám hiệu, Ban Lãnh đạo <strong>Viện Quản trị &amp; Công nghệ FSB</strong> cùng toàn thể Quý Thầy Cô <strong>Trường Đại học FPT</strong> đã truyền dạy nền tảng tri thức vững chắc và tạo môi trường nghiên cứu hiện đại.
             </p>
         </div>
 
         <!-- Card 3: C12 Department &amp; Colleagues -->
-        <div class="card card-purple" style="padding: 26px 30px; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.35); border-radius: 14px;">
+        <div class="card card-purple" style="padding: 26px 30px; background: rgba(109, 40, 217, 0.05); border: 1.5px solid rgba(139, 92, 246, 0.35); border-radius: 14px;">
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
-                <div style="width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #A78BFA;">
+                <div style="width: 48px; height: 48px; background: rgba(139, 92, 246, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #7C3AED;">
                     <i class="fa-solid fa-building-user"></i>
                 </div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: #A78BFA;">Đơn Vị Công Tác &amp; Đồng Nghiệp</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #7C3AED;">Đơn Vị Công Tác &amp; Đồng Nghiệp</div>
             </div>
-            <p style="font-size: 1.05rem; color: var(--text-main); line-height: 1.7;">
+            <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
                 Chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại <strong>Cục C12 - Trung tâm Dữ liệu Quốc gia</strong> đã tin tưởng, tạo điều kiện linh hoạt về thời gian và chia sẻ những kinh nghiệm thực chiến phong phú ứng dụng trực tiếp vào hệ thống.
             </p>
         </div>
 
         <!-- Card 4: Family Support -->
-        <div class="card card-amber" style="padding: 26px 30px; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 14px;">
+        <div class="card card-amber" style="padding: 26px 30px; background: rgba(180, 83, 9, 0.05); border: 1.5px solid rgba(245, 158, 11, 0.35); border-radius: 14px;">
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 12px;">
-                <div style="width: 48px; height: 48px; background: rgba(245, 158, 11, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #F59E0B;">
+                <div style="width: 48px; height: 48px; background: rgba(245, 158, 11, 0.15); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #D97706;">
                     <i class="fa-solid fa-heart"></i>
                 </div>
-                <div style="font-size: 1.25rem; font-weight: 800; color: #F59E0B;">Điểm Tựa Gia Đình</div>
+                <div style="font-size: 1.35rem; font-weight: 800; color: #D97706;">Điểm Tựa Gia Đình</div>
             </div>
-            <p style="font-size: 1.05rem; color: var(--text-main); line-height: 1.7;">
+            <p style="font-size: 1.18rem; color: var(--text-main); line-height: 1.75;">
                 Dành trọn tình yêu thương và lòng biết ơn vô hạn tới <strong>vợ hiền cùng con nhỏ</strong> — chỗ dựa tinh thần vững chắc nhất, luôn kiên nhẫn, hy sinh thầm lặng và động viên để tôi vững tâm hoàn thành nghiên cứu trong những đêm thực nghiệm kéo dài.
             </p>
         </div>
@@ -1742,8 +1793,8 @@
     </div>
 
     <!-- Student Author Footer Info Banner -->
-    <div style="padding: 14px 20px; background: rgba(15, 23, 42, 0.06); border: 1px solid var(--border-glass); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 1.0rem; color: var(--text-muted); flex-wrap: wrap; gap: 10px;">
-        <div><strong>Học viên thực hiện:</strong> Nguyễn Đức Bình (MSHV: <strong>24MSE13183</strong> — Lớp: <strong>MSE23HN</strong>)</div>
+    <div style="padding: 14px 22px; background: rgba(15, 23, 42, 0.06); border: 1.5px solid var(--border-glass); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 1.12rem; color: var(--text-muted); flex-wrap: wrap; gap: 10px;">
+        <div><strong>Học viên thực hiện:</strong> Nguyễn Đức Bình (MSHV: <strong style="color: var(--blue);">24MSE13183</strong> — Lớp: <strong>MSE23HN</strong>)</div>
         <div><strong>Chương trình:</strong> Thạc sĩ Kỹ thuật Phần mềm (MSE) — Viện Quản trị &amp; Công nghệ FSB, ĐH FPT</div>
     </div>
 </section>
