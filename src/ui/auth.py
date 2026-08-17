@@ -5,8 +5,11 @@ Mật khẩu được băm PBKDF2-HMAC-SHA256 (Tương thích CWE-916 & CWE-259)
 
 THIẾT KẾ BẢO MẬT:
   - KHÔNG ghi cứng mật khẩu DẠNG RÕ (plaintext) trong mã nguồn (CWE-798): chỉ lưu
-    HASH đã tính sẵn. Mật khẩu rõ của bộ demo nằm trong tài liệu triển khai
-    (docs/Codebase/guides/RUN_PROJECT.md), KHÔNG nằm trong source.
+    HASH đã tính sẵn.
+  - NHƯNG salt demo VÀ hash demo đều nằm ngay dưới đây, trong một kho công khai.
+    Vì vậy thông tin đăng nhập demo phải coi như CÔNG KHAI: bỏ plaintext chỉ loại bỏ
+    hằng số nhạy cảm dạng rõ, KHÔNG biến bộ demo thành bí mật. Không tài liệu nào
+    trong kho công bố mật khẩu demo, và cũng không nên có.
   - Ưu tiên đọc HASH + SALT từ biến môi trường (OS Environment Variables).
   - Khi rơi về HASH/SALT demo mặc định -> CẢNH BÁO rõ ràng (không dùng cho production).
   - Quy trình xác thực chỉ làm việc với chuỗi băm, KHÔNG bao giờ lưu văn bản rõ.
@@ -43,8 +46,8 @@ def hash_password(password: str) -> str:
 
 
 # HASH DEMO TÍNH SẴN (PBKDF2-HMAC-SHA256, salt demo mặc định, 100k vòng).
-# KHÔNG còn plaintext password trong source. Mật khẩu rõ của bộ demo được tài liệu
-# hóa riêng trong RUN_PROJECT.md; production PHẢI đặt SENTINEL_*_HASH + SENTINEL_AUTH_SALT.
+# Salt + hash đều công khai trong kho => bộ demo KHÔNG bí mật, chỉ dùng cho dashboard
+# cục bộ. Production PHẢI đặt SENTINEL_AUTH_SALT + SENTINEL_ANALYST_HASH + SENTINEL_MANAGER_HASH.
 _DEFAULT_ANALYST_HASH = "0999ca36c62e69601515210699602ce665f6ff1ffd452fcd136d351b73fb86fb"
 _DEFAULT_MANAGER_HASH = "edf6fd717ffe8e326b1d4becb7e22a4f0781c81cb1b7cd419944c2be530207d1"
 

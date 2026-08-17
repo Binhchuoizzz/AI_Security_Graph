@@ -11,7 +11,7 @@
 SENTINEL giải **1 bài toán**: SOC bị ngập cảnh báo (alert fatigue), mà đưa MỌI log qua LLM thì quá chậm (4–6s/log) và LLM lại **bị tấn công thao túng được**. Giải pháp = **2 tầng**, có **Cổng ML** làm van giảm tải ở giữa:
 
 - **Tier-1** (tất định, ~0.1ms/log): luật + thống kê **Welford** lọc phần lớn log ở "tốc độ đường truyền". Chỉ phần **mơ hồ** mới leo thang (`ESCALATE`).
-- **Cổng ML** (LightGBM, ~0.3ms): ca `ESCALATE` đi qua đây TRƯỚC — chấm xác suất tấn công rồi tự quyết **83.8%** (Chặn/Báo/Thả) mà **KHÔNG cần LLM**; chỉ ca ML "bỏ ngỏ" mới lên Tier-2.
+- **Cổng ML** (LightGBM, ~0.3ms): ca `ESCALATE` đi qua đây TRƯỚC — chấm xác suất tấn công rồi tự quyết **68,19%** (Chặn/Báo/Thả) mà **KHÔNG cần LLM**; chỉ ca ML "bỏ ngỏ" mới lên Tier-2.
 - **Tier-2** (nhận thức, ~vài giây/lô): tác tử **LangGraph** chạy LLM **Foundation-Sec-8B cục bộ** + **Dual-RAG** (MITRE/NIST) để suy luận có căn cứ, rồi hành động.
 
 Mấu chốt: **tầng LLM nằm NGOÀI đường chặn đồng bộ** → LLM nghẽn thì chỉ chậm phần làm-giàu-ngữ-cảnh, KHÔNG chậm việc bảo vệ. Và **Tier-1 (không thể bị thuyết phục) làm trọng tài kiểm tra Tier-2** — nếu LLM bị lừa hạ cấp tấn công thành lành tính, hệ ép về con người duyệt.
@@ -66,10 +66,11 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 
 ### ⑤ Cổng ML — van giảm tải trước LLM · `ml_gateway.py`
 
-- 🎯 **Bản chất:** ca `ESCALATE` (Tier-1 thấy đáng ngờ nhưng chưa chắc) đi qua **LightGBM**: chấm `P(tấn công)` rồi tự quyết **83.8%** (Chặn/Báo/Thả) mà **KHÔNG gọi LLM**; chỉ ca ML "bỏ ngỏ" (dải `ESCALATE`) mới lên Tier-2. Đây là van cắt ~6× chi phí LLM.
+- 🎯 **Bản chất:** ca `ESCALATE` (Tier-1 thấy đáng ngờ nhưng chưa chắc) đi qua **LightGBM**: chấm `P(tấn công)` rồi tự quyết **68,19%** (Chặn/Báo/Thả) mà **KHÔNG gọi LLM**; chỉ ca ML "bỏ ngỏ" (dải `ESCALATE`) mới lên Tier-2. Đây là van cắt ~3× chi phí LLM.
 - 📂 subscriber gọi [ml_gateway.py:115 `evaluate()`](../../../src/tier1_filter/ml_gateway.py#L115) tại [subscriber.py:370](../../../src/streaming/subscriber.py#L370); lõi phân dải [decision_policy.py:72 `classify_ml`](../../../src/guardrails/decision_policy.py#L72); mô hình nạp ở [ml_gateway.py:46 `class MLGateway`](../../../src/tier1_filter/ml_gateway.py#L46).
 - ⚙️ **LightGBM** (full-feature, `predict_proba`) + **4 dải confidence** (`classify_ml`): `BLOCK_IP` ≥0.85 · `ESCALATE` 0.65–0.85 (→ LLM) · `ALERT` 0.40–0.65 (IP tái phạm → tự BLOCK) · `DROP` <0.40.
-- 🔑 **Ý cốt lõi:** giảm tải LLM **83.8%** (761/908 ca), precision trên bypass **98.82%**; kháng né-tránh **99.58%**. ML tự tin chặn → block-on-sight qua reputation.
+- 🔑 **Ý cốt lõi:** giảm tải LLM **68,19%** (761/1.116 ca), precision trên phần tự quyết **98,82%**; kháng né-tránh **98,75%** (chế độ KHÓ `extreme_broad`, 1.023/1.036). ML tự tin chặn → block-on-sight qua reputation.
+- ⚠️ **Ba số trên lấy từ `ml_gate_results.json` / `ablation_mlgate_results.json` lượt 06/08/2026.** Bản tài liệu trước ghi 83,8% · 99,58% — đó là lượt đo cũ trên mẫu số khác. Đọc số ở tệp JSON, đừng đọc ở tài liệu.
 - 👀 `.venv/bin/python experiments/evaluate_ml_gate.py`
 - ➡️ Ca ML bỏ ngỏ → `agent_app.invoke(...)` (bước ⑥). Ca ML tự quyết → `queue_decisions` (không tốn LLM).
 
@@ -144,7 +145,7 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 | Chống sửa nhật ký? | `executor.py:224/421` (HMAC chain) |
 | Phát hiện APT đa-ngày? | `threat_memory.py:447` (`check_apt_chain`) |
 | Hệ "học" ra sao? | `feedback_listener.py:126` → Tier-1 hot-reload |
-| Vì sao nhanh hơn LLM-only? | ④ định tuyến + ⑤ Cổng ML (chỉ ca ML bỏ ngỏ gọi LLM) + `experiments/measure_latency_baseline.py` (−82.97%) |
+| Vì sao nhanh hơn LLM-only? | ④ định tuyến + ⑤ Cổng ML (chỉ ca ML bỏ ngỏ gọi LLM) + `experiments/measure_latency_baseline.py` (trung bình **−69,24%**, trung vị 17.174,7 → **0,88 ms**; 🔴 **p95 xấu đi**: 25.829 vs 21.434 ms) |
 | LLM chết có sập không? | `nodes.py:240` (try/except → `AWAIT_HITL`) |
 
 ---

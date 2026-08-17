@@ -84,6 +84,12 @@ thẳng trên tệp theo khoá `unified_source` (14/08/2026), không chép lại
 22 lớp tấn công phân biệt. CSIC nằm ở ngày 2–5 nên **xuất hiện từ vị trí ~92.000** — cắt lát
 đầu sẽ không thấy web attack nào; muốn xem tầng ứng dụng nhanh thì dùng `--small` (§2.2).
 
+> 🔴 **Tệp này MỚI HƠN lượt đo xả tải.** Bản 496.885 sự kiện được dựng **12/08/2026**; con số
+> xả tải **97,47%** đang trích trong luận văn đo ngày **05/08** trên bản cũ 99.717 sự kiện
+> **chưa có CSIC**. `measure_offload_vs_baserate.py --source demo` đọc thẳng tệp này, nên chạy
+> lại hôm nay ra số khác — đó là hành vi đúng, không phải lỗi. Chi tiết:
+> [DEMO_BY_RQ.md §0](DEMO_BY_RQ.md).
+
 ### 2.2. Lát nhỏ
 
 ```bash

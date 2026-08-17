@@ -68,9 +68,11 @@ Trước khi đưa hệ thống SENTINEL ra môi trường thực tế (Producti
 
 Đã rà soát độc lập **8 lớp vector tấn công** (*Secrets, SQL Injection, Command Injection, Deserialization, Path Traversal, SSRF, Cryptography, Third-party Dependencies*). Toàn bộ 8 lớp đã được gia cố vững chắc:
 
-- 🔐 **Authentication (CWE-798 / CWE-259):** `src/ui/auth.py` — **Loại bỏ hoàn toàn mật khẩu dạng rõ (Plaintext) khỏi mã nguồn**, thay thế bằng thuật toán băm chuẩn **PBKDF2-HMAC-SHA256 (100.000 vòng lặp)**. Cơ chế tự động cảnh báo `fail-loud` khi phát hiện salt/hash demo. Mật khẩu demo được lưu riêng trong tài liệu `RUN_PROJECT.md`.
+- 🔐 **Authentication (CWE-798 / CWE-259):** `src/ui/auth.py` — **Loại bỏ hoàn toàn mật khẩu dạng rõ (Plaintext) khỏi mã nguồn**, thay thế bằng thuật toán băm chuẩn **PBKDF2-HMAC-SHA256 (100.000 vòng lặp)**. Cơ chế tự động cảnh báo `fail-loud` khi phát hiện salt/hash demo.
+  > [!WARNING]
+  > **Thông tin đăng nhập demo phải coi như CÔNG KHAI.** Cả salt demo lẫn hai hash demo đều nằm trong mã nguồn của kho công khai này, nên bất kỳ ai cũng dò ngược được mật khẩu demo — bỏ plaintext khỏi source **không** làm bộ demo trở nên bí mật, nó chỉ loại bỏ hằng số nhạy cảm dạng rõ. Bộ demo chỉ dành cho dashboard chạy cục bộ. **Production BẮT BUỘC đặt `SENTINEL_AUTH_SALT` + `SENTINEL_ANALYST_HASH` + `SENTINEL_MANAGER_HASH`** rồi mới mở cổng ra ngoài `127.0.0.1`.
 - 🛡️ **Anti-Self-DoS Shield:** `DecisionValidator` đã được tinh chỉnh từ `trusted_internal_subnets` (toàn dải RFC 1918 — quá rộng, khiến không chặn được attacker nội bộ/lateral movement) sang **`critical_infrastructure_subnets` thu hẹp có chủ đích** (chỉ bảo vệ Loopback và IP máy chủ hạ tầng cốt lõi `10.0.0.99`).
-- 📦 **CVE Dependency Pinning:** Tệp `requirements.txt` ghim cứng phiên bản an toàn tối thiểu cho các thư viện trung gian có CVE (*`aiohttp >= 3.14.0`*, *`authlib >= 1.6.12`*, *`gitpython >= 3.1.50`*, *`pyjwt >= 2.13.0`*, *`langchain-core >= 1.3.3`*); `torch CVE-2025-3000` được ghi nhận theo diện rủi ro chấp nhận được (accepted-risk) trong môi trường local air-gapped.
+- 📦 **CVE Dependency Pinning:** Tệp `requirements.txt` ghim cứng phiên bản an toàn tối thiểu cho các thư viện trung gian có CVE (*`aiohttp >= 3.14.1`*, *`authlib >= 1.6.12`*, *`gitpython >= 3.1.50`*, *`pyjwt >= 2.13.0`*, *`langchain-core >= 1.3.3`*); `torch CVE-2025-3000` được ghi nhận theo diện rủi ro chấp nhận được (accepted-risk) trong môi trường local air-gapped.
 - 🧹 **Resource Leak (CWE-404):** Đã rà soát và bọc toàn bộ 10 vị trí mở file bằng cú pháp ngữ cảnh chuẩn `with open(...) as f:` đảm bảo tự động đóng file descriptor.
 
 > [!NOTE]

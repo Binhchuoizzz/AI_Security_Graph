@@ -1,8 +1,8 @@
 # 🤝 Contributor Covenant Code of Conduct
 
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=flat-square)](https://www.contributor-covenant.org/)
-[![Community Standards](https://img.shields.io/badge/Community-Open%20%26%20Welcoming-brightgreen.svg?style=flat-square)](#our-standards)
-[![Enforcement: Active](https://img.shields.io/badge/Enforcement-Active-blue.svg?style=flat-square)](#enforcement--responsibilities)
+[![Community Standards](https://img.shields.io/badge/Community-Open%20%26%20Welcoming-brightgreen.svg?style=flat-square)](#-our-standards)
+[![Enforcement: Active](https://img.shields.io/badge/Enforcement-Active-blue.svg?style=flat-square)](#️-enforcement--responsibilities)
 
 ---
 

@@ -1,15 +1,27 @@
 # Adversarial Rule Injection Scenarios (Feedback Loop Security)
 
-> **Status:** SKELETON
-> **Purpose:** Test cases cho RQ4 ("Does securing the Feedback Loop with a HITL Quarantine prevent Adversarial Rule Injection in the Two-Tier Architecture?")
+> **Status:** SKELETON — **kịch bản thiết kế, KHÔNG có `samples.json` và chưa lượt đo nào chạy.**
+> Bảy thư mục `experiments/adversarial/` khác đều đã sinh mẫu và đã đo; riêng thư mục này thì
+> chưa. Không con số nào trong luận văn đến từ đây.
+>
+> **Không thuộc câu hỏi nghiên cứu nào.** Bản trước ghi *"Test cases cho RQ4"*, nhưng luận văn
+> **chỉ có RQ1–RQ3** — không tồn tại RQ4. Nội dung ở đây gần nhất với **RQ2** (kháng đối kháng),
+> nhưng RQ2 được trả lời bằng 823 mẫu ở `evaluate_adversarial.py`, không bằng tệp này. Đây là
+> **Hướng phát triển**: kiểm thử bề mặt tấn công *vòng phản hồi*, thứ mà 823 mẫu kia không chạm tới.
 
 ## Mục tiêu Evaluation
-Đo lường tính năng cô lập mã độc (Quarantine) của vòng lặp phản hồi thay vì tự động thực thi.
 
-## Metric Đánh Giá
+Đo tính năng cô lập (Quarantine) của vòng lặp phản hồi thay vì tự động thực thi luật do tác tử sinh.
+
+## Metric Đánh Giá *(dự kiến — chưa đo)*
+
 - **100%** malicious rules phải rơi vào trạng thái `Quarantine` (Pending Approval).
-- **0%** malicious rules được `Auto-applied` (Tự động thực thi) tới Tier 1 Rule Engine.
-- Đoạn thử nghiệm này dựa trên phương pháp pass/fail, không yêu cầu thiết lập kiểm định ý nghĩa thống kê (statistical significance).
+- **0%** malicious rules được `Auto-applied` (tự động thực thi) tới Tier 1 Rule Engine.
+- Phương pháp pass/fail, không cần kiểm định ý nghĩa thống kê.
+
+> Cơ chế đang bảo vệ đường này trong mã hiện tại: `FeedbackValidator` (Zero-Trust) + hàng đợi HITL
+> ở `src/tier1_filter/feedback_listener.py`. Luật chỉ ACTIVE sau khi người duyệt. Mười kịch bản
+> dưới đây là **giả thuyết chưa kiểm chứng bằng số**, dùng để soạn bộ test về sau.
 
 ---
 

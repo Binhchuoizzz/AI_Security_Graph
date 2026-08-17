@@ -4,8 +4,9 @@ Mỗi script ở đây **chống lưng một mục trong Chương 4 luận văn*
 là "rác": nhóm rigor (độ nhạy ngưỡng, đối chứng âm, baseline ngoài, vòng phản hồi…) chính
 là phần bảo vệ luận văn trước phản biện hội đồng.
 
-> **Định nghĩa chỉ số** nằm ở [`docs/Codebase/learning/05_CHI_SO_DANH_GIA.md`](../docs/Codebase/learning/05_CHI_SO_DANH_GIA.md)
-> — từ điển bản chất từng chỉ số, không số liệu. **Số liệu** nằm ở `results/*.json`
+> **Định nghĩa + mẫu số + bẫy đọc của từng chỉ số** nằm ở
+> [`docs/Codebase/guides/DEMO_BY_RQ.md`](../docs/Codebase/guides/DEMO_BY_RQ.md) — bảng 22 chỉ số
+> theo ba câu hỏi nghiên cứu, kèm khoá JSON để tra ngược. **Số liệu** nằm ở `results/*.json`
 > (nguồn sự thật) + `reports/`. Muốn thử nhanh thì dùng `--limit`/`--out` ghi ra chỗ tạm,
 > đừng chạy full rồi ghi đè kết quả đã trích.
 
@@ -58,17 +59,24 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | :--- | :--- | :--- |
 | `scripts/demo.py` · `scripts/push_datatest.py` | `python scripts/build_datatest.py && python scripts/push_datatest.py` | Đẩy luồng gộp lên Redis → chảy qua **toàn hệ thống thật**. Dùng chung `build_stream()`/`enrich()` với eval offline. |
 
-**Luồng DEMO trước hội đồng** dùng `data/demo.json` (≈100k sự kiện) hoặc
-`data/demo_small.json` (5k, phân tầng cho đủ mọi panel). Dựng lại bằng
-`scripts/build_demo.py` rồi `scripts/build_demo_small.py`. Tỉ lệ tấn công của tập nhỏ
-**cao hơn** luồng đầy đủ do phân tầng — script in cả hai cạnh nhau, đừng trích tỉ lệ của
-tập nhỏ như thể đó là hồ sơ tải của hệ thống.
+**Luồng DEMO trước hội đồng** dùng `data/demo.json` (**496.885** sự kiện, 5,24% tấn công) hoặc
+`data/demo_small.json` (**10.000**, phân tầng cho đủ mọi panel). Dựng lại bằng
+`scripts/build_demo.py` rồi `scripts/build_demo_small.py`. Tỉ lệ tấn công của tập nhỏ là
+**30,8%** — cao hơn hẳn luồng đầy đủ do phân tầng; script in cả hai cạnh nhau, đừng trích tỉ lệ
+của tập nhỏ như thể đó là hồ sơ tải của hệ thống. Phân bổ đầy đủ:
+[`RUN_PROJECT.md §2`](../docs/Codebase/guides/RUN_PROJECT.md).
 
 ## 5. Dữ liệu
 
-- `ground_truth.json` — CICIDS2018 đã gán nhãn (nguồn phân loại + nền zero-day).
-- `adversarial/<nhóm>/samples.json` — 120 payload OWASP LLM Top-10 (5 nhóm).
+- `ground_truth.json` — **1.750** ca đã gán nhãn (CICIDS2018 + CSIC 2010); còn **1.700** sau
+  `drop_authored` — 50 mẫu do tác giả biên soạn bị loại khỏi mọi tỉ lệ công bố vì cả 50 cùng
+  đáp án `T1190`.
+- `adversarial/<nhóm>/samples.json` — **723 payload, 8 nhóm**: 603 từ ba tập công khai
+  (AdvBench 200 · jackhhao 200 · deepset 203) + **120 tự soạn** (encoding 45 · structural 20 ·
+  semantic 20 · jailbreak 20 · rag_poisoning 15). Thêm 100 mẫu `field_injection` ở
+  `data/adversarial_llm/mixed_llm_attacks.json` ⇒ tổng bề mặt đối kháng **823**.
 - `results/*.json`, `results/plots/*.png` — **số liệu + hình đã trích trong luận văn**.
+- `results/_archive_pre_2026-08/` — kết quả LỖI THỜI, giữ để lưu vết, **không trích**.
 - `.unified_eval_memory.db` — DB threat-memory tạm của eval offline (tự sinh, gitignored).
 
 ---

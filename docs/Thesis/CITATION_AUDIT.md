@@ -3,8 +3,14 @@
 Mục đích: mỗi mục trong `thebibliography` được **tra tận nguồn gốc** (trang xuất bản, DOI, hoặc
 trang arXiv), không tin bản ghi cũ. Lần sau muốn kiểm thì đọc bảng này thay vì tra lại từ đầu.
 
-Ngày rà: **06/08/2026**, rà lại **10/08/2026** · Số mục: **38** (34 cũ + 4 mới) · Công cụ kiểm
-tự động: `scripts/audit_thesis_refs.py`
+Ngày rà: **06/08/2026**, rà lại **10/08/2026**, đối chiếu số mục **17/08/2026** ·
+Số mục: **41** · Công cụ kiểm tự động: `scripts/audit_thesis_refs.py`
+
+> Lượt 17/08 chỉ sửa **con số ở dòng trên**: bản trước ghi "38 mục (34 cũ + 4 mới)", trong khi
+> `\bibitem` trong `main.tex` của cả hai bản EN/VI đều đếm được **41**. `audit_thesis_refs.py`
+> xác nhận **cả 41 mục đều đã có trong sổ tra này**, đúng thứ tự trích lần đầu theo IEEE, 0 mục
+> mồ côi và 0 lệch gương EN⇄VI — nghĩa là nội dung sổ tra vẫn đủ, chỉ có con số tổng bị bỏ quên
+> khi thêm mục ở các lượt sau.
 
 ## 🔧 Lượt rà lại 10/08/2026 — hai mục còn sai
 

@@ -1,6 +1,6 @@
 # Chạy tay TỪNG luồng dữ liệu
 
-> Cập nhật 31/07/2026. Trình diễn **tách bạch** từng kịch bản qua đường ống sống
+> Cập nhật 17/08/2026. Trình diễn **tách bạch** từng kịch bản qua đường ống sống
 > (Tier-1 → Cổng ML → *(chỉ ca ML bỏ ngỏ)* Tier-2 → Dashboard), thay vì luồng gộp.
 >
 > Cách chạy hệ thống & demo theo RQ: [RUN_PROJECT.md](RUN_PROJECT.md) ·
@@ -12,10 +12,11 @@ Mọi con số của luận văn nằm trong `experiments/results/*.json`, khôn
 tài liệu chép số thì sau mỗi lượt đo lại nó lặng lẽ thành số cũ, và người đọc không có cách
 nào biết. Mỗi mục dưới đây ghi rõ **đọc số ở tệp nào**.
 
-> **Trạng thái số liệu (31/07/2026):** hầu hết `experiments/results/*.json` mang mốc **30/07**,
-> tức có TRƯỚC các bản vá ngày 31/07 (neo quy kết · lọc mẫu biên soạn · viết lại phép đo độ
-> trễ). Chỉ `adversarial_pipeline_results.json` và `ml_gate_results.json` là mới. **Chưa chạy
-> lại lượt đầy đủ** — đừng trích số 30/07 cho tới khi chạy xong.
+> **Trạng thái số liệu (17/08/2026):** các lượt đo đầy đủ đã chạy xong đợt **05–06/08/2026**;
+> cảnh báo "chưa chạy lại, đừng trích số 30/07" của bản 31/07 **đã hết hiệu lực**. Bản 30/07
+> được lưu ở [`experiments/results/_archive_pre_2026-08/`](../../../experiments/results/_archive_pre_2026-08/)
+> kèm lý do loại từng tệp. Một ngoại lệ còn sống: `data/demo.json` dựng lại **12/08**, mới hơn
+> lượt đo xả tải 05/08 — xem [DEMO_BY_RQ.md §0](DEMO_BY_RQ.md).
 
 ---
 
@@ -48,7 +49,7 @@ Model đang phục vụ: **Foundation-Sec-8B-Instruct Q4_K_M**, `LLAMA_ARG_CTX_S
 | **CICIDS** | `push_flow.py --source cicids` | Phân loại lưu lượng + xả tải | Tổng quan / SIEM |
 | **DAPT** | `push_flow.py --source dapt` | APT đa ngày *nổi lên dần* | Giám sát APT |
 | **Zero-day** | `push_flow.py --source zeroday` | Welford bắt cái luật tĩnh bỏ sót | Tổng quan / log |
-| **Adversarial** | `push_flow.py --source adversarial` | 600+ payload đối kháng siêu cấp (Jailbreak, AdvBench, Prompt Injection) | Tổng quan |
+| **Adversarial** | `push_flow.py --source adversarial --real-only` | 603 payload thật (AdvBench · jackhhao · deepset) | Tổng quan |
 | **Vòng phản hồi** | *(mục 5)* | Duyệt luật → Tier-1 tự chặn, KHÔNG tốn LLM | Phê duyệt HITL |
 
 Thêm `--dry-run` để **chỉ đếm phân bố hàng đợi**, không đụng Redis.
@@ -131,10 +132,12 @@ Mỗi payload là một IP TEST-NET riêng (`198.51.100.x`) tải một đòn t�
 
 | lớp | tệp | phạm vi |
 | :-- | :-- | :-- |
-| Guardrail **tĩnh** | `robustness_results.json` | 120 mẫu, 5 nhóm |
-| **Tier-2** (LLM) | `adversarial_pipeline_results.json` | 75 mẫu, 4 nhóm ngữ nghĩa |
+| Guardrail **tĩnh** | `robustness_results.json` | **823 mẫu, 8 nhóm** — 703 công bố + 120 tự soạn |
+| **Tier-2** (LLM) | `adversarial_pipeline_results.json` | **678 mẫu KHÓ, 7 nhóm** — phần lớp tĩnh không hấp thụ được |
 
-Lớp tĩnh mạnh ở `encoding_bypass` nhưng **mù trước tấn công ngữ nghĩa**; 75 mẫu Tier-2 nhận là siêu tập của phần lọt qua lớp tĩnh.
+Lớp tĩnh mạnh ở `encoding_bypass` (45/45) nhưng **mù trước tấn công ngữ nghĩa** (`advbench_gcg`
+0/200, `semantic_confusion` 0/20); 678 mẫu Tier-2 nhận là **siêu tập** của 543 mẫu thật sự lọt qua
+lớp tĩnh trong 7 nhóm đó. Mẫu số và cách tách xuất xứ: [DEMO_BY_RQ.md §2](DEMO_BY_RQ.md) mục 2.a/2.b.
 
 > **Trung thực khi demo end-to-end:** một phần payload bị Tier-1 **DROP** trước khi tới Guardrail — lọt bằng cách bị bỏ qua, không phải bị chặn có chủ đích. Con số kháng tiêm nhiễm đo bằng cách nạp **thẳng** vào đường ống, và phải nói rõ như vậy.
 

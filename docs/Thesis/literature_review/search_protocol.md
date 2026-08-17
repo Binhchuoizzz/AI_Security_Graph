@@ -1,7 +1,17 @@
 # Literature Review — Search Protocol (PRISMA-ScR)
 
-> **Status:** SKELETON — Điền trước khi bắt đầu search
-> **Framework:** PRISMA for Scoping Reviews (Tricco et al., 2018)
+> ⛔ **TÀI LIỆU LỊCH SỬ — KHUNG KHÔNG ĐƯỢC THỰC HIỆN.**
+>
+> Đây là khung giao thức PRISMA-ScR dự kiến từ giai đoạn đầu. **Chương 2 của luận văn cuối cùng
+> KHÔNG viết theo scoping review**: nó là tổng quan có định hướng, dựng quanh 41 nguồn đã rà tận
+> gốc. Mọi ô đánh dấu, số mục tiêu và sơ đồ PRISMA bên dưới **chưa từng được điền** — đừng đọc
+> chúng như mô tả việc đã làm.
+>
+> - Danh mục thật + xác minh tận nguồn từng mục: [`../CITATION_AUDIT.md`](../CITATION_AUDIT.md)
+> - Đối chứng ngoài, đã kiểm từ bài gốc: [`../DOI_CHUNG_NGOAI.md`](../DOI_CHUNG_NGOAI.md)
+> - Kiểm tự động (mồ côi · treo · gương EN⇄VI · thứ tự IEEE): `scripts/audit_thesis_refs.py`
+>
+> **Framework dự kiến:** PRISMA for Scoping Reviews (Tricco et al., 2018).
 
 ---
 

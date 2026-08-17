@@ -26,9 +26,14 @@ Dự án áp dụng mô hình **Feature Branch Workflow**:
 | Nhánh (Branch) | Mục Đích Sử Dụng | Quyền Hạn Merge |
 | :--- | :--- | :--- |
 | `main` | Production-ready & Bản nộp Luận văn chuẩn | Chỉ nhận merge từ các PR đã pass 100% CI & Review |
-| `develop` | Tích hợp các tính năng và thử nghiệm đang phát triển | Nhận merge từ các nhánh `feature/*` và `bugfix/*` |
-| `feature/<tên>` | Phát triển tính năng mới (VD: `feature/trivy-scanner`) | Nhánh làm việc cá nhân của Contributor |
-| `bugfix/<tên>` | Sửa lỗi khẩn cấp (VD: `bugfix/redis-timeout`) | Dành cho các bản vá lỗi |
+| `feature/<tên>` | Phát triển tính năng mới (VD: `feature/trivy-scanner`) | PR thẳng vào `main` |
+| `fix/<tên>` | Sửa lỗi (VD: `fix/redis-timeout`) | PR thẳng vào `main` |
+| `perf/<tên>` | Tối ưu hiệu năng (VD: `perf/parallel-agent-workers`) | PR thẳng vào `main` |
+
+> [!NOTE]
+> Kho này **không có nhánh `develop`**. Mọi nhánh làm việc rẽ từ `main` và PR ngược về `main`;
+> tiền tố nhánh dùng đúng bộ `type` của Conventional Commits ở mục 2 để tên nhánh và tên commit
+> nói cùng một thứ.
 
 ---
 
@@ -87,7 +92,7 @@ source .venv/bin/activate
 ruff check src/ tests/
 ruff format --check src/ tests/
 
-# 3. Chạy toàn bộ 609+ Unit & Integration Tests
+# 3. Chạy toàn bộ bộ test: 613 ca thu thập -> 609 pass, 4 skip khi không có Redis
 SENTINEL_FREEZE_DYNAMIC_RULES=1 pytest tests/ --tb=short
 
 # 4. Chạy kiểm toán đối chiếu số liệu
@@ -101,7 +106,7 @@ python scripts/audit_thesis_numbers.py
 Trước khi nhấn nút **Create Pull Request**, hãy tự rà soát danh sách kiểm tra sau:
 
 - [ ] ✅ **Unit Tests:** Mã nguồn mới đã có Unit Test đi kèm với độ bao phủ (Coverage) cao.
-- [ ] ✅ **Xanh Toàn Bộ Tests:** Lệnh `SENTINEL_FREEZE_DYNAMIC_RULES=1 pytest` chạy thành công (609 passed).
+- [ ] ✅ **Xanh Toàn Bộ Tests:** Lệnh `SENTINEL_FREEZE_DYNAMIC_RULES=1 pytest` chạy thành công (609 passed, 4 skipped).
 - [ ] ✅ **Code Quality:** Tuân thủ chuẩn PEP 8 và đã chạy qua linter `ruff`.
 - [ ] ✅ **Tài Liệu:** Đã cập nhật tài liệu Markdown (`README.md`, `RUN_PROJECT.md`) nếu có thay đổi kiến trúc/API.
 - [ ] ✅ **Bảo Mật:** Tuyệt đối không commit tệp nhạy cảm (token, mật khẩu, file `.env`, database `.db`).

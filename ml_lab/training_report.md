@@ -1,16 +1,29 @@
-# Báo Cáo Huấn Luyện & So Sánh Mô Hình ML (Tier 2 Filter)
+# Báo Cáo Huấn Luyện & So Sánh Mô Hình ML (Cổng ML — Tier 1)
 
-Tài liệu này mô tả chi tiết quá trình chuẩn bị dữ liệu, chiến lược huấn luyện, so sánh và kết luận rút ra từ các mô hình Machine Learning truyền thống, được sử dụng làm **Tier 2** trong hệ thống Agentic AI (SENTINEL).
+Tài liệu này mô tả quá trình chuẩn bị dữ liệu, chiến lược huấn luyện, so sánh và kết luận rút ra
+từ các mô hình Machine Learning truyền thống, được dùng làm **Cổng ML** trong SENTINEL.
 
 ## 1. Mục Đích
-Kiến trúc SENTINEL phân tầng quy trình phát hiện tấn công để tối ưu hóa giữa **Tốc độ (Latency)** và **Chiều sâu suy luận (Reasoning capability)**:
-- **Tier 1**: Welford Rule Engine (Thống kê Z-Score & Luật tĩnh).
-- **Cổng ML — thuộc Tier-1 (Mục tiêu của Lab này)**: chặng lọc MÁY HỌC của Tier-1 (chạy sau luật/Welford, TRƯỚC khi escalate lên Tier-2 LLM), dùng mô hình siêu nhẹ (LightGBM) làm bộ lọc Early Exit. Đặt ở Tier-1 để giải quyết Head-of-Line blocking: chặn đứng ngay các cuộc DDoS/Brute-force rõ ràng ở đường đọc, KHÔNG để nghẽn hàng đợi LLM. Kiến trúc luận văn vẫn là HAI TẦNG: Tier-1 (luật + Welford + Cổng ML) và Tier-2 (LLM Agent).
-- **Tier 2 — LLM Agent**: chặng sau của cùng Tier-2 — GenAI/LLM Triage (xử lý zero-day và ngữ cảnh tinh vi). Kiến trúc luận văn là HAI tầng: ML và LLM là 2 chặng trong một Tier-2.
+
+Kiến trúc SENTINEL là **HAI TẦNG**, tối ưu giữa **Tốc độ (Latency)** và **Chiều sâu suy luận
+(Reasoning capability)**:
+
+- **Tier 1 — tất định**: Rule Engine + Welford Z-Score + **Cổng ML** (mục tiêu của Lab này).
+- **Tier 2 — nhận thức**: LangGraph Agent + LLM (zero-day và ngữ cảnh tinh vi).
+
+**Cổng ML thuộc Tier-1**, chạy sau luật/Welford và TRƯỚC khi escalate lên Tier-2. Đặt ở Tier-1 để
+giải quyết Head-of-Line blocking: chặn đứng ngay các cuộc DDoS/Brute-force rõ ràng ở đường đọc,
+KHÔNG để nghẽn hàng đợi LLM.
+
+> ⚠️ **Tên tệp `tier_2_model.pkl` là di sản lịch sử, không phải mô tả kiến trúc.** Mô hình này là
+> Cổng ML của **Tier-1**. Bản trước của tài liệu này gọi nó là "Tier 2 Filter" ở tiêu đề rồi lại
+> gọi là "thuộc Tier-1" ở phần thân — hai câu mâu thuẫn nhau. Cách gọi đúng: **Cổng ML (Tier-1)**.
 
 ## 2. Quá Trình Chuẩn Bị Dữ Liệu (bản 1 TRIỆU — 2026-07-18)
+
 Script `build_1m_dataset.py` tổng hợp tập `dataset_1m.csv` gồm **949.535 mẫu** (NetFlow metrics)
 từ **CICIDS2018**, tỉ lệ **~79% attack / ~21% benign** (mục tiêu 80/20; sau khử trùng lặp còn):
+
 1. **Benign (Bình thường):** 200.000 mẫu (~21%).
 2. **Attack (đa dạng):** 749.535 mẫu (~79%) — BruteForce (FTP/SSH), DoS (Hulk/GoldenEye/
    Slowloris/SlowHTTP), DDoS (HOIC/LOIC-UDP), Botnet, Infiltration, Web (BruteForce/XSS/SQLi).
@@ -21,7 +34,9 @@ chỉ giữ 76 cột số, **trộn đều** (seed=42). *(Bản 100k cũ `datase
 được GIỮ làm mốc đối chiếu lịch sử.)*
 
 ## 3. Chiến Lược Phân Chia Dữ Liệu
+
 Dữ liệu ~949k dòng chia theo tỉ lệ chuẩn (stratify theo nhãn):
+
 - **Tập Train (70%):** 664.674 mẫu — huấn luyện.
 - **Tập Validation (10%):** ~94.954 mẫu — đánh giá nội bộ / tinh chỉnh siêu tham số.
 - **Tập Test / Tập Thi (20%):** 189.907 mẫu — đánh giá tổng quát hóa cuối cùng.
@@ -39,49 +54,66 @@ File `train_1m.py` huấn luyện 5 thuật toán: `Logistic Regression`, `Decis
 
 Kết quả trên Tập Test (**189.907 dòng**, held-out):
 
-| Model | Test F1 | Precision | Recall | Inference (ms/sample) |
-|---|---|---|---|---|
-| **LightGBM** (tinh chỉnh) | **0.9635** | 0.9548 | 0.9723 | 0.000875 |
-| **XGBoost** | 0.9429 | 0.9500 | 0.9360 | 0.000151 |
-| **Decision Tree** | 0.9422 | 0.9411 | 0.9433 | 0.000096 |
-| **Random Forest** | 0.9402 | 0.9400 | 0.9403 | 0.000922 |
-| **Logistic Regression** | 0.9278 | 0.9125 | 0.9436 | 0.000044 |
+| Model | Test F1 | Precision | Recall | FPR | Inference (ms/sample) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| **LightGBM** (tinh chỉnh) | **0.9635** | 0.9548 | 0.9723 | **0.1724** | 0.00077 |
+| XGBoost | 0.9429 | 0.9500 | 0.9360 | 0.1848 | 0.000149 |
+| Decision Tree | 0.9422 | 0.9411 | 0.9433 | 0.2211 | 0.000102 |
+| Random Forest | 0.9402 | 0.9400 | 0.9403 | 0.2248 | 0.001051 |
+| Logistic Regression | 0.9278 | 0.9125 | 0.9436 | 0.3392 | 0.000039 |
 
-Ngoài F1 test held-out, đo thêm hành vi **triển khai thực** của Cổng ML (dải BLOCK C≥0.85) trên
-luồng gộp `data/datatest.json` (`experiments/evaluate_ml_gate.py`) và mức giảm tải LLM
+> 🔴 **Cột FPR là con số phải tự nêu.** LightGBM có F1 0,9635 nhưng **FPR 17,24%** — hệ quả trực
+> tiếp của việc cố ý huấn luyện trên tập 79% attack (thiên recall). Trích F1 mà giấu FPR là trình
+> bày một nửa. Chính FPR này là lý do dải auto-BLOCK phải đặt cao ở 0,85 thay vì 0,5.
+
+Ngoài F1 test held-out, đo thêm hành vi **triển khai thực** của Cổng ML trên luồng gộp
+`data/datatest.json` (`experiments/evaluate_ml_gate.py`) và mức giảm tải LLM
 (`run_ablation.py --mode mlgate`, Config G):
 
-Benchmark `data/datatest.json` = **3204 mẫu từ FULL 4 luồng** (15 lớp CICIDS đa-ngày ≤80/lớp + benign
-đa-ngày + DAPT day2-5 (500) + zero-day real-derived (360) + adversarial OWASP). **Chính sách 4 dải**
-(C≥0.85 BLOCK · 0.65–0.85 ESCALATE · 0.40–0.65 ALERT · <0.40 PASS). Vì hành động quyết định là
-**auto-BLOCK**, chỉ số headline là **độ chính xác auto-BLOCK**.
+Benchmark `data/datatest.json` = **4.240 mẫu** — `cicids` 1.171 · `cicids_max` 1.169 · **CSIC 2010**
+1.036 · `dapt_max` 469 · zero-day real-derived 360 · `dapt` 31 · đối kháng tự soạn 4. Sau
+`drop_authored` còn **4.236** ca được chấm. **Chính sách 4 dải** (C≥0.85 BLOCK · 0.65–0.85 ESCALATE ·
+0.40–0.65 ALERT · <0.40 PASS). Vì hành động quyết định là **auto-BLOCK**, chỉ số headline là **độ
+chính xác auto-BLOCK**.
 
-| Chỉ số triển khai (datatest 3.2k, 4 luồng, dải mới) | Giá trị |
-|---|---|
-| **Auto-BLOCK (C≥0.85) precision** | **100%** — 962 đúng / **0** chặn nhầm (962 block) |
-| Kháng né-tránh (Inf/cực-đoan) | **99.58%** |
-| Giảm tải LLM (bypass, Config G, ground_truth 1250) | **83.8%** — F1(bypass) 0.9739 |
-| F1 gộp (tính CẢ dải ALERT-0.40 là "tấn công") | 0.825 (P .909 / R .755) — *xem chú thích* |
+| Chỉ số triển khai (datatest 4.236, lượt 06/08/2026) | Giá trị |
+| :--- | :--- |
+| **Auto-BLOCK (C≥0.85) precision** | **100%** — 962 lệnh, **0 FP** (Wilson 99,6–100) |
+| Kháng né-tránh — chế độ KHÓ `extreme_broad` | **98,75%** (1.023/1.036 · CI95 97,86–99,27) |
+| Giảm tải LLM (bypass, Config G) | **68,19%** — 761/1.116 · F1(bypass) 0.9739 · P 0.9882 |
+| MCC trên phần Cổng ML tự quyết | **0.6667** — BalAcc 0.8328, mẫu số **2.534**, không phải 4.236 |
+| F1 gộp (tính CẢ dải ALERT-0.40 là "tấn công") | 0.8248 (P 0.909 / R 0.755) — *xem chú thích* |
 
 **Nhận xét Kết Quả:**
 
-- LightGBM thắng với **F1-Score 96.35%** trên Tập Test 190k held-out (số của MODEL, không đổi).
-- **Auto-BLOCK hoàn hảo trên benchmark này:** ở dải C≥0.85, Cổng ML chặn 962 luồng mà **0 benign bị chặn
-  nhầm** (precision 100%, 0 FP) — dải block cố tình đặt cao 0.85 nên rất bảo thủ; hành động dứt khoát
-  (không thể đảo) cực đáng tin. (Đây là số của benchmark 3.2k cụ thể, không phải tuyên bố tổng quát;
-  model held-out vẫn 0.9635.)
-- **Chú thích trung thực về F1 gộp 0.825:** con số này lấy CẢ dải ALERT (0.40–0.65) làm "dự đoán tấn công";
-  vì ngưỡng ALERT thấp (0.40) nên một số benign low-priority bị cảnh báo (104 FP) → kéo F1 xuống. Đây KHÔNG
-  phải model kém đi (đã quét nâng ngưỡng: precision cải thiện rất ít — vùng 0.40–0.85 vốn benign-dominated).
-  ALERT là cảnh báo **low-priority** (không chặn, người xem), nên chấp nhận được.
-- Tốc độ dự đoán vẫn ở mức vài phần triệu giây/luồng (≤ 0.001 ms/sample) — không ảnh hưởng
-  đường đọc Tier-1.
+- LightGBM thắng với **F1 96,35%** trên Tập Test 190k held-out (số của MODEL, không đổi khi đổi
+  benchmark triển khai).
+- **Auto-BLOCK sạch trên benchmark này:** ở dải C≥0.85 Cổng ML chặn 962 luồng mà **0 benign bị chặn
+  nhầm**. Nhưng lý do là **ngưỡng đặt cao**, không phải mô hình giỏi: cùng lượt đo, dải ALERT chỉ đạt
+  precision **0,416** (74 TP / 104 FP). Đây là số của benchmark 4.236 cụ thể, không phải tuyên bố
+  tổng quát.
+- **Chú thích trung thực về F1 gộp 0.8248:** con số này lấy CẢ dải ALERT (0.40–0.65) làm "dự đoán tấn
+  công"; ngưỡng ALERT thấp nên 104 benign low-priority bị cảnh báo → kéo F1 xuống. ALERT là cảnh báo
+  **không chặn**, nên chấp nhận được — nhưng phải nói rõ mẫu số.
+- **`bypass_rate` 59,82%:** trong 4.236 ca vào, chỉ **2.534** được Cổng ML tự quyết; 1.586 ca bỏ qua vì
+  thiếu đặc trưng NetFlow và 116 ca abstain. Trích MCC 0,667 mà ghi mẫu số 4.236 là **sai mẫu số** —
+  `audit_metric_denominators.py` gắn cờ đúng chỗ này.
+- Tốc độ dự đoán ≤ 0,001 ms/mẫu — không ảnh hưởng đường đọc Tier-1.
 
 ## 5. Kết Luận & Quyết Định Kiến Trúc
-Bộ lọc Tier 2 đã được đào tạo cực kì mạnh mẽ để nhận diện các đợt tấn công từ CICIDS2018:
-- **Với các cuộc tấn công DDoS/Brute Force:** Tier 2 sẽ tự tin >95% và tự động chặn đứng ngay lập tức (Early Exit `BLOCK_IP`).
-- **Lưu ý Kiến trúc Hệ thống:** Model xuất sắc nhất là **LightGBM** (tinh chỉnh cho 1M), file
-  mô hình xuất ra dạng Tự Điển (`dict`) gồm `scaler`, `model`, `features`. Lưu ở `tier_2_model.pkl`
-  (tên file giữ theo lịch sử; bản cũ backup `tier_2_model_100k.bak.pkl`) và được Cổng ML của
-  Tier-1 nạp lúc chạy. Log rơi vào dải ESCALATE (0.65≤C<0.85) hoặc lệch phân bố (OOD-abstain /
-  thiếu feature) sẽ tự động escalate lên **Tier-2 (LLM Agent)** đánh giá ngữ cảnh.
+
+Cổng ML đã được huấn luyện đủ mạnh để nhận diện các đợt tấn công tần suất cao từ CICIDS2018:
+
+- **Với DDoS/Brute Force:** Cổng ML thường tự tin > 0,85 và tự động chặn ngay (Early Exit `BLOCK_IP`),
+  không tốn một token LLM nào.
+- **Lưu trữ:** mô hình thắng là **LightGBM** (tinh chỉnh cho 1M), xuất ra `dict` gồm `scaler`, `model`,
+  `features`, lưu ở **`ml_lab/tier_2_model.pkl`** (bản cũ backup `tier_2_model_100k.bak.pkl`), do Cổng
+  ML của **Tier-1** nạp lúc chạy.
+- **Đường thoát lên Tier-2:** log rơi vào dải ESCALATE (0.65 ≤ C < 0.85) hoặc lệch phân bố
+  (OOD-abstain / thiếu feature) sẽ escalate lên **Tier-2 (LLM Agent)** đánh giá ngữ cảnh.
+
+> **Giới hạn khái quát hoá phải tự nêu.** Tập train/test chia **ngẫu nhiên**, không chia theo thời
+> gian. Nghiên cứu *"The Evaluation Protocol Is the Hidden Variable"* (06/2026) quét đúng LightGBM
+> trên đúng họ dữ liệu này và cho thấy macro-F1 tụt từ 0,79–0,82 (chia ngẫu nhiên) xuống **≈0,02**
+> khi chia theo thời gian. Chi tiết và cách trả lời khi bị hỏi:
+> [`docs/Thesis/DOI_CHUNG_NGOAI.md`](../docs/Thesis/DOI_CHUNG_NGOAI.md).

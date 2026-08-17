@@ -8,7 +8,7 @@ SENTINEL bằng QLoRA trên dữ liệu định dạng RAFT.
 
 ---
 
-## Trạng thái thật (cập nhật 03/08/2026)
+## Trạng thái thật (cập nhật 17/08/2026)
 
 | hạng mục | trạng thái |
 | :-- | :-- |
@@ -18,10 +18,11 @@ SENTINEL bằng QLoRA trên dữ liệu định dạng RAFT.
 | **Nối vào hệ chạy thật** | ❌ **CHƯA** |
 | Ảnh hưởng tới số liệu hiện tại | **KHÔNG có** |
 
-`models/foundation_sec_qlora_adapter/` chỉ chứa `adapter_config.json` (230 byte) — **không có
-tệp trọng số** (`adapter_model.safetensors`). Và không chỗ nào trong `src/agent/llm_client.py`
-hay `docker-compose.yml` nạp adapter: hệ vẫn chạy **Foundation-Sec-8B-Instruct Q4_K_M gốc**
-qua llama.cpp.
+Thư mục `models/foundation_sec_qlora_adapter/` **không tồn tại** — không có `adapter_config.json`,
+càng không có tệp trọng số `adapter_model.safetensors`. *(Bản tài liệu 03/08 ghi thư mục này còn
+`adapter_config.json` 230 byte; nay cả thư mục đã không còn.)* Và không chỗ nào trong
+`src/agent/llm_client.py` hay `docker-compose.yml` nạp adapter: hệ vẫn chạy
+**Foundation-Sec-8B-Instruct Q4_K_M gốc** qua llama.cpp.
 
 Hệ quả cho luận văn: đây là **Hướng phát triển**, không phải đóng góp đã kiểm chứng. Mọi con
 số hiện có đều đo trên model gốc. Muốn tuyên bố fine-tuning có tác dụng thì cần đủ ba việc:
