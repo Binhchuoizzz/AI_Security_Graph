@@ -2217,7 +2217,19 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
         # đó, nên ở nhánh này KHÔNG ghi thêm dòng AWAIT_HITL và KHÔNG đẻ phiếu HITL trùng.
         from src.response.executor import raise_alert
 
-        formatted_reasoning = f"[LEO THANG: tái phạm sau HITL] {formatted_reasoning}"
+        # Nhánh này thi hành cái `raise_alert` trả về, KHÁC với `AWAIT_HITL` đã dùng để
+        # dựng `formatted_reasoning` ở trên, nên nhãn ghi đè dựng ở đó không khớp và bị bỏ.
+        # Đo lượt 17/08/2026: 4/550 bản ghi hiện "ALERT" ngay trên một đoạn văn kết bằng
+        # "the action is BLOCK_IP", không dòng nào nói ai đã hạ cấp.
+        # Nêu ĐỀ NGHỊ của model (biết chắc) và LÝ DO leo thang (biết chắc), không đoán
+        # trước kết quả của `raise_alert`.
+        _want = str(latest_decision.get("_policy_action_before") or "")
+        _note = (
+            f"[CHÍNH SÁCH: model đề nghị {_want} -> hệ xử theo luật tái phạm] "
+            if _want and _want != "AWAIT_HITL"
+            else ""
+        )
+        formatted_reasoning = f"{_note}[LEO THANG: tái phạm sau HITL] {formatted_reasoning}"
         executed = raise_alert(
             target,
             formatted_reasoning,
