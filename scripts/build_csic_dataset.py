@@ -159,10 +159,45 @@ def to_event(req: dict, is_attack: bool, idx: int, rnd: random.Random) -> dict:
     fam, tech = classify(decoded) if is_attack else ("", "")
     # IP nguồn: dải TEST-NET-2 (RFC 5737) để KHÔNG đụng bất kỳ IP nào của CICIDS/DAPT —
     # trùng dải sẽ làm trí nhớ/reputation của hai tập trộn vào nhau và bẩn cả hai phép đo.
-    ip = f"198.51.100.{rnd.randint(1, 254)}" if is_attack else f"198.51.100.{rnd.randint(1, 254)}"
+    #
+    # LỖI ĐÃ SỬA 17/08/2026 — TOÁN TỬ BA NGÔI VÔ NGHĨA + HỒ IP QUÁ HẸP. Dòng cũ là
+    #     ip = f"198.51.100.{rnd.randint(1,254)}" if is_attack else f"198.51.100.{rnd.randint(1,254)}"
+    # tức HAI NHÁNH GIỐNG HỆT NHAU: benign và tấn công bốc từ CÙNG một hồ 254 địa chỉ.
+    #
+    # Hai hậu quả, cái sau nghiêm trọng hơn nhiều:
+    #
+    # (a) NHIỄM CHÉO DANH TIẾNG. Mỗi địa chỉ gánh ~142 sự kiện trộn cả lành lẫn độc, nên
+    #     chặn một IP vì payload SQLi của nó cũng chặn luôn lưu lượng lành của chính địa
+    #     chỉ đó. Mọi chỉ số tính theo IP đều mất nghĩa.
+    #
+    # (b) BENIGN BỊ CHẤM LÀ "FLOOD". Luật tần suất Tier-1 bắn từ sự kiện thứ BA của cùng
+    #     một IP ("Tần suất cao: 3,00 req/s, ngưỡng 1,00") -> +20 điểm -> vượt ngưỡng leo
+    #     thang 15 -> lên Tier-2. Với 142 sự kiện/IP thì gần như MỌI địa chỉ CSIC đều dính,
+    #     kể cả một lượt tải `/tienda1/imagenes/nuestratierra.jpg`. Đo lượt chạy 17/08/2026:
+    #     68/90 lô Tier-2 là loại này — điểm Tier-1 đúng 20, không chữ ký nào, LLM buộc
+    #     phải đoán T1571, rồi rơi vào hàng đợi người. Đó là toàn bộ lý do HITL lấn át BLOCK.
+    #
+    # Sửa theo hình dạng lưu lượng THẬT chứ không nới ngưỡng: hàng nghìn client lành khác
+    # nhau, còn kẻ tấn công quét từ vài địa chỉ.
+    #   * benign  -> 100.64.0.0/10 (RFC 6598, dải dùng chung của CGNAT): hồ RỘNG, mỗi client
+    #     chỉ gửi vài yêu cầu nên không chạm luật tần suất. Không đụng CICIDS (192.168/16),
+    #     DAPT (172.16/12) hay TEST-NET.
+    #   * tấn công -> vẫn TEST-NET-2, CỐ Ý hẹp: kẻ tấn công gửi dồn là hành vi thật, và
+    #     điều đó khiến danh tiếng/chặn-theo-IP có ý nghĩa để đo.
+    if is_attack:
+        ip = f"198.51.100.{rnd.randint(130, 254)}"
+    else:
+        ip = f"100.{rnd.randint(64, 79)}.{rnd.randint(0, 255)}.{rnd.randint(1, 254)}"
     return {
         "Source IP": ip,
-        "Destination Port": 8080,
+        # CỔNG 80, KHÔNG PHẢI 8080. Bản cũ đóng cứng 8080 cho CẢ 36.000 bản ghi, kể cả
+        # benign. Tier-1 coi 8080 là cổng bất thường nên MỌI yêu cầu CSIC — kể cả một lượt
+        # tải ảnh `/tienda1/imagenes/nuestratierra.jpg` — đều được cộng điểm rủi ro rồi leo
+        # thang lên Tier-2. Đo lượt chạy 17/08/2026: 68/90 lô Tier-2 là loại này, tất cả
+        # điểm Tier-1 đúng 20, không chữ ký nào, và LLM buộc phải đoán T1571 "Non-Standard
+        # Port" — một quy kết do CHÍNH KHÂU DỰNG DỮ LIỆU bịa ra, không có trong CSIC 2010.
+        # CSIC 2010 là HTTP cổng 80; tín hiệu tấn công phải đến từ PAYLOAD, không từ cổng.
+        "Destination Port": 80,
         "Protocol": 6,
         "service": "http",
         "method": req["method"],
