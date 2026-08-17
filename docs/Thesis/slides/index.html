@@ -2082,7 +2082,7 @@
             <rect x="690" y="60" width="180" height="120" rx="14" fill="url(#purpleGrad)" filter="url(#glow)" />
             <text x="780" y="95" text-anchor="middle" fill="#FFFFFF" font-weight="800" font-size="15">TIER 1.75 CACHE</text>
             <text x="780" y="120" text-anchor="middle" fill="#EDE9FE" font-weight="700" font-size="13.5">ExactMatch SHA-256</text>
-            <text x="780" y="145" text-anchor="middle" fill="#DDD6FE" font-weight="600" font-size="12.5">Hit Rate 81,3% (8.9x)</text>
+            <text x="780" y="145" text-anchor="middle" fill="#DDD6FE" font-weight="600" font-size="12.5">Hit Rate 81,3% (8,9×)</text>
 
             <!-- Node 5: Tier 2 Cognitive Agent -->
             <rect x="920" y="60" width="160" height="120" rx="14" fill="#0F172A" stroke="#A78BFA" stroke-width="2.5" />
@@ -2214,7 +2214,7 @@
                     <div style="font-size: 1.55rem; font-weight: 800; color: #10B981;">Mô Hình &amp; Chính Sách 4 Dải Độ Tin Cậy</div>
                 </div>
                 <p style="font-size: 1.2rem; color: var(--text-main); line-height: 1.75; margin-bottom: 16px;">
-                    Mô hình LightGBM (<code>ml_gateway.py</code>) được huấn luyện trên <strong>949.535 mẫu NetFlow</strong> với <strong>76 đặc trưng</strong> (MCC = <strong>0.6667</strong>, F1 = <strong>0.8248</strong> trên 2.534 sự kiện Cổng trực tiếp phán quyết), đóng vai trò phân loại tự động tại Tầng 1:
+                    Mô hình LightGBM (<code>ml_gateway.py</code>) được huấn luyện trên <strong>949.535 mẫu NetFlow</strong> với <strong>76 đặc trưng</strong> (MCC = <strong>0,6667</strong>, F1 = <strong>0,8248</strong> trên 2.534 sự kiện Cổng trực tiếp phán quyết), đóng vai trò phân loại tự động tại Tầng 1:
                 </p>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.8; list-style: none; padding-left: 0; margin-bottom: 16px;">
                     <li style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
@@ -2227,7 +2227,12 @@
                     </li>
                     <li style="margin-bottom: 12px; display: flex; align-items: center; gap: 12px;">
                         <span style="background: rgba(245, 158, 11, 0.15); border: 1.5px solid #F59E0B; color: #F59E0B; font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; padding: 4px 12px; border-radius: 8px;">$0.40 \le C < 0.65$</span>
-                        <span>$\implies$ <strong style="color: #D97706; font-size: 1.2rem;">AWAIT_HITL</strong> (Hoãn cho người xem)</span>
+                        <!-- SỬA: dải này trả ALERT, KHÔNG phải AWAIT_HITL. Nguồn chân lý là
+                             src/guardrails/decision_policy.py:123 — classify_ml() trả "ALERT"
+                             cho 0,40 <= C < 0,65. AWAIT_HITL là nhánh của classify_llm() ở
+                             Tier-2, không phải của Cổng ML. Ghi sai ở đây là mô tả sai chính
+                             sách quyết định của hệ, ngay trên slide giải thích chính sách đó. -->
+                        <span>$\implies$ <strong style="color: #D97706; font-size: 1.2rem;">ALERT</strong> (Cảnh báo ưu tiên thấp)</span>
                     </li>
                     <li style="display: flex; align-items: center; gap: 12px;">
                         <span style="background: rgba(16, 185, 129, 0.15); border: 1.5px solid #10B981; color: #10B981; font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; padding: 4px 12px; border-radius: 8px;">$C < 0.40$</span>
@@ -2236,7 +2241,7 @@
                 </ul>
             </div>
             <div style="background: rgba(16, 185, 129, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #047857; margin-top: 12px;">
-                🎯 Chặn tự động đạt 0 FP trên 962 lệnh auto-block tại ngưỡng $C \ge 0.85$ (MCC = 0.6667 / BA = 0.833 trên 2.534 ca).
+                🎯 Chặn tự động đạt 0 FP trên 962 lệnh auto-block tại ngưỡng $C \ge 0.85$ (MCC = 0,6667 / BA = 0,833 trên 2.534 ca).
             </div>
         </div>
 
@@ -2339,7 +2344,7 @@
                     </div>
                     <div style="background: #FFFFFF; border: 2px solid #E2E8F0; border-radius: 14px; padding: 18px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
                         <div style="font-size: 2.8rem; font-weight: 800; color: #0284C7; line-height: 1.1;">9,8 ms</div>
-                        <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Độ Trễ Trúng Đệm (8.9x)</div>
+                        <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-muted); margin-top: 6px;">Độ Trễ Trúng Đệm (8,9×)</div>
                     </div>
                 </div>
 
@@ -2356,7 +2361,7 @@
                 </ul>
             </div>
             <div style="background: rgba(56, 189, 248, 0.12); padding: 12px 18px; border-radius: 10px; font-size: 1.12rem; font-weight: 700; color: #0284C7; margin-top: 14px;">
-                🚀 Giúp giảm 8.9 lần độ trễ phán quyết (9,8ms vs 87,7ms) cho luồng trùng lặp — Loại bỏ triệt để nghẽn GPU.
+                🚀 Giúp giảm 8,9 lần độ trễ phán quyết (9,8ms vs 87,7ms) cho luồng trùng lặp — Loại bỏ triệt để nghẽn GPU.
             </div>
         </div>
 
@@ -2764,7 +2769,7 @@
                     <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">1. Hiệu Năng &amp; Độ Trễ</td>
                     <td style="padding: 10px 14px; color: #334155;">Offload Rate · Latency Median · Stage Latencies</td>
                     <td style="padding: 10px 14px; font-weight: 800; color: #0284C7;">97,5% · 0,88 ms · T1 0,182ms / T2 13,438s</td>
-                    <td style="padding: 10px 14px; color: #475569;">Xả tải 97,5% lưu lượng; ML Gate Auto-BLOCK 0 FP (962 ca tại C &gt;= 0.85).</td>
+                    <td style="padding: 10px 14px; color: #475569;">Xả tải 97,5% lưu lượng; ML Gate Auto-BLOCK 0 FP (962 ca tại C ≥ 0,85).</td>
                 </tr>
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #7C3AED;">2. An Toàn AI &amp; Mật Mã</td>
@@ -2787,7 +2792,7 @@
                 <tr style="background: #FFFFFF;">
                     <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">5. Suy Luận &amp; Giảm Ảo Giác</td>
                     <td style="padding: 10px 14px; color: #334155;">RAGAS 4 trục (LLM-as-Judge) · Tỷ lệ ảo giác mã (`bad`)</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">3.78 / 5.0 · 0,0% (bad = 0 / 1.421)</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #E11D48;">3,78 / 5,0 · 0,0% (bad = 0 / 1.421)</td>
                     <td style="padding: 10px 14px; color: #475569;">Trọng tài LLM độc lập chấm Relevancy 4,52/5; Grounding Guardrail giữ giảm thiểu ảo giác.</td>
                 </tr>
             </tbody>
@@ -2858,7 +2863,7 @@
                 </div>
                 <ul style="font-size: 1.18rem; color: var(--text-main); line-height: 1.8; padding-left: 22px;">
                     <li style="margin-bottom: 12px;">
-                        <strong>Điểm RAGAS trung bình 4 trục:</strong> Đạt <strong style="color: #0284C7;">3.78 / 5.0</strong> (Relevancy: <strong>4.52</strong>, Context-Recall: <strong>4.11</strong>, Faithfulness: <strong>3.96</strong>, Context-Precision: <strong>2.54</strong> &mdash; trục thấp nhất, do truy xuất còn tài liệu nhiễu).
+                        <strong>Điểm RAGAS trung bình 4 trục:</strong> Đạt <strong style="color: #0284C7;">3,78 / 5,0</strong> (Relevancy: <strong>4,52</strong>, Context-Recall: <strong>4,11</strong>, Faithfulness: <strong>3,96</strong>, Context-Precision: <strong>2,54</strong> &mdash; trục thấp nhất, do truy xuất còn tài liệu nhiễu).
                     </li>
                     <li style="margin-bottom: 12px;">
                         <strong>Tỷ Lệ Ảo Giác Mã (`bad`):</strong> Đạt <strong style="color: #059669;">0,0%</strong> (0 / 1.421 ca khẳng định mã kỹ thuật MITRE).
@@ -3263,7 +3268,7 @@ Từ đó tính toán độ lệch chuẩn sigma_k và chỉ số Z-score = (x -
 
 Tiếp nối lọc thống kê là Cổng ML LightGBM (ml_gateway.py) được huấn luyện trên 949.535 mẫu NetFlow (tier_2_model_1m.pkl).
 
-Cổng ML đạt chỉ số phân loại MCC = 0.6667, F1 = 0.8248, Precision = 0.9088 và đạt ĐỘ CHÍNH XÁC AUTO-BLOCK TUYỆT ĐỐI 100% (962/962 lệnh chặn tự động, 0 Báo động giả - FP) tại ngưỡng cao >= 0.85.
+Cổng ML đạt chỉ số phân loại MCC = 0,6667, F1 = 0,8248, Precision = 0.9088 và đạt ĐỘ CHÍNH XÁC AUTO-BLOCK TUYỆT ĐỐI 100% (962/962 lệnh chặn tự động, 0 Báo động giả - FP) tại ngưỡng cao >= 0.85.
 
 Thông lượng xử lý đạt 3.452,4 sự kiện/giây (độ trễ 0,287ms/véc-tơ). Cổng ML tích hợp cơ chế Anti-Evasion: kẹp Z-score trong khoảng ±8sigma, điền mean cho giá trị thiếu, và tự động Abstain đẩy lên LLM nếu >30% đặc trưng bị biến dạng vượt 6sigma.`,
 
