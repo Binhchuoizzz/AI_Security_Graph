@@ -217,14 +217,46 @@ def parse_mitre_technique(raw_reason: str) -> str:
     return "N/A"
 
 
+# Dấu hiệu LÁ CHẮN NEO ĐÃ NỔ. Chuỗi này do `src/agent/nodes.py` đóng vào `reasoning`, và nó
+# CHỈ được sinh ở nhánh lá chắn TỪ CHỐI kỹ thuật (hai chỗ: log cảnh báo và tiền tố reasoning).
+# Không có chỗ nào trong hệ sinh chuỗi này với nghĩa "đã neo được".
+_SHIELD_MARK = "NEO BẰNG CHỨNG"
+
+
 def build_grounding_badge(raw_reason: str, mitre_tech: str) -> tuple[str, bool]:
-    """Thẻ neo-bằng-chứng. Trả `(html, is_grounded)` để bên gọi dùng lại cờ."""
+    """Thẻ neo-bằng-chứng. Trả `(html, is_grounded)` để bên gọi dùng lại cờ.
+
+    ĐẢO DẤU ĐÃ VÁ (2026-08-17). Bản trước viết:
+
+        is_grounded = "NEO BẰNG CHỨNG" in raw_reason or (has_tech and ...)
+
+    tức coi sự CÓ MẶT của dấu hiệu lá chắn là bằng chứng ĐÃ NEO ĐƯỢC — trong khi dấu hiệu
+    đó chỉ xuất hiện đúng lúc lá chắn **TỪ CHỐI** kỹ thuật vì nó KHÔNG có trong tài liệu đã
+    truy xuất. Hậu quả nhìn thấy trên Dashboard: một thẻ vừa in `MITRE: N/A`, vừa in dòng
+    "[NEO BẰNG CHỨNG: kỹ thuật T1684 … KHÔNG nằm trong tài liệu đã truy xuất]", lại vừa gắn
+    badge xanh `✅ GROUNDED IN RAG`. Ba mảnh trên cùng một thẻ nói ba điều khác nhau, và
+    badge là mảnh nói sai.
+
+    Cùng họ lỗi với `evaluate_feedback_loop` từng đếm `BLOCK_IP` là *leo thang*: đọc đúng
+    tín hiệu, gán ngược ý nghĩa.
+
+    BA TRẠNG THÁI, không phải hai — vì "lá chắn đã chặn" KHÁC "không có gì để quy kết":
+      * đã neo        : có kỹ thuật, lá chắn không nổ           -> xanh
+      * lá chắn chặn  : model có đề xuất, lá chắn bác bỏ        -> hổ phách, đây là an toàn
+                        CHẠY ĐÚNG, không phải hỏng hóc
+      * không quy kết : không có kỹ thuật nào và lá chắn im     -> hổ phách nhạt
+    """
     has_tech = bool(mitre_tech and mitre_tech != "N/A" and not mitre_tech.startswith("N/A"))
-    is_grounded = "NEO BẰNG CHỨNG" in raw_reason or (
-        has_tech and "unmappable" not in raw_reason.lower()
-    )
+    shield_fired = _SHIELD_MARK in raw_reason
+    is_grounded = has_tech and not shield_fired and "unmappable" not in raw_reason.lower()
+
     if is_grounded:
         return f'<span class="soc-badge" style="{_BADGE_GREEN}">✅ GROUNDED IN RAG</span>', True
+    if shield_fired:
+        return (
+            f'<span class="soc-badge" style="{_BADGE_AMBER}">🛡️ LÁ CHẮN NEO ĐÃ CHẶN</span>',
+            False,
+        )
     return (
         f'<span class="soc-badge" style="{_BADGE_AMBER}">🛡️ DEGRADED SAFEGUARD (N/A)</span>',
         False,
@@ -312,6 +344,12 @@ def build_technique_codes_html(raw_reason: str) -> str:
     Bản cũ độn `["T1190","T1595.003","T1059.007","T1083","T1046"]` cho đủ 5 rồi dán nhãn
     "Top-5 Ứng viên RAG Truy xuất (FAISS + BM25)" — tức gán cho bộ truy xuất những mã nó chưa
     từng trả về. Nhãn nay nói đúng thứ đang hiện: mã đọc được từ chuỗi phán quyết.
+
+    VÁ 2026-08-17 — KHI LÁ CHẮN NEO ĐÃ NỔ, ĐÂY LÀ MÃ BỊ BÁC BỎ, KHÔNG PHẢI PHÁT HIỆN.
+    Cùng một thẻ cảnh báo từng hiện: `MITRE: N/A` ở trên, dòng "[NEO BẰNG CHỨNG: kỹ thuật
+    T1684 … KHÔNG nằm trong tài liệu]" ở giữa, rồi `🔍 Mã kỹ thuật nêu trong phán quyết (2):
+    T1684 · T1036.012` ở dưới — in bằng cùng màu xanh thông tin như mọi phát hiện hợp lệ.
+    Analyst đọc lướt sẽ ghi T1684 vào hồ sơ sự cố, đúng cái mã mà hệ vừa từ chối khẳng định.
     """
     seen: list[str] = []
     for c in _TECH_CODE_RE.findall(raw_reason):
@@ -321,23 +359,77 @@ def build_technique_codes_html(raw_reason: str) -> str:
     if not seen:
         return ""
     shown = seen[:5]
+    rejected = _SHIELD_MARK in raw_reason
+
+    if rejected:
+        color, bg = "#FFB454", "rgba(255,180,84,0.15)"
+        nhan = f"Mã model ĐỀ XUẤT nhưng lá chắn BÁC BỎ ({len(shown)}):"
+        duoi = " — không có trong tài liệu RAG của lô này, <b>đừng ghi vào hồ sơ sự cố</b>"
+    else:
+        color, bg = "#69c0ff", "rgba(24,144,255,0.15)"
+        nhan = f"Mã kỹ thuật nêu trong phán quyết ({len(shown)}):"
+        duoi = ""
+
     badges = " · ".join(
-        f'<code style="color:#69c0ff;background:rgba(24,144,255,0.15);padding:1px 5px;'
+        f'<code style="color:{color};background:{bg};padding:1px 5px;'
         f'border-radius:3px;font-size:0.8rem;">{html_lib.escape(c)}</code>'
         for c in shown
     )
     return (
-        '<div class="soc-reasoning-section" style="color: #69c0ff; margin-top: 6px; font-size: 0.82rem;">'
-        f"  🔍 <b>Mã kỹ thuật nêu trong phán quyết ({len(shown)}):</b> {badges}"
+        f'<div class="soc-reasoning-section" style="color: {color}; margin-top: 6px; font-size: 0.82rem;">'
+        f"  🔍 <b>{nhan}</b> {badges}{duoi}"
         "</div>"
     )
 
 
-def build_guardrail_note(is_grounded: bool, mitre_tech: str, action: str) -> str:
-    """Ghi chú chính sách Guardrail — chỉ hiện cho ca bị ép hạ xuống `AWAIT_HITL`."""
+_OVERRIDE_RE = re.compile(r"\[CHÍNH SÁCH:\s*model đề nghị\s+(\w+)\s*->\s*hệ thực thi\s+(\w+)\]")
+
+
+def build_policy_override_note(raw_reason: str) -> str:
+    """Khối nói rõ CHÍNH SÁCH ĐÃ GHI ĐÈ model. Rỗng khi hai hành động trùng nhau.
+
+    VÌ SAO CẦN. Phần biện giải của model hay kết bằng "Therefore, the action is BLOCK_IP",
+    trong khi tiêu đề thẻ ghi `[HIGH] ALERT`. Không có khối này thì thẻ tự mâu thuẫn ngay
+    trước mắt người đọc, và cách hiểu tự nhiên nhất là "màn hình hiển thị sai" — trong khi
+    sự thật là hệ ĐÃ CỐ Ý hạ cấp, và đó chính là cơ chế an toàn đáng khoe nhất.
+
+    Nhãn `[CHÍNH SÁCH: …]` do `src/agent/nodes.py::_policy_override_tag` ghi vào `reason`
+    từ trường `_policy_action_before` — tức đọc DỮ LIỆU đã lưu, không suy từ câu chữ model.
+    """
+    m = _OVERRIDE_RE.search(raw_reason or "")
+    if not m:
+        return ""
+    # Hai giá trị này đến từ `reason` — chuỗi mà LLM đã góp phần sinh ra, nên vẫn phải thoát
+    # và đặt tên `safe_` đúng quy ước của tệp (xem `test_ma_mitre_khong_duoc_nhung_tho_vao_html`).
+    safe_want = html_lib.escape(m.group(1))
+    safe_got = html_lib.escape(m.group(2))
+    return (
+        f'<div style="{_GUARDRAIL_BOX}">  ⚖️ <b>Chính sách ghi đè model:</b> '
+        f"model đề nghị <code>{safe_want}</code>, hệ thống thực thi <code>{safe_got}</code>. "
+        "Đoạn biện giải bên dưới là lập luận CỦA MODEL nên vẫn nói "
+        f"<code>{safe_want}</code> — hành động thật của hệ là <code>{safe_got}</code>.</div>"
+    )
+
+
+def build_guardrail_note(
+    is_grounded: bool, mitre_tech: str, action: str, raw_reason: str = ""
+) -> str:
+    """Ghi chú chính sách Guardrail — chỉ hiện cho ca bị ép hạ xuống `AWAIT_HITL`.
+
+    `raw_reason` để phân biệt "lá chắn đã bác một đề xuất cụ thể" với "không có gì để quy
+    kết". Bản trước gộp hai ca đó vào cùng một câu "Không chắc kỹ thuật MITRE cụ thể", nên
+    analyst không đọc ra được rằng model ĐÃ đề xuất một mã và hệ đã chủ động bác nó.
+    """
     if action.upper() != "AWAIT_HITL":
         return ""
-    if is_grounded and mitre_tech and mitre_tech != "N/A":
+    if _SHIELD_MARK in raw_reason:
+        body = (
+            "Model có đề xuất một mã kỹ thuật, nhưng mã đó <b>không nằm trong tài liệu RAG "
+            "đã truy xuất cho chính lô này</b> ➔ lá chắn neo bác bỏ, hạ kỹ thuật về "
+            "<code>N/A</code> và chuyển <code>AWAIT_HITL</code>. Đây là lá chắn CHẠY ĐÚNG, "
+            "không phải lỗi."
+        )
+    elif is_grounded and mitre_tech and mitre_tech != "N/A":
         body = (
             f"Nhận diện mã kỹ thuật <code>{html_lib.escape(mitre_tech)}</code>, nhưng chưa chắc "
             "bằng chứng payload (chỉ có tín hiệu tổng quát/cổng lạ) ➔ Tự động ép hạ "
@@ -607,10 +699,14 @@ def render_alert_card(
     if is_self_inferred:
         inference_badge = '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.15); color:#faad14; border:1px solid rgba(250, 173, 20, 0.35); margin-left:4px;">🤖 Self-Inferred</span>'
 
+    override_note_html = build_policy_override_note(raw_reason)
+
     clean_reason = html_lib.escape(raw_reason)
     clean_reason = re.sub(
         r"\[MITRE:(?:[^\[\]]|\[[^\[\]]*\])*\]", "", clean_reason, flags=re.IGNORECASE
     )
+    # Nhãn ghi đè đã được tách ra thành khối riêng ở trên -> gỡ khỏi đoạn văn để khỏi lặp.
+    clean_reason = re.sub(r"\[CHÍNH SÁCH:[^\]]*\]", "", clean_reason).strip()
     clean_reason = re.sub(
         r"\[(?:Confidence|Độ\s+tin\s+cậy):\s*[^\]]*\]", "", clean_reason, flags=re.IGNORECASE
     ).strip()
@@ -711,7 +807,7 @@ def render_alert_card(
     rep_badge = build_threat_memory_badge(raw_reason, reputation)
     mitre_hierarchy_html = _build_mitre_hierarchy_html(mitre_tech)
     rag_candidates_html = build_technique_codes_html(raw_reason)
-    guardrail_note_html = build_guardrail_note(is_grounded, mitre_tech, action)
+    guardrail_note_html = build_guardrail_note(is_grounded, mitre_tech, action, raw_reason)
 
     # Render HTML Card
     html_content = (
@@ -736,6 +832,9 @@ def render_alert_card(
         f"    </div>"
         f'    <div class="soc-reasoning-box">'
         f'        <div class="soc-reasoning-title">{reasoning_title}</div>'
+        # Đặt TRƯỚC đoạn biện giải: người đọc phải biết "đây là lời model, không phải hành
+        # động của hệ" TRƯỚC khi đọc câu "the action is BLOCK_IP" ở cuối đoạn.
+        f"        {override_note_html}"
         f'        <div style="margin-bottom: 8px;">{clean_reason}</div>'
         f'        <div class="soc-reasoning-section" style="color: #D3ADF7;">{mitre_section_text}</div>'
         f"        {mitre_hierarchy_html}"

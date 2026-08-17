@@ -1560,7 +1560,7 @@ def main_dashboard():
                             f'font-size:0.83rem;">🎯 MITRE ATT&CK Mapping: <code>{safe_mitre_tech_hitl}</code></div>'
                             f"{ui_components._build_mitre_hierarchy_html(mitre_tech_hitl)}"
                             f"{ui_components.build_technique_codes_html(raw_reason_hitl)}"
-                            f"{ui_components.build_guardrail_note(is_gr, mitre_tech_hitl, 'AWAIT_HITL')}"
+                            f"{ui_components.build_guardrail_note(is_gr, mitre_tech_hitl, 'AWAIT_HITL', raw_reason_hitl)}"
                             '<div style="color:#98FB98;margin-top:6px;font-size:0.83rem;font-weight:500;">'
                             "🛡️ NIST Incident Response Playbook (Section 3.2.3): Require "
                             "Human-in-the-Loop (HITL) analyst approval to trigger automated block rule."

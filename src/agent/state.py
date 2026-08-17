@@ -176,6 +176,19 @@ class SentinelState:
     Chỉ bật bởi `guardrails.injection_patterns` (chữ ký nhắm vào LLM) và bộ dò jailbreak.
     Chữ ký tấn công WEB (`UNION SELECT`, `<script>`…) nằm ở `web_attack_patterns` và KHÔNG
     bật cờ này — nếu không, một câu SQLi sẽ bị quy kết sang ATLAS thay vì ATT&CK.
+
+    DÙNG ĐỂ: định tuyến quy kết + bỏ truy vấn payload. KHÔNG dùng làm bằng chứng cho phép
+    CHẶN — xem `_llm_injection_strict`.
+    """
+
+    _llm_injection_strict: list[bool] = field(default_factory=list)
+    """Cờ CHẶT: chỉ chữ ký `injection_patterns` khớp NGUYÊN VĂN, KHÔNG gồm bộ dò jailbreak.
+
+    Đây là cờ DUY NHẤT trong hai cờ được phép làm bằng chứng cho một lệnh chặn tự động.
+    Lý do: `jailbreak_detected` dùng `role_play_re` có các nhánh `step by step` / `disrupt` /
+    `cause chaos` — những cụm xuất hiện bình thường trong văn bản lành, nên nó đủ tốt để
+    thận trọng thêm nhưng KHÔNG đủ chắc để tự chặn một IP. Lớp khớp nguyên văn đo được
+    **0 báo nhầm trên 230 log lành CSIC**.
     """
 
     last_updated: str = ""

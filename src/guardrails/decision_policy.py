@@ -75,12 +75,49 @@ HITL_REASONS: dict[str, str] = {
     "port_only_c2": "Non-standard port as sole evidence without C2 indicators",
     "social_engineering_suspected": "Suspected prompt injection or downgrade attempt",
     "tier1_hitl_threshold": "Tier-1 reached human review threshold",
+    # ── thêm 2026-08-17 ──
+    "flow_only_no_payload": "Flow-only batch: no payload/URI/User-Agent to attribute from",
+    "context_truncated": "Prompt exceeded context window; evidence was cut and no injection found",
+    "unspecified": "NO REASON RECORDED — this is a defect, every deferral must state why",
+}
+
+# ── PHÂN LOẠI ĐỂ AUDIT ────────────────────────────────────────────────────────────
+# Mỗi mã thuộc ĐÚNG MỘT nhóm. Nhóm trả lời câu "ai phải xử lý phiếu này":
+#
+#   EVIDENCE    hệ KHÔNG ĐỦ DỮ LIỆU để kết luận  -> analyst thu thêm telemetry
+#   ATTRIBUTION hệ có dữ liệu nhưng KHÔNG QUY KẾT ĐƯỢC kỹ thuật -> analyst tra thủ công
+#   SAFETY      hệ NGHI BỊ THAO TÚNG hoặc chạm ngưỡng an toàn   -> analyst xét đối kháng
+#   INFRA       hỏng hạ tầng / hợp đồng đầu ra    -> KỸ SƯ, không phải analyst
+#   UNKNOWN     không ghi lý do — LUÔN PHẢI BẰNG 0, có mặt ở đây là lỗi
+#
+# Vì sao tách INFRA khỏi ba nhóm kia: một phiếu `llm_unavailable` nằm lẫn trong hàng đợi
+# phân tích sẽ khiến analyst đi đọc log tấn công, trong khi việc cần làm là bật lại dịch vụ.
+# Đếm gộp cả hai vào một con số "tải HITL" cũng làm hỏng chỉ số — phần INFRA không phản ánh
+# độ khó của lưu lượng.
+HITL_CATEGORIES: dict[str, str] = {
+    "flow_only_no_payload": "EVIDENCE",
+    "low_confidence": "EVIDENCE",
+    "context_truncated": "EVIDENCE",
+    "llm_abstained": "EVIDENCE",
+    "port_only_c2": "EVIDENCE",
+    "technique_not_in_rag": "ATTRIBUTION",
+    "technique_unmappable": "ATTRIBUTION",
+    "social_engineering_suspected": "SAFETY",
+    "tier1_hitl_threshold": "SAFETY",
+    "llm_unavailable": "INFRA",
+    "llm_output_unreadable": "INFRA",
+    "unspecified": "UNKNOWN",
 }
 
 
 def hitl_reason_text(code: str) -> str:
     """English description of HITL reason code."""
     return HITL_REASONS.get(code, code)
+
+
+def hitl_category(code: str) -> str:
+    """Nhóm audit của một mã lý do HITL. Mã lạ -> UNKNOWN (để nó lộ ra, không im lặng)."""
+    return HITL_CATEGORIES.get(code or "", "UNKNOWN")
 
 
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")

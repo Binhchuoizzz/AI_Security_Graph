@@ -159,9 +159,88 @@ def test_grounding_theo_ma_ky_thuat():
     assert gr is False and "DEGRADED SAFEGUARD" in html
 
 
+# Chuỗi nguyên văn mà `src/agent/nodes.py` đóng vào `reasoning` KHI LÁ CHẮN TỪ CHỐI kỹ thuật.
+_LY_DO_LA_CHAN_NO = (
+    "[NEO BẰNG CHỨNG: kỹ thuật T1684 do model đề xuất KHÔNG nằm trong tài liệu đã "
+    "truy xuất cho lô này — hệ thống KHÔNG khẳng định kỹ thuật, chuyển người xử lý] "
+    "The source IP 203.0.113.163 issued an HTTP request..."
+)
+
+
+def test_la_chan_neo_no_KHONG_duoc_bao_la_da_neo():
+    """ĐẢO DẤU đã vá: dấu hiệu lá chắn = lá chắn TỪ CHỐI, không phải "đã neo được".
+
+    Bản lỗi viết `is_grounded = "NEO BẰNG CHỨNG" in raw_reason or (...)`, nên đúng lúc lá
+    chắn bác bỏ một kỹ thuật ảo giác thì Dashboard lại gắn badge XANH "GROUNDED IN RAG" —
+    ngay cạnh dòng chữ nói kỹ thuật đó KHÔNG có trong tài liệu, và ngay cạnh `MITRE: N/A`.
+    """
+    html, gr = C.build_grounding_badge(_LY_DO_LA_CHAN_NO, "N/A")
+    assert gr is False, "lá chắn nổ mà vẫn báo đã neo được — đảo dấu quay lại rồi"
+    assert "GROUNDED IN RAG" not in html
+    assert "LÁ CHẮN NEO ĐÃ CHẶN" in html
+
+
+def test_la_chan_no_van_khong_neo_ke_ca_khi_con_sot_ma_ky_thuat():
+    """Phòng ca mapper còn sót mã: lá chắn nổ thì KHÔNG bao giờ là 'đã neo'."""
+    _, gr = C.build_grounding_badge(_LY_DO_LA_CHAN_NO, "T1684")
+    assert gr is False
+
+
+def test_ba_trang_thai_neo_phan_biet_duoc():
+    """'Lá chắn đã chặn' KHÁC 'không có gì để quy kết' — hai ca, hai nhãn."""
+    h_shield, _ = C.build_grounding_badge(_LY_DO_LA_CHAN_NO, "N/A")
+    h_none, _ = C.build_grounding_badge("Agent: không rõ", "N/A")
+    assert h_shield != h_none
+
+
 def test_guardrail_note_chi_hien_cho_await_hitl():
     assert C.build_guardrail_note(True, "T1190", "BLOCK_IP") == ""
     assert "AWAIT_HITL" in C.build_guardrail_note(True, "T1190", "AWAIT_HITL")
+
+
+def test_guardrail_note_noi_ro_la_chan_da_bac_bo():
+    """Analyst phải đọc ra được 'model CÓ đề xuất và hệ đã bác', không phải 'không rõ gì'."""
+    note = C.build_guardrail_note(False, "N/A", "AWAIT_HITL", _LY_DO_LA_CHAN_NO)
+    assert "lá chắn neo bác bỏ" in note
+    assert "CHẠY ĐÚNG" in note
+
+
+# ── build_policy_override_note ─────────────────────────────────────────────────────
+_LY_DO_GHI_DE = (
+    "[CHÍNH SÁCH: model đề nghị BLOCK_IP -> hệ thực thi ALERT] [MITRE: N/A] "
+    "[Độ tin cậy: 84.00%] ... Therefore, the action is BLOCK_IP to prevent further activity."
+)
+
+
+def test_ghi_de_chinh_sach_phai_hien_khi_khac_nhau():
+    """Thẻ từng ghi tiêu đề `[HIGH] ALERT` ngay trên đoạn văn nói "the action is BLOCK_IP".
+
+    Không có khối này thì thẻ tự mâu thuẫn và cách hiểu tự nhiên nhất là "màn hình sai",
+    trong khi sự thật là hệ CỐ Ý hạ cấp — chính là cơ chế an toàn đáng nói nhất.
+    """
+    note = C.build_policy_override_note(_LY_DO_GHI_DE)
+    assert "BLOCK_IP" in note and "ALERT" in note
+    assert "lập luận CỦA MODEL" in note
+
+
+def test_ghi_de_im_lang_khi_khong_co_ghi_de():
+    assert C.build_policy_override_note("[MITRE: T1190] [Độ tin cậy: 0.95] bình thường") == ""
+    assert C.build_policy_override_note("") == ""
+
+
+def test_ma_ky_thuat_bi_bac_bo_phai_dan_nhan_khac():
+    """Mã bị lá chắn bác KHÔNG được hiện như phát hiện hợp lệ.
+
+    Ảnh chụp thật 17/08: thẻ hiện `MITRE: N/A`, dòng lá chắn nói T1684 không có trong tài
+    liệu, rồi ngay dưới in `🔍 Mã kỹ thuật nêu trong phán quyết (2): T1684 · T1036.012`
+    bằng đúng màu xanh thông tin như mọi phát hiện thật — mời analyst ghi T1684 vào hồ sơ.
+    """
+    bi_bac = C.build_technique_codes_html(_LY_DO_LA_CHAN_NO)
+    assert "BÁC BỎ" in bi_bac
+    assert "đừng ghi vào hồ sơ sự cố" in bi_bac
+    binh_thuong = C.build_technique_codes_html("[MITRE: T1190] phát hiện SQLi T1190")
+    assert "BÁC BỎ" not in binh_thuong
+    assert "nêu trong phán quyết" in binh_thuong
 
 
 # ── build_tier1_block_badge ────────────────────────────────────────────────────────
@@ -234,7 +313,12 @@ def test_khong_con_dau_hieu_gia_tri_bia(ten_tep, dau_hieu):
 def test_app_khong_tu_dung_badge_ma_goi_bo_dung_chung():
     """Chống chép bản thứ hai: app.py phải GỌI components chứ không tự ghép chuỗi badge."""
     ma = (SRC_DIR / "app.py").read_text(encoding="utf-8")
-    for ten in ("GROUNDED IN RAG", "DEGRADED SAFEGUARD", "Semantic Cache Hit"):
+    for ten in (
+        "GROUNDED IN RAG",
+        "DEGRADED SAFEGUARD",
+        "LÁ CHẮN NEO ĐÃ CHẶN",
+        "Semantic Cache Hit",
+    ):
         assert ten not in ma, f"app.py chép lại badge {ten!r} — phải gọi components.build_*"
 
 

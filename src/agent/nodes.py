@@ -48,6 +48,11 @@ retriever = DualRetriever(use_cache=True)
 # payload — xem `node_rag_context`). LLM vẫn luôn nhận log đầy đủ, đây chỉ là truy vấn RAG.
 PAYLOAD_QUERY_CHARS = 120
 
+# Chừa chỗ cho phần LLM SINH RA. Trần ngữ cảnh là trần cho (prompt + đáp án), nên cắt prompt
+# vừa khít trần là đảm bảo model không còn chỗ trả lời. 1.024 token đủ cho một phán quyết
+# JSON kèm đoạn biện giải dài nhất quan sát được.
+_CTX_RESERVE_TOK = 1024
+
 # Cache khối `tier2` của config, làm mới theo mtime.
 #
 # KHÔNG dùng lại lối đọc-mỗi-lần-gọi của `attack_mapper._llm_select_enabled`: hệ thật ghi
@@ -358,6 +363,43 @@ def batch_attack_vocabulary(logs: dict | list) -> list[str]:
                 reasons.append(rs)
     spec = [t for t in _canonical_attack_terms(reasons[:8]) if t not in _GENERIC_TERMS]
     return spec or _waf_vocabulary(logs)
+
+
+def _policy_override_tag(decision: dict, executed: str) -> str:
+    """Nhãn `[CHÍNH SÁCH: ...]` khi hành động THỰC THI khác hành động model YÊU CẦU.
+
+    Trả chuỗi rỗng khi hai thứ trùng nhau (phần lớn trường hợp), nên nhãn chỉ xuất hiện
+    đúng lúc có chuyện để giải thích. Xem `_policy_action_before` ở `node_llm_triage`.
+    """
+    want = str(decision.get("_policy_action_before") or "")
+    if not want or want == executed:
+        return ""
+    return f"[CHÍNH SÁCH: model đề nghị {want} -> hệ thực thi {executed}] "
+
+
+def batch_has_attack_evidence(state: Any) -> bool:
+    """Lô có bằng chứng tấn công không — MỘT định nghĩa dùng chung cho MỌI chốt quyết định.
+
+    Ba nguồn, hợp bằng OR:
+      1. `tier1_reasons` — chữ ký đường nóng Tier-1 đã ghi.
+      2. chữ ký WAF chạy lại trên chính lô (bắt log leo thang qua z-score).
+      3. `_llm_injection_strict` — chữ ký tiêm nhiễm khớp NGUYÊN VĂN từ node rào chắn.
+
+    Nguồn (3) thêm ngày 17/08/2026. Trước đó hàm này chỉ có (1)+(2), tức chỉ nhìn tấn công
+    MẠNG/WEB; một payload tiêm nhiễm là văn xuôi tự nhiên nên không khớp chữ ký WAF nào và
+    luôn bị chấm "không có bằng chứng" — kể cả khi node rào chắn ngay trước đó đã khẳng định
+    dương tính.
+
+    CỐ Ý KHÔNG nhận `_llm_attack_flags` (gộp cả bộ dò jailbreak): `role_play_re` khớp cả
+    `step by step` / `disrupt` / `cause chaos`, những cụm có mặt bình thường trong văn bản
+    lành. Xem `SentinelState._llm_injection_strict`.
+
+    Gom thành hàm vì trước đây có BỐN bản sao của cùng phép thử này rải trong file, và chỉ
+    cần sửa ba trong bốn là hệ tự mâu thuẫn với chính nó mà không test nào bắt được.
+    """
+    if batch_attack_vocabulary(getattr(state, "current_batch_logs", None) or []):
+        return True
+    return any(getattr(state, "_llm_injection_strict", None) or [])
 
 
 def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
@@ -675,12 +717,40 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
         else False
         for r in _res
     ]
+
+    # ── CỜ CHẶT: CHỈ chữ ký khớp NGUYÊN VĂN, KHÔNG gồm bộ dò jailbreak ──
+    #
+    # Hai cờ trên không cùng chất lượng, nên chỉ MỘT trong hai được phép làm BẰNG CHỨNG cho
+    # quyết định chặn:
+    #
+    #   `llm_attack_detected`  <- `injection_patterns`, so khớp bằng `re.escape` (nguyên văn,
+    #                             không phân biệt hoa thường). Đo trên 230 log lành CSIC:
+    #                             lớp khớp mẫu **0 báo nhầm**.
+    #   `jailbreak_detected`   <- thêm `role_play_re`, mà biểu thức đó có các nhánh
+    #                             `step\s+by\s+step`, `disrupt`, `cause\s+chaos`. Ba cụm này
+    #                             xuất hiện thường xuyên trong văn bản LÀNH, nên cờ này KHÔNG
+    #                             đủ chắc để tự động chặn một địa chỉ IP.
+    #
+    # `adv_flags` (gộp) giữ nguyên cho định tuyến QUY KẾT và bỏ truy vấn payload — hai việc
+    # đó chỉ làm hệ thận trọng hơn, đoán sai thì mất chút chất lượng truy xuất chứ không
+    # chặn nhầm ai. `adv_strict` mới là thứ được dùng làm bằng chứng cho phép CHẶN.
+    adv_strict = [
+        bool(r.get("llm_attack_detected")) if isinstance(r, dict) else False for r in _res
+    ]
+
     if trace.enabled():
-        trace.add("guardrails", llm_attack_flags=adv_flags, n_llm_attack=sum(adv_flags))
+        trace.add(
+            "guardrails",
+            llm_attack_flags=adv_flags,
+            n_llm_attack=sum(adv_flags),
+            llm_injection_strict=adv_strict,
+            n_injection_strict=sum(adv_strict),
+        )
 
     return {
         "current_batch_encapsulated": batch_enc,
         "_llm_attack_flags": adv_flags,
+        "_llm_injection_strict": adv_strict,
         "_guardrails_system_instruction": processed_data["system_instruction"],
         # Giữ khoá cũ cho tương thích, nhưng nay nó CHỈ mang nghĩa "lô có ít nhất một log
         # bị tấn công nhắm vào LLM" và chỉ dùng để ghi vết / hiển thị. Mọi quyết định quy
@@ -928,20 +998,78 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     _layer = evidence_layer_of(state.current_batch_logs)
     if trace.enabled():
         trace.add("batch", evidence_layer=_layer)
-    messages = build_triage_prompt(
-        log_data=raw_logs_str,
-        rag_context=rag_combined,
-        threat_memory_context=threat_memory_context,
-        evidence_layer=_layer,
-    )
-
     guardrails_instruction = getattr(state, "_guardrails_system_instruction", "")
     logger.info(f"Guardrails instruction length: {len(guardrails_instruction)}")
-    if guardrails_instruction:
-        messages[0]["content"] = guardrails_instruction + "\n\n" + messages[0]["content"]
 
-    if state.narrative_summary:
-        messages[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
+    def _assemble_prompt(_logs_str: str) -> list[dict[str, Any]]:
+        """Lắp prompt hoàn chỉnh từ phần log đã đóng gói. Gọi lại được sau khi cắt."""
+        _m = build_triage_prompt(
+            log_data=_logs_str,
+            rag_context=rag_combined,
+            threat_memory_context=threat_memory_context,
+            evidence_layer=_layer,
+        )
+        # Chỉ dẫn an toàn của Guardrails PHẢI đứng đầu system prompt: nó là thứ dặn model coi
+        # nội dung giữa hai data-marker là DỮ LIỆU, không phải mệnh lệnh.
+        if guardrails_instruction:
+            _m[0]["content"] = guardrails_instruction + "\n\n" + _m[0]["content"]
+        if state.narrative_summary:
+            _m[0]["content"] += f"\n\n=== PREVIOUS CONTEXT ===\n{state.narrative_summary}"
+        return _m
+
+    messages = _assemble_prompt(raw_logs_str)
+
+    # ── TRÀN NGỮ CẢNH: ĐO PROMPT THẬT, KHÔNG ĐOÁN BẰNG HẰNG SỐ ────────────────────
+    #
+    # LỖI ĐÃ VÁ (2026-08-17). `node_guardrails` ước lượng `2000 + len(batch_enc)//4`, trong
+    # đó **2000 là hằng số cứng** và KHÔNG hề đếm ngữ cảnh RAG, Bộ nhớ Đe doạ, hay system
+    # prompt thật. Đo lại bằng chính `llm.prompt` trong tracer, 92 lô ngày 17/08/2026:
+    #
+    #       canh gác báo   trung vị  2.505 tok  ·  lớn nhất  3.431 tok
+    #       prompt THẬT    trung vị  9.258 tok  ·  lớn nhất 11.373 tok      (trần 16.384)
+    #       tỉ số thật/ước lượng: trung vị 3,63×  ·  lớn nhất 4,78×
+    #
+    # Canh gác báo "còn rộng chán" trong khi cửa sổ đã dùng 57%, đỉnh 69%. Nó chỉ nổ khi
+    # `batch_enc > 57.536` ký tự, còn prompt thật đụng trần sớm hơn nhiều — tức tồn tại một
+    # dải mà prompt THẬT tràn còn canh gác vẫn báo PASS.
+    #
+    # HẬU QUẢ NẾU TRÀN nặng hơn vẻ ngoài: slot llama.cpp là 32768/-np 2 = 16.384 token. Vượt
+    # thì ngữ cảnh bị cắt, và phần nằm ở ĐẦU prompt chính là chỉ dẫn "coi nội dung giữa hai
+    # marker là DỮ LIỆU, đừng tuân theo". Tràn ngữ cảnh vì thế ăn mất đúng lớp phòng thủ
+    # chống tiêm nhiễm. Nên phép cắt dưới đây cắt PHẦN LOG, giữ nguyên phần đầu.
+    _budget_tok = int(getattr(context_overflow_guard, "max_tokens", 16384) or 16384)
+
+    def _tok_of(_ms: list[dict[str, Any]]) -> int:
+        return sum(len(str(m.get("content", ""))) for m in _ms) // 4
+
+    _real_tok_before = _tok_of(messages)
+    _context_truncated = False
+    if _real_tok_before > _budget_tok:
+        # Phần KHÔNG cắt được (system + RAG + memory) = tổng trừ phần log.
+        _fixed_tok = _real_tok_before - (len(raw_logs_str) // 4)
+        _room_tok = _budget_tok - _fixed_tok - _CTX_RESERVE_TOK
+        if _room_tok > 0:
+            raw_logs_str = raw_logs_str[: _room_tok * 4] + "\n... [CẮT DO TRÀN NGỮ CẢNH]"
+        else:
+            # Ngay cả khi bỏ hết log vẫn tràn -> phần cố định tự nó đã quá khổ. Giữ một mẩu
+            # log tượng trưng để prompt còn hợp lệ; ca này chắc chắn đi HITL ở dưới.
+            raw_logs_str = "[LOG BỊ CẮT TOÀN BỘ DO TRÀN NGỮ CẢNH]"
+        messages = _assemble_prompt(raw_logs_str)
+        _context_truncated = True
+        logger.warning(
+            f"[NGỮ CẢNH] Prompt thật {_real_tok_before} tok > trần {_budget_tok} tok — "
+            f"đã cắt phần log còn {_tok_of(messages)} tok. Lô này chỉ được phán quyết nếu "
+            f"CÓ bằng chứng tiêm nhiễm; không thì chuyển người xử lý."
+        )
+
+    if trace.enabled():
+        trace.add(
+            "guardrails",
+            prompt_tokens_real=_real_tok_before,
+            prompt_tokens_after_cut=_tok_of(messages),
+            prompt_budget=_budget_tok,
+            context_truncated=_context_truncated,
+        )
 
     if trace.enabled():
         # PROMPT ĐẦY ĐỦ. Đây là thứ DUY NHẤT cho phép kiểm chứng hậu kiểm rằng không mẩu
@@ -1081,6 +1209,18 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
 
+    # GHI LẠI HÀNH ĐỘNG MODEL YÊU CẦU, TRƯỚC MỌI BƯỚC CHÍNH SÁCH.
+    #
+    # VÌ SAO PHẢI GHI, KHÔNG SUY LẠI TỪ VĂN BẢN. Phần biện giải của model thường kết bằng
+    # câu "Therefore, the action is BLOCK_IP…", trong khi chính sách hạ xuống ALERT. Thẻ
+    # cảnh báo trên Dashboard vì thế hiện tiêu đề `[HIGH] ALERT` ngay trên một đoạn văn nói
+    # phải BLOCK_IP, và KHÔNG có dòng nào giải thích. Người đọc chỉ có hai cách hiểu, và cả
+    # hai đều xấu: hoặc hệ mâu thuẫn, hoặc màn hình hiển thị sai.
+    #
+    # Suy ngược từ câu chữ của model là đúng cái bẫy đã sinh ra lỗi đảo dấu ở badge neo bằng
+    # chứng. Nên lưu thẳng vào phán quyết ở đây — nguồn có thẩm quyền, không phải suy đoán.
+    validated_decision["_policy_action_before"] = action
+
     # ── TRẦN TỰ-TIN KHI KHÔNG CÓ CĂN CỨ QUY KẾT ───────────────────────────────────
     # Lô không suy ra được từ vựng tấn công đặc trưng nào (không chữ ký Tier-1, và soi lại
     # chữ ký WAF cũng trượt) thì thứ duy nhất hệ thống biết là "khối lượng/nhịp độ bất
@@ -1095,7 +1235,53 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     # Hạ trần xuống dải ALERT thay vì AWAIT_HITL: ALERT không chặn và không chất thêm việc
     # cho người. Cảnh báo này KHÔNG được phép tự tích luỹ thành lệnh chặn ở lần sau — xem
     # `_batch_has_attack_evidence` ngay dưới đây.
-    _batch_has_attack_evidence = bool(batch_attack_vocabulary(state.current_batch_logs or []))
+    #
+    # ── NGUỒN BẰNG CHỨNG THỨ BA (vá 2026-08-17) ───────────────────────────────────
+    # `batch_attack_vocabulary` chỉ đọc HAI nguồn: `tier1_reasons` và chữ ký WAF chạy lại.
+    # Cả hai đều nhắm vào tấn công MẠNG/WEB. Một payload tiêm nhiễm câu lệnh là văn xuôi
+    # tự nhiên: nó không khớp chữ ký WAF nào, nên lô luôn bị chấm "không có bằng chứng" —
+    # kể cả khi node rào chắn NGAY TRƯỚC ĐÓ đã khẳng định dương tính và ghi hẳn vào trace.
+    #
+    # Đo trên lượt chạy 17/08/2026, 99 lô Tier-2: 40 lô bị trần hạ BLOCK_IP -> ALERT, trong
+    # đó **4 lô** rào chắn đã gắn cờ tấn công LLM. Hệ tự bịt mắt: nó cố ý không dùng payload
+    # để truy xuất (đúng — nạp jailbreak vào truy vấn RAG là tự đầu độc), rồi trừ điểm chính
+    # lô đó vì thiếu bằng chứng truy xuất được.
+    #
+    # CHỈ nhận `_llm_injection_strict` (khớp nguyên văn, 0 báo nhầm trên 230 log lành).
+    # KHÔNG nhận `_llm_attack_flags` gộp: bộ dò jailbreak khớp cả `step by step` / `disrupt`,
+    # đưa nó vào đây là mở đường cho một câu văn lành tự chặn một địa chỉ IP.
+    _strict_injection = any(getattr(state, "_llm_injection_strict", None) or [])
+    _batch_has_attack_evidence = batch_has_attack_evidence(state)
+    if trace.enabled():
+        if _strict_injection:
+            trace.add("policy", evidence_from_strict_injection=True)
+
+    # ── LÔ BỊ CẮT NGỮ CẢNH: PHÁN QUYẾT CHỈ KHI CÓ BẰNG CHỨNG TIÊM NHIỄM ───────────
+    #
+    # Khi prompt vượt trần, phần log bị cắt — nghĩa là model kết luận trên bằng chứng KHÔNG
+    # đầy đủ. Quy tắc:
+    #
+    #   cắt + CÓ bằng chứng tiêm nhiễm  -> giữ phán quyết. Chữ ký khớp nguyên văn là bằng
+    #                                      chứng ĐỦ tự thân: nó không cần phần log bị cắt
+    #                                      để đứng vững.
+    #   cắt + KHÔNG có bằng chứng nào   -> AWAIT_HITL. Hệ không được kết luận trên dữ liệu
+    #                                      mà chính nó biết là thiếu.
+    #
+    # Đặt TRƯỚC trần tự tin và trước banding, vì đây là điều kiện MẠNH HƠN: thiếu dữ liệu thì
+    # mọi tranh luận về ngưỡng đều vô nghĩa.
+    if _context_truncated and not _batch_has_attack_evidence:
+        logger.warning(
+            "[NGỮ CẢNH] Lô bị cắt và KHÔNG có bằng chứng tiêm nhiễm -> chuyển người xử lý."
+        )
+        action = "AWAIT_HITL"
+        validated_decision["action"] = "AWAIT_HITL"
+        validated_decision["hitl_reason"] = "context_truncated"
+        if trace.enabled():
+            trace.add("policy", forced_hitl="context_truncated")
+    elif _context_truncated:
+        if trace.enabled():
+            trace.add("policy", truncated_but_evidence_backed=True)
+
     if (
         action == "BLOCK_IP"
         and not validated_decision.get("_critical_shield")
@@ -1560,7 +1746,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # Đo trên lượt chạy 12/08/2026, 49 lô đầu (toàn bộ nằm ở vùng lưu lượng LÀNH trước mốc
     # tấn công): 23 lô vào HITL, trong đó 14 do `technique_not_in_rag` và 8 do lá chắn ảo
     # giác — không lô nào có bằng chứng tấn công. Tỉ lệ HITL 47% cho một cửa sổ 100% lành.
-    _has_attack_evidence = bool(batch_attack_vocabulary(state.current_batch_logs or []))
+    _has_attack_evidence = batch_has_attack_evidence(state)
     _shield_action = "AWAIT_HITL" if _has_attack_evidence else "ALERT"
 
     if trace.enabled():
@@ -1789,7 +1975,10 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning") or _degraded_reason(latest_decision)
     safe_reasoning = output_sanitizer.sanitize(raw_reasoning)
-    formatted_reasoning = f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2%}] {safe_reasoning}"
+    formatted_reasoning = (
+        f"{_policy_override_tag(latest_decision, action)}"
+        f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2%}] {safe_reasoning}"
+    )
 
     # LOG THÔ đại diện (khớp target, fallback log đầu batch) -> đính kèm audit để Dashboard
     # hiển thị "cái gì đã vào Tier-1/LLM". Đây là đặc trưng luồng ĐÃ LOẠI nhãn (label leak).
@@ -1807,7 +1996,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     # Tính LẠI ở đây thay vì mang biến từ node chính sách sang: `batch_attack_vocabulary` là
     # hàm THUẦN trên chính lô log, chi phí vài nghìn phép regex — không đáng kể cạnh một lượt
     # gọi LLM ~20 giây, và tránh thêm một trường trạng thái có thể lệch giữa hai node.
-    _batch_has_attack_evidence = bool(batch_attack_vocabulary(state.current_batch_logs or []))
+    _batch_has_attack_evidence = batch_has_attack_evidence(state)
 
     # ALERT: raise_alert là CHOKE-POINT THỐNG NHẤT (chung với Cổng ML) — ghi ALERT, và nếu IP
     # TÁI PHẠM (đã cảnh báo trước) / known-bad thì TỰ leo thang -> BLOCK ngay bên trong.
@@ -1926,7 +2115,10 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     _reason_txt = (
         f"[REASON: {decision_policy.hitl_reason_text(_reason_code)}] " if _reason_code else ""
     )
-    formatted_reasoning = f"{_reason_txt}[MITRE: {mitre}] [Confidence: {conf:.2%}] {raw_reasoning}"
+    formatted_reasoning = (
+        f"{_policy_override_tag(latest_decision, 'AWAIT_HITL')}{_reason_txt}"
+        f"[MITRE: {mitre}] [Confidence: {conf:.2%}] {raw_reasoning}"
+    )
 
     logger.warning(f" [HÀNG ĐỢI SOC ANALYST] Cần con người kiểm duyệt: {formatted_reasoning}")
 
@@ -1972,7 +2164,7 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
             raw_log=raw_log_json,
             confidence=float(conf or 0.0),
             tier=TIER_LLM,
-            evidence_backed=bool(batch_attack_vocabulary(state.current_batch_logs or [])),
+            evidence_backed=batch_has_attack_evidence(state),
         )
         # Ghi SỰ THẬT đã thực thi, không ghi ý định: `raise_alert` trả "ALERT" hoặc
         # "BLOCK_IP" tuỳ lịch sử của IP.
