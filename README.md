@@ -243,11 +243,11 @@ Access the Streamlit SOC Dashboard at: **`http://localhost:8501`** (login: `mana
 
 #### Demo Stream Composition Breakdown
 
-496,885 events, 100% real records, 5.24% attack / 94.76% benign, 24 distinct attack classes, 9 DAPT2020 chain records of which **3 attacker IPs carry attack-phase activity on ≥ 2 days** (3/3 APT chains detected):
+496,885 events, 100% real records, 5.24% attack / 94.76% benign, 22 distinct attack classes, 9 DAPT2020 chain records of which **3 attacker IPs carry attack-phase activity on ≥ 2 days** (3/3 APT chains detected). Every figure below is counted directly from `data/demo.json`:
 
 | Source | Events | Attacks | Role in Evaluation |
 | :--- | ---: | ---: | :--- |
-| **CSE-CIC-IDS2018 NetFlow (10 days)** | 456,849 | 6,304 | Benign-heavy volume base, resolved at Tier 1 |
+| **CSE-CIC-IDS2018 NetFlow (10 days)** | 456,849 | 5,296 | Benign-heavy volume base, resolved at Tier 1 |
 | **CSIC 2010 HTTP payloads** | 36,000 | 18,000 | Application-layer evidence — primary attribution scoring source |
 | **DAPT2020 (volume + real chains)** | 1,902 | 669 | Multi-day kill-chain correlation |
 | **`ground_truth` slice** | 1,250 | 1,170 | Covers all 15 labelled CICIDS classes |

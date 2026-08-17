@@ -2,7 +2,7 @@
 
 > Bạn KHÔNG cần đọc hết ~40 file `src/`. Chỉ cần **bám theo hành trình của MỘT bản ghi log** đi qua hệ thống — mỗi điểm dừng học **1 khái niệm + 1 công nghệ + 1 hàm cốt lõi**, rồi chạy 1 lệnh để **thấy tận mắt**. Đọc xong 12 điểm dừng dưới đây là đủ hiểu + giải thích được toàn hệ.
 >
-> Tài liệu bạn đọc: **file này** (đọc code theo luồng) → [Bản đồ Quyết định 2 Tier](04_DECISION_MAP_TIER1_TIER2.md) (chi tiết điều kiện Block/Alert) → [codebase_summary.md](codebase_summary.md) (bản đồ file→vai trò) → [RUN_PROJECT.md](../guides/RUN_PROJECT.md) (cách chạy).
+> Tài liệu bạn đọc: **file này** (đọc code theo luồng) → [RUN_PROJECT.md](../guides/RUN_PROJECT.md) (cách chạy).
 
 ---
 
@@ -151,7 +151,7 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 
 ## 4. Bỏ qua lúc đầu (đọc sau khi đã nắm luồng)
 
-- `experiments/*` — benchmark/rigor sinh số liệu luận văn (KHÔNG chạy runtime). Xem [codebase_summary.md](codebase_summary.md) §"Ngoài luồng".
+- `experiments/*` — benchmark/rigor sinh số liệu luận văn (KHÔNG chạy runtime). Xem `experiments/README.md`.
 - `demos/*`, `scripts/fetch_*`, `scripts/build_*` — dựng dữ liệu & minh họa.
 - `src/guardrails/*` còn lại (`data_validator`, `state_monitor`, `constants`) — tiện ích bọc quanh, đọc khi cần chi tiết bảo mật.
 - Neo4j `graph_builder.py` — Knowledge Graph V2 **tùy chọn**, luồng lõi không phụ thuộc.
@@ -159,7 +159,7 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 ## 5. Ba mạch đọc theo mục tiêu
 
 - **Hiểu luồng để giải thích (bạn ở đây):** đọc §0 → 12 điểm dừng ①–⑫.
-- **Hiểu tuyến phòng thủ bảo mật:** ⑦ consensus → ⑧ RAG checksum → ⑩ HMAC → `prompt_filter.py`/`output_sanitizer.py` (Phần B [codebase_summary.md](codebase_summary.md)).
-- **Hiểu thực nghiệm/số liệu:** [RUN_PROJECT.md §3](../guides/RUN_PROJECT.md) → `evaluate_unified_stream.py` → `run_ablation.py`.
+- **Hiểu tuyến phòng thủ bảo mật:** ⑦ consensus → ⑧ RAG checksum → ⑩ HMAC → `prompt_filter.py`/`output_sanitizer.py` .
+- **Hiểu thực nghiệm/số liệu:** [DEMO_BY_RQ.md](../guides/DEMO_BY_RQ.md) → `evaluate_unified_stream.py` → `run_ablation.py`.
 
 > **Kiểm tra bản thân:** giải thích lại được chuỗi `log → ③ Tier-1 (Welford) → ④ ESCALATE → ⑤ Cổng ML → ⑥ đồ thị → ⑦ LLM+consensus → ⑩ HMAC → ⑪ APT → ⑫ feedback` bằng lời của bạn là **đã hiểu hệ thống**.

@@ -1979,9 +1979,14 @@
                 <tr style="border-bottom: 1px solid #E2E8F0; background: #FFFFFF;">
                     <td style="padding: 14px 20px; font-weight: 800; color: #0F172A; font-size: 1.15rem;">Chống Prompt Injection</td>
                     <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">❌ Không hỗ trợ</td>
-                    <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">⚠️ Checkpoint thủ công + Llama Prompt Guard 2 (F1 98,1%)</td>
+                    <td style="padding: 14px 20px; color: #334155; font-size: 1.12rem;">⚠️ Checkpoint thủ công + Llama Prompt Guard 2 (F1 98,1%<sup style="color:#B45309;">†</sup>)</td>
+                    <!-- CHÚ THÍCH MẪU SỐ. Hai con số cạnh nhau KHÔNG so sánh được: 98,1% là F1
+                         do LanG tự báo trên dữ liệu của họ; 100% là tỉ lệ trên 678 mẫu đối kháng
+                         của luận văn này. Không có chú thích thì bảng mời người đọc hiểu "hơn
+                         1,9 điểm" — một kết luận không phép đo nào chống lưng. Ch2 của luận văn
+                         đã ghi đúng (LanG CÓ phòng thủ hai lớp); slide phải nói cùng một điều. -->
                     <td style="padding: 14px 20px; background: #F0FDF4; border-left: 3px solid #10B981; font-weight: 700; color: #064E3B; font-size: 1.15rem;">
-                        🛡️ <strong style="color: #E11D48;">Kháng 100%</strong> (Delimited Data)
+                        🛡️ <strong style="color: #E11D48;">Kháng 100%</strong><sup style="color:#B45309;">‡</sup> (Delimited Data)
                     </td>
                 </tr>
                 <tr style="background: #FFFFFF;">
@@ -1995,6 +2000,16 @@
             </tbody>
         </table>
     </div>
+
+    <!-- Chú thích mẫu số cho cột "Chống Prompt Injection" — hai con số ở hàng đó đo trên hai
+         dân số khác nhau, phải nói ra ngay dưới bảng chứ không để hội đồng tự suy. -->
+    <p style="font-size: 0.92rem; color: #64748B; margin: 10px 2px 16px; line-height: 1.5;">
+        <sup style="color:#B45309;">†</sup> F1 do LanG tự báo cáo trên tập dữ liệu của họ.
+        <sup style="color:#B45309;">‡</sup> Tỉ lệ trên <strong>678 mẫu đối kháng</strong> của luận
+        văn này, tiêu chí: không mẫu nào ép được Tier-2 kết luận lưu lượng là lành tính.
+        <strong>Hai con số đo trên hai dân số khác nhau — đặt cạnh nhau để thấy cách tiếp cận,
+        không phải để so hơn kém.</strong>
+    </p>
 
     <!-- Key Takeaway Banner (Mapped Explicitly to 3 Core Problems) -->
     <div style="padding: 18px 24px; background: #ECFDF5; border: 1.5px solid #6EE7B7; border-radius: 14px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.08);">
