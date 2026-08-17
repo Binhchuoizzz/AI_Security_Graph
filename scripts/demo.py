@@ -14,7 +14,7 @@ sys.path.append(ROOT)
 
 # determine_queue dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
 from experiments.unified_dataset import determine_queue  # noqa: E402
-from src.streaming.backpressure import consumer_group_lag  # noqa: E402
+from src.streaming.backpressure import LAG_UNKNOWN, consumer_group_lag  # noqa: E402
 
 # Cho phép chỉ định file luồng khác (demo ngắn dùng data/demo_small.json — tập con PHÂN
 # TẦNG đủ 4 nguồn + chuỗi APT đa-ngày; xem scripts/build_demo_small.py).
@@ -63,12 +63,72 @@ def _wait_for_capacity(redis_client) -> None:
         if lag < STREAM_LAG_MAX and backlog < MAX_LLM_BACKLOG:
             return
         if not warned:
-            print(
-                f"\n[~] Backpressure: consumer lag={lag}, LLM backlog={backlog} "
-                f"— chờ consumer bắt kịp (đẩy tiếp khi có chỗ)…"
-            )
+            if lag >= LAG_UNKNOWN:
+                # Không phải "consumer chậm" mà là "chưa có consumer nào". Nói đúng tên,
+                # vì cách xử lý khác hẳn: chờ subscriber nạp xong mô hình, không phải
+                # tăng worker.
+                print(
+                    "\n[~] Chưa có consumer-group trên stream — subscriber chưa sẵn sàng. "
+                    "Dừng đẩy để MAXLEN không huỷ mất log chưa ai đọc…"
+                )
+            else:
+                print(
+                    f"\n[~] Backpressure: consumer lag={lag}, LLM backlog={backlog} "
+                    f"— chờ consumer bắt kịp (đẩy tiếp khi có chỗ)…"
+                )
             warned = True
         time.sleep(0.2)
+
+
+def _consumed_total() -> int:
+    """Số log Tier-1 đã THẬT SỰ xử lý, do subscriber ghi ra (luỹ kế, sống qua restart)."""
+    try:
+        with open(STATS_PATH) as f:
+            return int(json.load(f).get("raw_logs_total", 0))
+    except Exception:
+        return 0
+
+
+def _verify_no_loss(redis_client, pushed: int, consumed_before: int) -> None:
+    """Đối chiếu ĐẨY vào với TIÊU THỤ ra — mất log KHÔNG được phép im lặng.
+
+    VÌ SAO PHẢI ĐỐI CHIẾU THỦ CÔNG. Không một chỉ số nào của Redis tự tố cáo được việc này:
+    khi `MAXLEN` cắt entry chưa ai đọc, Redis DỜI LUÔN `entries-read` của consumer-group cho
+    khớp, nên `lag` về 0 và `entries-added == entries-read` — nhìn y hệt "giao đủ".
+    Thí nghiệm 17/08/2026: đẩy 700 entry vào stream `maxlen=200`, không ai đọc; `lag` báo
+    200, `entries-added` báo 700, `xreadgroup` nhận đúng 200. 500 bản ghi biến mất không dấu.
+
+    Trong sự cố cùng ngày, 91.500/496.885 sự kiện (18,4%) bị huỷ như vậy và lượt chạy vẫn
+    "thành công" — mọi tỉ lệ tính trên lượt đó đều sai mẫu số mà không ai biết. Với một luận
+    văn thì đó là hỏng ở mức không cứu được sau khi đã trích số, nên chốt chặn nằm ở ĐÂY.
+    """
+    print("[*] Đối chiếu đẩy-vào / tiêu-thụ-ra (chờ consumer rút hết)…")
+    stable = 0
+    last = -1
+    for _ in range(900):  # trần ~3 phút
+        lag = consumer_group_lag(redis_client, QUEUES)
+        now = _consumed_total()
+        if lag == 0 and now == last:
+            stable += 1
+            if stable >= 3:
+                break
+        else:
+            stable = 0
+        last = now
+        time.sleep(0.2)
+
+    consumed = _consumed_total() - consumed_before
+    lost = pushed - consumed
+    if lost <= 0:
+        print(f"[+] TOÀN VẸN: đẩy {pushed} — Tier-1 xử lý {consumed}. Không mất log.")
+        return
+    pct = lost / pushed * 100 if pushed else 0.0
+    print("\n" + "=" * 78)
+    print(f"[!!!] MẤT LOG: đẩy {pushed}, Tier-1 chỉ xử lý {consumed} -> THIẾU {lost} ({pct:.1f}%).")
+    print("      Nguyên nhân thường gặp: producer chạy trước khi subscriber tạo consumer-group,")
+    print(f"      nên MAXLEN={MAX_QUEUE_SIZE} huỷ log chưa ai đọc.")
+    print("      MỌI tỉ lệ tính trên lượt chạy này đều SAI MẪU SỐ — đừng trích số, hãy chạy lại.")
+    print("=" * 78)
 
 
 def main():
@@ -99,6 +159,9 @@ def main():
 
     print(f"[*] Connected to Redis. Starting push (Batch: {BATCH_SIZE}, Delay: {BATCH_DELAY}s)...")
 
+    # Chụp TRƯỚC khi đẩy: `raw_logs_total` là bộ đếm luỹ kế sống qua restart, nên chỉ phần
+    # chênh lệch mới thuộc về lượt này.
+    consumed_before = _consumed_total()
     total_pushed = 0
     for i in range(0, len(events), BATCH_SIZE):
         _wait_for_capacity(redis_client)  # backpressure: chờ nếu consumer sau lưng
@@ -112,9 +175,11 @@ def main():
         pipe.execute()
         total_pushed += len(batch)
         print(f"  -> Pushed {total_pushed}/{len(events)} events...", end="\r")
-        time.sleep(BATCH_DELAY)
+        if BATCH_DELAY:
+            time.sleep(BATCH_DELAY)
 
     print(f"\n[+] Finished streaming {total_pushed} events to Redis.")
+    _verify_no_loss(redis_client, total_pushed, consumed_before)
 
 
 if __name__ == "__main__":

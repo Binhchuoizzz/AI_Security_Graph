@@ -134,6 +134,39 @@ if [ "$PUSH" = "none" ]; then
   exit 0
 fi
 
+# ── CHỜ CONSUMER-GROUP TỒN TẠI TRƯỚC KHI ĐẨY ────────────────────────────────────────
+# pgrep chỉ chứng minh TIẾN TRÌNH có sống, KHÔNG chứng minh nó đang đọc. Subscriber cần
+# ~8 giây nạp mô hình nhúng + FAISS + LightGBM rồi mới tạo consumer group.
+#
+# SỰ CỐ ĐO ĐƯỢC 17/08/2026: đẩy ngay trong cửa sổ đó -> chưa có nhóm -> backpressure đọc
+# lag = 0 (van mở toang) -> producer xả tối đa tốc độ Redis vào stream `maxlen=10.000` ->
+# **91.500/496.885 sự kiện (18,4%) bị huỷ trước khi có ai đọc**, không một dòng lỗi nào.
+# Trước đó phanh cứng sleep(0.3) che mất lỗi vì 8 giây chỉ rò ~1.300 sự kiện.
+echo "▶ [4.5/5] Chờ subscriber tạo consumer-group (chống đua khởi động)…"
+for i in $(seq 1 120); do
+  READY="$("$PY" - <<'PYEOF'
+import os
+from dotenv import load_dotenv
+load_dotenv()
+import redis
+try:
+    r = redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+                             decode_responses=True)
+    ok = all(
+        any(g.get("name") == "sentinel_group" for g in r.xinfo_groups(q))
+        for q in ("queue_firewall", "queue_waf", "queue_sysmon")
+    )
+except Exception:
+    ok = False
+print("1" if ok else "0")
+PYEOF
+)"
+  [ "$READY" = "1" ] && { echo "   ✓ consumer-group sẵn sàng trên cả 3 stream"; break; }
+  [ "$i" = "120" ] && { echo "   ✗ Quá 120s vẫn chưa có consumer-group — DỪNG, không đẩy."; \
+                        echo "     (đẩy lúc này sẽ mất log im lặng; xem logs/subscriber.log)"; exit 1; }
+  sleep 1
+done
+
 echo "▶ [5/5] ĐẨY LUỒNG GỘP → Dashboard (CICIDS + DAPT + Zero-day + Adversarial)…"
 if [ "$PUSH" = "small" ]; then
   # --small dùng TẬP CON PHÂN TẦNG data/demo_small.json (KHÔNG phải "5.000 sự kiện đầu").
@@ -152,7 +185,12 @@ if [ "$PUSH" = "small" ]; then
   UNIFIED_STREAM_BATCH="${UNIFIED_STREAM_BATCH:-50}" UNIFIED_STREAM_DELAY="${UNIFIED_STREAM_DELAY:-0.1}" \
     "$PY" scripts/demo.py
 else
-  "$PY" scripts/demo.py
+  # `demo.py` mặc định BATCH=50 + DELAY=0,3 -> trần cứng ~167 sk/s bất kể consumer khoẻ đến
+  # đâu (đo 17/08/2026: 164,8 sk/s so với 1.454 sk/s khi bỏ phanh — khâu đẩy ~50 phút xuống
+  # ~6). Phanh đó KHÔNG phải cơ chế an toàn: an toàn là `_wait_for_capacity()` gác theo lag
+  # consumer-group và backlog LLM. Đặt mặc định nhanh ở đây, vẫn cho phép ghi đè.
+  UNIFIED_STREAM_BATCH="${UNIFIED_STREAM_BATCH:-500}" UNIFIED_STREAM_DELAY="${UNIFIED_STREAM_DELAY:-0}" \
+    "$PY" scripts/demo.py
 fi
 
 echo ""
