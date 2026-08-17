@@ -975,7 +975,15 @@ def main_dashboard():
             '<div class="glossary-box">'
             '  <div class="glossary-item">'
             '    <span class="glossary-title">Tier 1 (Lọc nhiễu):</span>'
-            '    <div class="glossary-desc">Session Baselining giám sát hành vi mạng và lọc bỏ >95% logs sạch, chống Alert Fatigue cho Analyst.</div>'
+            # SỐ ĐO KHÔNG ĐƯỢC VIẾT CỨNG TRONG BẢNG THUẬT NGỮ. Dòng này từng ghi "lọc bỏ
+            # >95% logs sạch" — một con số không có nguồn, không có mẫu số, và gán cho
+            # riêng "Session Baselining" cái thành tích của CẢ tầng 1 (chữ ký WAF + z-score
+            # + danh tiếng). Đo trên lượt chạy 17/08/2026 thì Tier-1 DROP 41,0%
+            # (69.932/170.450) — cách xa 95%. Tỉ lệ xả tải thật đã hiển thị ở các ô số liệu
+            # phía trên, đọc từ `pipeline_stats.json`; bảng thuật ngữ chỉ định nghĩa cơ chế.
+            '    <div class="glossary-desc">Luật chữ ký WAF + ngưỡng lệch chuẩn Welford '
+            "O(1) chấm điểm rủi ro từng sự kiện, loại nhiễu ngay tại đầu vào để chuyên viên "
+            "không bị ngập cảnh báo (tỉ lệ thật xem ô số liệu phía trên).</div>"
             "  </div>"
             '  <div class="glossary-item">'
             '    <span class="glossary-title">Tier-2 · LLM Agent:</span>'

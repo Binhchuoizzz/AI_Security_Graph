@@ -147,7 +147,9 @@ for i in $(seq 1 120); do
   READY="$("$PY" - <<'PYEOF'
 import os
 from dotenv import load_dotenv
-load_dotenv()
+# PHẢI nêu đường dẫn tường minh: `load_dotenv()` không tham số dò ngược theo frame của
+# caller, mà chạy từ stdin (`python - <<EOF`) thì không có frame -> AssertionError.
+load_dotenv(os.path.join(os.getcwd(), ".env"))
 import redis
 try:
     r = redis.Redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"),

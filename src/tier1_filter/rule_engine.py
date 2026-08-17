@@ -539,6 +539,23 @@ def load_config() -> dict[str, Any]:
     }
 
 
+# Số yêu cầu TỐI THIỂU của một IP trước khi được phép kết luận gì về "tốc độ" của nó.
+# Một mẫu không tạo thành một tốc độ: `request_count / elapsed` với `elapsed` kẹp sàn 1 giây
+# gán cho MỌI IP lần đầu xuất hiện đúng 1,00 req/s — con số do công thức sinh ra, không phải
+# do đo. Xem chú thích dài ở Indicator 2 và `update_global_baseline`.
+_MIN_RATE_SAMPLES = 3
+
+# SÀN của "tốc độ bình thường". Trung bình toàn cục là số TỰ THÍCH NGHI, nên nó trôi theo
+# thành phần lưu lượng và có hai hướng hỏng đối xứng:
+#   * trôi XUỐNG (đa số hồ sơ là khách vãng lai) -> ngưỡng tụt quanh 1,0 -> mọi IP mới dính;
+#   * trôi LÊN  (chỉ hồ sơ gửi dồn mới đủ mẫu)  -> kẻ tấn công bị so với chính kẻ tấn công,
+#     `rate > avg × 2` không bao giờ đúng và chỉ báo chết lặng.
+# Kẹp sàn ở 1 req/s: một khách web gửi một yêu cầu mỗi giây là chuyện bình thường theo định
+# nghĩa, nên ngưỡng thực thi không bao giờ thấp hơn 2 req/s. Phần thích nghi vẫn còn nguyên
+# cho lưu lượng thật sự bận.
+_MIN_NORMAL_RATE = 1.0
+
+
 class SessionBaseline:
     """
     Theo dõi behavioral baseline cho mỗi Source IP.
@@ -572,6 +589,10 @@ class SessionBaseline:
         self.max_profiles = max_profiles
         self.eviction_interval = eviction_interval
         self.global_avg_request_rate = 1.0
+        # Tổng và số hạng của trung bình toàn cục — giữ lại để trừ được phần đóng góp của
+        # chính hồ sơ đang xét (so với NGƯỜI KHÁC, không so với chính mình).
+        self._rate_sum = 0.0
+        self._rate_n = 0
         self._update_counter = 0  # Đếm để trigger eviction định kỳ
 
     def _evict_stale_profiles(self):
@@ -648,13 +669,42 @@ class SessionBaseline:
             )
 
         # Indicator 2: High-frequency requests (so với global average)
+        #
+        # ── MỘT YÊU CẦU KHÔNG PHẢI LÀ MỘT TỐC ĐỘ (vá 2026-08-17) ─────────────────────
+        # `elapsed` bị kẹp sàn 1 giây, nên một IP LẦN ĐẦU xuất hiện luôn được chấm
+        # `1 / 1 = 1,00 req/s` — không phải đo được, mà do công thức sinh ra. Cùng lúc,
+        # `update_global_baseline()` lấy trung bình tốc độ của MỌI hồ sơ, mà phần lớn hồ sơ
+        # là IP chỉ gửi đúng một yêu cầu rồi già đi (tốc độ tiến dần về 0). Trung bình vì
+        # thế TỤT dần xuống dưới 0,5, kéo ngưỡng `avg × 2` xuống quanh 1,0 — đúng bằng con
+        # số mà mọi IP mới bị gán. Kết quả: MỌI địa chỉ lần đầu xuất hiện đều vượt ngưỡng.
+        #
+        # Đo trên hai lượt chạy 17/08/2026, hai hình dạng dữ liệu NGƯỢC NHAU nhưng cùng hỏng:
+        #   * hồ IP hẹp (142 yêu cầu/IP)  -> "3,00 req/s (ngưỡng 1,00)" ngay ở yêu cầu thứ 3
+        #   * hồ IP rộng (1 yêu cầu/IP)   -> "1,00 req/s (ngưỡng 0,50)" ngay ở yêu cầu đầu
+        # Trải dữ liệu kiểu nào cũng dính, vì lỗi nằm ở CÔNG THỨC chứ không ở lưu lượng.
+        #
+        # Sửa: chưa đủ mẫu thì KHÔNG kết luận gì về tốc độ. Cần ít nhất `_MIN_RATE_SAMPLES`
+        # yêu cầu mới được chấm — đúng nguyên tắc "không đo được thì không phán".
         elapsed = max(now - profile["first_seen"], 1)
         request_rate = profile["request_count"] / elapsed
-        if request_rate > self.global_avg_request_rate * self.deviation_threshold:
+        # SO VỚI NGƯỜI KHÁC, KHÔNG SO VỚI CHÍNH MÌNH. Trung bình toàn cục có tính cả hồ sơ
+        # đang xét, nên khi chỉ một IP gửi dồn thì trung bình BẰNG tốc độ của chính nó và
+        # `rate > avg × 2` không bao giờ đúng — chỉ báo chết lặng đúng lúc cần nhất. Trừ
+        # phần đóng góp của chính nó ra (xấp xỉ: tốc độ có thể đã nhích từ lần cập nhật
+        # trước, sai số đó nhỏ hơn nhiều so với việc tự so với mình).
+        if self._rate_n > 1:
+            _others = (self._rate_sum - request_rate) / (self._rate_n - 1)
+        else:
+            _others = _MIN_NORMAL_RATE
+        _normal = max(_others, _MIN_NORMAL_RATE)
+        if (
+            profile["request_count"] >= _MIN_RATE_SAMPLES
+            and request_rate > _normal * self.deviation_threshold
+        ):
             deviation_score += 20
             deviation_reasons.append(
                 f"Tần suất gửi yêu cầu cao: {request_rate:.2f} req/s "
-                f"(ngưỡng bình thường: {self.global_avg_request_rate:.2f})"
+                f"(ngưỡng bình thường: {_normal:.2f})"
             )
 
         # Indicator 3: Abnormal packet volume
@@ -677,17 +727,25 @@ class SessionBaseline:
         }
 
     def update_global_baseline(self):
-        """Cập nhật global average request rate từ tất cả IP profiles."""
+        """Cập nhật global average request rate từ các IP profiles ĐỦ MẪU.
+
+        Hồ sơ một-yêu-cầu KHÔNG được vào trung bình. Tốc độ của chúng là hiện vật của công
+        thức (`1 / elapsed` với `elapsed` kẹp sàn 1 giây), không phải phép đo. Gộp chúng
+        vào khiến trung bình tụt dần theo thời gian chạy — ngưỡng `avg × 2` trôi xuống
+        quanh 1,0, đúng bằng giá trị mà mọi IP mới bị gán, nên mọi IP mới đều vượt ngưỡng.
+        """
         if not self.profiles:
             return
         total_rates = []
         now = time.time()
         for _ip, profile in self.profiles.items():
-            if profile["first_seen"]:
+            if profile["first_seen"] and profile["request_count"] >= _MIN_RATE_SAMPLES:
                 elapsed = max(now - profile["first_seen"], 1)
                 total_rates.append(profile["request_count"] / elapsed)
         if total_rates:
-            self.global_avg_request_rate = sum(total_rates) / len(total_rates)
+            self._rate_sum = sum(total_rates)
+            self._rate_n = len(total_rates)
+            self.global_avg_request_rate = self._rate_sum / self._rate_n
 
     def reset_window(self):
         """Reset tất cả profiles. Gọi sau mỗi time window."""

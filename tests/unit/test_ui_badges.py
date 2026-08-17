@@ -685,3 +685,47 @@ def test_khong_co_bieu_thuc_tran_cap_module(ten_tep):
             f"{ten_tep}:{nut.lineno} có biểu thức trần cấp module — Streamlit sẽ in nó ra "
             "trang. Docstring phải là câu lệnh đầu tiên của tệp."
         )
+
+
+# ==============================================================================
+# TRÍCH DẪN BỊA — thẻ cảnh báo không được gán số mục cho tri thức nó chưa tra
+# ==============================================================================
+
+
+def test_khong_bia_so_muc_nist_trong_the_canh_bao():
+    """Thẻ từng in "NIST Incident Response Playbook (Section 3.2.1)" — bịa ở ba tầng.
+
+    1. Chuỗi được chọn THUẦN theo `severity_level`, một bảng tra cứng, không có lượt truy
+       xuất nào — nhưng in ngay dưới khối quy kết nên đọc như tri thức lấy từ kho.
+    2. Kho NIST của chính dự án (`knowledge_base/nist_800_61r2.json`) gồm 13 playbook khoá
+       `NIST.IR.*`, KHÔNG có mục nào đánh số "3.2.x".
+    3. Số mục còn sai so với bản gốc SP 800-61r2: §3.2 là "Detection and Analysis"
+       (3.2.1 Attack Vectors), ngăn chặn nằm ở §3.3.1 — thẻ gán hành động ngăn chặn cho
+       mục nói về véc-tơ tấn công.
+    """
+    import re
+
+    src = (Path(__file__).resolve().parents[2] / "src" / "ui" / "components.py").read_text()
+    # Bỏ chú thích: phần giải thích lỗi ĐƯỢC PHÉP nhắc lại chuỗi sai.
+    code = "\n".join(ln for ln in src.splitlines() if not ln.lstrip().startswith("#"))
+    for bad in re.findall(r"Section\s+3\.\d(?:\.\d)?", code):
+        raise AssertionError(f"số mục NIST bịa còn trong mã: {bad!r}")
+    assert "Incident Response Playbook (Section" not in code
+
+
+def test_nist_kb_that_su_khong_danh_so_muc():
+    """Chốt tiền đề của test trên bằng chính nguồn dữ liệu, không bằng trí nhớ.
+
+    Nếu sau này ai đó nạp một kho NIST CÓ đánh số mục thì test này đỏ, và lúc đó việc trích
+    số mục mới là chính đáng — nhưng phải trích từ tài liệu ĐÃ TRUY XUẤT cho lô, không phải
+    từ bảng tra theo mức nghiêm trọng.
+    """
+    import json
+
+    kb = Path(__file__).resolve().parents[2] / "knowledge_base" / "nist_800_61r2.json"
+    if not kb.exists():
+        pytest.skip("chưa có kho NIST cục bộ")
+    ids = [c.get("control", "") for c in json.load(kb.open()).get("controls", [])]
+    assert ids, "kho NIST rỗng"
+    assert all(i.startswith("NIST.IR.") for i in ids), ids
+    assert not any(re.search(r"\b3\.\d\.\d\b", i) for i in ids)

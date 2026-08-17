@@ -292,3 +292,60 @@ class TestReputationEnforcement:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestRequestRateNeedsSamples:
+    """Một yêu cầu không phải là một tốc độ.
+
+    `elapsed` bị kẹp sàn 1 giây nên `request_count / elapsed` gán cho MỌI IP lần đầu xuất
+    hiện đúng 1,00 req/s — con số do công thức sinh ra, không phải do đo. Cùng lúc, trung
+    bình toàn cục lấy cả những hồ sơ một-yêu-cầu nên tụt dần dưới 0,5, kéo ngưỡng
+    `avg × 2` xuống quanh 1,0 — đúng bằng giá trị mà mọi IP mới bị gán.
+
+    Đo trên hai lượt chạy 17/08/2026 với hình dạng dữ liệu NGƯỢC NHAU mà cùng hỏng:
+      * hồ IP hẹp (142 yêu cầu/IP) -> "3,00 req/s (ngưỡng 1,00)" ở yêu cầu thứ ba
+      * hồ IP rộng (1 yêu cầu/IP)  -> "1,00 req/s (ngưỡng 0,50)" ở yêu cầu đầu tiên
+    """
+
+    def _log(self, ip, i):
+        return {
+            "Source IP": ip,
+            "Destination Port": 80,
+            "Protocol": 6,
+            "service": "http",
+            "method": "GET",
+            "uri": f"/tienda1/publico/productos.jsp?id={i}",
+            "payload": "",
+            "user_agent": "Mozilla/5.0",
+            "message": "HTTP GET /tienda1/publico/productos.jsp",
+            "Total Fwd Packets": 5,
+            "Total Length of Bwd Packets": 3000,
+            "Flow Duration": 40000,
+        }
+
+    def test_khach_moi_mot_yeu_cau_khong_bi_cham_la_tan_suat_cao(self):
+        """Mỗi IP gửi ĐÚNG một yêu cầu -> không địa chỉ nào được coi là gửi dồn."""
+        from src.tier1_filter.rule_engine import RuleEngine
+
+        eng = RuleEngine()
+        flagged = 0
+        for i in range(500):
+            out = eng.evaluate(self._log(f"100.64.{i // 254}.{i % 254 + 1}", i))
+            if any("Tần suất" in r for r in (out.get("tier1_reasons") or [])):
+                flagged += 1
+        assert flagged == 0, f"{flagged}/500 khách vãng lai bị chấm là tần suất cao"
+
+    def test_van_bat_duoc_ip_gui_don_that(self):
+        """Đối chứng dương: một IP gửi dồn hàng trăm yêu cầu PHẢI bị chấm.
+
+        Thiếu test này thì bản vá có thể lặng lẽ tắt hẳn chỉ báo tần suất.
+        """
+        from src.tier1_filter.rule_engine import RuleEngine
+
+        eng = RuleEngine()
+        for i in range(200):
+            eng.evaluate(self._log("100.70.0.9", i))
+        out = eng.evaluate(self._log("100.70.0.9", 999))
+        assert any("Tần suất" in r for r in (out.get("tier1_reasons") or [])), (
+            "IP gửi dồn 200 yêu cầu mà không bị chấm — chỉ báo tần suất đã chết"
+        )

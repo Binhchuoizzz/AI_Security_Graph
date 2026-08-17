@@ -790,15 +790,48 @@ def render_alert_card(
                 "🎯 MITRE ATT&CK Mapping: <code>N/A</code> — chưa quy kết được kỹ thuật"
             )
 
+    # ── KHUYẾN NGHỊ PHẢN HỒI — LÀ CHÍNH SÁCH CỦA HỆ, KHÔNG PHẢI TRÍCH DẪN ────────────
+    #
+    # LỖI ĐÃ SỬA 17/08/2026 — TRÍCH DẪN BỊA. Bốn dòng này từng in
+    #     "NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment…"
+    # và sai ở ba tầng cùng lúc:
+    #
+    #   1. Chuỗi được chọn THUẦN theo `severity_level` — một bảng tra cứng, không có một
+    #      lượt truy xuất nào. Nhưng nó nằm ngay dưới khối quy kết, in màu như tri thức
+    #      lấy từ kho, nên đọc như thể đã tra tài liệu.
+    #   2. Kho NIST của chính dự án (`knowledge_base/nist_800_61r2.json`) gồm 13 playbook
+    #      khoá `NIST.IR.*` — KHÔNG có mục nào đánh số "3.2.x". Số mục đó không tồn tại
+    #      trong nguồn mà hệ thống thật sự đọc.
+    #   3. Đối chiếu bản gốc SP 800-61r2 thì số mục còn SAI: §3.2 là "Detection and
+    #      Analysis" (3.2.1 Attack Vectors · 3.2.2 Signs of an Incident · 3.2.3 Sources of
+    #      Precursors and Indicators). Ngăn chặn nằm ở §3.3.1 "Choosing a Containment
+    #      Strategy". Thẻ ghi "Section 3.2.1: Execute emergency containment" là gán hành
+    #      động ngăn chặn cho mục nói về véc-tơ tấn công.
+    #
+    # Cùng họ lỗi "đúng ID sai tên" mà `verify_technique_label` đã chặn cho MITRE — chỉ
+    # khác là ở đây trích dẫn được BỊA hẳn. Một hội đồng thuộc SP 800-61r2 bắt được ngay.
+    #
+    # Nay gọi đúng tên: đây là bảng ánh xạ mức nghiêm trọng -> hành động của HỆ. Muốn trích
+    # dẫn thật thì phải hiển thị playbook mà bộ truy xuất trả về cho chính lô này.
     nist_playbook_text = (
-        "🛡️ NIST Incident Response Playbook: Log event and perform continuous behavioral monitoring."
+        "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): ghi nhận sự kiện và tiếp tục "
+        "giám sát hành vi."
     )
     if severity_level == "CRITICAL":
-        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment - Block source IP at Firewall to isolate attack boundary."
+        nist_playbook_text = (
+            "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): ngăn chặn khẩn cấp — chặn IP "
+            "nguồn tại tường lửa để cô lập phạm vi tấn công."
+        )
     elif severity_level == "HIGH":
-        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.2): High-priority alert to L1/L3 SOC Analysts; place IP on high-risk watchlist."
+        nist_playbook_text = (
+            "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): cảnh báo ưu tiên cao tới "
+            "chuyên viên L1/L3; đưa IP vào danh sách theo dõi rủi ro cao."
+        )
     elif severity_level == "MEDIUM":
-        nist_playbook_text = "🛡️ NIST Incident Response Playbook (Section 3.2.3): Require Human-in-the-Loop (HITL) analyst approval to trigger automated block rule."
+        nist_playbook_text = (
+            "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): cần chuyên viên duyệt (HITL) "
+            "trước khi kích hoạt luật chặn tự động."
+        )
 
     # ── Badge: dùng bộ dựng CHUNG (xem đầu tệp) để thẻ này, cụm HITL trong app.py và
     # thẻ chặn Tier-1 không còn trôi dạt khỏi nhau.
