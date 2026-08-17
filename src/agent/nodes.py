@@ -1748,6 +1748,20 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # giác — không lô nào có bằng chứng tấn công. Tỉ lệ HITL 47% cho một cửa sổ 100% lành.
     _has_attack_evidence = batch_has_attack_evidence(state)
     _shield_action = "AWAIT_HITL" if _has_attack_evidence else "ALERT"
+    # CÂU CHỮ PHẢI KHỚP ĐÍCH ĐẾN THẬT (vá 2026-08-17).
+    # Đoạn `[NEO BẰNG CHỨNG: ...]` ghi cứng "chuyển người xử lý" từ thời lá chắn CHỈ có một
+    # nhánh. Sau khi tách hai nhánh theo bằng chứng ở ngay trên, dòng đó thành lời hứa sai:
+    # đo trên lượt chạy 17/08/2026, lá chắn khai hoả 126 lần, CẢ 126 đều đi nhánh ALERT, và
+    # cả 126 đều in "chuyển người xử lý". Analyst đọc thẻ rồi mở tab HITL sẽ không thấy phiếu
+    # nào — đúng câu hỏi "neo bằng chứng nhưng không ở tab HITL?".
+    _shield_dest = (
+        "chuyển người xử lý"
+        if _has_attack_evidence
+        else (
+            "hạ xuống CẢNH BÁO — lô này không có bằng chứng tấn công truy xuất được nên "
+            "KHÔNG sinh phiếu HITL"
+        )
+    )
 
     if trace.enabled():
         trace.add(
@@ -1759,7 +1773,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         _was_block = decision.get("action") == "BLOCK_IP"
         logger.warning(
             f"[NEO BẰNG CHỨNG] {_shield_target} KHÔNG có trong ngữ cảnh RAG của lô này — "
-            f"đặt kỹ thuật về N/A và chuyển người xử lý (đúng hợp đồng prompt)."
+            f"đặt kỹ thuật về N/A và {_shield_dest} (đúng hợp đồng prompt)."
         )
         decision["action"] = _shield_action
         decision["hitl_reason"] = "technique_not_in_rag" if _has_attack_evidence else ""
@@ -1775,8 +1789,8 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         _who = "model" if (_llm_tech_m and _llm_tech_raw.upper() != "N/A") else "bộ ánh xạ"
         decision["reasoning"] = (
             f"[NEO BẰNG CHỨNG: kỹ thuật {_shield_target} do {_who} đề xuất KHÔNG nằm trong "
-            f"tài liệu đã truy xuất cho lô này — hệ thống KHÔNG khẳng định kỹ thuật, chuyển "
-            f"người xử lý] {decision.get('reasoning', '')}"
+            f"tài liệu đã truy xuất cho lô này — hệ thống KHÔNG khẳng định kỹ thuật, "
+            f"{_shield_dest}] {decision.get('reasoning', '')}"
         )
         if trace.enabled():
             trace.add(

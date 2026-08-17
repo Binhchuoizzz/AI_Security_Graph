@@ -469,6 +469,30 @@ def test_ungrounded_shield_routes_by_attack_evidence():
     assert d_yes["hitl_reason"] == "technique_not_in_rag"
 
 
+def test_shield_wording_matches_the_real_destination():
+    """Đoạn biện giải KHÔNG được hứa "chuyển người xử lý" khi phán quyết thật là ALERT.
+
+    Lá chắn từng ghi cứng một câu duy nhất từ thời nó chỉ có một nhánh. Sau khi tách nhánh
+    theo bằng chứng, câu đó thành lời hứa sai: đo trên lượt chạy 17/08/2026, lá chắn khai
+    hoả 126 lần, CẢ 126 đi nhánh ALERT nhưng vẫn in "chuyển người xử lý". Analyst đọc thẻ
+    rồi mở tab HITL thì không có phiếu nào — thẻ và hàng đợi nói hai chuyện khác nhau.
+    """
+    from src.agent.nodes import node_attack_mapper
+
+    ctx = "T1498 Network Denial of Service"
+    d_no = node_attack_mapper(_mapper_state("T1030", ctx, attack_evidence=False))["decisions"][-1]
+    d_yes = node_attack_mapper(_mapper_state("T1030", ctx, attack_evidence=True))["decisions"][-1]
+
+    assert d_no["action"] == "ALERT"
+    assert "chuyển người xử lý" not in d_no["reasoning"], (
+        "nhánh ALERT vẫn hứa đưa lên người — đúng lỗi thẻ nói một đằng, hàng đợi một nẻo"
+    )
+    assert "CẢNH BÁO" in d_no["reasoning"]
+
+    assert d_yes["action"] == "AWAIT_HITL"
+    assert "chuyển người xử lý" in d_yes["reasoning"]
+
+
 def test_block_is_kept_when_technique_is_grounded():
     from src.agent.nodes import node_attack_mapper
 
