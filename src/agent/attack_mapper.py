@@ -39,6 +39,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from src.guardrails import llm_attack_signatures as _llm_sig
+
 logger = logging.getLogger(__name__)
 
 
@@ -337,6 +339,19 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         0.85,
         framework=FRAMEWORK_ATLAS,
     ),
+    # Jailbreak KHÁC tiêm nhiễm câu lệnh, và ATLAS tách hẳn hai mã. Trước đây mọi đòn đánh
+    # vào LLM đều đổ chung vào AML.T0051, nên một payload chiếm vai / gỡ ràng buộc bị ghi
+    # vào hồ sơ sự cố dưới nhãn "LLM Prompt Injection" — sai kỹ thuật ngay trong chứng cứ.
+    # Tên lấy đúng nguyên văn ATLAS, thống nhất với hợp đồng đã nêu ở `prompts.py`.
+    "llm_jailbreak": _entry(
+        "LLM Jailbreak",
+        "AML.T0054",
+        "LLM Jailbreak",
+        "Defense Evasion",
+        "",
+        0.85,
+        framework=FRAMEWORK_ATLAS,
+    ),
     # TÊN PHẢI ĐI VỚI ĐÚNG MÃ. Hai mục dưới từng ghi tên của kỹ thuật CHA cạnh mã của kỹ
     # thuật CON ("T1595.003 - Active Scanning", "T1071.001 - Application Layer Protocol").
     # `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` và KHÔNG đi qua
@@ -535,6 +550,21 @@ def normalize_attack_type(*texts: str) -> str:
     for key, kws in _ATTACK_KEYWORDS:
         if any(_kw_hit(kw, haystack) or _kw_hit(kw, raw_haystack) for kw in kws):
             return key
+    # Chữ ký CẤU TRÚC cho đòn đánh vào LLM — chạy SAU vòng từ khoá, không bao giờ trước.
+    # Thứ tự này giữ đúng bất biến đã vá một lần: một câu SQLi phải ra `sqli`/T1190, không
+    # được rơi vào họ ATLAS. Vòng từ khoá nhận diện tấn công web trước, nên tới được đây
+    # nghĩa là không có chữ ký web nào khớp.
+    #
+    # VÌ SAO CẦN Ở ĐÂY, không chỉ ở guardrail: quy kết đi đường riêng. Trước đây bảng từ
+    # khoá `prompt_injection` chỉ có 7 chuỗi, nên một payload chiếm vai không nằm trong 7
+    # chuỗi đó sẽ không được bộ ánh xạ tất định nhận -> rơi xuống đường RRF -> RRF tra kho
+    # ATT&CK mạng (kho không có ATLAS) -> lá chắn neo bác bỏ -> `N/A`. Đo lượt 17/08/2026:
+    # 130 lô tấn công vào LLM hiện `MITRE: N/A` trên dashboard đúng vì đường này.
+    _, atlas_tech = _llm_sig.classify(haystack)
+    if atlas_tech == _llm_sig.TECHNIQUE_INJECTION:
+        return "prompt_injection"
+    if atlas_tech == _llm_sig.TECHNIQUE_JAILBREAK:
+        return "llm_jailbreak"
     return ""
 
 

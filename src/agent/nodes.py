@@ -1287,16 +1287,27 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         and not validated_decision.get("_critical_shield")
         and not _batch_has_attack_evidence
     ):
-        _capped = min(float(confidence or 0.0), decision_policy.LLM_BLOCK_CONF - 0.01)
+        # ĐỔI ĐÍCH ĐẾN 17/08/2026: KHÔNG chắc thì đưa NGƯỜI, không hạ xuống cảnh báo.
+        #
+        # Bản trước hạ trần tự tin xuống 0,84 để banding tự đẩy về ALERT. Lập luận khi đó
+        # là "ALERT không chặn và không chất việc cho người". Nhưng đo lượt chạy 17/08/2026
+        # (220 lô Tier-2) cho thấy cái giá thật: 130 lô mà model kết luận là tấn công với
+        # độ tin cậy >= 0,85 (cao nhất 0,98) rơi hết vào ALERT — một kênh không ai hành
+        # động. Hệ và model BẤT ĐỒNG mà không ai phân xử.
+        #
+        # Bất đồng giữa model và bằng chứng chính là định nghĩa của "không chắc", và ca
+        # không chắc thuộc về con người. Trần tự tin bị bỏ hẳn: nó là một quyền phủ quyết
+        # nguỵ trang thành con số, làm hỏng luôn ý nghĩa của trường `confidence` trong
+        # nhật ký kiểm toán (0,84 ghi ra không phải độ tin cậy của model).
         if trace.enabled():
             trace.add(
                 "policy",
-                confidence_capped_from=float(confidence or 0.0),
-                confidence_capped_to=_capped,
-                cap_reason="no_specific_attack_vocabulary",
+                forced_hitl="unverified_llm_claim",
+                model_confidence=float(confidence or 0.0),
             )
-        confidence = _capped
-        validated_decision["confidence"] = _capped
+        action = "AWAIT_HITL"
+        validated_decision["action"] = "AWAIT_HITL"
+        validated_decision["hitl_reason"] = "unverified_llm_claim"
 
     # ── CHÍNH SÁCH ĐỘ-TIN-CẬY THỐNG NHẤT (chung Cổng ML + LLM) ────────────────────
     # Confidence LÁI action thay vì để LLM tự chọn (sửa lỗi "0.75 + T1571 chung chung -> BLOCK").
@@ -1748,20 +1759,43 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     # giác — không lô nào có bằng chứng tấn công. Tỉ lệ HITL 47% cho một cửa sổ 100% lành.
     _has_attack_evidence = batch_has_attack_evidence(state)
     _shield_action = "AWAIT_HITL" if _has_attack_evidence else "ALERT"
-    # CÂU CHỮ PHẢI KHỚP ĐÍCH ĐẾN THẬT (vá 2026-08-17).
-    # Đoạn `[NEO BẰNG CHỨNG: ...]` ghi cứng "chuyển người xử lý" từ thời lá chắn CHỈ có một
-    # nhánh. Sau khi tách hai nhánh theo bằng chứng ở ngay trên, dòng đó thành lời hứa sai:
-    # đo trên lượt chạy 17/08/2026, lá chắn khai hoả 126 lần, CẢ 126 đều đi nhánh ALERT, và
-    # cả 126 đều in "chuyển người xử lý". Analyst đọc thẻ rồi mở tab HITL sẽ không thấy phiếu
-    # nào — đúng câu hỏi "neo bằng chứng nhưng không ở tab HITL?".
-    _shield_dest = (
-        "chuyển người xử lý"
-        if _has_attack_evidence
-        else (
-            "hạ xuống CẢNH BÁO — lô này không có bằng chứng tấn công truy xuất được nên "
-            "KHÔNG sinh phiếu HITL"
+
+    def _apply_shield_action(dec: dict) -> None:
+        """Hạ cấp theo lá chắn, nhưng KHÔNG BAO GIỜ kéo ngược một phiếu đã lên người.
+
+        BẪY THỨ TỰ. `node_attack_mapper` chạy SAU `node_llm_triage` và ghi thẳng vào
+        `decision["action"]`. Từ 17/08/2026, triage đẩy ca "model khẳng định tấn công mà
+        không chữ ký nào xác nhận" sang `AWAIT_HITL`. Nếu lá chắn ở đây vẫn gán đè
+        `_shield_action` vô điều kiện thì đúng những lô đó — vốn cũng không có bằng chứng,
+        nên rơi vào nhánh `ALERT` — sẽ bị kéo tụt từ HITL xuống cảnh báo. Phiếu biến mất
+        khỏi hàng đợi người, im lặng, ở một node hoàn toàn khác node ra quyết định.
+
+        Lá chắn chỉ được HẠ cấp, không được NÂNG một ca đã giao cho người trở lại tự động.
+        """
+        if dec.get("action") == "AWAIT_HITL":
+            return
+        dec["action"] = _shield_action
+
+    def _shield_dest(dec: dict) -> str:
+        """Câu mô tả đích đến — đọc từ HÀNH ĐỘNG THẬT sau khi đã áp lá chắn.
+
+        CÂU CHỮ PHẢI KHỚP ĐÍCH ĐẾN THẬT (vá 2026-08-17). Đoạn `[NEO BẰNG CHỨNG: ...]` từng
+        ghi cứng "chuyển người xử lý" từ thời lá chắn chỉ có một nhánh; đo lượt chạy
+        17/08/2026 thì lá chắn khai hoả 126 lần, cả 126 đi nhánh ALERT mà vẫn in câu đó —
+        analyst mở tab HITL không thấy phiếu nào.
+
+        Suy câu chữ từ `_shield_action` cũng chưa đủ: sau khi triage biết đẩy ca không
+        kiểm chứng được sang người, hành động cuối có thể là `AWAIT_HITL` trong khi
+        `_shield_action` là `ALERT`. Chỉ có hành động cuối mới nói đúng sự thật.
+        """
+        return (
+            "chuyển người xử lý"
+            if dec.get("action") == "AWAIT_HITL"
+            else (
+                "hạ xuống CẢNH BÁO — lô này không có bằng chứng tấn công truy xuất được "
+                "nên KHÔNG sinh phiếu HITL"
+            )
         )
-    )
 
     if trace.enabled():
         trace.add(
@@ -1771,12 +1805,21 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         )
     if _ungrounded:
         _was_block = decision.get("action") == "BLOCK_IP"
+        _apply_shield_action(decision)
         logger.warning(
             f"[NEO BẰNG CHỨNG] {_shield_target} KHÔNG có trong ngữ cảnh RAG của lô này — "
-            f"đặt kỹ thuật về N/A và {_shield_dest} (đúng hợp đồng prompt)."
+            f"đặt kỹ thuật về N/A và {_shield_dest(decision)} (đúng hợp đồng prompt)."
         )
-        decision["action"] = _shield_action
-        decision["hitl_reason"] = "technique_not_in_rag" if _has_attack_evidence else ""
+        # Mã lý do bám vào HÀNH ĐỘNG CUỐI, không bám vào `_shield_action`. Hai thứ đó nay
+        # có thể khác nhau (xem `_apply_shield_action`), và gán theo cái sau sẽ xoá trắng
+        # lý do của một phiếu HITL do node trước đã lập — phá bất biến "mọi đường tới
+        # AWAIT_HITL đều mang một mã máy đọc được".
+        if decision.get("action") == "AWAIT_HITL":
+            decision.setdefault("hitl_reason", "")
+            if not decision["hitl_reason"]:
+                decision["hitl_reason"] = "technique_not_in_rag"
+        else:
+            decision["hitl_reason"] = ""
         decision["mitre_technique"] = "N/A"
         decision["mitre_technique_id"] = ""
         decision["mitre_technique_name_verified"] = False
@@ -1790,7 +1833,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         decision["reasoning"] = (
             f"[NEO BẰNG CHỨNG: kỹ thuật {_shield_target} do {_who} đề xuất KHÔNG nằm trong "
             f"tài liệu đã truy xuất cho lô này — hệ thống KHÔNG khẳng định kỹ thuật, "
-            f"{_shield_dest}] {decision.get('reasoning', '')}"
+            f"{_shield_dest(decision)}] {decision.get('reasoning', '')}"
         )
         if trace.enabled():
             trace.add(
@@ -1813,14 +1856,17 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         )
         if trace.enabled():
             trace.add("attack_mapper", hallucination_shield=True)
-        decision["action"] = _shield_action
+        _apply_shield_action(decision)
         # `setdefault` KHÔNG ghi đè chuỗi rỗng — khoá đã tồn tại với giá trị "" thì nó im lặng
         # bỏ qua. Đo được 8/23 lô AWAIT_HITL không có mã lý do, phá đúng bất biến mà chú thích
         # ở `node_llm_triage` tuyên bố ("MỌI đường tới AWAIT_HITL phải mang một mã máy đọc
         # được"). Gán tường minh khi giá trị hiện tại rỗng.
-        if _shield_action == "AWAIT_HITL" and not decision.get("hitl_reason"):
-            decision["hitl_reason"] = "technique_unmappable"
-        elif _shield_action != "AWAIT_HITL":
+        # Bám HÀNH ĐỘNG CUỐI chứ không phải `_shield_action` — xem chú thích cùng loại ở
+        # lá chắn neo phía trên.
+        if decision.get("action") == "AWAIT_HITL":
+            if not decision.get("hitl_reason"):
+                decision["hitl_reason"] = "technique_unmappable"
+        else:
             decision["hitl_reason"] = ""
         if "[WARNING]" not in str(decision.get("reasoning", "")):
             decision["reasoning"] = (

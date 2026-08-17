@@ -78,6 +78,7 @@ HITL_REASONS: dict[str, str] = {
     # ── thêm 2026-08-17 ──
     "flow_only_no_payload": "Flow-only batch: no payload/URI/User-Agent to attribute from",
     "context_truncated": "Prompt exceeded context window; evidence was cut and no injection found",
+    "unverified_llm_claim": "Model claims threat but no signature corroborates it — human arbitrates",
     "unspecified": "NO REASON RECORDED — this is a defect, every deferral must state why",
 }
 
@@ -100,6 +101,9 @@ HITL_CATEGORIES: dict[str, str] = {
     "context_truncated": "EVIDENCE",
     "llm_abstained": "EVIDENCE",
     "port_only_c2": "EVIDENCE",
+    # Model nói "tấn công", không chữ ký nào xác nhận. Đây KHÔNG phải thiếu dữ liệu (lô có
+    # đủ payload) mà là BẤT ĐỒNG giữa model và bằng chứng — analyst phân xử, nên xếp SAFETY.
+    "unverified_llm_claim": "SAFETY",
     "technique_not_in_rag": "ATTRIBUTION",
     "technique_unmappable": "ATTRIBUTION",
     "social_engineering_suspected": "SAFETY",

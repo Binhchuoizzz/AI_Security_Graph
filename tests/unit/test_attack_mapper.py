@@ -469,6 +469,31 @@ def test_ungrounded_shield_routes_by_attack_evidence():
     assert d_yes["hitl_reason"] == "technique_not_in_rag"
 
 
+def test_shield_never_pulls_a_hitl_ticket_back_down():
+    """Lá chắn chỉ được HẠ cấp, không được kéo một ca đã giao cho người trở lại tự động.
+
+    BẪY THỨ TỰ. `node_attack_mapper` chạy SAU `node_llm_triage` và ghi thẳng vào
+    `decision["action"]`. Từ 17/08/2026 triage đẩy ca "model khẳng định tấn công mà không
+    chữ ký nào xác nhận" sang `AWAIT_HITL`. Những lô đó theo định nghĩa là KHÔNG có bằng
+    chứng, nên nhánh lá chắn dành cho chúng là `ALERT` — gán đè vô điều kiện sẽ xoá phiếu
+    khỏi hàng đợi người, im lặng, ở một node khác hẳn node ra quyết định.
+    """
+    from src.agent.nodes import node_attack_mapper
+
+    st = _mapper_state(
+        "T1030 - Data Transfer Size Limits",
+        "T1498 Network Denial of Service",
+        action="AWAIT_HITL",
+        attack_evidence=False,
+    )
+    st.decisions[0]["hitl_reason"] = "unverified_llm_claim"
+    d = node_attack_mapper(st)["decisions"][-1]
+
+    assert d["action"] == "AWAIT_HITL", "phiếu HITL bị lá chắn kéo tụt xuống cảnh báo"
+    assert d["hitl_reason"] == "unverified_llm_claim", "mã lý do gốc bị ghi đè/xoá trắng"
+    assert "chuyển người xử lý" in d["reasoning"], "câu chữ phải khớp đích đến thật"
+
+
 def test_shield_wording_matches_the_real_destination():
     """Đoạn biện giải KHÔNG được hứa "chuyển người xử lý" khi phán quyết thật là ALERT.
 

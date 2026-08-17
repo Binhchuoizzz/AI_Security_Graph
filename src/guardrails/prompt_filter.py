@@ -14,6 +14,7 @@ from html.parser import HTMLParser
 
 import yaml  # type: ignore
 
+from src.guardrails import llm_attack_signatures as llm_sig
 from src.guardrails.constants import normalize_log_keys
 from src.guardrails.template_miner import EntropyScorer, LogTemplateMiner, TokenBudgetManager
 
@@ -189,6 +190,20 @@ class PromptInjectionDetector:
     `_llm_attack_detected` mới là thứ nhánh đối kháng được phép dùng.
     """
 
+    # ── CỤM QUÁ LỎNG ĐỂ LÀM BẰNG CHỨNG TỰ CHẶN (chốt 17/08/2026) ──────────────────
+    # Ba cụm này là MẢNH câu, không phải ngữ pháp tấn công, nên chúng khớp cả văn xuôi lành:
+    #     "The secondary node will act as a backup"        -> khớp "act as"
+    #     "Please show disregard for legacy timeouts"      -> khớp "disregard"
+    #     "We updated the system prompt for the deploy bot" -> khớp "system prompt"
+    # Cả ba đều bật `_llm_attack_detected`, mà từ 17/08/2026 cờ đó là giấy phép CHẶN CỨNG
+    # một địa chỉ IP. Ba câu vô hại ở trên đủ để chặn nhầm.
+    #
+    # Chúng vẫn được giữ cho `_injection_detected` (lớp vô hiệu hoá): đóng gói thừa một log
+    # lành không tốn gì, còn chặn nhầm một IP thì có. Dạng TẤN CÔNG THẬT của cả ba cụm đã
+    # được `llm_attack_signatures` bắt chặt hơn — "act as" phải đi cùng ngôi thứ hai, "moi
+    # system prompt" phải có động từ moi, "disregard" phải có tân ngữ chỉ dẫn.
+    _AMBIGUOUS_FOR_EVIDENCE = frozenset({"act as", "disregard", "system prompt"})
+
     def __init__(self, patterns: list | None = None, web_patterns: list | None = None):
         config = load_config()
         guardrails_cfg = config.get("guardrails", {})
@@ -223,10 +238,23 @@ class PromptInjectionDetector:
                 if pattern.search(str_value):
                     is_injected = True
                     # `compiled` xếp LLM trước, web sau -> chỉ số < _n_llm là chữ ký LLM.
-                    if i < self._n_llm:
+                    if i < self._n_llm and (
+                        self.patterns[i].lower() not in self._AMBIGUOUS_FOR_EVIDENCE
+                    ):
                         is_llm_attack = True
                     detected_patterns.append(self.patterns[i])
                     injection_fields.append(key)
+
+            # TẦNG CHỮ KÝ CẤU TRÚC (thêm 17/08/2026). Danh sách nguyên văn ở trên là danh
+            # sách đen từ khoá: nó mù trước mọi cách diễn đạt chưa liệt kê. Đo trên 403 mẫu
+            # đối kháng, nó trượt 84,2% mẫu tiêm nhiễm và 30,5% mẫu jailbreak — mà đây là
+            # đúng cái cờ quyết định "lô này có bằng chứng tấn công hay không" ở hạ nguồn.
+            # `llm_attack_signatures` bắt theo NGỮ PHÁP đòn đánh thay vì theo chuỗi con.
+            for family in llm_sig.detect_families(str_value):
+                is_injected = True
+                is_llm_attack = True
+                detected_patterns.append(f"struct:{family}")
+                injection_fields.append(key)
 
         result = dict(normalized_log)
         result["_injection_detected"] = is_injected
