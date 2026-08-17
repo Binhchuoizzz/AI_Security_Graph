@@ -42,12 +42,41 @@ Khôi phục snapshot xong thì **đừng chạy `reset_all`** — lệnh đó x
 ### 2.1. Luồng tổng
 
 ```bash
+UNIFIED_STREAM_DELAY=0 UNIFIED_STREAM_BATCH=500 \
 SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --fresh
-grep -oP 'qsize~\K[0-9]+' logs/subscriber.log | tail -1     # đợi về 0 mới xong
+
+watch -n2 'jq -c "{raw:.raw_logs_total, llm:.pending_llm_queue}" config/pipeline_stats.json'
 ```
 
-Đẩy trọn `data/demo.json` qua Tier-1 → Cổng ML → Tier-2. Mất khoảng **3 giờ 30 phút**, nên
-chạy hôm trước rồi hôm demo chỉ bật hạ tầng bằng `--no-push`.
+Đẩy trọn `data/demo.json` qua Tier-1 → Cổng ML → Tier-2. **Xong** = producer in
+`[+] Finished streaming …` **và** `pending_llm_queue` về 0 (Tier-2 tiêu hoá hết backlog).
+
+> **Hai biến môi trường ở dòng đầu không phải trang trí.** `scripts/demo.py` mặc định
+> `BATCH_SIZE=50` + `BATCH_DELAY=0.3`, tức trần cứng ~167 sự kiện/giây bất kể consumer khoẻ
+> đến đâu. Đo ngày 17/08/2026 trên chính máy demo:
+>
+> | cấu hình | nhịp đẩy đo được | riêng khâu đẩy 496.885 sự kiện |
+> | :-- | --: | --: |
+> | mặc định (`delay=0,3` · `batch=50`) | 164,8 sk/s | ~50 phút |
+> | `delay=0` · `batch=500` | **1.454 sk/s** | **~6 phút** |
+>
+> Bỏ phanh KHÔNG mất an toàn: `_wait_for_capacity()` đã gác trước mỗi lô bằng vòng phản hồi
+> thật — dừng đẩy khi lag consumer-group ≥ 5.000 hoặc backlog LLM ≥ 2.000. `time.sleep(0.3)`
+> là cái phanh thứ hai, mù, chồng lên một cái phanh đã biết nhìn. `maxlen=10.000` của stream
+> vẫn lớn hơn trần lag 5.000 nên Redis chỉ cắt entry đã ack, không mất sự kiện chưa đọc.
+>
+> Nghịch lý phải biết: nhánh `--small` (§2.2) đặt sẵn `delay=0,1`, nhánh đầy đủ thì không đặt
+> gì nên rơi về `0,3` — bản demo NGẮN đang chạy nhanh gấp 3 lần mỗi sự kiện so với bản đầy đủ.
+>
+> ⚠️ **Con số "3 giờ 30 phút" trong bản trước là của cấu hình CÓ phanh** và chưa đo lại sau khi
+> bỏ. Riêng khâu đẩy giảm từ ~50 phút xuống ~6 phút; tổng thời gian lượt chạy còn phụ thuộc
+> Tier-2 tiêu hoá backlog, phần đó chưa đo. Đừng trích một con số tổng nào cho tới khi đo.
+>
+> ❌ **Đừng dùng lại lệnh theo dõi cũ** `grep -oP 'qsize~\K[0-9]+' logs/subscriber.log`. Chuỗi
+> `qsize~` chỉ được in khi có một lô ĐƯỢC ĐẨY SANG TIER-2, mà ~95% luồng là benign nên phần đầu
+> lượt chạy không sinh dòng nào. Kết quả rỗng bị đọc nhầm thành "hàng đợi đã về 0, chạy xong" —
+> trong khi thực tế mới nạp được vài chục nghìn sự kiện. Đo 17/08/2026 sau 30.650 sự kiện:
+> 0 dòng `Enqueue lô`, 0 lượt Tier-2.
 
 `run_demo.sh` đặt sẵn `SENTINEL_TIER2_APP_EVIDENCE_ONLY=1`: Tier-2 chỉ nhận lô có
 payload/URI/User-Agent, NetFlow thuần dừng ở ALERT tại Tier-1 (Cổng ML vẫn chặn bình thường).

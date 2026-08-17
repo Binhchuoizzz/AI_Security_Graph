@@ -150,11 +150,18 @@ reversing the two silently yields a stream with zero CSIC records and no applica
 ```bash
 python scripts/build_csic_dataset.py --limit 36000     # ~1 min
 python scripts/build_demo.py                           # ~4 min, ~4 GB RAM
-./scripts/run_demo.sh --fresh                          # infra + dashboard + full push
+UNIFIED_STREAM_DELAY=0 UNIFIED_STREAM_BATCH=500 \
+  ./scripts/run_demo.sh --fresh                        # infra + dashboard + full push
 ```
 
 Dashboard at **`http://localhost:8501`** (user `manager`). Use `--small` for a ~10,000-event stratified
 subset that populates every panel in minutes.
+
+The two `UNIFIED_STREAM_*` overrides matter: `scripts/demo.py` defaults to a fixed
+`sleep(0.3)` per 50-event batch, capping ingest at ~167 events/s no matter how much headroom the
+consumer has. Measured 2026-08-17: **164.8 events/s** with the defaults versus **1,454 events/s**
+without, cutting the push phase from ~50 minutes to ~6. Safety is unaffected — `_wait_for_capacity()`
+already gates every batch on real consumer-group lag (< 5,000) and LLM backlog (< 2,000).
 
 ### Demo stream composition
 
