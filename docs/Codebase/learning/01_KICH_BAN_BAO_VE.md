@@ -352,6 +352,14 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 > 🔴 ĐÓNG ĐINH: 76 lệnh chặn ảo giác đã bị giữ lại.
 > Câu chốt: mã kỹ thuật ở trên chỉ được phép tồn tại vì đoạn tài liệu ở dưới tồn tại. Không neo được thì hệ hạ cấp xuống hàng chờ chuyên gia. Trên 1.421 ca khẳng định mã kỹ thuật, không ca nào thiếu neo.
 > NÊU LUÔN CÁI GIÁ: chỉ dùng bộ truy xuất thì quy kết đúng 80,0%; chạy toàn tuyến qua rào chắn còn 68,0%. Mười hai điểm phần trăm là học phí của việc không tin lời mô hình — em cho rằng đáng trả.
+>
+> 📎 BẰNG CHỨNG MÃ NGUỒN — mở sẵn tab thứ hai, chỉ dùng nếu Hội đồng hỏi "chỗ nào trong code":
+> · Lá chắn neo bằng chứng: [`_grounded()` — nodes.py:1593](../../../src/agent/nodes.py#L1593) (mã chỉ được nhận nếu nằm trong ngữ cảnh RAG của **chính lô đó**) → hạ cấp tại [nodes.py:1806](../../../src/agent/nodes.py#L1806), gắn `mapping_status = "ungrounded_in_rag"`.
+> · Chốt riêng cho ca LLM nói tấn công mà lô không có bằng chứng: [nodes.py:1305 `unverified_llm_claim`](../../../src/agent/nodes.py#L1305) → `AWAIT_HITL`.
+> · Hai đường truy xuất hợp nhất theo thứ hạng: [`RRF_K = 60` — retriever.py:207](../../../src/rag/retriever.py#L207).
+> · **76** = `block_ip_bi_chan_lai` (và `ha_cap_hanh_dong["BLOCK_IP->AWAIT_HITL"]`) · **1.421** = `n_khang_dinh_ky_thuat`, `bad: 0`, lá chắn kích hoạt 145 ca (9,26%) — [evidence_grounding_results.json](../../../experiments/results/evidence_grounding_results.json), sinh bởi [score_evidence_grounding.py](../../../experiments/score_evidence_grounding.py).
+> · **80,0%** = `technique_exact_match_pct` trong [attack_mapper_eval_rrf_payload.json](../../../experiments/results/attack_mapper_eval_rrf_payload.json) · **68,0%** = cùng trường trong [attack_mapper_eval_e2e_payload.json](../../../experiments/results/attack_mapper_eval_e2e_payload.json); cả hai cùng `n_with_technique = 250`, nên 12 điểm là so sánh hợp lệ trên **cùng một tập**.
+> ⚠️ NÓI THẲNG NẾU BỊ TRUY: `bad = 0` đo bằng thước CHẶT (mã phải nằm trong danh sách ID tài liệu đã truy xuất), còn lá chắn trong `nodes.py` dùng thước RỘNG hơn (quét regex toàn văn ngữ cảnh). Vì tracer không lưu toàn văn nên số 0 này là **cận trên** của số ca lá chắn bỏ lọt, không phải phép đếm tuyệt đối — đã ghi rõ trong đầu tệp `score_evidence_grounding.py`.
 
 ---
 
