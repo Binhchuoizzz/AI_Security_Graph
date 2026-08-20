@@ -40,7 +40,7 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | 1 Bìa | 30s | — | — | — | — |
 | 2 Cảm ơn | 20s | — | — | — | — |
 | 3 Cấu trúc | 30s | — | — | — | — |
-| **4 Ba nút thắt → đề xuất hệ thống** | 115s | — | — | — | — |
+| **4 Ba nút thắt → đề xuất hệ thống** | 125s | — | — | — | — |
 | 5 Ba câu hỏi | 80s | — | — | — | — |
 | 6 So sánh | 60s | — | — | — | *(cắt đầu tiên nếu trễ)* |
 | **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
@@ -172,19 +172,19 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 > Kính thưa Hội đồng, em xin bắt đầu bằng vấn đề và bối cảnh của đề tài.
 >
-> Mỗi ngày, một trung tâm giám sát an ninh nhận từ hàng trăm nghìn đến hàng triệu bản ghi, mà tuyệt đại đa số là hoạt động bình thường. Số cảnh báo sinh ra luôn nhiều hơn số cảnh báo đội trực ca kịp đọc, và cảnh báo thật thì nằm lẫn trong đó. Khi cảnh báo nhiều đến mức không ai đọc xuể, thì thêm một cảnh báo nữa cũng không còn làm ai chú ý. Đó là nút thắt thứ nhất.
+> Mỗi ngày, một trung tâm giám sát an ninh nhận từ hàng trăm nghìn đến hàng triệu bản ghi, mà tuyệt đại đa số là hoạt động bình thường. Số cảnh báo sinh ra luôn vượt xa khả năng xử lý của đội trực ca, trong khi những cảnh báo thật sự nguy hiểm lại nằm lẫn giữa chúng. Hệ quả là quá tải cảnh báo: nhiều tới mức không còn được xem xét đúng mức. Đó là nút thắt thứ nhất, nút thắt về khối lượng.
 >
-> Vậy lời giải hiển nhiên là gì? Đưa AI vào đọc hộ. Nghe rất hợp lý — cho tới khi ta nhận ra mình vừa tự tạo ra nút thắt thứ hai.
+> Hướng xử lý tự nhiên là đưa AI vào đọc thay cho con người. Nhưng đặt AI vào đúng vị trí đó thì lại sinh ra nút thắt thứ hai: bản thân mô hình trở thành mục tiêu bị tấn công.
 >
-> Bởi vì nhật ký không phải thứ chúng ta viết. Nhật ký là thứ kẻ tấn công viết ra. Hắn chỉ cần cài một câu lệnh giả vào trong log là sai khiến được chính mô hình đang canh gác; chỉnh vài con số là lách được mô hình học máy; và vào được rồi thì sửa xoá nhật ký để phi tang.
+> Lý do là nhật ký an ninh không phải thứ chúng ta viết ra, mà phần lớn do chính kẻ tấn công sinh ra. Hắn chỉ cần cài một câu lệnh giả vào trong log là sai khiến được mô hình đang canh gác; chỉnh vài con số là lách được mô hình học máy; và khi đã vào được rồi thì sửa xoá nhật ký để phi tang.
 >
 > Ngay cả khi AI không bị ai tấn công, vẫn còn nút thắt thứ ba: chất lượng phán quyết. Kịch bản xử lý cố định thì không suy luận được ngữ cảnh, gặp hành vi mới là đứng hình. Còn thả AI tự do thì nó lại quá tự tin — tự nghĩ ra mã kỹ thuật không có thật và ra lệnh chặn thiếu căn cứ.
 >
 > Ba nút thắt khoá lẫn nhau: không dùng AI thì không đủ, mà dùng AI thì phải lo bảo vệ chính nó và kiểm soát những gì nó nói.
 >
-> Vì vậy em đề xuất SENTINEL, một hệ thống hai tầng. Tầng ngoài là bộ lọc nhanh, xử lý ngay khi bản ghi vừa tới và giữ lại phần lớn lưu lượng. Tầng trong là tác tử AI chạy ngay trên máy, chỉ nhận phần tầng ngoài không kết luận được, và luôn bị ràng buộc bởi rào chắn cùng một cuốn sổ ghi chép không sửa được.
+> Vì vậy em đề xuất SENTINEL, một hệ thống hai tầng. Tầng ngoài là bộ lọc nhanh, xử lý ngay khi bản ghi vừa tới và giữ lại phần lớn lưu lượng. Tầng trong là tác tử AI chạy tại chỗ, chỉ nhận phần tầng ngoài không kết luận được, và luôn bị ràng buộc bởi rào chắn cùng một cuốn sổ ghi chép không sửa được.
 >
-> ⏱ 115 giây — Mở bằng VẤN ĐỀ và BỐI CẢNH, nói ở tầm trung tâm giám sát chứ không kể chuyện một cá nhân. Ba nút thắt là chuỗi nhân quả. Câu cuối là câu đề xuất, nối thẳng sang slide 5.
+> ⏱ 125 giây — Mở bằng VẤN ĐỀ và BỐI CẢNH, nói ở tầm trung tâm giám sát chứ không kể chuyện một cá nhân. Ba nút thắt là chuỗi nhân quả. Câu cuối là câu đề xuất, nối thẳng sang slide 5.
 
 ---
 
