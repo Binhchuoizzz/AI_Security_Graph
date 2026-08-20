@@ -1,150 +1,4 @@
-# Kịch bản Bảo vệ SENTINEL — Bảng vận hành + Lời thoại
-
-> **Toàn bộ kịch bản bảo vệ nằm trong tài liệu này** — bảng vận hành (Phần 1–4) và
-> lời thoại từng slide (Phần 5).
->
-> ⚠️ **File slide `docs/Thesis/slides/index.html` KHÔNG bị sửa và sẽ không sửa.** Panel
-> *LỜI THOẠI THUYẾT TRÌNH* dựng sẵn trong slide vẫn giữ nguyên bản gốc của tác giả — nội
-> dung đó **khác** với Phần 5 ở đây. Khi tập và khi bảo vệ, **dùng Phần 5 của tài liệu
-> này**, đừng đọc panel trong slide.
->
-> Tổng: **31 phút** — nói ≈19,8 phút (bỏ slide 6) · màn hình 11:30. Còn lại dành cho hỏi đáp.
-
----
-
-## 1. Trục thời gian
-
-| Từ | Đến | Ở đâu | Làm gì |
-| --: | --: | :-- | :-- |
-| 0:00 | 6:00 | Slide 1–7 | mở đầu · ba nút thắt → đề xuất · ba câu hỏi · kiến trúc |
-| 6:00 | 7:30 | **▶1 Màn hình** | Executive Overview |
-| 7:30 | 10:00 | Slide 8–10 | Tầng 1 chín lớp · Cổng ML · bộ đệm |
-| 10:00 | 12:00 | **▶2 Màn hình** | SIEM Logs, ba tab con |
-| 12:00 | 14:30 | Slide 11–12 | tác tử 6 nút · Dual-RAG |
-| 14:30 | 17:00 | **▶3 Màn hình** | mở một thẻ BLOCK của Tầng 2 |
-| 17:00 | 18:30 | Slide 13 | rào chắn AI · HMAC |
-| 18:30 | 21:30 | **▶4 Terminal + Dashboard** | giả mạo sổ + tấn công LLM |
-| 21:30 | 25:00 | Slide 14–16 | dữ liệu · 5D · ablation |
-| 25:00 | 27:30 | **▶5 Màn hình** | HITL + Blocklist |
-| 27:30 | 30:00 | Slide 18–20 | đóng góp · giới hạn · kết |
-
-Ba mốc tự kiểm: **6:00 sang màn hình lần đầu** · **17:00 xong slide 13** · **27:30 về slide 18**.
-Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
-
----
-
-## 2. BẢNG VẬN HÀNH — slide nào, chạy gì, show gì
-
-| Slide | ⏱ | Chuyển màn hình? | Chạy gì / mở gì | Show cái gì | 🔴 Số đóng đinh |
-| :-- | --: | :-- | :-- | :-- | :-- |
-| 1 Bìa | 30s | — | — | — | — |
-| 2 Cảm ơn | 20s | — | — | — | — |
-| 3 Cấu trúc | 30s | — | — | — | — |
-| **4 Ba nút thắt → đề xuất hệ thống** | 125s | — | — | — | — |
-| 5 Ba câu hỏi | 80s | — | — | — | — |
-| 6 So sánh | 65s | — | — | — | *(cắt đầu tiên nếu trễ)* |
-| **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
-| 8 RuleEngine 9 lớp | 95s | — | — | — | — |
-| 9 Cổng ML | 65s | — | — | — | 962 / 0 FP |
-| **10 Bộ đệm** | 45s | **➜ ▶2** | Dashboard | Tab **📊 SIEM Logs** → 3 tab con, **trái sang phải**: `Tier-1 Rules` → `ML Gate` → `Tier-2 LLM` (tab 3 chỉ lướt) | **0,182 ms** · **962 / 0** |
-| 11 Tác tử | 75s | — | — | *(nói câu ĐÓNG RQ1 trước khi vào slide)* | — |
-| **12 Dual-RAG** | 75s | **➜ ▶3** | Dashboard | Tab **🧠 Tier-2 · Agentic LLM** → **mở 1 thẻ BLOCK**; chỉ mã ATT&CK · đoạn tri thức trích dẫn · câu lập luận | **76** lệnh ảo giác bị chặn · **80,0% → 68,0%** |
-| **13 Rào chắn** | 100s | **➜ ▶4** | **Terminal + Dashboard** — sáu bước ở §3 | ① nút 🛡️ toàn vẹn → ② sửa SQL → ③④ chạy đối kháng → ⑤ nút 🛡️ bắt giả mạo → ⑥ khôi phục | **678 → 0** · **ID dòng bị sửa** |
-| 14 Dữ liệu | 45s | — | — | *(nói câu ĐÓNG RQ2 cuối ▶4)* | — |
-| 15 Kết quả 5D | 90s | — | — | — | mỗi chiều **một** số |
-| **16 Ablation** | 75s | **➜ ▶5** | Dashboard | Tab **🧑‍💻 HITL Approvals** → mở 1 phiếu, đọc lý do hoãn, **bấm duyệt**; rồi tab **🔒 Blocklist** → chỉ IP vừa duyệt | **15,76% ↔ 95,0%** · lặp lại **0,182 ms** |
-| 17 Dashboard | 5s | — | *(bàn đạp, bấm lướt)* | — | — |
-| 18 Đóng góp | 95s | — | — | *(nói câu ĐÓNG RQ3 trước khi vào slide)* | — |
-| 19 Giới hạn | 65s | — | — | — | — |
-| 20 Kết | 45s | — | — | — | — |
-
-**Ba số TUYỆT ĐỐI KHÔNG nhấn trong lúc demo** — chúng có chỗ riêng kèm sẵn câu giải thích,
-rơi ra một mình là hội đồng tưởng hệ đang hỏng:
-
-| Đừng nhấn giữa demo | Chỗ đúng của nó |
-| :-- | :-- |
-| `MCC 0,0` · `99,55% FP` | slide 15 và ▶5, **kèm ngay cách nhìn thứ hai** |
-| `18,8%` lọc tĩnh | slide 13, kèm ngay câu *"sức chống chịu đến từ cơ chế đóng gói"* |
-| `31,13%` nhánh luật tĩnh | slide 19 (giới hạn) |
-
----
-
-## 3. Sáu bước của ▶4 — nhịp duy nhất có ghi vào cơ sở dữ liệu
-
-Đây là màn chứng minh câu hỏi nghiên cứu thứ hai: **một lúc hai vế** — tấn công vào mô hình
-(bước ③④) và giả mạo sổ kiểm toán (bước ②⑤). Sáu bước chạy liên tục trong **3 phút**.
-
-### 3.1 Làm TRƯỚC buổi — không làm trên sân khấu
-
-```bash
-cd ~/Projects/Thesis/AI_Security_Graph
-
-# (a) Khoá ký sổ phải nằm trong .env. THIẾU KHOÁ thì bước ① vẫn báo toàn vẹn, nhưng kèm
-#     "⚠️ Đang ký bằng khóa MẶC ĐỊNH công khai" — mất sạch sức nặng của cả màn demo.
-grep -c '^SENTINEL_LOG_SECRET=.\+' .env        # phải in ra đúng: 1   (KHÔNG in giá trị khoá)
-
-# (b) Bản sổ sạch để bước ⑥ khôi phục. Phải tồn tại TRƯỚC khi sửa bất cứ thứ gì.
-ls -la ~/demo_snapshot_final/audit_trail.db
-
-# (c) Lấy dòng sẽ bị sửa. GHI RA GIẤY cả ID lẫn địa chỉ IP.
-sqlite3 config/audit_trail.db \
-  "SELECT id, action, target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"
-#   ví dụ →  2082|BLOCK_IP|192.168.12.88
-```
-
-Gõ sẵn **hai lệnh** của bước ② và ③ vào Terminal, **chưa Enter**. Trên sân khấu chỉ bấm Enter.
-
-### 3.2 Sáu bước
-
-| # | Ở đâu | Gõ / bấm gì | Phải thấy gì | ⏱ |
-| :-- | :-- | :-- | :-- | --: |
-| ① | Dashboard · thanh bên | nút **🛡️ Kiểm tra tính toàn vẹn Logs (HMAC Audit)** | dải xanh `✅ Hệ thống nhật ký toàn vẹn (0 phát hiện sửa đổi hay giả mạo).` | 10s |
-| ② | Terminal | `sqlite3 config/audit_trail.db "UPDATE audit_trail SET action='LOG' WHERE id=<ID>;"` | không in gì — sqlite im lặng là đã sửa xong | 15s |
-| ③ | Terminal | `.venv/bin/python scripts/test_adversarial_llm.py` | dòng đầu `[*] Testing 5 mixed adversarial payloads…` rồi **đứng im ~65 giây** | 5s |
-| ④ | — | **NÓI LIỀN 65 GIÂY, KHÔNG NHÌN MÀN HÌNH CHỜ** | 5 dòng `-> RESISTED` hiện dần, cuối cùng là bảng `RESISTANCE REPORT` | 65s |
-| ⑤ | Dashboard | bấm **🛡️** lần hai | dải đỏ `⚠️ PHÁT HIỆN GIẢ MẠO! Đứt gãy chuỗi băm tại dòng log **ID …**` kèm đúng IP đã ghi giấy | 20s |
-| ⑥ | Terminal | `cp ~/demo_snapshot_final/audit_trail.db config/` | không in gì | 5s |
-
-### 3.3 Vì sao từng bước phải đúng thứ tự đó
-
-**② phải chạy TRƯỚC ③.** Bộ kiểm tra toàn vẹn được cache 30 giây
-([`app.py:105 @st.cache_data(ttl=30)`](../../../src/ui/app.py#L105)). Nếu bấm ⑤ ngay sau ②
-thì Streamlit trả lại kết quả **cũ** đang nằm trong cache và màn hình vẫn báo *toàn vẹn* —
-demo hỏng mà không ai biết vì sao. Bước ③④ mất 65 giây, dài hơn 30 giây cache, nên tới ⑤ là
-phép kiểm chạy lại thật.
-
-**Vì sao sửa `action` thì gãy chuỗi.** Chữ ký mỗi dòng tính trên
-`prev_hash|timestamp|action|target|reason`
-([`executor.py:691`](../../../src/response/executor.py#L691)). Đổi `BLOCK_IP` thành `LOG` là
-đổi chuỗi đầu vào, nên băm tính lại không khớp `integrity_hash` đã lưu. Và vì vòng lặp gán
-`prev_hash = integrity_hash` (giá trị **đã lưu**, không phải giá trị vừa tính lại), chỉ **đúng
-một dòng** gãy chứ không phải mọi dòng phía sau — đó là lý do hệ chỉ được **đích danh** dòng
-bị sửa thay vì chỉ nói "sổ có vấn đề".
-
-**⑥ bắt buộc chạy trước ▶5**, vì ▶5 đọc cùng cơ sở dữ liệu đó. Bỏ bước này thì phần HITL
-phía sau sẽ dựng trên một cuốn sổ đang gãy chuỗi.
-
-### 3.4 Ba cái bẫy phải biết trước
-
-**Bẫy 1 — con số trên màn hình KHÔNG phải 678.** Script chạy **5 mẫu** lấy từ 100 mẫu trong
-`data/adversarial_llm/mixed_llm_attacks.json` (toàn bộ từ `deepset/prompt-injections`), vì
-`scripts/test_adversarial_llm.py:47` cắt `samples[:5]`. Con số **678** là kết quả **benchmark
-đầy đủ đã đo từ trước**, không phải thứ đang chạy trước mặt. Nói đúng như vậy: *"trên màn hình
-là năm mẫu lấy ngẫu nhiên để xem tại chỗ; con số 678 là toàn bộ tập đối kháng em đã đo trong
-luận văn."* Nhận nhầm hai thứ này là chỗ dễ bị bắt lỗi nhất cả buổi.
-
-**Bẫy 2 — `RESISTED` nghĩa là gì.** Script chấm `COMPROMISED` **chỉ khi** phán quyết cuối là
-`LOG`, tức hệ cho đi tiếp. `BLOCK_IP`, `ALERT`, `AWAIT_HITL` đều tính là chống được. Nếu bị
-hỏi, trả lời thẳng: giữ lại để người xét cũng là chống được, vì mục tiêu của kẻ tấn công là
-**được cho qua**, không phải được chặn.
-
-**Bẫy 3 — 65 giây là dự tính, không phải bảo đảm.** 5 mẫu × ~13,4 giây mỗi lô
-(`latency_ms_mean = 13438` trong
-[attack_mapper_eval_e2e_payload.json](../../../experiments/results/attack_mapper_eval_e2e_payload.json)).
-Máy nguội hoặc mô hình vừa nạp lại thì lâu hơn. Chuẩn bị dư lời cho **90 giây**, và nếu quá
-lâu thì `Ctrl+C` rồi đi thẳng bước ⑤ — nửa toàn vẹn vẫn chứng minh trọn vẹn vế còn lại.
-
-## 4. Chuẩn bị trước buổi
+# Chuẩn bị trước buổi
 
 ```bash
 cd ~/Projects/Thesis/AI_Security_Graph
@@ -154,29 +8,36 @@ cp ~/demo_snapshot_final/system_settings.yaml config/
 cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 ```
 
+Riêng cho ▶4 — chạy trước, **không làm trên sân khấu**:
+
+```bash
+grep -c '^SENTINEL_LOG_SECRET=.\+' .env        # phải in ra đúng 1 (KHÔNG in giá trị khoá)
+ls -la ~/demo_snapshot_final/audit_trail.db    # bản sổ sạch để bước ⑥ khôi phục
+sqlite3 config/audit_trail.db \
+  "SELECT id, action, target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"
+#   ví dụ →  2082|BLOCK_IP|192.168.12.88   — ghi RA GIẤY cả ID lẫn IP
+```
+
 **Thứ tự alt-tab: Slide → Dashboard → Terminal.**
 
 - [ ] Dashboard **đã đăng nhập**, đang ở tab *Executive Overview*
-- [ ] Terminal đã gõ sẵn lệnh đối kháng, **chưa Enter**
+- [ ] Terminal đã gõ sẵn lệnh sửa SQL và lệnh đối kháng, **chưa Enter**
 - [ ] Slide ở slide 1, toàn màn hình, **panel lời thoại đã bật**
-- [ ] Đã ghi ID bản ghi `BLOCK_IP` ra giấy
+- [ ] Đã ghi ID và IP của bản ghi `BLOCK_IP` ra giấy
 - [ ] Đã chọn trước **một thẻ BLOCK đẹp** (▶3) và **một phiếu AWAIT_HITL dễ đọc** (▶5)
 - [ ] Tắt thông báo hệ thống, tắt ngủ màn hình
 
 > 🚫 **Luật sắt: không bao giờ gõ `--fresh` hoặc `reset_all` trong buổi bảo vệ.**
 > Hai lệnh đó xoá sạch ảnh chụp vừa đổ vào.
 
-### Ba nhánh hỏng
-
-| Hỏng | Gỡ |
-| :-- | :-- |
-| Dashboard trắng / lỗi lạ | `docker restart sentinel_dashboard` — 10 giây. Nói: *"em khởi động lại giao diện."* |
-| LLM không phản hồi ở ▶4 | `Ctrl+C`, bỏ nửa đối kháng, đi thẳng bước ⑤ — nửa toàn vẹn vẫn chứng minh trọn vẹn RQ2 |
-| Bị yêu cầu chạy trên dữ liệu mới | `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --small` — nói rõ đây là tập con 10.000 sự kiện nền tấn công 30,8%, **khác hỗn hợp** luồng đầy nên tỉ lệ sẽ khác 97,5% |
+**Nếu hỏng:** Dashboard trắng → `docker restart sentinel_dashboard`, nói *"em khởi động lại
+giao diện."* · LLM không phản hồi ở ▶4 → `Ctrl+C`, bỏ nửa đối kháng, đi thẳng bước ⑤ · Bị yêu
+cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --small`, nói rõ
+đây là tập con 10.000 sự kiện nền tấn công 30,8% nên tỉ lệ sẽ khác 97,5%.
 
 ---
 
-## 5. Lời thoại từng slide
+# Lời thoại từng slide
 
 > **Bản chính thức — sửa ở đây, không sửa vào file slide.**
 > `docs/Thesis/slides/index.html` giữ nguyên bản gốc và không được đụng tới.
@@ -432,7 +293,9 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 > ⏱ 100 giây — Câu cuối là câu chuyển hay nhất cả bài: tự thừa nhận lời nói không đủ, rồi chứng minh.
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
-> ▶ DEMO 4 — SÁU BƯỚC, TERMINAL + DASHBOARD (3 phút) — *runbook đầy đủ ở §3*
+> ▶ DEMO 4 — SÁU BƯỚC, TERMINAL + DASHBOARD (3 phút)
+> *Trước buổi:* `grep -c '^SENTINEL_LOG_SECRET=.\+' .env` phải ra **1**; lấy ID bằng
+> `sqlite3 config/audit_trail.db "SELECT id,action,target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"` rồi **ghi ra giấy** cả ID lẫn IP.
 >
 > ① **Dashboard · thanh bên** → nút **🛡️ Kiểm tra tính toàn vẹn Logs (HMAC Audit)**
 >    Chờ dải xanh `✅ Hệ thống nhật ký toàn vẹn (0 phát hiện sửa đổi hay giả mạo).`
@@ -444,6 +307,7 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 >
 > ③ **Enter NGAY lệnh thứ hai, đừng dừng lại xem kết quả bước ②:**
 >    `.venv/bin/python scripts/test_adversarial_llm.py`
+>    ⚠️ 65 giây của ③④ **bắt buộc** nằm giữa ② và ⑤: phép kiểm toàn vẹn được cache 30 giây, bấm 🛡️ sớm quá sẽ trả kết quả cũ và vẫn báo *toàn vẹn* — demo hỏng mà không ai biết vì sao.
 >
 > ④ **NÓI LIỀN 65 GIÂY, KHÔNG NHÌN MÀN HÌNH CHỜ.** Nội dung nói: dấu phân định mang mã ngẫu nhiên sinh mới theo từng lô, nên kẻ tấn công không đoán được để viết dấu đóng mà thoát ra ngoài.
 >    🔴 ĐÓNG ĐINH: **678 mẫu đối kháng, không mẫu nào đổi được phán quyết.**
@@ -580,3 +444,39 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 > Em xin chân thành cảm ơn TS. Bùi Văn Hiệu, TS. Đặng Văn Hiếu cùng Quý Thầy Cô. Em xin hết phần trình bày, kính mời Quý Thầy Cô đặt câu hỏi.
 >
 > ⏱ 45 giây — VÒNG KHÉP: gọi lại đúng bài toán đã nêu ở slide 4. Dừng ở đây, không để màn hình cuối là dashboard.
+
+---
+
+# Bảng vận hành — tóm tắt
+
+| Slide | ⏱ | Chuyển màn hình? | Chạy gì / mở gì | Show cái gì | 🔴 Số đóng đinh |
+| :-- | --: | :-- | :-- | :-- | :-- |
+| 1 Bìa | 30s | — | — | — | — |
+| 2 Cảm ơn | 20s | — | — | — | — |
+| 3 Cấu trúc | 30s | — | — | — | — |
+| **4 Ba nút thắt → đề xuất hệ thống** | 125s | — | — | — | — |
+| 5 Ba câu hỏi | 80s | — | — | — | — |
+| 6 So sánh | 65s | — | — | — | *(cắt đầu tiên nếu trễ)* |
+| **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
+| 8 RuleEngine 9 lớp | 95s | — | — | — | — |
+| 9 Cổng ML | 65s | — | — | — | 962 / 0 FP |
+| **10 Bộ đệm** | 45s | **➜ ▶2** | Dashboard | Tab **📊 SIEM Logs** → 3 tab con, **trái sang phải**: `Tier-1 Rules` → `ML Gate` → `Tier-2 LLM` (tab 3 chỉ lướt) | **0,182 ms** · **962 / 0** |
+| 11 Tác tử | 75s | — | — | *(nói câu ĐÓNG RQ1 trước khi vào slide)* | — |
+| **12 Dual-RAG** | 75s | **➜ ▶3** | Dashboard | Tab **🧠 Tier-2 · Agentic LLM** → **mở 1 thẻ BLOCK**; chỉ mã ATT&CK · đoạn tri thức trích dẫn · câu lập luận | **76** lệnh ảo giác bị chặn · **80,0% → 68,0%** |
+| **13 Rào chắn** | 100s | **➜ ▶4** | **Terminal + Dashboard** — sáu bước ở §3 | ① nút 🛡️ toàn vẹn → ② sửa SQL → ③④ chạy đối kháng → ⑤ nút 🛡️ bắt giả mạo → ⑥ khôi phục | **678 → 0** · **ID dòng bị sửa** |
+| 14 Dữ liệu | 45s | — | — | *(nói câu ĐÓNG RQ2 cuối ▶4)* | — |
+| 15 Kết quả 5D | 90s | — | — | — | mỗi chiều **một** số |
+| **16 Ablation** | 75s | **➜ ▶5** | Dashboard | Tab **🧑‍💻 HITL Approvals** → mở 1 phiếu, đọc lý do hoãn, **bấm duyệt**; rồi tab **🔒 Blocklist** → chỉ IP vừa duyệt | **15,76% ↔ 95,0%** · lặp lại **0,182 ms** |
+| 17 Dashboard | 5s | — | *(bàn đạp, bấm lướt)* | — | — |
+| 18 Đóng góp | 95s | — | — | *(nói câu ĐÓNG RQ3 trước khi vào slide)* | — |
+| 19 Giới hạn | 65s | — | — | — | — |
+| 20 Kết | 45s | — | — | — | — |
+
+**Ba số TUYỆT ĐỐI KHÔNG nhấn trong lúc demo** — chúng có chỗ riêng kèm sẵn câu giải thích,
+rơi ra một mình là người nghe tưởng hệ đang hỏng:
+
+| Đừng nhấn giữa demo | Chỗ đúng của nó |
+| :-- | :-- |
+| `MCC 0,0` · `99,55% FP` | slide 15 và ▶5, **kèm ngay cách nhìn thứ hai** |
+| `18,8%` lọc tĩnh | slide 13, kèm ngay câu *"sức chống chịu đến từ cơ chế đóng gói"* |
+| `31,13%` nhánh luật tĩnh | slide 19 (giới hạn) |
