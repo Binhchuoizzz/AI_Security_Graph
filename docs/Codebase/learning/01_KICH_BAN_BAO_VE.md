@@ -461,12 +461,3 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 | 18 Đóng góp | 95s | — | — | *(nói câu ĐÓNG RQ3 trước khi vào slide)* | — |
 | 19 Giới hạn | 65s | — | — | — | — |
 | 20 Kết | 45s | — | — | — | — |
-
-**Ba số TUYỆT ĐỐI KHÔNG nhấn trong lúc demo** — chúng có chỗ riêng kèm sẵn câu giải thích,
-rơi ra một mình là người nghe tưởng hệ đang hỏng:
-
-| Đừng nhấn giữa demo | Chỗ đúng của nó |
-| :-- | :-- |
-| `MCC 0,0` · `99,55% FP` | slide 15 và ▶5, **kèm ngay cách nhìn thứ hai** |
-| `18,8%` lọc tĩnh | slide 13, kèm ngay câu *"sức chống chịu đến từ cơ chế đóng gói"* |
-| `31,13%` nhánh luật tĩnh | slide 19 (giới hạn) |
