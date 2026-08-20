@@ -15,8 +15,14 @@ grep -c '^SENTINEL_LOG_SECRET=.\+' .env        # phải in ra đúng 1 (KHÔNG i
 ls -la ~/demo_snapshot_final/audit_trail.db    # bản sổ sạch để bước ⑥ khôi phục
 sqlite3 config/audit_trail.db \
   "SELECT id, action, target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"
-#   ví dụ →  2082|BLOCK_IP|192.168.12.88   — ghi RA GIẤY cả ID lẫn IP
+#   PHẢI ra →  2076|BLOCK_IP|198.19.2.41
 ```
+
+> **ID đã chốt: `2076` · IP `198.19.2.41` · dấu thời gian `2026-08-18 12:15:58`.**
+> Đây là dòng `BLOCK_IP` cuối trong ảnh chụp `~/demo_snapshot_final/audit_trail.db` (2.077 dòng,
+> chuỗi HMAC đã kiểm: **toàn vẹn**). Sau khi `cp` ảnh chụp đè vào `config/`, đúng nó là dòng cuối.
+> Nếu lệnh trên ra số **khác 2076** thì có ai đó đã chạy thêm luồng sau bước `cp` — dùng số vừa
+> in ra, đừng dùng 2076.
 
 **Thứ tự alt-tab: Slide → Dashboard → Terminal.**
 
@@ -280,15 +286,15 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
 > ▶ DEMO 4 — SÁU BƯỚC, TERMINAL + DASHBOARD (3 phút)
-> *Trước buổi:* `grep -c '^SENTINEL_LOG_SECRET=.\+' .env` phải ra **1**; lấy ID bằng
-> `sqlite3 config/audit_trail.db "SELECT id,action,target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"` rồi **ghi ra giấy** cả ID lẫn IP.
+> *Trước buổi:* `grep -c '^SENTINEL_LOG_SECRET=.\+' .env` phải ra **1**; và xác nhận lại ID bằng
+> `sqlite3 config/audit_trail.db "SELECT id,action,target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"` — **phải ra `2076|BLOCK_IP|198.19.2.41`**.
 >
 > ① **Dashboard · thanh bên** → nút **🛡️ Kiểm tra tính toàn vẹn Logs (HMAC Audit)**
 >    Chờ dải xanh `✅ Hệ thống nhật ký toàn vẹn (0 phát hiện sửa đổi hay giả mạo).`
 >    Nói: *"Trước khi làm gì, em xin xác nhận cuốn sổ đang lành."*
 >
-> ② **Terminal** — Enter lệnh đã dán sẵn, thay `<ID>` bằng số đã ghi giấy:
->    `sqlite3 config/audit_trail.db "UPDATE audit_trail SET action='LOG' WHERE id=<ID>;"`
+> ② **Terminal** — Enter lệnh đã dán sẵn (ID đã điền, không phải sửa gì):
+>    `sqlite3 config/audit_trail.db "UPDATE audit_trail SET action='LOG' WHERE id=2076;"`
 >    Nói: *"Em xin đóng vai kẻ tấn công vừa bị hệ ra lệnh chặn, nay sửa thẳng cơ sở dữ liệu để xoá dấu vết — đổi lệnh chặn thành một dòng ghi log vô hại."*
 >
 > ③ **Enter NGAY lệnh thứ hai, đừng dừng lại xem kết quả bước ②:**
@@ -299,8 +305,10 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >    🔴 ĐÓNG ĐINH: **678 mẫu đối kháng, không mẫu nào đổi được phán quyết.**
 >    ⚠️ Nói rõ hai thứ khác nhau: *"trên màn hình là năm mẫu chạy tại chỗ; 678 là toàn bộ tập đối kháng em đã đo trong luận văn."* Đừng để hiểu nhầm terminal đang chạy 678.
 >
-> ⑤ **Quay lại Dashboard, bấm 🛡️ lần hai** → dải đỏ `⚠️ PHÁT HIỆN GIẢ MẠO! Đứt gãy chuỗi băm tại dòng log ID …`
->    Chỉ tay vào **ID** và **IP** trên màn hình, đối chiếu với tờ giấy đã ghi.
+> ⑤ **Quay lại Dashboard, bấm 🛡️ lần hai** → dải đỏ:
+>    `⚠️ PHÁT HIỆN GIẢ MẠO! Đứt gãy chuỗi băm tại dòng log **ID 2076**.`
+>    `- Thời điểm: 2026-08-18 12:15:58 · Mục tiêu bị sửa đổi (IP): 198.19.2.41 · Hành động đang hiển thị: LOG`
+>    Chỉ tay vào **ID 2076** và **198.19.2.41**, đối chiếu với con số đã đọc ở bước trước.
 >    Nói: *"Hệ không chỉ biết có người sửa — nó chỉ đúng dòng nào bị sửa."*
 >
 > ⑥ **Khôi phục, bắt buộc trước ▶5:** `cp ~/demo_snapshot_final/audit_trail.db config/`
@@ -460,7 +468,7 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 | **10 Bộ đệm** | 45s | **➜ ▶2** | Dashboard | Tab **`📊 SIEM Logs & Audit Trail`** → 3 tab con **trái sang phải**: `🟢 Tier-1 · Rules` → `⚡ Tier-1 · ML Gate` → `🧠 Tier-2 · Agentic LLM` (tab 3 **chỉ lướt, chưa mở thẻ**) | **0,182 ms** · **962 / 0** |
 | 11 Tác tử | 95s | — | — | *(nói câu ĐÓNG RQ1 trước khi vào slide)* | — |
 | **12 Dual-RAG** | 75s | **➜ ▶3** | Dashboard | Tab con **`🧠 Tier-2 · Agentic LLM`** → mở **thẻ BLOCK đã chọn sẵn**; chỉ 3 chỗ theo thứ tự: mã ATT&CK → đoạn tri thức trích dẫn → câu lập luận | **76** lệnh ảo giác bị chặn · **80,0% → 68,0%** |
-| **13 Rào chắn** | 80s | **➜ ▶4** | **Terminal + Dashboard** | ① nút **`🛡️ Kiểm tra tính toàn vẹn Logs`** → ② `UPDATE … SET action='LOG'` → ③④ `test_adversarial_llm.py` (65s) → ⑤ bấm 🛡️ lần hai → ⑥ `cp` khôi phục | **678 → 0** · **đích danh ID dòng bị sửa** |
+| **13 Rào chắn** | 80s | **➜ ▶4** | **Terminal + Dashboard** | ① nút **`🛡️ Kiểm tra tính toàn vẹn Logs`** → ② `UPDATE … WHERE id=2076` → ③④ `test_adversarial_llm.py` (65s) → ⑤ bấm 🛡️ lần hai → ⑥ `cp` khôi phục | **678 → 0** · **đích danh `ID 2076`** |
 | 14 Dữ liệu | 30s | — | — | *(nói câu ĐÓNG RQ2 cuối ▶4)* | — |
 | 15 Kết quả 5D | 100s | — | — | — | mỗi chiều **một** số |
 | **16 Ablation** | 60s | **➜ ▶5** | Dashboard | Tab **`🧑‍💻 HITL Approvals`** → mở phiếu đã chọn sẵn, đọc lý do hoãn, bấm **`✅ Approve`**; rồi tab **`🔒 Blocklist & Whitelist`** → chỉ IP vừa duyệt | **15,76% ↔ 95,0%** · lặp lại **0,182 ms** |
