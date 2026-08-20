@@ -14,7 +14,7 @@
 
 | Từ | Đến | Ở đâu | Làm gì |
 | --: | --: | :-- | :-- |
-| 0:00 | 6:00 | Slide 1–7 | mở đầu · ba vướng mắc · ba câu hỏi · kiến trúc |
+| 0:00 | 6:00 | Slide 1–7 | mở đầu · ba nút thắt → đề xuất · ba câu hỏi · kiến trúc |
 | 6:00 | 7:30 | **▶1 Màn hình** | Executive Overview |
 | 7:30 | 10:00 | Slide 8–10 | Welford · Cổng ML · bộ đệm |
 | 10:00 | 12:00 | **▶2 Màn hình** | SIEM Logs, ba tab con |
@@ -36,9 +36,9 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | Slide | ⏱ | Chuyển màn hình? | Chạy gì / mở gì | Show cái gì | 🔴 Số đóng đinh |
 | :-- | --: | :-- | :-- | :-- | :-- |
 | 1 Bìa | 25s | — | — | — | — |
-| 2 Cảm ơn | 15s | — | — | — | — |
+| 2 Cảm ơn | 20s | — | — | — | — |
 | 3 Cấu trúc | 20s | — | — | — | — |
-| 4 Ba vướng mắc | 90s | — | — | — | — |
+| **4 Ba nút thắt → đề xuất hệ thống** | 90s | — | — | — | — |
 | 5 Ba câu hỏi | 60s | — | — | — | — |
 | 6 So sánh | 45s | — | — | — | *(cắt đầu tiên nếu trễ)* |
 | **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
@@ -124,14 +124,19 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ## 5. Lời thoại từng slide
 
-> **Đây là bản sao sinh tự động từ `speakerNotes` trong** `docs/Thesis/slides/index.html`.
+> **Bản sao sinh tự động từ `speakerNotes` trong** `docs/Thesis/slides/index.html`.
 > Bản gốc nằm trong slide — sửa ở đó, đừng sửa ở đây.
 >
-> Phần nói trên slide: **≈ 3.566 âm tiết ≈ 19,8 phút** ở nhịp 180 âm tiết/phút.
-> Ngân sách 18:30 — nếu trễ thì **bỏ slide 6** (khoảng 58 giây) là vừa khít.
+> Phần nói trên slide: **≈ 3.665 âm tiết ≈ 20,4 phút** ở nhịp 180 âm tiết/phút;
+> **bỏ slide 6** thì còn **19,4 phút** — nằm trong khung 15–20 phút.
 >
-> Ký hiệu trong lời thoại: `⏱` mốc thời gian · `▶` chỉ dẫn demo · `🔴` con số phải đóng đinh
+> Ký hiệu: `⏱` mốc thời gian · `▶` chỉ dẫn demo · `🔴` con số phải đóng đinh
 > · `🔒` câu đóng câu hỏi nghiên cứu (nói lúc chuyển màn hình, tính vào giờ demo).
+>
+> **Slide 4 và 5 là một mạch liền:** slide 4 dựng ba nút thắt theo quan hệ nhân quả rồi
+> **đề xuất SENTINEL** ở câu cuối; slide 5 mở đúng bằng *"để giải quyết cụ thể đề xuất vừa
+> nêu, em chia bài toán thành ba phần"* rồi gắn mỗi phần vào một nút thắt. Đừng đọc lại
+> ba nút thắt ở slide 5 — chỉ gọi tên chúng.
 
 ---
 
@@ -151,11 +156,13 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ### Slide 2 — Lời cảm ơn
 
-> Em xin trân trọng cảm ơn hai Thầy hướng dẫn; Quý Thầy Cô Viện FSB và Trường Đại học FPT; Ban Lãnh đạo và đồng nghiệp tại Trung tâm Dữ liệu Quốc gia; cùng gia đình em.
+> Trước khi vào nội dung, em xin phép được bày tỏ lòng biết ơn.
 >
-> Nội dung đã ghi đầy đủ trên slide, em xin phép không đọc lại để dành thời gian cho phần chuyên môn.
+> Em xin trân trọng cảm ơn Quý Thầy Cô trong Hội đồng đã dành thời gian đọc và phản biện luận văn của em; cảm ơn hai Thầy hướng dẫn là TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu; Quý Thầy Cô Viện FSB và Trường Đại học FPT; các đồng nghiệp tại Trung tâm Dữ liệu Quốc gia; và gia đình em.
 >
-> ⏱ 15 giây — NÓI NHANH, TRANG TRỌNG.
+> Nội dung đã ghi đầy đủ trên slide, em xin phép không đọc lại.
+>
+> ⏱ 20 giây — CẢM ƠN HỘI ĐỒNG TRƯỚC TIÊN. Nói nhanh, trang trọng.
 
 ---
 
@@ -169,35 +176,37 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ---
 
-### Slide 4 — Ba nút thắt SOC
+### Slide 4 — Ba nút thắt SOC → đề xuất hệ thống
 
-> Kính thưa Hội đồng, em xin bắt đầu từ ba nút thắt trong vận hành thực tế.
+> Kính thưa Hội đồng, ba nút thắt sau đây không tách rời nhau — nút thắt trước sinh ra nút thắt sau.
 >
-> NÚT THẮT MỘT — QUY MÔ LOG VÀ KHỦNG HOẢNG ĐỘ TRỄ. Một trung tâm giám sát nhận hàng trăm nghìn đến hàng triệu bản ghi mỗi ngày, mà phần lớn cảnh báo lại là hoạt động lành tính, gây quá tải cảnh báo — hiện tượng AlAhmadi và cộng sự đã ghi nhận tại USENIX Security 2022. Đẩy toàn bộ log thô qua AI thì chính AI thành điểm nghẽn. Cần một bộ lọc tốc độ cao ở vành ngoài.
+> NÚT THẮT THỨ NHẤT LÀ QUY MÔ. Một trung tâm giám sát nhận hàng trăm nghìn đến hàng triệu bản ghi mỗi ngày, mà phần lớn cảnh báo lại là hoạt động lành tính, gây quá tải cảnh báo — hiện tượng AlAhmadi và cộng sự đã ghi nhận tại USENIX Security 2022. Luật tương quan tĩnh thì rẻ nhưng không hiểu ngữ cảnh, nên muốn đọc được ý nghĩa của một chuỗi hành vi thì buộc phải đưa AI vào. Nhưng đẩy toàn bộ log thô qua AI thì chính AI thành điểm nghẽn.
 >
-> NÚT THẮT HAI — BỀ MẶT TẤN CÔNG AI VÀ GIẢ MẠO NHẬT KÝ. Nút thắt này sinh ra do chính việc đưa AI vào tuyến phòng thủ. Kẻ tấn công chèn câu lệnh vào Syslog hoặc User-Agent để chiếm quyền điều khiển mô hình; bóp méo đặc trưng để né mô hình học máy; và sửa xoá nhật ký sau xâm nhập, làm mất tính chống chối bỏ. Cần rào chắn cô lập đầu vào và niêm phong vết kiểm toán.
+> CHÍNH VIỆC ĐƯA AI VÀO SINH RA NÚT THẮT THỨ HAI: AI trở thành một bề mặt tấn công mới. Kẻ tấn công chèn câu lệnh vào Syslog hoặc User-Agent để chiếm quyền điều khiển mô hình; bóp méo đặc trưng để né mô hình học máy; và sửa xoá nhật ký sau xâm nhập để phi tang.
 >
-> NÚT THẮT BA — SOAR CỨNG NHẮC, ẢO GIÁC VÀ TẢI CHUYÊN GIA. Playbook cố định không phán quyết được theo ngữ cảnh mới. Nhưng AI để tự do thì ảo giác, tự bịa mã kỹ thuật và chặn vô căn cứ. Cần tác tử có tra cứu để giảm ảo giác, và phân loại thông minh để giảm tải chuyên gia.
+> NÚT THẮT THỨ BA NẰM Ở CHẤT LƯỢNG PHÁN QUYẾT. Playbook SOAR cố định không phán quyết được trước hành vi mới; nhưng thả AI tự do thì nó ảo giác, tự bịa mã kỹ thuật và chặn vô căn cứ, đồng thời hàng đợi thủ công của chuyên gia vẫn ngập như cũ.
 >
-> Ba nút thắt này không giải quyết riêng lẻ được. Đó là bài toán trung tâm của luận văn: một kiến trúc phân tầng hai lớp.
+> Nói gọn: phải dùng AI vì luật tĩnh không đủ, nhưng dùng AI thì phải giải luôn bài toán bảo vệ chính nó và kiểm soát lời nó nói.
 >
-> ⏱ 90 giây — Ba nút thắt ánh xạ MỘT-MỘT sang ba câu hỏi ở slide sau. Tách rõ ba khối.
+> TỪ ĐÓ EM ĐỀ XUẤT SENTINEL — KIẾN TRÚC NHẬN THỨC HAI TẦNG. Vành ngoài là bộ lọc tất định chi phí hằng số, xả tải phần lớn lưu lượng ngay ở tốc độ đường truyền. Bên trong là tác tử suy luận vận hành hoàn toàn tại chỗ, chỉ nhận phần dư, và bị ràng buộc bởi rào chắn cùng vết kiểm toán niêm phong.
+>
+> ⏱ 90 giây — BA NÚT THẮT LÀ MỘT CHUỖI NHÂN QUẢ, KHÔNG PHẢI BA GẠCH ĐẦU DÒNG. Câu cuối là câu ĐỀ XUẤT HỆ THỐNG, nối thẳng sang slide 5.
 
 ---
 
 ### Slide 5 — Ba câu hỏi nghiên cứu
 
-> Ba nút thắt vừa nêu dẫn thẳng tới ba câu hỏi nghiên cứu, theo đúng thứ tự.
+> Để giải quyết cụ thể đề xuất vừa nêu, em chia bài toán thành ba phần, mỗi phần ứng với một nút thắt và được phát biểu thành một câu hỏi nghiên cứu.
 >
-> CÂU HỎI MỘT — HIỆU NĂNG VÀ CHI PHÍ SUY LUẬN. Làm thế nào xả tải log thô ngay ở tốc độ đường truyền để giảm độ trễ và chi phí GPU. Chỗ khó: lọc rẻ thì bỏ sót, lọc kỹ thì lại phải gọi mô hình.
+> PHẦN MỘT GIẢI NÚT THẮT QUY MÔ — câu hỏi số một: làm thế nào xả tải log thô ngay ở tốc độ đường truyền để giảm độ trễ và chi phí GPU. Chỗ khó: lọc rẻ thì bỏ sót, lọc kỹ thì lại phải gọi mô hình.
 >
-> CÂU HỎI HAI — PHÒNG THỦ ĐA VECTOR VÀ VẾT KIỂM TOÁN. Cơ chế nào chống đỡ được cả chèn câu lệnh, né tránh cổng học máy, lẫn giả mạo nhật ký. Chỗ khó: nhật ký chính là dữ liệu do kẻ tấn công viết, nên lọc theo từ khoá thì hắn chỉ cần đổi câu chữ.
+> PHẦN HAI GIẢI NÚT THẮT BỀ MẶT TẤN CÔNG — câu hỏi số hai: cơ chế nào chống đỡ được cả chèn câu lệnh, né tránh cổng học máy, lẫn giả mạo nhật ký. Chỗ khó: nhật ký chính là dữ liệu do kẻ tấn công viết, nên lọc theo từ khoá thì hắn chỉ cần đổi câu chữ.
 >
-> CÂU HỎI BA — SUY LUẬN TÁC TỬ VÀ QUY KẾT MITRE. Làm sao quy kết đúng mã ATT&CK và giảm tải chuyên gia mà vẫn hạn chế ảo giác. Chỗ khó: một mô hình lượng tử hoá thì luôn có câu trả lời, kể cả khi không biết. Làm sao buộc nó im lặng khi thiếu bằng chứng.
+> PHẦN BA GIẢI NÚT THẮT CHẤT LƯỢNG PHÁN QUYẾT — câu hỏi số ba: làm sao quy kết đúng mã ATT&CK và giảm tải chuyên gia mà vẫn hạn chế ảo giác. Chỗ khó: một mô hình đã lượng tử hoá thì luôn có câu trả lời, kể cả khi không biết.
 >
-> Ba nút thắt, ba câu hỏi, ba đóng góp — gắn một-một. Mọi con số em báo cáo hôm nay đều thuộc một trong ba trục này.
+> Ba nút thắt, ba câu hỏi, ba đóng góp — gắn một-một. Cuối mỗi phần em sẽ quay lại khép đúng câu hỏi tương ứng.
 >
-> ⏱ 60 giây
+> ⏱ 60 giây — MỞ ĐẦU BẰNG CÂU NỐI TỪ SLIDE 4. Không kể lại ba nút thắt, chỉ gọi tên.
 
 ---
 
