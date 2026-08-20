@@ -47,9 +47,9 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Em là Nguyễn Đức Bình, học viên lớp MSE23HN, ngành Kỹ thuật Phần mềm, Viện Quản trị và Công nghệ FSB. Đề tài của em: SENTINEL — Kiến trúc Nhận thức Hai tầng cho Phát hiện và Phản hồi Mối đe doạ Tự động sử dụng AI Tác tử, dưới sự hướng dẫn của TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu.
 >
-> Em xin nói trước một điều: toàn bộ hệ thống này chạy trên một máy tính cá nhân, không gọi ra bất kỳ dịch vụ đám mây nào. Mọi con số em báo cáo hôm nay đều đo trên chính chiếc máy đó.
+> Em xin nói trước: toàn bộ hệ thống chạy trên một máy tính cá nhân, không gọi dịch vụ đám mây nào. Mọi con số hôm nay đều đo trên chính máy đó.
 >
-> ⏱ 30 giây
+> ⏱ 35 giây
 
 ---
 
@@ -65,9 +65,9 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 
 > Báo cáo của em gồm bốn phần: vấn đề đặt ra, kiến trúc giải quyết, kết quả thực nghiệm, và những gì hệ thống còn chưa làm được.
 >
-> Em xin phép một điều. Thay vì kể lại hệ thống bằng lời, ở những chỗ thích hợp em sẽ mở nó ra để Quý Thầy Cô nhìn trực tiếp — nói xong cơ chế nào là cho xem cơ chế đó chạy luôn. Như vậy Quý Thầy Cô không phải chờ tới cuối buổi mới biết những điều em nói có thật hay không.
+> Em xin phép một điều: nói xong cơ chế nào, em sẽ mở hệ thống ra cho xem cơ chế đó chạy luôn, thay vì để Quý Thầy Cô chờ tới cuối buổi.
 >
-> ⏱ 25 giây — Câu xin phép đan xen là bản lề cả buổi. Đừng bỏ.
+> ⏱ 20 giây — Câu xin phép đan xen là bản lề cả buổi. Đừng bỏ.
 
 ---
 
@@ -79,15 +79,15 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Hướng xử lý tự nhiên là đưa AI vào đọc thay cho con người. Nhưng đặt AI vào đúng vị trí đó thì lại sinh ra nút thắt thứ hai: bản thân mô hình trở thành mục tiêu bị tấn công.
 >
-> Lý do là nhật ký an ninh không phải thứ chúng ta viết ra, mà phần lớn do chính kẻ tấn công sinh ra. Hắn chỉ cần cài một câu lệnh giả vào trong log là sai khiến được mô hình đang canh gác; chỉnh vài con số là lách được mô hình học máy; và khi đã vào được rồi thì sửa xoá nhật ký để phi tang.
+> Lý do là nhật ký an ninh phần lớn do chính kẻ tấn công sinh ra. Hắn cài một câu lệnh giả vào log là sai khiến được mô hình đang canh gác; chỉnh vài con số là lách được mô hình học máy; vào được rồi thì sửa xoá nhật ký để phi tang.
 >
 > Ngay cả khi AI không bị ai tấn công, vẫn còn nút thắt thứ ba: chất lượng phán quyết. Kịch bản xử lý cố định thì không suy luận được ngữ cảnh, gặp hành vi mới là đứng hình. Còn thả AI tự do thì nó lại quá tự tin — tự nghĩ ra mã kỹ thuật không có thật và ra lệnh chặn thiếu căn cứ.
 >
 > Ba nút thắt khoá lẫn nhau: không dùng AI thì không đủ, mà dùng AI thì phải lo bảo vệ chính nó và kiểm soát những gì nó nói.
 >
-> Vì vậy em đề xuất SENTINEL, một hệ thống hai tầng. Tầng ngoài là bộ lọc nhanh, xử lý ngay khi bản ghi vừa tới và giữ lại phần lớn lưu lượng. Tầng trong là tác tử AI chạy tại chỗ, chỉ nhận phần tầng ngoài không kết luận được, và luôn bị ràng buộc bởi rào chắn cùng một cuốn sổ ghi chép không sửa được.
+> Vì vậy em đề xuất SENTINEL, một hệ thống hai tầng. Tầng ngoài là bộ lọc nhanh, giữ lại phần lớn lưu lượng ngay khi bản ghi vừa tới. Tầng trong là tác tử AI chạy tại chỗ, chỉ nhận phần tầng ngoài không kết luận được, và luôn bị ràng buộc bởi rào chắn cùng một cuốn sổ không sửa được.
 >
-> ⏱ 125 giây — Mở bằng VẤN ĐỀ và BỐI CẢNH, nói ở tầm trung tâm giám sát chứ không kể chuyện một cá nhân. Ba nút thắt là chuỗi nhân quả. Câu cuối là câu đề xuất, nối thẳng sang slide 5.
+> ⏱ 120 giây — Mở bằng VẤN ĐỀ và BỐI CẢNH, nói ở tầm trung tâm giám sát chứ không kể chuyện một cá nhân. Ba nút thắt là chuỗi nhân quả. Câu cuối là câu đề xuất, nối thẳng sang slide 5.
 
 ---
 
@@ -97,13 +97,13 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Phần thứ nhất nhắm nút thắt số lượng. Câu hỏi: lọc bớt được bao nhiêu ngay từ đầu, để giảm độ trễ và chi phí tính toán? Nghịch lý là lọc sơ sài thì bỏ sót đe doạ thật, mà lọc kỹ thì lại phải nhờ tới AI — đúng thứ ta đang muốn tránh.
 >
-> Phần thứ hai nhắm nút thắt AI bị tấn công. Câu hỏi: cơ chế nào chặn được cả ba đường — chèn câu lệnh, lách mô hình học máy, và sửa nhật ký? Cái khó là log do kẻ tấn công viết, nên chỉ dò từ khoá thì hắn đổi cách viết là xong. Ta cần một cách phòng thủ không phụ thuộc vào việc hắn viết gì.
+> Phần thứ hai nhắm nút thắt AI bị tấn công. Câu hỏi: cơ chế nào chặn được cả ba đường — chèn câu lệnh, lách mô hình học máy, và sửa nhật ký? Cái khó là log do kẻ tấn công viết: chỉ dò từ khoá thì hắn đổi cách viết là xong.
 >
 > Phần thứ ba nhắm nút thắt chất lượng phán quyết. Câu hỏi: làm sao để AI quy kết đúng kỹ thuật tấn công và giảm việc cho chuyên viên, mà không nói bừa? Cái khó nằm ở bản chất mô hình — nó luôn có câu trả lời, kể cả khi không biết gì.
 >
 > Ba nút thắt, ba câu hỏi, ba đóng góp — đi với nhau từng cặp. Trình bày xong mỗi phần, em sẽ quay lại chốt đúng câu hỏi tương ứng.
 >
-> ⏱ 80 giây — Mỗi câu hỏi kèm một NGHỊCH LÝ, đó là chỗ gây tò mò. Không kể lại ba nút thắt, chỉ gọi tên.
+> ⏱ 75 giây — Mỗi câu hỏi kèm một NGHỊCH LÝ, đó là chỗ gây tò mò. Không kể lại ba nút thắt, chỉ gọi tên.
 
 ---
 
@@ -131,7 +131,7 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Toàn bộ thiết kế sau đây chỉ nhằm đúng một việc: đẩy càng nhiều lưu lượng về phía con số nhỏ càng tốt — mà không được để lọt.
 >
-> Em xin đi theo hành trình của một bản ghi. Đầu vào là luồng hợp nhất 99.717 sự kiện, ghép từ CSE-CIC-IDS2018 và CSIC 2010.
+> Em xin đi theo hành trình của một bản ghi, trong luồng 99.717 sự kiện ghép từ CSE-CIC-IDS2018 và CSIC 2010.
 >
 > Chặng một là Tầng 1: luật WAF cộng mốc thống kê Welford, ngưỡng ba phẩy năm sigma, chi phí gần như bằng không.
 >
@@ -139,20 +139,28 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Chặng ba là bộ đệm phán quyết: bản ghi nào trùng khít một ca đã xử thì dùng lại kết quả cũ, không hỏi lại mô hình.
 >
-> Ba chặng xếp đúng thứ tự rẻ trước, đắt sau. Mỗi chặng chỉ nhận phần mà chặng trước không kết luận nổi.
+> Mỗi chặng chỉ nhận phần mà chặng trước không kết luận nổi.
 >
-> Chặng bốn mới là Tầng 2, và nó chỉ nhìn thấy phần dư: đồ thị LangGraph điều phối mô hình Foundation-Sec 8B, có tra cứu 433 mã MITRE ATT&CK, có bộ nhớ đe doạ, và bị bao bởi rào chắn cùng chuỗi HMAC.
+> Chặng bốn mới là Tầng 2, và nó chỉ nhìn thấy phần dư: LangGraph điều phối mô hình Foundation-Sec 8B, tra cứu 433 mã MITRE ATT&CK, có bộ nhớ đe doạ, và bị bao bởi rào chắn cùng chuỗi HMAC.
 >
 > Nguyên tắc của cả hệ gói trong một câu: phán quyết rẻ phải đứng trước phán quyết đắt.
 >
 > Phần dư còn lại lớn tới đâu — em xin để Quý Thầy Cô tự nhìn trên hệ thống đang chạy.
 >
-> ⏱ 120 giây — SLIDE QUAN TRỌNG NHẤT. Mở bằng CÂU ĐỐ hai con số, kiến trúc là lời giải.
+> ⏱ 80 giây — SLIDE QUAN TRỌNG NHẤT. Mở bằng CÂU ĐỐ hai con số, kiến trúc là lời giải.
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
 > ▶ DEMO 1 — Tab Executive Overview (1 phút 30)
-> Chỉ ba số: tổng log thô · tỉ lệ xả tải · hàng đợi LLM.
+>
+> ① Alt-tab sang **Dashboard** → tab **`🎬 Executive Overview`** → kéo tới hàng **`📊 Real-Time Operational Metrics`** (8 ô số liệu).
+> ② Chỉ **ba ô**, đúng thứ tự này: **`Log thô vào`** → **`Hàng đợi LLM (lô) ⏳`** → **`Chuỗi HMAC`**.
+>    Nói: *"Đây là tổng bản ghi đi vào. Đây là số lô còn phải nhờ tới mô hình. Khoảng cách giữa hai con số đó chính là phần hệ thống tự giải quyết mà không cần AI."*
+>    Ô **`Chuỗi HMAC ✅ Nguyên vẹn`** — dừng nửa nhịp, nói: *"ô này lát nữa em sẽ quay lại."* Đây là gài sẵn cho ▶4.
+> ③ Kéo xuống khối **`🏆 Empirical Thesis Benchmark Results`**, chỉ hai ô **`Giảm độ trễ đầu-cuối`** và **`Cổng ML giảm tải LLM`**.
+>
 > 🔴 ĐÓNG ĐINH: 97,5% — LUÔN NÓI KÈM 90,6%, KHÔNG NÓI LẺ.
+> ⚠️ **KHÔNG có ô nào trên màn hình in ra "97,5%"** — đó là số benchmark của luận văn, không phải số đang chạy. Nói tách bạch: *"trên màn hình là luồng đang chạy; 97,5% là con số em đo trong luận văn."* Chỉ tay vào một ô rồi đọc 97,5% là tự tạo ra một lỗi không cần thiết.
+> ⚠️ Ô **`Tier-1 luật chặn`** mang dấu ⚠️ vì đọc từ **bộ đếm luồng**, không phải từ sổ HMAC — nhánh chặn của luật Tier-1 không ghi dòng audit nào. Nếu bị hỏi thì nhận thẳng: đây là giới hạn đã ghi trong luận văn. Tuyệt đối đừng nói *"mọi lệnh chặn đều nằm trong sổ ký"*.
 > Câu chốt: 97,5% này đo ở tỉ lệ tấn công nền 9,8%. Khi nền lên 31,56% thì xả tải còn 90,6%, và vai gánh tải giữa hai tầng đảo chiều. Xả tải là thuộc tính của hỗn hợp lưu lượng, không phải hằng số của hệ. Em công bố cả hai điểm đo, vì nếu chỉ trưng một số thì câu hỏi hiển nhiên — trên hạ tầng khác có giữ được không — sẽ không có chỗ nào trả lời.
 
 ---
@@ -183,13 +191,13 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Nhưng điều em tâm đắc ở cổng này không phải là nó đoán giỏi. Mà là nó biết lúc nào nên im lặng.
 >
-> Nếu quá 30 phần trăm đặc trưng lệch quá sáu sigma so với những gì nó từng học, hoặc bản ghi thiếu quá nhiều thông tin, mô hình sẽ không đưa ra phán quyết mà đẩy thẳng lên Tầng 2. Cộng thêm một lớp kẹp giá trị ở tám sigma, để một đặc trưng bị bóp méo cực đoan không lái được cả kết quả.
+> Nếu quá 30 phần trăm đặc trưng lệch quá sáu sigma so với những gì nó từng học, hoặc bản ghi thiếu quá nhiều thông tin, mô hình không phán quyết mà đẩy thẳng lên Tầng 2. Thêm một lớp kẹp giá trị ở tám sigma, để một đặc trưng bị bóp méo cực đoan không lái được kết quả.
 >
 > Về số đo: trên 2.534 ca cổng trực tiếp phán quyết, hệ số Matthews đạt 0,6667 và F1 đạt 0,8248. Và ở dải tin cậy từ 0,85 trở lên, cổng đã tự ra lệnh chặn 962 lần — không sai một lần nào.
 >
-> Chính sách chia bốn dải: từ 0,85 trở lên thì chặn; 0,65 đến 0,85 thì đẩy lên Tầng 2; 0,40 đến 0,65 thì cảnh báo ưu tiên thấp; dưới 0,40 thì bỏ qua.
+> Chính sách bốn dải: từ 0,85 trở lên thì chặn; 0,65 đến 0,85 đẩy lên Tầng 2; 0,40 đến 0,65 cảnh báo ưu tiên thấp; dưới 0,40 bỏ qua.
 >
-> ⏱ 70 giây — Câu "biết lúc nào nên im lặng" là câu ăn điểm, nói chậm.
+> ⏱ 60 giây — Câu "biết lúc nào nên im lặng" là câu ăn điểm, nói chậm.
 
 ---
 
@@ -205,13 +213,20 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Ba chặng lọc vừa rồi chính là ba tab em xin mở ra sau đây.
 >
-> ⏱ 40 giây
+> ⏱ 45 giây
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
 > ▶ DEMO 2 — Tab SIEM Logs, ba tab con, TRÁI SANG PHẢI (2 phút)
-> ① Tier-1 Rules — 🔴 0,182 ms: "đây là quyết định giá 0,182 mili giây."
-> ② ML Gate — 🔴 962 / 0 FP: "962 lệnh chặn tự động, không sai một lần nào, và mỗi dòng đều nằm trong vết kiểm toán."
-> ③ Tier-2 LLM — chỉ lướt, CHƯA MỞ THẺ NÀO, để dành cho demo 3.
+>
+> Tab **`📊 SIEM Logs & Audit Trail`** → hàng ba tab con, đi **trái sang phải, không nhảy cóc**:
+>
+> ① **`🟢 Tier-1 · Rules (Welford & Signatures)`**
+>    🔴 **0,182 ms** — Nói: *"đây là quyết định giá 0,182 mili giây."*
+> ② **`⚡ Tier-1 · ML Gate (LightGBM)`**
+>    🔴 **962 / 0 FP** — Nói: *"962 lệnh chặn tự động, không sai một lần nào, và mỗi dòng đều nằm trong vết kiểm toán."*
+> ③ **`🧠 Tier-2 · Agentic LLM (LangGraph)`** — **chỉ lướt qua, CHƯA MỞ THẺ NÀO.** Nói: *"phần này em xin quay lại ngay sau đây."* Mở thẻ ở đây là đốt mất cao trào của ▶3.
+>
+> ⚠️ Giao diện gọi cổng ML là **"Tier-1 · ML Gate"**, còn luận văn gọi là **Cổng ML** đứng giữa hai tầng. Nếu bị hỏi *"sao lại có hai Tier-1"*, trả lời ngay: nhãn giao diện gộp theo **chi phí** (cả hai đều là đường rẻ, không gọi mô hình ngôn ngữ), luận văn tách theo **cơ chế**. Đừng để câu hỏi này treo.
 
 ---
 
@@ -223,15 +238,15 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Tầng 2 không phải một lời gọi AI. Nếu chỉ có vậy thì em đã không cần làm luận văn này.
 >
-> Nó là một máy trạng thái sáu nút chạy trên LangGraph. Nút một chắn đầu vào. Nút hai tra cứu tri thức. Nút ba mới là mô hình ngôn ngữ phân loại. Nút bốn quy kết kỹ thuật tấn công theo chuẩn STIX. Nút năm thi hành, và lệnh chặn phải mang chữ ký HMAC. Nút sáu chuyển cho người.
+> Nó là một quy trình sáu bước chạy trên LangGraph. Nút một chắn đầu vào. Nút hai tra cứu tri thức. Nút ba mới là mô hình ngôn ngữ phân loại. Nút bốn quy kết kỹ thuật tấn công theo chuẩn STIX. Nút năm thi hành, và lệnh chặn phải mang chữ ký HMAC. Nút sáu chuyển cho người.
 >
-> Mô hình là Foundation-Sec 8B, phục vụ cục bộ qua llama.cpp, cửa sổ 16.384 token, nhiệt độ 0,1. Lượng tử hoá bốn bit giữ nó ở 7 đến 8 GB, vừa đúng một GPU 16GB.
+> Mô hình là Foundation-Sec 8B chạy cục bộ qua llama.cpp, cửa sổ 16.384 token, nhiệt độ 0,1; lượng tử hoá bốn bit giữ nó ở 7 đến 8 GB, vừa một GPU 16GB.
 >
-> Đầu ra bị siết bằng ba lớp: ép mô hình xuất JSON theo lược đồ cố định chỉ gồm ba hành động hợp lệ; gỡ sạch nhãn nội bộ khỏi prompt để nó không nhìn thấy đáp án; và nếu đầu ra vẫn méo thì hệ tự chuyển ca đó về hàng chờ chuyên gia.
+> Đầu ra bị siết ba lớp: bắt mô hình trả lời theo một khuôn JSON cố định chỉ có ba hành động hợp lệ; gỡ sạch nhãn nội bộ khỏi prompt để nó không nhìn thấy đáp án; và nếu đầu ra vẫn méo thì ca đó chuyển thẳng về hàng chờ chuyên gia.
 >
 > Nhưng điều em muốn Quý Thầy Cô chú ý nhất là nút thứ sáu. Nó cho phép tác tử nói: tôi không chắc. Vì trong an ninh, một hệ thống buộc phải trả lời mọi câu hỏi là một hệ thống nguy hiểm.
 >
-> ⏱ 95 giây — Câu cuối là một trong ba câu đắt nhất cả bài. Ngắt nửa nhịp trước khi nói.
+> ⏱ 90 giây — Câu cuối là một trong ba câu đắt nhất cả bài. Ngắt nửa nhịp trước khi nói.
 
 ---
 
@@ -251,7 +266,10 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
 > ▶ DEMO 3 — Tab Tier-2, MỞ MỘT THẺ BLOCK (2 phút 30) — TRÁI TIM BUỔI BẢO VỆ
-> Chỉ ba chỗ: mã ATT&CK · đoạn tri thức được trích dẫn · câu lập luận.
+>
+> ① Quay lại tab **`📊 SIEM Logs & Audit Trail`** → tab con **`🧠 Tier-2 · Agentic LLM (LangGraph)`**.
+> ② Mở **đúng thẻ đã chọn từ trước buổi** — tuyệt đối không cuộn tìm tại chỗ, vì thẻ đẹp và thẻ khó đọc nằm lẫn nhau.
+> ③ Chỉ **ba chỗ trên thẻ**, đúng thứ tự này: **mã ATT&CK** → **đoạn tri thức được trích dẫn** → **câu lập luận**. Đọc theo thứ tự đó thì người nghe tự thấy quan hệ nhân quả; đọc ngược lại thì thành ba mảnh rời.
 > 🔴 ĐÓNG ĐINH: 76 lệnh chặn ảo giác đã bị giữ lại.
 > Câu chốt: mã kỹ thuật ở trên chỉ được phép tồn tại vì đoạn tài liệu ở dưới tồn tại. Không neo được thì hệ hạ cấp xuống hàng chờ chuyên gia. Trên 1.421 ca khẳng định mã kỹ thuật, không ca nào thiếu neo.
 > NÊU LUÔN CÁI GIÁ: chỉ dùng bộ truy xuất thì quy kết đúng 80,0%; chạy toàn tuyến qua rào chắn còn 68,0%. Mười hai điểm phần trăm là học phí của việc không tin lời mô hình — em cho rằng đáng trả.
@@ -274,13 +292,11 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Cách chống của em không phải là dò xem hắn viết gì. Em bọc toàn bộ phần không tin cậy vào giữa một cặp dấu phân định mang mã ngẫu nhiên, sinh mới theo từng lô. Mọi thứ nằm trong ranh giới đó bị xử lý như văn bản để đọc, không phải mệnh lệnh để làm. Và vì mã đó đổi liên tục, hắn không thể đoán trước để viết dấu đóng rồi thoát ra ngoài.
 >
-> Điểm mạnh của cách này là nó không quan tâm hắn viết gì. Đổi câu chữ bao nhiêu lần cũng vậy.
->
 > Vế thứ hai là cuốn sổ. Mỗi phán quyết được ký bằng HMAC-SHA256, và chữ ký tính trên cả nội dung của nó lẫn chữ ký của bản ghi liền trước. Sửa một dòng ở giữa là gãy toàn bộ chuỗi phía sau — nên hệ không chỉ biết là có người sửa, mà còn chỉ đúng dòng bị sửa.
 >
 > Nhưng nói thì Quý Thầy Cô vẫn phải tin lời em. Nên em xin phép chứng minh — thử tấn công thật, ngay bây giờ.
 >
-> ⏱ 100 giây — Câu cuối là câu chuyển hay nhất cả bài: tự thừa nhận lời nói không đủ, rồi chứng minh.
+> ⏱ 80 giây — Câu cuối là câu chuyển hay nhất cả bài: tự thừa nhận lời nói không đủ, rồi chứng minh.
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
 > ▶ DEMO 4 — SÁU BƯỚC, TERMINAL + DASHBOARD (3 phút)
@@ -322,7 +338,7 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Dữ liệu gồm hai tập chuẩn quốc tế: CSE-CIC-IDS2018 cho lưu lượng mạng, và CSIC 2010 cho tấn công tầng ứng dụng web. Hai tập ghép thành luồng 99.717 sự kiện với tỉ lệ tấn công nền 9,8%, cùng một tập nhãn chuẩn 1.700 mẫu.
 >
-> ⏱ 50 giây
+> ⏱ 45 giây
 
 ---
 
@@ -342,9 +358,9 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Và bây giờ là con số em không hài lòng. Trong bốn trục chấm, trục đánh giá độ sạch của tài liệu truy xuất chỉ được 2,54 trên 5 — thấp nhất. Nghĩa là bộ truy xuất vẫn kéo về khá nhiều tài liệu không liên quan. Em ghi hạn chế này ở Chương 5 và có hướng khắc phục ở slide cuối.
 >
-> Còn một điều nữa em muốn nói về con số 97,5 phần trăm. Nó đo ở tỉ lệ tấn công nền 9,8%. Khi em nâng tỉ lệ nền lên 31,56% thì xả tải tụt còn 90,6%, và vai gánh tải giữa hai tầng đảo chiều. Cho nên một con số xả tải mà không kèm tỉ lệ tấn công nền là một con số không đọc được — và em công bố cả hai.
+> Và xin nhắc lại một lần: con số 97,5% đo ở nền tấn công 9,8%; nâng nền lên 31,56% thì còn 90,6%. Một con số xả tải không kèm tỉ lệ nền là một con số không đọc được, nên em công bố cả hai.
 >
-> ⏱ 130 giây — Lời hứa ở câu mở ("bắt đầu bằng số hài lòng nhất, kết thúc bằng số không hài lòng") làm cho điểm yếu 2,54 trở thành cao trào chứ không phải lời xin lỗi.
+> ⏱ 80 giây — Lời hứa ở câu mở ("bắt đầu bằng số hài lòng nhất, kết thúc bằng số không hài lòng") làm cho điểm yếu 2,54 trở thành cao trào chứ không phải lời xin lỗi.
 
 ---
 
@@ -358,19 +374,21 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Về chất lượng lập luận, trọng tài độc lập chấm trung bình 3,78 trên 5, và tỉ lệ bịa mã kỹ thuật là 0 trên 1.421 ca.
 >
-> Nhưng em xin nêu thẳng cái giá của lá chắn đó. Nếu chỉ dùng bộ truy xuất thì quy kết đúng 200 trên 250, tức 80,0%. Chạy toàn tuyến qua rào chắn thì còn 170 trên 250, tức 68,0%. Mười hai điểm phần trăm chênh lệch chính là học phí của việc không tin lời mô hình.
+> Cái giá của lá chắn đó em cũng xin nêu thẳng: chỉ dùng bộ truy xuất thì quy kết đúng 80,0%; chạy toàn tuyến qua rào chắn còn 68,0%. Mười hai điểm là học phí của việc không tin lời mô hình.
 >
 > Hàng đợi chờ người đó trông ra sao, em xin phép mở ra xem trực tiếp.
 >
-> ⏱ 90 giây — "Kiểu sai đã thay đổi" mới là điểm nhấn, không phải 7 điểm phần trăm.
+> ⏱ 65 giây — "Kiểu sai đã thay đổi" mới là điểm nhấn, không phải 7 điểm phần trăm.
 >
 > ━━━━━━━━━━━━━━━━━━━━━━━━
 > ▶ DEMO 5 — HITL + BLOCKLIST (2 phút 30)
-> ① Tab HITL Approvals: mở một phiếu AWAIT_HITL, ĐỌC TO LÝ DO HOÃN.
+> ⚠️ Trước khi bắt đầu: **bước ⑥ của ▶4 phải đã chạy** (`cp ~/demo_snapshot_final/audit_trail.db config/`). ▶5 đọc đúng cơ sở dữ liệu đó.
+>
+> ① Tab **`🧑‍💻 HITL Approvals`** → mục **`Phê duyệt Phân tích từ LLM (AWAIT_HITL)`** → mở **phiếu đã chọn từ trước buổi**, **ĐỌC TO LÝ DO HOÃN**.
 >    🔴 ĐÓNG ĐINH: 15,76% khối lượng chứa 95,0% đe doạ thật.
 >    Câu chốt: hệ nhận 1.066 cảnh báo, trong đó chỉ 80 là đe doạ thật. Nhìn hàng đợi này như một bộ phân loại nhị phân thì kết quả rất kém — hệ số Matthews bằng 0, báo nhầm 99,55%, em báo cáo đầy đủ trong luận văn. Nhưng nó không phải bộ phân loại, mà là kênh phân loại ưu tiên: hàng đợi này chỉ chiếm 15,76% khối lượng mà chứa tới 95,0% đe doạ thật, làm giàu 6,03 lần.
->    Rồi BẤM DUYỆT MỘT PHIẾU.
-> ② Tab Blocklist: chỉ IP vừa duyệt, nay nằm trong luật chặn vĩnh viễn.
+>    Rồi bấm **`✅ Approve`** — nút **`❌ Reject`** nằm ngay cạnh, bấm nhầm là hỏng cả bước ②.
+> ② Tab **`🔒 Blocklist & Whitelist Management`** → chỉ đúng **IP vừa duyệt**, nay nằm trong luật chặn vĩnh viễn.
 >    🔴 LẶP LẠI 0,182 ms — CỐ Ý, KHÉP VÒNG VỚI SLIDE 7.
 >    Câu chốt: mô hình đề xuất, chuyên gia phê duyệt, luật nạp về Tầng 1. Từ lần sau, ca này chỉ tốn 0,182 mili giây — hệ thống càng chạy càng đẩy được nhiều việc về phía rẻ.
 
@@ -394,13 +412,13 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Thứ nhất: thứ quyết định kiến trúc một trung tâm giám sát dùng AI không phải là mô hình đoán giỏi tới đâu, mà là mỗi phán quyết tốn bao nhiêu. Và xả tải không phải hằng số của hệ thống — nó là hàm của hỗn hợp lưu lượng.
 >
-> Thứ hai: phòng thủ theo cấu trúc thắng phòng thủ theo nội dung. Bộ dò từ khoá mù trước cách diễn đạt mới; còn cách bọc dữ liệu không cần hiểu câu chữ nên không bị câu chữ đánh lừa. Cái giá em cũng đã đo và nêu: chuỗi HMAC không bắt được việc cắt cụt đuôi sổ — giới hạn nguyên lý, không phải lỗi cài đặt.
+> Thứ hai: phòng thủ theo cấu trúc thắng phòng thủ theo nội dung. Bộ dò từ khoá mù trước cách diễn đạt mới; cách bọc dữ liệu không cần hiểu câu chữ nên không bị câu chữ đánh lừa.
 >
-> Thứ ba, và đây là phát hiện trái ngược trực giác mà em quyết định giữ nguyên: thêm tầng suy luận vào lại làm quy kết xấu đi so với chỉ dùng truy xuất. Em giữ vì đó là đánh đổi có chủ ý — lá chắn buộc mô hình trả về không xác định thay vì đoán một mã nghe hợp lý. Đóng góp thật không nằm ở điểm quy kết cao, mà ở cơ chế buộc mô hình im lặng khi thiếu bằng chứng.
+> Thứ ba, và đây là điều trái ngược trực giác mà em quyết định giữ nguyên: thêm tầng suy luận vào lại làm quy kết xấu đi so với chỉ dùng truy xuất. Em giữ vì đó là đánh đổi có chủ ý — lá chắn buộc mô hình trả về không xác định thay vì đoán một mã nghe hợp lý.
 >
 > Thứ tư, về mặt sản phẩm: dùng mô hình ngôn ngữ làm bộ định tuyến, không dùng làm bộ phán quyết.
 >
-> ⏱ 95 giây
+> ⏱ 90 giây
 
 ---
 
@@ -418,7 +436,7 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Năm, em mới chạy trên một máy trạm đơn GPU, chưa kiểm ở quy mô hạ tầng lớn.
 >
-> ⏱ 85 giây — CHỖ ĂN ĐIỂM, ĐỪNG LƯỚT. Nói thẳng, không rào đón.
+> ⏱ 65 giây — CHỖ ĂN ĐIỂM, ĐỪNG LƯỚT. Nói thẳng, không rào đón.
 > Nếu trễ: nói kỹ ba giới hạn đầu, hai cái cuối gộp một câu.
 
 ---
@@ -441,23 +459,23 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 
 | Slide | ⏱ | Chuyển màn hình? | Chạy gì / mở gì | Show cái gì | 🔴 Số đóng đinh |
 | :-- | --: | :-- | :-- | :-- | :-- |
-| 1 Bìa | 30s | — | — | — | — |
+| 1 Bìa | 35s | — | — | — | — |
 | 2 Cảm ơn | 20s | — | — | — | — |
-| 3 Cấu trúc | 30s | — | — | — | — |
-| **4 Ba nút thắt → đề xuất hệ thống** | 125s | — | — | — | — |
-| 5 Ba câu hỏi | 80s | — | — | — | — |
+| 3 Cấu trúc | 20s | — | — | — | — |
+| **4 Ba nút thắt → đề xuất hệ thống** | 120s | — | — | — | — |
+| 5 Ba câu hỏi | 75s | — | — | — | — |
 | 6 So sánh | 65s | — | — | — | *(cắt đầu tiên nếu trễ)* |
-| **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
+| **7 Kiến trúc** | 80s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **`🎬 Executive Overview`** → hàng `📊 Real-Time Operational Metrics`: 3 ô `Log thô vào` · `Hàng đợi LLM` · `Chuỗi HMAC`; rồi khối `🏆 Empirical Thesis Benchmark Results` | **97,5% + 90,6%** — luôn nói cặp |
 | 8 RuleEngine 9 lớp | 95s | — | — | — | — |
-| 9 Cổng ML | 65s | — | — | — | 962 / 0 FP |
-| **10 Bộ đệm** | 45s | **➜ ▶2** | Dashboard | Tab **📊 SIEM Logs** → 3 tab con, **trái sang phải**: `Tier-1 Rules` → `ML Gate` → `Tier-2 LLM` (tab 3 chỉ lướt) | **0,182 ms** · **962 / 0** |
-| 11 Tác tử | 75s | — | — | *(nói câu ĐÓNG RQ1 trước khi vào slide)* | — |
-| **12 Dual-RAG** | 75s | **➜ ▶3** | Dashboard | Tab **🧠 Tier-2 · Agentic LLM** → **mở 1 thẻ BLOCK**; chỉ mã ATT&CK · đoạn tri thức trích dẫn · câu lập luận | **76** lệnh ảo giác bị chặn · **80,0% → 68,0%** |
-| **13 Rào chắn** | 100s | **➜ ▶4** | **Terminal + Dashboard** — sáu bước ở §3 | ① nút 🛡️ toàn vẹn → ② sửa SQL → ③④ chạy đối kháng → ⑤ nút 🛡️ bắt giả mạo → ⑥ khôi phục | **678 → 0** · **ID dòng bị sửa** |
+| 9 Cổng ML | 60s | — | — | — | 962 / 0 FP |
+| **10 Bộ đệm** | 45s | **➜ ▶2** | Dashboard | Tab **`📊 SIEM Logs & Audit Trail`** → 3 tab con **trái sang phải**: `🟢 Tier-1 · Rules` → `⚡ Tier-1 · ML Gate` → `🧠 Tier-2 · Agentic LLM` (tab 3 **chỉ lướt, chưa mở thẻ**) | **0,182 ms** · **962 / 0** |
+| 11 Tác tử | 90s | — | — | *(nói câu ĐÓNG RQ1 trước khi vào slide)* | — |
+| **12 Dual-RAG** | 75s | **➜ ▶3** | Dashboard | Tab con **`🧠 Tier-2 · Agentic LLM`** → mở **thẻ BLOCK đã chọn sẵn**; chỉ 3 chỗ theo thứ tự: mã ATT&CK → đoạn tri thức trích dẫn → câu lập luận | **76** lệnh ảo giác bị chặn · **80,0% → 68,0%** |
+| **13 Rào chắn** | 80s | **➜ ▶4** | **Terminal + Dashboard** | ① nút **`🛡️ Kiểm tra tính toàn vẹn Logs`** → ② `UPDATE … SET action='LOG'` → ③④ `test_adversarial_llm.py` (65s) → ⑤ bấm 🛡️ lần hai → ⑥ `cp` khôi phục | **678 → 0** · **đích danh ID dòng bị sửa** |
 | 14 Dữ liệu | 45s | — | — | *(nói câu ĐÓNG RQ2 cuối ▶4)* | — |
-| 15 Kết quả 5D | 90s | — | — | — | mỗi chiều **một** số |
-| **16 Ablation** | 75s | **➜ ▶5** | Dashboard | Tab **🧑‍💻 HITL Approvals** → mở 1 phiếu, đọc lý do hoãn, **bấm duyệt**; rồi tab **🔒 Blocklist** → chỉ IP vừa duyệt | **15,76% ↔ 95,0%** · lặp lại **0,182 ms** |
+| 15 Kết quả 5D | 80s | — | — | — | mỗi chiều **một** số |
+| **16 Ablation** | 65s | **➜ ▶5** | Dashboard | Tab **`🧑‍💻 HITL Approvals`** → mở phiếu đã chọn sẵn, đọc lý do hoãn, bấm **`✅ Approve`**; rồi tab **`🔒 Blocklist & Whitelist`** → chỉ IP vừa duyệt | **15,76% ↔ 95,0%** · lặp lại **0,182 ms** |
 | 17 Dashboard | 5s | — | *(bàn đạp, bấm lướt)* | — | — |
-| 18 Đóng góp | 95s | — | — | *(nói câu ĐÓNG RQ3 trước khi vào slide)* | — |
+| 18 Đóng góp | 90s | — | — | *(nói câu ĐÓNG RQ3 trước khi vào slide)* | — |
 | 19 Giới hạn | 65s | — | — | — | — |
 | 20 Kết | 45s | — | — | — | — |
