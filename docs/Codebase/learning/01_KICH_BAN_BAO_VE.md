@@ -356,11 +356,15 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 >
 > Chiều chất lượng lập luận: một mô hình khác họ chấm độc lập, đạt 3,78 trên 5.
 >
-> Và bây giờ là con số em không hài lòng. Trong bốn trục chấm, trục đánh giá độ sạch của tài liệu truy xuất chỉ được 2,54 trên 5 — thấp nhất. Nghĩa là bộ truy xuất vẫn kéo về khá nhiều tài liệu không liên quan. Em ghi hạn chế này ở Chương 5 và có hướng khắc phục ở slide cuối.
+> Và bây giờ là con số em không hài lòng: độ sạch của tài liệu truy xuất chỉ 2,54 trên 5 — thấp nhất trong bốn trục.
+>
+> Em xin nói rõ nó nghĩa là gì, vì đây là chỗ dễ hiểu nhầm. Không phải hệ tìm không ra tài liệu đúng — trục độ phủ đạt 4,11, tức tài liệu đúng gần như luôn có mặt. Điểm thấp là ở chỗ nó kéo về kèm quá nhiều tài liệu không liên quan.
+>
+> Nhiễu đó không khiến mô hình bịa ra mã kỹ thuật, vì lá chắn neo bằng chứng chặn việc đó — 0 trên 1.421 ca. Nhưng nó khiến mô hình chọn nhầm giữa nhiều ứng viên cùng được đưa tới. Đó chính là chỗ 80,0% tụt còn 68,0%. Em ghi hạn chế này ở Chương 5, hướng khắc phục ở slide cuối.
 >
 > Và xin nhắc lại một lần: con số 97,5% đo ở nền tấn công 9,8%; nâng nền lên 31,56% thì còn 90,6%. Một con số xả tải không kèm tỉ lệ nền là một con số không đọc được, nên em công bố cả hai.
 >
-> ⏱ 80 giây — Lời hứa ở câu mở ("bắt đầu bằng số hài lòng nhất, kết thúc bằng số không hài lòng") làm cho điểm yếu 2,54 trở thành cao trào chứ không phải lời xin lỗi.
+> ⏱ 105 giây — Lời hứa ở câu mở ("bắt đầu bằng số hài lòng nhất, kết thúc bằng số không hài lòng") làm cho điểm yếu 2,54 trở thành cao trào chứ không phải lời xin lỗi.
 
 ---
 
@@ -391,6 +395,13 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 > ② Tab **`🔒 Blocklist & Whitelist Management`** → chỉ đúng **IP vừa duyệt**, nay nằm trong luật chặn vĩnh viễn.
 >    🔴 LẶP LẠI 0,182 ms — CỐ Ý, KHÉP VÒNG VỚI SLIDE 7.
 >    Câu chốt: mô hình đề xuất, chuyên gia phê duyệt, luật nạp về Tầng 1. Từ lần sau, ca này chỉ tốn 0,182 mili giây — hệ thống càng chạy càng đẩy được nhiều việc về phía rẻ.
+>
+> 📎 BẰNG CHỨNG MÃ NGUỒN — chỉ dùng nếu bị hỏi:
+> · Mọi số của ▶5 nằm trong `summary` của [tier2_decision_results.json](../../../experiments/results/tier2_decision_results.json): `n_escalated 1066` · `n_threat 80` (`true_alert_rate_in 0.075`) · `mcc 0.0` · `triage.defer_rate 0.1576` · `triage.threat_recall_in_deferred 0.95` · `triage.deferred_enrichment_x 6.03` · `triage.fp_rate_on_confirmed 0.9955` · `triage.workload_reduction 0.8424` · `triage.n_deferred 168`. Sinh bởi [evaluate_tier2_decision.py](../../../experiments/evaluate_tier2_decision.py).
+> · **0,182 ms** = `stage_breakdown.mean_ms_by_stage.tier1_drop` trong [latency_benchmark.json](../../../experiments/results/latency_benchmark.json), đo trên **131/500** sự kiện Tier-1 loại. Cùng bảng đó: Cổng ML 0,924 ms · LLM 22.785 ms.
+> · Nút duyệt gọi [`approve_rule()` — feedback_listener.py:308](../../../src/tier1_filter/feedback_listener.py#L308): chuyển luật sang `ACTIVE` kèm `is_hitl_approved=True`, và **tự gỡ IP khỏi whitelist** nếu nó đang nằm đó — vì whitelist ưu tiên cao nhất ở Tầng 1, để nguyên thì luật vừa duyệt vô hiệu.
+> ⚠️ **Nút `✅ Approve` chỉ hiện với vai `L3_Manager`** ([app.py:1598](../../../src/ui/app.py#L1598)). Đăng nhập sai vai là mất trắng bước ②.
+> ⚠️ **99,55% đọc kèm mẫu số, luôn luôn.** Tệp kết quả tự ghi trong trường `cach_doc`: đây là tỉ lệ cảnh báo giả **trong phần LLM khẳng định là thật**, `AWAIT_HITL` không nằm trong mẫu số; và phải trích kèm `true_alert_rate_in` = **7,5%** vì cùng hệ này trên luồng có tỉ lệ cảnh báo thật khác sẽ cho FP khác.
 
 ---
 
@@ -473,7 +484,7 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 | **12 Dual-RAG** | 75s | **➜ ▶3** | Dashboard | Tab con **`🧠 Tier-2 · Agentic LLM`** → mở **thẻ BLOCK đã chọn sẵn**; chỉ 3 chỗ theo thứ tự: mã ATT&CK → đoạn tri thức trích dẫn → câu lập luận | **76** lệnh ảo giác bị chặn · **80,0% → 68,0%** |
 | **13 Rào chắn** | 80s | **➜ ▶4** | **Terminal + Dashboard** | ① nút **`🛡️ Kiểm tra tính toàn vẹn Logs`** → ② `UPDATE … SET action='LOG'` → ③④ `test_adversarial_llm.py` (65s) → ⑤ bấm 🛡️ lần hai → ⑥ `cp` khôi phục | **678 → 0** · **đích danh ID dòng bị sửa** |
 | 14 Dữ liệu | 45s | — | — | *(nói câu ĐÓNG RQ2 cuối ▶4)* | — |
-| 15 Kết quả 5D | 80s | — | — | — | mỗi chiều **một** số |
+| 15 Kết quả 5D | 105s | — | — | — | mỗi chiều **một** số |
 | **16 Ablation** | 65s | **➜ ▶5** | Dashboard | Tab **`🧑‍💻 HITL Approvals`** → mở phiếu đã chọn sẵn, đọc lý do hoãn, bấm **`✅ Approve`**; rồi tab **`🔒 Blocklist & Whitelist`** → chỉ IP vừa duyệt | **15,76% ↔ 95,0%** · lặp lại **0,182 ms** |
 | 17 Dashboard | 5s | — | *(bàn đạp, bấm lướt)* | — | — |
 | 18 Đóng góp | 90s | — | — | *(nói câu ĐÓNG RQ3 trước khi vào slide)* | — |
