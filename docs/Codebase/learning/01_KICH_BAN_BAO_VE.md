@@ -40,7 +40,7 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | 1 Bìa | 30s | — | — | — | — |
 | 2 Cảm ơn | 20s | — | — | — | — |
 | 3 Cấu trúc | 30s | — | — | — | — |
-| **4 Ba nút thắt → đề xuất hệ thống** | 110s | — | — | — | — |
+| **4 Ba nút thắt → đề xuất hệ thống** | 115s | — | — | — | — |
 | 5 Ba câu hỏi | 80s | — | — | — | — |
 | 6 So sánh | 60s | — | — | — | *(cắt đầu tiên nếu trễ)* |
 | **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
@@ -129,9 +129,9 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 > **Bản chính thức — sửa ở đây, không sửa vào file slide.**
 > `docs/Thesis/slides/index.html` giữ nguyên bản gốc và không được đụng tới.
 >
-> **Mạch kể:** mở ở slide 4 bằng một chuyên viên trực ca ngập cảnh báo, và đóng ở slide 20
-> bằng chính người đó. Mỗi slide mở bằng **một câu hỏi hoặc một nghịch lý**, không mở bằng
-> nhãn — đó là chỗ giữ Hội đồng tỉnh táo.
+> **Mạch kể:** mở ở slide 4 bằng vấn đề và bối cảnh của một trung tâm giám sát, và đóng ở
+> slide 20 bằng chính bài toán đó. Mỗi slide mở bằng **một câu hỏi hoặc một nghịch lý**,
+> không mở bằng nhãn — đó là chỗ giữ Hội đồng tỉnh táo.
 >
 > Ký hiệu: `⏱` mốc thời gian · `▶` chỉ dẫn demo · `🔴` con số phải đóng đinh
 > · `🔒` câu đóng câu hỏi nghiên cứu (nói lúc chuyển màn hình, tính vào giờ demo).
@@ -170,9 +170,9 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ### Slide 4 — Ba nút thắt SOC → đề xuất hệ thống
 
-> Kính thưa Hội đồng, em xin bắt đầu bằng một tình huống rất quen với người làm trực ca.
+> Kính thưa Hội đồng, em xin bắt đầu bằng vấn đề và bối cảnh của đề tài.
 >
-> Chuyên viên mở màn hình lên, thấy vài nghìn cảnh báo đang chờ. Anh ta biết chắc trong đống đó có cảnh báo thật, và cũng biết chắc mình sẽ không kịp đọc hết. Mỗi ngày một trung tâm giám sát nhận hàng trăm nghìn đến hàng triệu bản ghi, mà phần lớn lại là hoạt động bình thường. Nhìn cảnh báo nhiều quá thì thành ra không còn để ý cảnh báo nào nữa. Đó là nút thắt thứ nhất.
+> Mỗi ngày, một trung tâm giám sát an ninh nhận từ hàng trăm nghìn đến hàng triệu bản ghi, mà tuyệt đại đa số là hoạt động bình thường. Số cảnh báo sinh ra luôn nhiều hơn số cảnh báo đội trực ca kịp đọc, và cảnh báo thật thì nằm lẫn trong đó. Khi cảnh báo nhiều đến mức không ai đọc xuể, thì thêm một cảnh báo nữa cũng không còn làm ai chú ý. Đó là nút thắt thứ nhất.
 >
 > Vậy lời giải hiển nhiên là gì? Đưa AI vào đọc hộ. Nghe rất hợp lý — cho tới khi ta nhận ra mình vừa tự tạo ra nút thắt thứ hai.
 >
@@ -184,7 +184,7 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 >
 > Vì vậy em đề xuất SENTINEL, một hệ thống hai tầng. Tầng ngoài là bộ lọc nhanh, xử lý ngay khi bản ghi vừa tới và giữ lại phần lớn lưu lượng. Tầng trong là tác tử AI chạy ngay trên máy, chỉ nhận phần tầng ngoài không kết luận được, và luôn bị ràng buộc bởi rào chắn cùng một cuốn sổ ghi chép không sửa được.
 >
-> ⏱ 110 giây — Mở bằng CẢNH, không mở bằng định nghĩa. Ba nút thắt là chuỗi nhân quả. Câu cuối là câu đề xuất, nối thẳng sang slide 5.
+> ⏱ 115 giây — Mở bằng VẤN ĐỀ và BỐI CẢNH, nói ở tầm trung tâm giám sát chứ không kể chuyện một cá nhân. Ba nút thắt là chuỗi nhân quả. Câu cuối là câu đề xuất, nối thẳng sang slide 5.
 
 ---
 
@@ -496,10 +496,10 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 > Kính thưa Hội đồng.
 >
-> Em xin quay lại người chuyên viên trực ca ở đầu buổi. Điều luận văn này hướng tới là để anh ta không còn phải nhìn vào vài nghìn cảnh báo, mà chỉ nhìn vào một hàng đợi nhỏ — và tin được những gì hệ thống viết trong đó.
+> Em xin quay lại bài toán đặt ra ở đầu buổi. Điều luận văn này hướng tới là để đội trực ca không còn phải nhìn vào hàng nghìn cảnh báo mỗi ca, mà chỉ nhìn vào một hàng đợi nhỏ — và tin được những gì hệ thống viết trong đó.
 >
 > Kết luận của em gồm hai điều kiện: mô hình ngôn ngữ dùng được trong trung tâm giám sát an ninh, nếu đặt nó đứng sau các tầng lọc rẻ hơn, và nếu không tin lời nó khi nó chưa đưa ra được bằng chứng.
 >
 > Em xin chân thành cảm ơn TS. Bùi Văn Hiệu, TS. Đặng Văn Hiếu cùng Quý Thầy Cô trong Hội đồng. Em xin hết phần trình bày, kính mời Hội đồng đặt câu hỏi.
 >
-> ⏱ 45 giây — VÒNG KHÉP: gọi lại người trực ca ở slide 4. Dừng ở đây, không để màn hình cuối là dashboard.
+> ⏱ 45 giây — VÒNG KHÉP: gọi lại đúng bài toán đã nêu ở slide 4. Dừng ở đây, không để màn hình cuối là dashboard.
