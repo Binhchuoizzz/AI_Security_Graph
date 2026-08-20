@@ -8,7 +8,7 @@
 > dung đó **khác** với Phần 5 ở đây. Khi tập và khi bảo vệ, **dùng Phần 5 của tài liệu
 > này**, đừng đọc panel trong slide.
 >
-> Tổng: **31 phút** — nói ≈19,7 phút (bỏ slide 6) · màn hình 11:30. Còn lại dành cho hỏi đáp.
+> Tổng: **31 phút** — nói ≈19,0 phút (bỏ slide 6) · màn hình 11:30. Còn lại dành cho hỏi đáp.
 
 ---
 
@@ -38,7 +38,7 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | Slide | ⏱ | Chuyển màn hình? | Chạy gì / mở gì | Show cái gì | 🔴 Số đóng đinh |
 | :-- | --: | :-- | :-- | :-- | :-- |
 | 1 Bìa | 25s | — | — | — | — |
-| 2 Cảm ơn | 60s | — | — | — | — |
+| 2 Cảm ơn | 15s | — | — | — | — |
 | 3 Cấu trúc | 20s | — | — | — | — |
 | **4 Ba nút thắt → đề xuất hệ thống** | 100s | — | — | — | — |
 | 5 Ba câu hỏi | 70s | — | — | — | — |
@@ -129,8 +129,8 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 > **Đây là bản chính thức của lời thoại — sửa ở đây, không sửa vào file slide.**
 > `docs/Thesis/slides/index.html` giữ nguyên bản gốc và không được đụng tới.
 >
-> Thời lượng: **≈ 3.727 âm tiết ≈ 20,7 phút** ở nhịp 180 âm tiết/phút;
-> **bỏ slide 6** thì còn **19,7 phút** — nằm trong khung 15–20 phút.
+> Thời lượng: **≈ 3.593 âm tiết ≈ 20,0 phút** ở nhịp 180 âm tiết/phút;
+> **bỏ slide 6** thì còn **19,0 phút** — nằm trong khung 15–20 phút.
 >
 > Ký hiệu: `⏱` mốc thời gian · `▶` chỉ dẫn demo · `🔴` con số phải đóng đinh
 > · `🔒` câu đóng câu hỏi nghiên cứu (nói lúc chuyển màn hình, tính vào giờ demo).
@@ -158,17 +158,9 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ### Slide 2 — Lời cảm ơn
 
-> Kính thưa Hội đồng. Trước khi vào nội dung, em xin phép được gửi vài lời cảm ơn.
+> Em xin trân trọng cảm ơn **Quý Thầy Cô trong Hội đồng**, hai Thầy hướng dẫn là **TS. Bùi Văn Hiệu** và **TS. Đặng Văn Hiếu**, **Viện FSB — Trường Đại học FPT**, **Trung tâm Dữ liệu Quốc gia**, và **gia đình em**.
 >
-> Em xin trân trọng cảm ơn Quý Thầy Cô trong Hội đồng đã dành thời gian đọc luận văn và cho em cơ hội được trình bày ngày hôm nay.
->
-> Em xin cảm ơn hai Thầy hướng dẫn, TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu, đã kiên nhẫn định hướng và chỉ cho em thấy những chỗ em còn thiếu chặt chẽ mà tự mình em không nhìn ra.
->
-> Em cảm ơn Quý Thầy Cô Viện FSB và Trường Đại học FPT đã cho em nền tảng để làm được đề tài này; cảm ơn các đồng nghiệp tại Trung tâm Dữ liệu Quốc gia đã tạo điều kiện về thời gian — nhiều tình huống trong luận văn đến từ chính công việc hằng ngày ở đơn vị.
->
-> Và cuối cùng, em xin cảm ơn gia đình, đặc biệt là vợ và con em, đã lặng lẽ chịu thiệt thòi trong suốt những tháng em làm thực nghiệm.
->
-> ⏱ 60 giây — Nói chậm, chân thành. Cảm ơn Hội đồng trước tiên.
+> ⏱ 15 giây — Đúng một câu. Nhấn rõ từng tên in đậm, nghỉ nửa nhịp sau mỗi tên.
 
 ---
 
