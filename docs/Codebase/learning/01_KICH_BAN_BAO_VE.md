@@ -38,7 +38,7 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | Slide | ⏱ | Chuyển màn hình? | Chạy gì / mở gì | Show cái gì | 🔴 Số đóng đinh |
 | :-- | --: | :-- | :-- | :-- | :-- |
 | 1 Bìa | 25s | — | — | — | — |
-| 2 Cảm ơn | 15s | — | — | — | — |
+| 2 Cảm ơn | 20s | — | — | — | — |
 | 3 Cấu trúc | 20s | — | — | — | — |
 | **4 Ba nút thắt → đề xuất hệ thống** | 100s | — | — | — | — |
 | 5 Ba câu hỏi | 70s | — | — | — | — |
@@ -158,9 +158,9 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ### Slide 2 — Lời cảm ơn
 
-> Em xin trân trọng cảm ơn **Quý Thầy Cô trong Hội đồng**, hai Thầy hướng dẫn là **TS. Bùi Văn Hiệu** và **TS. Đặng Văn Hiếu**, **Viện FSB — Trường Đại học FPT**, **Trung tâm Dữ liệu Quốc gia**, và **gia đình em**.
+> Em xin trân trọng cảm ơn **Quý Thầy Cô trong Hội đồng**, hai Thầy hướng dẫn là **TS. Bùi Văn Hiệu** và **TS. Đặng Văn Hiếu**, **Viện FSB — Trường Đại học FPT**, **Trung tâm Dữ liệu Quốc gia**, cùng **gia đình em** đã tận tình hướng dẫn và tạo mọi điều kiện để em hoàn thiện luận văn này.
 >
-> ⏱ 15 giây — Đúng một câu. Nhấn rõ từng tên in đậm, nghỉ nửa nhịp sau mỗi tên.
+> ⏱ 20 giây — Đúng một câu. Nhấn rõ từng tên in đậm, nghỉ nửa nhịp sau mỗi tên.
 
 ---
 
@@ -182,7 +182,7 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 >
 > Và việc mời AI vào tạo ra nút thắt thứ hai: bản thân AI trở thành mục tiêu. Kẻ tấn công viết câu lệnh giả vào trong log để điều khiển mô hình, chỉnh số liệu để lách mô hình học máy, rồi sửa xoá nhật ký để phi tang.
 >
-> Nút thắt thứ ba là chất lượng phán quyết. Kịch bản xử lý cố định thì không xoay xở được trước hành vi mới; còn để AI tự do thì nó nói bừa và ra lệnh chặn thiếu căn cứ.
+> Nút thắt thứ ba là chất lượng phán quyết. Kịch bản xử lý cố định thì không suy luận được ngữ cảnh, nên gặp hành vi mới là không xoay xở được; còn để AI tự do thì nó nói bừa và ra lệnh chặn thiếu căn cứ.
 >
 > Nói ngắn gọn: không dùng AI thì không đủ, mà dùng AI thì phải lo bảo vệ chính nó và kiểm soát những gì nó nói.
 >
