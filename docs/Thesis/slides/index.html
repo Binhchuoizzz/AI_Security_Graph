@@ -3200,298 +3200,197 @@
     <script>
         // Speaker Scripts for each slide (for 20-30 min presentation)
         const speakerNotes = {
-    1: `Kính thưa Quý Thầy Cô trong Hội đồng.
+    1: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG BẢO VỆ LUẬN VĂN THẠC SĨ!
 
-Em là Nguyễn Đức Bình, học viên lớp MSE23HN, ngành Kỹ thuật Phần mềm, Viện Quản trị và Công nghệ FSB.
+Em xin kính chào Quý Thầy Cô! Em tên là Nguyễn Đức Bình, Học viên cao học Lớp MSE23HN (MSHV: 24MSE13183) ngành Kỹ thuật Phần mềm (MSE) tại Viện Quản trị và Công nghệ FSB, Đại học FPT.
 
-Đề tài của em: SENTINEL — Kiến trúc Nhận thức Hai tầng cho Phát hiện và Phản hồi Mối đe doạ Tự động sử dụng AI Tác tử, dưới sự hướng dẫn của TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu.
+Hôm nay, em rất vinh dự được đại diện nhóm nghiên cứu trình bày công trình luận văn thạc sĩ của mình với đề tài: "SENTINEL: Kiến trúc Nhận thức Hai tầng cho Phát hiện và Phản hồi Mối đe dọa Tự động sử dụng AI Tác tử" (tên tiếng Anh: A Cognitive Two-Tier Architecture for Automated Threat Detection and Contextual Response using Agentic AI).
 
-Toàn hệ chạy cục bộ trên một GPU 16GB, không phụ thuộc dịch vụ đám mây. Em xin phép bắt đầu.
+Công trình được thực hiện dưới sự hướng dẫn khoa học tận tình của TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Em xin phép được bắt đầu phần trình bày của mình.`,
 
-⏱ 25 giây`,
+    2: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG BẢO VỆ,
 
-    2: `Trước khi vào nội dung, em xin phép được bày tỏ lòng biết ơn.
+Để hoàn thành công trình nghiên cứu này và hoàn thiện bản luận văn thạc sĩ hôm nay, em xin phép được bày tỏ lòng tri ân sâu sắc tới 4 điểm tựa quan trọng:
 
-Em xin trân trọng cảm ơn Quý Thầy Cô trong Hội đồng đã dành thời gian đọc và phản biện luận văn của em; cảm ơn hai Thầy hướng dẫn là TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu; Quý Thầy Cô Viện FSB và Trường Đại học FPT; các đồng nghiệp tại Trung tâm Dữ liệu Quốc gia; và gia đình em.
+Thứ nhất, em xin gửi lời biết ơn chân thành nhất tới hai Thầy hướng dẫn khoa học là TS. Bùi Văn Hiệu và TS. Đặng Văn Hiếu. Với tri thức học thuật uyên bác và tinh thần làm việc nghiêm túc, hai Thầy đã luôn kiên nhẫn định hướng tư duy phản biện, đưa ra những góp ý chuyên môn sắc bén và truyền cảm hứng nghiên cứu cho em trong suốt chặng đường thực hiện luận văn.
 
-Nội dung đã ghi đầy đủ trên slide, em xin phép không đọc lại.
+Thứ hai, em xin trân trọng cảm ơn Ban Giám hiệu, Ban Lãnh đạo Viện Quản trị & Công nghệ FSB cùng toàn thể Quý Thầy Cô Trường Đại học FPT đã truyền dạy nền tảng tri thức lý thuyết và thực tiễn vững chắc trong một môi trường nghiên cứu chuyên nghiệp và hiện đại.
 
-⏱ 20 giây — CẢM ƠN HỘI ĐỒNG TRƯỚC TIÊN. Nói nhanh, trang trọng.`,
+Thứ ba, em xin chân thành cảm ơn Ban Lãnh đạo cùng các đồng nghiệp tại Trung tâm Dữ liệu Quốc gia. Sự tin tưởng, điều kiện thuận lợi về thời gian cùng những kinh nghiệm thực chiến phong phú từ đơn vị đã đem lại cho em những góc nhìn thực tiễn sâu sắc, áp dụng trực tiếp vào quá trình thiết kế và thực nghiệm hệ thống SENTINEL.
 
-    3: `Báo cáo của em gồm bốn phần: đặt vấn đề và mục tiêu; kiến trúc hai tầng; thực nghiệm và đánh giá năm chiều; đóng góp, hạn chế và hướng phát triển.
+Cuối cùng, em xin dành trọn tình yêu thương và lòng biết ơn sâu sắc nhất tới gia đình thân yêu, đặc biệt là người vợ hiền cùng con nhỏ. Sự hy sinh thầm lặng, lòng kiên nhẫn và nguồn động viên không ngừng nghỉ của gia đình trong những tháng ngày em miệt mài thực nghiệm xuyên đêm chính là điểm tựa vững chắc nhất giúp em hoàn thành công trình nghiên cứu này.`,
 
-Em xin phép Hội đồng một điều: ở những chỗ thích hợp, em sẽ mở hệ thống đang vận hành để Hội đồng quan sát trực tiếp, thay vì dồn phần minh hoạ về cuối buổi.
+    3: `KÍNH THƯA HỘI ĐỒNG,
 
-⏱ 20 giây — CÂU XIN PHÉP ĐAN XEN LÀ BẢN LỀ CẢ BUỔI. ĐỪNG BỎ.`,
+Báo cáo bảo vệ luận văn hôm nay của em được bố cục chặt chẽ theo 4 phần chính:
 
-    4: `Kính thưa Hội đồng, ba nút thắt sau đây không tách rời nhau — nút thắt trước sinh ra nút thắt sau.
+PHẦN 1: ĐẶT VẤN ĐỀ VÀ MỤC TIÊU NGHIÊN CỨU — Phân tích 3 nút thắt cổ chai SOC vận hành thực tế, khủng hoảng độ trễ, nguy cơ an toàn AI và phát biểu 3 câu hỏi nghiên cứu (RQ1 - RQ3).
 
-NÚT THẮT THỨ NHẤT LÀ QUY MÔ. Một trung tâm giám sát nhận hàng trăm nghìn đến hàng triệu bản ghi mỗi ngày, mà phần lớn cảnh báo lại là hoạt động lành tính, gây quá tải cảnh báo — hiện tượng AlAhmadi và cộng sự đã ghi nhận tại USENIX Security 2022. Luật tương quan tĩnh thì rẻ nhưng không hiểu ngữ cảnh, nên muốn đọc được ý nghĩa của một chuỗi hành vi thì buộc phải đưa AI vào. Nhưng đẩy toàn bộ log thô qua AI thì chính AI thành điểm nghẽn.
+PHẦN 2: KIẾN TRÚC VÀ THIẾT KẾ HỆ THỐNG SENTINEL — Trình bày chi tiết Kiến trúc Lai Hai Tầng (Two-Tier), thuật toán Welford O(1), Cổng Machine Learning LightGBM, Semantic Cache Tầng 1.75, Tác tử LangGraph Tầng 2, Dual-RAG và cơ chế niêm phong kiểm toán HMAC-SHA256.
 
-CHÍNH VIỆC ĐƯA AI VÀO SINH RA NÚT THẮT THỨ HAI: AI trở thành một bề mặt tấn công mới. Kẻ tấn công chèn câu lệnh vào Syslog hoặc User-Agent để chiếm quyền điều khiển mô hình; bóp méo đặc trưng để né mô hình học máy; và sửa xoá nhật ký sau xâm nhập để phi tang.
+PHẦN 3: KẾT QUẢ THỰC NGHIỆM VÀ ĐÁNH GIÁ 5D METRICS — Báo cáo các chỉ số thực nghiệm đột phá thu được trên 99.717 sự kiện luồng SOC stream thực tế và 949.535 mẫu NetFlow.
 
-NÚT THẮT THỨ BA NẰM Ở CHẤT LƯỢNG PHÁN QUYẾT. Playbook SOAR cố định không phán quyết được trước hành vi mới; nhưng thả AI tự do thì nó ảo giác, tự bịa mã kỹ thuật và chặn vô căn cứ, đồng thời hàng đợi thủ công của chuyên gia vẫn ngập như cũ.
+PHẦN 4: THẢO LUẬN, HẠN CHẾ VÀ HƯỚNG PHÁT TRIỂN — Nêu rõ minh bạch 5 giới hạn kỹ thuật hiện hữu và 5 hướng kỹ thuật mở rộng cho sản phẩm thực tế.`,
 
-Nói gọn: phải dùng AI vì luật tĩnh không đủ, nhưng dùng AI thì phải giải luôn bài toán bảo vệ chính nó và kiểm soát lời nó nói.
+    4: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG,
 
-TỪ ĐÓ EM ĐỀ XUẤT SENTINEL — KIẾN TRÚC NHẬN THỨC HAI TẦNG. Vành ngoài là bộ lọc tất định chi phí hằng số, xả tải phần lớn lưu lượng ngay ở tốc độ đường truyền. Bên trong là tác tử suy luận vận hành hoàn toàn tại chỗ, chỉ nhận phần dư, và bị ràng buộc bởi rào chắn cùng vết kiểm toán niêm phong.
+Đi vào thực trạng vận hành an ninh mạng hiện nay, em xin trình bày 3 NÚT THẮT CỔ CHAI VẬN HÀNH CỐT LÕI mà các trung tâm SOC đang gặp phải:
 
-⏱ 90 giây — BA NÚT THẮT LÀ MỘT CHUỖI NHÂN QUẢ, KHÔNG PHẢI BA GẠCH ĐẦU DÒNG. Câu cuối là câu ĐỀ XUẤT HỆ THỐNG, nối thẳng sang slide 5.`,
+NÚT THẮT 1 — QUY MÔ LOG KHỔNG LỒ VÀ KHỦNG HOẢNG ĐỘ TRỄ: Mỗi ngày, một trung tâm SOC cỡ vừa phải tiếp nhận từ hàng trăm nghìn đến hàng triệu log sự kiện từ SIEM, Tường lửa và EDR. Phần lớn cảnh báo trong hàng đợi lại là hoạt động lành tính, gây ra hội chứng Alert Fatigue làm kiệt sức các chuyên gia SOC (AlAhmadi và cộng sự, USENIX Security 2022). Khi đưa AI vào xử lý trực tiếp luồng dữ liệu thô, độ trễ tính toán của AI gây tắc nghẽn toàn bộ đường truyền dữ liệu an ninh.
 
-    5: `Để giải quyết cụ thể đề xuất vừa nêu, em chia bài toán thành ba phần, mỗi phần ứng với một nút thắt và được phát biểu thành một câu hỏi nghiên cứu.
+NÚT THẮT 2 — BỀ MẶT TẤN CÔNG AI, ML EVASION VÀ NGUY CƠ GIẢ MẠO NHẬT KÝ: Ứng dụng AI tạo ra các bề mặt tấn công mới: kẻ tấn công cố ý chèn câu lệnh độc hại vào log thô (Log-substrate Prompt Injection) hoặc bóp méo đặc trưng dữ liệu để né tránh mô hình Học máy (Machine Learning Gate Evasion). Đồng thời, nhật ký sự cố sau khi thâm nhập có nguy cơ bị chỉnh sửa trái phép. Do đó, cần cơ chế Guardrails cô lập dữ liệu và niêm phong vết kiểm toán.
 
-PHẦN MỘT GIẢI NÚT THẮT QUY MÔ — câu hỏi số một: làm thế nào xả tải log thô ngay ở tốc độ đường truyền để giảm độ trễ và chi phí GPU. Chỗ khó: lọc rẻ thì bỏ sót, lọc kỹ thì lại phải gọi mô hình.
+NÚT THẮT 3 — SOAR CỨNG NHẮC, ẢO GIÁC AI VÀ QUÁ TẢI CHUYÊN GIA: Các nền tảng SOAR dựa trên Playbook cố định không thể hình thành phán quyết ngữ cảnh trước các hành vi bất thường mới. Ngược lại, nếu dùng AI tự do không có rào chắn thì mô hình dễ bị Ảo giác (Hallucination), tự bịa mã kỹ thuật tấn công và tự ý ra lệnh chặn IP vô căn cứ (Self-DoS). Bên cạnh đó, việc thiếu cơ chế phân loại cảnh báo (Triage) thông minh làm ngập hàng đợi khiến con người phải kiểm tra thủ công. Do đó, cần một Tác tử AI có rào chắn neo bằng chứng để suy luận chính xác, loại bỏ ảo giác và phân loại thông minh nhằm giảm thiểu tối đa khối lượng công việc cho chuyên gia.
 
-PHẦN HAI GIẢI NÚT THẮT BỀ MẶT TẤN CÔNG — câu hỏi số hai: cơ chế nào chống đỡ được cả chèn câu lệnh, né tránh cổng học máy, lẫn giả mạo nhật ký. Chỗ khó: nhật ký chính là dữ liệu do kẻ tấn công viết, nên lọc theo từ khoá thì hắn chỉ cần đổi câu chữ.
+Từ 3 nút thắt trên, bài toán đặt ra cho đề tài là: Thiết kế một kiến trúc SOC phân tầng hai lớp (Two-Tier), kết hợp bộ lọc tốc độ cao ở vành ngoài với AI Tác tử suy luận ngữ cảnh an toàn On-Premises ở bên trong?`,
 
-PHẦN BA GIẢI NÚT THẮT CHẤT LƯỢNG PHÁN QUYẾT — câu hỏi số ba: làm sao quy kết đúng mã ATT&CK và giảm tải chuyên gia mà vẫn hạn chế ảo giác. Chỗ khó: một mô hình đã lượng tử hoá thì luôn có câu trả lời, kể cả khi không biết.
+    5: `KÍNH THƯA HỘI ĐỒNG,
 
-Ba nút thắt, ba câu hỏi, ba đóng góp — gắn một-một. Cuối mỗi phần em sẽ quay lại khép đúng câu hỏi tương ứng.
+Từ 3 nút thắt trên, nghiên cứu đặt ra 3 câu hỏi. Em xin phép CHỈ nêu câu hỏi ở đây, chưa nêu lời giải: kiến trúc là Phần II, và số đo trả lời từng câu hỏi là Phần III.
 
-⏱ 60 giây — MỞ ĐẦU BẰNG CÂU NỐI TỪ SLIDE 4. Không kể lại ba nút thắt, chỉ gọi tên.`,
+RQ1 (Hiệu năng & Độ trễ): Đặt câu hỏi làm sao tự động xả tải luồng log nhiễu ở tốc độ đường truyền mà không làm giảm khả năng phát hiện mối đe dọa? -> Hướng giải quyết là thiết kế chặng lọc Tầng 1 hai lớp (Welford O(1), Cổng Machine Learning LightGBM và Semantic Cache Tầng 1.75) tuân theo nguyên lý "Phán quyết rẻ đứng trước phán quyết đắt".
 
-    6: `Em xin đặt SENTINEL cạnh hai nhóm giải pháp hiện hành.
+RQ2 (An toàn AI & Kiểm toán Pháp y): Đặt câu hỏi về cơ chế vô hiệu hóa các tấn công tiêm nhiễm câu lệnh (Prompt Injection) và bảo đảm tính chống chối bỏ vết pháp y? -> Hướng giải quyết là áp dụng cơ chế Delimited Data Encapsulation cô lập payload thô bằng cấu trúc cứng, kết hợp niêm phong chuỗi băm HMAC-SHA256 liên vết.
 
-SIEM và SOAR truyền thống dùng luật tương quan tĩnh: một tầng, rẻ và nhanh, nhưng báo động giả cao vì không suy luận ngữ cảnh, và không có cơ chế chống chèn câu lệnh.
+RQ3 (Suy luận Tác tử & Quy kết MITRE ATT&CK): Đặt câu hỏi làm sao để Tác tử AI suy luận ngữ cảnh chính xác, quy kết mã MITRE ATT&CK và giảm khối lượng công việc cho chuyên gia mà không phát ra mã kỹ thuật thiếu chứng cứ? -> Hướng giải quyết là xây dựng Đồ thị Tác tử LangGraph kết hợp Dual-RAG (FAISS + BM25) tri thức STIX/NIST và Lá chắn Neo bằng chứng (Grounding Guardrail).`,
 
-Các hệ tác tử một tầng như CyberRAG hay LanG suy luận tốt, nhưng chạy mô hình cho từng sự kiện nên độ trễ tính bằng giây.
+    6: `KÍNH THƯA HỘI ĐỒNG,
 
-SENTINEL đi hướng lai: định tuyến theo chi phí phán quyết, chỉ phần dư mới chạm mô hình; và chống chèn câu lệnh bằng cơ chế bọc theo cấu trúc, độc lập với nội dung.
+Khi tổng quan các hướng nghiên cứu hiện hữu trên thế giới, em nhận thấy một khoảng trống nghiên cứu (Research Gap) lớn:
 
-Em xin nói rõ một điểm cho công bằng: con số F1 chín tám phẩy một của LanG là số nhóm tác giả đó tự công bố trên dữ liệu của họ, còn số của em đo trên 678 mẫu đối kháng của luận văn này. Hai bên đo trên hai tập khác nhau, nên em không đặt cạnh nhau để tuyên bố hơn kém.
+Các hệ thống SIEM/SOAR truyền thống xử lý rất nhanh nhưng thiếu khả năng suy luận ngữ cảnh trước các dạng tấn công mới. Các hệ thống AI Cloud suy luận thông minh nhưng độ trễ rất cao, vi phạm chủ quyền dữ liệu và ngốn VRAM lớn. Ở nhóm tác tử tự chủ, từng mảnh ghép đã xuất hiện riêng lẻ: Policy-Guided Threat Hunting có tiền phân loại bằng học tăng cường, LanG có phòng thủ tiêm nhiễm hai lớp, một số công trình đã chạy cục bộ. Nhưng chưa công trình nào công bố tỷ lệ xả tải kèm tỷ lệ tấn công nền của luồng đo, cũng chưa hợp nhất cả ba yêu cầu trong một kiến trúc.
 
-⏱ 45 giây — CẮT ĐẦU TIÊN NẾU TRỄ. Nhưng phải giữ đoạn cuối về LanG, nói khi bước sang slide 7.`,
+SENTINEL hợp nhất cả ba yêu cầu trong MỘT kiến trúc: định tuyến theo chi phí phán quyết ở Tầng 1; suy luận tác tử Tầng 2 chạy On-Premises trên 1 GPU 16GB VRAM; và phòng thủ AI theo CẤU TRÚC (Delimited Data Encapsulation) kèm niêm phong mật mã HMAC-SHA256. Bảng này so CÁCH TIẾP CẬN, chưa so điểm số — em xin để toàn bộ số đo của SENTINEL ở Phần III, vì số của em và số các hệ kia tự báo cáo đo trên hai dân số khác nhau, đặt cạnh nhau sẽ mời hội đồng trừ hai con số không so được.`,
 
-    7: `Đây là kiến trúc tổng thể. Em xin đi theo hành trình của một bản ghi, không liệt kê từng khối.
+    7: `KÍNH THƯA HỘI ĐỒNG,
 
-Đầu vào là luồng hợp nhất 99.717 sự kiện, ghép từ CSE-CIC-IDS2018 và CSIC 2010.
+Về tổng quan kiến trúc, SENTINEL thực thi nguyên lý TÁCH CÔNG VIỆC NGHIÊM NGẠT (Strict Operational Decoupling) giữa hai tầng:
 
-CHẶNG MỘT — TẦNG 1, đường nhanh: luật WAF tất định cộng điểm Z theo Welford, ngưỡng ba phẩy năm sigma, chi phí hằng số.
+TIER 1 (Wire-speed Filter & Machine Learning Gate): Xử lý phi trạng thái trên đường truyền. Nhận dữ liệu thô từ Redis Stream, dùng thuật toán Welford O(1) tính Z-score bất thường, rồi tới Cổng Machine Learning LightGBM, rồi tới Tier 1.75 Semantic Cache. Ba chặng xếp theo đúng thứ tự RẺ TRƯỚC, ĐẮT SAU, mỗi chặng chỉ nhận phần chặng trước không kết luận nổi.
 
-CHẶNG HAI — CỔNG HỌC MÁY: LightGBM trên 76 đặc trưng, chia bốn dải độ tin cậy.
+TIER 2 (Cognitive Agent Engine): Chỉ tiếp nhận PHẦN DƯ mà ba chặng trên không kết luận được — phần dư đó nhỏ tới đâu, em xin trình bày bằng số ở Phần III. Đồ thị LangGraph điều phối mô hình Foundation-Sec-8B-Instruct Q4_K_M, kết hợp Dual-RAG (FAISS + BM25) và SQLite Threat Memory để đưa ra phán quyết chính xác (BLOCK_IP, LOG, AWAIT_HITL) và niêm phong kiểm toán HMAC-SHA256.`,
 
-CHẶNG BA — BỘ ĐỆM PHÁN QUYẾT TẦNG MỘT PHẨY BẢY LĂM: khoá băm SHA-256 trên payload và headers; ca trùng khít thì dùng lại phán quyết cũ, bỏ qua hoàn toàn mô hình.
+    8: `KÍNH THƯA HỘI ĐỒNG,
 
-Ba chặng xếp đúng thứ tự rẻ trước, đắt sau, và mỗi chặng chỉ nhận phần chặng trước không kết luận nổi.
+Đi sâu vào kỹ thuật Tier 1, bộ lọc thống kê áp dụng thuật toán Welford O(1) để cập nhật liên tục giá trị trung bình mu_k và tổng bình phương độ lệch S_k theo thời gian thực:
 
-CHẶNG BỐN — TẦNG 2 chỉ tiếp nhận phần dư: đồ thị LangGraph điều phối Foundation-Sec 8B, kết hợp Dual-RAG trên 433 mã MITRE ATT&CK, bộ nhớ đe doạ, và rào chắn Đóng gói Dữ liệu kèm HMAC. Vận hành tại chỗ trên một GPU 16GB.
+mu_k = mu_{k-1} + (x_k - mu_{k-1}) / k
+S_k = S_{k-1} + (x_k - mu_{k-1})(x_k - mu_k)
 
-Nguyên tắc của toàn hệ nằm ở một câu: PHÁN QUYẾT RẺ PHẢI ĐỨNG TRƯỚC PHÁN QUYẾT ĐẮT.
+Từ đó tính toán độ lệch chuẩn sigma_k và chỉ số Z-score = (x - mu) / sigma cho từng thuộc tính NetFlow (packet rate, flow volume, connection duration). Các luồng dữ liệu tuân theo phân bố chuẩn sẽ được loại bỏ ngay tại Tầng 1, ở độ trễ trung bình 0,182 ms.`,
 
-Phần dư lớn tới đâu, Phần Ba sẽ đo. Nhưng xin nêu trước hai mỏ neo: Tầng 1 xử lý một sự kiện trung bình 0,182 mili giây; Tầng 2 xử lý một lô mất 13,438 giây.
+    9: `KÍNH THƯA HỘI ĐỒNG,
 
-Em xin phép mở hệ thống để Hội đồng quan sát phễu xả tải đang vận hành.
+Tiếp nối lọc thống kê là Cổng ML LightGBM (ml_gateway.py) được huấn luyện trên 949.535 mẫu NetFlow (tier_2_model_1m.pkl).
 
-⏱ 120 giây — SLIDE QUAN TRỌNG NHẤT.
+Cổng ML chấm xác suất tấn công rồi tự quyết theo CHÍNH SÁCH 4 DẢI: từ 0,85 trở lên thì chặn thẳng, 0,65 đến 0,85 thì đẩy lên LLM, 0,40 đến 0,65 thì cảnh báo không chặn, dưới 0,40 thì thả. Dải chặn đặt cao 0,85 là CÓ CHỦ ĐÍCH, vì chặn nhầm một khách thật là hành động không đảo được.
 
-━━━━━━━━━━━━━━━━━━━━━━━━
-▶ DEMO 1 — Tab Executive Overview (1 phút 30)
-Chỉ ba số: tổng log thô · tỉ lệ xả tải · hàng đợi LLM.
-🔴 ĐÓNG ĐINH: 97,5% — LUÔN NÓI KÈM 90,6%, KHÔNG NÓI LẺ.
-Câu chốt: 97,5% đo ở tỉ lệ tấn công nền 9,8%. Khi nền lên 31,56% thì xả tải còn 90,6%, và vai tầng gánh tải đảo chiều. Xả tải là thuộc tính của hỗn hợp lưu lượng, không phải hằng số của hệ. Em công bố cả hai điểm đo, vì nếu chỉ trưng một số thì câu hỏi hiển nhiên của Hội đồng — trên hạ tầng khác có giữ được không — không có chỗ nào trả lời.`,
+Cổng ML tích hợp cơ chế Anti-Evasion: kẹp Z-score trong khoảng ±8sigma, điền mean cho giá trị thiếu, và tự động Abstain đẩy lên LLM nếu >30% đặc trưng bị biến dạng vượt 6sigma.`,
 
-    8: `Đây là chi tiết Tầng 1.
+    10: `KÍNH THƯA HỘI ĐỒNG,
 
-Cốt lõi là THUẬT TOÁN TRỰC TUYẾN WELFORD: cập nhật liên tục trung bình và tổng bình phương độ lệch trên luồng vô hạn mà không cần lưu lịch sử, thời gian và bộ nhớ hằng số. Điểm Z tính từ đó, ngưỡng ba phẩy năm sigma.
+Cơ chế thứ ba của Tier 1 là Bộ đệm Ngữ nghĩa Tầng 1.75 (ExactMatchResponseCache).
 
-Ý nghĩa: hệ phát hiện bất thường mà không cần mẫu tấn công, tức là có khả năng với biến thể chưa từng biết.
+Bộ đệm sử dụng thuật toán băm SHA-256 ép TẤT CẢ các trường tầng ứng dụng (message, payload, uri, user_agent, headers) vào khóa băm. Việc bổ sung đầy đủ user_agent và headers giúp ngăn chặn triệt để tấn công Cache Poisoning và đảm bảo tính độc lập của phép đo.
 
-Em có hai biện pháp bảo vệ đường nền. Thứ nhất, CẬP NHẬT KHOÁ THEO PHÁN QUYẾT: chỉ luồng đã kết luận lành tính mới được cập nhật, chống đầu độc kiểu nước sôi từ từ. Thứ hai, GIEO ĐƯỜNG NỀN CHUẨN từ trước, tránh báo động nhầm khi khởi động lạnh.
+Điểm mấu chốt là VÌ SAO có ca trùng: hàm build_rag_queries chuẩn hoá log về "dịch vụ + cổng + kỹ thuật", nên hai log khác nhau về IP và thời gian vẫn sinh ra CÙNG MỘT truy vấn. Tỉ lệ trúng thật và hệ số tăng tốc, em xin trình bày ở Phần III.`,
 
-Ngoài ra RuleEngine còn ba rào chắn bộ nhớ: tra cứu cổng bằng cấu trúc Set thay cho biểu thức chính quy; bộ đệm uy tín IP có giới hạn dung lượng chống cạn kiệt bộ nhớ; và bảng phiên tự dọn theo thời gian sống.
+    11: `KÍNH THƯA HỘI ĐỒNG,
 
-Kết quả: Tầng 1 xử lý trung bình 0,182 mili giây và không tiêu tốn VRAM.
+Tại Tier 2, mô hình Foundation-Sec-8B-Instruct Q4_K_M chạy On-Premises qua llama.cpp CUDA trên duy nhất 1 card GPU RTX 4060 Ti 16GB, với lượng tử hóa Q4_K_M mô hình chiếm 7-8GB VRAM, vừa đủ chỗ cho bộ đệm ngữ cảnh và chỉ mục truy xuất.
 
-⏱ 60 giây`,
+Luồng suy luận được điều phối bởi đồ thị LangGraph DAG qua 6 nút: guardrails -> rag_context -> llm_triage -> attack_mapper, rồi rẽ nhánh sang action_executor HOẶC human_in_the_loop.
 
-    9: `Ca nào Tầng 1 không kết luận được sẽ sang Cổng học máy.
+Hệ thống tối ưu KV-Caching bằng cách tĩnh hóa System Prompt. Tại nút attack_mapper, nếu không có mã kỹ thuật khớp rõ ràng, đồ thị sẽ chuyển thẳng trạng thái AWAIT_HITL, bỏ qua lượt gọi LLM thứ 2 để tiết kiệm chi phí tính toán.`,
 
-Mô hình LightGBM huấn luyện trên 949.535 mẫu NetFlow với 76 đặc trưng. Trên 2.534 sự kiện Cổng trực tiếp phán quyết, hệ số Matthews đạt 0,6667 và F1 đạt 0,8248.
+    12: `KÍNH THƯA HỘI ĐỒNG,
 
-Chính sách chia bốn dải: từ 0,85 trở lên thì tự động chặn IP; từ 0,65 đến 0,85 thì đẩy lên Tầng 2; từ 0,40 đến 0,65 thì cảnh báo ưu tiên thấp; dưới 0,40 thì bỏ qua.
+Về tri thức và bộ nhớ đe dọa:
 
-Kết quả đáng chú ý nhất: ở ngưỡng từ 0,85 trở lên, Cổng đã tự động chặn 962 ca và KHÔNG CÓ CA BÁO NHẦM NÀO.
+Hệ thống Dual-RAG dung hợp truy xuất véc-tơ FAISS (Sentence-BERT) và từ khóa BM25 qua thuật toán Reciprocal Rank Fusion (RRF, k=60), trên 433 mã MITRE ATT&CK chuẩn STIX 2.1 và tài liệu NIST SP 800-61r2. Ý của RRF là hợp nhất hai bảng xếp hạng CHỈ THEO THỨ HẠNG, nên không phải cân hai thang điểm khác đơn vị. Truy xuất đúng tới đâu — và vì sao phải đo trên HAI lát bằng chứng khác nhau — em xin trình bày ở Phần III.
 
-Phần thứ hai là chống né tránh, nhằm vô hiệu hoá kỹ thuật bóp méo đặc trưng đối kháng. Lớp một: KẸP ĐIỂM Z TẠI TÁM SIGMA, giá trị dị biệt cực đoan bị kẹp, giá trị thiếu điền bằng trung bình. Lớp hai: TỰ TỪ CHỐI — nếu quá 30 phần trăm đặc trưng vượt sáu sigma, mô hình không phán quyết mà đẩy thẳng lên Tầng 2.
+Bộ nhớ đe dọa Threat Memory chạy trên SQLite tối ưu (synchronous=NORMAL, tuyệt đối không dùng WAL mode để tránh lỗi lock file trong Docker). Điểm uy tín IP giảm dần theo thời gian S_new = S_old * (1-lambda)^t. Khi IP chạm S=100, hệ thống chuyển sang chế độ Block-on-sight vĩnh viễn tại Tier 1. Whitelist cứng bảo vệ IP hạ tầng (10.0.0.99).`,
 
-Em xin nhấn mạnh lớp thứ hai: một mô hình chịu thừa nhận đầu vào nằm ngoài vùng nó đã học thì an toàn hơn một mô hình luôn có câu trả lời. Bóp méo đặc trưng có lật nổi phán quyết không, Phần Ba đo.
+    13: `KÍNH THƯA HỘI ĐỒNG,
 
-⏱ 60 giây`,
+Về an toàn AI và kiểm toán pháp y:
 
-    10: `Giữa Cổng học máy và Tầng 2 còn một chặng, em gọi là Tầng một phẩy bảy lăm.
+SENTINEL áp dụng cơ chế Delimited Data Encapsulation, dùng thẻ nonce mật mã ngẫu nhiên cô lập dữ liệu thô («<DATA_HASH...>»). Điểm mấu chốt: đây là phòng thủ theo CẤU TRÚC, không dò từ khoá — nên nó không phụ thuộc kẻ tấn công viết gì. Số đo trên tập đối kháng, em xin để ở Phần III.
 
-Khi bị tấn công bùng nổ, hàng nghìn bản ghi trùng payload đổ về cùng lúc; gọi mô hình cho từng bản ghi lặp lại là lãng phí GPU nghiêm trọng. Em ép toàn bộ payload, URI, User-Agent và headers vào một khoá băm SHA-256; trùng khoá thì dùng lại phán quyết cũ. Khoá chặt cả headers còn loại bỏ nguy cơ đầu độc bộ đệm giữa các máy khách.
+Về kiểm toán, chuỗi băm HMAC-SHA256 liên kết (H_i = HMAC(D_i || H_{i-1}, K)) khiến sửa MỘT dòng làm gãy mọi chữ ký sau nó, nên phát hiện có ĐỊNH VỊ đúng dòng bị đụng. Tỉ lệ phát hiện thật, và cả dạng xâm phạm mà chuỗi KHÔNG bắt được, em xin trình bày ở Phần III. Giới hạn còn lại: khóa đối xứng phải giữ cục bộ, và kẻ có quyền root vẫn có thể cắt đuôi chuỗi — hướng khắc phục là chữ ký bất đối xứng Ed25519 kèm neo băm định kỳ.`,
 
-Kết quả đo: trúng đệm 1.220 trên 1.500; độ trễ khi trúng là 9,8 mili giây so với 87,7 — nhanh hơn 8,9 lần.
+    14: `KÍNH THƯA HỘI ĐỒNG,
 
-Ba chặng lọc vừa trình bày chính là ba tab em xin mở ra đây.
+Về môi trường thực nghiệm và dữ liệu:
 
-⏱ 30 giây
+Hệ thống được đóng gói hoàn chỉnh qua Docker Compose trên máy chủ Intel Core i7-14700KF, RTX 4060 Ti 16GB VRAM, 32GB DDR5 RAM, hoạt động hoàn toàn Air-Gapped.
 
-━━━━━━━━━━━━━━━━━━━━━━━━
-▶ DEMO 2 — Tab SIEM Logs, ba tab con, TRÁI SANG PHẢI (2 phút)
-① Tier-1 Rules — 🔴 0,182 ms: "đây là quyết định giá 0,182 mili giây."
-② ML Gate — 🔴 962 / 0 FP: "962 lệnh chặn tự động, không có ca báo nhầm, và mỗi dòng đều nằm trong vết kiểm toán."
-③ Tier-2 LLM — chỉ lướt, CHƯA MỞ THẺ NÀO, để dành cho demo 3.`,
+Bộ dữ liệu đánh giá kết hợp 5 nguồn chuẩn: datatest (4.236 mẫu), build_stream (25.649 events, 31,56% attack), demo stream (99.717 events dạng SOC thật, 9,77% attack), ground_truth (1.700 mẫu), và tập đối kháng 823 mẫu.`,
 
-    11: `🔒 NÓI TRƯỚC KHI VÀO SLIDE — ĐÓNG CÂU HỎI THỨ NHẤT:
-Đến đây em xin khép lại câu hỏi thứ nhất. Kiến trúc phân tầng xả tải 97,5% ở tỉ lệ tấn công nền 9,8%, và 90,6% ở nền 31,56%. Mỗi con số đều công bố kèm tỉ lệ nền mà nó được đo trên đó. Câu hỏi thứ nhất đã được trả lời bằng số đo.
-━━━━━━━━━━━━━━━━━━━━━━━━
+    15: `KÍNH THƯA HỘI ĐỒNG,
 
-Tầng 2 không phải một lời gọi mô hình. Nó là máy trạng thái hữu hạn trên LangGraph, gồm sáu nút: rào chắn kiểm nonce và whitelist; tra cứu ngữ cảnh bằng Dual-RAG; phân loại bằng Foundation-Sec 8B; quy kết kỹ thuật sang MITRE chuẩn STIX; thi hành lệnh chặn có chữ ký HMAC; và chuyển người xử lý.
+Em xin báo cáo BẢNG KẾT QUẢ THỰC NGHIỆM ĐỘT PHÁ 5D METRICS:
 
-Mô hình phục vụ cục bộ qua llama.cpp trên CUDA, cửa sổ 16.384 token, nhiệt độ 0,1. Lượng tử hoá Q4_K_M giữ mô hình ở 7 đến 8 GB VRAM, vừa một GPU 16GB.
+1. XẢ TẢI: Đạt 97,5% trên luồng 99.717 sự kiện có tỷ lệ tấn công nền 9,8%.
+2. ĐỘ TRỄ: Giảm độ trễ trung bình 69,24% (từ 17,187ms xuống 5.286,7ms); ĐỘ TRỄ TRUNG VỊ ĐẠT MỨC DƯỚI 1MS (0,88ms) - rút ngắn 19.500 lần ở mức trung vị. Thông lượng Cổng Machine Learning đạt 3.452 sự kiện/s.
+3. BẢO MẬT AI: Kháng Prompt Injection 100%, kháng Evasion 98,75%, phát hiện gian lận HMAC 100%.
+4. QUY KẾT MITRE: RAG Recall@3 đạt 93,0% trên lát payload n=243, quy kết RRF đạt 80,0%, quy kết toàn tuyến E2E đạt 68,0%.
+5. PHÂN LOẠI CẢNH BÁO: Kênh hoãn AWAIT_HITL gom được 95,0% mối đe dọa thật, GIẢM 84,24% KHỐI LƯỢNG CÔNG VIỆC CHO ANALYST. Trọng tài khác họ mô hình (Meta-Llama-3-8B) chấm 4 trục RAGAS trung bình 3,78/5.0 trên 1.052 ca leo thang và ẢO GIÁC MÃ KỸ THUẬT ĐẠT ĐÚNG 0% (bad = 0/1.421).`,
 
-Ba cơ chế bảo đảm đầu ra. Một, ÉP CẤU TRÚC: mô hình bắt buộc xuất JSON theo lược đồ Pydantic, chỉ ba hành động hợp lệ. Hai, GỠ NHÃN TỰ ĐỘNG: mọi nhãn nội bộ bị gỡ khỏi prompt trước khi gọi, tránh lộ đáp án. Ba, CHỊU LỖI: JSON méo thì bóc tách dự phòng; thất bại hoàn toàn thì tự chuyển về chờ chuyên gia.
+    16: `KÍNH THƯA HỘI ĐỒNG,
 
-Điểm em muốn nhấn nhất là NÚT THỨ SÁU: tác tử được phép không đưa ra phán quyết. Thiếu căn cứ thì ca đó sang hàng đợi chờ chuyên gia. Trong an ninh, một hệ thống buộc phải trả lời mọi câu hỏi là một hệ thống nguy hiểm.
+Đi sâu vào phân tích chuyên sâu:
 
-⏱ 90 giây`,
+Thử nghiệm Ablation chấm theo hành động xác nhận Cấu hình F (SENTINEL hoàn chỉnh) đạt độ chính xác hành động 35,35%, hoãn 44,76% và bỏ ngỏ 0%, vượt trội so với Cấu hình A (28,29% accuracy, bỏ ngỏ 59,0%).
 
-    12: `Tác tử không suy luận trong chân không. Nó tra cứu song song hai kênh theo hai nguyên lý khác nhau.
+Đặc biệt, Lá chắn Neo bằng chứng (Grounding Guardrail) đã đánh chặn thành công 76 lệnh BLOCK_IP ảo giác do LLM tự đoán mà không có căn cứ RAG, tự động hạ cấp về AWAIT_HITL. Điều này lý giải tại sao độ chính xác E2E (68%) thấp hơn RRF thuần (80%) — đây là sự đánh đổi CÓ CHỦ Ý: thà bỏ trống phán quyết còn hơn phát ra mã kỹ thuật không có chứng cứ truy xuất.`,
 
-KÊNH DÀY dùng FAISS với mô hình nhúng all-MiniLM-L6-v2, mạnh ở ngữ nghĩa. KÊNH THƯA dùng BM25, mạnh ở khớp chính xác mã CVE, số cổng, địa chỉ IP. Hai bảng xếp hạng dung hợp bằng Reciprocal Rank Fusion với k bằng 60 — hợp nhất theo THỨ HẠNG nên không phải cân hai thang điểm khác nhau. Kho tri thức gồm 433 mã STIX MITRE ATT&CK và NIST SP 800-61r2.
+    17: `KÍNH THƯA HỘI ĐỒNG,
 
-Trên nền đó em đặt hai rào chắn. NEO BẰNG CHỨNG: mọi mã kỹ thuật mô hình khẳng định phải hiện diện trong tài liệu đã truy xuất của chính lô đó — cơ chế này đã chặn 76 lệnh chặn IP ảo giác. KHỬ ĐỘC TÀI LIỆU: vô hiệu hoá cấu trúc mệnh lệnh trong tài liệu trước khi chèn vào prompt.
+Giao diện SOC Analyst Dashboard được phát triển bằng Streamlit, kết nối trực tiếp với Redis Stream và SQLite Threat Memory.
 
-Song song là bộ nhớ đe doạ SQLite: uy tín IP suy giảm theo hàm mũ khi IP im lặng, để không chặn vĩnh viễn một địa chỉ đã sạch; ngược lại IP đạt điểm nguy hiểm tối đa bị Tầng 1 chặn tức thì.
+Giao diện cung cấp cho chuyên gia hình ảnh trực quan theo thời gian thực: thông lượng xử lý Tier 1, mốc thời gian diễn biến tấn công APT, trạng thái chuỗi kiểm toán HMAC, và hàng đợi HITL (AWAIT_HITL) để chuyên gia duyệt phán quyết với đầy đủ trích dẫn chứng cứ RAG và mức điểm nguy cơ.`,
 
-Em xin mở một quyết định thật của tác tử.
+    18: `KÍNH THƯA HỘI ĐỒNG,
 
-⏱ 60 giây
+Về tổng kết, luận văn mang lại 4 đóng góp cốt lõi:
 
-━━━━━━━━━━━━━━━━━━━━━━━━
-▶ DEMO 3 — Tab Tier-2, MỞ MỘT THẺ BLOCK (2 phút 30) — TRÁI TIM BUỔI BẢO VỆ
-Chỉ ba chỗ: mã ATT&CK · đoạn tri thức được trích dẫn · câu lập luận.
-🔴 ĐÓNG ĐINH: 76 lệnh chặn ảo giác đã bị lá chắn neo giữ lại.
-Câu chốt: mọi mã kỹ thuật đều phải hiện diện trong tài liệu truy xuất của chính lô đó; không neo được thì hạ cấp an toàn xuống hàng đợi chờ chuyên gia. Trên 1.421 ca khẳng định mã kỹ thuật, không ca nào thiếu neo.
-NÊU LUÔN CÁI GIÁ: trần truy xuất 80,0%, toàn tuyến chỉ 68,0%. Mười hai điểm phần trăm là cái giá của việc không tin lời mô hình — em cho rằng đáng trả.`,
+Các con số em vừa trình bày ở Phần III, xin phép KHÔNG nhắc lại. Slide này nói ý nghĩa của chúng.
 
-    13: `Phần vừa rồi là giữ cho mô hình không khẳng định sai. Slide này là giữ cho mô hình không bị chiếm quyền, và giữ sổ kiểm toán không bị giả mạo — chính là câu hỏi thứ hai.
+VỀ MẶT KHOA HỌC:
+(1) Kinh tế học Tầng lọc: thứ quyết định kiến trúc SOC dùng LLM là CHI PHÍ PHÁN QUYẾT, không phải độ chính xác. Và luận văn chứng minh xả tải là HÀM CỦA HỖN HỢP LƯU LƯỢNG chứ không phải hằng số của hệ — đo trên hai nền tấn công cho hai con số khác nhau, đảo cả vai tầng gánh tải. Một con số xả tải đứng một mình, không kèm tỉ lệ tấn công nền, là một con số không đọc được.
+(2) Phòng thủ theo CẤU TRÚC thắng phòng thủ theo NỘI DUNG: lớp dò từ khoá mù trước tấn công ngữ nghĩa, còn lớp bọc dữ liệu không cần hiểu câu chữ nên không bị câu chữ đánh lừa. Cái giá cũng đã đo và được nêu: lớp tĩnh báo nhầm trên log lành, và chuỗi HMAC không bắt được cắt đuôi.
+(3) Phát hiện phản trực giác mà luận văn GIỮ NGUYÊN chứ không giấu: thêm tầng suy luận LLM làm quy kết XẤU ĐI so với chỉ dùng truy xuất. Đó là đánh đổi có chủ ý — lá chắn neo bằng chứng ép mô hình trả N/A thay vì đoán bừa. Đóng góp không nằm ở điểm quy kết cao, mà ở cơ chế buộc mô hình im lặng khi thiếu bằng chứng.
 
-CƠ CHẾ MỘT — ĐÓNG GÓI DỮ LIỆU PHÂN ĐỊNH. Nhật ký là dữ liệu do kẻ tấn công viết, nên ghép thẳng vào prompt thì hắn viết được chỉ dẫn cho mô hình. Em bọc toàn bộ payload không tin cậy vào giữa cặp dấu phân định mang nonce mật mã ngẫu nhiên. Mọi token câu lệnh nằm trong ranh giới đó bị ép xử lý như văn bản thụ động.
+VỀ MẶT THỰC TIỄN:
+(4) Dùng LLM làm bộ ĐỊNH TUYẾN, không dùng làm bộ phân loại. Cùng một lượt đo: nhìn như bộ phân loại nhị phân thì tầng suy luận gần như vô giá trị; nhìn theo kênh hoãn thì nó dồn hầu hết đe doạ thật vào một phần nhỏ khối lượng. Chọn đúng khung đo là một phần của đóng góp. Sản phẩm mẫu chạy hoàn toàn Air-Gapped trên GPU cục bộ.`,
 
-Mấu chốt là nonce sinh động theo từng lô, nên kẻ tấn công không đoán trước được dấu phân định để thoát ra — điều mà dấu phân định cố định không làm được. Bản chất cơ chế là BỌC THEO CẤU TRÚC, KHÔNG DÒ TỪ KHOÁ, nên hiệu lực không phụ thuộc kẻ tấn công viết gì.
+    19: `KÍNH THƯA HỘI ĐỒNG,
 
-CƠ CHẾ HAI — NIÊM PHONG MẬT MÃ. Mỗi bản ghi phán quyết được băm liên hoàn bằng HMAC-SHA256, chữ ký tính trên cả nội dung của nó lẫn chữ ký bản ghi liền trước. Sửa một dòng làm gãy mọi chữ ký sau nó, nên hệ không chỉ phát hiện mà còn ĐỊNH VỊ đúng dòng bị đụng.
+Một nghiên cứu khoa học nghiêm túc luôn cần nhìn nhận minh bạch các giới hạn và định hướng mở rộng:
 
-Bổ trợ là ba bộ thẩm định: thẩm định dữ liệu lọc log dị dạng; thẩm định quyết định bác bỏ lệnh chặn nhắm vào hạ tầng nội bộ; thẩm định phản hồi áp nguyên tắc không tin mặc định lên luật do AI đề xuất.
+CÁC GIỚI HẠN KỸ THUẬT:
+1. Độ phủ tri thức RAG đối với các kỹ thuật hiếm còn khoảng lệch 12,0 điểm phần trăm so với trần truy xuất (kỹ thuật T1083 Hit@3 = 0,00).
+2. Điểm RAGAS context precision đạt 2,54/5,0 do tài liệu RAG truy xuất còn nhiễu.
+3. Tỷ lệ trích dẫn trực tiếp dòng nhật ký thô mới đạt 11,2% (KTC 95% 9,5–13,3%).
+4. Tầng 2 hiện vận hành LangGraph DAG đơn lẻ.
+5. Thử nghiệm thực hiện trên máy chủ cục bộ Single-GPU.
 
-Phần Ba sẽ đo cả phần cơ chế này KHÔNG bắt được. Nhưng trước đó, em xin phép thử tấn công trực tiếp, ngay bây giờ.
+HƯỚNG PHÁT TRIỂN TƯƠNG LAI:
+1. Mở rộng chữ ký số bất đối xứng Ed25519 và neo băm định kỳ ra môi trường phân tán.
+2. Tự động nạp dữ liệu Tình báo Mối đe dọa CTI STIX/TAXII thời gian thực và nén ngữ cảnh.
+3. Fine-tune DPO cho mô hình LLM cục bộ trên tập dữ liệu nhật ký nội địa để ép trích dẫn log trọn vẹn.
+4. Mở rộng kiến trúc Đa tác tử (Multi-Agent Swarm) phân vai chuyên biệt.
+5. Tối ưu hóa Cổng Tầng 1 bằng Rust/Go và kết hợp vLLM PagedAttention cho Tầng 2.`,
 
-⏱ 90 giây
+    20: `KÍNH THƯA QUÝ THẦY CÔ TRONG HỘI ĐỒNG,
 
-━━━━━━━━━━━━━━━━━━━━━━━━
-▶ DEMO 4 — SÁU BƯỚC, TERMINAL + DASHBOARD (3 phút)
-① Dashboard, thanh bên, bấm Kiểm tra tính toàn vẹn Logs — hiện Hệ thống toàn vẹn.
-② Terminal: sqlite3 config/audit_trail.db "UPDATE audit_trail SET action='LOG' WHERE id=<ID>;"
-   Nói: em đóng vai kẻ tấn công đã bị ra lệnh chặn, nay sửa thẳng cơ sở dữ liệu để xoá dấu vết.
-③ Enter ngay: .venv/bin/python scripts/test_adversarial_llm.py
-④ NÓI LIỀN 65 GIÂY, KHÔNG NHÌN MÀN HÌNH CHỜ. Giải thích nonce theo lô.
-   🔴 ĐÓNG ĐINH: 678 mẫu đối kháng, không mẫu nào đổi được phán quyết.
-⑤ Quay lại Dashboard, bấm lần hai — hiện PHÁT HIỆN GIẢ MẠO, định vị đúng dòng ID.
-⑥ Khôi phục: cp ~/demo_snapshot_final/audit_trail.db config/
+SENTINEL đã chứng minh rằng một kiến trúc lai hai tầng thông minh hoàn toàn có thể mang lại khả năng tự động hóa an ninh mạng tin cậy, tốc độ cao và có bảo chứng an ninh ngay trên hạ tầng phần cứng thương mại sẵn có.
 
-🔒 ĐÓNG CÂU HỎI THỨ HAI (cuối demo 4):
-Như vậy câu hỏi thứ hai đã được trả lời trên cả hai vế, ngay trước Hội đồng. Vế một: 678 mẫu đối kháng không mẫu nào chiếm được quyền điều khiển mô hình. Vế hai: sổ bị sửa thì hệ phát hiện và định vị đúng dòng. Đây không phải em thuật lại — Hội đồng vừa quan sát trực tiếp.`,
+Em xin chân thành cảm ơn Quý Thầy Cô trong Hội đồng đã chú ý theo dõi bài trình bày của em!
 
-    14: `Em xin trình bày môi trường thực nghiệm trước khi vào kết quả.
-
-Hạ tầng: một máy trạm cục bộ, NVIDIA RTX 4060 Ti 16GB VRAM, Intel Core i7-14700KF, 32GB RAM DDR5. Máy chủ mô hình llama.cpp trên CUDA, trọng số Q4_K_M nặng 4,6GB, chiếm 7 đến 8GB VRAM khi nạp ngữ cảnh. Đóng gói bằng Docker Compose với Redis Stream và SQLite. Vận hành tại chỗ hoàn toàn.
-
-Dữ liệu: hai tập chuẩn quốc tế. CSE-CIC-IDS2018 cho log xâm nhập mạng; CSIC 2010 cho tấn công tầng ứng dụng web. Hai tập ghép thành luồng 99.717 sự kiện, tỉ lệ tấn công nền 9,8%. Tập nhãn chuẩn 1.700 mẫu, ánh xạ tự động từ nhãn gốc.
-
-Phương pháp: đo trên năm chiều — xả tải, độ trễ, độ chính xác, kháng chèn câu lệnh, chi phí tài nguyên. Đối chứng với SIEM/SOAR và hệ tác tử một tầng. Và dùng một mô hình độc lập khác họ chấm định tính chất lượng lập luận.
-
-⏱ 45 giây`,
-
-    15: `Đây là kết quả trên năm chiều. Em xin không đọc toàn bảng, mỗi chiều chỉ nêu một con số cùng mẫu số của nó.
-
-CHIỀU MỘT — HIỆU NĂNG. Xả tải 97,5% trên luồng 99.717 sự kiện. Độ trễ trung vị giảm từ 17,18 giây xuống 0,88 mili giây. Phân rã theo tầng: Tầng 1 là 0,182 mili giây, Tầng 2 là 13,438 giây.
-
-CHIỀU HAI — AN TOÀN AI VÀ MẬT MÃ. Trên 678 mẫu đối kháng, không mẫu nào đổi được phán quyết. Kháng né tránh học máy 98,75%. Toàn vẹn HMAC 100%.
-
-CHIỀU BA — QUY KẾT VÀ TRUY XUẤT. Tài liệu đúng nằm trong ba kết quả đầu đạt 93,0% trên 243 truy vấn. Trần truy xuất của RRF là 80,0%. Lá chắn neo giữ tỉ lệ ca thiếu neo ở mức không trên 1.421 ca.
-
-CHIỀU BỐN — PHÂN LOẠI SỰ CỐ. Giảm 84,24% khối lượng cho chuyên viên, trên 1.066 cảnh báo. Hàng đợi hoãn chứa 95,0% đe doạ thật.
-
-CHIỀU NĂM — CHẤT LƯỢNG SUY LUẬN. Trọng tài là mô hình khác họ, chấm độc lập, đạt 3,78 trên 5.
-
-Em xin chủ động nêu điểm yếu: trong bốn trục chấm, trục độ sạch tài liệu truy xuất chỉ đạt 2,54 — thấp nhất, do bộ truy xuất còn kéo về tài liệu nhiễu. Hạn chế này em ghi ở Chương 5, có hướng khắc phục ở slide cuối.
-
-Và về con số 97,5%: nó đo ở tỉ lệ tấn công nền 9,8%. Khi nền lên 31,56%, xả tải còn 90,6% và vai tầng gánh tải đảo chiều. MỘT CON SỐ XẢ TẢI KHÔNG KÈM TỈ LỆ TẤN CÔNG NỀN LÀ MỘT CON SỐ KHÔNG ĐỌC ĐƯỢC — nên em công bố cả hai.
-
-⏱ 120 giây`,
-
-    16: `Hai phân tích chuyên sâu.
-
-Thứ nhất, ABLATION so Cấu hình A chỉ có Tầng 1 với Cấu hình F hoàn chỉnh, trên cùng 1.700 mẫu. Độ chính xác hành động: A đạt 28,29%, F đạt 35,35%, khoảng tin cậy không chồng lấn.
-
-Nhưng điều đáng nói không phải bảy điểm phần trăm đó, mà là KIỂU SAI ĐÃ THAY ĐỔI. Cấu hình A bỏ ngỏ 59,00% số ca — không được xử lý và cũng không ai biết là có. Cấu hình F bỏ ngỏ 0%, chuyển 44,76% ca nghi ngờ sang hàng đợi hoãn. F triệt tiêu hoàn toàn rủi ro bỏ ngỏ.
-
-Thứ hai, TRỌNG TÀI ĐỘC LẬP chấm trung bình bốn trục 3,78 trên 5, trong đó độ sạch ngữ cảnh 2,54 là trục thấp nhất. Tỉ lệ ảo giác mã kỹ thuật 0,0% trên 1.421 ca.
-
-Em xin nêu thẳng cái giá của lá chắn neo: trần truy xuất 200 trên 250, tức 80,0%; toàn tuyến 170 trên 250, tức 68,0%. Mười hai điểm phần trăm chênh lệch chính là cái giá đó.
-
-Hàng đợi hoãn trông như thế nào, em xin Hội đồng cho phép quan sát trực tiếp.
-
-⏱ 45 giây
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-▶ DEMO 5 — HITL + BLOCKLIST (2 phút 30)
-① Tab HITL Approvals: mở một phiếu AWAIT_HITL, ĐỌC TO LÝ DO HOÃN.
-   🔴 ĐÓNG ĐINH: 15,76% khối lượng chứa 95,0% đe doạ thật.
-   Câu chốt: hệ nhận 1.066 cảnh báo, chỉ 80 là đe doạ thật. Nhìn như bộ phân loại nhị phân thì kết quả rất kém — Matthews bằng 0, báo nhầm 99,55%, em báo cáo đầy đủ trong luận văn. Nhưng nó là kênh phân loại ưu tiên: hàng đợi hoãn chiếm 15,76% khối lượng mà chứa 95,0% đe doạ thật, làm giàu 6,03 lần.
-   Rồi BẤM DUYỆT MỘT PHIẾU.
-② Tab Blocklist: chỉ IP vừa duyệt, nay nằm trong luật chặn vĩnh viễn.
-   🔴 LẶP LẠI 0,182 ms — CỐ Ý, KHÉP VÒNG VỚI SLIDE 7.
-   Câu chốt: mô hình đề xuất, chuyên gia phê duyệt, luật nạp về Tầng 1; từ lần sau ca này chỉ tốn 0,182 mili giây.`,
-
-    17: `Phần giao diện vận hành và hàng đợi hợp tác người-máy, em xin trình bày trực tiếp trên hệ thống.
-
-⏱ 5 GIÂY — CHỈ LÀ BÀN ĐẠP SANG DEMO 5. ĐỪNG GIẢNG.`,
-
-    18: `🔒 NÓI TRƯỚC KHI VÀO SLIDE — ĐÓNG CÂU HỎI THỨ BA:
-Và câu hỏi thứ ba. Tác tử quy kết đúng 68,0%; em không giấu rằng con số này thấp hơn trần truy xuất 80,0%. Nhưng độ tin cậy không nằm ở điểm quy kết, mà ở chỗ không ca nào mô hình khẳng định mà thiếu neo bằng chứng, và 76 lệnh chặn do chính nó sinh ra đã bị giữ lại. Đáng tin không có nghĩa là luôn đúng — đáng tin là biết im lặng khi thiếu bằng chứng.
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-Em xin tổng kết bốn đóng góp.
-
-MỘT — KIẾN TRÚC LAI HAI TẦNG. Chi phí phán quyết, chứ không phải độ chính xác, mới là thứ quyết định kiến trúc một trung tâm giám sát dùng mô hình ngôn ngữ. Và xả tải là hàm của hỗn hợp lưu lượng, không phải hằng số của hệ.
-
-HAI — BẢO MẬT AI VÀ KIỂM TOÁN MẬT MÃ. Phòng thủ theo cấu trúc thắng phòng thủ theo nội dung. Giá cũng đã đo và nêu, không giấu: lớp tĩnh có báo nhầm trên log lành, và chuỗi HMAC không bắt được cắt cụt đuôi — giới hạn nguyên lý, không phải lỗi cài đặt.
-
-BA — RÀO CHẮN NEO BẰNG CHỨNG. Đây là phát hiện phản trực giác và luận văn giữ nguyên: thêm tầng suy luận làm quy kết XẤU ĐI so với chỉ dùng truy xuất. Đó là đánh đổi có chủ ý. Đóng góp thật không phải điểm quy kết cao, mà là cơ chế buộc mô hình im lặng khi thiếu bằng chứng.
-
-BỐN — SẢN PHẨM THỰC TIỄN. Dùng mô hình ngôn ngữ làm bộ ĐỊNH TUYẾN, không làm bộ phân loại. Cùng một lượt đo, hai khung nhìn cho hai kết luận trái ngược; chọn đúng khung đo cũng là một phần của đóng góp.
-
-⏱ 60 giây`,
-
-    19: `Đây là phần em cho là quan trọng nhất: năm giới hạn kỹ thuật, mỗi giới hạn kèm một hướng phát triển.
-
-MỘT, VỀ MẬT MÃ. HMAC-SHA256 là thuật toán đối xứng nên phải bảo mật khoá cục bộ; và kẻ có quyền quản trị vẫn cắt cụt được đuôi nhật ký. Hướng: chữ ký bất đối xứng Ed25519 và neo băm định kỳ ra ngoài.
-
-HAI, VỀ TRI THỨC. Độ phủ với kỹ thuật hiếm còn lệch 12,0 điểm phần trăm so với trần truy xuất; cá biệt kỹ thuật T1083 đạt tỉ lệ trúng bằng không. Hướng: nạp tình báo mối đe doạ chuẩn STIX/TAXII thời gian thực.
-
-BA, VỀ NHIỄU TRUY XUẤT. Độ sạch ngữ cảnh mới đạt 2,54 trên 5, tỉ lệ trích dẫn trực tiếp log thô mới 11,2%. Hướng: tinh chỉnh mô hình cục bộ để ép trích dẫn trọn vẹn.
-
-BỐN, VỀ ĐƠN TÁC TỬ. Tầng 2 hiện là một đồ thị đơn lẻ, chưa phân vai chuyên biệt. Hướng: kiến trúc đa tác tử.
-
-NĂM, VỀ QUY MÔ HẠ TẦNG. Thực nghiệm mới trên một máy trạm đơn GPU. Hướng: nâng cấp cổng Tầng 1 bằng ngôn ngữ biên dịch và áp dụng vLLM cho Tầng 2.
-
-⏱ 60 giây — CHỖ ĂN ĐIỂM, ĐỪNG LƯỚT. NÓI THẲNG, KHÔNG RÀO ĐÓN.
-Nếu trễ: nói kỹ ba giới hạn đầu, hai cái cuối gộp một câu.`,
-
-    20: `Kính thưa Hội đồng.
-
-Tóm lại, luận văn cho thấy mô hình ngôn ngữ lớn ứng dụng được trong trung tâm giám sát an ninh, với hai điều kiện: đặt nó đứng SAU các tầng lọc rẻ hơn, và không tin lời nó khi nó không đưa ra được bằng chứng truy xuất.
-
-Em xin chân thành cảm ơn TS. Bùi Văn Hiệu, TS. Đặng Văn Hiếu cùng Quý Thầy Cô trong Hội đồng.
-
-Em xin hết phần trình bày, kính mời Hội đồng đặt câu hỏi.
-
-⏱ 30 giây — DỪNG Ở ĐÂY. KHÔNG ĐỂ MÀN HÌNH CUỐI LÀ DASHBOARD.`
-        };
+Em rất mong nhận được những nhận xét, góp ý quý báu và các câu hỏi từ Quý Thầy Cô để công trình nghiên cứu của em được hoàn thiện hơn. Em xin trân trọng cảm ơn!`
+};
 
         // Slide State Persistence Engine
         const totalSlides = 20;

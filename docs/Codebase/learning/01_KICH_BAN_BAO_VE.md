@@ -1,12 +1,14 @@
 # Kịch bản Bảo vệ SENTINEL — Bảng vận hành + Lời thoại
 
-> **Văn trình bày nằm trong slide.** Mở `docs/Thesis/slides/index.html`, bật panel
-> *LỜI THOẠI THUYẾT TRÌNH* — mỗi slide đã có sẵn lời nói, mốc thời gian, và chỉ dẫn demo
-> ngay tại slide cần chuyển màn hình. Bản sao đầy đủ nằm ở **Phần 5** của tài liệu này.
+> **Toàn bộ kịch bản bảo vệ nằm trong tài liệu này** — bảng vận hành (Phần 1–4) và
+> lời thoại từng slide (Phần 5).
 >
-> **Tài liệu này trả lời đúng một câu hỏi: slide nào thì chạy gì, show gì.**
+> ⚠️ **File slide `docs/Thesis/slides/index.html` KHÔNG bị sửa và sẽ không sửa.** Panel
+> *LỜI THOẠI THUYẾT TRÌNH* dựng sẵn trong slide vẫn giữ nguyên bản gốc của tác giả — nội
+> dung đó **khác** với Phần 5 ở đây. Khi tập và khi bảo vệ, **dùng Phần 5 của tài liệu
+> này**, đừng đọc panel trong slide.
 >
-> Tổng: **30 phút** — nói 18:30 · màn hình 11:30. Còn lại dành cho hỏi đáp.
+> Tổng: **30 phút** — nói ≈19,4 phút (bỏ slide 6) · màn hình 11:30. Còn lại dành cho hỏi đáp.
 
 ---
 
@@ -124,10 +126,10 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ## 5. Lời thoại từng slide
 
-> **Bản sao sinh tự động từ `speakerNotes` trong** `docs/Thesis/slides/index.html`.
-> Bản gốc nằm trong slide — sửa ở đó, đừng sửa ở đây.
+> **Đây là bản chính thức của lời thoại — sửa ở đây, không sửa vào file slide.**
+> `docs/Thesis/slides/index.html` giữ nguyên bản gốc và không được đụng tới.
 >
-> Phần nói trên slide: **≈ 3.665 âm tiết ≈ 20,4 phút** ở nhịp 180 âm tiết/phút;
+> Thời lượng: **≈ 3.665 âm tiết ≈ 20,4 phút** ở nhịp 180 âm tiết/phút;
 > **bỏ slide 6** thì còn **19,4 phút** — nằm trong khung 15–20 phút.
 >
 > Ký hiệu: `⏱` mốc thời gian · `▶` chỉ dẫn demo · `🔴` con số phải đóng đinh
