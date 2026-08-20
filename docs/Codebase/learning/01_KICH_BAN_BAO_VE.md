@@ -42,7 +42,7 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | 3 Cấu trúc | 30s | — | — | — | — |
 | **4 Ba nút thắt → đề xuất hệ thống** | 125s | — | — | — | — |
 | 5 Ba câu hỏi | 80s | — | — | — | — |
-| 6 So sánh | 60s | — | — | — | *(cắt đầu tiên nếu trễ)* |
+| 6 So sánh | 65s | — | — | — | *(cắt đầu tiên nếu trễ)* |
 | **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
 | 8 Welford | 70s | — | — | — | — |
 | 9 Cổng ML | 65s | — | — | — | 962 / 0 FP |
@@ -206,7 +206,7 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ### Slide 6 — So sánh đối chiếu
 
-> Vấn đề này không mới. Vậy tại sao chưa có lời giải trọn vẹn?
+> Bài toán này không mới, và các hướng giải quyết cũng không mới. Vấn đề là chưa hướng nào giải trọn vẹn được cả ba nút thắt.
 >
 > SIEM và SOAR truyền thống dùng luật tương quan tĩnh: một tầng, rẻ và nhanh — nhưng không suy luận được ngữ cảnh nên báo động giả rất nhiều, và không có cơ chế chống chèn câu lệnh.
 >
@@ -216,7 +216,7 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 >
 > Em xin nói rõ một điểm cho công bằng: con số F1 chín tám phẩy một của LanG là số nhóm tác giả đó tự công bố trên dữ liệu của họ, còn số của em đo trên 678 mẫu đối kháng của luận văn này. Hai bên đo trên hai tập khác nhau, nên em không đặt cạnh nhau để tuyên bố hơn kém.
 >
-> ⏱ 60 giây — CẮT ĐẦU TIÊN NẾU TRỄ. Nhưng phải giữ đoạn cuối về LanG, nói khi bước sang slide 7.
+> ⏱ 65 giây — CẮT ĐẦU TIÊN NẾU TRỄ. Nhưng phải giữ đoạn cuối về LanG, nói khi bước sang slide 7.
 
 ---
 
