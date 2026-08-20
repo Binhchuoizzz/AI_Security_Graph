@@ -39,16 +39,6 @@ cầu chạy dữ liệu mới → `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/ru
 
 # Lời thoại từng slide
 
-> **Bản chính thức — sửa ở đây, không sửa vào file slide.**
-> `docs/Thesis/slides/index.html` giữ nguyên bản gốc và không được đụng tới.
->
-> **Mạch kể:** mở ở slide 4 bằng vấn đề và bối cảnh của một trung tâm giám sát, và đóng ở
-> slide 20 bằng chính bài toán đó. Mỗi slide mở bằng **một câu hỏi hoặc một nghịch lý**,
-> không mở bằng nhãn — đó là chỗ giữ người nghe tỉnh táo.
->
-> Ký hiệu: `⏱` mốc thời gian · `▶` chỉ dẫn demo · `🔴` con số phải đóng đinh
-> · `🔒` câu đóng câu hỏi nghiên cứu (nói lúc chuyển màn hình, tính vào giờ demo).
-
 ---
 
 ### Slide 1 — Bìa
