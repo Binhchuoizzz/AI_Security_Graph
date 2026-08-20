@@ -18,7 +18,7 @@
 | --: | --: | :-- | :-- |
 | 0:00 | 6:00 | Slide 1–7 | mở đầu · ba nút thắt → đề xuất · ba câu hỏi · kiến trúc |
 | 6:00 | 7:30 | **▶1 Màn hình** | Executive Overview |
-| 7:30 | 10:00 | Slide 8–10 | Welford · Cổng ML · bộ đệm |
+| 7:30 | 10:00 | Slide 8–10 | Tầng 1 chín lớp · Cổng ML · bộ đệm |
 | 10:00 | 12:00 | **▶2 Màn hình** | SIEM Logs, ba tab con |
 | 12:00 | 14:30 | Slide 11–12 | tác tử 6 nút · Dual-RAG |
 | 14:30 | 17:00 | **▶3 Màn hình** | mở một thẻ BLOCK của Tầng 2 |
@@ -44,7 +44,7 @@ Trễ quá 1 phút thì bỏ slide 6 và rút ▶5 còn mỗi tab HITL.
 | 5 Ba câu hỏi | 80s | — | — | — | — |
 | 6 So sánh | 65s | — | — | — | *(cắt đầu tiên nếu trễ)* |
 | **7 Kiến trúc** | 120s | **➜ ▶1** | Dashboard (đã mở sẵn) | Tab **🎬 Executive Overview** | **97,5% + 90,6%** — luôn nói cặp |
-| 8 Welford | 70s | — | — | — | — |
+| 8 RuleEngine 9 lớp | 95s | — | — | — | — |
 | 9 Cổng ML | 65s | — | — | — | 962 / 0 FP |
 | **10 Bộ đệm** | 45s | **➜ ▶2** | Dashboard | Tab **📊 SIEM Logs** → 3 tab con, **trái sang phải**: `Tier-1 Rules` → `ML Gate` → `Tier-2 LLM` (tab 3 chỉ lướt) | **0,182 ms** · **962 / 0** |
 | 11 Tác tử | 75s | — | — | *(nói câu ĐÓNG RQ1 trước khi vào slide)* | — |
@@ -256,17 +256,21 @@ cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
 ### Slide 8 — RuleEngine & Welford
 
-> Câu hỏi đặt ra ở Tầng 1 là: làm sao phát hiện một cuộc tấn công mà mình chưa từng thấy bao giờ?
+> Tầng 1 không phải một bộ lọc đơn lẻ, mà là chuỗi chín lớp kiểm tra chạy nối tiếp, xếp trên màn hình đúng theo thứ tự chạy.
 >
-> Cách của em là không học tấn công, mà học cái bình thường. Hệ dùng thuật toán Welford để cập nhật liên tục trung bình và độ lệch của lưu lượng ngay trên dòng chảy, không cần lưu lại lịch sử, chi phí hằng số cho mỗi bản ghi. Cái gì lệch quá ba phẩy năm lần độ lệch chuẩn thì bị nâng điểm nghi ngờ.
+> Mở đầu là danh sách trắng, nhưng em cố ý chỉ cho nó đánh dấu chứ không cho thoát sớm — máy chủ nội bộ nếu bị chiếm quyền thì vẫn phải qua đủ các lớp sau.
 >
-> Nhưng cách này có một tử huyệt. Nếu kẻ tấn công tăng cường độ thật chậm, hệ sẽ quen dần và coi đó là bình thường — như con ếch trong nồi nước đun từ từ.
+> Hai lớp tiếp theo là so khớp chữ ký: 30 họ tấn công web quen thuộc; rồi 14 mẫu chèn câu lệnh và 22 mẫu bẻ khoá, dành riêng cho tấn công nhắm vào AI.
 >
-> Em khoá lại bằng hai biện pháp: chỉ luồng đã kết luận là lành tính mới được phép cập nhật mốc, và mốc ban đầu được gieo sẵn từ dữ liệu sạch để hệ không báo bừa lúc mới khởi động. Ngoài ra Tầng 1 còn ba rào chắn bộ nhớ, để một trận tấn công dồn dập không làm tràn RAM.
+> Lớp thứ tư là Welford — chỗ duy nhất không so khớp mẫu có sẵn, mà học cái bình thường của chính hệ thống. Nó cập nhật trung bình và độ lệch ngay trên dòng chảy, không lưu lịch sử; lệch quá ba phẩy năm lần độ lệch chuẩn thì bị nâng điểm nghi ngờ.
 >
-> Kết quả: trung bình 0,182 mili giây một bản ghi, và không dùng đến một megabyte VRAM nào.
+> Bốn lớp sau đều là luật: luật tĩnh cho cổng nhạy cảm và ngưỡng gói; luật động do chuyên viên duyệt từ vòng phản hồi; hồ sơ phiên theo từng IP trong cửa sổ 300 giây, để nhìn ra hành vi rải đều mà từng bản ghi riêng lẻ trông vô hại; và cưỡng chế theo danh tiếng từ Bộ nhớ mối đe doạ — IP từng bị chặn thì không phải xét lại từ đầu.
 >
-> ⏱ 65 giây — Mở bằng câu hỏi zero-day. Điểm gây tò mò: "không học tấn công, mà học cái bình thường" và tử huyệt con ếch.
+> Lớp cuối là chốt an toàn cho Welford: chỉ bản ghi đã kết luận là lành tính mới được cập nhật mốc. Không có chốt này, kẻ tấn công chỉ cần tăng cường độ thật chậm là hệ sẽ quen dần.
+>
+> Cả chín lớp chạy hết trung bình 0,182 mili giây một bản ghi, và không dùng đến một megabyte VRAM nào.
+>
+> ⏱ 95 giây — Đi ĐÚNG thứ tự trên màn hình: 0 → 0.1 → 0.2 → 0.5 → 1 → 2 → 3 → 3.5 → 0.6. Welford chỉ nói một đoạn ngắn; chốt chống đầu độc để dành làm câu cuối vì nó khép lại chính Welford.
 
 ---
 
