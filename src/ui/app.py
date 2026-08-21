@@ -456,11 +456,20 @@ def render_demo_overview(
             )
         ),
     )
-    c4.metric(
-        "Chuỗi HMAC",
-        "✅ Nguyên vẹn" if integ_valid else "⚠️ Bị sửa",
-        help="Kiểm chuỗi băm toàn sổ. Kết quả được đệm 30 giây (app.py:105).",
-    )
+    # Ô này mang giá trị CHỮ, không phải số — dùng st.metric thì "Nguyên vẹn" bị đặt ở cỡ
+    # chữ dành cho con số (2,6rem) rồi vỡ hai dòng và tràn khỏi thẻ. Dựng bằng thẻ trạng
+    # thái riêng, cùng khung .stat-card với các lưới khác nên nhìn vẫn đồng bộ.
+    with c4:
+        _ok = bool(integ_valid)
+        st.markdown(
+            f'<div class="stat-card stat-card--state" style="--accent:{"#34D399" if _ok else "#ff4d4f"}">'
+            f'<div class="stat-label">Chuỗi HMAC</div>'
+            f'<div class="stat-state" style="color:{"#34D399" if _ok else "#ff4d4f"}">'
+            f"{'✅ Nguyên vẹn' if _ok else '⚠️ Bị sửa'}</div>"
+            '<div class="stat-sub">kiểm toàn sổ · đệm 30 giây</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
     st.markdown("---")
     col_left, col_right = st.columns([3, 2])

@@ -23,8 +23,8 @@
     --fs-md:  1.02rem;
     --fs-lg:  1.18rem;
     --fs-xl:  1.35rem;
-    --fs-num: 2.15rem;   /* con số lớn trên thẻ chỉ số */
-    --fs-num-sm: 1.9rem; /* con số trên thẻ kết quả */
+    --fs-num: 2.6rem;     /* con số lớn trên thẻ chỉ số */
+    --fs-num-sm: 2.25rem; /* con số trên thẻ kết quả */
 }
 
 html, body, [class*="css"] {
@@ -331,13 +331,26 @@ html, body, [class*="css"] {
     border-color: rgba(64,169,255,0.35);
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
 }
-[data-testid="stMetricValue"] {
-    font-size: var(--fs-num); font-weight: 800;
-    font-variant-numeric: tabular-nums; letter-spacing: 0.5px;
+/* Streamlit bọc giá trị trong một <div> CON mang font-size riêng của emotion, nên đặt
+   cỡ chữ trên đúng phần tử có data-testid thì bị con đè và con số vẫn nhỏ như mặc định.
+   Phải với xuống mọi hậu duệ và dùng !important để thắng emotion. Đo trên Streamlit
+   1.59.1 — kiểm bằng cách so con số của st.metric với con số trong thẻ HTML tự dựng
+   ngay cạnh: trước khi vá, hai bên chênh nhau rõ rệt trên cùng một màn hình. */
+[data-testid="stMetricValue"],
+[data-testid="stMetricValue"] * {
+    font-size: var(--fs-num) !important;
+    font-weight: 800 !important;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.5px;
+    line-height: 1.15 !important;
 }
-[data-testid="stMetricLabel"] {
-    font-size: var(--fs-2xs) !important; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 1px; color: #93A1B5 !important;
+[data-testid="stMetricLabel"],
+[data-testid="stMetricLabel"] * {
+    font-size: var(--fs-xs) !important; font-weight: 700 !important;
+    text-transform: uppercase; letter-spacing: 0.9px; color: #93A1B5 !important;
+}
+[data-testid="stMetricDelta"], [data-testid="stMetricDelta"] * {
+    font-size: var(--fs-xs) !important;
 }
 
 /* Tabs: clear active state with accent underline */
@@ -521,7 +534,7 @@ h3 { letter-spacing: 0.2px; }
 
 /* Laptop 13–14": giảm nhẹ con số lớn để nhãn không bị ép vỡ dòng. */
 @media (max-width: 1366px) {
-    :root { --fs-num: 1.95rem; --fs-num-sm: 1.7rem; }
+    :root { --fs-num: 2.25rem; --fs-num-sm: 2rem; }
     .kpi-container { grid-template-columns: repeat(auto-fit, minmax(152px, 1fr)); gap: 12px; }
 }
 
@@ -537,7 +550,7 @@ h3 { letter-spacing: 0.2px; }
     :root {
         --fs-2xs: 0.78rem; --fs-xs: 0.85rem; --fs-sm: 0.92rem;
         --fs-md: 0.98rem;  --fs-lg: 1.1rem;  --fs-xl: 1.22rem;
-        --fs-num: 1.7rem;  --fs-num-sm: 1.5rem;
+        --fs-num: 2rem;    --fs-num-sm: 1.8rem;
     }
     .kpi-container, .stat-grid { grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); }
     .soc-card { padding: 13px; }
@@ -561,4 +574,27 @@ h3 { letter-spacing: 0.2px; }
     color: #8E9AA8;
     line-height: 1.6;
     margin: -6px 0 20px;
+}
+
+/* Thẻ trạng thái (giá trị là CHỮ, không phải số) — cùng khung .stat-card nhưng cỡ chữ
+   của chữ, không phải của con số. Dùng thang số cho "Nguyên vẹn" thì vỡ dòng và tràn thẻ. */
+.stat-card--state {
+    border-top: none;
+    border-left: 3px solid var(--accent, #34D399);
+    text-align: left;
+    padding: 16px 16px 14px;
+}
+
+.stat-card--state .stat-label { margin: 0 0 8px; text-align: left; }
+
+.stat-state {
+    font-size: var(--fs-xl);
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.stat-sub {
+    font-size: var(--fs-2xs);
+    color: #8E9AA8;
+    margin-top: 6px;
 }

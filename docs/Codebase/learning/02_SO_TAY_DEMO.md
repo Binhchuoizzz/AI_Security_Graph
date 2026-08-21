@@ -18,7 +18,8 @@ Chạy **sau slide 12**. Năm cảnh, **10 phút**. Thứ tự đi đúng mạch
 ```bash
 cd ~/Projects/Thesis/AI_Security_Graph
 SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --no-push
-cp ~/demo_snapshot_final/*.db ~/demo_snapshot_final/pipeline_stats.json config/
+cp ~/demo_snapshot_final/*.db config/
+cp ~/demo_snapshot_final/pipeline_stats.json ~/demo_snapshot_final/tier1_blocks.json config/
 cp ~/demo_snapshot_final/system_settings.yaml config/
 cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
 
@@ -210,6 +211,79 @@ trong bảng **`🛑 Luật chặn vĩnh viễn và lịch sử`**.
 > tầng rẻ nhất. Hệ càng chạy càng đẩy được nhiều việc về phía rẻ.
 
 Rồi **alt-tab về slide 12** và dừng. Đừng để màn hình cuối buổi là dashboard.
+
+---
+
+## Sau khi demo xong — trả về trạng thái đã chuẩn bị
+
+Buổi demo làm thay đổi bốn chỗ. Muốn diễn lại (buổi sau, hoặc quay video) thì phải trả hết về
+mốc ban đầu, **không phải chạy lại luồng**.
+
+| Cảnh | Đã đổi gì | Nằm ở đâu |
+| :-- | :-- | :-- |
+| ▶4② | Sửa dòng `id=2076` thành `LOG` | `config/audit_trail.db` |
+| ▶5① | Duyệt một luật → `ACTIVE` | `config/system_settings.yaml` |
+| ▶5① | `mark_ip_blocked()` đẩy uy tín IP lên 100 | `config/threat_memory.db` |
+| ▶5① | Ghi thêm dòng `BLOCK_IP` "APPROVED (HITL)" | `config/audit_trail.db` |
+| ▶5① | Đưa IP vào blacklist Redis | Redis (TTL 1 giờ, tự hết hạn) |
+
+### Cách trả về — chép đè từ ảnh chụp, đúng ba lệnh của bước chuẩn bị
+
+```bash
+cd ~/Projects/Thesis/AI_Security_Graph
+cp ~/demo_snapshot_final/*.db config/
+cp ~/demo_snapshot_final/pipeline_stats.json ~/demo_snapshot_final/tier1_blocks.json config/
+cp ~/demo_snapshot_final/system_settings.yaml config/
+cp ~/demo_snapshot_final/tier2_trace.jsonl logs/
+docker restart sentinel_dashboard          # buộc UI bỏ cache và đọc lại tệp mới
+```
+
+Blacklist Redis không cần đụng — nó tự hết hạn sau 1 giờ. Muốn sạch ngay:
+
+```bash
+docker exec sentinel_redis redis-cli --no-auth-warning -a "$REDIS_PASSWORD" \
+  --scan --pattern 'blacklist:*' | xargs -r -n50 \
+  docker exec sentinel_redis redis-cli --no-auth-warning -a "$REDIS_PASSWORD" DEL
+```
+
+### Kiểm ba thứ trước khi coi là xong
+
+```bash
+sqlite3 config/audit_trail.db \
+  "SELECT COUNT(*), (SELECT id||'|'||action||'|'||target FROM audit_trail
+                     WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1) FROM audit_trail;"
+#   PHẢI ra →  2077|2076|BLOCK_IP|198.19.2.41
+
+# So NỘI DUNG hai tệp, không so byte: cơ sở dữ liệu bật WAL nên tệp đổi byte ngay khi
+# Dashboard mở đọc, dù nội dung y hệt — `md5sum` ở đây sẽ báo lệch một cách vô cớ.
+# Vân tay dưới đây là mã băm của dòng cuối, tức đại diện cho cả chuỗi HMAC.
+for f in config/audit_trail.db ~/demo_snapshot_final/audit_trail.db; do
+  sqlite3 "$f" "SELECT COUNT(*)||' | '||substr((SELECT integrity_hash FROM audit_trail
+                       ORDER BY id DESC LIMIT 1),1,16) FROM audit_trail;"
+done
+#   HAI DÒNG PHẢI GIỐNG NHAU →  2077 | a02536ea4a77699b
+```
+
+Rồi mở Dashboard, bấm **`🛡️ Kiểm tra tính toàn vẹn Logs`** → phải ra dải xanh. Chưa xanh thì
+chờ hết 30 giây đệm rồi bấm lại; vẫn đỏ nghĩa là bản chép chưa vào.
+
+> 🚫 **Vẫn không dùng `--fresh` và `reset_all.py` để trả về mốc này.** Hai lệnh đó XOÁ SẠCH rồi
+> dựng lại từ đầu — mất luôn 2.077 dòng sổ và dòng `2076` mà cả cảnh ▶4 dựa vào. Chúng chỉ dùng
+> khi muốn tạo một ảnh chụp HOÀN TOÀN MỚI, và khi đó phải làm lại từ đầu:
+>
+> ```bash
+> SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --fresh   # dựng dữ liệu mới
+> mkdir -p ~/demo_snapshot_final
+> cp config/audit_trail.db config/threat_memory.db config/guardrails_audit.db \
+>    config/pipeline_stats.json config/tier1_blocks.json config/system_settings.yaml \
+>    ~/demo_snapshot_final/
+> cp logs/tier2_trace.jsonl ~/demo_snapshot_final/
+> sqlite3 config/audit_trail.db \
+>   "SELECT id, action, target FROM audit_trail WHERE action='BLOCK_IP' ORDER BY id DESC LIMIT 1;"
+> ```
+>
+> **Ghi lại ID vừa in ra** và sửa vào ▶4② cùng mục "ID đã chốt" ở đầu tài liệu — con số `2076`
+> chỉ đúng với ảnh chụp hiện tại.
 
 ---
 
