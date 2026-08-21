@@ -12,14 +12,36 @@ from datetime import datetime
 import pandas as pd  # type: ignore
 import streamlit as st  # type: ignore
 
-from src.guardrails.constants import (
-    TIER_LLM,
-    TIER_MANUAL,
-    TIER_ML,
-    TIER_RULE,
-    vn_num,
-    vn_pct,
-)
+from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
+
+
+# ── Định dạng số theo quy ước tiếng Việt ────────────────────────────────────────
+# DẤU PHẨY là thập phân, DẤU CHẤM phân cách hàng nghìn — ngược hẳn mặc định của Python.
+# Định nghĩa MỘT LẦN ở đây (module hiển thị) rồi app.py nhập lại — một con số hiện hai
+# kiểu trên cùng màn hình là lỗi người xem thấy ngay: hàng chỉ số từng in "99,717"
+# ngay trên bảng kết quả in "99.717" cho ĐÚNG một đại lượng.
+def vn_num(value, nd: int = 0) -> str:
+    """Số nguyên/thực -> chuỗi kiểu Việt. `None` -> "—" (không bịa 0)."""
+    if value is None:
+        return "—"
+    try:
+        return f"{float(value):,.{nd}f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def vn_pct(value, nd: int = 1, *, already_pct: bool = False) -> str:
+    """Tỉ lệ -> chuỗi phần trăm kiểu Việt. Đúng 100% bỏ phần thập phân, khớp slide."""
+    if value is None:
+        return "—"
+    try:
+        v = float(value) if already_pct else float(value) * 100.0
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(v - 100.0) < 1e-9:
+        return "100%"
+    return f"{v:.{nd}f}".replace(".", ",") + "%"
+
 
 # Marker chuỗi để nhận diện phán quyết đến từ CỔNG ML Tier-1 (dùng CHUNG cho components.py
 # và app.py để phân loại nguồn NHẤT QUÁN — 1 nguồn chân lý, tránh drift giữa các nơi).
@@ -757,10 +779,10 @@ def render_alert_card(
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#1890ff;'
             "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
-            'border-radius:4px;margin-left:8px;">🔧 Manual Action</span>'
+            'border-radius:4px;margin-left:8px;">🔧 Thao tác thủ công</span>'
         )
-        reasoning_title = "🔧 Manual Action Note:"
-        mitre_section_text = "🎯 MITRE ATT&CK Mapping: <code>N/A (Manual Action)</code>"
+        reasoning_title = "🔧 Ghi chú thao tác thủ công:"
+        mitre_section_text = "🎯 Quy kết MITRE ATT&CK: <code>N/A — thao tác thủ công</code>"
     elif is_tier1:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(82, 196, 26, 0.2);color:#95de64;'
@@ -1146,7 +1168,7 @@ def render_threat_intel_tables(high_risk_ips):
 
     st.subheader("🔴 Địa chỉ IP nguy cơ cao (Threat Actor)")
     if not high_risk_ips:
-        st.info("Chưa ghi nhận Threat Actor nào.")
+        st.info("Chưa ghi nhận đối tượng nguy cơ cao nào.")
     else:
         df_high_risk = pd.DataFrame(
             high_risk_ips,

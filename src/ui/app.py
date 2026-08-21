@@ -31,14 +31,7 @@ import streamlit as st  # type: ignore
 from streamlit_autorefresh import st_autorefresh  # type: ignore
 
 from src.agent.threat_memory import threat_memory
-from src.guardrails.constants import (
-    TIER_LLM,
-    TIER_MANUAL,
-    TIER_ML,
-    TIER_RULE,
-    vn_num,
-    vn_pct,
-)
+from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
 from src.response.executor import (
     count_audit_alerts,
     count_blocks_by_tier,
@@ -196,6 +189,8 @@ from src.ui.components import (
     render_metrics_header,
     render_theme_styles,
     render_threat_intel_tables,
+    vn_num,
+    vn_pct,
 )
 
 
@@ -421,17 +416,17 @@ def render_demo_overview(
     # nên khi luồng vượt ngưỡng, "tổng lệnh chặn" âm thầm bão hoà và nhỏ hơn tổng ba tầng.
     escalated = sum(int(v or 0) for v in _bt.values())
 
-    # ---------- Operational Metrics Row ----------
+    # ---------- Bốn thẻ mà hàng KPI phía trên KHÔNG có ----------
+    # Bản cũ in TÁM thẻ, trong đó bốn thẻ (log thô, Cổng ML chặn, Tier-2 chặn, chờ duyệt)
+    # lặp y nguyên hàng chỉ số ngay phía trên — cùng một màn hình, cùng một con số, in hai
+    # lần cách nhau vài chục pixel. Chỉ giữ phần BỔ SUNG cho hàng trên.
     st.markdown("### 📊 Chỉ số vận hành thời gian thực")
-    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8)
-    c1.metric("Log thô vào", vn_num(raw_logs_count))
-    c2.metric(
-        "Chặn ghi sổ kiểm toán",
-        vn_num(escalated),
-        help="Phán quyết BLOCK_IP CÓ dòng trong audit trail HMAC (Cổng ML + Tier-2 + thủ "
-        "công). CHƯA gồm lệnh chặn của luật Tier-1 — nhánh đó hiện không ghi sổ.",
+    st.caption(
+        "Bổ sung cho hàng chỉ số phía trên, không lặp lại. Rê chuột vào từng thẻ để xem "
+        "nguồn số liệu."
     )
-    c3.metric(
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(
         "Tier-1 luật chặn" + (" ⚠️" if _t1_tu_so_dem else ""),
         vn_num(_t1_blk),
         help=(
@@ -443,15 +438,15 @@ def render_demo_overview(
             else "Lệnh chặn do bộ máy luật Tier-1 ra, đếm trên audit trail."
         ),
     )
-    c4.metric("Cổng ML chặn", vn_num(_ml_blk), help="Lệnh chặn do Cổng ML (LightGBM) ra.")
-    c5.metric(
-        "Tier-2 LLM chặn",
-        vn_num(_llm_blk),
-        help="Lệnh chặn do tác tử LangGraph ra — khớp đúng số thẻ ở tab Tier-2.",
+    c2.metric(
+        "Chặn ghi sổ kiểm toán",
+        vn_num(escalated),
+        help="Phán quyết BLOCK_IP CÓ dòng trong audit trail HMAC (Cổng ML + Tier-2 + thủ "
+        "công). CHƯA gồm lệnh chặn của luật Tier-1 — nhánh đó hiện không ghi sổ.",
     )
-    c6.metric(
+    c3.metric(
         "Hàng đợi LLM (lô) ⏳",
-        f"{pending_llm}" + (" ⏸" if pending_llm_stale and pending_llm else ""),
+        vn_num(pending_llm) + (" ⏸" if pending_llm_stale and pending_llm else ""),
         help=(
             "Số LÔ còn chờ Tier-2 (mỗi lô gom nhiều log cùng một IP), ảnh chụp tức thời. "
             + (
@@ -461,8 +456,11 @@ def render_demo_overview(
             )
         ),
     )
-    c7.metric("Chờ duyệt (HITL)", f"{len(pending_rules)}")
-    c8.metric("Chuỗi HMAC", "✅ Nguyên vẹn" if integ_valid else "⚠️ Bị sửa")
+    c4.metric(
+        "Chuỗi HMAC",
+        "✅ Nguyên vẹn" if integ_valid else "⚠️ Bị sửa",
+        help="Kiểm chuỗi băm toàn sổ. Kết quả được đệm 30 giây (app.py:105).",
+    )
 
     st.markdown("---")
     col_left, col_right = st.columns([3, 2])
@@ -473,9 +471,9 @@ def render_demo_overview(
         if all_alerts:
             feed = [
                 {
-                    "Timestamp": str(a.get("timestamp", ""))[5:19],
-                    "Action": a.get("action", ""),
-                    "Target IP": a.get("target", ""),
+                    "Thời gian": str(a.get("timestamp", ""))[5:19],
+                    "Hành động": a.get("action", ""),
+                    "IP mục tiêu": a.get("target", ""),
                     "MITRE ATT&CK": _extract_mitre_technique(a.get("reason", "")) or "—",
                 }
                 for a in all_alerts[:10]
@@ -491,10 +489,12 @@ def render_demo_overview(
         if apt_events:
             apt_tbl = [
                 {
-                    "Source IP": e.get("src_ip", ""),
-                    "Day": e.get("apt_day", ""),
-                    "Killchain Phase": e.get("apt_phase", ""),
-                    "Threat Label": e.get("label", ""),
+                    "IP nguồn": e.get("src_ip", ""),
+                    "Ngày": e.get("apt_day", ""),
+                    # `apt_phase` là NHÃN GIAI ĐOẠN của bộ DAPT2020, không phải một chuỗi
+                    # kill-chain do hệ thống suy ra — gọi đúng tên để không bị hiểu nhầm.
+                    "Giai đoạn (DAPT2020)": e.get("apt_phase", ""),
+                    "Nhãn": e.get("label", ""),
                 }
                 for e in apt_events[:12]
             ]
@@ -1440,7 +1440,7 @@ def main_dashboard():
                             '    <span class="soc-label">IP bị chặn:</span>'
                             f'    <span class="soc-value-code" style="color:#ff7875;">{ip}</span>'
                             f"    {build_tier1_block_badge(count, score)}"
-                            '    <span class="soc-badge" style="background:rgba(82,196,26,0.15);color:#95de64;border:1px solid rgba(82,196,26,0.35);">🟢 Rule Engine Match</span>'
+                            '    <span class="soc-badge" style="background:rgba(82,196,26,0.15);color:#95de64;border:1px solid rgba(82,196,26,0.35);">🟢 Khớp luật Tier-1</span>'
                             "  </div>"
                             '  <div class="soc-reasoning-box" style="margin-top:8px;">'
                             '    <div class="soc-reasoning-title">⚡ Lý do Tier-1 chặn (Rule Engine):</div>'
@@ -2057,7 +2057,7 @@ def main_dashboard():
             else:
                 for ip in whitelisted_ips:
                     with st.expander(f"✅ Whitelisted: {ip}", expanded=False):
-                        st.write(f"Mọi traffic từ `{ip}` sẽ được bỏ qua bởi Rule Engine.")
+                        st.write(f"Mọi lưu lượng từ `{ip}` được Tier-1 bỏ qua.")
                         if is_l3:
                             if st.button("❌ Gỡ khỏi Whitelist", key=f"rmwl_t4_top_{ip}"):
                                 feedback_mgr.remove_from_whitelist(ip)
@@ -2103,13 +2103,13 @@ def main_dashboard():
                     # Phân loại HITL/Nguồn
                     src = rule.get("source", "")
                     if "langgraph_agent_hitl" in src:
-                        phan_loai = "🧠 LLM Agent (Chờ duyệt)"
+                        phan_loai = "🧠 LLM Tier-2 (chờ duyệt)"
                     elif "ml_triage" in src:
                         phan_loai = "⚡ Cổng ML (Chờ duyệt)"
                     elif "tier1_rule_engine" in src:
                         phan_loai = "🛡️ Tier-1 (Chờ duyệt)"
                     elif "langgraph_agent" in src:
-                        phan_loai = "🧠 LLM Agent (AI Block)"
+                        phan_loai = "🧠 LLM Tier-2 (tự chặn)"
                     else:
                         phan_loai = f"🔧 MANUAL ({src})"
 
@@ -2286,7 +2286,7 @@ def main_dashboard():
                     key="manual_block_ip_input",
                 ).strip()
                 manual_block_score = st.slider(
-                    "Điểm Risk Score",
+                    "Điểm rủi ro",
                     min_value=10,
                     max_value=100,
                     value=100,
@@ -2343,7 +2343,7 @@ def main_dashboard():
             # Form Whitelist thủ công
             with st.expander("🛡️ Thêm IP vào Whitelist", expanded=True):
                 st.write(
-                    "Thêm thủ công một IP an toàn (Pentest, Máy chủ nội bộ) để Rule Engine bỏ qua."
+                    "Thêm thủ công một IP an toàn (máy kiểm thử, máy chủ nội bộ) để Tier-1 bỏ qua."
                 )
                 manual_wl_ip = st.text_input(
                     "Địa chỉ IP an toàn",
@@ -2436,12 +2436,12 @@ def main_dashboard():
                     for v in vulnerabilities:
                         vuln_list.append(
                             {
-                                "Target": target,
-                                "CVE ID": v.get("VulnerabilityID", "N/A"),
-                                "Package": v.get("PkgName", "N/A"),
-                                "Installed": v.get("InstalledVersion", "N/A"),
-                                "Severity": v.get("Severity", "UNKNOWN").upper(),
-                                "Description": v.get("Description", "No description provided."),
+                                "Thành phần": target,
+                                "Mã CVE": v.get("VulnerabilityID", "N/A"),
+                                "Gói": v.get("PkgName", "N/A"),
+                                "Phiên bản": v.get("InstalledVersion", "N/A"),
+                                "Mức độ": v.get("Severity", "UNKNOWN").upper(),
+                                "Mô tả": v.get("Description", "Không có mô tả."),
                             }
                         )
                 has_vulns = len(vuln_list) > 0
@@ -2452,7 +2452,7 @@ def main_dashboard():
         if has_vulns:
             sev_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
             for v in vuln_list:
-                sev = v["Severity"]
+                sev = v["Mức độ"]
                 if sev in sev_counts:
                     sev_counts[sev] += 1
                 else:
@@ -2505,7 +2505,7 @@ def main_dashboard():
             from typing import Any, cast
 
             vuln_selection = st.dataframe(
-                cast(Any, df_vulns.style.map(color_sev, subset=["Severity"])),
+                cast(Any, df_vulns.style.map(color_sev, subset=["Mức độ"])),
                 on_select="rerun",
                 selection_mode="single-row",
                 key="trivy_vulns_table_select",
@@ -2522,11 +2522,11 @@ def main_dashboard():
             if selected_vuln_idx is not None:
                 v = vuln_list[selected_vuln_idx]
                 st.markdown("---")
-                st.markdown(f"#### 🔍 Chi tiết lỗ hổng: `{v['CVE ID']}`")
-                st.markdown(f"**Tập tin bị ảnh hưởng:** `{v['Target']}`")
-                st.markdown(f"**Gói thư viện:** `{v['Package']}` (Đang dùng: `{v['Installed']}`)")
-                st.markdown(f"**Mức độ nguy hại:** `{v['Severity']}`")
-                st.info(f"**Mô tả:** {v['Description']}")
+                st.markdown(f"#### 🔍 Chi tiết lỗ hổng: `{v['Mã CVE']}`")
+                st.markdown(f"**Tập tin bị ảnh hưởng:** `{v['Thành phần']}`")
+                st.markdown(f"**Gói thư viện:** `{v['Gói']}` (Đang dùng: `{v['Phiên bản']}`)")
+                st.markdown(f"**Mức độ nguy hại:** `{v['Mức độ']}`")
+                st.info(f"**Mô tả:** {v['Mô tả']}")
 
             # 5. Vẽ biểu đồ Knowledge Graph (Neo4j Visual Tree)
             st.markdown("---")
@@ -2556,26 +2556,26 @@ def main_dashboard():
 
             subcomponents = set()
             for v in vuln_list[:8]:
-                target_clean = _dot_id(v["Target"])
-                if v["Target"] not in subcomponents:
-                    subcomponents.add(v["Target"])
+                target_clean = _dot_id(v["Thành phần"])
+                if v["Thành phần"] not in subcomponents:
+                    subcomponents.add(v["Thành phần"])
                     dot_lines.append(
-                        f'    {target_clean} [label="{_dot_label(v["Target"])}", fillcolor="#14c2c2", color="#14c2c2"];'
+                        f'    {target_clean} [label="{_dot_label(v["Thành phần"])}", fillcolor="#14c2c2", color="#14c2c2"];'
                     )
                     dot_lines.append(f'    SOC -> {target_clean} [label="CONTAINS"];')
 
-                cve_clean = _dot_id(v["CVE ID"])
+                cve_clean = _dot_id(v["Mã CVE"])
                 color = (
                     "#ff4d4f"
-                    if v["Severity"] == "CRITICAL"
+                    if v["Mức độ"] == "CRITICAL"
                     else "#fa8c16"
-                    if v["Severity"] == "HIGH"
+                    if v["Mức độ"] == "HIGH"
                     else "#fadb14"
-                    if v["Severity"] == "MEDIUM"
+                    if v["Mức độ"] == "MEDIUM"
                     else "#1890ff"
                 )
                 dot_lines.append(
-                    f'    {cve_clean} [label="{_dot_label(v["CVE ID"])}\\n({v["Severity"]})", fillcolor="#1d39c4", color="{color}"];'
+                    f'    {cve_clean} [label="{_dot_label(v["Mã CVE"])}\\n({v["Mức độ"]})", fillcolor="#1d39c4", color="{color}"];'
                 )
                 dot_lines.append(f'    {target_clean} -> {cve_clean} [label="HAS_VULN"];')
 
@@ -2594,22 +2594,30 @@ def main_dashboard():
                 unsafe_allow_html=True,
             )
             st.markdown("##### 🧬 Sơ đồ Kiến trúc Tri thức SENTINEL (minh hoạ)")
+            # Sơ đồ phải kể ĐÚNG chỗ rẽ nhánh: Cổng ML tự quyết phần lớn (bypass), chỉ
+            # phần còn lại mới trả phí Tier-2. Bản cũ gán nhãn "bypass" cho cạnh ĐI TỚI LLM
+            # — nói ngược đúng thứ luận văn chứng minh. Vòng phản hồi (luật đã duyệt rơi về
+            # Tier-1) cũng phải có mặt, vì đó là cảnh cuối của buổi demo.
             arch_dot = (
-                'digraph G { rankdir=LR; bgcolor="transparent"; '
-                'node [style=filled, fontname="sans-serif", fontcolor="#ffffff", shape=box, color="#ffffff"]; '
-                'edge [color="#888888", fontcolor="#888888", fontsize=10, fontname="sans-serif"]; '
-                'SOC [label="SENTINEL_SOC", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"]; '
-                'T1 [label="Tier-1 Welford Filter", fillcolor="#14c2c2", color="#14c2c2"]; '
-                'ML [label="Tier-1 ML Gate (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
-                'GR [label="Guardrails (Encapsulation)", fillcolor="#14c2c2", color="#14c2c2"]; '
-                'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
-                f'LLM [label="Tier-2 LLM Agent ({_model_display_name()})", fillcolor="#1d39c4", color="#1d39c4"]; '
-                'MEM [label="Threat Memory (APT)", fillcolor="#1d39c4", color="#1d39c4"]; '
-                'DROP [label="Tự quyết, KHÔNG gọi LLM", fillcolor="#52c41a", color="#52c41a"]; '
-                'SOC -> T1 [label="ingest"]; T1 -> ML [label="escalate"]; '
-                'ML -> DROP [label="bypass (tự quyết)"]; '
-                'ML -> GR [label="phần còn lại"]; GR -> RAG [label="ground"]; '
-                'RAG -> LLM [label="reason"]; LLM -> MEM [label="correlate"]; }'
+                'digraph G { rankdir=LR; bgcolor="transparent"; nodesep=0.35; ranksep=0.55; '
+                'node [style=filled, fontname="sans-serif", fontsize=11, fontcolor="#ffffff", '
+                'shape=box, color="#ffffff", margin="0.14,0.09"]; '
+                'edge [color="#7A8699", fontcolor="#9FB0C4", fontsize=9, fontname="sans-serif"]; '
+                'SOC [label="SENTINEL", shape=doublecircle, fillcolor="#177ddc", color="#177ddc"]; '
+                'T1 [label="Tier-1\nluật + Welford", fillcolor="#14c2c2", color="#14c2c2"]; '
+                'ML [label="Tier-1\nCổng ML (LightGBM)", fillcolor="#52c41a", color="#52c41a"]; '
+                'DROP [label="Tự quyết\nKHÔNG gọi LLM", fillcolor="#237804", color="#52c41a"]; '
+                'GR [label="Rào chắn\nbọc dữ liệu", fillcolor="#14c2c2", color="#14c2c2"]; '
+                'RAG [label="Dual-RAG\nMITRE + NIST", fillcolor="#14c2c2", color="#14c2c2"]; '
+                f'LLM [label="Tier-2 · tác tử\\n{_model_display_name()}", fillcolor="#1d39c4", color="#1d39c4"]; '
+                'MEM [label="Bộ nhớ đe doạ\nchuỗi APT", fillcolor="#1d39c4", color="#1d39c4"]; '
+                'HITL [label="Chuyên viên\nphê duyệt", fillcolor="#d48806", color="#faad14"]; '
+                'SOC -> T1 [label="nạp"]; T1 -> ML [label="leo thang"]; '
+                'ML -> DROP [label="tự quyết (bypass)"]; ML -> GR [label="phần còn lại"]; '
+                'GR -> RAG [label="neo bằng chứng"]; RAG -> LLM [label="suy luận"]; '
+                'LLM -> MEM [label="tương quan"]; LLM -> HITL [label="hoãn"]; '
+                'HITL -> T1 [label="luật đã duyệt", style=dashed, color="#faad14", '
+                'fontcolor="#faad14", constraint=false]; }'
             )
             st.graphviz_chart(arch_dot, width="stretch")
 
