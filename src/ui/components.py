@@ -12,7 +12,14 @@ from datetime import datetime
 import pandas as pd  # type: ignore
 import streamlit as st  # type: ignore
 
-from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
+from src.guardrails.constants import (
+    TIER_LLM,
+    TIER_MANUAL,
+    TIER_ML,
+    TIER_RULE,
+    vn_num,
+    vn_pct,
+)
 
 # Marker chuỗi để nhận diện phán quyết đến từ CỔNG ML Tier-1 (dùng CHUNG cho components.py
 # và app.py để phân loại nguồn NHẤT QUÁN — 1 nguồn chân lý, tránh drift giữa các nơi).
@@ -1075,7 +1082,7 @@ def render_metrics_header(
 
     # Tỉ lệ analyst BÁC BỎ luật do hệ đề xuất — KHÔNG phải False Positive Rate (xem chú thích
     # tại chỗ tính trong app.py). None = chưa ai duyệt luật nào -> hiện "—", không hiện 0.0%.
-    reject_str = f"{live_fpr:.1f}%" if live_fpr is not None else "—"
+    reject_str = vn_pct(live_fpr, 1, already_pct=True)
     fpr_color = "#52c41a"  # xanh
     if live_fpr is None:
         fpr_color = "#94A3B8"  # xám: chưa đo được
@@ -1087,46 +1094,46 @@ def render_metrics_header(
     # CHỈ MỘT chỉ số phần trăm trên phễu: xả tải LLM = 1 − (sự kiện TỚI LLM / log thô).
     # "Giảm nhiễu" từng đứng cạnh đây nhưng là đại lượng KHÁC (log thô − cảnh báo tới
     # analyst) và luôn cao hơn ~11 điểm, nên đặt cạnh nhau chỉ khiến người đọc trích nhầm.
-    offload_str = f"{llm_offload:.1f}%" if llm_offload is not None else "—"
+    offload_str = vn_pct(llm_offload, 1, already_pct=True)
 
     html_kpi = (
         f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">'
         f'  <div style="font-size: 0.95rem; font-weight: 800; color: #CBD5E1; letter-spacing: 0.5px;">'
-        f"    📊 Real-Time Cyber Security Operational Metrics"
+        f"    📊 Chỉ số vận hành thời gian thực"
         f"  </div>"
         f'  <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); padding: 4px 14px; border-radius: 20px; font-size: 0.78rem; color: #34D399; font-weight: 700; letter-spacing: 0.5px;">'
         f'    <span class="blink" style="display: inline-block; width: 8px; height: 8px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 8px #10B981;"></span>'
-        f"    REALTIME STREAMING ACTIVE · SYNC 4S"
+        f"    ĐANG NHẬN LUỒNG · LÀM MỚI 4 GIÂY"
         f"  </div>"
         f"</div>"
         f'<div class="kpi-container">'
         f'  <div class="kpi-card" style="border-top: 4px solid #64748B;">'
-        f'    <div class="kpi-val" style="color: #F8FAFC;">{int(total_raw_logs or 0):,}</div>'
-        f'    <div class="kpi-label">Raw Input Logs</div>'
+        f'    <div class="kpi-val" style="color: #F8FAFC;">{vn_num(total_raw_logs or 0)}</div>'
+        f'    <div class="kpi-label">Log thô vào</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #FF5252;">'
         f'    <div class="kpi-val" style="color: #FF5252;">{offload_str}</div>'
-        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Luật Tier-1 tự xử {t1_count:,}</span></div>'
+        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Luật Tier-1 tự xử {vn_num(t1_count)}</span></div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #3B82F6;">'
-        f'    <div class="kpi-val" style="color: #60A5FA;">{ml_count:,}</div>'
+        f'    <div class="kpi-val" style="color: #60A5FA;">{vn_num(ml_count)}</div>'
         f'    <div class="kpi-label">Cổng ML chặn ⚡</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #8B5CF6;">'
-        f'    <div class="kpi-val" style="color: #A78BFA;">{llm_count:,}</div>'
+        f'    <div class="kpi-val" style="color: #A78BFA;">{vn_num(llm_count)}</div>'
         f'    <div class="kpi-label">Tier-2 LLM chặn 🧠</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #F59E0B;">'
-        f'    <div class="kpi-val" style="color: #FBBF24;">{int(pending_rules or 0):,}</div>'
-        f'    <div class="kpi-label">HITL Approvals 🧑‍💻</div>'
+        f'    <div class="kpi-val" style="color: #FBBF24;">{vn_num(pending_rules or 0)}</div>'
+        f'    <div class="kpi-label">Chờ duyệt 🧑‍💻</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #10B981;">'
-        f'    <div class="kpi-val" style="color: #34D399;">{int(active_rules or 0):,}</div>'
-        f'    <div class="kpi-label">Active Block Rules 🔒</div>'
+        f'    <div class="kpi-val" style="color: #34D399;">{vn_num(active_rules or 0)}</div>'
+        f'    <div class="kpi-label">Luật đang chặn 🔒</div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid {fpr_color};">'
         f'    <div class="kpi-val" style="color: {fpr_color};">{reject_str}</div>'
-        f'    <div class="kpi-label">Analyst bác bỏ luật 🎯</div>'
+        f'    <div class="kpi-label">Analyst bác bỏ 🎯</div>'
         f"  </div>"
         f"</div>"
     )

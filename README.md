@@ -9,23 +9,53 @@ Master's thesis, Software Engineering — Nguyen Duc Binh (24MSE13183, MSE23HN),
 FSB Institute of Management & Technology, FPT University.
 Supervisors: Dr. Bui Van Hieu, Dr. Dang Van Hieu.
 
+## Pipeline
+
+| Stage | What runs | Outcome |
+| :--- | :--- | :--- |
+| Tier 1 | WAF signatures, Welford O(1) baselining, LightGBM gateway | The bulk resolved at line rate — block, alert or pass, no token spent |
+| Tier 2 | Guardrails, dual-RAG over MITRE ATT&CK and NIST SP 800-61r2, LangGraph agent | Blocks, or defers to a human with the evidence attached |
+| Ledger | Every decision appended to an HMAC-SHA256 chain | One altered row breaks exactly one link, which names it |
+| Loop | An analyst approves a proposed rule | It hot-reloads into Tier 1, so the next hit costs nothing |
+
+A technique ID may only be emitted if it appears in the context retrieved for that batch. When it
+does not, the claim is dropped and the action downgraded — the shield that produces the 9.26%
+figure below.
+
 ## Results
 
-Read straight from `experiments/results/*.json`. Every ratio is quoted with its denominator; the
-caveats are part of the result, not footnotes to it.
+Four numbers, each read straight from `experiments/results/*.json`. Every ratio carries its
+denominator; the defence deck and the dashboard read the same five files.
 
-| | Headline | Denominator and caveat |
+| | Value | Denominator |
 | :--- | :--- | :--- |
-| Offload & latency | 97.5% offload · 0.88 ms median | Offload is a property of the traffic mix, not a constant: 97.47% at a 9.77% attack base rate, 90.57% at 31.56%. Median drops 17,174.7 → 0.88 ms, but p95 gets **worse** (25,829 vs 21,434 ms) — escalated cases pay both tiers. |
-| Adversarial & integrity | 100% injection resistance · 98.75% evasion resistance | 678/678 hard adversarial samples. Evasion measured on the hard `extreme_broad` mode only (1,023/1,036). The HMAC chain catches edits, insertions and mid-deletions 30/30 each — **but not tail truncation (0/30)**. |
-| ATT&CK attribution | 80.0% retrieval-only · 68.0% full pipeline | Attribution is **worse with the reasoning tier than without it**; reported as a limitation, not hidden. The grounding shield fired on 9.26% of batches and blocked 76 ungroundable `BLOCK_IP` actions; 0/1,421 assertions went unanchored. |
-| Triage & HITL | −84.24% analyst load at 95.0% threat coverage | As a binary classifier the reasoning tier is worthless (MCC 0.0, 99.55% FP on confirmations, n = 1,066 at a 7.5% true-alert rate). Its value is as a router: the deferred queue is 15.76% of volume and 6.03× enriched. |
-| Reasoning quality | 3.78 / 5.0 mean | Cross-family LLM-as-judge, n = 1,052. Context precision is the weakest axis at 2.54, and only 11.2% of justifications cite a checkable log value. |
+| Stream offload | **97.5%** | 99,717 events at a 9.77% attack base rate — 2.53% reached the LLM |
+| Median latency | **0.88 ms** | against 17,174.7 ms single-tier LLM, n = 500 |
+| Analyst load cut | **84.24%** | 1,066 escalated alerts; the 15.76% deferred queue holds 95.0% of real threats |
+| Injection and ledger | **100%** | 678/678 adversarial samples blocked; the HMAC chain caught 90/90 edits, insertions and mid-deletions |
+
+The numbers that do not flatter the system. They are part of the result, not a footnote to it:
+
+- **p95 latency gets worse** — 25,829 ms against 21,434 ms. Escalated cases pay for both tiers.
+- **Offload is a property of the traffic mix, not a constant** — 97.47% at a 9.77% attack rate,
+  90.57% at 31.56%. Quoting it without the base rate means nothing.
+- **The chain cannot detect tail truncation** (0/30). It pinpoints one altered row; it cannot
+  prove the ledger is complete.
+- **As a binary classifier the reasoning tier is worthless** — MCC 0.0, 99.55% false positives on
+  what it confirms, n = 1,066 at a 7.5% true-alert rate. Its value is as a router, not a detector.
+- **Attribution is worse with the reasoning tier than without it** — 68.0% for the full pipeline
+  against 80.0% retrieval-only. Reported as a limitation, not hidden.
+- **Reasoning quality** averages 3.78/5.0 (cross-family LLM-as-judge, n = 1,052), weakest on
+  context precision at 2.54; only 11.2% of justifications cite a checkable log value.
+
+The evidence-anchoring shield fired on 9.26% of batches and blocked 76 ungroundable `BLOCK_IP`
+actions; 0/1,421 assertions went unanchored. Evasion resistance is 98.75% measured on the hard
+`extreme_broad` mode only (1,023/1,036).
 
 The 97.5% figure has a specific denominator: the 2026-08-05 build of the demo stream — 99,717
-scored events, 9.77% attack, no CSIC 2010. The current `data/demo.json` is a later, larger rebuild
-(496,885 events), so re-running the offload measurement today will not reproduce it. The 90.57%
-figure on the 25,649-event benchmark stream is unaffected.
+scored events, no CSIC 2010. `data/demo.json` is now a larger rebuild (496,885 events), so
+re-running the measurement today will not reproduce it. The 90.57% figure on the 25,649-event
+benchmark stream is unaffected.
 
 ## Repository
 
@@ -34,7 +64,7 @@ figure on the 25,649-event benchmark stream is unaffected.
 | `src/` | Runtime: `streaming/` · `tier1_filter/` · `guardrails/` · `rag/` · `agent/` · `response/` · `ui/` |
 | `experiments/` | Benchmark harnesses and `results/*.json` — the source of every number above |
 | `scripts/` | Dataset builders, demo runner, number/reference audits |
-| `tests/` | 613 tests (609 pass, 4 skip without Redis) |
+| `tests/` | 666 tests, all passing with Redis up; the streaming ones skip without it |
 | `docs/Thesis/` | Thesis LaTeX (EN + VI), submitted PDF, defence deck |
 | `docs/Codebase/` | Runtime walkthrough, operating guide, defence script and demo runbook |
 | `ml_lab/`, `llm_lab/` | Gateway training; QLoRA scaffolding for the fine-tuning direction in future work |

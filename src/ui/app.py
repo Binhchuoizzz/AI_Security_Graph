@@ -14,7 +14,6 @@ import os
 import re
 import sys
 import time
-import typing
 
 import pandas as pd  # type: ignore
 
@@ -32,7 +31,14 @@ import streamlit as st  # type: ignore
 from streamlit_autorefresh import st_autorefresh  # type: ignore
 
 from src.agent.threat_memory import threat_memory
-from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
+from src.guardrails.constants import (
+    TIER_LLM,
+    TIER_MANUAL,
+    TIER_ML,
+    TIER_RULE,
+    vn_num,
+    vn_pct,
+)
 from src.response.executor import (
     count_audit_alerts,
     count_blocks_by_tier,
@@ -150,33 +156,34 @@ def cached_get_high_risk_ips(min_score=1.0):
 # ground_truth và không ai cập nhật lại giao diện — đúng kiểu trôi số mà chỉ cần chạy lại
 # benchmark một lần nữa là tái diễn. Đọc thẳng từ file thì không thể trôi được nữa.
 @st.cache_data(ttl=30)
-def cached_experiment_results() -> dict:
-    """Nạp experiments/results/*.json. Thiếu file -> trả {} và giao diện hiện '—'."""
-    base = os.path.join(os.path.dirname(__file__), "..", "..", "experiments", "results")
-    out: dict = {}
-    for name in (
-        "latency_benchmark",
-        "ablation_mlgate_results",
-        "apt_negative_control_results",
-        "ml_gate_results",
-    ):
-        try:
-            with open(os.path.join(base, f"{name}.json")) as f:
-                out[name] = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            out[name] = {}
-    return out
+def cached_mitre_options() -> list[str]:
+    """Danh sách kỹ thuật MITRE dựng TỪ CHÍNH sổ kiểm toán, không viết cứng.
+
+    Bản cũ ghim sẵn ["T1059.004", "T1190", "T1595", "T1071"]. Bốn mã đó là phỏng đoán từ
+    một lượt chạy cũ, nên bộ lọc vừa liệt kê kỹ thuật hệ thống KHÔNG hề quy kết, vừa
+    KHÔNG có mã mà nó quy kết nhiều nhất (T1595.003) — chọn mục nào cũng ra bảng rỗng và
+    người xem tưởng hệ thống không phát hiện gì. Đọc thẳng dữ liệu thì không thể lệch.
+    """
+    techs: set[str] = set()
+    try:
+        for a in get_audit_trail(1000, None):
+            t = _extract_mitre_technique(a.get("reason", ""))
+            if not t:
+                continue
+            # Chuỗi thật có dạng "T1190 - Exploit Public-Facing Application" -> lấy mã.
+            code = t.split("-")[0].split()[0].strip() if t.split() else ""
+            if code.upper().startswith("T"):
+                techs.add(code)
+    except Exception:
+        return []
+    return sorted(techs)
 
 
-def _res_metric(col, label: str, value, delta: str, fmt: "typing.Callable | type" = str) -> None:
-    """Hiện chỉ số; nếu số liệu chưa có thì nói THẲNG là chưa có, không bịa giá trị."""
-    if value is None:
-        col.metric(label, "—", "chưa có file kết quả")
-    else:
-        col.metric(label, fmt(value), delta)
+# Thư mục kết quả thực nghiệm — MỘT nơi khai báo, để panel kết quả và mọi chỗ khác
+# không thể trỏ về hai đường dẫn khác nhau.
+_RES_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "experiments", "results")
 
 
-# ---------------------------------------------------------------------------
 from src.tier1_filter.feedback_listener import FeedbackListener
 from src.ui import components as ui_components
 from src.ui.auth import logout, require_auth
@@ -367,7 +374,7 @@ def render_demo_overview(
     blocks_by_tier=None,
 ):
     """Tab Tổng quan Trình diễn — gom mọi thứ cần show vào MỘT màn hình."""
-    st.markdown("## 🎬 SENTINEL — Bảng Trình diễn Tổng quan (Executive Demo)")
+    st.markdown("## 🎬 SENTINEL — Bảng trình diễn tổng quan")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
         "Welford $O(1)$ + **Cổng ML** (cùng Tier-1) → **Tier-2** tác tử LangGraph (Foundation-Sec-8B-Instruct Q4\\_K\\_M qua llama.cpp) + "
@@ -376,7 +383,7 @@ def render_demo_overview(
 
     # ---------- Thu thập dữ liệu (an toàn) ----------
     try:
-        # Qua cache (ttl=5): st.tabs render MỌI tab mỗi lượt refresh 3s nên các query này
+        # Qua cache (ttl=5): st.tabs render MỌI tab mỗi lượt refresh 4s nên các query này
         # nổ bất kể tab đang xem — cache gộp lại 1 lần đọc DB thay vì nhiều lần/refresh.
         apt_events = cached_get_all_threat_events() or []
     except Exception:
@@ -415,18 +422,18 @@ def render_demo_overview(
     escalated = sum(int(v or 0) for v in _bt.values())
 
     # ---------- Operational Metrics Row ----------
-    st.markdown("### 📊 Real-Time Operational Metrics")
+    st.markdown("### 📊 Chỉ số vận hành thời gian thực")
     c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8)
-    c1.metric("Log thô vào", f"{raw_logs_count:,}")
+    c1.metric("Log thô vào", vn_num(raw_logs_count))
     c2.metric(
         "Chặn ghi sổ kiểm toán",
-        f"{escalated:,}",
+        vn_num(escalated),
         help="Phán quyết BLOCK_IP CÓ dòng trong audit trail HMAC (Cổng ML + Tier-2 + thủ "
         "công). CHƯA gồm lệnh chặn của luật Tier-1 — nhánh đó hiện không ghi sổ.",
     )
     c3.metric(
         "Tier-1 luật chặn" + (" ⚠️" if _t1_tu_so_dem else ""),
-        f"{_t1_blk:,}",
+        vn_num(_t1_blk),
         help=(
             "⚠️ Số này đọc từ BỘ ĐẾM LUỒNG (pipeline_stats), KHÔNG từ sổ kiểm toán: nhánh "
             "BLOCK_IP của luật Tier-1 đẩy IP vào blacklist Redis + Threat Memory nhưng không "
@@ -436,10 +443,10 @@ def render_demo_overview(
             else "Lệnh chặn do bộ máy luật Tier-1 ra, đếm trên audit trail."
         ),
     )
-    c4.metric("Cổng ML chặn", f"{_ml_blk:,}", help="Lệnh chặn do Cổng ML (LightGBM) ra.")
+    c4.metric("Cổng ML chặn", vn_num(_ml_blk), help="Lệnh chặn do Cổng ML (LightGBM) ra.")
     c5.metric(
         "Tier-2 LLM chặn",
-        f"{_llm_blk:,}",
+        vn_num(_llm_blk),
         help="Lệnh chặn do tác tử LangGraph ra — khớp đúng số thẻ ở tab Tier-2.",
     )
     c6.metric(
@@ -462,7 +469,7 @@ def render_demo_overview(
 
     # ---------- Left Column: Live Feed + APT ----------
     with col_left:
-        st.markdown("### 🚨 Live Threat Feed (Recent Alerts)")
+        st.markdown("### 🚨 Dòng cảnh báo trực tiếp")
         if all_alerts:
             feed = [
                 {
@@ -475,9 +482,12 @@ def render_demo_overview(
             ]
             st.dataframe(pd.DataFrame(feed), width="stretch", height=300, hide_index=True)
         else:
-            st.info("No alerts registered. Stream events via unified_stream or demo script.")
+            st.info(
+                "Chưa có cảnh báo nào. Đẩy luồng bằng `scripts/run_demo.sh` "
+                "(hoặc `scripts/demo.py`) để hệ thống bắt đầu chấm sự kiện."
+            )
 
-        st.markdown("### 🎯 Multi-day APT Campaign (Kill-chain Correlation)")
+        st.markdown("### 🎯 Chiến dịch APT nhiều ngày")
         if apt_events:
             apt_tbl = [
                 {
@@ -493,102 +503,112 @@ def render_demo_overview(
                 f"🔗 Detected **{len(apt_ips)} APT IPs** via multi-day threat correlation in Threat Memory (SQLite)."
             )
         else:
-            st.info("No APT events recorded. Seed DAPT2020 dataset for multi-day correlation demo.")
+            st.info(
+                "Chưa ghi nhận sự kiện APT nào. Nạp DAPT2020 (`scripts/build_dapt_chains.py`) "
+                "để có tương quan nhiều ngày."
+            )
 
     # ---------- Right Column: Benchmark Results + System Status ----------
     with col_right:
-        st.markdown("### 🏆 Empirical Thesis Benchmark Results")
-        st.markdown("*CSE-CIC-IDS2018 + DAPT2020 · kiểm định thống kê phi tham số.*")
-        _R = cached_experiment_results()
-        _lat = _R.get("latency_benchmark") or {}
-        _mlg = _R.get("ablation_mlgate_results") or {}
-        _apt = _R.get("apt_negative_control_results") or {}
-        _mgr = _R.get("ml_gate_results") or {}
+        # ── BỐN CON SỐ CỦA SLIDE KẾT QUẢ ────────────────────────────────────────
+        # Màn hình này và slide Kết quả PHẢI nói cùng một bộ số. Bản cũ in sáu chỉ số
+        # khác hẳn (0,509 ms · −69,24% · 68,2% · APT recall 1,00 · 99,58%) lấy từ những
+        # lượt đo khác, nên hội đồng nhìn slide rồi nhìn Dashboard sẽ thấy hai bộ số
+        # không con nào trùng con nào — mà cả hai đều đúng, chỉ khác phép đo. Nay đọc
+        # thẳng đúng bốn tệp mà slide trích, không viết cứng con số nào.
+        st.markdown("### 🏆 Bốn con số của luận văn")
 
-        # Đường nhanh Tier-1 = các sự kiện KHÔNG gọi LLM (<1 ms), tính thẳng từ chuỗi đo.
-        _fast = [x for x in (_lat.get("per_event_two_tier_ms") or []) if x < 1.0]
-        _t1_ms = (sum(_fast) / len(_fast)) if _fast else None
+        def _J(name: str) -> dict:
+            try:
+                with open(os.path.join(_RES_DIR, f"{name}.json")) as f:
+                    return json.load(f)
+            except (OSError, json.JSONDecodeError):
+                return {}
 
-        e1, e2 = st.columns(2)
-        _res_metric(
-            e1,
-            "Độ trễ Tier-1 (luật)",
-            _t1_ms,
-            f"đường nhanh · n={len(_fast)}/{_lat.get('n_events', '?')}",
-            lambda v: f"{v:.3f} ms",
-        )
-        _res_metric(
-            e2,
-            "Giảm độ trễ đầu-cuối",
-            _lat.get("latency_reduction_pct"),
-            f"{(_lat.get('two_tier_mean_ms') or 0) / 1000:.2f} s vs "
-            f"{(_lat.get('baseline_mean_ms') or 0) / 1000:.2f} s LLM-only",
-            lambda v: f"−{v:.2f}%",
-        )
+        _off = _J("offload_vs_baserate_demo")
+        _lat = _J("latency_benchmark")
+        _tri = (_J("tier2_decision_results").get("summary") or {}).get("triage") or {}
+        _adv = _J("adversarial_pipeline_results")
+        _tam = _J("audit_tamper_results")
+        _mode = _tam.get("by_mode") or {}
 
-        e3, e4 = st.columns(2)
-        # Chính sách 4 dải (C>=0.85 BLOCK · 0.65-0.85 ESCALATE · 0.40-0.65 ALERT · <0.40 PASS).
-        _byp = _mlg.get("ml_bypass_rate")
-        _res_metric(
-            e3,
-            "Cổng ML giảm tải LLM",
-            None if _byp is None else 100 * _byp,
-            f"F1(bypass) {_mlg.get('ml_f1_on_bypass', '—')} · "
-            f"{_mlg.get('n_ml_bypass', '?')}/{_mlg.get('n_escalated_would_call_llm', '?')} ca",
-            lambda v: f"{v:.1f}%",
+        # Dùng CHUNG bộ định dạng với hàng chỉ số phía trên (src/guardrails/constants.py).
+        # Bản trước tự viết lại ở đây, nên cùng một con số hiện hai kiểu trên một màn hình.
+        _pct, _num = vn_pct, vn_num
+
+        _core = sum(
+            int((_mode.get(k) or {}).get("detected", 0)) for k in _tam.get("core_modes") or []
         )
-        _res_metric(
-            e4,
-            "APT recall",
-            _apt.get("recall"),
-            f"DAPT2020 · {_apt.get('detected', '?')}/{_apt.get('positives_apt_truth', '?')} "
-            f"· specificity {_apt.get('specificity', '?')}",
-            lambda v: f"{v:.2f}",
+        _core_n = sum(
+            int((_mode.get(k) or {}).get("trials", 0)) for k in _tam.get("core_modes") or []
         )
 
-        e5, e6 = st.columns(2)
-        # HEADLINE = độ chính xác auto-BLOCK (hành động DỨT KHOÁT, không đảo được, dải C>=0.85).
-        # F1 gộp thấp hơn vì tính CẢ dải ALERT-0.40 (cảnh báo low-priority, KHÔNG chặn) —
-        # không mâu thuẫn, nhưng phải nói rõ thay vì chỉ khoe con số đẹp.
-        _blk = ((_mgr.get("classification") or {}).get("by_action") or {}).get("BLOCK_IP") or {}
-        _res_metric(
-            e5,
-            "Cổng ML — auto-BLOCK chính xác",
-            _blk.get("precision"),
-            f"{_blk.get('tp', '?')} chặn · {_blk.get('fp', '?')} chặn nhầm",
-            lambda v: f"{100 * v:.1f}%",
+        _cards = [
+            (
+                "#22D3EE",
+                "Tỷ lệ xả tải",
+                _pct(_off.get("offload_tong")),
+                f"{_num(_off.get('n_events'), 0)} sự kiện · nền tấn công "
+                f"{_pct(_off.get('attack_rate_do_duoc'), 2)} · chỉ "
+                f"{_pct(_off.get('ti_le_toi_llm'), 2)} chạm tới LLM",
+            ),
+            (
+                "#FBBF24",
+                "Độ trễ trung vị",
+                f"{_num(_lat.get('two_tier_median_ms'), 2)} ms",
+                f"so với {_num(_lat.get('baseline_median_ms'), 1)} ms của LLM đơn tầng · "
+                f"n={_num(_lat.get('n_events'), 0)}",
+            ),
+            (
+                "#A78BFA",
+                "Cắt giảm tải chuyên viên",
+                _pct(_tri.get("workload_reduction"), 2),
+                f"trên {_num(_tri.get('n_alerts_in'), 0)} cảnh báo leo thang · hàng đợi hoãn "
+                f"({_pct(_tri.get('defer_rate'), 2)} khối lượng) giữ "
+                f"{_pct(_tri.get('threat_recall_in_deferred'), 1)} đe doạ thật",
+            ),
+            (
+                "#34D399",
+                "Tiêm nhiễm và toàn vẹn sổ",
+                _pct((_adv.get("resistance_rate_pct") or 0) / 100),
+                f"{_adv.get('resisted', '?')}/{_adv.get('n_tested', '?')} mẫu tiêm nhiễm bị chặn · "
+                f"chuỗi HMAC bắt {_core}/{_core_n} lần sửa, chèn, xoá giữa sổ",
+            ),
+        ]
+        st.markdown(
+            '<div class="res-grid">'
+            + "".join(
+                f'<div class="res-card" style="--accent:{c}">'
+                f'<div class="res-eyebrow">{lbl}</div>'
+                f'<div class="res-val" style="color:{c}">{val}</div>'
+                f'<div class="res-den">{den}</div>'
+                "</div>"
+                for c, lbl, val, den in _cards
+            )
+            + "</div>",
+            unsafe_allow_html=True,
         )
-        _modes = (_mgr.get("evasion_resistance") or {}).get("by_mode") or {}
-        _ev = (
-            sum(m.get("resistance_rate", 0) for m in _modes.values()) / len(_modes)
-            if _modes
-            else None
+
+        # GIỚI HẠN NẰM CẠNH CON SỐ, không lùi xuống chú thích cuối trang. Ba câu dưới đây
+        # là ba chỗ số liệu KHÔNG đẹp, và đều đọc từ chính các tệp ở trên.
+        _tail = _mode.get("xoá_dòng_cuối") or {}
+        st.markdown(
+            '<div class="res-limits">'
+            "<b>Giới hạn phải nói kèm.</b> "
+            f"Trung vị giảm mạnh nhưng <b>p95 xấu đi</b> — {_num(_lat.get('two_tier_p95_ms'), 1)} ms "
+            f"so với {_num(_lat.get('baseline_p95_ms'), 1)} ms, vì ca leo thang trả phí cả hai tầng. "
+            "Tỉ lệ xả tải là hàm của hỗn hợp lưu lượng, <b>không phải hằng số</b>. "
+            f"Chuỗi HMAC <b>không phát hiện được cắt đuôi sổ</b> ({_tail.get('detected', 0)}/"
+            f"{_tail.get('trials', 0)})."
+            "</div>",
+            unsafe_allow_html=True,
         )
-        _res_metric(
-            e6,
-            "Kháng né-tránh Cổng ML",
-            _ev,
-            f"trung bình {len(_modes)} kiểu né-tránh",
-            lambda v: f"{100 * v:.2f}%",
-        )
-        # Caption cũng ĐỌC TỪ FILE. Bản trước viết cứng "giảm tải 83.8% (761/908 ca)" trong
-        # khi file ghi 602/747 — caption tự khẳng định "mọi số truy được về results/*.json"
-        # mà chính nó lại là số không truy được. Nay mọi con số dưới đây đều lấy tại chỗ.
-        _cls = _mgr.get("classification") or {}
-        st.caption(
-            "Nguồn — đọc TRỰC TIẾP từ `experiments/results/*.json` mỗi lần tải trang: "
-            f"**ml_gate** — {_cls.get('total_events', '?')} mẫu, auto-BLOCK precision "
-            f"**{100 * _blk.get('precision', 0):.1f}%** ({_blk.get('tp', '?')} chặn, "
-            f"**{_blk.get('fp', '?')}** FP, `by_action`) · "
-            f"**ablation_mlgate** — giảm tải **{100 * (_byp or 0):.1f}%** "
-            f"({_mlg.get('n_ml_bypass', '?')}/{_mlg.get('n_escalated_would_call_llm', '?')} ca), "
-            f"F1(bypass) {_mlg.get('ml_f1_on_bypass', '—')} · "
-            f"**apt_negative_control** — recall {_apt.get('recall', '—')} "
-            f"({_apt.get('detected', '?')}/{_apt.get('positives_apt_truth', '?')}), "
-            f"specificity {_apt.get('specificity', '—')} ({_apt.get('false_apt_firings', '?')} báo giả) · "
-            f"**latency_benchmark** — −{_lat.get('latency_reduction_pct', '—')}%. "
-            "F1 gộp thấp hơn auto-BLOCK vì tính CẢ dải ALERT-0.40 (cảnh báo low-priority, "
-            "KHÔNG chặn). Audit HMAC: 100%."
+        st.markdown(
+            '<div class="res-src">Đọc trực tiếp từ <code>experiments/results/</code> mỗi lần tải '
+            "trang: <code>offload_vs_baserate_demo</code> · <code>latency_benchmark</code> · "
+            "<code>tier2_decision_results</code> · <code>adversarial_pipeline_results</code> · "
+            "<code>audit_tamper_results</code>. Đây đúng năm tệp mà slide Kết quả trích.</div>",
+            unsafe_allow_html=True,
         )
 
         st.markdown("### 🔐 Trạng thái Hệ thống")
@@ -618,7 +638,7 @@ def render_demo_overview(
 
     # ---------- Vòng phản hồi Hai tầng: Tier-1 chặn ↔ Tier-2 dạy ----------
     st.markdown("---")
-    st.markdown("### 🔁 Vòng phản hồi Hai tầng (Tier-1 chặn ↔ ML/LLM dạy ngược)")
+    st.markdown("### 🔁 Vòng phản hồi hai tầng — Tier-1 chặn, ML/LLM dạy ngược")
     fb_left, fb_right = st.columns(2)
 
     with fb_left:
@@ -721,7 +741,7 @@ def render_demo_overview(
             )
 
     # ---------- Cổng ML (Tier-1) + LLM (Tier-2) đã CHẶN — phán quyết ghi vào Audit Trail ----------
-    st.markdown("### 🧠 Cổng ML (Tier-1) & LLM (Tier-2) đã CHẶN (ghi chép Audit Trail)")
+    st.markdown("### 🧠 Cổng ML và LLM đã chặn — có ghi sổ kiểm toán")
     _t2_blocks = [a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP",)]
     if _t2_blocks:
         st.dataframe(
@@ -780,13 +800,13 @@ def main_dashboard():
 
     # Sidebar
     with st.sidebar:
-        st.markdown(f"### 👤 Account: `{st.session_state.get('username')}`")
-        st.markdown(f"### 🔑 Role: `{st.session_state.get('role')}`")
-        if st.button("🚪 Logout"):
+        st.markdown(f"### 👤 Tài khoản: `{st.session_state.get('username')}`")
+        st.markdown(f"### 🔑 Vai trò: `{st.session_state.get('role')}`")
+        if st.button("🚪 Đăng xuất"):
             logout()
 
         st.markdown("---")
-        st.markdown("### 🔍 Incident Filters")
+        st.markdown("### 🔍 Bộ lọc sự cố")
 
         # Lọc theo hành động
         # Chỉ liệt kê các hành động THỰC SỰ có trong nhật ký sự cố (bỏ "LOG" vì đó là
@@ -798,11 +818,18 @@ def main_dashboard():
             key="action_filter_sb",
         )
 
+        _mitre_opts = cached_mitre_options()
         mitre_filter = st.selectbox(
             "Kỹ thuật MITRE",
-            options=["Tất cả", "T1059.004", "T1190", "T1595", "T1071", "N/A"],
+            options=["Tất cả", *_mitre_opts, "N/A"],
             index=0,
             key="mitre_filter_sb",
+            help=(
+                f"{len(_mitre_opts)} kỹ thuật đọc từ sổ kiểm toán (1.000 bản ghi gần nhất). "
+                "Danh sách trống nghĩa là chưa có bản ghi nào được quy kết."
+                if _mitre_opts
+                else "Chưa có bản ghi nào được quy kết MITRE — đẩy luồng để hệ thống sinh dữ liệu."
+            ),
         )
 
         st.markdown("---")
@@ -821,7 +848,7 @@ def main_dashboard():
         )
 
         st.markdown("---")
-        st.markdown("### ⚙️ Quản lý Lịch sử")
+        st.markdown("### ⚙️ Quản lý dữ liệu")
 
         # Nút Reset — gated L3_Manager + tích xác nhận để tránh xoá nhầm dữ liệu demo
         _is_mgr = st.session_state.get("role") == "L3_Manager"
@@ -908,7 +935,7 @@ def main_dashboard():
                 st.error(f"Lỗi khi reset: {e}")
 
         st.markdown("---")
-        st.markdown("### 🛡️ Nhật ký An toàn & Toàn vẹn")
+        st.markdown("### 🛡️ Toàn vẹn nhật ký")
         if st.button(
             "🛡️ Kiểm tra tính toàn vẹn Logs (HMAC Audit)",
             help="Xác minh chuỗi băm HMAC Ledger để phát hiện giả mạo dữ liệu",
@@ -920,7 +947,7 @@ def main_dashboard():
                 st.error(msg)
 
         st.markdown("---")
-        st.markdown("### 📟 Live System Console Logs")
+        st.markdown("### 📟 Bảng điều khiển trực tiếp")
 
         # Lấy 10 log mới nhất từ Audit (Cổng ML, LLM, Manual) và kết hợp với Tier-1 Blocks
         console_logs = cached_get_audit_trail(limit=10)
@@ -970,7 +997,7 @@ def main_dashboard():
         st.markdown(console_html, unsafe_allow_html=True)
 
         st.markdown("---")
-        st.markdown("### 📖 Thuật ngữ & Kiến trúc SOC")
+        st.markdown("### 📖 Thuật ngữ")
         glossary_html = (
             '<div class="glossary-box">'
             '  <div class="glossary-item">'
@@ -1121,12 +1148,12 @@ def main_dashboard():
 
     tab0, tab1, tab2, tab3, tab4, tab5 = st.tabs(
         [
-            "🎬 Executive Overview",
-            "📊 SIEM Logs & Audit Trail",
-            "🧑‍💻 HITL Approvals",
-            "🎯 Threat Intel & APT Correlation",
-            "🔒 Blocklist & Whitelist Management",
-            "🔍 Graph Knowledge & Vulnerabilities",
+            "🎬 Tổng quan",
+            "📊 Nhật ký & Sổ kiểm toán",
+            "🧑‍💻 Phê duyệt (HITL)",
+            "🎯 Tình báo & Chuỗi APT",
+            "🔒 Chặn & Miễn trừ",
+            "🔍 Lỗ hổng & Tri thức",
         ]
     )
 
@@ -1144,7 +1171,7 @@ def main_dashboard():
 
     with tab1:
         # Biểu đồ Live SOC Analytics dạng collapsible
-        with st.expander("📊 Phân tích số liệu & Biểu đồ SIEM (Live Analytics)", expanded=True):
+        with st.expander("📊 Biểu đồ phân tích SIEM", expanded=True):
             if not all_alerts:
                 st.info("Chưa có đủ dữ liệu sự cố để vẽ biểu đồ phân tích.")
             else:
@@ -1154,7 +1181,7 @@ def main_dashboard():
 
                     col_chart1, col_chart2 = st.columns(2)
                     with col_chart1:
-                        st.markdown("##### 📈 Xu hướng Sự cố theo Thời gian (Timeline)")
+                        st.markdown("##### 📈 Xu hướng sự cố theo thời gian")
 
                         # Cùng nguồn chân lý với bảng "đã chặn" và phần chia tab: cột `tier`.
                         # Biểu đồ này từng dò chuỗi riêng, nên một sự cố có thể được xếp vào
@@ -1174,7 +1201,7 @@ def main_dashboard():
                             width="stretch",
                         )
                     with col_chart2:
-                        st.markdown("##### 📊 Phân bổ Cảnh báo theo Hành động (Distribution)")
+                        st.markdown("##### 📊 Phân bổ cảnh báo theo hành động")
                         action_df = (
                             df_alerts.groupby("action")
                             .size()
@@ -1187,7 +1214,7 @@ def main_dashboard():
                 except Exception as e:
                     st.write("Không thể vẽ biểu đồ phân tích SIEM:", e)
 
-        st.subheader("Phân tích Ngữ cảnh & Cảnh báo")
+        st.subheader("Phân tích ngữ cảnh và cảnh báo")
         st.caption(
             "🔵 **Tier-2 · LLM Agent**: Quyết định do LLM/Agent suy luận sau khi Tier-1 leo thang (ESCALATE).  ·  "
             "🟢 **Tier-1 Filter**: Whitelist cho qua hoặc chặn tự động (không cần LLM).  ·  "
@@ -1266,8 +1293,8 @@ def main_dashboard():
 
             if _alerts_capped:
                 st.warning(
-                    f"⚠️ Sổ kiểm toán đã vượt {_ALERT_CAP:,} dòng — mỗi tab dưới đây hiển thị "
-                    f"{_ALERT_CAP:,} sự cố MỚI NHẤT **của riêng tầng đó**. Số ở hàng chỉ số phía "
+                    f"⚠️ Sổ kiểm toán đã vượt {vn_num(_ALERT_CAP)} dòng — mỗi tab dưới đây hiển thị "
+                    f"{vn_num(_ALERT_CAP)} sự cố MỚI NHẤT **của riêng tầng đó**. Số ở hàng chỉ số phía "
                     "trên là COUNT(*) trên toàn sổ nên sẽ LỚN HƠN tổng ba tab. Đây là giới hạn "
                     "hiển thị, không phải số liệu lệch."
                 )
@@ -1418,7 +1445,7 @@ def main_dashboard():
                             '  <div class="soc-reasoning-box" style="margin-top:8px;">'
                             '    <div class="soc-reasoning-title">⚡ Lý do Tier-1 chặn (Rule Engine):</div>'
                             f'    <ul style="margin:6px 0 0 18px;font-size:0.85rem;color:#d9d9d9;">{reasons_html}</ul>'
-                            '    <div style="color: #98FB98; margin-top: 6px; font-size: 0.85rem; font-weight: 500;">🛡️ NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment - Block source IP at Firewall to isolate attack boundary.</div>'
+                            '    <div style="color: #98FB98; margin-top: 6px; font-size: 0.85rem; font-weight: 500;">🛡️ Khuyến nghị phản hồi (chính sách hệ thống): ngăn chặn khẩn cấp — chặn IP nguồn tại tường lửa để cô lập phạm vi tấn công.</div>'
                             "  </div>"
                             '  <div class="soc-detail-row" style="margin-top:8px;">'
                             '    <span class="soc-badge" style="background:rgba(255,77,79,0.15);color:#ff7875;'
@@ -1507,16 +1534,16 @@ def main_dashboard():
 
                     src = rule.get("source", "")
                     if "langgraph_agent_hitl" in src:
-                        hitl_type = "🧠 AWAIT_HITL (Tier-2 LLM requires human analyst review)"
+                        hitl_type = "🧠 AWAIT_HITL — Tier-2 LLM đề nghị chuyên viên xem xét"
                         hitl_color = "#722ed1"
                     elif "ml_triage" in src:
-                        hitl_type = "⚡ AWAIT_HITL (ML Gate recommendation)"
+                        hitl_type = "⚡ AWAIT_HITL — Cổng ML đề xuất"
                         hitl_color = "#1890ff"
                     elif "tier1_rule_engine" in src:
-                        hitl_type = "🛡️ AWAIT_HITL (Tier-1 Rule Engine alert)"
+                        hitl_type = "🛡️ AWAIT_HITL — cảnh báo từ luật Tier-1"
                         hitl_color = "#faad14"
                     elif "langgraph_agent" in src:
-                        hitl_type = "🛑 BLOCK_IP (System recommendation for blocking)"
+                        hitl_type = "🛑 BLOCK_IP — hệ thống đề nghị chặn"
                         hitl_color = "#ff4d4f"
                     else:
                         # `src` đọc từ luật động trong YAML -> thoát trước khi nhúng vào HTML.
@@ -1528,15 +1555,15 @@ def main_dashboard():
                         expanded=True,
                     ):
                         st.markdown(
-                            f"**HITL Type:** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
+                            f"**Loại phê duyệt:** <span style='color: {hitl_color}; font-weight: bold;'>{hitl_type}</span>",
                             unsafe_allow_html=True,
                         )
                         st.write(
-                            f"**Severity:** {sev_icon} {sev_label} (score {rule.get('score')})"
+                            f"**Mức nghiêm trọng:** {sev_icon} {sev_label} (điểm {rule.get('score')})"
                         )
-                        st.write(f"**Created Time:** {created}")
-                        st.write(f"**Data Field:** {rule.get('field')}")
-                        st.write(f"**Reason:** {rule.get('reason')}")
+                        st.write(f"**Tạo lúc:** {created}")
+                        st.write(f"**Trường dữ liệu:** {rule.get('field')}")
+                        st.write(f"**Lý do:** {rule.get('reason')}")
 
                         # ── Badge + hierarchy + mã kỹ thuật cho thẻ HITL ──────────────
                         # Dùng ĐÚNG bộ dựng mà `render_alert_card` dùng, để hai màn hình
@@ -1570,8 +1597,8 @@ def main_dashboard():
                             f"{ui_components.build_technique_codes_html(raw_reason_hitl)}"
                             f"{ui_components.build_guardrail_note(is_gr, mitre_tech_hitl, 'AWAIT_HITL', raw_reason_hitl)}"
                             '<div style="color:#98FB98;margin-top:6px;font-size:0.83rem;font-weight:500;">'
-                            "🛡️ NIST Incident Response Playbook (Section 3.2.3): Require "
-                            "Human-in-the-Loop (HITL) analyst approval to trigger automated block rule."
+                            "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): cần chuyên viên "
+                            "phê duyệt (HITL) trước khi luật chặn tự động có hiệu lực."
                             "</div></div>",
                             unsafe_allow_html=True,
                         )
@@ -1592,7 +1619,7 @@ def main_dashboard():
                         if not matched_audit:  # Fallback lấy cái mới nhất có raw_log
                             matched_audit = next((a for a in ip_audits if a.get("raw_log")), None)
                         if matched_audit and matched_audit.get("raw_log"):
-                            with st.expander("🔍 View Full Raw Log (Evidence)"):
+                            with st.expander("🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng)"):
                                 ui_components.render_ground_truth(matched_audit.get("raw_log"))
                                 st.code(matched_audit.get("raw_log"), language="json")
 
@@ -1600,7 +1627,7 @@ def main_dashboard():
                             col1, col2 = st.columns([1, 1])
                             with col1:
                                 if st.button(
-                                    "✅ Approve", key=f"app_{rule.get('pattern')}_{page_key}"
+                                    "✅ Duyệt", key=f"app_{rule.get('pattern')}_{page_key}"
                                 ):
                                     # Phát hiện xung đột block↔whitelist TRƯỚC khi duyệt (approve_rule
                                     # sẽ tự gỡ khỏi whitelist) để thông báo cho analyst.
@@ -1613,9 +1640,7 @@ def main_dashboard():
                                         rule.get("pattern"), rule.get("field")
                                     )
                                     st.cache_data.clear()
-                                    st.success(
-                                        f"✅ APPROVED blocking rule for {rule.get('pattern')}"
-                                    )
+                                    st.success(f"✅ Đã DUYỆT luật chặn cho {rule.get('pattern')}")
                                     # Ghi audit khi DUYỆT luật (đồng bộ: duyệt block cũng để lại
                                     # 1 bản ghi như duyệt whitelist). Luật Source IP -> BLOCK_IP.
                                     from src.response.executor import _log_to_db
@@ -1633,13 +1658,13 @@ def main_dashboard():
                                         threat_memory.mark_ip_blocked(str(rule.get("pattern")))
                                     if _was_wl:
                                         st.warning(
-                                            f"⚠️ {rule.get('pattern')} REMOVED from Whitelist due to "
-                                            "blocking rule approval."
+                                            f"⚠️ {rule.get('pattern')} đã được GỠ khỏi Whitelist "
+                                            "vì luật chặn được duyệt."
                                         )
                                     st.rerun()
                             with col2:
                                 if st.button(
-                                    "❌ Reject", key=f"rej_{rule.get('pattern')}_{page_key}"
+                                    "❌ Bác bỏ", key=f"rej_{rule.get('pattern')}_{page_key}"
                                 ):
                                     feedback_mgr.reject_rule(rule.get("pattern"), rule.get("field"))
                                     st.cache_data.clear()
@@ -1655,10 +1680,10 @@ def main_dashboard():
                                         str(rule.get("pattern")),
                                         f"[Tier-1 Filter] Rule REJECTED (HITL) by {st.session_state.get('username')}: {rule.get('reason')}",
                                     )
-                                    st.warning(f"Rejected rule for {rule.get('pattern')}")
+                                    st.warning(f"Đã bác bỏ luật cho {rule.get('pattern')}")
                                     st.rerun()
                         else:
-                            st.warning("L3_Manager role required to approve/reject.")
+                            st.warning("Cần vai trò L3_Manager để duyệt hoặc bác bỏ.")
 
                 # Điều hướng trang (HITL)
                 if n_pages > 1:
@@ -1691,7 +1716,7 @@ def main_dashboard():
             _render_pending_list(llm_pending_rules, "hitl_page_all")
 
         st.markdown("---")
-        st.subheader("Lịch sử Thao tác HITL (Đã áp dụng)")
+        st.subheader("Lịch sử phê duyệt đã áp dụng")
         hitl_active_rules = [r for r in active_rules if r.get("is_hitl_approved") is True]
         if not hitl_active_rules:
             st.info("Không có luật nào đang hoạt động.")
@@ -1744,7 +1769,7 @@ def main_dashboard():
                             st.rerun()
 
     with tab3:
-        st.subheader("Giám sát Chuỗi APT & Danh tiếng IP")
+        st.subheader("Giám sát chuỗi APT và danh tiếng IP")
         st.caption(
             "ℹ️ Phân biệt: **Điểm danh tiếng** = lịch sử vi phạm của MỘT IP (1 lần BLOCK = 30đ, "
             "cap 100, tự giảm theo thời gian) — KHÔNG phải 'điểm APT'. **APT thật** (bảng phía dưới) "
@@ -1786,7 +1811,7 @@ def main_dashboard():
 
         # Phần điều tra sự cố IP (Drill-down Investigation)
         st.markdown("---")
-        st.subheader("🔍 Trung tâm Điều tra Đối tượng (Threat Investigation)")
+        st.subheader("🔍 Trung tâm điều tra đối tượng")
 
         # Gom danh sách IP từ cả hai bảng để người dùng có thể điều tra bất cứ IP nào
         all_ips = set(r["ip"] for r in high_risk_ips)
@@ -1967,7 +1992,7 @@ def main_dashboard():
             st.info("Chưa ghi nhận IP nguy cơ cao nào trong hệ thống để thực hiện điều tra.")
 
     with tab4:
-        st.subheader("🔒 Quản lý Blocklist & Whitelist (IP Control Center)")
+        st.subheader("🔒 Danh sách chặn và miễn trừ")
 
         # -------------------------------------------------------------
         # Phân quyền check
@@ -1986,6 +2011,10 @@ def main_dashboard():
         # Chặn TỨC THỜI của Tier-1 (WAF/injection/cổng nhạy cảm) -> Redis blacklist TTL 1h.
         # Dashboard container KHÔNG reach được Redis nên đọc qua file tier1_blocks.json
         # (subscriber ghi). Trước đây tab này bỏ sót -> hiển thị nhầm "0 đang chặn".
+        # TRẦN 25 — đây là "gần nhất", KHÔNG phải tổng. Cùng họ lỗi đã vá ở tab Nhật ký:
+        # ring buffer `tier1_blocks.json` bị cắt hai lần (subscriber giữ 50 bản ghi cuối,
+        # UI lấy 25). In trần con số cạnh ô "Tier-1 luật chặn" hàng nghìn thì đọc như hai
+        # số mâu thuẫn, thực ra là hai đại lượng khác nhau.
         tier1_temp_blocks = cached_get_tier1_blocks(show=25)
         tier1_temp_count = len(tier1_temp_blocks)
 
@@ -1994,7 +2023,7 @@ def main_dashboard():
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
             <div style="background: rgba(255, 77, 79, 0.1); border: 1px solid rgba(255, 77, 79, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
                 <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{tier1_temp_count}</div>
-                <div style="font-size: 0.85rem; color: #ff7875; font-weight: 600; text-transform: uppercase;">🛡️ Tier-1 Tạm thời (TTL 1h)</div>
+                <div style="font-size: 0.85rem; color: #ff7875; font-weight: 600; text-transform: uppercase;">🛡️ Tier-1 tạm thời (25 gần nhất)</div>
             </div>
             <div style="background: rgba(114, 46, 209, 0.1); border: 1px solid rgba(114, 46, 209, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
                 <div style="font-size: 1.5rem; font-weight: bold; color: #b37feb;">{active_blocks_count}</div>
@@ -2010,7 +2039,8 @@ def main_dashboard():
             </div>
         </div>
         <p style="font-size: 0.8rem; color: #8E9AA8; margin-top: -12px; margin-bottom: 20px;">
-            🛡️ <b>Tier-1 Tạm thời</b>: IP bị chặn tức thời bởi chữ ký WAF/injection/cổng nhạy cảm (Redis blacklist, tự hết hạn TTL 1h).
+            🛡️ <b>Tier-1 tạm thời</b>: IP bị chặn tức thời bởi chữ ký WAF/injection/cổng nhạy cảm (Redis blacklist, tự hết hạn TTL 1h).
+            Ô này hiển thị <b>tối đa 25 lệnh chặn GẦN NHẤT</b> đọc từ ring buffer, <b>không phải tổng</b> — tổng xem hàng chỉ số đầu trang.
             <b>Luật Vĩnh viễn</b>: luật động do Tier-2 (LLM) đề xuất, đã được Analyst DUYỆT (HITL) — không hết hạn.
         </p>
         """,
@@ -2020,7 +2050,7 @@ def main_dashboard():
         col_left, col_right = st.columns([3, 2])
 
         with col_left:
-            # ── Danh sách Whitelisted IPs hiện tại (Thay thế Chặn tức thời Tier-1) ──
+            # ── Danh sách Whitelist hiện tại ──
             st.markdown("### ✅ Danh sách Whitelist hiện tại")
             if not whitelisted_ips:
                 st.info("Chưa có IP nào trong danh sách Whitelist.")
@@ -2050,7 +2080,7 @@ def main_dashboard():
                                 st.warning(f"Đã gỡ IP {ip} khỏi danh sách Whitelist.")
                                 st.rerun()
 
-            st.markdown("### 🛑 Luật chặn Vĩnh viễn & Lịch sử (Dynamic Rules)")
+            st.markdown("### 🛑 Luật chặn vĩnh viễn và lịch sử")
 
             # Lọc bỏ các IP đang nằm trong Whitelist để không hiển thị ở 2 bảng cùng lúc
             ip_blocks = [r for r in ip_blocks if r.get("pattern") not in whitelisted_ips]
@@ -2245,7 +2275,7 @@ def main_dashboard():
                             st.warning("💡 Yêu cầu vai trò L3 Manager để thay đổi trạng thái chặn.")
 
         with col_right:
-            st.markdown("### ⚙️ Thao tác & Quản lý Whitelist")
+            st.markdown("### ⚙️ Thao tác thủ công")
 
             # Form chặn IP thủ công (Manual Block)
             with st.expander("🛑 Chặn IP thủ công", expanded=True):
@@ -2350,10 +2380,8 @@ def main_dashboard():
                                 "Mọi IP host cụ thể đều được phép."
                             )
 
-            # Đã chuyển Danh sách Whitelist lên trên
-
     with tab5:
-        st.subheader("🔍 Quản lý Lỗ hổng & Tri thức Graph (Vulnerabilities & Graph)")
+        st.subheader("🔍 Lỗ hổng và tri thức đồ thị")
 
         # 1. Nút bấm Quét Lỗ Hổng Hệ thống
         col_scan_btn, col_integrity_btn = st.columns([1, 1])
@@ -2507,9 +2535,9 @@ def main_dashboard():
             # Xây dựng DOT code động dựa trên lỗ hổng thực tế để vẽ sơ đồ đẹp mắt
             dot_lines = [
                 "digraph G {",
-                '    background="transparent";',
+                '    bgcolor="transparent";',
                 "    rankdir=LR;",
-                '    node [color="#ffffff", fontcolor="#ffffff", style=filled, fillcolor="#112240", fontname="sans-serif", shape=box, rx=5];',
+                '    node [color="#ffffff", fontcolor="#ffffff", style=filled, fillcolor="#112240", fontname="sans-serif", shape=box];',
                 '    edge [color="#888888", fontcolor="#888888", fontname="sans-serif", fontsize=10];',
                 "    ",
                 "    // Nodes",
@@ -2517,17 +2545,26 @@ def main_dashboard():
             ]
 
             # Thêm tối đa 8 SubComponents và Vulnerabilities để sơ đồ không bị rối mắt
+            def _dot_id(raw: str) -> str:
+                """Ép chuỗi bất kỳ về một định danh DOT hợp lệ ([A-Za-z_][A-Za-z0-9_]*)."""
+                out = re.sub(r"[^0-9A-Za-z_]", "_", str(raw))
+                return ("n_" + out) if not out or out[0].isdigit() else out
+
+            def _dot_label(raw: str) -> str:
+                """Thoát dấu nháy kép/gạch chéo trước khi nhúng vào nhãn DOT."""
+                return str(raw).replace("\\", "\\\\").replace('"', '\\"')
+
             subcomponents = set()
             for v in vuln_list[:8]:
-                target_clean = v["Target"].replace(".", "_").replace("/", "_").replace("-", "_")
+                target_clean = _dot_id(v["Target"])
                 if v["Target"] not in subcomponents:
                     subcomponents.add(v["Target"])
                     dot_lines.append(
-                        f'    {target_clean} [label="{v["Target"]}", fillcolor="#14c2c2", color="#14c2c2"];'
+                        f'    {target_clean} [label="{_dot_label(v["Target"])}", fillcolor="#14c2c2", color="#14c2c2"];'
                     )
                     dot_lines.append(f'    SOC -> {target_clean} [label="CONTAINS"];')
 
-                cve_clean = v["CVE ID"].replace("-", "_")
+                cve_clean = _dot_id(v["CVE ID"])
                 color = (
                     "#ff4d4f"
                     if v["Severity"] == "CRITICAL"
@@ -2538,7 +2575,7 @@ def main_dashboard():
                     else "#1890ff"
                 )
                 dot_lines.append(
-                    f'    {cve_clean} [label="{v["CVE ID"]}\\n({v["Severity"]})", fillcolor="#1d39c4", color="{color}"];'
+                    f'    {cve_clean} [label="{_dot_label(v["CVE ID"])}\\n({v["Severity"]})", fillcolor="#1d39c4", color="{color}"];'
                 )
                 dot_lines.append(f'    {target_clean} -> {cve_clean} [label="HAS_VULN"];')
 
@@ -2568,8 +2605,10 @@ def main_dashboard():
                 'RAG [label="Dual-RAG (MITRE+NIST)", fillcolor="#14c2c2", color="#14c2c2"]; '
                 f'LLM [label="Tier-2 LLM Agent ({_model_display_name()})", fillcolor="#1d39c4", color="#1d39c4"]; '
                 'MEM [label="Threat Memory (APT)", fillcolor="#1d39c4", color="#1d39c4"]; '
+                'DROP [label="Tự quyết, KHÔNG gọi LLM", fillcolor="#52c41a", color="#52c41a"]; '
                 'SOC -> T1 [label="ingest"]; T1 -> ML [label="escalate"]; '
-                'ML -> GR [label="bypass"]; GR -> RAG [label="ground"]; '
+                'ML -> DROP [label="bypass (tự quyết)"]; '
+                'ML -> GR [label="phần còn lại"]; GR -> RAG [label="ground"]; '
                 'RAG -> LLM [label="reason"]; LLM -> MEM [label="correlate"]; }'
             )
             st.graphviz_chart(arch_dot, width="stretch")

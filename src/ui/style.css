@@ -355,3 +355,74 @@ h3 { letter-spacing: 0.2px; }
 }
 .soc-empty-title { font-size: 1rem; font-weight: 700; color: #C7D2E0; margin-bottom: 4px; }
 .soc-empty-sub { font-size: 0.85rem; color: #8E9AA8; }
+
+/* ── Bảng kết quả thực nghiệm (tab Tổng quan) ───────────────────────────────
+   Bốn con số ĐÚNG BẰNG bốn con số trên slide Kết quả của bài bảo vệ. Mỗi thẻ
+   phải mang theo mẫu số: một tỉ lệ không mẫu số thì không kiểm chứng được. */
+.res-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 4px 0 14px;
+}
+
+.res-card {
+    background: rgba(22, 28, 45, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3px solid var(--accent, #40A9FF);
+    border-radius: 10px;
+    padding: 12px 14px;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.res-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.14);
+    border-left-color: var(--accent, #40A9FF);
+}
+
+.res-eyebrow {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #8E9AA8;
+    margin-bottom: 6px;
+}
+
+.res-val {
+    font-family: monospace;
+    font-size: 1.65rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--accent, #40A9FF);
+    margin-bottom: 5px;
+}
+
+/* Mẫu số — cố tình để nhỏ và mờ hơn, nhưng KHÔNG được bỏ. */
+.res-den {
+    font-size: 0.76rem;
+    line-height: 1.45;
+    color: #94A3B8;
+}
+
+/* Khối giới hạn: số xấu ở lại màn hình, không giấu xuống chú thích cuối. */
+.res-limits {
+    background: rgba(255, 77, 79, 0.06);
+    border: 1px solid rgba(255, 77, 79, 0.18);
+    border-left: 3px solid #ff4d4f;
+    border-radius: 8px;
+    padding: 10px 13px;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: #C7D2E0;
+}
+
+.res-limits b { color: #ff9c9e; }
+
+.res-src {
+    font-size: 0.72rem;
+    color: #6B7A8D;
+    margin-top: 8px;
+    line-height: 1.5;
+}

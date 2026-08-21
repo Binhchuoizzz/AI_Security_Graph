@@ -39,9 +39,10 @@ lưu được trọng số → nạp vào runtime → đo lại trên tập hold
 | `raft_train.jsonl` | **4.952** mẫu huấn luyện (80,0%) |
 | `raft_test.jsonl` | **1.238** mẫu kiểm thử (20,0%) |
 
-> **Hai bộ RAFT song song — dễ nhầm.** `experiments/data/raft_{train,test}.jsonl` là bộ CŨ
-> (1.400/350, chỉ ground_truth). Bộ trong `llm_lab/` là bộ HIỆN HÀNH, lớn hơn vì đã nạp thêm
-> CSIC 2010. Dùng nhầm bộ cũ thì tưởng dữ liệu ít đi 3,5 lần.
+> **Chỉ còn MỘT bộ RAFT.** Trước 21/08/2026 kho có thêm `experiments/data/raft_{train,test}.jsonl`
+> (1.400/350, chỉ ground_truth) cùng cặp script sinh/huấn luyện riêng trong `scripts/`. Bộ đó đã
+> bị xoá vì dùng nhầm thì tưởng dữ liệu ít đi 3,5 lần. Bộ trong `llm_lab/` là bộ duy nhất, lớn
+> hơn vì đã nạp thêm CSIC 2010.
 
 ---
 

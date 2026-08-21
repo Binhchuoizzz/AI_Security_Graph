@@ -56,3 +56,31 @@ def normalize_log_keys(log_entry: dict) -> dict:
         canonical_key = KEY_ALIASES.get(k.lower(), k)
         normalized[canonical_key] = v
     return normalized
+
+
+# ── Định dạng số theo quy ước tiếng Việt ────────────────────────────────────────
+# DẤU PHẨY là thập phân, DẤU CHẤM phân cách hàng nghìn — ngược hẳn mặc định của Python.
+# Để đây (chứ không phải trong ui/) vì cả Dashboard lẫn báo cáo đều cần, và một con số
+# hiện hai kiểu trên cùng màn hình là lỗi người xem thấy ngay: hàng chỉ số từng in
+# "99,717" ngay trên bảng kết quả in "99.717" cho ĐÚNG một đại lượng.
+def vn_num(value, nd: int = 0) -> str:
+    """Số nguyên/thực -> chuỗi kiểu Việt. `None` -> "—" (không bịa 0)."""
+    if value is None:
+        return "—"
+    try:
+        return f"{float(value):,.{nd}f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def vn_pct(value, nd: int = 1, *, already_pct: bool = False) -> str:
+    """Tỉ lệ -> chuỗi phần trăm kiểu Việt. Đúng 100% bỏ phần thập phân, khớp slide."""
+    if value is None:
+        return "—"
+    try:
+        v = float(value) if already_pct else float(value) * 100.0
+    except (TypeError, ValueError):
+        return str(value)
+    if abs(v - 100.0) < 1e-9:
+        return "100%"
+    return f"{v:.{nd}f}".replace(".", ",") + "%"

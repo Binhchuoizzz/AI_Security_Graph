@@ -30,8 +30,9 @@ từ **CICIDS2018**, tỉ lệ **~79% attack / ~21% benign** (mục tiêu 80/20;
 
 Đọc **CHUNKED** từ 9 file-ngày CICIDS (bỏ Tuesday-20 do lỗi trích xuất nghiêm trọng), **khử
 trùng lặp** (dữ liệu thô ~17% trùng → chống rò rỉ train/test), tách cột định danh (IP/Timestamp),
-chỉ giữ 76 cột số, **trộn đều** (seed=42). *(Bản 100k cũ `dataset_100k.csv` + `train_and_compare.ipynb`
-được GIỮ làm mốc đối chiếu lịch sử.)*
+chỉ giữ 76 cột số, **trộn đều** (seed=42). *(Bản 100k cũ `dataset_100k.csv` + `train_and_compare.py`
+được GIỮ làm mốc đối chiếu lịch sử; notebook `train_and_compare.ipynb` đã xoá 21/08/2026 — nó chỉ là
+bản xuất của cùng script đó, mọi số đã nằm trong bảng §4 dưới đây.)*
 
 ## 3. Chiến Lược Phân Chia Dữ Liệu
 

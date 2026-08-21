@@ -394,9 +394,13 @@ def test_pheu_khong_bi_tran_boi_ring_buffer():
             C.st.markdown = goc  # type: ignore[assignment]
 
     html = ghi.get("html", "")
-    assert "6,666" in html, f"Tier-1 phải là 10000-3334=6666, không phải 12. HTML: {html[:400]}"
-    # xả tải LLM = 1 - 1411/10000 = 85.9%
-    assert "85.9%" in html, "phải hiện tỉ lệ XẢ TẢI LLM"
+    # Định dạng SỐ KIỂU VIỆT (dấu chấm phân cách hàng nghìn, dấu phẩy thập phân) —
+    # xem vn_num/vn_pct trong src/guardrails/constants.py. Khẳng định luôn cả định dạng:
+    # trước đây hàng chỉ số in "99,717" ngay trên bảng kết quả in "99.717" cho cùng một số.
+    assert "6.666" in html, f"Tier-1 phải là 10000-3334=6666, không phải 12. HTML: {html[:400]}"
+    assert "6,666" not in html, "số phải theo quy ước Việt: 6.666, không phải 6,666"
+    # xả tải LLM = 1 - 1411/10000 = 85,9%
+    assert "85,9%" in html, "phải hiện tỉ lệ XẢ TẢI LLM (định dạng Việt)"
 
 
 def test_phieu_chi_co_DUY_NHAT_mot_chi_so_phan_tram():
@@ -638,9 +642,12 @@ def test_phieu_in_so_CHAN_chu_khong_in_so_su_kien_di_qua():
     html = ghi.get("html", "")
     assert ">58<" in html, f"phải in số Cổng ML ĐÃ CHẶN (58). HTML: {html[:400]}"
     assert ">160<" in html, "phải in số Tier-2 ĐÃ CHẶN (160)"
-    assert "1,881" not in html and "1,403" not in html, (
-        "bộ đếm SỰ KIỆN ĐI QUA không được lên phễu — nó không so được với nhật ký"
-    )
+    for _cam in ("1,881", "1.881", "1,403", "1.403"):
+        assert _cam not in html, (
+            f"bộ đếm SỰ KIỆN ĐI QUA ({_cam}) không được lên phễu — nó không so được với "
+            "nhật ký. (Canh cả hai cách viết số: đổi sang quy ước Việt thì khẳng định chỉ "
+            "canh kiểu Anh sẽ đỗ mà không kiểm được gì.)"
+        )
 
 
 def test_khong_dan_nhan_FPR_cho_ti_le_analyst_bac_bo():
@@ -662,7 +669,9 @@ def test_khong_dan_nhan_FPR_cho_ti_le_analyst_bac_bo():
         C.render_metrics_header(all_alerts=[], pending_rules=0, active_rules=0, live_fpr=None)
     finally:
         C.st.markdown = goc  # type: ignore[assignment]
-    assert "0.0%" not in ghi.get("html", ""), "chưa đo được thì phải hiện '—', không hiện 0.0%"
+    _html = ghi.get("html", "")
+    for _cam in ("0.0%", "0,0%"):
+        assert _cam not in _html, f"chưa đo được thì phải hiện '—', không hiện {_cam}"
 
 
 # ── Streamlit "magic": biểu thức trần cấp module bị IN RA TRANG ────────────────────

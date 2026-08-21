@@ -1,8 +1,9 @@
 """Backpressure dùng chung cho MỌI producer đẩy log vào Redis Stream.
 
 MỘT NGUỒN CHÂN LÝ: trước đây `scripts/demo.py` và `src/streaming/publisher.py` mỗi nơi
-tự viết một kiểu — demo.py đã sửa sang đo `lag`, publisher.py thì BỎ SÓT và vẫn đo
-`xlen`, nên tái hiện y nguyên lỗi cũ. Gom về đây để không còn chỗ nào lệch.
+tự viết một kiểu — demo.py sửa sang đo `lag` trước, publisher.py bị bỏ sót và còn đo
+`xlen`, nên tái hiện y nguyên lỗi cũ. Nay CẢ HAI đều gọi `consumer_group_lag()` ở đây,
+không còn chỗ nào tự viết lại.
 
 TẠI SAO KHÔNG DÙNG xlen: subscriber tiêu thụ bằng `xreadgroup` + `xack`, hai thao tác
 này KHÔNG xoá entry khỏi stream — `xlen` chỉ giảm khi bị `maxlen` cắt bớt. Producer nào
