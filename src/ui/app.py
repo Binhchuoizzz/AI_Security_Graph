@@ -469,16 +469,27 @@ def render_demo_overview(
     with col_left:
         st.markdown("### 🚨 Dòng cảnh báo trực tiếp")
         if all_alerts:
+            # Cột "Quyết định bởi" đọc cột `tier` do CHÍNH tầng ra quyết định ghi. Trước
+            # đây bảng này không có cột đó, nên phải kèm thêm MỘT bảng nữa ở cuối tab chỉ
+            # để trả lời "tầng nào chặn" — hai bảng, cùng một nguồn `all_alerts`, trên
+            # cùng một màn hình. Gộp lại còn một.
             feed = [
                 {
                     "Thời gian": str(a.get("timestamp", ""))[5:19],
                     "Hành động": a.get("action", ""),
                     "IP mục tiêu": a.get("target", ""),
+                    "Quyết định bởi": _nhan_tang(a),
                     "MITRE ATT&CK": _extract_mitre_technique(a.get("reason", "")) or "—",
                 }
-                for a in all_alerts[:10]
+                for a in all_alerts[:12]
             ]
-            st.dataframe(pd.DataFrame(feed), width="stretch", height=300, hide_index=True)
+            st.dataframe(pd.DataFrame(feed), width="stretch", height=330, hide_index=True)
+            _n_blk = sum(1 for a in all_alerts if str(a.get("action", "")).upper() == "BLOCK_IP")
+            st.caption(
+                f"**{vn_num(_n_blk)}** phán quyết CHẶN trong sổ kiểm toán HMAC-SHA256 (Cổng ML, "
+                "Tier-2 và thao tác thủ công). Khác với *Tier-1 đã chặn* bên dưới — đó là chữ ký "
+                "tốc độ cao, TTL 1 giờ ở Redis. IP đã miễn trừ không bao giờ xuất hiện ở đây."
+            )
         else:
             st.info(
                 "Chưa có cảnh báo nào. Đẩy luồng bằng `scripts/run_demo.sh` "
@@ -611,12 +622,12 @@ def render_demo_overview(
             unsafe_allow_html=True,
         )
 
-        st.markdown("### 🔐 Trạng thái Hệ thống")
-        st.success("🟢 LLM cục bộ: Foundation-Sec-8B-Instruct Q4\\_K\\_M (llama.cpp · air-gapped)")
-        st.success(
-            "🟢 Audit HMAC-SHA256: " + ("Toàn vẹn" if integ_valid else "CẢNH BÁO: bị sửa đổi")
-        )
-        st.success(f"🟢 Luật đang chặn (active): {len(active_rules)} · Whitelist nội bộ đã seed")
+        # Bản cũ in BA dòng trạng thái, trong đó hai dòng lặp nguyên thứ đã có trên cùng
+        # màn hình: "Audit HMAC: Toàn vẹn" trùng thẻ `Chuỗi HMAC` cách đó vài trăm pixel,
+        # "Luật đang chặn (active)" trùng ô `Luật đang chặn` ở hàng chỉ số. Chỉ giữ dòng
+        # DUY NHẤT mang thông tin mới: mô hình nào đang chạy, đọc động chứ không viết cứng.
+        st.markdown("### 🔐 Trạng thái hệ thống")
+        st.success(f"🟢 LLM cục bộ: {_model_display_name()} — llama.cpp, không gọi dịch vụ đám mây")
 
         # Ngân sách ngữ cảnh LLM (observability) — biết prompt cách trần n_ctx bao xa.
         from src.agent.token_monitor import get_stats as _get_token_stats
@@ -739,49 +750,6 @@ def render_demo_overview(
             st.info(
                 "Chưa có luật nào ML/LLM dạy cho Tier-1. Chạy luồng có escalate để hệ thống sinh luật."
             )
-
-    # ---------- Cổng ML (Tier-1) + LLM (Tier-2) đã CHẶN — phán quyết ghi vào Audit Trail ----------
-    st.markdown("### 🧠 Cổng ML và LLM đã chặn — có ghi sổ kiểm toán")
-    _t2_blocks = [a for a in all_alerts if str(a.get("action", "")).upper() in ("BLOCK_IP",)]
-    if _t2_blocks:
-        st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Thời gian": str(a.get("timestamp", ""))[5:19],
-                        "Hành động": a.get("action", ""),
-                        "IP / Host": a.get("target", ""),
-                        # Đọc cột `tier` do CHÍNH tầng ra quyết định ghi. Bản cũ dò chuỗi
-                        # trong câu lý do, cùng lỗi đã vá ở phần chia tab: câu lý do của
-                        # Tier-2 có thể chứa cụm "Tier-1" và bị gán nhầm nguồn.
-                        "Quyết định bởi": _nhan_tang(a),
-                        "MITRE": _extract_mitre_technique(a.get("reason", "")) or "—",
-                        "Lý do": (str(a.get("reason", "")) or "—")[:110],
-                    }
-                    for a in _t2_blocks[:15]
-                ]
-            ),
-            width="stretch",
-            height=280,
-            hide_index=True,
-        )
-        st.caption(
-            f"**{len(_t2_blocks)}** quyết định CHẶN do Cổng ML (Tier-1), LLM (Tier-2) (và thao tác thủ công của "
-            "Analyst) ghi vào Audit Trail HMAC-SHA256. Khác với *Tier-1 đã chặn* (chữ ký tốc độ "
-            "cao, TTL 1h ở Redis): đây là phán quyết **có suy luận MITRE/NIST** của LLM sau khi "
-            "leo thang. IP đã whitelist KHÔNG bao giờ xuất hiện ở đây (đã miễn trừ)."
-        )
-    else:
-        st.info(
-            "Chưa có quyết định CHẶN nào từ Cổng ML (Tier-1) hoặc LLM (Tier-2). Chạy luồng có escalate (adversarial/APT) để "
-            "LLM phán quyết và ghi vào Audit Trail."
-        )
-
-    st.markdown("---")
-    st.caption(
-        "💡 Tab này gom toàn bộ thành phần để trình bày tổng quan. Các tab kế tiếp cung cấp "
-        "chi tiết: Nhật ký SIEM & Audit, Phê duyệt Luật (HITL), Giám sát APT, Blocklist/Whitelist, và Tri thức Graph."
-    )
 
 
 def main_dashboard():
@@ -1432,7 +1400,7 @@ def main_dashboard():
                             '  <div class="soc-card-header">'
                             '    <h4 class="soc-card-title">🛑 [BLOCK] ĐÃ CHẶN TẠI TIER-1</h4>'
                             '    <span class="soc-badge" style="background:rgba(255,77,79,0.2);color:#ff7875;'
-                            "border:1px solid rgba(255,77,79,0.4);font-size:0.75rem;padding:2px 8px;"
+                            "border:1px solid rgba(255,77,79,0.4);font-size:var(--fs-2xs);padding:2px 8px;"
                             'border-radius:4px;margin-left:8px;">🛡️ Tier-1 Block · Redis TTL 1h</span>'
                             f'    <span class="soc-timestamp">{ts}</span>'
                             "  </div>"
@@ -1444,8 +1412,8 @@ def main_dashboard():
                             "  </div>"
                             '  <div class="soc-reasoning-box" style="margin-top:8px;">'
                             '    <div class="soc-reasoning-title">⚡ Lý do Tier-1 chặn (Rule Engine):</div>'
-                            f'    <ul style="margin:6px 0 0 18px;font-size:0.85rem;color:#d9d9d9;">{reasons_html}</ul>'
-                            '    <div style="color: #98FB98; margin-top: 6px; font-size: 0.85rem; font-weight: 500;">🛡️ Khuyến nghị phản hồi (chính sách hệ thống): ngăn chặn khẩn cấp — chặn IP nguồn tại tường lửa để cô lập phạm vi tấn công.</div>'
+                            f'    <ul style="margin:6px 0 0 18px;font-size:var(--fs-xs);color:#d9d9d9;">{reasons_html}</ul>'
+                            '    <div style="color: #98FB98; margin-top: 6px; font-size: var(--fs-xs); font-weight: 500;">🛡️ Khuyến nghị phản hồi (chính sách hệ thống): ngăn chặn khẩn cấp — chặn IP nguồn tại tường lửa để cô lập phạm vi tấn công.</div>'
                             "  </div>"
                             '  <div class="soc-detail-row" style="margin-top:8px;">'
                             '    <span class="soc-badge" style="background:rgba(255,77,79,0.15);color:#ff7875;'
@@ -1572,8 +1540,13 @@ def main_dashboard():
                         # sửa hai lần ở hai tệp.
                         raw_reason_hitl = str(rule.get("reason", ""))
                         mitre_tech_hitl = ui_components.parse_mitre_technique(raw_reason_hitl)
+                        # Cùng lý do như thẻ cảnh báo: hai huy hiệu này CHỈ đúng với phán
+                        # quyết của Tier-2. Phiếu chờ duyệt do `ml_triage` hay
+                        # `tier1_rule_engine` sinh ra thì không có lá chắn neo nào để nói,
+                        # và chắc chắn không đi qua GPU.
+                        _hitl_from_llm = "langgraph_agent" in src
                         gr_badge, is_gr = ui_components.build_grounding_badge(
-                            raw_reason_hitl, mitre_tech_hitl
+                            raw_reason_hitl, mitre_tech_hitl, from_llm=_hitl_from_llm
                         )
                         # CHỐNG STORED XSS. `parse_mitre_technique` trả về NGUYÊN VĂN cụm
                         # trong `[MITRE: ...]`, mà chuỗi reason do LLM sinh ra sau khi đã ĐỌC
@@ -1588,15 +1561,15 @@ def main_dashboard():
                             'border-radius:6px;border:1px solid rgba(255,255,255,0.08);">'
                             '<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;">'
                             f"{gr_badge}"
-                            f"{ui_components.build_origin_badge(raw_reason_hitl)}"
+                            f"{ui_components.build_origin_badge(raw_reason_hitl, from_llm=_hitl_from_llm)}"
                             f"{ui_components.build_threat_memory_badge(raw_reason_hitl, cached_get_ip_reputation(str(rule.get('pattern') or '')))}"
                             "</div>"
                             '<div class="soc-reasoning-section" style="color:#D3ADF7;margin-top:4px;'
-                            f'font-size:0.83rem;">🎯 MITRE ATT&CK Mapping: <code>{safe_mitre_tech_hitl}</code></div>'
+                            f'font-size:var(--fs-xs);">🎯 MITRE ATT&CK Mapping: <code>{safe_mitre_tech_hitl}</code></div>'
                             f"{ui_components._build_mitre_hierarchy_html(mitre_tech_hitl)}"
                             f"{ui_components.build_technique_codes_html(raw_reason_hitl)}"
                             f"{ui_components.build_guardrail_note(is_gr, mitre_tech_hitl, 'AWAIT_HITL', raw_reason_hitl)}"
-                            '<div style="color:#98FB98;margin-top:6px;font-size:0.83rem;font-weight:500;">'
+                            '<div style="color:#98FB98;margin-top:6px;font-size:var(--fs-xs);font-weight:500;">'
                             "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): cần chuyên viên "
                             "phê duyệt (HITL) trước khi luật chặn tự động có hiệu lực."
                             "</div></div>",
@@ -2020,25 +1993,25 @@ def main_dashboard():
 
         st.markdown(
             f"""
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
-            <div style="background: rgba(255, 77, 79, 0.1); border: 1px solid rgba(255, 77, 79, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{tier1_temp_count}</div>
-                <div style="font-size: 0.85rem; color: #ff7875; font-weight: 600; text-transform: uppercase;">🛡️ Tier-1 tạm thời (25 gần nhất)</div>
+        <div class="stat-grid">
+            <div class="stat-card" style="--accent:#ff4d4f">
+                <div class="stat-val">{tier1_temp_count}</div>
+                <div class="stat-label">🛡️ Tier-1 tạm thời (25 gần nhất)</div>
             </div>
-            <div style="background: rgba(114, 46, 209, 0.1); border: 1px solid rgba(114, 46, 209, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: bold; color: #b37feb;">{active_blocks_count}</div>
-                <div style="font-size: 0.85rem; color: #d3adf7; font-weight: 600; text-transform: uppercase;">Luật Vĩnh viễn (Active)</div>
+            <div class="stat-card" style="--accent:#b37feb">
+                <div class="stat-val">{active_blocks_count}</div>
+                <div class="stat-label">Luật vĩnh viễn</div>
             </div>
-            <div style="background: rgba(250, 173, 20, 0.1); border: 1px solid rgba(250, 173, 20, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: bold; color: #faad14;">{pending_blocks_count}</div>
-                <div style="font-size: 0.85rem; color: #ffc069; font-weight: 600; text-transform: uppercase;">Luật Chờ Duyệt (Pending)</div>
+            <div class="stat-card" style="--accent:#faad14">
+                <div class="stat-val">{pending_blocks_count}</div>
+                <div class="stat-label">Chờ duyệt</div>
             </div>
-            <div style="background: rgba(82, 196, 26, 0.1); border: 1px solid rgba(82, 196, 26, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                <div style="font-size: 1.5rem; font-weight: bold; color: #52c41a;">{whitelisted_count}</div>
-                <div style="font-size: 0.85rem; color: #95de64; font-weight: 600; text-transform: uppercase;">IP Đặc Cách (Whitelist)</div>
+            <div class="stat-card" style="--accent:#52c41a">
+                <div class="stat-val">{whitelisted_count}</div>
+                <div class="stat-label">IP miễn trừ</div>
             </div>
         </div>
-        <p style="font-size: 0.8rem; color: #8E9AA8; margin-top: -12px; margin-bottom: 20px;">
+        <p class="stat-note">
             🛡️ <b>Tier-1 tạm thời</b>: IP bị chặn tức thời bởi chữ ký WAF/injection/cổng nhạy cảm (Redis blacklist, tự hết hạn TTL 1h).
             Ô này hiển thị <b>tối đa 25 lệnh chặn GẦN NHẤT</b> đọc từ ring buffer, <b>không phải tổng</b> — tổng xem hàng chỉ số đầu trang.
             <b>Luật Vĩnh viễn</b>: luật động do Tier-2 (LLM) đề xuất, đã được Analyst DUYỆT (HITL) — không hết hạn.
@@ -2127,7 +2100,7 @@ def main_dashboard():
 
                 # Interactive Table
                 st.markdown(
-                    "<p style='font-size: 0.85rem; color: #8E9AA8;'>💡 Click chọn hàng bất kỳ để xem chi tiết lịch sử và thực hiện Hoàn tác / Gỡ chặn:</p>",
+                    "<p style='font-size: var(--fs-xs); color: #8E9AA8;'>💡 Click chọn hàng bất kỳ để xem chi tiết lịch sử và thực hiện Hoàn tác / Gỡ chặn:</p>",
                     unsafe_allow_html=True,
                 )
 
@@ -2460,26 +2433,26 @@ def main_dashboard():
 
             st.markdown(
                 f"""
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 16px; margin-bottom: 24px;">
-                <div style="background: rgba(255, 77, 79, 0.1); border: 1px solid rgba(255, 77, 79, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #ff4d4f;">{sev_counts["CRITICAL"]}</div>
-                    <div style="font-size: 0.8rem; color: #ff7875; font-weight: 600;">CRITICAL</div>
+            <div class="stat-grid">
+                <div class="stat-card" style="--accent:#ff4d4f">
+                    <div class="stat-val">{sev_counts["CRITICAL"]}</div>
+                    <div class="stat-label">Nghiêm trọng</div>
                 </div>
-                <div style="background: rgba(250, 140, 22, 0.1); border: 1px solid rgba(250, 140, 22, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #fa8c16;">{sev_counts["HIGH"]}</div>
-                    <div style="font-size: 0.8rem; color: #ffa940; font-weight: 600;">HIGH</div>
+                <div class="stat-card" style="--accent:#fa8c16">
+                    <div class="stat-val">{sev_counts["HIGH"]}</div>
+                    <div class="stat-label">Cao</div>
                 </div>
-                <div style="background: rgba(250, 219, 20, 0.1); border: 1px solid rgba(250, 219, 20, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #fadb14;">{sev_counts["MEDIUM"]}</div>
-                    <div style="font-size: 0.8rem; color: #ffe58f; font-weight: 600;">MEDIUM</div>
+                <div class="stat-card" style="--accent:#fadb14">
+                    <div class="stat-val">{sev_counts["MEDIUM"]}</div>
+                    <div class="stat-label">Trung bình</div>
                 </div>
-                <div style="background: rgba(24, 144, 255, 0.1); border: 1px solid rgba(24, 144, 255, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #1890ff;">{sev_counts["LOW"]}</div>
-                    <div style="font-size: 0.8rem; color: #69c0ff; font-weight: 600;">LOW</div>
+                <div class="stat-card" style="--accent:#1890ff">
+                    <div class="stat-val">{sev_counts["LOW"]}</div>
+                    <div class="stat-label">Thấp</div>
                 </div>
-                <div style="background: rgba(140, 140, 140, 0.1); border: 1px solid rgba(140, 140, 140, 0.3); border-radius: 8px; padding: 12px; text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #8c8c8c;">{len(vuln_list)}</div>
-                    <div style="font-size: 0.8rem; color: #bfbfbf; font-weight: 600;">TOTAL VULNS</div>
+                <div class="stat-card" style="--accent:#8c8c8c">
+                    <div class="stat-val">{len(vuln_list)}</div>
+                    <div class="stat-label">Tổng lỗ hổng</div>
                 </div>
             </div>
             """,

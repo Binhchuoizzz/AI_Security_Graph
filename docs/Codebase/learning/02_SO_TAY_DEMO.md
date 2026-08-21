@@ -49,7 +49,13 @@ sqlite3 config/audit_trail.db \
 > Đây là tổng bản ghi đã vào hệ thống. Còn đây là tỉ lệ hệ tự giải quyết mà không tốn một
 > token nào — số này đang chạy theo luồng, không phải số cố định.
 
-Xuống khối `📊 Chỉ số vận hành thời gian thực`, dừng nửa nhịp ở **`Chuỗi HMAC ✅ Nguyên vẹn`**:
+Nếu còn thời gian, chỉ vào bảng **`🚨 Dòng cảnh báo trực tiếp`**, cột **`Quyết định bởi`**:
+
+> Mỗi dòng ghi rõ tầng nào ra quyết định. Cột này đọc từ chính cột `tier` mà tầng đó ghi vào
+> sổ, không phải suy từ câu chữ.
+
+Xuống khối `📊 Chỉ số vận hành thời gian thực` — bốn thẻ, bổ sung cho hàng trên chứ không lặp
+lại. Dừng nửa nhịp ở thẻ cuối, **`Chuỗi HMAC ✅ Nguyên vẹn`**:
 
 > Ô này lát nữa em sẽ quay lại.
 
@@ -103,6 +109,12 @@ Kéo xuống khối **`🏆 Bốn con số của luận văn`**:
 
 Chỉ **ba chỗ, đúng thứ tự: ① mã ATT&CK → ② đoạn tri thức được trích → ③ câu lập luận.**
 Đọc thứ tự đó thì người nghe tự thấy quan hệ nhân quả; đọc ngược thành ba mảnh rời.
+
+Nếu Thầy hỏi vì sao thẻ này có huy hiệu mà thẻ Tier-1 không có:
+
+> Hai huy hiệu `✅ GROUNDED IN RAG` và `🧠 Live GPU` **chỉ xuất hiện trên thẻ của Tier-2**. Luật
+> Tier-1 và Cổng ML chạy trên CPU và không truy xuất tri thức, nên thẻ của chúng không đeo hai
+> huy hiệu đó — nhìn huy hiệu là biết ngay ca nào đã tốn một lượt suy luận.
 
 > Mã kỹ thuật ở trên chỉ được phép tồn tại vì đoạn tài liệu ở dưới tồn tại. Không neo được vào
 > chứng cứ thì hệ hạ cấp ca đó xuống hàng chờ chuyên gia, chứ không cho đi qua.
@@ -189,9 +201,10 @@ Bấm **`✅ Duyệt`**.
 
 > ⚠️ Nút **`❌ Bác bỏ`** nằm ngay cạnh — bấm nhầm là hỏng bước ②.
 > ⚠️ Nút `✅ Duyệt` **chỉ hiện với vai `L3_Manager`**
-> ([`app.py:1626`](../../../src/ui/app.py#L1626)). Sai vai là mất trắng bước ②.
+> ([`app.py:1599`](../../../src/ui/app.py#L1599)). Sai vai là mất trắng bước ②.
 
-**② Tab `🔒 Chặn & Miễn trừ`** → chỉ đúng IP vừa duyệt.
+**② Tab `🔒 Chặn & Miễn trừ`** → thẻ **`Luật vĩnh viễn`** tăng thêm 1, rồi chỉ đúng IP vừa duyệt
+trong bảng **`🛑 Luật chặn vĩnh viễn và lịch sử`**.
 
 > Mô hình đề xuất, chuyên gia phê duyệt, luật rơi về Tầng 1. Từ lần sau ca này chỉ tốn giá của
 > tầng rẻ nhất. Hệ càng chạy càng đẩy được nhiều việc về phía rẻ.
@@ -208,6 +221,7 @@ Rồi **alt-tab về slide 12** và dừng. Đừng để màn hình cuối bu�
 | LLM không phản hồi ở ▶4③ | `Ctrl+C`, bỏ phần đối kháng, sang thẳng ⑤ | *"Phần này em đã đo đầy đủ trong luận văn."* |
 | Bấm 🛡️ lần hai vẫn báo *toàn vẹn* | Chờ đủ 30 giây rồi bấm lại | *"Phép kiểm này được đệm ba mươi giây."* |
 | ID không phải 2076 | Dùng số `sqlite3` vừa in ra | — |
+| Chữ hiển thị lạ / thiếu dấu | Không cần làm gì — giao diện dùng phông hệ thống, **không tải phông qua mạng** | — |
 | Bị yêu cầu chạy dữ liệu mới | `SENTINEL_FREEZE_DYNAMIC_RULES=1 ./scripts/run_demo.sh --small` | *"Tập con 10.000 sự kiện, nền tấn công cao hơn nên tỉ lệ xả tải sẽ khác 97,5%."* |
 
 ---

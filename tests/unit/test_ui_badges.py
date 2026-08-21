@@ -738,3 +738,44 @@ def test_nist_kb_that_su_khong_danh_so_muc():
     assert ids, "kho NIST rỗng"
     assert all(i.startswith("NIST.IR.") for i in ids), ids
     assert not any(re.search(r"\b3\.\d\.\d\b", i) for i in ids)
+
+
+def test_huy_hieu_chi_cua_tier2_khong_duoc_dan_len_the_tier1():
+    """`Live GPU` và lá chắn neo CHỈ có nghĩa với phán quyết của Tier-2.
+
+    LỖI ĐÃ SỬA (21/08/2026). Thẻ của luật Tier-1 và của Cổng ML đều đeo
+    `🛡️ DEGRADED SAFEGUARD (N/A)` và `🧠 Live GPU`:
+
+      * Lá chắn neo bằng chứng chỉ tồn tại trong đường LLM (`src/agent/nodes.py`). Tier-1
+        và Cổng ML không truy xuất RAG và không phát mã kỹ thuật — không có gì để neo.
+        In "DEGRADED SAFEGUARD" ở đó đọc như một cơ chế an toàn đang HỎNG, trên đúng những
+        thẻ mà cơ chế đó chưa từng tham gia.
+      * `Live GPU` còn tệ hơn: luật Tier-1 chạy CPU, Cổng ML là LightGBM cũng CPU. Dán nhãn
+        đó lên thẻ của chúng ngụ ý MỌI sự kiện đều tốn một lượt suy luận GPU — phủ định
+        thẳng luận điểm trung tâm "phần lớn lưu lượng không chạm tới LLM".
+    """
+    from src.ui import components as C
+
+    # Không phải LLM -> hai bộ dựng phải im lặng, không "đoán" trạng thái.
+    assert C.build_origin_badge("bất kỳ lý do gì", from_llm=False) == ""
+    html, grounded = C.build_grounding_badge("bất kỳ lý do gì", "N/A", from_llm=False)
+    assert html == "" and grounded is False
+
+    # Là LLM -> vẫn giữ nguyên hành vi cũ.
+    assert "Live GPU" in C.build_origin_badge("phán quyết mới", from_llm=True)
+    html_llm, _ = C.build_grounding_badge("có kỹ thuật", "T1190", from_llm=True)
+    assert "GROUNDED IN RAG" in html_llm
+
+
+def test_do_tin_cay_hien_theo_quy_uoc_so_viet():
+    """Huy hiệu độ tin cậy phải cùng quy ước với hàng chỉ số và bảng kết quả.
+
+    Trước đây thẻ in `93.00%` (dấu chấm thập phân) ngay cạnh hàng chỉ số in `97,5%`.
+    """
+    from src.ui import components as C
+
+    assert C.vn_pct(0.93, 2) == "93,00%"
+    assert C.vn_pct(99.9, 2, already_pct=True) == "99,90%"
+    assert C.vn_pct(1.0) == "100%"
+    assert C.vn_num(99717) == "99.717"
+    assert C.vn_num(None) == "—"

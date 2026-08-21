@@ -144,10 +144,10 @@ def render_ground_truth(raw_log_str) -> None:
 
     st.markdown(
         '<div style="margin-top:6px;padding:8px 10px;background:rgba(250,173,20,0.07);'
-        'border-left:3px solid #FAAD14;border-radius:4px;font-size:0.85rem;color:#D9D9D9;">'
+        'border-left:3px solid #FAAD14;border-radius:4px;font-size:var(--fs-xs);color:#D9D9D9;">'
         '<span style="color:#FAAD14;font-weight:800;">📗 ĐÁP ÁN BỘ DỮ LIỆU</span> — '
         + " · ".join(dong)
-        + f'<div style="opacity:0.6;font-size:0.78rem;margin-top:4px;">gt_id <code>{html_lib.escape(gt_id)}</code>'
+        + f'<div style="opacity:0.6;font-size:var(--fs-2xs);margin-top:4px;">gt_id <code>{html_lib.escape(gt_id)}</code>'
         " · đọc từ sidecar <code>data/*.labels.json</code>, KHÔNG đi qua Tier-1/LLM</div></div>",
         unsafe_allow_html=True,
     )
@@ -225,7 +225,7 @@ _BADGE_PURPLE = (
 )
 
 _GUARDRAIL_BOX = (
-    "color: #faad14; margin-top: 5px; font-size: 0.83rem; background: rgba(250,173,20,0.08);"
+    "color: #faad14; margin-top: 5px; font-size: var(--fs-xs); background: rgba(250,173,20,0.08);"
     " padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(250,173,20,0.25);"
 )
 
@@ -252,7 +252,9 @@ def parse_mitre_technique(raw_reason: str) -> str:
 _SHIELD_MARK = "NEO BẰNG CHỨNG"
 
 
-def build_grounding_badge(raw_reason: str, mitre_tech: str) -> tuple[str, bool]:
+def build_grounding_badge(
+    raw_reason: str, mitre_tech: str, *, from_llm: bool = True
+) -> tuple[str, bool]:
     """Thẻ neo-bằng-chứng. Trả `(html, is_grounded)` để bên gọi dùng lại cờ.
 
     ĐẢO DẤU ĐÃ VÁ (2026-08-17). Bản trước viết:
@@ -275,6 +277,13 @@ def build_grounding_badge(raw_reason: str, mitre_tech: str) -> tuple[str, bool]:
                         CHẠY ĐÚNG, không phải hỏng hóc
       * không quy kết : không có kỹ thuật nào và lá chắn im     -> hổ phách nhạt
     """
+    # LÁ CHẮN NEO CHỈ TỒN TẠI Ở TIER-2. Luật Tier-1 và Cổng ML không truy xuất RAG và
+    # không bao giờ phát mã kỹ thuật, nên với chúng KHÔNG có gì để neo. Bản trước vẫn dán
+    # "🛡️ DEGRADED SAFEGUARD (N/A)" lên mọi thẻ Tier-1/Cổng ML — đọc như một cơ chế an toàn
+    # đang HỎNG, trên đúng những thẻ mà cơ chế đó chưa từng tham gia. Không áp thì không nói.
+    if not from_llm:
+        return "", False
+
     has_tech = bool(mitre_tech and mitre_tech != "N/A" and not mitre_tech.startswith("N/A"))
     shield_fired = _SHIELD_MARK in raw_reason
     is_grounded = has_tech and not shield_fired and "unmappable" not in raw_reason.lower()
@@ -292,12 +301,19 @@ def build_grounding_badge(raw_reason: str, mitre_tech: str) -> tuple[str, bool]:
     )
 
 
-def build_origin_badge(raw_reason: str) -> str:
+def build_origin_badge(raw_reason: str, *, from_llm: bool = True) -> str:
     """Nguồn phán quyết: bộ đệm ngữ nghĩa hay suy luận thật trên GPU.
 
     KHÔNG kèm số thời gian. Thẻ này chỉ phân biệt NGUỒN, nó không đo gì cả — bản cũ ghi
     "(TTFT 0.3s)" cho mọi lô, một con số không đến từ phép đo nào.
     """
+    # Chỉ Tier-2 mới có "nguồn phán quyết" để phân biệt. Luật Tier-1 chạy trên CPU, Cổng ML
+    # là LightGBM cũng trên CPU — dán "🧠 Live GPU" lên thẻ của chúng là một tuyên bố SAI,
+    # và sai đúng vào chỗ nhạy nhất: nó ngụ ý mọi sự kiện đều tốn một lượt suy luận GPU,
+    # phủ định thẳng luận điểm trung tâm "phần lớn lưu lượng không chạm tới LLM".
+    if not from_llm:
+        return ""
+
     low = raw_reason.lower()
     if "PHÁN QUYẾT TÁI SỬ DỤNG" in raw_reason or "responsecache" in low or "tái sử dụng" in low:
         return f'<span class="soc-badge" style="{_BADGE_PURPLE}">⚡ Semantic Cache Hit</span>'
@@ -401,11 +417,11 @@ def build_technique_codes_html(raw_reason: str) -> str:
 
     badges = " · ".join(
         f'<code style="color:{color};background:{bg};padding:1px 5px;'
-        f'border-radius:3px;font-size:0.8rem;">{html_lib.escape(c)}</code>'
+        f'border-radius:3px;font-size:var(--fs-2xs);">{html_lib.escape(c)}</code>'
         for c in shown
     )
     return (
-        f'<div class="soc-reasoning-section" style="color: {color}; margin-top: 6px; font-size: 0.82rem;">'
+        f'<div class="soc-reasoning-section" style="color: {color}; margin-top: 6px; font-size: var(--fs-xs);">'
         f"  🔍 <b>{nhan}</b> {badges}{duoi}"
         "</div>"
     )
@@ -495,7 +511,7 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
 
     if "AML.T0051" in tech_upper or "PROMPT INJECTION" in tech_upper:
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             "  🎯 <b>Cây Phân rã MITRE:</b> "
             '<span style="color:#ffa940;">Framework: MITRE ATLAS</span> ➔ '
             '<span style="color:#69c0ff;">Tactic: LLM Attack Vector</span> ➔ '
@@ -505,7 +521,7 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
 
     if "T1110.004" in tech_upper or "CREDENTIAL STUFFING" in tech_upper:
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             "  🎯 <b>Cây Phân rã MITRE:</b> "
             '<span style="color:#ffa940;">TA0006 (Credential Access)</span> ➔ '
             '<span style="color:#69c0ff;">T1110 (Brute Force)</span> ➔ '
@@ -514,7 +530,7 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
         )
     elif "T1110" in tech_upper or "BRUTE FORCE" in tech_upper:
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             "  🎯 <b>Cây Phân rã MITRE:</b> "
             '<span style="color:#ffa940;">TA0006 (Credential Access)</span> ➔ '
             '<span style="color:#69c0ff;">T1110 (Brute Force)</span>'
@@ -523,7 +539,7 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
 
     if "T1190" in tech_upper or "EXPLOIT" in tech_upper:
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             "  🎯 <b>Cây Phân rã MITRE:</b> "
             '<span style="color:#ffa940;">TA0001 (Initial Access)</span> ➔ '
             '<span style="color:#69c0ff;">T1190 (Exploit Public-Facing Application)</span>'
@@ -532,7 +548,7 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
 
     if "T1595.003" in tech_upper or "WORDLIST SCANNING" in tech_upper:
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             "  🎯 <b>Cây Phân rã MITRE:</b> "
             '<span style="color:#ffa940;">TA0043 (Reconnaissance)</span> ➔ '
             '<span style="color:#69c0ff;">T1595 (Active Scanning)</span> ➔ '
@@ -542,7 +558,7 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
 
     if "T1059.007" in tech_upper or "JAVASCRIPT" in tech_upper:
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             "  🎯 <b>Cây Phân rã MITRE:</b> "
             '<span style="color:#ffa940;">TA0002 (Execution)</span> ➔ '
             '<span style="color:#69c0ff;">T1059 (Command & Scripting)</span> ➔ '
@@ -556,14 +572,14 @@ def _build_mitre_hierarchy_html(mitre_tech: str) -> str:
         sub_id = f"T{m_id.group(1)}.{m_id.group(2)}" if m_id.group(2) else ""
         if sub_id:
             return (
-                '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+                '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
                 f'  🎯 <b>Cây Phân rã MITRE:</b> <span style="color:#ffa940;">TA0001 (Security Event)</span> ➔ '
                 f'<span style="color:#69c0ff;">{t_id} (Parent Technique)</span> ➔ '
                 f'<span style="color:#b7eb8f;">{sub_id} (Sub-Technique)</span>'
                 "</div>"
             )
         return (
-            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: 0.83rem;">'
+            '<div class="soc-reasoning-section" style="color: #d3adf7; margin-top: 6px; font-size: var(--fs-xs);">'
             f'  🎯 <b>Cây Phân rã MITRE:</b> <span style="color:#ffa940;">TA0001 (Security Event)</span> ➔ '
             f'<span style="color:#69c0ff;">{t_id} (Primary Technique)</span>'
             "</div>"
@@ -633,7 +649,7 @@ def render_alert_card(
             '<div class="soc-card-header">'
             '<h4 class="soc-card-title">✅ [WHITELIST] Truy cập được CHO QUA (không chặn)</h4>'
             '<span class="soc-badge" style="background:rgba(82,196,26,0.2);color:#95de64;'
-            "border:1px solid rgba(82,196,26,0.4);font-size:0.75rem;padding:2px 8px;"
+            "border:1px solid rgba(82,196,26,0.4);font-size:var(--fs-2xs);padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">🟢 Tier-1 Filter</span>'
             f'<span class="soc-timestamp">{formatted_time}</span>'
             "</div>"
@@ -644,11 +660,11 @@ def render_alert_card(
             '<div class="soc-detail-row">'
             '<span class="soc-label">Kiểu phát hiện (Tier-1):</span>'
             f'<span class="soc-value-code" style="color:#ffa940;">{html_lib.escape(attack_type)}</span>'
-            f'<span style="color:#8c8c8c;font-size:0.8rem;">{html_lib.escape(score_txt)}</span>'
+            f'<span style="color:#8c8c8c;font-size:var(--fs-2xs);">{html_lib.escape(score_txt)}</span>'
             "</div>"
             '<div class="soc-reasoning-box" style="margin-top:8px;">'
             '<div class="soc-reasoning-title">🔎 Suy luận Tier-1 (để giám sát, KHÔNG dùng LLM):</div>'
-            f'<ul style="margin:6px 0 0 18px;font-size:0.85rem;color:#d9d9d9;">{reasons_html}</ul>'
+            f'<ul style="margin:6px 0 0 18px;font-size:var(--fs-xs);color:#d9d9d9;">{reasons_html}</ul>'
             "</div>"
             '<div class="soc-detail-row" style="margin-top:8px;">'
             '<span class="soc-badge" style="background:rgba(82,196,26,0.15);'
@@ -682,13 +698,15 @@ def render_alert_card(
         try:
             val_str = conf_match.group(1)
             if val_str.endswith("%"):
-                confidence = val_str
+                # Chuỗi `reason` ghi sẵn kiểu Anh ("99.90%"); đưa về quy ước Việt để thẻ
+                # không nói khác hàng chỉ số và bảng kết quả trên cùng màn hình.
+                confidence = vn_pct(float(val_str.rstrip("%")), 2, already_pct=True)
             else:
                 val = float(val_str)
                 # 2 chữ số thập phân, ĐỒNG NHẤT với Cổng ML và với chuỗi reason mới
                 # (đã ghi sẵn dạng "40.00%"). Trước đây làm tròn về số nguyên nên bản
                 # ghi cũ/định dạng float hiển thị "95%" còn bản ghi mới "95.00%".
-                confidence = f"{val * 100:.2f}%"
+                confidence = vn_pct(val, 2)
         except ValueError:
             pass
 
@@ -744,6 +762,15 @@ def render_alert_card(
         clean_reason = clean_reason[1:].strip()
 
     clean_reason = clean_reason.replace("\n", "<br>")
+    # CHỈ chuẩn hoá đúng cụm "Độ tin cậy: <số>%" cho khớp huy hiệu ngay phía trên (Cổng ML
+    # ghi vào sổ theo kiểu Anh "99.90%"). Cố ý KHÔNG đổi dấu thập phân toàn đoạn: phần biện
+    # giải của model có "Protocol=6", "Duration=46", "Z-Score > 3.5" — đổi đại trà là hỏng số.
+    # Đây là chuẩn hoá HIỂN THỊ; bản ghi trong audit_trail giữ nguyên, chuỗi HMAC không đổi.
+    clean_reason = re.sub(
+        r"(Độ tin cậy:\s*)(\d+)\.(\d+)(%)",
+        lambda m: f"{m.group(1)}{m.group(2)},{m.group(3)}{m.group(4)}",
+        clean_reason,
+    )
 
     reason_text = raw_reason
     # NGUỒN CHÂN LÝ là cột `tier` do chính tầng ra quyết định ghi vào audit_trail. Dò chuỗi
@@ -778,7 +805,7 @@ def render_alert_card(
     if is_manual:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#1890ff;'
-            "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
+            "border:1px solid rgba(24,144,255,0.4);font-size:var(--fs-2xs);padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">🔧 Thao tác thủ công</span>'
         )
         reasoning_title = "🔧 Ghi chú thao tác thủ công:"
@@ -786,15 +813,20 @@ def render_alert_card(
     elif is_tier1:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(82, 196, 26, 0.2);color:#95de64;'
-            "border:1px solid rgba(82, 196, 26, 0.4);font-size:0.75rem;padding:2px 8px;"
+            "border:1px solid rgba(82, 196, 26, 0.4);font-size:var(--fs-2xs);padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">🟢 Tier-1 Filter</span>'
         )
         reasoning_title = "⚡ Tier-1 Rule/Filter Reasoning:"
-        mitre_section_text = "🎯 Mapping: Initial analysis from raw log telemetry"
+        # Tier-1 KHÔNG quy kết kỹ thuật — nói thẳng thế, đừng dựng một dòng nghe như
+        # đã có ánh xạ. Bản cũ in "Mapping: Initial analysis from raw log telemetry".
+        mitre_section_text = (
+            "🎯 Quy kết MITRE ATT&CK: <code>N/A</code> — Tier-1 chấm điểm theo luật và "
+            "thống kê, không quy kết kỹ thuật"
+        )
     elif is_ml_tier:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(250, 173, 20, 0.2);color:#faad14;'
-            "border:1px solid rgba(250, 173, 20, 0.4);font-size:0.75rem;padding:2px 8px;"
+            "border:1px solid rgba(250, 173, 20, 0.4);font-size:var(--fs-2xs);padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">⚡ Tier-1 · ML Gate</span>'
         )
         reasoning_title = "⚡ Tier-1 ML Gate Reasoning (LightGBM):"
@@ -809,7 +841,7 @@ def render_alert_card(
     else:
         tier_badge = (
             '<span class="soc-badge" style="background:rgba(24,144,255,0.2);color:#69c0ff;'
-            "border:1px solid rgba(24,144,255,0.4);font-size:0.75rem;padding:2px 8px;"
+            "border:1px solid rgba(24,144,255,0.4);font-size:var(--fs-2xs);padding:2px 8px;"
             'border-radius:4px;margin-left:8px;">🧠 Tier-2 · LLM Agent</span>'
         )
         reasoning_title = "🤖 Agentic LLM Reasoning (Foundation-Sec-8B):"
@@ -864,8 +896,8 @@ def render_alert_card(
 
     # ── Badge: dùng bộ dựng CHUNG (xem đầu tệp) để thẻ này, cụm HITL trong app.py và
     # thẻ chặn Tier-1 không còn trôi dạt khỏi nhau.
-    grounding_badge, is_grounded = build_grounding_badge(raw_reason, mitre_tech)
-    origin_badge = build_origin_badge(raw_reason)
+    grounding_badge, is_grounded = build_grounding_badge(raw_reason, mitre_tech, from_llm=is_llm)
+    origin_badge = build_origin_badge(raw_reason, from_llm=is_llm)
     rep_badge = build_threat_memory_badge(raw_reason, reputation)
     mitre_hierarchy_html = _build_mitre_hierarchy_html(mitre_tech)
     rag_candidates_html = build_technique_codes_html(raw_reason)
@@ -902,7 +934,7 @@ def render_alert_card(
         f"        {mitre_hierarchy_html}"
         f"        {rag_candidates_html}"
         f"        {guardrail_note_html}"
-        f'        <div style="color: #98FB98; margin-top: 4px; font-size: 0.85rem; font-weight: 500;">{nist_playbook_text}</div>'
+        f'        <div style="color: #98FB98; margin-top: 4px; font-size: var(--fs-xs); font-weight: 500;">{nist_playbook_text}</div>'
         f"    </div>"
         f"</div>"
     )
@@ -1120,10 +1152,10 @@ def render_metrics_header(
 
     html_kpi = (
         f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">'
-        f'  <div style="font-size: 0.95rem; font-weight: 800; color: #CBD5E1; letter-spacing: 0.5px;">'
+        f'  <div style="font-size: var(--fs-md); font-weight: 800; color: #CBD5E1; letter-spacing: 0.5px;">'
         f"    📊 Chỉ số vận hành thời gian thực"
         f"  </div>"
-        f'  <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); padding: 4px 14px; border-radius: 20px; font-size: 0.78rem; color: #34D399; font-weight: 700; letter-spacing: 0.5px;">'
+        f'  <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); padding: 4px 14px; border-radius: 20px; font-size: var(--fs-2xs); color: #34D399; font-weight: 700; letter-spacing: 0.5px;">'
         f'    <span class="blink" style="display: inline-block; width: 8px; height: 8px; background-color: #10B981; border-radius: 50%; box-shadow: 0 0 8px #10B981;"></span>'
         f"    ĐANG NHẬN LUỒNG · LÀM MỚI 4 GIÂY"
         f"  </div>"
@@ -1135,7 +1167,7 @@ def render_metrics_header(
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #FF5252;">'
         f'    <div class="kpi-val" style="color: #FF5252;">{offload_str}</div>'
-        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.85em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Luật Tier-1 tự xử {vn_num(t1_count)}</span></div>'
+        f'    <div class="kpi-label">Xả tải LLM 🛡️<br/><span style="font-size: 0.92em; font-weight: 600; opacity: 0.85; color: #94A3B8;">Luật Tier-1 tự xử {vn_num(t1_count)}</span></div>'
         f"  </div>"
         f'  <div class="kpi-card" style="border-top: 4px solid #3B82F6;">'
         f'    <div class="kpi-val" style="color: #60A5FA;">{vn_num(ml_count)}</div>'
