@@ -36,6 +36,10 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | `evaluate_adversarial.py` | `--mode {static,pipeline,all}` | `robustness_results.json` · `adversarial_pipeline_results.json` | §Adversarial Robustness (lớp tĩnh theo nhóm + pipeline đầy đủ) |
 | `evaluate_reasoning.py` | `python -m experiments.evaluate_reasoning` | `reasoning_eval_results.json` | §Reasoning Quality. LLM-as-Judge 4 chiều + **neo bằng chứng** (thay `audit_completeness`) |
 | `evaluate_tier2_decision.py` | `python -m experiments.evaluate_tier2_decision` | `tier2_decision_results.json` | §Tier-2 Adjudication. Xuất MCC + Wilson CI cho recall/specificity + **hiệu chuẩn confidence** (kiểm chứng giả định nền của chính sách 4 dải) |
+| `measure_offload_vs_baserate.py` | `--source {demo,stream}` | `offload_vs_baserate_{demo,stream}.json` | §Offload. **Nguồn của con số 97,5% / 90,6%** — và của chính luận điểm "xả tải là hàm của tỉ lệ nền, không phải hằng số": chạy cùng một hệ trên hai luồng có nền tấn công khác nhau |
+| `run_audit_tamper.py` | `python -m experiments.run_audit_tamper` | `audit_tamper_results.json` | §Audit Integrity. Bốn kiểu giả mạo × 30 lượt + đối chứng âm. **Nguồn của 30/30 sửa·chèn·xoá-giữa VÀ của 0/30 cắt đuôi** — giới hạn phải tự nêu |
+| `score_evidence_grounding.py` | `python -m experiments.score_evidence_grounding` | `evidence_grounding_results.json` | §Evidence Anchoring. **Nguồn của 0/1.421 khẳng định không neo và 76 lệnh `BLOCK_IP` bị lá chắn giữ lại** |
+| `run_cache_efficiency.py` | `python -m experiments.run_cache_efficiency` | `cache_efficiency_results.json` | §Semantic Cache — cơ chế xả tải thứ ba mà RQ1 nêu đích danh. `hit_rate` · `speedup_x` · `evictions` |
 
 ## 3. Thí nghiệm RIGOR — chống phản biện (GIỮ, đừng xoá)
 
@@ -51,7 +55,7 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | `measure_latency_baseline.py` | Claim độ trễ chủ đạo (hai tầng vs LLM-only) | `latency_benchmark.json` | ✓ |
 | `run_llm_robustness.py` | *"LLM tất định? đổi seed có đổi kết luận? chết thì sao? tốn bao nhiêu?"* — determinism + **variance đa seed** + suy biến + **chi phí tài nguyên** | `llm_robustness_results.json` | ✓ |
 | `audit_tier_capability.py` | Ma trận năng lực 3 tầng trên các họ tấn công | `tier_capability_audit.json` | ✓ |
-| `export_judge_sample.py` | *"Ai kiểm định chính trọng tài LLM?"* — xuất mẫu cho người chấm → Cohen's κ | `judge_agreement_results.json` | ✗ (cần **người**) |
+| `export_judge_sample.py` | *"Ai kiểm định chính trọng tài LLM?"* — xuất mẫu cho người chấm → Cohen's κ | `judge_agreement_results.json` — **CHƯA CHẠY**, tệp chưa tồn tại và luận văn không trích κ | ✗ (cần **người**) |
 
 ## 4. Luồng ONLINE / demo (chứng minh vận hành, không trích số)
 
@@ -59,12 +63,19 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | :--- | :--- | :--- |
 | `scripts/demo.py` · `scripts/push_datatest.py` | `python scripts/build_datatest.py && python scripts/push_datatest.py` | Đẩy luồng gộp lên Redis → chảy qua **toàn hệ thống thật**. Dùng chung `build_stream()`/`enrich()` với eval offline. |
 
-**Luồng DEMO trước hội đồng** dùng `data/demo.json` (**496.885** sự kiện, 5,24% tấn công) hoặc
+**Luồng DEMO trước hội đồng** dùng `data/demo.json` (**496.885** sự kiện, **5,24%** tấn công) hoặc
 `data/demo_small.json` (**10.000**, phân tầng cho đủ mọi panel). Dựng lại bằng
 `scripts/build_demo.py` rồi `scripts/build_demo_small.py`. Tỉ lệ tấn công của tập nhỏ là
 **30,8%** — cao hơn hẳn luồng đầy đủ do phân tầng; script in cả hai cạnh nhau, đừng trích tỉ lệ
 của tập nhỏ như thể đó là hồ sơ tải của hệ thống. Phân bổ đầy đủ:
 [`RUN_PROJECT.md §2`](../docs/Codebase/guides/RUN_PROJECT.md).
+
+> **Hai tỉ lệ tấn công, hai định nghĩa — đừng "sửa" nhầm.** Hai con số trên đếm theo
+> `expected_threat` **hoặc** `apt_is_attack`, đúng định nghĩa của `build_demo.py:307`. Tệp
+> `data/*.labels.json` chỉ ghi `expected_threat`, nên đếm ở đó ra **5,17%** (25.695/496.885)
+> và **29,92%** (2.992/10.000) — thấp hơn, không phải sai. Bảng phân bổ từng nguồn và lý do
+> chênh lệch nằm ở [`RUN_PROJECT.md §2.1`](../docs/Codebase/guides/RUN_PROJECT.md); **đó là
+> nơi giữ số**, mục này chỉ nhắc để không ai "sửa" nhầm một trong hai.
 
 ## 5. Dữ liệu
 

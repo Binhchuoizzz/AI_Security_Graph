@@ -124,7 +124,7 @@ Mỗi điểm: 🎯 bản chất · 📂 hàm cốt lõi (bấm vào) · ⚙️ 
 - 🔑 **Khép vòng:** `get_ip_reputation` được **Tier-1 đọc** (bước ③) → IP tiền sử xấu bị chặn ngay, khỏi tốn LLM lần sau.
 - ➡️ Nuôi cả Tier-1 lẫn prompt Tier-2.
 
-### ⑫ Vòng phản hồi + Dashboard — `feedback_listener.py` + `ui/app.py`
+### ⑫ Vòng phản hồi + Dashboard — `feedback_listener.py` + `app.py`
 
 - 🎯 **Bản chất:** Tier-2 sinh luật → **người duyệt** → Tier-1 nạp nóng → lần sau chặn ở tốc độ cao (hệ "học"). Con người là chốt chặn cuối. Giao diện (UI) hiển thị tường minh mọi suy luận của Agent.
 - 📂 [feedback_listener.py:126 `receive_new_rule`](../../../src/tier1_filter/feedback_listener.py#L126) → [feedback_listener.py:272 `approve_rule`](../../../src/tier1_filter/feedback_listener.py#L272); UI ở [ui/app.py](../../../src/ui/app.py) và [components.py](../../../src/ui/components.py) (nơi bóc tách nhãn MITRE tự suy luận).

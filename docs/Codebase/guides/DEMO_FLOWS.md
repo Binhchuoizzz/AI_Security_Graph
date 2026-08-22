@@ -1,6 +1,6 @@
 # Chạy tay TỪNG luồng dữ liệu
 
-> Cập nhật 17/08/2026. Trình diễn **tách bạch** từng kịch bản qua đường ống sống
+> Cập nhật 21/08/2026. Trình diễn **tách bạch** từng kịch bản qua đường ống sống
 > (Tier-1 → Cổng ML → *(chỉ ca ML bỏ ngỏ)* Tier-2 → Dashboard), thay vì luồng gộp.
 >
 > Cách chạy hệ thống & demo theo RQ: [RUN_PROJECT.md](RUN_PROJECT.md) ·
@@ -37,8 +37,16 @@ Subscriber **phải chạy ở host** — container Dashboard không với tới
 > **CHỈ ĐƯỢC 1 SUBSCRIBER.** Nhiều tiến trình cùng consumer-group sẽ **chia đôi** log →
 > Dashboard hiển thị thiếu (đẩy 120 chỉ thấy 63). Kiểm: `reset_all.py --dry-run`, dòng `[1/3]`.
 
-Model đang phục vụ: **Foundation-Sec-8B-Instruct Q4_K_M**, `LLAMA_ARG_CTX_SIZE=32768` với
-`-np 2` → **16.384 token/khe**. Dashboard: <http://localhost:8501> (`analyst` hoặc `manager`).
+Model đang phục vụ: **Foundation-Sec-8B-Instruct Q4_K_M**, máy chủ nạp với
+`-c 32768`. Số khe do `LLAMA_ARG_N_PARALLEL` quyết định (mặc định 2 trong compose; kiểm
+bằng `ps aux | grep llama-server`), nên **token/khe = 32768 ÷ số khe**.
+
+> Đừng lẫn hai con số. **16.384** hay xuất hiện trong tài liệu KHÔNG phải cỡ ngữ cảnh của
+> máy chủ mà là **trần do ứng dụng tự đặt**: `llm.max_context_tokens` trong
+> `config/system_settings.yaml`, đọc bởi `src/agent/token_monitor.py`. Thẻ *Ngân sách ngữ
+> cảnh* trên Dashboard đo theo trần này.
+
+Dashboard: <http://localhost:8501> (`analyst` hoặc `manager`).
 
 ---
 
@@ -46,11 +54,11 @@ Model đang phục vụ: **Foundation-Sec-8B-Instruct Q4_K_M**, `LLAMA_ARG_CTX_S
 
 | luồng | lệnh | chứng minh điều gì | xem ở tab |
 | :-- | :-- | :-- | :-- |
-| **CICIDS** | `push_flow.py --source cicids` | Phân loại lưu lượng + xả tải | Tổng quan / SIEM |
-| **DAPT** | `push_flow.py --source dapt` | APT đa ngày *nổi lên dần* | Giám sát APT |
-| **Zero-day** | `push_flow.py --source zeroday` | Welford bắt cái luật tĩnh bỏ sót | Tổng quan / log |
+| **CICIDS** | `push_flow.py --source cicids` | Phân loại lưu lượng + xả tải | Tổng quan / Nhật ký |
+| **DAPT** | `push_flow.py --source dapt` | APT đa ngày *nổi lên dần* | Tình báo & Chuỗi APT |
+| **Zero-day** | `push_flow.py --source zeroday` | Welford bắt cái luật tĩnh bỏ sót | Tổng quan / Nhật ký |
 | **Adversarial** | `push_flow.py --source adversarial --real-only` | 603 payload thật (AdvBench · jackhhao · deepset) | Tổng quan |
-| **Vòng phản hồi** | *(mục 5)* | Duyệt luật → Tier-1 tự chặn, KHÔNG tốn LLM | Phê duyệt HITL |
+| **Vòng phản hồi** | *(mục 5)* | Duyệt luật → Tier-1 tự chặn, KHÔNG tốn LLM | Phê duyệt (HITL) |
 
 Thêm `--dry-run` để **chỉ đếm phân bố hàng đợi**, không đụng Redis.
 
@@ -65,7 +73,8 @@ Thêm `--dry-run` để **chỉ đếm phân bố hàng đợi**, không đụng
 Lưu lượng THẬT CSE-CIC-IDS2018. Tier-1 chấm bằng luật tĩnh + Welford; ca đáng ngờ
 (`ESCALATE`) → **Cổng ML** quyết ngay, chỉ ca ML bỏ ngỏ mới lên Tier-2.
 
-**Xem:** tab *Tổng quan / Nhật ký SIEM* — thẻ `LOGS THÔ`, `TỶ LỆ GIẢM TẢI`, phân bố hành động.
+**Xem:** tab *🎬 Tổng quan* — thẻ `Log thô vào` và `Xả tải LLM` ở hàng chỉ số đầu trang;
+phân bố hành động ở tab *📊 Nhật ký & Sổ kiểm toán* → khối *Biểu đồ phân tích SIEM*.
 **Số đọc ở:** `ml_gate_results.json` · `unified_stream_results.json`
 
 > **Cạm bẫy khi trình bày.** F1 nhị phân trên tập vận hành bị **base-rate thổi phồng** vì tập
@@ -84,7 +93,7 @@ Từng sự kiện APT lẻ có tín hiệu THẤP (thường DROP/LOG ở Tier-
 dần** từ Threat Memory khi một IP xuất hiện ở **≥2 ngày** (`COUNT(DISTINCT apt_day) ≥ 2`) —
 không phải từ một flow đơn.
 
-**Xem:** tab *Giám sát APT & Threat Intel* → "Nhật ký chuỗi tấn công APT".
+**Xem:** tab *🎯 Tình báo & Chuỗi APT*.
 **Số đọc ở:** `unified_stream_results.json` → `apt_dapt` · `apt_negative_control_results.json`
 
 - **Phân biệt:** *điểm danh tiếng* (1 BLOCK = +30) **≠** *APT* (cần ≥2 ngày, chỉ dữ liệu DAPT).
@@ -126,13 +135,13 @@ Script **luôn** kèm 150 benign warmup — bỏ warmup thì Z-score vô nghĩa 
 
 Mỗi payload là một IP TEST-NET riêng (`198.51.100.x`) tải một đòn tầng ứng dụng. Mọi log đi qua TẤT CẢ các lớp Tier-1, không tách theo loại.
 
-**Xem:** tab *Tổng quan* → "Vòng phản hồi Hai tầng" và *Live Threat Feed*.
+**Xem:** tab *🎬 Tổng quan* → khối *Vòng phản hồi hai tầng* và bảng *Dòng cảnh báo trực tiếp*.
 
 **Hai con số này BỔ SUNG nhau, không thay thế nhau:**
 
 | lớp | tệp | phạm vi |
 | :-- | :-- | :-- |
-| Guardrail **tĩnh** | `robustness_results.json` | **823 mẫu, 8 nhóm** — 703 công bố + 120 tự soạn |
+| Guardrail **tĩnh** | `robustness_results.json` | **823 mẫu, 9 nhóm** — 703 công bố + 120 tự soạn |
 | **Tier-2** (LLM) | `adversarial_pipeline_results.json` | **678 mẫu KHÓ, 7 nhóm** — phần lớp tĩnh không hấp thụ được |
 
 Lớp tĩnh mạnh ở `encoding_bypass` (45/45) nhưng **mù trước tấn công ngữ nghĩa** (`advbench_gcg`
@@ -154,7 +163,7 @@ lớp tĩnh trong 7 nhóm đó. Mẫu số và cách tách xuất xứ: [DEMO_BY
 # B1: đẩy adversarial → 1 IP bị ESCALATE → Tier-2 → sinh luật PENDING
 .venv/bin/python scripts/push_flow.py --source adversarial
 
-# B2: Dashboard → tab "Phê duyệt Luật (HITL)" → DUYỆT luật cho 198.51.100.15
+# B2: Dashboard → tab "🧑‍💻 Phê duyệt (HITL)" → nút "✅ Duyệt" cho 198.51.100.15
 #     (luật ghi vào system_settings.yaml, RuleEngine nạp nóng theo mtime mỗi 5s)
 
 # B3: đẩy lại traffic từ đúng IP đó
@@ -172,7 +181,7 @@ print("đã đẩy lại 198.51.100.15")
 PY
 ```
 
-**Kỳ vọng:** `198.51.100.15` hiện ở **"Tier-1 đã chặn"** với lý do `Luật động [từ Tác tử]`;
+**Kỳ vọng:** `198.51.100.15` hiện ở bảng **"🛡️ Tier-1 đã chặn"** (tab *🎬 Tổng quan*) với lý do `Luật động [từ Tác tử]`;
 blacklist thêm `.15`; **`audit_trail` KHÔNG tăng** ⇒ không leo Tier-2, không tốn LLM.
 
 Luật chỉ tự chặn khi **khớp IP chính xác** (`.15` ≠ `.150`) và **đã được duyệt** (ACTIVE).

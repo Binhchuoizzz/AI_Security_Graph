@@ -1,7 +1,7 @@
 # Adversarial Rule Injection Scenarios (Feedback Loop Security)
 
 > **Status:** SKELETON — **kịch bản thiết kế, KHÔNG có `samples.json` và chưa lượt đo nào chạy.**
-> Bảy thư mục `experiments/adversarial/` khác đều đã sinh mẫu và đã đo; riêng thư mục này thì
+> Tám thư mục `experiments/adversarial/` khác đều đã sinh mẫu và đã đo; riêng thư mục này thì
 > chưa. Không con số nào trong luận văn đến từ đây.
 >
 > **Không thuộc câu hỏi nghiên cứu nào.** Bản trước ghi *"Test cases cho RQ4"*, nhưng luận văn
