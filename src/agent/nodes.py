@@ -2259,6 +2259,10 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
         latest_decision.get("target", "UNKNOWN_TARGET"),
         formatted_reasoning,
         raw_log=raw_log_json,
+        # Ba lời gọi `_log_to_db` khác của tệp này đều truyền `tier=TIER_LLM`; nhánh hoãn
+        # thì quên, nên MỌI bản ghi AWAIT_HITL có cột `tier` rỗng. Dashboard rơi về heuristic
+        # và dán nhãn "Luật Tier-1 🟢" — tức gán ca KHÓ NHẤT của Tier-2 cho tầng rẻ nhất.
+        tier=TIER_LLM,
     )
 
     # Đưa vào hàng đợi duyệt luật (Tab Phê duyệt Luật HITL) để human có thể xem xét

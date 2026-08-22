@@ -70,6 +70,15 @@ def _nhan_tang(alert: dict) -> str:
     nhan = _TIER_LABELS.get(str(alert.get("tier") or ""))
     if nhan:
         return nhan
+    # HOÃN LÀ HÀNH ĐỘNG RIÊNG CỦA TIER-2 — phải xét TRƯỚC mọi phép đoán theo câu chữ.
+    # Bộ máy luật Tier-1 và Cổng ML không có nhánh nào sinh `AWAIT_HITL`: luật chỉ chặn hoặc
+    # cho qua, Cổng ML chỉ có bốn dải BLOCK/ESCALATE/ALERT/PASS. Chỉ tác tử Tier-2 mới hoãn.
+    # Nhánh ghi sổ của nó từng quên truyền `tier` (`nodes.py`), nên toàn bộ bản ghi cũ có cột
+    # rỗng và rơi xuống câu `return` cuối — bị dán nhãn "Luật Tier-1 🟢", tức gán ca khó nhất
+    # của tầng đắt cho tầng rẻ nhất. Giữ nhánh này kể cả sau khi đã vá nơi ghi, vì các sổ
+    # kiểm toán ĐÃ có trên đĩa không được sửa (chuỗi HMAC coi cả tệp là bằng chứng).
+    if str(alert.get("action", "")).upper() == "AWAIT_HITL":
+        return "LLM 🧠"
     r = str(alert.get("reason", ""))
     if any(k in r for k in ML_GATE_MARKERS):
         return "Cổng ML ⚡"
