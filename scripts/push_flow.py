@@ -20,7 +20,7 @@ LƯU Ý QUAN TRỌNG:
   - dapt & zeroday luôn được PREPEND benign warmup (mặc định 150, cờ --warmup) để Welford có
     baseline — nếu không, Z-score zero-day sẽ vô nghĩa (chưa học nền).
   - Cần subscriber chạy trên HOST (`python main.py --mode server`) để Tier-1+Tier-2 xử lý và ghi
-    DB/config cho Dashboard đọc. Dashboard container KHÔNG reach Redis (xem DEMO_FLOWS.md mục 0).
+    DB/config cho Dashboard đọc. Dashboard container KHÔNG reach Redis.
   - REDIS_URL (kèm mật khẩu) CHỈ lấy từ .env — không bao giờ in ra stdout/log.
 
 Chạy:

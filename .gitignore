@@ -45,7 +45,6 @@ trivy-config.sarif
 !CONTRIBUTING.md
 !CODE_OF_CONDUCT.md
 !reports/test_report_FINAL.md
-!reports/unified_stream_evaluation_report.md
 reports/test_report_*.md
 
 # Track markdown docs in docs/ and experiments/
@@ -162,3 +161,10 @@ docs/Thesis/latex/thesis_latex_*/*.png
 
 # Tài liệu học/diễn tập cá nhân — không đẩy lên remote
 docs/Codebase/learning/
+
+# Tài liệu diễn tập / số liệu đã bị luận văn thay thế — giữ trên đĩa, không đẩy lên remote
+docs/Codebase/guides/DEMO_BY_RQ.md
+docs/Codebase/guides/DEMO_FLOWS.md
+docs/Thesis/DOI_CHUNG_NGOAI.md
+experiments/results/_archive_pre_2026-08/
+reports/unified_stream_evaluation_report.md

@@ -4,10 +4,7 @@ Mỗi script ở đây **chống lưng một mục trong Chương 4 luận văn*
 là "rác": nhóm rigor (độ nhạy ngưỡng, đối chứng âm, baseline ngoài, vòng phản hồi…) chính
 là phần bảo vệ luận văn trước phản biện hội đồng.
 
-> **Định nghĩa + mẫu số + bẫy đọc của từng chỉ số** nằm ở
-> [`docs/Codebase/guides/DEMO_BY_RQ.md`](../docs/Codebase/guides/DEMO_BY_RQ.md) — bảng 22 chỉ số
-> theo ba câu hỏi nghiên cứu, kèm khoá JSON để tra ngược. **Số liệu** nằm ở `results/*.json`
-> (nguồn sự thật) + `reports/`. Muốn thử nhanh thì dùng `--limit`/`--out` ghi ra chỗ tạm,
+> **Số liệu** nằm ở `results/*.json` (nguồn sự thật) + `reports/`. Muốn thử nhanh thì dùng `--limit`/`--out` ghi ra chỗ tạm,
 > đừng chạy full rồi ghi đè kết quả đã trích.
 
 ---
@@ -87,7 +84,6 @@ của tập nhỏ như thể đó là hồ sơ tải của hệ thống. Phân b
   semantic 20 · jailbreak 20 · rag_poisoning 15). Thêm 100 mẫu `field_injection` ở
   `data/adversarial_llm/mixed_llm_attacks.json` ⇒ tổng bề mặt đối kháng **823**.
 - `results/*.json`, `results/plots/*.png` — **số liệu + hình đã trích trong luận văn**.
-- `results/_archive_pre_2026-08/` — kết quả LỖI THỜI, giữ để lưu vết, **không trích**.
 - `.unified_eval_memory.db` — DB threat-memory tạm của eval offline (tự sinh, gitignored).
 
 ---

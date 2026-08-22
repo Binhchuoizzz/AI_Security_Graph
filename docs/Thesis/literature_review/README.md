@@ -14,9 +14,6 @@
 >    (Sharafaldin, Lashkari, Ghorbani · ICISSP 2018) nhưng **khác bộ dữ liệu**. Nhầm hai bộ này
 >    là lỗi nặng vì mọi số của Chương 4 đo trên bộ 2018.
 >
-> Muốn biết vì sao những con số 99% công bố trên CSE-CIC-IDS2018 không đem so trực tiếp được với
-> luận văn này, đọc [`../DOI_CHUNG_NGOAI.md`](../DOI_CHUNG_NGOAI.md).
-
 ---
 
 ## Danh sách khảo sát ban đầu *(giữ nguyên văn, KHÔNG cập nhật)*

@@ -146,7 +146,7 @@ CHI_SO: list[tuple] = [
         ],
         "⏳ **Chờ chạy lại** — `RQ1_WITH_LATENCY=1 bash scripts/run_rq1_all.sh` (~3,3 giờ, cần LLM). "
         "Lượt cũ đã bị loại vì đếm xả tải sai (chỉ tính `DROP`, bỏ sót `BLOCK_IP`/`ALERT`/`AWAIT_HITL` "
-        "vốn cũng kết thúc tại Tier-1) — xem `experiments/results/_archive_pre_2026-08/README.md`. "
+        "vốn cũng kết thúc tại Tier-1). "
         "**Tỉ lệ xả tải nay đọc ở 1.e**, không đọc ở đây.",
     ),
     (

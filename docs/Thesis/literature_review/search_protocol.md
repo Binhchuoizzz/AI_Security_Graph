@@ -8,7 +8,6 @@
 > chúng như mô tả việc đã làm.
 >
 > - Danh mục thật + xác minh tận nguồn từng mục: [`../CITATION_AUDIT.md`](../CITATION_AUDIT.md)
-> - Đối chứng ngoài, đã kiểm từ bài gốc: [`../DOI_CHUNG_NGOAI.md`](../DOI_CHUNG_NGOAI.md)
 > - Kiểm tự động (mồ côi · treo · gương EN⇄VI · thứ tự IEEE): `scripts/audit_thesis_refs.py`
 >
 > **Framework dự kiến:** PRISMA for Scoping Reviews (Tricco et al., 2018).

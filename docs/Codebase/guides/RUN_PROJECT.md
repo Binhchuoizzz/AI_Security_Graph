@@ -1,8 +1,7 @@
 # Chạy & Demo SENTINEL
 
 > Cập nhật 14/08/2026. Tệp này chỉ trả lời: **chạy cái gì, nó làm gì, và dữ liệu của lượt đó
-> phân bổ ra sao**. Chỉ số đo đạc xem [DEMO_BY_RQ.md](DEMO_BY_RQ.md); chạy tay từng luồng xem
-> [DEMO_FLOWS.md](DEMO_FLOWS.md).
+> phân bổ ra sao**. Chỉ số đo đạc đọc thẳng ở `experiments/results/*.json`.
 >
 > **Đặt `SENTINEL_FREEZE_DYNAMIC_RULES=1` cho MỌI lệnh dưới đây.** Không đặt thì Cổng ML ghi
 > hàng trăm luật động thẳng vào `config/system_settings.yaml`, làm bẩn cấu hình dùng chung và
@@ -116,8 +115,7 @@ thẳng trên tệp theo khoá `unified_source` (14/08/2026), không chép lại
 > 🔴 **Tệp này MỚI HƠN lượt đo xả tải.** Bản 496.885 sự kiện được dựng **12/08/2026**; con số
 > xả tải **97,47%** đang trích trong luận văn đo ngày **05/08** trên bản cũ 99.717 sự kiện
 > **chưa có CSIC**. `measure_offload_vs_baserate.py --source demo` đọc thẳng tệp này, nên chạy
-> lại hôm nay ra số khác — đó là hành vi đúng, không phải lỗi. Chi tiết:
-> [DEMO_BY_RQ.md §0](DEMO_BY_RQ.md).
+> lại hôm nay ra số khác — đó là hành vi đúng, không phải lỗi.
 
 ### 2.2. Lát nhỏ
 

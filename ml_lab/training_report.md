@@ -116,5 +116,4 @@ Cổng ML đã được huấn luyện đủ mạnh để nhận diện các đ�
 > **Giới hạn khái quát hoá phải tự nêu.** Tập train/test chia **ngẫu nhiên**, không chia theo thời
 > gian. Nghiên cứu *"The Evaluation Protocol Is the Hidden Variable"* (06/2026) quét đúng LightGBM
 > trên đúng họ dữ liệu này và cho thấy macro-F1 tụt từ 0,79–0,82 (chia ngẫu nhiên) xuống **≈0,02**
-> khi chia theo thời gian. Chi tiết và cách trả lời khi bị hỏi:
-> [`docs/Thesis/DOI_CHUNG_NGOAI.md`](../docs/Thesis/DOI_CHUNG_NGOAI.md).
+> khi chia theo thời gian.

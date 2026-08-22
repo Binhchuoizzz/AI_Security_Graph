@@ -2,8 +2,8 @@
 # Chạy TOÀN BỘ phép đo quy kết ATT&CK (3.a–3.d) rồi gom số.
 #
 # Đây là chỉ số RQ3 duy nhất còn thiếu sau lượt RQ1+RQ2 ngày 05/08/2026. Các tệp kết quả cũ
-# nằm trong `experiments/results/_archive_pre_2026-08/` được sinh TRƯỚC giao ước
-# `drop_authored()` và mâu thuẫn nhau (68,4% với 2,33% cho cùng chế độ e2e) — KHÔNG trích.
+# sinh TRƯỚC giao ước `drop_authored()` mâu thuẫn nhau (68,4% với 2,33% cho cùng chế độ
+# e2e) — KHÔNG trích.
 #
 # RẺ TRƯỚC, ĐẮT SAU:
 #   Khối A — `rrf` tắt LLM, tất định, vài phút. Đây là TRẦN do truy xuất quyết định.
