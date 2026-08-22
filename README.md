@@ -66,11 +66,8 @@ benchmark stream is unaffected.
 | `scripts/` | Dataset builders, demo runner, number/reference audits |
 | `tests/` | 666 tests, all passing with Redis up; the streaming ones skip without it |
 | `docs/Thesis/` | Thesis LaTeX (EN + VI), submitted PDF, defence deck |
-| `docs/Codebase/` | Runtime walkthrough, operating guide, defence script and demo runbook |
+| `docs/Codebase/` | `guides/` — operating guide, demo flows, per-question demo map |
 | `ml_lab/`, `llm_lab/` | Gateway training; QLoRA scaffolding for the fine-tuning direction in future work |
-
-A stage-by-stage walkthrough of the runtime path is in
-[`docs/Codebase/learning/00_DOC_CODE_THEO_LUONG.md`](docs/Codebase/learning/00_DOC_CODE_THEO_LUONG.md).
 
 ## Thesis and defence
 

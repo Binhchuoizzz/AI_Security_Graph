@@ -159,3 +159,6 @@ experiments/results/_scratch/
 # Đã dọn 49 tệp/11 MB ngày 14/08/2026; chúng không được `.tex` nào tham chiếu (luận văn chỉ
 # dùng ảnh PDF trong `images/`). Chặn ở đây để lần soi bố cục sau không commit lại vào repo.
 docs/Thesis/latex/thesis_latex_*/*.png
+
+# Tài liệu học/diễn tập cá nhân — không đẩy lên remote
+docs/Codebase/learning/
