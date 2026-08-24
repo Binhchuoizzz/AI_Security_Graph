@@ -68,9 +68,6 @@ else
   echo "     RQ2_WITH_LLM=1 bash scripts/run_rq2_all.sh" | tee -a "$LOGDIR/_console.log"
 fi
 
-# ── C. Gom số ────────────────────────────────────────────────────────────────
-buoc gom_bao_cao        $PY scripts/collect_rq2_report.py --ledger "$LEDGER"
-
 echo "▉ RQ2 — xong $(date +'%F %T')" | tee -a "$LOGDIR/_console.log"
 echo
 column -t -s $'\t' "$LEDGER"

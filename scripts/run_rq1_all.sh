@@ -51,7 +51,6 @@ echo "▶ RQ1 — bắt đầu $(date +'%F %T')" | tee "$LOGDIR/_console.log"
 buoc ml_gate            $PY experiments/evaluate_ml_gate.py
 buoc ablation_mlgate    $PY experiments/run_ablation.py --mode mlgate
 buoc ml_threshold_sweep $PY experiments/run_ml_threshold_sweep.py
-buoc offload_mechanisms $PY scripts/audit_offload_mechanisms.py
 buoc unified_stream     $PY experiments/evaluate_unified_stream.py
 buoc cache_efficiency   $PY experiments/run_cache_efficiency.py
 buoc train_1m           $PY ml_lab/train_1m.py
@@ -79,9 +78,6 @@ else
   echo "⏭  BỎ QUA latency_baseline (~3,3 giờ). Muốn số 1.h thì chạy:" | tee -a "$LOGDIR/_console.log"
   echo "     RQ1_WITH_LATENCY=1 bash scripts/run_rq1_all.sh" | tee -a "$LOGDIR/_console.log"
 fi
-
-# ── C. Gom số ────────────────────────────────────────────────────────────────
-buoc gom_bao_cao        $PY scripts/collect_rq1_report.py --ledger "$LEDGER"
 
 echo "▉ RQ1 — xong $(date +'%F %T')" | tee -a "$LOGDIR/_console.log"
 echo

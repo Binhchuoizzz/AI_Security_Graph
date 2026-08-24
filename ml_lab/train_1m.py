@@ -135,7 +135,7 @@ def main():
         pickle.dump(pipeline, f)
     print(f"[*] Saved {MODEL_OUT}")
     # results đã sắp giảm dần theo Test F1 -> results[0] chính là model thắng. Nâng P/R/FPR của nó
-    # lên cấp cao nhất để báo cáo đọc được mà không phải lội vào mảng (collect_rq1_report.lay()
+    # lên cấp cao nhất để báo cáo đọc được mà không phải lội vào mảng (bộ gom số
     # chỉ đi theo khoá dict, không có chỉ số mảng).
     tot = results[0]
     with open(METRICS_OUT, "w", encoding="utf-8") as f:

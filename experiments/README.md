@@ -18,7 +18,6 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | `action_scoring.py` | **Chấm theo hành động cuối cùng** — thước đo CHÍNH của ablation (thay thước đo nhị phân đã bão hoà). |
 | `_eval_isolation.py` | Snapshot/khôi phục 4 kho trạng thái quanh script eval có side effect → phép đo không tự làm nhiễm chính nó. |
 | `build_golden_baseline.py` | Dựng golden baseline benign (loại trừ flow trùng benchmark) cho hiệu chỉnh Welford. |
-| `plot_results.py` | Vẽ hình PNG (`results/plots/`) cho các mục Chương 4. |
 | `e2e_test_runner.py` | Smoke-test end-to-end offline — không trích số. |
 | `statistical_tests.py` | McNemar + Mann-Whitney U trên kết quả ablation đã lưu. |
 
