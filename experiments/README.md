@@ -22,6 +22,17 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | `e2e_test_runner.py` | Smoke-test end-to-end offline — không trích số. |
 | `statistical_tests.py` | McNemar + Mann-Whitney U trên kết quả ablation đã lưu. |
 
+> **Kết quả KHÔNG còn lưu (dọn 22/08/2026).** Năm phép đo dưới đây vẫn chạy được, nhưng tệp
+> `.json` của chúng đã bị xoá vì **luận văn không còn trích số nào từ đó** sau lần viết lại
+> Chương 4: `evaluate_feedback_loop` · `evaluate_unified_stream` · `run_apt_negative_control` ·
+> `run_context_stress` · `run_zeroday_graded`. Cần lại thì chạy lại script, nó tự ghi ra
+> `results/`. Cùng đợt còn xoá `ablation_balanced_results` (tập "cân bằng" giả — lỗi đo đã vá),
+> `adversarial_pipeline_field_injection`, `attack_mapper_eval_rrf_all` và `offload_mechanisms_audit`.
+>
+> **Vẫn giữ dù luận văn không in:** `ml_threshold_sweep_results` và `threshold_sensitivity_results`
+> — hai tệp này trả lời *"sao chọn 0,85/0,65/0,40?"* và *"sao chọn 3,5σ, có cherry-pick không?"*,
+> là câu hỏi phản biện nhiều khả năng gặp nhất.
+
 ## 2. Đánh giá CHÍNH (trích số vào Chương 4)
 
 | File | Chạy | Output | Mục luận văn (Ch.4) |
