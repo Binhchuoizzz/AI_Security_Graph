@@ -1,20 +1,19 @@
 """
-SENTINEL — Đánh giá CỔNG ML (Tier-1, LightGBM) như một CHIỀU riêng của khung 5D.
-=============================================================================
-Cổng ML là chặng MÁY HỌC của Tier-1: chặn/cảnh báo tức thì các flow tấn công rõ ràng,
-GIẢM TẢI cho Tier-2 (LLM). Trước đây khung 5D chỉ đo Tier-1 (rule/Welford) + LLM — CHƯA
-đo riêng Cổng ML. Script này bổ sung, đo trên DATA CÂN BẰNG (`data/datatest.json`: ~933
+SENTINEL - Đánh giá Cổng ML (Tier-1, LightGBM) như một chiều riêng của khung 5D.
+Cổng ML là chặng máy học của Tier-1: chặn/cảnh báo tức thì các flow tấn công rõ ràng,
+Giảm tải cho Tier-2 (LLM). Trước đây khung 5D chỉ đo Tier-1 (rule/Welford) + LLM - chưa
+đo riêng Cổng ML. Script này bổ sung, đo trên DATA cân bằng (`data/datatest.json`: ~933
 attack / ~1000 benign) để F1 không bị lệch bởi skew.
 
 Đo 2 nhóm chỉ số:
-  A) HIỆU NĂNG PHÂN LOẠI + GIẢM TẢI (chiều Accuracy/Performance):
-     F1/Precision/Recall (chỉ trên mẫu ML RA quyết định), bypass-rate (ML tự quyết,
+  A) hiệu năng phân loại + giảm tải (chiều Accuracy/Performance):
+     F1/Precision/Recall (chỉ trên mẫu ML ra quyết định), bypass-rate (ML tự quyết,
      không cần LLM), abstain-rate (OOD -> escalate), skip-rate (payload-thuần), latency,
-     majority_baseline (tỷ lệ attack — chống F1 gây ngộ nhận).
-  B) KHÁNG NÉ-TRÁNH (chiều Security cho ML): bơm Inf + giá trị cực đoan vào mẫu tấn công,
-     đo tỷ lệ lớp bảo mật KHÔNG bị lừa thành benign (block đúng, HOẶC abstain->escalate).
+     majority_baseline (tỷ lệ attack - chống F1 gây ngộ nhận).
+  B) kháng né-tránh (chiều Security cho ML): bơm Inf + giá trị cực đoan vào mẫu tấn công,
+     đo tỷ lệ lớp bảo mật không bị lừa thành benign (block đúng, hoặc abstain->escalate).
 
-Thuần ĐỌC: không ghi audit/threat_memory/luật động (không làm bẩn hệ thống).
+Thuần đọc: không ghi audit/threat_memory/luật động (không làm bẩn hệ thống).
 
 Chạy:
     .venv/bin/python experiments/evaluate_ml_gate.py            # dùng data/datatest.json
@@ -74,7 +73,7 @@ def _f1(tp, fp, tn, fn):
 
 
 def _f1_of_pairs(pairs) -> float:
-    """F1 tính lại từ cặp (is_threat, pred_attack) — hàm thống kê cho bootstrap CI."""
+    """F1 tính lại từ cặp (is_threat, pred_attack) - hàm thống kê cho bootstrap CI."""
     tp = sum(1 for t, p in pairs if t and p)
     fp = sum(1 for t, p in pairs if not t and p)
     fn = sum(1 for t, p in pairs if t and not p)
@@ -90,11 +89,11 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
     n_threat = 0
     decided_records: list[dict] = []  # cho per-class + bootstrap CI
     wall_start = time.perf_counter()
-    # Tách confusion THEO TỪNG HÀNH ĐỘNG (= theo dải tin cậy của chính sách 4 dải:
+    # Tách confusion theo từng hành động (= theo dải tin cậy của chính sách 4 dải:
     # BLOCK_IP C>=0.85 · ALERT 0.40-0.65). Cần thiết vì chỉ số headline là độ chính xác
-    # của auto-BLOCK — hành động DỨT KHOÁT, không thể đảo — chứ không phải F1 gộp (F1 gộp
+    # của auto-BLOCK - hành động dứt khoát, không thể đảo - chứ không phải F1 gộp (F1 gộp
     # tính cả dải ALERT low-priority nên bị kéo xuống). Trước đây số này chỉ nằm trong
-    # báo cáo viết tay, KHÔNG được script xuất ra -> không tái lập được. Nay xuất ra JSON.
+    # báo cáo viết tay, không được script xuất ra -> không tái lập được. Nay xuất ra JSON.
     per_action: dict[str, dict[str, int]] = {}
     cal_conf: list[float] = []
     cal_correct: list[bool] = []
@@ -135,14 +134,14 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
             fn += 1
         bucket = per_action.setdefault(action, {"tp": 0, "fp": 0, "tn": 0, "fn": 0})
         bucket[cell] += 1
-        # HIỆU CHUẨN: dải tự quyết của Cổng ML (0,85/0,65/0,40) chỉ hợp lệ nếu `confidence`
-        # THẬT SỰ tương ứng với tần suất đúng. Thu cặp (độ tin cậy, đúng/sai) tại đây để
-        # tính Brier/ECE — không tốn thêm lần suy luận nào vì giá trị đã có sẵn.
+        # Hiệu chuẩn: dải tự quyết của Cổng ML (0,85/0,65/0,40) chỉ hợp lệ nếu `confidence`
+        # thật sự tương ứng với tần suất đúng. Thu cặp (độ tin cậy, đúng/sai) tại đây để
+        # tính Brier/ECE - không tốn thêm lần suy luận nào vì giá trị đã có sẵn.
         cal_conf.append(conf or 0.0)
         cal_correct.append(cell in ("tp", "tn"))
         decided_records.append(
             {
-                # Nhãn LỚP cụ thể chỉ có ở nguồn `cicids` (từ ground_truth); các nguồn khác
+                # Nhãn lớp cụ thể chỉ có ở nguồn `cicids` (từ ground_truth); các nguồn khác
                 # chỉ mang Attack/Benign. Suy biến về nhãn thô để bảng per-class vẫn dựng
                 # được, chỉ là độ hạt thô hơn ở phần đó.
                 "label": ev.get("gt_label") or ("Attack" if threat else "Benign"),
@@ -159,7 +158,7 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
     majority = round(n_threat / total, 4) if total else 0.0
     rep = confusion_report(tp, fp, tn, fn)
 
-    # Precision theo TỪNG dải hành động (bằng chứng cho chỉ số headline auto-BLOCK).
+    # Precision theo từng dải hành động (bằng chứng cho chỉ số headline auto-BLOCK).
     by_action = {}
     for act, c in sorted(per_action.items()):
         n_pred_atk = c["tp"] + c["fp"]
@@ -184,8 +183,8 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
         "recall": rec,
         "f1": f1,
         "f1_ci95_bootstrap": list(f1_ci),
-        # MCC = chỉ số CHÍNH. Bằng 0 với mọi bộ đoán-một-lớp bất kể tỉ lệ lớp, nên không
-        # bị base rate đánh lừa như F1/Accuracy. `zero_r_accuracy` là mốc ĐÚNG cho accuracy
+        # MCC = chỉ số chính. Bằng 0 với mọi bộ đoán-một-lớp bất kể tỉ lệ lớp, nên không
+        # bị base rate đánh lừa như F1/Accuracy. `zero_r_accuracy` là mốc đúng cho accuracy
         # (bộ phân loại hằng tốt nhất), khác `majority_baseline` (stub luôn hô "tấn công").
         "mcc": rep["mcc"],
         "balanced_accuracy": rep["balanced_accuracy"],
@@ -196,12 +195,12 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
         # Bóc theo lớp: recall gộp che mất lớp bị bỏ sót sạch.
         "per_class": cls_report,
         "weakest_classes": weakest_classes(cls_report, k=3),
-        # Thông lượng: trả lời "hệ chịu được bao nhiêu EPS?" — câu hỏi vận hành mà độ trễ
+        # Thông lượng: trả lời "hệ chịu được bao nhiêu EPS?" - câu hỏi vận hành mà độ trễ
         # mỗi-sự-kiện không trả lời được, và là điều kiện cần cho tuyên bố "LLM cục bộ khả thi".
         "throughput_eps": throughput(total, wall_elapsed),
         "wall_seconds": round(wall_elapsed, 3),
-        # Gánh nặng cảnh báo quy về đơn vị SOC thật dùng. LƯU Ý: tỉ lệ thuận với nhịp phát
-        # của benchmark, KHÔNG phải nhịp lưu lượng của một mạng doanh nghiệp — phải nêu rõ
+        # Gánh nặng cảnh báo quy về đơn vị SOC thật dùng. Lưu Ý: tỉ lệ thuận với nhịp phát
+        # của benchmark, không phải nhịp lưu lượng của một mạng doanh nghiệp - phải nêu rõ
         # khi trích, hoặc chuẩn hoá lại theo EPS mục tiêu.
         "alert_burden_at_bench_rate": alert_burden(fp, tp + fp, wall_elapsed),
         "n_decided_by_ml": n_decided,
@@ -216,17 +215,17 @@ def evaluate_classification(gw: MLGateway, events: list) -> dict:
         "auto_block_precision": _blk.get("precision"),
         "auto_block_n": _blk.get("n_predicted_attack", 0),
         "auto_block_fp": _blk.get("fp", 0),
-        # Hiệu chuẩn độ tin cậy — kiểm chứng chính GIẢ ĐỊNH nền của chính sách 4 dải.
+        # Hiệu chuẩn độ tin cậy - kiểm chứng chính giả định nền của chính sách 4 dải.
         # `auto_block_precision` nói "khi đã chặn thì đúng bao nhiêu"; hiệu chuẩn nói
-        # "con số tin cậy có nghĩa gì" — cái sau mới biện minh được cho việc CHỌN ngưỡng.
+        # "con số tin cậy có nghĩa gì" - cái sau mới biện minh được cho việc chọn ngưỡng.
         "confidence_calibration": calibration_report(cal_conf, cal_correct),
     }
 
 
-# Độ KHÓ của từng chế độ né-tránh — quyết định cách ĐỌC con số, nên phải đi kèm kết quả.
-# `*_single` chỉ nhiễu MỘT đặc trưng (lấy theo thứ tự dict, thường còn chẳng phải đặc trưng
-# mô hình dùng) nên đạt ~100% là chuyện TẦM THƯỜNG. Chỉ `extreme_broad` mới thực sự thử
-# lớp phòng thủ. Vì thế KHÔNG có số gộp: trung bình 3 chế độ sẽ bị 2 chế độ dễ kéo lên.
+# Độ khó của từng chế độ né-tránh - quyết định cách đọc con số, nên phải đi kèm kết quả.
+# `*_single` chỉ nhiễu một đặc trưng (lấy theo thứ tự dict, thường còn chẳng phải đặc trưng
+# mô hình dùng) nên đạt ~100% là chuyện tầm thường. Chỉ `extreme_broad` mới thực sự thử
+# lớp phòng thủ. Vì thế không có số gộp: trung bình 3 chế độ sẽ bị 2 chế độ dễ kéo lên.
 EVASION_MODES: dict[str, str] = {
     "inf_single": "DỄ — bơm Infinity vào 1 đặc trưng; lớp sanitize bắt ngay",
     "extreme_single": "DỄ — 1 đặc trưng cực đoan; lớp clamp ±8σ chặn được",
@@ -235,7 +234,7 @@ EVASION_MODES: dict[str, str] = {
 
 
 def _inject(ev: dict, mode: str) -> dict:
-    """Sinh biến thể NÉ-TRÁNH từ 1 event flow (xem EVASION_MODES về độ khó)."""
+    """Sinh biến thể né-tránh từ 1 event flow (xem EVASION_MODES về độ khó)."""
     evil = dict(ev)
     numeric = [k for k, v in ev.items() if isinstance(v, (int, float)) and not isinstance(v, bool)]
     if mode == "inf_single" and numeric:
@@ -249,8 +248,8 @@ def _inject(ev: dict, mode: str) -> dict:
 
 
 def evaluate_evasion_resistance(gw: MLGateway, events: list) -> dict:
-    """Với mỗi mẫu TẤN CÔNG mà ML vốn bắt được, thử 3 kiểu né-tránh. 'Kháng được' =
-    ML KHÔNG bị lừa thành benign/LOG (vẫn BLOCK/ALERT, HOẶC abstain->escalate LLM)."""
+    """Với mỗi mẫu tấn công mà ML vốn bắt được, thử 3 kiểu né-tránh. 'Kháng được' =
+    ML không bị lừa thành benign/LOG (vẫn BLOCK/ALERT, hoặc abstain->escalate LLM)."""
     modes = list(EVASION_MODES)
     stats: dict[str, dict[str, Any]] = {
         m: {"attempts": 0, "resisted": 0, "flipped_benign": 0, "difficulty": EVASION_MODES[m]}
@@ -262,13 +261,13 @@ def evaluate_evasion_resistance(gw: MLGateway, events: list) -> dict:
             continue
         base_action, _r, _c, _s = gw.evaluate_detailed(ev)
         if base_action not in ATTACK_ACTIONS:
-            continue  # chỉ thử né-tránh trên mẫu ML vốn ĐÃ bắt là tấn công
+            continue  # chỉ thử né-tránh trên mẫu ML vốn đã bắt là tấn công
         base_caught += 1
         for m in modes:
             evil = _inject(ev, m)
             a, _r2, _c2, sec = gw.evaluate_detailed(evil)
             stats[m]["attempts"] += 1
-            # An toàn: vẫn coi là tấn công HOẶC không tin ML (abstain/skip -> LLM).
+            # An toàn: vẫn coi là tấn công hoặc không tin ML (abstain/skip -> LLM).
             safe = (a in ATTACK_ACTIONS) or (a is None)
             if safe:
                 stats[m]["resisted"] += 1
@@ -279,10 +278,10 @@ def evaluate_evasion_resistance(gw: MLGateway, events: list) -> dict:
         stats[m]["resistance_rate"] = round(stats[m]["resisted"] / at, 4) if at else None
         stats[m]["resistance_ci95"] = list(wilson_ci(stats[m]["resisted"], at)) if at else None
 
-    # KHÔNG trả `overall_resistance_rate` nữa — CÓ CHỦ ĐÍCH.
-    # Trung bình 3 chế độ bị hai chế độ DỄ (nhiễu 1 đặc trưng, gần như luôn 100%) kéo lên,
-    # tạo ra một con số ~99,6% nghe rất mạnh nhưng che mất chế độ KHÓ duy nhất. Chỉ số đáng
-    # trích là `headline_hard_mode` — kết quả của phép thử thật.
+    # Không trả `overall_resistance_rate` nữa - có chủ đích.
+    # Trung bình 3 chế độ bị hai chế độ dễ (nhiễu 1 đặc trưng, gần như luôn 100%) kéo lên,
+    # tạo ra một con số ~99,6% nghe rất mạnh nhưng che mất chế độ khó duy nhất. Chỉ số đáng
+    # trích là `headline_hard_mode` - kết quả của phép thử thật.
     hard = stats.get("extreme_broad", {})
     return {
         "attack_samples_ml_caught": base_caught,
@@ -313,11 +312,11 @@ def main():
     with open(args.data, encoding="utf-8") as f:
         events = json.load(f)
 
-    # Chính sách CHUNG: đầu vào do tác giả biên soạn không vào bất kỳ tỉ lệ nào. Ở đây chỉ có
-    # 4/4240 dòng `unified_source == "adversarial"` (0,09%) nên con số gần như không đổi —
-    # loại vì tính NHẤT QUÁN, để câu "không một mẫu tự viết nào nằm trong tỉ lệ" đúng ở MỌI
-    # phép đo, chứ không phải đúng ở hầu hết. `zeroday` GIỮ LẠI: đó là biến thể REAL-DERIVED
-    # từ flow benign thật và là chỉ số hệ CÓ tuyên bố, không phải payload tưởng tượng.
+    # Chính sách chung: đầu vào do tác giả biên soạn không vào bất kỳ tỉ lệ nào. Ở đây chỉ có
+    # 4/4240 dòng `unified_source == "adversarial"` (0,09%) nên con số gần như không đổi -
+    # loại vì tính nhất quán, để câu "không một mẫu tự viết nào nằm trong tỉ lệ" đúng ở mọi
+    # phép đo, chứ không phải đúng ở hầu hết. `zeroday` giữ lại: đó là biến thể REAL-DERIVED
+    # từ flow benign thật và là chỉ số hệ có tuyên bố, không phải payload tưởng tượng.
     _n_before = len(events)
     events = [e for e in events if e.get("unified_source") != "adversarial"]
     if len(events) != _n_before:

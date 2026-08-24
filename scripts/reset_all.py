@@ -1,23 +1,23 @@
-"""reset_all.py — Reset SẠCH hệ thống demo trong MỘT lệnh: DỪNG → XOÁ → BẬT LẠI.
+"""reset_all.py - Reset sạch hệ thống demo trong một lệnh: Dừng -> xoá -> bật lại.
 
 Chống 2 lỗi hay gặp khi quản subscriber thủ công:
-  1. Chạy >1 subscriber cùng consumer group -> log bị CHIA -> dashboard thiếu số
+  1. Chạy >1 subscriber cùng consumer group -> log bị chia -> dashboard thiếu số
      (vd đẩy 120 chỉ thấy 63).
-  2. Reset xong QUÊN bật lại subscriber -> log kẹt Redis -> dashboard = 0.
+  2. Reset xong quên bật lại subscriber -> log kẹt Redis -> dashboard = 0.
 
 Việc thực hiện (đúng thứ tự an toàn):
-  1. DỪNG mọi subscriber cũ (pkill 'main.py --mode server') + xác minh đã tắt.
-  2. XOÁ: SQLite (audit_trail, threat_memory), pipeline_stats.json, tier1_blocks.json,
+  1. Dừng mọi subscriber cũ (pkill 'main.py --mode server') + xác minh đã tắt.
+  2. Xoá: SQLite (audit_trail, threat_memory), pipeline_stats.json, tier1_blocks.json,
      luật động (system_settings.yaml), Redis stream + blacklist.
-  3. BẬT LẠI ĐÚNG 1 subscriber (trừ khi --no-restart) + xác minh đúng 1 tiến trình.
+  3. Bật lại đúng 1 subscriber (trừ khi --no-restart) + xác minh đúng 1 tiến trình.
 
-Ưu điểm so với gõ tay: pkill chạy TRONG tiến trình Python (không dính lỗi exit-144
+Ưu điểm so với gõ tay: pkill chạy trong tiến trình Python (không dính lỗi exit-144
 do SIGTERM lan sang shell), và luôn kiểm đếm lại số subscriber sau mỗi bước.
 
 Chạy:
   .venv/bin/python scripts/reset_all.py              # reset + bật lại subscriber
   .venv/bin/python scripts/reset_all.py --no-restart # chỉ reset, không bật lại
-  .venv/bin/python scripts/reset_all.py --dry-run    # chỉ in việc sẽ làm, KHÔNG đổi gì
+  .venv/bin/python scripts/reset_all.py --dry-run    # chỉ in việc sẽ làm, không đổi gì
 """
 
 import argparse
@@ -31,7 +31,7 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
-# Secret chỉ sống trong .env — nạp trước khi đọc REDIS_URL (script chạy standalone).
+# Secret chỉ sống trong .env - nạp trước khi đọc REDIS_URL (script chạy standalone).
 from dotenv import load_dotenv  # noqa: E402
 
 load_dotenv()
@@ -43,13 +43,13 @@ STREAMS = ["queue_waf", "queue_firewall", "queue_sysmon", "queue_decisions", "qu
 
 
 def _count_subscribers() -> int:
-    """Đếm tiến trình subscriber THẬT (python chạy main.py --mode server).
+    """Đếm tiến trình subscriber thật (python chạy main.py --mode server).
 
-    Tránh false-positive kinh điển: shell wrapper / pgrep / grep có thể chứa CHUỖI
+    Tránh false-positive kinh điển: shell wrapper / pgrep / grep có thể chứa chuỗi
     'main.py --mode server' -> bị đếm nhầm. Ta xác thực /proc/<pid>/cmdline: argv[0]
     phải là python interpreter (loại zsh/bash/pgrep) và args phải có main.py --mode server.
     """
-    # check=False CỐ Ý: pgrep trả mã 1 khi KHÔNG khớp tiến trình nào — đó là trạng thái
+    # check=False cố Ý: pgrep trả mã 1 khi không khớp tiến trình nào - đó là trạng thái
     # hợp lệ (đã sạch), không phải lỗi; check=True sẽ ném CalledProcessError oan.
     out = subprocess.run(
         ["pgrep", "-f", SUBSCRIBER_PATTERN], capture_output=True, text=True, check=False
@@ -71,7 +71,7 @@ def _count_subscribers() -> int:
 
 
 def _count_producers() -> int:
-    """Đếm tiến trình ĐẨY LUỒNG thật (python chạy scripts/demo.py), xác thực qua /proc."""
+    """Đếm tiến trình đẩy luồng thật (python chạy scripts/demo.py), xác thực qua /proc."""
     out = subprocess.run(
         ["pgrep", "-f", PRODUCER_PATTERN], capture_output=True, text=True, check=False
     )
@@ -90,17 +90,17 @@ def _count_producers() -> int:
 
 
 def stop_producers(dry_run: bool = False) -> None:
-    """Dừng MỌI tiến trình đẩy luồng trước khi reset.
+    """Dừng mọi tiến trình đẩy luồng trước khi reset.
 
-    LỖI ĐÃ GẶP 11/08/2026. Reset chỉ dừng subscriber, không dừng producer. Một lượt đẩy cũ
+    Lỗi đã gặp 11/08/2026. Reset chỉ dừng subscriber, không dừng producer. Một lượt đẩy cũ
     sống sót qua reset và chạy song song với lượt mới: cả hai cùng đẩy trọn 496.885 sự kiện,
-    subscriber đếm được **516.885/496.885 = 104%** và Dashboard hiện một con số vô lý. Tệ hơn
-    con số: mỗi IP nhận lưu lượng NHÂN ĐÔI, nên mọi tỉ lệ đo trong lượt đó đều vô giá trị mà
+    subscriber đếm được 516.885/496.885 = 104% và Dashboard hiện một con số vô lý. Tệ hơn
+    con số: mỗi IP nhận lưu lượng nhân đôi, nên mọi tỉ lệ đo trong lượt đó đều vô giá trị mà
     không có gì báo.
 
-    Giết theo PID xác thực qua /proc, KHÔNG dùng `pkill -f 'scripts/demo\\.py'`: mẫu đó khớp
+    Giết theo PID xác thực qua /proc, không dùng `pkill -f 'scripts/demo\\.py'`: mẫu đó khớp
     cả dòng lệnh của chính shell đang gọi, nên shell tự sát giữa chừng (exit 144) và vòng lặp
-    chết trước khi giết được tiến trình cần giết — đúng cách mà lỗi trên đã lọt qua.
+    chết trước khi giết được tiến trình cần giết - đúng cách mà lỗi trên đã lọt qua.
     """
     n = _count_producers()
     print(f"[0/3] DỪNG producer (đẩy luồng) — đang chạy: {n}")
@@ -148,7 +148,7 @@ def stop_subscribers(dry_run: bool = False) -> None:
     if n == 0:
         print("      (không có tiến trình nào để dừng)")
         return
-    # check=False CỐ Ý: pkill trả mã 1 khi không còn tiến trình nào để giết (đã dừng xong).
+    # check=False cố Ý: pkill trả mã 1 khi không còn tiến trình nào để giết (đã dừng xong).
     subprocess.run(["pkill", "-f", SUBSCRIBER_PATTERN], capture_output=True, check=False)
     for _ in range(12):  # chờ tối đa 6s cho SIGTERM
         time.sleep(0.5)
@@ -212,7 +212,7 @@ def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
                         pass
         return
 
-    # --- SQLite ---
+    # SQLite
     for db, tbls in db_tables.items():
         try:
             if os.path.exists(db) and not os.access(db, os.W_OK):
@@ -240,11 +240,11 @@ def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
         except Exception as e:  # noqa: BLE001
             print(f"      [!] lỗi xoá {os.path.basename(db)}: {e}")
 
-    # --- SINK TIER-2: audit guardrails + tracer ------------------------------------ #
-    # LỖI ĐÃ SỬA: hai sink này KHÔNG nằm trong `db_tables` nên `reset_all` chưa bao giờ đụng
+    # Hai nơi ghi của Tier-2: sổ guardrails và tracer
+    # Lỗi đã sửa: hai sink này không nằm trong `db_tables` nên `reset_all` chưa bao giờ đụng
     # tới chúng. Đo được lúc phát hiện: `guardrails_audit.db` = 10.888 dòng và
-    # `tier2_trace.jsonl` = 708 dòng tích luỹ qua nhiều lượt chạy khác nhau. Hệ quả: MỌI
-    # thống kê Tier-2 tính trên chúng đều trộn lẫn các lượt — một lượt "nguội" vẫn đọc ra số
+    # `tier2_trace.jsonl` = 708 dòng tích luỹ qua nhiều lượt chạy khác nhau. Hệ quả: Mọi
+    # thống kê Tier-2 tính trên chúng đều trộn lẫn các lượt - một lượt "nguội" vẫn đọc ra số
     # của lượt trước. Xoá ở đây để "reset" đúng nghĩa là reset.
     for rel in ("logs/guardrails_audit.db", "logs/tier2_trace.jsonl"):
         if rel.endswith("tier2_trace.jsonl") and keep_trace:
@@ -258,7 +258,7 @@ def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
         except OSError as e:
             print(f"      [!] không xoá được {rel}: {e}")
 
-    # --- config JSON (counter + Tier-1 blocks) ---
+    # Hai tệp JSON đếm và danh sách chặn của Tier-1
     try:
 
         def _reset_json(filename, default_data):
@@ -281,9 +281,9 @@ def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
     except Exception as e:  # noqa: BLE001
         print(f"      [!] lỗi reset config JSON: {e}")
 
-    # --- luật động + whitelist (qua API HỆ THỐNG, không tự ghi file) ---
+    # luật động + whitelist (qua API hệ thống, không tự ghi file)
     # FeedbackListener sở hữu logic rule/whitelist + đã bền với cross-UID Docker (0666 +
-    # _ensure_lock_writable). reset_all chỉ GỌI API, không reimplement việc ghi YAML.
+    # _ensure_lock_writable). reset_all chỉ gọi API, không reimplement việc ghi YAML.
     from src.tier1_filter.feedback_listener import FeedbackListener
 
     fl = FeedbackListener()
@@ -294,7 +294,7 @@ def clear_data(dry_run: bool = False, keep_trace: bool = False) -> None:
     else:
         print(f"      [!] clear_rules={ok_rules} reset_whitelist={ok_wl} — kiểm quyền config/")
 
-    # --- Redis stream + blacklist ---
+    # Stream Redis và blacklist
     try:
         r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
         for k in STREAMS:
@@ -315,7 +315,7 @@ def start_subscriber(dry_run: bool = False) -> None:
     os.makedirs(os.path.join(ROOT, "logs"), exist_ok=True)
     log = open(os.path.join(ROOT, "logs", "subscriber.log"), "w")  # noqa: SIM115
     env = {**os.environ, "REDIS_URL": REDIS_URL, "LLM_API_BASE": LLM_API_BASE}
-    # start_new_session=True -> tiến trình con SỐNG TIẾP sau khi script này thoát (như nohup).
+    # start_new_session=True -> tiến trình con sống tiếp sau khi script này thoát (như nohup).
     subprocess.Popen(
         [sys.executable, "main.py", "--mode", "server", "--log-level", "INFO"],
         cwd=ROOT,
@@ -352,7 +352,7 @@ def main():
     args = ap.parse_args()
 
     print("=== SENTINEL reset_all ===" + (" [DRY-RUN]" if args.dry_run else ""))
-    # Producer TRƯỚC subscriber: một lượt đẩy còn sống sẽ bơm sự kiện vào giữa lúc đang xoá
+    # Producer trước subscriber: một lượt đẩy còn sống sẽ bơm sự kiện vào giữa lúc đang xoá
     # bảng, và nếu nó sống qua cả reset thì chạy song song với lượt sau (xem `stop_producers`).
     stop_producers(args.dry_run)
     stop_subscribers(args.dry_run)

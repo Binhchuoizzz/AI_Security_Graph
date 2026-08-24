@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
-"""Kiểm TRÍCH NGUỒN của luận văn — phần mà `audit_thesis_numbers.py` không với tới.
+"""Kiểm trích nguồn của luận văn - phần mà `audit_thesis_numbers.py` không với tới.
 
 Bộ kiểm số lo chuyện "con số trong .tex có khớp JSON không". Bộ kiểm này lo chuyện khác hẳn
-và cũng nguy hiểm không kém: **nguồn có đúng, có đủ, có chuẩn không**. Rà tay ngày 06/08/2026
-tìm được bốn mục sai (một mục BỊA hoàn toàn: tác giả, nhan đề, nơi công bố, năm đều không có
+và cũng nguy hiểm không kém: nguồn có đúng, có đủ, có chuẩn không. Rà tay ngày 06/08/2026
+tìm được bốn mục sai (một mục bịa hoàn toàn: tác giả, nhan đề, nơi công bố, năm đều không có
 thật), bảy mục nằm trong danh mục mà không ai trích, và bộ dữ liệu gánh gần trọn phần bằng
-chứng tầng ứng dụng thì **không có mục tài liệu nào**. Không phép kiểm nào bắt được những
+chứng tầng ứng dụng thì không có mục tài liệu nào. Không phép kiểm nào bắt được những
 thứ đó, nên phải có tệp này.
 
-NĂM PHÉP KIỂM:
-  1. MỒ CÔI      — `\\bibitem` không ai `\\cite`. Chuẩn IEEE không cho phép.
-  2. TREO        — `\\cite` không có `\\bibitem` tương ứng (LaTeX in ra `[?]`).
-  3. GƯƠNG       — danh mục EN và VI phải trùng khoá, trùng thứ tự, trùng nội dung. Tài liệu
-                   tham khảo KHÔNG dịch, nên lệch một ký tự là một bản đã sửa còn bản kia chưa.
-  4. DỮ LIỆU     — mọi bộ dữ liệu gọi đích danh trong luận văn đều phải kèm `\\cite`.
-  5. ĐÃ TRA      — mọi khoá phải có mặt trong `docs/Thesis/CITATION_AUDIT.md`, tức đã có người
+Năm phép kiểm:
+  1. Mồ côi      - `\\bibitem` không ai `\\cite`. Chuẩn IEEE không cho phép.
+  2. TREO        - `\\cite` không có `\\bibitem` tương ứng (LaTeX in ra `[?]`).
+  3. Gương       - danh mục EN và VI phải trùng khoá, trùng thứ tự, trùng nội dung. Tài liệu
+                   tham khảo không dịch, nên lệch một ký tự là một bản đã sửa còn bản kia chưa.
+  4. Dữ liệu     - mọi bộ dữ liệu gọi đích danh trong luận văn đều phải kèm `\\cite`.
+  5. Đã TRA      - mọi khoá phải có mặt trong `docs/Thesis/CITATION_AUDIT.md`, tức đã có người
                    mở nguồn gốc ra đối chiếu chứ không phải chép lại bản ghi cũ.
 
-Phép kiểm 5 là phép quan trọng nhất về lâu dài. Bốn phép trên bắt lỗi CƠ HỌC; chỉ phép 5 bắt
+Phép kiểm 5 là phép quan trọng nhất về lâu dài. Bốn phép trên bắt lỗi cơ học; chỉ phép 5 bắt
 được lỗi "mục này trông rất chuẩn nhưng chưa ai kiểm nó có thật không".
 
 Chạy:  .venv/bin/python scripts/audit_thesis_refs.py
@@ -102,7 +102,7 @@ def main() -> int:
         docs = sources(lang)
         per_lang[lang] = (bib_entries(docs["main.tex"]), cited_keys(docs))
 
-    # ── 1 & 2: mồ côi và treo ────────────────────────────────────────────────
+    # 1 & 2: mồ côi và treo
     for lang in LANGS:
         entries, cites = per_lang[lang]
         keys = [k for k, _ in entries]
@@ -126,7 +126,7 @@ def main() -> int:
             fail += 1
             print(f"  ✗ TRÙNG KHOÁ: {', '.join(dup)}")
 
-    # ── 3: gương EN ⇄ VI ─────────────────────────────────────────────────────
+    # 3: gương EN ⇄ VI
     en, vi = per_lang["thesis_latex_en"][0], per_lang["thesis_latex_vi"][0]
     print("\n── Gương danh mục EN ⇄ VI ──")
     if [k for k, _ in en] != [k for k, _ in vi]:
@@ -143,7 +143,7 @@ def main() -> int:
         else:
             print(f"  ✓ {len(en)} mục trùng khớp khoá, thứ tự và nội dung")
 
-    # ── 4: bộ dữ liệu gọi tên thì phải dẫn nguồn ─────────────────────────────
+    # 4: bộ dữ liệu gọi tên thì phải dẫn nguồn
     print("\n── Bộ dữ liệu gọi đích danh phải có \\cite ──")
     missing_ds = []
     for lang in LANGS:
@@ -160,10 +160,10 @@ def main() -> int:
     else:
         print(f"  ✓ cả {len(DATASETS)} bộ dữ liệu đều được dẫn nguồn")
 
-    # ── 5: số lượng mục kho tri thức phải khớp kho THẬT ──────────────────────
+    # 5: số lượng mục kho tri thức phải khớp kho thật
     # Bắt được lỗi thật ngày 07/08: tóm tắt ghi "107 quy trình NIST SP 800-61r2" trong khi
-    # kho chỉ có 13 control (193 đoạn đã lập chỉ mục). Con số 107 KHÔNG có nguồn ở bất kỳ đâu
-    # trong repo — nó trôi vào từ một ghi chú cũ. Kho tri thức nằm ngoài `experiments/results/`
+    # kho chỉ có 13 control (193 đoạn đã lập chỉ mục). Con số 107 không có nguồn ở bất kỳ đâu
+    # trong repo - nó trôi vào từ một ghi chú cũ. Kho tri thức nằm ngoài `experiments/results/`
     # nên bộ kiểm số không với tới; phải canh ở đây.
     print("\n── Số mục kho tri thức trong luận văn ⇄ kho thật ──")
     kb = os.path.join(ROOT, "knowledge_base")
@@ -185,7 +185,7 @@ def main() -> int:
             (
                 "MITRE ATT&CK",
                 n_mitre,
-                # `STIX` có thể đi kèm SỐ PHIÊN BẢN ("STIX 2.1 MITRE ATT&CK"). Số ấy là
+                # `STIX` có thể đi kèm số phiên bản ("STIX 2.1 MITRE ATT&CK"). Số ấy là
                 # phiên bản chuẩn, không phải số mục trong kho, nên phải nuốt cả nó vào
                 # phần tuỳ chọn thay vì để nó rơi vào nhóm bắt. Không có `[\d.]*` ở đây
                 # thì câu "433 STIX 2.1 MITRE ATT&CK entries" bị đọc thành "21 mục MITRE".
@@ -204,7 +204,7 @@ def main() -> int:
         else:
             print(f"  ✓ MITRE {n_mitre} · NIST {n_nist} control — mọi số nêu đều khớp kho")
 
-    # ── 6: đã có người tra nguồn gốc chưa ────────────────────────────────────
+    # 6: đã có người tra nguồn gốc chưa
     print("\n── Đối chiếu sổ tra nguồn gốc ──")
     if not os.path.exists(LEDGER):
         fail += 1
@@ -219,7 +219,7 @@ def main() -> int:
         else:
             print(f"  ✓ cả {len(en)} mục đều có trong sổ tra")
 
-    # ── 7: danh mục phải xếp theo THỨ TỰ TRÍCH LẦN ĐẦU (kiểu số IEEE) ────────
+    # 7: danh mục phải xếp theo thứ tự trích lần đầu (kiểu số IEEE)
     # Phép kiểm này sinh ra sau một lần hỏng thật: nén lại văn ở các chương làm
     # đổi chỗ lần trích đầu tiên, và 25/38 vị trí lệch đi mà không có gì báo.
     print("\n── Thứ tự danh mục ⇄ thứ tự trích lần đầu (IEEE) ──")
@@ -238,7 +238,7 @@ def main() -> int:
         first: list[str] = []
         for fname in order_files:
             text = docs.get(fname, "")
-            # main.tex: chỉ phần TRƯỚC danh mục mới tính là trích trong thân bài
+            # main.tex: chỉ phần trước danh mục mới tính là trích trong thân bài
             if fname == "main.tex":
                 text = text.split(r"\begin{thebibliography}", 1)[0]
             for group in RE_CITE.findall(text):

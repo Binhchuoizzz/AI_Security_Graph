@@ -1,22 +1,22 @@
 """Đo hiệu quả Bộ đệm Tầng 1.75 (Semantic Cache) trên truy vấn RAG của luồng thật.
 
-[Luận văn Ch.4 — vế "Bộ đệm Semantic Cache Tầng 1.75" của RQ1]
+[Luận văn Ch.4 - vế "Bộ đệm Semantic Cache Tầng 1.75" của RQ1]
 
-VÌ SAO CÓ TỆP NÀY. RQ1 nêu đích danh ba cơ chế xả tải: bộ lọc Welford O(1), Cổng ML LightGBM
-và **Bộ đệm Semantic Cache Tầng 1.75**. Hai cái đầu có phép đo riêng; cái thứ ba thì không —
+Vì sao có tệp này. RQ1 nêu đích danh ba cơ chế xả tải: bộ lọc Welford O(1), Cổng ML LightGBM
+và Bộ đệm Semantic Cache Tầng 1.75. Hai cái đầu có phép đo riêng; cái thứ ba thì không -
 `SemanticCache.get_hit_rate()` chỉ được đọc ké trong `run_ablation.py` như một dòng phụ. Một
 cơ chế được nêu trong câu hỏi nghiên cứu mà không có phép đo là một lỗ hổng phải bịt.
 
-ĐO TRÊN ĐÚNG THỨ HỆ THỐNG HỎI. Không tự bịa truy vấn: dựng lại chuỗi bằng chính
-`build_rag_queries()` mà `node_rag_context` dùng, trên các sự kiện THỰC SỰ lọt qua Tier-1 và
+Đo trên đúng thứ hệ thống hỏi. Không tự bịa truy vấn: dựng lại chuỗi bằng chính
+`build_rag_queries()` mà `node_rag_context` dùng, trên các sự kiện thực sự lọt qua Tier-1 và
 Cổng ML. Cache chỉ có ý nghĩa trên phân bố truy vấn thật; đo trên truy vấn tự soạn thì tỉ lệ
 trúng muốn bao nhiêu cũng được.
 
-MỘT ĐIỀU PHẢI NÓI THẲNG. Khoá cache là `sha256(query_text)` — KHỚP CHÍNH XÁC, không phải
+Một điều phải nói thẳng. Khoá cache là `sha256(query_text)` - khớp chính xác, không phải
 tương đồng embedding. Tên gọi "Semantic Cache" dễ khiến người đọc hiểu là khớp ngữ nghĩa;
 báo cáo phải ghi rõ cơ chế thật, vì tỉ lệ trúng của khớp-chính-xác phụ thuộc hoàn toàn vào
 mức lặp lại của truy vấn, và `build_rag_queries` cố tình chuẩn hoá đầu vào nên nhiều log
-KHÁC nhau sinh ra cùng một truy vấn. Đó mới là nguồn của tỉ lệ trúng, và nói đúng nguồn thì
+Khác nhau sinh ra cùng một truy vấn. Đó mới là nguồn của tỉ lệ trúng, và nói đúng nguồn thì
 con số vẫn đẹp mà không phải khoác cho nó một cơ chế nó không có.
 
 Chạy:  .venv/bin/python experiments/run_cache_efficiency.py [--limit 1500]
@@ -37,7 +37,7 @@ OUT = "experiments/results/cache_efficiency_results.json"
 
 
 def collect_tier2_queries(limit: int) -> tuple[list[str], dict]:
-    """Chạy Tier-1 + Cổng ML để lấy CHÍNH những truy vấn sẽ tới RAG."""
+    """Chạy Tier-1 + Cổng ML để lấy chính những truy vấn sẽ tới RAG."""
     from experiments.unified_dataset import build_stream
     from src.agent.nodes import build_rag_queries
     from src.tier1_filter.ml_gateway import MLGateway
@@ -45,11 +45,11 @@ def collect_tier2_queries(limit: int) -> tuple[list[str], dict]:
 
     warmup, main, _apt, _n = build_stream()
     engine, gw = RuleEngine(), MLGateway()
-    # `build_stream()` trả phần tử VỎ BỌC {source, log, expected_threat, label, t}; log thật
+    # `build_stream()` trả phần tử vỏ bọc {source, log, expected_threat, label, t}; log thật
     # nằm ở `ev["log"]`. Truyền cả vỏ vào Tier-1 thì engine không thấy một trường nào nó
-    # biết -> `tier1_score = 0` cho MỌI sự kiện -> DROP 100%, kể cả tấn công. Đo được: 0/2370
+    # biết -> `tier1_score = 0` cho mọi sự kiện -> DROP 100%, kể cả tấn công. Đo được: 0/2370
     # tấn công escalate. Bẫy này im lặng tuyệt đối vì không có ngoại lệ nào được ném ra.
-    # Nguồn sự thật: `unified_dataset.score_stream()` — luôn gọi `engine.evaluate(ev["log"])`.
+    # Nguồn sự thật: `unified_dataset.score_stream()` - luôn gọi `engine.evaluate(ev["log"])`.
     for w in warmup:
         try:
             engine.evaluate(w["log"])
@@ -75,7 +75,7 @@ def collect_tier2_queries(limit: int) -> tuple[list[str], dict]:
                 continue
             funnel["reached_rag"] += 1
             queries.append(tq)
-            # Truy vấn 2 chỉ chạy khi log CÓ payload và khác truy vấn kỹ thuật — sao chép
+            # Truy vấn 2 chỉ chạy khi log có payload và khác truy vấn kỹ thuật - sao chép
             # đúng điều kiện của node_rag_context, nếu không sẽ thổi phồng số lượt truy xuất.
             if cq and cq != tq:
                 queries.append(cq)

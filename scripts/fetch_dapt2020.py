@@ -1,12 +1,12 @@
 """
 Trình tải và tạo dữ liệu giả lập DAPT2020
 
-NGUỒN DỮ LIỆU:
+Nguồn dữ liệu:
   - DAPT2020 (Dynamic Adversary Profile Tracking 2020)
   - Chính: Tải từ Kaggle (yêu cầu API key)
   - Dự phòng: Tự sinh dữ liệu chuỗi APT giả lập theo cấu trúc DAPT2020
 
-CHẾ ĐỘ GIẢ LẬP (SYNTHETIC MODE):
+Chế độ giả lập (SYNTHETIC MODE):
   Khi không tải được DAPT2020, tự động tạo chuỗi APT thực tế qua nhiều ngày
   để kiểm định Bộ nhớ Mối đe dọa Dài hạn (Threat Memory) Tier 2.
   Cấu trúc tương đương DAPT2020: 5 ngày, chuỗi tấn công nhiều giai đoạn.
@@ -20,8 +20,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-# Static analysis tools (VS Code/Pyright) will resolve scripts.dapt2020_config
-# Fallback handles direct execution within scripts/ directory
+# Công cụ phân tích tĩnh (VS Code/Pyright) phân giải được scripts.dapt2020_config
+# Nhánh lùi lo trường hợp chạy thẳng trong thư mục scripts/
 try:
     from scripts.dapt2020_config import (
         APT_PHASES,

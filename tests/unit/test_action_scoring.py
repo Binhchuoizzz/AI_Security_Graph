@@ -1,6 +1,6 @@
 """Unit tests cho chấm-theo-hành-động (`experiments/action_scoring.py`).
 
-VÌ SAO QUAN TRỌNG: đây là thước đo CHÍNH của ablation — xương sống bằng chứng Chương 4.
+Vì sao quan trọng: đây là thước đo chính của ablation - xương sống bằng chứng Chương 4.
 Thước đo nhị phân cũ khiến A ≡ F và B ≡ C ≡ D ≡ E *từng bit*, tức ablation không chứng
 minh được gì. Các test dưới khoá lại đúng những tính chất khiến thước đo mới phân biệt được.
 """
@@ -11,11 +11,9 @@ from experiments.action_scoring import (
 )
 
 
-# ==============================================================================
-# HỒI QUY LỖI GỐC: hai cấu hình khác hẳn nhau phải cho điểm KHÁC nhau
-# ==============================================================================
+# Hồi quy lỗi gốc: hai cấu hình khác hẳn nhau phải cho điểm khác nhau
 def test_discriminates_configs_that_binary_metric_collapsed():
-    """Ca THẬT: A treo ở ESCALATE, F tự quyết — thước đo cũ cho hai bên F1 GIỐNG HỆT."""
+    """Ca thật: A treo ở ESCALATE, F tự quyết - thước đo cũ cho hai bên F1 giống hệt."""
     expected = ["ALERT"] * 770 + ["AWAIT_HITL"] * 80 + ["BLOCK_IP"] * 320 + ["LOG"] * 80
     # A: không có tầng sau -> mọi ca đều treo ở ESCALATE (chưa phân giải)
     cfg_a = ["ESCALATE"] * 1250
@@ -41,7 +39,7 @@ def test_escalate_is_never_counted_as_detection():
 
 
 def test_await_hitl_is_a_correct_answer_when_expected():
-    """AWAIT_HITL là ĐÁP ÁN ĐÚNG cho 80 mẫu trong ground_truth — không phải luôn sai."""
+    """AWAIT_HITL là đáp án đúng cho 80 mẫu trong ground_truth - không phải luôn sai."""
     sc = score_actions(["AWAIT_HITL", "AWAIT_HITL"], ["AWAIT_HITL", "AWAIT_HITL"])
     assert sc["action_accuracy"] == 1.0, "hoãn cho người đôi khi CHÍNH LÀ hành động đúng"
     assert sc["defer_rate"] == 1.0
@@ -49,23 +47,21 @@ def test_await_hitl_is_a_correct_answer_when_expected():
 
 
 def test_deferring_when_action_was_expected_is_wrong():
-    """Hoãn trong khi lẽ ra phải CHẶN thì KHÔNG được tính đúng."""
+    """Hoãn trong khi lẽ ra phải chặn thì không được tính đúng."""
     sc = score_actions(["BLOCK_IP"] * 4, ["AWAIT_HITL"] * 4)
     assert sc["action_accuracy"] == 0.0
     assert sc["defer_rate"] == 1.0
 
 
-# ==============================================================================
-# autonomous_precision — câu hỏi vận hành: "khi hệ dám tự quyết, nó có đáng tin?"
-# ==============================================================================
+# autonomous_precision - câu hỏi vận hành: "khi hệ dám tự quyết, nó có đáng tin?"
 def test_autonomous_precision_ignores_deferrals():
-    """Chỉ chấm trên các ca hệ TỰ QUYẾT; ca hoãn không kéo tỉ lệ này lên/xuống."""
+    """Chỉ chấm trên các ca hệ tự quyết; ca hoãn không kéo tỉ lệ này lên/xuống."""
     expected = ["BLOCK_IP", "BLOCK_IP", "ALERT", "AWAIT_HITL"]
     actual = ["BLOCK_IP", "ALERT", "ALERT", "AWAIT_HITL"]  # 3 tự quyết, 2 đúng
     sc = score_actions(expected, actual)
     assert sc["n_terminal"] == 3
     assert sc["autonomous_precision"] == round(2 / 3, 4)
-    assert sc["action_accuracy"] == round(3 / 4, 4)  # ca hoãn ĐÚNG vẫn tính vào accuracy
+    assert sc["action_accuracy"] == round(3 / 4, 4)  # ca hoãn đúng vẫn tính vào accuracy
 
 
 def test_perfect_autonomy_and_accuracy():
@@ -77,9 +73,7 @@ def test_perfect_autonomy_and_accuracy():
     assert sc["unresolved_rate"] == 0.0
 
 
-# ==============================================================================
 # Chuẩn hoá tên hành động
-# ==============================================================================
 def test_drop_and_log_are_the_same_verdict():
     """ground_truth dùng nhãn di sản `LOG`; hệ sinh ra `DROP`. Phải coi là một."""
     assert _canon_action("DROP") == "LOG"
@@ -88,7 +82,7 @@ def test_drop_and_log_are_the_same_verdict():
 
 
 def test_tier1_prefix_is_stripped():
-    """Config F ghi `TIER1_BLOCK_IP` khi gate không escalate — vẫn phải khớp `BLOCK_IP`."""
+    """Config F ghi `TIER1_BLOCK_IP` khi gate không escalate - vẫn phải khớp `BLOCK_IP`."""
     assert _canon_action("TIER1_BLOCK_IP") == "BLOCK_IP"
     assert score_actions(["BLOCK_IP"], ["TIER1_BLOCK_IP"])["action_accuracy"] == 1.0
 
@@ -105,7 +99,7 @@ def test_empty_input_returns_safely():
 
 
 def test_confusion_table_shows_how_it_fails():
-    """Bảng chéo phải cho biết hệ sai KIỂU gì, không chỉ sai bao nhiêu."""
+    """Bảng chéo phải cho biết hệ sai kiểu gì, không chỉ sai bao nhiêu."""
     sc = score_actions(["BLOCK_IP", "BLOCK_IP", "LOG"], ["ALERT", "ALERT", "LOG"])
     assert sc["confusion"]["BLOCK_IP"]["ALERT"] == 2, "hạ cấp BLOCK->ALERT phải hiện ra"
     assert sc["confusion"]["LOG"]["LOG"] == 1

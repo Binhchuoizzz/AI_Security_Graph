@@ -1,6 +1,6 @@
 """Test biến đổi log1p cho baseline Welford (`rule_engine.scale_feature`).
 
-Log-transform chỉ ĐÚNG khi áp NHẤT QUÁN ở cả hai phía (học baseline + tính Z). Các test
+Log-transform chỉ đúng khi áp nhất quán ở cả hai phía (học baseline + tính Z). Các test
 dưới khoá lại đúng những tính chất đó, và chốt an toàn từ chối baseline thang cũ.
 """
 
@@ -25,7 +25,7 @@ def test_log_scale_features_are_transformed():
 
 
 def test_non_log_features_stay_linear():
-    """Trường cờ / kích thước giao thức KHÔNG bị log-hoá (bị chặn, không lệch đuôi)."""
+    """Trường cờ / kích thước giao thức không bị log-hoá (bị chặn, không lệch đuôi)."""
     for key in ("PSH Flag Cnt", "Fwd Seg Size Min", "Init Bwd Win Byts", "Bwd Pkt Len Min"):
         assert key not in LOG_SCALE_FEATURES
         assert scale_feature(key, 42.0) == 42.0
@@ -52,18 +52,18 @@ def test_log_transform_compresses_heavy_tail():
 
 
 def test_transform_id_is_stable():
-    """Cờ transform ổn định — chốt an toàn của RuleEngine so khớp chuỗi này."""
+    """Cờ transform ổn định - chốt an toàn của RuleEngine so khớp chuỗi này."""
     assert BASELINE_TRANSFORM_ID == "log1p-v1"
 
 
-# ── Hồi quy: đường CẬP NHẬT ONLINE phải ở CÙNG thang với đường TÍNH Z ────────────────
-# Các test trên chỉ soi `scale_feature` biệt lập nên KHÔNG bắt được lỗi thật đã xảy ra:
-# `RuleEngine.evaluate()` push giá trị THÔ vào baseline vốn học ở thang log1p. Hai test
-# dưới đi qua evaluate() thật — đó là nơi lỗi sống.
+# Hồi quy: đường cập nhật ONLINE phải ở cùng thang với đường tính Z
+# Các test trên chỉ soi `scale_feature` biệt lập nên không bắt được lỗi thật đã xảy ra:
+# `RuleEngine.evaluate()` push giá trị thô vào baseline vốn học ở thang log1p. Hai test
+# dưới đi qua evaluate() thật - đó là nơi lỗi sống.
 
 
 def _engine_with_empty_stats():
-    """RuleEngine với Welford RỖNG (bỏ seed golden) để quan sát riêng đường học online."""
+    """RuleEngine với Welford rỗng (bỏ seed golden) để quan sát riêng đường học online."""
     from src.tier1_filter.rule_engine import RuleEngine
 
     engine = RuleEngine()
@@ -73,9 +73,9 @@ def _engine_with_empty_stats():
 
 
 def test_evaluate_updates_baseline_in_log_space():
-    """Log benign đi qua evaluate() phải để lại baseline ở THANG LOG, không phải thô."""
+    """Log benign đi qua evaluate() phải để lại baseline ở thang LOG, không phải thô."""
     engine = _engine_with_empty_stats()
-    duration = 1_000_000.0  # 1s tính bằng micro-giây — giá trị flow đời thật
+    duration = 1_000_000.0  # 1s tính bằng micro-giây - giá trị flow đời thật
 
     for _ in range(20):
         engine.evaluate(
@@ -96,17 +96,17 @@ def test_evaluate_updates_baseline_in_log_space():
 
 
 def test_welford_still_flags_outlier_after_learning_benign():
-    """Học nền benign rồi thì một outlier cực trị vẫn PHẢI vượt ngưỡng Z.
+    """Học nền benign rồi thì một outlier cực trị vẫn phải vượt ngưỡng Z.
 
     Đây chính là hành vi bị lỗi thang đo giết chết: sd nổ 23.000 lần sau vài trăm log
     benign nên zero-day exfil rơi từ Z=4.58 xuống Z=0.07.
     """
     engine = _engine_with_empty_stats()
 
-    # MỖI log một IP khác nhau: baseline chỉ học từ phán quyết DROP/LOG, mà dồn dập cùng
+    # Mỗi log một IP khác nhau: baseline chỉ học từ phán quyết DROP/LOG, mà dồn dập cùng
     # một IP sẽ kích "tần suất yêu cầu cao" của SessionBaseline (+20 -> ESCALATE) nên không
     # log nào được học. Nhiều nguồn cũng đúng với cách dựng baseline benign ngoài đời.
-    # Phương sai phải THẬT: engine bỏ qua Z khi sd <= 0.01 (dữ liệu phẳng).
+    # Phương sai phải thật: engine bỏ qua Z khi sd <= 0.01 (dữ liệu phẳng).
     def _log(i, bwd_bytes):
         return {
             "Source IP": f"10.1.{i // 254}.{i % 254}",

@@ -1,10 +1,10 @@
 """
-Unit tests cho LỚP-2 feature-fingerprint của ExactMatchResponseCache
+Unit tests cho lớp-2 feature-fingerprint của ExactMatchResponseCache
 (src/agent/response_cache.py).
 
-Mục tiêu: các flow CÙNG BẢN CHẤT (khác mỗi IP/timestamp) phải GỘP về 1 khoá -> 1 lần
-gọi LLM, còn flow KHÁC bản chất (khác payload/dịch vụ) phải TÁCH khoá. Đây là cách hạ
-backlog LLM mà KHÔNG bỏ sót tấn công.
+Mục tiêu: các flow cùng bản chất (khác mỗi IP/timestamp) phải gộp về 1 khoá -> 1 lần
+gọi LLM, còn flow khác bản chất (khác payload/dịch vụ) phải tách khoá. Đây là cách hạ
+backlog LLM mà không bỏ sót tấn công.
 """
 
 from src.agent.response_cache import ExactMatchResponseCache
@@ -15,7 +15,7 @@ def _cache():
 
 
 def test_identical_flows_differing_only_by_ip_collapse():
-    """2 log DAPT nền chỉ khác IP/timestamp -> CÙNG fingerprint -> gộp 1 verdict."""
+    """2 log DAPT nền chỉ khác IP/timestamp -> cùng fingerprint -> gộp 1 verdict."""
     c = _cache()
     a = {"Source IP": "10.0.0.1", "Destination Port": 443, "timestamp": "t1"}
     b = {"Source IP": "10.0.0.2", "Destination Port": 443, "timestamp": "t2"}
@@ -25,7 +25,7 @@ def test_identical_flows_differing_only_by_ip_collapse():
 
 
 def test_different_payload_stays_separate():
-    """Khác nội dung app-layer (payload/message) -> fingerprint KHÁC -> KHÔNG gộp nhầm."""
+    """Khác nội dung app-layer (payload/message) -> fingerprint khác -> không gộp nhầm."""
     c = _cache()
     a = {"Destination Port": 443, "message": "[Threat-Intel] MITRE T1046"}
     b = {"Destination Port": 443, "message": "[Threat-Intel] MITRE T1087"}
@@ -53,7 +53,7 @@ def test_wellknown_port_kept_but_ephemeral_bucketed():
 
 
 def test_tier1_signal_separates_benign_from_attack():
-    """tier1_action/tier1_reasons vào fingerprint -> benign vs attack cùng cổng KHÔNG gộp."""
+    """tier1_action/tier1_reasons vào fingerprint -> benign vs attack cùng cổng không gộp."""
     c = _cache()
     benign = {"Destination Port": 80, "tier1_action": "LOG", "tier1_reasons": []}
     attack = {
@@ -64,16 +64,14 @@ def test_tier1_signal_separates_benign_from_attack():
     assert c.feature_fingerprint(benign) != c.feature_fingerprint(attack)
 
 
-# ==============================================================================
-# XUẤT XỨ CỦA PHẦN LẬP LUẬN KHI CACHE HIT TRÊN MỘT IP KHÁC
-# ==============================================================================
+# Xuất xứ của phần lập luận khi CACHE HIT trên một IP khác
 #
-# Lỗi thật, phát hiện bằng cách đọc `config/system_settings.yaml` do hệ thống SỐNG ghi ra
+# Lỗi thật, phát hiện bằng cách đọc `config/system_settings.yaml` do hệ thống sống ghi ra
 # trong lượt chạy 2026-07-28: luật chặn `172.20.0.122` mang phần lý do nói về
 # `10.200.4.164`; hai luật chặn `192.168.41.100` / `192.168.41.5` cùng mang lý do viết cho
-# `192.168.42.174`. Cache lớp-2 gộp theo ĐẶC TRƯNG (cố ý bỏ IP khỏi khoá) nên `reasoning`
+# `192.168.42.174`. Cache lớp-2 gộp theo đặc trưng (cố ý bỏ IP khỏi khoá) nên `reasoning`
 # của IP gốc đi thẳng vào nhật ký kiểm toán, lý do luật động và giao diện analyst.
-# `target` thực thi thì vẫn đúng — chỉ phần GIẢI THÍCH là sai địa chỉ.
+# `target` thực thi thì vẫn đúng - chỉ phần giải thích là sai địa chỉ.
 
 
 def test_cached_reasoning_declares_its_origin_ip():
@@ -85,7 +83,7 @@ def test_cached_reasoning_declares_its_origin_ip():
     out = _annotate_reused_verdict(reasoning, decision, "172.20.0.122")
     assert "TÁI SỬ DỤNG" in out
     assert "10.200.4.164" in out and "172.20.0.122" in out
-    # Nguyên văn của LLM phải được GIỮ, không bị viết lại thành tên IP mới.
+    # Nguyên văn của LLM phải được giữ, không bị viết lại thành tên IP mới.
     assert reasoning in out
 
 
@@ -99,7 +97,7 @@ def test_same_ip_reasoning_is_left_untouched():
 
 
 def test_cache_get_returns_a_copy_not_the_stored_object():
-    """Sửa verdict lấy ra KHÔNG được làm hỏng mục trong cache."""
+    """Sửa verdict lấy ra không được làm hỏng mục trong cache."""
     from src.agent.response_cache import ExactMatchResponseCache
 
     c = ExactMatchResponseCache()
@@ -115,14 +113,12 @@ def test_cache_get_returns_a_copy_not_the_stored_object():
     assert again["nested"]["k"] == 1, "deepcopy không sâu — dict lồng vẫn bị chia sẻ"
 
 
-# ==============================================================================
-# BỘ NHỚ ĐE DOẠ DÀI HẠN PHẢI THỰC SỰ TỚI ĐƯỢC LLM
-# ==============================================================================
+# Bộ nhớ đe doạ dài hạn phải thực sự tới được LLM
 #
 # Lỗi thật: `node_llm_triage` truy vấn SQLite dựng `threat_memory_context` mỗi lô rồi cất
 # vào state, nhưng `build_triage_prompt` chỉ nhận (log_data, rag_context) và
-# `SentinelState.get_memory_for_prompt()` KHÔNG có nơi nào gọi. Bộ nhớ Đe doạ dài hạn —
-# đóng góp chính của RQ3 — chưa bao giờ tới được LLM: mô hình luôn phán quyết như thể mỗi
+# `SentinelState.get_memory_for_prompt()` không có nơi nào gọi. Bộ nhớ Đe doạ dài hạn -
+# đóng góp chính của RQ3 - chưa bao giờ tới được LLM: mô hình luôn phán quyết như thể mỗi
 # IP là lần đầu gặp.
 
 
@@ -136,7 +132,7 @@ def test_threat_memory_reaches_the_prompt():
     assert "5 sự cố trước đó" in user, "tiền sử KHÔNG vào prompt"
     assert "PRIOR HISTORY" in user
 
-    # Không có tiền sử -> KHÔNG chèn khối rỗng gây nhiễu prompt.
+    # Không có tiền sử -> không chèn khối rỗng gây nhiễu prompt.
     plain = build_triage_prompt(log_data="LOG", rag_context="RAG")[-1]["content"]
     assert "PRIOR HISTORY" not in plain
 

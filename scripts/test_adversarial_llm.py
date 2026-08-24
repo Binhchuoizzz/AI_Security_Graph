@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bộ thử đối kháng LLM chạy TAY (cần LLM sống). KHÔNG thuộc bộ pytest.
+"""Bộ thử đối kháng LLM chạy TAY (cần LLM sống). Không thuộc bộ pytest.
 
 `testpaths = ["tests"]` trong pyproject nên pytest không thu tệp này, nhưng tiền tố `test_`
 vẫn là bẫy: `pytest scripts/` sẽ thu và chạy nó vào LLM thật.
@@ -9,7 +9,7 @@ import json
 import os
 import sys
 
-# Gốc repo suy từ vị trí tệp, KHÔNG ghi cứng. Bản cũ nối thẳng
+# Gốc repo suy từ vị trí tệp, không ghi cứng. Bản cũ nối thẳng
 # "/home/binhchuoiz/Projects/Thesis/AI_Security_Graph" nên mọi bản clone khác máy đều
 # ImportError ngay dòng import đầu tiên.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -44,7 +44,7 @@ def main():
     with open(DATASET_FILE, encoding="utf-8") as f:
         samples = json.load(f)
 
-    samples = samples[:5]  # Limit to 5 for quick demo
+    samples = samples[:5]  # Chỉ lấy 5 mẫu cho demo nhanh
 
     engine = RuleEngine()
     results = {"resisted": 0, "compromised": 0, "details": []}

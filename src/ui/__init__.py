@@ -1,5 +1,5 @@
 """
-Module UI: Streamlit Dashboard cho SOC Analyst (Human-in-the-Loop).
+Dashboard Streamlit cho chuyên viên SOC, gồm hàng đợi phê duyệt HITL.
 
 Bao gom cac thanh phan:
 - App: Trang chinh hien thi Alert, IOC va Audit Trail.

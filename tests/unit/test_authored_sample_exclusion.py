@@ -1,18 +1,18 @@
-"""Bất biến: MẪU DO TÁC GIẢ BIÊN SOẠN không được vào bất kỳ TỈ LỆ nào của luận văn.
+"""Bất biến: Mẫu do tác giả biên soạn không được vào bất kỳ tỉ lệ nào của luận văn.
 
-VÌ SAO CÓ FILE NÀY. `unified_dataset.NON_CLASSIFIED_SOURCES` đã tuyên bố đúng chính sách
-này từ lâu — `adversarial` là "đầu vào biên soạn — không tính vào tỉ lệ". Nhưng nó lọc theo
-khoá `source`, mà khoá đó CHỈ tồn tại trên vỏ bọc của `build_stream()`. `ground_truth.json`
+Vì sao có FILE này. `unified_dataset.NON_CLASSIFIED_SOURCES` đã tuyên bố đúng chính sách
+này từ lâu - `adversarial` là "đầu vào biên soạn - không tính vào tỉ lệ". Nhưng nó lọc theo
+khoá `source`, mà khoá đó chỉ tồn tại trên vỏ bọc của `build_stream()`. `ground_truth.json`
 là artefact khác, dựng bởi `scripts/fetch_and_build_dataset.py`, và tệp đó cố ý chèn 50 mẫu
-đối địch tự viết (dòng ~502, mục đích ban đầu là để thử Guardrails). Chúng KHÔNG mang khoá
+đối địch tự viết (dòng ~502, mục đích ban đầu là để thử Guardrails). Chúng không mang khoá
 `source`, nên chính sách trên không chạm tới được.
 
 Hậu quả đo được trước khi vá: trong 300 mẫu "chấm được quy kết" (có bằng chứng tầng ứng
-dụng + có mã ATT&CK), 50 mẫu là tự viết — 16,7% — và cả 50 cùng một đáp án `T1190`, đẩy
+dụng + có mã ATT&CK), 50 mẫu là tự viết - 16,7% - và cả 50 cùng một đáp án `T1190`, đẩy
 T1190 từ 52 lên 102 mẫu. Thước đo quy kết vì thế vừa thưởng cho việc khớp khuôn mẫu của
 chính tác giả, vừa thưởng cho thiên vị đúng một mã.
 
-Các test dưới đây khoá cả hai chiều: bộ lọc phải bắt đúng mẫu biên soạn, VÀ mọi script sinh
+Các test dưới đây khoá cả hai chiều: bộ lọc phải bắt đúng mẫu biên soạn, và mọi script sinh
 tỉ lệ từ `ground_truth.json` phải thực sự gọi bộ lọc ấy.
 """
 
@@ -52,7 +52,7 @@ def test_authored_samples_are_detected():
 
 
 def test_drop_authored_reports_how_many_it_removed():
-    """Loại mẫu trong IM LẶNG là cách làm mẫu số đổi mà không ai biết."""
+    """Loại mẫu trong im lặng là cách làm mẫu số đổi mà không ai biết."""
     samples = [
         {"input": {"cicids_label": "Adversarial"}},
         {"input": {"cicids_label": "SQL Injection"}},
@@ -65,9 +65,9 @@ def test_drop_authored_reports_how_many_it_removed():
 
 
 def test_ground_truth_still_contains_authored_samples(ground_truth):
-    """Chúng PHẢI còn trong tệp — `evaluate_adversarial.py` cần chúng làm tập thử tiêm nhiễm.
+    """Chúng phải còn trong tệp - `evaluate_adversarial.py` cần chúng làm tập thử tiêm nhiễm.
 
-    Bản vá là LỌC KHI CHẤM, không phải xoá dữ liệu. Nếu ai đó xoá thẳng khỏi tệp thì test
+    Bản vá là lọc khi chấm, không phải xoá dữ liệu. Nếu ai đó xoá thẳng khỏi tệp thì test
     này đỏ để nhắc rằng cách sửa đó làm mất tập thử guardrail.
     """
     authored = [s for s in ground_truth if is_authored_sample(s)]
@@ -75,7 +75,7 @@ def test_ground_truth_still_contains_authored_samples(ground_truth):
 
 
 def test_attribution_pool_contains_no_authored_sample(ground_truth):
-    """Bất biến CỐT LÕI: tập chấm quy kết của `run_ablation --mode bcde` phải sạch."""
+    """Bất biến cốt lõi: tập chấm quy kết của `run_ablation --mode bcde` phải sạch."""
     from experiments.run_ablation import attributable
 
     pool = attributable(ground_truth, None)
@@ -87,7 +87,7 @@ def test_attribution_pool_contains_no_authored_sample(ground_truth):
 def test_attribution_pool_is_not_dominated_by_one_answer(ground_truth):
     """Chính 50 mẫu tự viết đã làm `T1190` chiếm gần một phần ba tập.
 
-    Sau khi lọc, không mã nào được chiếm quá 60% — nếu vượt thì "đoán bừa mã phổ biến nhất"
+    Sau khi lọc, không mã nào được chiếm quá 60% - nếu vượt thì "đoán bừa mã phổ biến nhất"
     tự nó đã là một điểm số cao, và tỉ lệ khớp mất hết ý nghĩa.
     """
     from collections import Counter
@@ -112,9 +112,9 @@ def test_attribution_pool_is_not_dominated_by_one_answer(ground_truth):
     ],
 )
 def test_every_ground_truth_consumer_filters_authored(script):
-    """Quét CHUNG: script nào đọc `ground_truth.json` cũng phải gọi `drop_authored`.
+    """Quét chung: script nào đọc `ground_truth.json` cũng phải gọi `drop_authored`.
 
-    Đây là phần bắt được lỗi TƯƠNG LAI. Thêm một script đo mới mà quên lọc thì danh sách
+    Đây là phần bắt được lỗi tương LAI. Thêm một script đo mới mà quên lọc thì danh sách
     này phải được cập nhật, và việc cập nhật buộc người viết phải nghĩ về dân số chấm điểm.
     """
     text = (ROOT / script).read_text(encoding="utf-8")
@@ -123,5 +123,5 @@ def test_every_ground_truth_consumer_filters_authored(script):
 
 
 def test_authored_labels_are_declared_not_guessed():
-    """Bộ nhãn phải tường minh — dò theo chuỗi con 'adversarial' là cách vỡ trong im lặng."""
+    """Bộ nhãn phải tường minh - dò theo chuỗi con 'adversarial' là cách vỡ trong im lặng."""
     assert "Adversarial" in AUTHORED_GT_LABELS

@@ -1,6 +1,4 @@
-"""
-Unit Tests: Tier 1 Rule Engine + Session Baselining
-"""
+"""Kiểm thử đơn vị: bộ luật Tier-1 và đường nền phiên"""
 
 import os
 import sys
@@ -18,9 +16,9 @@ class TestRuleEngine:
     def setup_method(self):
         self.engine = RuleEngine()
         self.engine.session_baseline = SessionBaseline()
-        self.engine.dynamic_behavioral_rules = []  # Isolate from Feedback Loop runtime state
+        self.engine.dynamic_behavioral_rules = []  # Cách ly khỏi trạng thái chạy của vòng phản hồi
         # Cô lập khỏi Threat Memory runtime: các test dưới đây kiểm tra logic chữ ký/cổng/
-        # baseline, KHÔNG phải reputation. Tắt để kết quả không phụ thuộc DB thật.
+        # baseline, không phải reputation. Tắt để kết quả không phụ thuộc DB thật.
         self.engine.reputation_enforcement = False
 
     def test_sensitive_port_ssh_escalate(self):
@@ -66,8 +64,8 @@ class TestRuleEngine:
         assert result["tier1_score"] < 15
 
     def test_whitelist_ip_drop(self):
-        """IP whitelist: CHO QUA (WHITELIST_DROP) NHƯNG vẫn được phân tích đầy đủ để analyst
-        quan sát — action bị ép cho qua, còn score/reasons vẫn phản ánh hành vi (cổng 22 nhạy
+        """IP whitelist: Cho qua (WHITELIST_DROP) nhưng vẫn được phân tích đầy đủ để analyst
+        quan sát - action bị ép cho qua, còn score/reasons vẫn phản ánh hành vi (cổng 22 nhạy
         cảm + dung lượng cao) thay vì bị nuốt lặng ở Tầng 0."""
         self.engine.whitelist_ips = {"10.0.0.99"}
         log = {
@@ -78,7 +76,7 @@ class TestRuleEngine:
         result = self.engine.evaluate(log)
         assert result["tier1_action"] == "WHITELIST_DROP"
         assert result.get("is_whitelisted") is True
-        # Vẫn PHÂN TÍCH: điểm > 0 và có lý do (kiểu tấn công) cho human quan sát.
+        # Vẫn phân tích: điểm > 0 và có lý do (kiểu tấn công) cho human quan sát.
         assert result["tier1_score"] > 0
         assert len(result["tier1_reasons"]) > 0
 
@@ -132,8 +130,8 @@ class TestRuleEngine:
     def test_unsupervised_anomaly_detection(self):
         """Kiểm thử phát hiện dị biệt thống kê (Unsupervised Anomaly Detection).
 
-        LƯU Ý: Z-Score chỉ kích hoạt khi TẤT CẢ 11 tracked keys đều vượt
-        warmup_count. Test này chỉ bơm `Total Fwd Packets` → volumetric
+        Lưu Ý: Z-Score chỉ kích hoạt khi tất cả 11 tracked keys đều vượt
+        warmup_count. Test này chỉ bơm `Total Fwd Packets` -> volumetric
         check (500000 > max_fwd_packets) trigger ALERT trước.
         """
         engine = RuleEngine()
@@ -223,9 +221,9 @@ class TestSessionBaseline:
 class TestReputationEnforcement:
     """Kiểm thử Tier-1 auto-block/HITL theo điểm danh tiếng (tiền sử IP).
 
-    Reputation được monkeypatch cố định -> test KHÔNG phụ thuộc Threat Memory DB thật.
-    Gói dùng để test đều là gói LÀNH (port 443, ít gói, không payload) nên bình thường
-    sẽ DROP — mọi thay đổi action đến TỪ reputation.
+    Reputation được monkeypatch cố định -> test không phụ thuộc Threat Memory DB thật.
+    Gói dùng để test đều là gói lành (port 443, ít gói, không payload) nên bình thường
+    sẽ DROP - mọi thay đổi action đến từ reputation.
     """
 
     def _engine(self, rep_score: float):
@@ -243,7 +241,7 @@ class TestReputationEnforcement:
         return {"Source IP": ip, "Destination Port": 443, "Total Fwd Packets": 5}
 
     def test_reputation_block_above_threshold(self):
-        """Reputation 80 (≥70) trên gói LÀNH -> BLOCK_IP."""
+        """Reputation 80 (≥70) trên gói lành -> BLOCK_IP."""
         result = self._engine(80.0).evaluate(self._benign("203.0.113.5"))
         assert result["tier1_action"] == "BLOCK_IP"
         assert any("tiền sử" in r.lower() for r in result["tier1_reasons"])
@@ -254,7 +252,7 @@ class TestReputationEnforcement:
         assert result["tier1_action"] == "BLOCK_IP"
 
     def test_reputation_hitl_mid_band(self):
-        """Reputation 55 (50–69) trên gói LÀNH -> ESCALATE (đẩy lên Tier 2)."""
+        """Reputation 55 (50–69) trên gói lành -> ESCALATE (đẩy lên Tier 2)."""
         result = self._engine(55.0).evaluate(self._benign("203.0.113.7"))
         assert result["tier1_action"] == "ESCALATE"
 
@@ -283,7 +281,7 @@ class TestReputationEnforcement:
         assert result["tier1_action"] == "DROP"
 
     def test_reputation_does_not_downgrade_strong_signal(self):
-        """Reputation HITL (55) KHÔNG được hạ cấp tín hiệu mạnh hơn: cổng nhạy cảm vẫn BLOCK_IP."""
+        """Reputation HITL (55) không được hạ cấp tín hiệu mạnh hơn: cổng nhạy cảm vẫn BLOCK_IP."""
         engine = self._engine(55.0)
         log = {"Source IP": "203.0.113.12", "Destination Port": 22, "Total Fwd Packets": 5}
         result = engine.evaluate(log)
@@ -297,12 +295,12 @@ if __name__ == "__main__":
 class TestRequestRateNeedsSamples:
     """Một yêu cầu không phải là một tốc độ.
 
-    `elapsed` bị kẹp sàn 1 giây nên `request_count / elapsed` gán cho MỌI IP lần đầu xuất
-    hiện đúng 1,00 req/s — con số do công thức sinh ra, không phải do đo. Cùng lúc, trung
+    `elapsed` bị kẹp sàn 1 giây nên `request_count / elapsed` gán cho mọi IP lần đầu xuất
+    hiện đúng 1,00 req/s - con số do công thức sinh ra, không phải do đo. Cùng lúc, trung
     bình toàn cục lấy cả những hồ sơ một-yêu-cầu nên tụt dần dưới 0,5, kéo ngưỡng
-    `avg × 2` xuống quanh 1,0 — đúng bằng giá trị mà mọi IP mới bị gán.
+    `avg × 2` xuống quanh 1,0 - đúng bằng giá trị mà mọi IP mới bị gán.
 
-    Đo trên hai lượt chạy 17/08/2026 với hình dạng dữ liệu NGƯỢC NHAU mà cùng hỏng:
+    Đo trên hai lượt chạy 17/08/2026 với hình dạng dữ liệu ngược nhau mà cùng hỏng:
       * hồ IP hẹp (142 yêu cầu/IP) -> "3,00 req/s (ngưỡng 1,00)" ở yêu cầu thứ ba
       * hồ IP rộng (1 yêu cầu/IP)  -> "1,00 req/s (ngưỡng 0,50)" ở yêu cầu đầu tiên
     """
@@ -324,7 +322,7 @@ class TestRequestRateNeedsSamples:
         }
 
     def test_khach_moi_mot_yeu_cau_khong_bi_cham_la_tan_suat_cao(self):
-        """Mỗi IP gửi ĐÚNG một yêu cầu -> không địa chỉ nào được coi là gửi dồn."""
+        """Mỗi IP gửi đúng một yêu cầu -> không địa chỉ nào được coi là gửi dồn."""
         from src.tier1_filter.rule_engine import RuleEngine
 
         eng = RuleEngine()
@@ -336,7 +334,7 @@ class TestRequestRateNeedsSamples:
         assert flagged == 0, f"{flagged}/500 khách vãng lai bị chấm là tần suất cao"
 
     def test_van_bat_duoc_ip_gui_don_that(self):
-        """Đối chứng dương: một IP gửi dồn hàng trăm yêu cầu PHẢI bị chấm.
+        """Đối chứng dương: một IP gửi dồn hàng trăm yêu cầu phải bị chấm.
 
         Thiếu test này thì bản vá có thể lặng lẽ tắt hẳn chỉ báo tần suất.
         """

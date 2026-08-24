@@ -54,9 +54,7 @@ def log_tokenizer(text: str) -> list[str]:
     return [t.lower() for t in tokens if t.strip()]
 
 
-# =========================================================================
-# PHÒNG THỦ RAG POISONING — Tính toàn vẹn của tài liệu (Attack Vector #06)
-# =========================================================================
+# Phòng thủ RAG POISONING - Tính toàn vẹn của tài liệu (Attack Vector #06)
 
 import hashlib
 import logging
@@ -78,7 +76,7 @@ def verify_document_integrity(exclude_generated: bool = False) -> dict:
     Trả về:
       {"verified": True/False, "details": [...]}
 
-    Nếu hash không khớp → KB có thể đã bị tamper (RAG Poisoning).
+    Nếu hash không khớp -> KB có thể đã bị tamper (RAG Poisoning).
     """
     results = {"verified": True, "details": []}
 

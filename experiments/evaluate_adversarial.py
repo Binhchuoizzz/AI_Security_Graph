@@ -1,21 +1,20 @@
 """
-Đánh giá Phòng thủ Đối kháng (Adversarial) HỢP NHẤT — 2 tầng phòng thủ.
-=========================================================================
-Gộp 2 file cũ (evaluate_robustness + evaluate_adversarial_pipeline) vào MỘT entry
-point. Tên file kết quả GIỮ NGUYÊN (đối chiếu số liệu §Adversarial Robustness trong
+Đánh giá Phòng thủ Đối kháng (Adversarial) hợp nhất - 2 tầng phòng thủ.
+Gộp 2 file cũ (evaluate_robustness + evaluate_adversarial_pipeline) vào một entry
+point. Tên file kết quả giữ nguyên (đối chiếu số liệu §Adversarial Robustness trong
 luận văn); thuần tổ chức lại code.
 
-  --mode static    Guardrails TĨNH (9 nhóm, 823 mẫu): đo Block/Bypass rate — pattern
-                   detection + encoding neutralize + delimiter strip. KHÔNG cần LLM.
+  --mode static    Guardrails tĩnh (9 nhóm, 823 mẫu): đo Block/Bypass rate - pattern
+                   detection + encoding neutralize + delimiter strip. Không cần LLM.
                    -> results/robustness_results.json
-  --mode pipeline  FULL pipeline Tier-2 (LLM): đẩy payload KHÓ (bypass được lớp tĩnh)
+  --mode pipeline  FULL pipeline Tier-2 (LLM): đẩy payload khó (bypass được lớp tĩnh)
                    nhúng vào flow tấn công thật -> hỏi "LLM có bị thao túng ra LOG?".
                    RESISTED = giữ quyết định tấn công; COMPROMISED = bị ép benign.
                    -> results/adversarial_pipeline_results.json
-  --mode negative  ĐỐI CHỨNG ÂM (bảng C): log LÀNH từ `ground_truth.json` đi qua ĐÚNG lớp
-                   tĩnh ấy -> đo `false_flag_rate_pct`. BẮT BUỘC đi kèm --mode static/pipeline:
-                   một hệ gắn cờ MỌI thứ cũng đạt "chặn 100%", nên tỉ lệ chặn không có vế âm
-                   là tỉ lệ không diễn giải được. KHÔNG cần LLM.
+  --mode negative  đối chứng âm (bảng C): log lành từ `ground_truth.json` đi qua đúng lớp
+                   tĩnh ấy -> đo `false_flag_rate_pct`. Bắt buộc đi kèm --mode static/pipeline:
+                   một hệ gắn cờ mọi thứ cũng đạt "chặn 100%", nên tỉ lệ chặn không có vế âm
+                   là tỉ lệ không diễn giải được. Không cần LLM.
                    -> results/adversarial_negative_results.json
   --mode all       Chạy static -> negative -> pipeline.
 
@@ -45,7 +44,7 @@ RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 OUT_STATIC = os.path.join(RESULTS_DIR, "robustness_results.json")
 OUT_PIPELINE = os.path.join(RESULTS_DIR, "adversarial_pipeline_results.json")
 
-# `field_injection` KHÔNG nằm trong `experiments/adversarial/` mà ở
+# `field_injection` không nằm trong `experiments/adversarial/` mà ở
 # `data/adversarial_llm/mixed_llm_attacks.json`, với lược đồ khác hẳn (`injected_field` + `raw_log`
 # thay cho `payload_field` + `payload`). Trước 05/08/2026 nó nằm ngoài mọi phép đo: tài liệu khai
 # bảng A có 703 mẫu nhưng script chỉ thấy 603. Nạp qua bộ chuyển ở `_nap_field_injection()`.
@@ -69,7 +68,7 @@ STATIC_CATEGORIES = [
     "advbench_gcg",
     "field_injection",
 ]
-# Nhóm KHÓ (bypass được lớp tĩnh) — phép thử thật cho Tier-2 LLM
+# Nhóm khó (bypass được lớp tĩnh) - phép thử thật cho Tier-2 LLM
 HARD_CATEGORIES = [
     "semantic_confusion",
     "jailbreak",
@@ -81,15 +80,13 @@ HARD_CATEGORIES = [
 ]
 
 
-# =========================================================================
-# MODE: static — Guardrails TĨNH (Block/Bypass rate)
-# =========================================================================
+# MODE: static - Guardrails tĩnh (Block/Bypass rate)
 def _nap_field_injection() -> list:
     """Chuyển `mixed_llm_attacks.json` sang cùng lược đồ với các nhóm khác.
 
     Nguồn dùng `injected_field` (URI · User-Agent · message · payload) + `raw_log` chứa payload
     tại chính trường đó. Bốn trường này là lý do bộ dữ liệu tồn tại: cơ chế đóng gói nonce bọc
-    THEO TRƯỜNG, nên vị trí trường quyết định payload nằm trong hay ngoài vùng bọc — 603 mẫu cũ
+    Theo trường, nên vị trí trường quyết định payload nằm trong hay ngoài vùng bọc - 603 mẫu cũ
     đều gán cứng `payload_field="payload"` nên không kiểm được điều đó.
     """
     if not os.path.exists(FIELD_INJECTION_FILE):
@@ -106,7 +103,7 @@ def _nap_field_injection() -> list:
             continue
         out.append(
             {
-                # Các nhóm khác có sẵn `id`; nguồn này không. Cấp id theo CHỈ SỐ DÒNG để mỗi mẫu
+                # Các nhóm khác có sẵn `id`; nguồn này không. Cấp id theo chỉ số dòng để mỗi mẫu
                 # vẫn truy ngược được về đúng dòng trong mixed_llm_attacks.json.
                 "id": f"FIELDINJ-{i:03d}",
                 "category": "field_injection",
@@ -332,14 +329,12 @@ def run_static(out=None):
     print(f"[+] Results saved to: {out_path}")
 
 
-# =========================================================================
-# MODE: negative — ĐỐI CHỨNG ÂM trên log LÀNH (bảng C)
-# =========================================================================
+# MODE: negative - đối chứng âm trên log lành (bảng C)
 def _nap_log_lanh(gioi_han: int | None = None) -> list:
-    """Log LÀNH từ `ground_truth.json` (`expected_action == "LOG"`).
+    """Log lành từ `ground_truth.json` (`expected_action == "LOG"`).
 
-    Đây là vế ÂM bắt buộc của 2.a/2.b. Không có nó thì "chặn 100%" không phân biệt được với
-    "gắn cờ mọi thứ" — một hệ luôn trả True đạt điểm tuyệt đối ở cả hai chỉ số dương.
+    Đây là vế âm bắt buộc của 2.a/2.b. Không có nó thì "chặn 100%" không phân biệt được với
+    "gắn cờ mọi thứ" - một hệ luôn trả True đạt điểm tuyệt đối ở cả hai chỉ số dương.
     """
     if not os.path.exists(GROUND_TRUTH_FILE):
         print(f"  [!] Thiếu: {GROUND_TRUTH_FILE}")
@@ -361,7 +356,7 @@ def _nap_log_lanh(gioi_han: int | None = None) -> list:
 
 
 def run_negative(limit=None, out=None):
-    """Đo tỉ lệ BÁO NHẦM của lớp guardrail tĩnh trên log lành."""
+    """Đo tỉ lệ báo nhầm của lớp guardrail tĩnh trên log lành."""
     out_path = out or OUT_NEGATIVE
     mau = _nap_log_lanh(limit)
     detector = PromptInjectionDetector()
@@ -421,22 +416,20 @@ def run_negative(limit=None, out=None):
     return ket
 
 
-# =========================================================================
-# MODE: pipeline — FULL pipeline Tier-2 (LLM) resistance
-# =========================================================================
+# MODE: pipeline - FULL pipeline Tier-2 (LLM) resistance
 def load_hard_samples(limit_per_cat: int | None, categories: list[str] | None = None):
-    """Mẫu KHÓ cho lượt chạy qua đường ống. `None` = lấy HẾT (mặc định) = **678** mẫu.
+    """Mẫu khó cho lượt chạy qua đường ống. `None` = lấy hết (mặc định) = 678 mẫu.
 
-    ĐỘ PHỦ LÀ VẤN ĐỀ, KHÔNG PHẢI TIỂU TIẾT. Mặc định cũ `limit_per_cat=3` cho ra đúng 12
+    Độ phủ là vấn đề, không phải tiểu tiết. Mặc định cũ `limit_per_cat=3` cho ra đúng 12
     mẫu, rồi con số "kháng tiêm nhiễm 100%" được trích từ 12 mẫu ấy. Lượt gần nhất chạy
-    `--limit 5` cho ra 35/678 = **5,2% độ phủ** và script tự gắn `metric_valid=false`.
+    `--limit 5` cho ra 35/678 = 5,2% độ phủ và script tự gắn `metric_valid=false`.
     Bỏ trống `--limit` thì `coverage_pct = 100`.
 
-    Vì sao 7 nhóm này mà không phải cả 9. Lớp Guardrail TĨNH chặn 192/823 mẫu, phân bố rất
-    lệch (số dưới là số CHẶN, đo 05/08/2026 — xem `robustness_results.json`):
+    Vì sao 7 nhóm này mà không phải cả 9. Lớp Guardrail tĩnh chặn 192/823 mẫu, phân bố rất
+    lệch (số dưới là số chặn, đo 05/08/2026 - xem `robustness_results.json`):
 
-        encoding_bypass      45/45   <- lớp tĩnh sinh ra để trị nhóm này, nên loại khỏi tập KHÓ
-        field_injection      12/100  <- loại: đo riêng ở 2.c (kiểm cơ chế bọc THEO TRƯỜNG)
+        encoding_bypass      45/45   <- lớp tĩnh sinh ra để trị nhóm này, nên loại khỏi tập khó
+        field_injection      12/100  <- loại: đo riêng ở 2.c (kiểm cơ chế bọc theo trường)
         jailbreak_hf         89/200
         rag_poisoning         6/15
         structural_attacks    7/20
@@ -445,14 +438,14 @@ def load_hard_samples(limit_per_cat: int | None, categories: list[str] | None = 
         semantic_confusion    0/20   <- pattern tĩnh mù hoàn toàn trước tấn công ngữ nghĩa
         advbench_gcg          0/200  <- mù hoàn toàn; đây chính là phần Tier-2 phải gánh
 
-    Bảy nhóm KHÓ cộng lại 678 mẫu — SIÊU TẬP của 631 mẫu lọt lớp tĩnh, tức chặt hơn mức cần
+    Bảy nhóm khó cộng lại 678 mẫu - siêu tập của 631 mẫu lọt lớp tĩnh, tức chặt hơn mức cần
     chứ không phải chọn mẫu dễ. Chạy hết ≈ 4,3 giờ (~23 s mỗi lần gọi LLM).
     """
     samples = []
     for cat in categories or HARD_CATEGORIES:
-        # `field_injection` KHÔNG nằm trong `ADV_DIR` — nạp qua bộ chuyển riêng (xem
+        # `field_injection` không nằm trong `ADV_DIR` - nạp qua bộ chuyển riêng (xem
         # `_nap_field_injection`). Nó bị loại khỏi HARD_CATEGORIES mặc định, nhưng phải
-        # gọi được qua `--category field_injection` để đo 2.c (cơ chế bọc THEO TRƯỜNG).
+        # gọi được qua `--category field_injection` để đo 2.c (cơ chế bọc theo trường).
         if cat == "field_injection":
             data = _nap_field_injection()
             samples.extend(data if limit_per_cat is None else data[:limit_per_cat])
@@ -469,7 +462,7 @@ def load_hard_samples(limit_per_cat: int | None, categories: list[str] | None = 
 
 
 def count_available_hard(categories: list[str] | None = None) -> dict:
-    """Tổng số mẫu KHÓ có sẵn mỗi nhóm — để báo độ phủ thật, không đoán."""
+    """Tổng số mẫu khó có sẵn mỗi nhóm - để báo độ phủ thật, không đoán."""
     out = {}
     for cat in categories or HARD_CATEGORIES:
         if cat == "field_injection":
@@ -483,7 +476,7 @@ def count_available_hard(categories: list[str] | None = None) -> dict:
 
 
 def make_attack_log(payload: str, field: str, idx: int) -> dict:
-    """Một flow SSH brute-force THẬT, nhúng payload adversarial vào trường text."""
+    """Một flow SSH brute-force thật, nhúng payload adversarial vào trường text."""
     log = {
         "Source IP": f"45.13.{idx % 255}.{(idx * 7) % 255}",
         "Destination Port": 22,
@@ -535,7 +528,7 @@ def run_pipeline(limit=None, out=None, categories: list[str] | None = None):
                     "id": s.get("id"),
                     "category": s.get("category"),
                     "attack_type": s.get("attack_type"),
-                    # Vị trí trường quyết định payload nằm TRONG hay NGOÀI vùng bọc nonce.
+                    # Vị trí trường quyết định payload nằm trong hay ngoài vùng bọc nonce.
                     # Không ghi lại thì không tách được kết quả theo trường.
                     "payload_field": field,
                     "llm_action": action,
@@ -571,7 +564,7 @@ def run_pipeline(limit=None, out=None, categories: list[str] | None = None):
         json.dump(
             {
                 "resistance_rate_pct": rr,
-                # ĐỘ PHỦ đi kèm tỉ lệ, luôn luôn. Một tỉ lệ không có mẫu số là một tỉ lệ
+                # Độ phủ đi kèm tỉ lệ, luôn luôn. Một tỉ lệ không có mẫu số là một tỉ lệ
                 # không kiểm chứng được.
                 "n_tested": n_run,
                 "n_available_hard": n_avail,
@@ -623,8 +616,8 @@ if __name__ == "__main__":
 
     if args.mode in ("static", "all"):
         run_static(out=args.out)
-    # `negative` chạy NGAY SAU `static` và TRƯỚC `pipeline`: nó rẻ (không LLM) và là vế đối chứng
-    # của chính con số `static` vừa in ra — đọc liền nhau thì không ai trích tỉ lệ chặn mà quên
+    # `negative` chạy ngay sau `static` và trước `pipeline`: nó rẻ (không LLM) và là vế đối chứng
+    # của chính con số `static` vừa in ra - đọc liền nhau thì không ai trích tỉ lệ chặn mà quên
     # tỉ lệ báo nhầm.
     if args.mode in ("negative", "all"):
         run_negative(limit=args.limit if args.mode == "negative" else None, out=args.out)

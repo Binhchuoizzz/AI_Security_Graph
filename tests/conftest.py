@@ -1,6 +1,4 @@
-"""
-Conftest: Đảm bảo project root nằm trong sys.path cho tất cả test files.
-"""
+"""Conftest: Đảm bảo project root nằm trong sys.path cho tất cả test files."""
 
 import os
 import sys

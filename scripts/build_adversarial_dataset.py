@@ -34,11 +34,11 @@ def fetch_deepset_prompt_injections(num_samples=200):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Fetch malicious text payloads
+    # Tải payload văn bản độc hại
     pi_samples = fetch_deepset_prompt_injections(100)
     print(f"Fetched {len(pi_samples)} prompt injections.")
 
-    # Load raw realistic data (demo_small.json)
+    # Nạp log thật (demo_small.json)
     raw_data_path = "data/demo_small.json"
     if not os.path.exists(raw_data_path):
         print(f"Error: {raw_data_path} not found. Run scripts/build_demo_small.py first.")
@@ -49,15 +49,15 @@ def main():
 
     print(f"Loaded {len(real_logs)} real network events.")
 
-    # Inject into real logs
+    # Chèn payload vào log thật
     mixed_dataset = []
     random.shuffle(real_logs)
 
     for i, payload in enumerate(pi_samples):
-        # Take a real log
+        # Lấy một log thật
         real_log = dict(real_logs[i % len(real_logs)])
 
-        # Inject payload into a text field (simulate injection)
+        # Chèn payload vào một trường văn bản
         injection_field = random.choice(["payload", "URI", "User-Agent", "message"])
         real_log[injection_field] = payload
 

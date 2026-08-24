@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# =============================================================================
 # SENTINEL — FULL ABLATION + toàn bộ chỉ số đánh giá (kể cả LLM), chạy TUẦN TỰ.
 # Chạy thâu đêm: log ra reports/full_ablation_<ts>.log, mỗi bước có mốc thời gian.
 #
@@ -9,7 +8,6 @@
 # Dùng:  ./scripts/run_full_ablation.sh          # full (offline + LLM)
 #        ./scripts/run_full_ablation.sh --offline-only
 #        AF_LIMIT=200 BCDE_LIMIT=150 ./scripts/run_full_ablation.sh   # rút gọn để test nhanh
-# =============================================================================
 set -u
 cd "$(dirname "$0")/.." || exit 1
 PY=.venv/bin/python

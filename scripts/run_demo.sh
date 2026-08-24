@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
 # SENTINEL — CHẠY FULL DEMO BẰNG **MỘT LỆNH**
-# =============================================================================
 # Dựng hạ tầng + UI rồi đẩy LUỒNG GỘP (CICIDS + DAPT2020 + Zero-day + Adversarial)
 # chảy qua pipeline đầy đủ → Dashboard điền dần.
 #
@@ -24,7 +22,6 @@
 #
 # Sau khi chạy: mở http://localhost:8501 (đăng nhập: manager).
 # Tắt để giải phóng RAM:  pkill -f "main.py --mode server" ; docker-compose stop
-# =============================================================================
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

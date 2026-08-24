@@ -1,9 +1,9 @@
 """
-Exact-Match Response Cache cho Tier-2 (LLM).
+Bộ đệm khớp chính xác cho Tier-2: log trùng thì dùng lại phán quyết, không gọi LLM.
 
-TRUNG THỰC VỀ THUẬT NGỮ: đây KHÔNG phải "semantic cache" (không có embedding/độ tương
-đồng vector như GPTCache). Đây là cache KHỚP-CHÍNH-XÁC theo dấu vân (fingerprint) MD5 của
-chuỗi batch ĐÃ MÃ HOÁ: chỉ HIT khi log mới băm ra CÙNG hash với log đã phân tích trước đó
+Trung thực về thuật ngữ: đây không phải "semantic cache" (không có embedding/độ tương
+đồng vector như GPTCache). Đây là cache khớp-chính-xác theo dấu vân (fingerprint) MD5 của
+chuỗi batch đã mã hoá: chỉ HIT khi log mới băm ra cùng hash với log đã phân tích trước đó
 (tức nội dung đưa vào LLM giống hệt sau khi Guardrails nén/che biến). Mục tiêu: các đợt
 DDoS/Brute-force sinh nhiều log gần như trùng lặp -> bỏ qua lần gọi LLM lặp lại (2-3s -> <1ms).
 
@@ -29,8 +29,8 @@ class ExactMatchResponseCache:
         self._lock = threading.Lock()
 
     def _hash_payload(self, batch_encapsulated: str) -> str:
-        """Dấu vân MD5 cho chuỗi dữ liệu (đã bọc tags). MD5 CHỈ dùng làm khoá cache —
-        KHÔNG dùng cho mục đích bảo mật (nên đặt usedforsecurity=False)."""
+        """Dấu vân MD5 cho chuỗi dữ liệu (đã bọc tags). MD5 chỉ dùng làm khoá cache -
+        không dùng cho mục đích bảo mật (nên đặt usedforsecurity=False)."""
         return hashlib.md5(batch_encapsulated.encode("utf-8"), usedforsecurity=False).hexdigest()
 
     def get(self, batch_encapsulated: str) -> dict | None:
@@ -45,10 +45,10 @@ class ExactMatchResponseCache:
                 return None
             if time.time() - entry["ts"] < self.ttl_seconds:
                 logger.info(f"[ResponseCache] HIT - Bypassing LLM cho dấu vân {key[:8]}...")
-                # BẢN SAO SÂU, không phải tham chiếu. Bản trước trả thẳng `entry["result"]`,
+                # Bản sao sâu, không phải tham chiếu. Bản trước trả thẳng `entry["result"]`,
                 # nên mọi thao tác bồi đắp verdict ở hạ nguồn (gắn cờ `_critical_shield`,
-                # sửa `action` sau banding, thêm ghi chú xuất xứ...) sẽ ghi ĐÈ luôn vào
-                # mục cache — mọi lần HIT sau đó nhận verdict đã bị sửa của lô trước. Đây là
+                # sửa `action` sau banding, thêm ghi chú xuất xứ...) sẽ ghi đè luôn vào
+                # mục cache - mọi lần HIT sau đó nhận verdict đã bị sửa của lô trước. Đây là
                 # lỗi tiềm ẩn, chưa nổ chỉ vì thứ tự ghi hiện tại còn may.
                 return copy.deepcopy(entry["result"])
             # Hết hạn -> loại bỏ
@@ -62,7 +62,7 @@ class ExactMatchResponseCache:
 
         key = self._hash_payload(batch_encapsulated)
         with self._lock:
-            # LRU eviction đơn giản nếu đầy: xoá 20% cũ nhất (thao tác nằm TRONG lock để
+            # LRU eviction đơn giản nếu đầy: xoá 20% cũ nhất (thao tác nằm trong lock để
             # snapshot keys không bị luồng khác sửa giữa chừng).
             if len(self.cache) >= self.max_size and key not in self.cache:
                 sorted_keys = sorted(self.cache, key=lambda k: self.cache[k]["ts"])
@@ -71,14 +71,14 @@ class ExactMatchResponseCache:
             self.cache[key] = {"ts": time.time(), "result": llm_decision}
             logger.debug(f"[ResponseCache] SET - Lưu kết quả cho dấu vân {key[:8]}")
 
-    # ── LỚP 2: Cache theo ĐẶC TRƯNG (feature fingerprint) ────────────────────────
-    # Exact-match ở trên chỉ HIT khi chuỗi log GIỐNG HỆT. Nhưng luồng gộp có RẤT NHIỀU
-    # log gần-trùng về BẢN CHẤT (vd ~400 DAPT nền benign: cùng cổng 443, không payload,
-    # khác mỗi IP/timestamp) — exact-match bỏ lỡ hết -> mỗi cái tốn 1 lần gọi LLM (5.7s),
-    # phình backlog. Lớp này băm theo ĐẶC TRƯNG NỔI BẬT (service/cổng/protocol/tier1/dấu
-    # vân payload) — KHÔNG gồm IP/timestamp — nên flow cùng bản chất GỘP về 1 lần gọi LLM.
-    # An toàn IP: mục tiêu THỰC THI (block) LUÔN lấy từ Source IP của batch hiện tại trong
-    # node_llm_triage, KHÔNG từ verdict cache -> gộp không gây chặn nhầm IP.
+    # lớp 2: Cache theo đặc trưng (feature fingerprint)
+    # Exact-match ở trên chỉ HIT khi chuỗi log giống hệt. Nhưng luồng gộp có rất nhiều
+    # log gần-trùng về bản chất (vd ~400 DAPT nền benign: cùng cổng 443, không payload,
+    # khác mỗi IP/timestamp) - exact-match bỏ lỡ hết -> mỗi cái tốn 1 lần gọi LLM (5.7s),
+    # phình backlog. Lớp này băm theo đặc trưng nổi bật (service/cổng/protocol/tier1/dấu
+    # vân payload) - không gồm IP/timestamp - nên flow cùng bản chất gộp về 1 lần gọi LLM.
+    # An toàn IP: mục tiêu thực thi (block) luôn lấy từ Source IP của batch hiện tại trong
+    # node_llm_triage, không từ verdict cache -> gộp không gây chặn nhầm IP.
     _WELL_KNOWN_PORTS = frozenset({21, 22, 23, 25, 53, 80, 110, 139, 143, 443, 445, 3389, 8080})
 
     def _port_token(self, val) -> str:
@@ -99,9 +99,9 @@ class ExactMatchResponseCache:
             reasons = "|".join(sorted(str(r) for r in reasons))
         else:
             reasons = str(reasons)
-        # MỌI trường tầng ứng dụng phải vào khoá. Bỏ sót một trường thì trường đó vừa GỘP
+        # Mọi trường tầng ứng dụng phải vào khoá. Bỏ sót một trường thì trường đó vừa gộp
         # mẫu số của phép đo (06/08: 100 mẫu field_injection chỉ sinh 79 phán quyết độc lập
-        # vì thiếu `user_agent`), vừa là MẶT ĐẦU ĐỘC CACHE trong vận hành: kẻ tấn công đổi
+        # vì thiếu `user_agent`), vừa là mặt đầu độc CACHE trong vận hành: kẻ tấn công đổi
         # riêng trường không nằm trong khoá thì nhận lại verdict cũ của một log lành.
         # `User-Agent` viết hoa là dạng chuẩn hoá của `normalize_log_keys`.
         app = (
@@ -141,12 +141,12 @@ class ExactMatchResponseCache:
     def _history_token(has_history: bool) -> str:
         """Tách rổ cache theo 'IP này đã có tiền sử hay chưa'.
 
-        VÌ SAO CẦN: khoá lớp-2 CỐ Ý bỏ IP ra ngoài để gộp các flow cùng bản chất. Điều đó
+        Vì sao cần: khoá lớp-2 cố Ý bỏ IP ra ngoài để gộp các flow cùng bản chất. Điều đó
         đúng khi prompt không phụ thuộc IP. Nhưng từ khi Bộ nhớ Đe doạ dài hạn được đưa vào
-        prompt, hai IP cùng đặc trưng mà KHÁC tiền sử sẽ nhận hai prompt khác nhau — nếu
+        prompt, hai IP cùng đặc trưng mà khác tiền sử sẽ nhận hai prompt khác nhau - nếu
         vẫn dùng chung một khoá thì verdict của IP sạch sẽ bị tái dùng cho kẻ tái phạm, tức
         là xoá sạch tác dụng của chính tính năng vừa bật. Chỉ tách hai rổ (có/không tiền
-        sử), KHÔNG đưa IP vào khoá: giữ được gần như toàn bộ hiệu quả gộp, vì đại đa số lưu
+        sử), không đưa IP vào khoá: giữ được gần như toàn bộ hiệu quả gộp, vì đại đa số lưu
         """
         return "§hist:1" if has_history else "§hist:0"
 

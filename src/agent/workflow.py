@@ -1,5 +1,5 @@
 """
-LangGraph StateGraph Workflow cho SENTINEL Agent
+Dựng và biên dịch đồ thị trạng thái LangGraph của Tier-2.
 
 Lắp ráp các Node thành một quy trình (Workflow) khép kín.
 """
@@ -25,9 +25,7 @@ from src.agent.state import SentinelState
 
 
 def create_agent_workflow() -> CompiledStateGraph:
-    """
-    Khởi tạo và biên dịch LangGraph cho quá trình phân tích bảo mật.
-    """
+    """Khởi tạo và biên dịch LangGraph cho quá trình phân tích bảo mật."""
     # 1. Khởi tạo Graph với State Schema
     workflow = StateGraph(SentinelState)
 
@@ -64,7 +62,7 @@ def create_agent_workflow() -> CompiledStateGraph:
     )
 
     # Sau attack_mapper -> định tuyến theo action (HITL / Action Executor / END),
-    # mang theo quyết định ĐÃ ĐƯỢC làm giàu MITRE.
+    # mang theo quyết định đã được làm giàu MITRE.
     workflow.add_conditional_edges(
         "attack_mapper",
         route_triage_decision,
@@ -86,24 +84,24 @@ def create_agent_workflow() -> CompiledStateGraph:
 
 
 class _TracedGraph:
-    """Proxy MỎNG quanh CompiledStateGraph: mở/đóng ĐÚNG MỘT bản ghi trace mỗi invoke.
+    """Proxy mỏng quanh CompiledStateGraph: mở/đóng đúng một bản ghi trace mỗi invoke.
 
-    VÌ SAO BỌC Ở SINGLETON chứ không ở `main.py`: có TÁM nơi gọi `agent_app.invoke(...)`
+    Vì sao bọc Ở SINGLETON chứ không ở `main.py`: có tám nơi gọi `agent_app.invoke(...)`
     (main.py + 7 script trong `experiments/`/`scripts/`). Bọc ở đây phủ hết bằng một chỗ
     sửa, và đảm bảo bất biến "một invoke = một bản ghi" không phụ thuộc người gọi nhớ hay
     quên.
 
-    `flush()` nằm trong `except BaseException` rồi `raise` tiếp — lô ném lỗi VẪN có bản ghi,
+    `flush()` nằm trong `except BaseException` rồi `raise` tiếp - lô ném lỗi vẫn có bản ghi,
     vì đó chính là lô cần audit nhất. Khi `SENTINEL_TRACE` tắt, invoke đi thẳng xuống graph:
     chi phí đúng một phép đọc bool.
     """
 
-    # CỐ Ý KHÔNG dùng `__slots__`. Nó chặn `setattr` trên instance, mà đó chính là cách
+    # Cố Ý không dùng `__slots__`. Nó chặn `setattr` trên instance, mà đó chính là cách
     # `tests/unit/test_tier2_eval_loop_guard.py` (và khuôn mẫu tương tự trong experiments)
     # stub `agent_app.invoke` để chạy không cần LLM/GPU:
     #     monkeypatch.setattr(ev.agent_app, "invoke", fake_invoke)
-    # Thêm `__slots__` làm ba test đó gãy cả ở thân test lẫn lúc teardown. Proxy phải THAY
-    # THẾ ĐƯỢC HOÀN TOÀN cho CompiledStateGraph trần trước đây — kể cả ở khả năng vá.
+    # Thêm `__slots__` làm ba test đó gãy cả ở thân test lẫn lúc teardown. Proxy phải thay
+    # Thế được hoàn toàn cho CompiledStateGraph trần trước đây - kể cả ở khả năng vá.
     def __init__(self, app: CompiledStateGraph):
         self._app = app
 

@@ -1,19 +1,19 @@
 """
 LangGraph Agent: Lược đồ trạng thái State Schema (Đối tượng bộ nhớ cấu trúc)
 
-CHỐNG SEMANTIC DRIFT:
-  Summary Memory thuần túy (tóm tắt → tóm tắt → tóm tắt) sẽ dẫn đến
+Chống SEMANTIC DRIFT:
+  Summary Memory thuần túy (tóm tắt -> tóm tắt -> tóm tắt) sẽ dẫn đến
   hiện tượng Semantic Drift: các IOCs chi tiết (IP, Hash, Port) dần bị
   rơi rụng hoặc làm mờ qua mỗi vòng tóm tắt.
 
-  GIẢI PHÁP: Structured MemoryObject chia thành 2 phần tách biệt:
+  Giải pháp: Structured MemoryObject chia thành 2 phần tách biệt:
   1. narrative_summary: Bối cảnh chung dạng text (LLM được phép tóm tắt)
-  2. extracted_iocs: Mảng JSON cứng lưu IOCs (LLM chỉ được APPEND, KHÔNG
+  2. extracted_iocs: Mảng JSON cứng lưu IOCs (LLM chỉ được APPEND, không
      được tóm tắt đè lên hoặc xóa bỏ)
 
   Điều này đảm bảo:
   - Bối cảnh phiên phân tích trước được giữ lại (narrative)
-  - IP, Port, Hash nghi ngờ KHÔNG BAO GIỜ bị làm mờ qua tóm tắt (iocs)
+  - IP, Port, Hash nghi ngờ không bao giờ bị làm mờ qua tóm tắt (iocs)
   - Metrics token luôn nằm trong tầm kiểm soát
 """
 
@@ -25,7 +25,7 @@ from typing import Any
 @dataclass
 class IOCEntry:
     """
-    Indicator of Compromise — lưu cứng, không bao giờ bị tóm tắt.
+    Indicator of Compromise - lưu cứng, không bao giờ bị tóm tắt.
     Agent chỉ được APPEND vào list, không được sửa/xóa entries cũ.
     """
 
@@ -49,7 +49,7 @@ class IOCEntry:
 
 @dataclass
 class AgentDecision:
-    """Lịch sử quyết định của Agent — phục vụ audit trail."""
+    """Lịch sử quyết định của Agent - phục vụ audit trail."""
 
     timestamp: str
     action: str  # "ESCALATE", "BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"
@@ -60,7 +60,7 @@ class AgentDecision:
     nist_control: str = ""  # Ví dụ: "Containment - Network isolation"
     hitl_status: str = "N/A"  # Các trạng thái: "PENDING", "APPROVED", "REJECTED", "N/A"
 
-    # === MITRE ATT&CK MAPPING (có cấu trúc) — do node_attack_mapper bồi đắp ===
+    # MITRE ATT&CK MAPPING (có cấu trúc) - do node_attack_mapper bồi đắp
     # Free-text mitre_technique ở trên được tách thành các trường kiểm chứng được.
     # Mặc định rỗng để các luồng cũ (chưa qua mapper) vẫn hợp lệ.
     mitre_tactic: str = ""  # VD: "Initial Access"
@@ -98,17 +98,17 @@ class AgentDecision:
 @dataclass
 class SentinelState:
     """
-    LangGraph State Schema — Structured MemoryObject.
+    Lược đồ state của LangGraph: bộ nhớ có cấu trúc.
     Đây là state object duy nhất được truyền qua các node trong LangGraph.
 
-    NGUYÊN TẮC SỬ DỤNG:
-    - narrative_summary: LLM được phép tóm tắt lại, CÓ THỂ ghi đè
-    - extracted_iocs: LLM CHỈ ĐƯỢC APPEND. KHÔNG BAO GIỜ xóa hoặc tóm tắt đè.
+    Nguyên tắc sử dụng:
+    - narrative_summary: LLM được phép tóm tắt lại, có thể ghi đè
+    - extracted_iocs: LLM chỉ được APPEND. Không bao giờ xóa hoặc tóm tắt đè.
     - decisions: Chỉ append thêm. Lịch sử audit trail bất khả xâm phạm.
     - current_batch: Dữ liệu batch hiện tại (reset mỗi cycle)
     """
 
-    # === NARRATIVE MEMORY (có thể tóm tắt) ===
+    # NARRATIVE MEMORY (có thể tóm tắt)
     narrative_summary: str = ""
     """
     Bối cảnh chung dạng text tự do.
@@ -117,7 +117,7 @@ class SentinelState:
     SSH port 22..." → Giữ ngữ cảnh nhưng tiết kiệm token.
     """
 
-    # === IOC REGISTRY (KHÔNG được tóm tắt — chỉ append) ===
+    # IOC REGISTRY (không được tóm tắt - chỉ append)
     extracted_iocs: list[dict[str, Any]] = field(default_factory=list)
     """
     Mảng JSON cứng lưu tất cả IOCs đã phát hiện.
@@ -126,14 +126,14 @@ class SentinelState:
     Chỉ được dùng 2 operations: APPEND (thêm IOC mới) hoặc READ (đọc).
     """
 
-    # === DECISION HISTORY (audit trail) ===
+    # Lịch sử phán quyết (sổ kiểm toán)
     decisions: list[dict[str, Any]] = field(default_factory=list)
     """
     Lịch sử quyết định. Mỗi phần tử là dict từ AgentDecision.to_dict().
     Không xóa, không sửa, chỉ append.
     """
 
-    # === CURRENT BATCH DATA (reset mỗi cycle) ===
+    # CURRENT BATCH DATA (reset mỗi cycle)
     current_batch_logs: list[dict[str, Any]] = field(default_factory=list)
     """Log entries của batch hiện tại (đã qua Guardrails)."""
 
@@ -146,14 +146,14 @@ class SentinelState:
     current_batch_size: int = 0
     """Số log trong batch hiện tại."""
 
-    # === RAG CONTEXT (refresh mỗi cycle) ===
+    # RAG CONTEXT (refresh mỗi cycle)
     rag_mitre_context: str = ""
     """Context từ MITRE ATT&CK FAISS search."""
 
     rag_nist_context: str = ""
     """Context từ NIST SP 800-61r2 FAISS search."""
 
-    # === METADATA ===
+    # METADATA
     cycle_count: int = 0
     """Số batch đã xử lý (tăng dần)."""
 
@@ -194,14 +194,14 @@ class SentinelState:
     last_updated: str = ""
     """Timestamp ISO format của lần cập nhật state gần nhất."""
 
-    # === FEEDBACK LOOP ===
+    # Vòng phản hồi luật động
     pending_rules: list[dict[str, Any]] = field(default_factory=list)
     """
     Rules mới sinh bởi Agent chờ đẩy về Tier 1.
     Sau khi feedback_listener xử lý, list này được clear.
     """
 
-    # === LONG-TERM THREAT MEMORY (persistent context) ===
+    # Bộ nhớ đe doạ dài hạn (ngữ cảnh bền)
     threat_memory_context: str = ""
     """
     Context từ Long-Term Memory Store (SQLite persistent).
@@ -209,7 +209,7 @@ class SentinelState:
     Inject vào prompt để Agent biết lịch sử IP trước khi phân tích.
     """
 
-    # === HELPER METHODS ===
+    # Hàm phụ trợ
 
     def add_ioc(
         self,
@@ -219,9 +219,7 @@ class SentinelState:
         source_template: str = "",
         context: str = "",
     ):
-        """
-        Thêm IOC mới vào registry. Kiểm tra trùng lặp trước khi append.
-        """
+        """Thêm IOC mới vào registry. Kiểm tra trùng lặp trước khi append."""
         # Kiểm tra trùng lặp: không thêm IOC đã tồn tại (cùng type + value)
         for existing in self.extracted_iocs:
             if existing.get("ioc_type") == ioc_type and existing.get("value") == value:
@@ -314,7 +312,7 @@ class SentinelState:
         if self.narrative_summary:
             parts.append(f"=== Session Context ===\n{self.narrative_summary}")
 
-        # Phần 2: Danh sách IOC (KHÔNG BAO GIỜ bị tóm tắt)
+        # Phần 2: Danh sách IOC (không bao giờ bị tóm tắt)
         iocs_text = self.get_iocs_summary_for_prompt()
         parts.append(f"=== Extracted IOCs (IMMUTABLE) ===\n{iocs_text}")
 
@@ -336,7 +334,7 @@ class SentinelState:
         return "\n\n".join(parts)
 
     def reset_current_batch(self):
-        """Reset batch data cho cycle mới. KHÔNG reset IOCs, narrative, hay threat memory."""
+        """Reset batch data cho cycle mới. Không reset IOCs, narrative, hay threat memory."""
         self.current_batch_logs = []
         self.current_batch_encapsulated = ""
         self.current_batch_size = 0

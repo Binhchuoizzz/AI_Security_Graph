@@ -15,8 +15,8 @@ class KnowledgeGraphBuilder:
     def __init__(self):
         self.uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         self.user = os.getenv("NEO4J_USER", "neo4j")
-        # KHÔNG hardcode mật khẩu thật trong code (git track). Thiếu env -> giá trị
-        # placeholder chắc chắn SAI để kết nối fail-loud thay vì lộ secret.
+        # Không hardcode mật khẩu thật trong code (git track). Thiếu env -> giá trị
+        # placeholder chắc chắn sai để kết nối fail-loud thay vì lộ secret.
         self.password = os.getenv("NEO4J_PASSWORD", "set-NEO4J_PASSWORD-in-.env")
         self.driver = None
 
@@ -143,10 +143,10 @@ class KnowledgeGraphBuilder:
             logger.info(f"Knowledge Graph updated (SAST). Total nodes: {count}")
 
     def _mock_build(self):
-        """Ghi lại SỰ THẬT rằng không dựng được đồ thị vì Neo4j ngoại tuyến.
+        """Ghi lại sự thật rằng không dựng được đồ thị vì Neo4j ngoại tuyến.
 
-        KHÔNG BỊA SỐ. Bản trước ghi cứng `{"nodes": 450, "edges": 1200}` kèm nhãn
-        "Mocked Successfully" — hai con số đó không đến từ bất kỳ phép đếm nào. File nằm
+        Không bịa số. Bản trước ghi cứng `{"nodes": 450, "edges": 1200}` kèm nhãn
+        "Mocked Successfully" - hai con số đó không đến từ bất kỳ phép đếm nào. File nằm
         trong data/ nên bất kỳ ai (hoặc bất kỳ đoạn code nào về sau) nhặt lên đều sẽ
         tưởng là kết quả đo thật. Đây là bẫy trích dẫn số giả vào luận văn.
         """

@@ -1,38 +1,37 @@
 """
-SENTINEL — Tier-2 Escalation Adjudication Accuracy (LLM decision quality)
-========================================================================
-Câu hỏi mà file này trả lời: "KHI một sự kiện được Tier-1 ĐẨY LÊN LLM (action =
-ESCALATE), tác tử Tier-2 phán quyết ĐÚNG hay SAI, tỉ lệ bao nhiêu?"
+Đo chất lượng phán quyết của Tier-2 trên các cảnh báo đã leo thang.
+Câu hỏi mà file này trả lời: "khi một sự kiện được Tier-1 đẩy lên LLM (action =
+ESCALATE), tác tử Tier-2 phán quyết đúng hay sai, tỉ lệ bao nhiêu?"
 
-Vì sao cần chỉ số RIÊNG này (khác F1 phân loại 0.61 ở `evaluate_unified_stream.py`):
-  - F1 0.61 đo TẦNG LỌC Tier-1 (rule tĩnh + Welford) trên TOÀN luồng — đa số benign
-    bị DROP ngay ở Tier-1, phần lộ rõ bị BLOCK/ALERT/HITL ngay, KHÔNG phiền LLM.
-  - Chỉ một tập nhỏ "ĐÁNG NGỜ NHƯNG CHƯA CHẮC" mới mang action ESCALATE → gọi LLM.
-    Chỉ số ở đây đo riêng NĂNG LỰC PHÁN QUYẾT của LLM trên đúng tập khó đó, có
-    ĐỐI CHIẾU ground-truth — điều F1 tổng thể không tách bạch được.
+Vì sao cần chỉ số riêng này (khác F1 phân loại 0.61 ở `evaluate_unified_stream.py`):
+  - F1 0.61 đo tầng lọc Tier-1 (rule tĩnh + Welford) trên toàn luồng - đa số benign
+    bị DROP ngay ở Tier-1, phần lộ rõ bị BLOCK/ALERT/HITL ngay, không phiền LLM.
+  - Chỉ một tập nhỏ "đáng ngờ nhưng chưa chắc" mới mang action ESCALATE -> gọi LLM.
+    Chỉ số ở đây đo riêng năng lực phán quyết của LLM trên đúng tập khó đó, có
+    Đối chiếu ground-truth - điều F1 tổng thể không tách bạch được.
 
-Phương pháp (điều kiện-hoá theo escalation, KHÔNG bịa dữ liệu):
-  1. Dựng CÙNG luồng gộp thật (CICIDS+DAPT+zero-day) qua `unified_dataset.build_stream`.
-  2. Chạy qua Tier-1 THẬT (golden baseline bật) → GOM đúng các sự kiện action==ESCALATE.
-  3. Mỗi sự kiện escalate → chạy qua Tier-2 THẬT (LangGraph agent: Guardrails → RAG →
-     LLM → consensus guard) → lấy action CUỐI.
-  4. So với ground-truth theo QUY ƯỚC DƯƠNG đồng nhất của luận văn: một sự kiện được
-     coi là "gắn cờ" (flagged) khi LLM KHÔNG hạ cấp im lặng — tức action ∈
+Phương pháp (điều kiện-hoá theo escalation, không bịa dữ liệu):
+  1. Dựng cùng luồng gộp thật (CICIDS+DAPT+zero-day) qua `unified_dataset.build_stream`.
+  2. Chạy qua Tier-1 thật (golden baseline bật) -> gom đúng các sự kiện action==ESCALATE.
+  3. Mỗi sự kiện escalate -> chạy qua Tier-2 thật (LangGraph agent: Guardrails -> RAG ->
+     LLM -> consensus guard) -> lấy action cuối.
+  4. So với ground-truth theo quy ước dương đồng nhất của luận văn: một sự kiện được
+     coi là "gắn cờ" (flagged) khi LLM không hạ cấp im lặng - tức action ∈
      {BLOCK_IP, ALERT, AWAIT_HITL, ESCALATE}. Threat đúng khi flagged; benign (lọt
      Tier-1) đúng khi được hạ cấp {DROP/LOG}.
 
-HAI RÀO CHẮN TÍNH HỢP LỆ (thêm sau sự cố 2026-07-14, xem `n_invoke_errors`):
-  - Ca agent KHÔNG cho ra phán quyết (crash / no_decision) bị LOẠI khỏi mẫu số chấm
+Hai rào chắn tính hợp lệ (thêm sau sự cố 2026-07-14, xem `n_invoke_errors`):
+  - Ca agent không cho ra phán quyết (crash / no_decision) bị loại khỏi mẫu số chấm
     điểm và tính riêng thành `agent_reliability`. Trước đây các ca này rơi về mặc
     định AWAIT_HITL và bị tính là "bắt đúng đe doạ" -> recall giả 1.00.
   - `majority_baseline` (= tỉ lệ threat) luôn được in kèm accuracy: một stub luôn hô
-    "threat" đạt đúng mốc này, nên accuracy KHÔNG vượt mốc = không có năng lực phân
+    "threat" đạt đúng mốc này, nên accuracy không vượt mốc = không có năng lực phân
     biệt. `metric_valid=false` nếu >5% ca lỗi.
 
 Kết quả: accuracy tổng, recall trên threat, specificity trên benign, ma trận nhầm
-lẫn, phân bố action LLM, phân rã theo nguồn → `results/tier2_decision_results.json`.
+lẫn, phân bố action LLM, phân rã theo nguồn -> `results/tier2_decision_results.json`.
 
-Chạy (CẦN LLM server ở :5000):
+Chạy (cần LLM server ở :5000):
     .venv/bin/python experiments/evaluate_tier2_decision.py            # toàn bộ tập escalate
     .venv/bin/python experiments/evaluate_tier2_decision.py --limit 12 # thử nhanh
 """
@@ -58,12 +57,12 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "tier2_decision_results.json")
 REPORT_MD = os.path.join(ROOT, "reports", "tier2_decision_report.md")
 
-# Quy ước DƯƠNG đồng nhất với luận văn: KHÔNG hạ cấp im lặng = gắn cờ (positive).
+# Quy ước dương đồng nhất với luận văn: Không hạ cấp im lặng = gắn cờ (positive).
 FLAG_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE", "QUARANTINE", "ISOLATE"}
 
 
 def _ground_truth(ev: dict) -> bool:
-    """True = sự kiện THẬT là mối đe doạ (theo nhãn nguồn)."""
+    """True = sự kiện thật là mối đe doạ (theo nhãn nguồn)."""
     src = ev["source"]
     if src == "cicids":
         return bool(ev.get("expected_threat"))
@@ -81,18 +80,18 @@ def _is_flagged(action: str) -> bool:
 
 
 def collect_escalated():
-    """Sự kiện THỰC SỰ tới Tier-2: qua Tier-1 **và** Cổng ML không tự quyết được.
+    """Sự kiện thực sự tới Tier-2: qua Tier-1 và Cổng ML không tự quyết được.
 
-    LỖI ĐÃ VÁ. Bản cũ chỉ lọc `tier1_action == "ESCALATE"` rồi coi đó là đầu vào Tier-2 —
-    tức BỎ QUA Cổng ML LightGBM, chặng cuối cùng trước LLM trên đường nóng thật
+    Lỗi đã vá. Bản cũ chỉ lọc `tier1_action == "ESCALATE"` rồi coi đó là đầu vào Tier-2 -
+    tức bỏ qua Cổng ML LightGBM, chặng cuối cùng trước LLM trên đường nóng thật
     (`src/streaming/subscriber.py`: `ESCALATE -> ml_gateway.evaluate() -> tự quyết thì dừng`).
 
     Đo được trên 8.000 sự kiện đầu luồng:
         Tier-1 ESCALATE           ~39,5%   -> nguồn của con số "8.323 ca escalate"
         sau Cổng ML, tới LLM      ~10,3%   -> nguồn của con số xả tải ~90%
-    Hai con số đó từng bị đọc như mâu thuẫn; thật ra chúng là HAI ĐIỂM CẮT khác nhau.
+    Hai con số đó từng bị đọc như mâu thuẫn; thật ra chúng là hai điểm cắt khác nhau.
 
-    Hệ quả của lỗi: LLM bị chấm trên một tập chứa hàng nghìn ca mà Cổng ML đã xử lý xong —
+    Hệ quả của lỗi: LLM bị chấm trên một tập chứa hàng nghìn ca mà Cổng ML đã xử lý xong -
     chủ yếu là lành tính. Mẫu số phình ra, và mọi chỉ số theo lớp (specificity, accuracy)
     tính trên một dân số Tier-2 không bao giờ gặp trong vận hành.
     """
@@ -105,15 +104,15 @@ def collect_escalated():
     n_tier1_escalate = 0
     n_ml_resolved = 0
     for ev in main:
-        # Exclude DAPT2020 logs (dapt, dapt_max) from Tier-2 evaluation: Sysmon audit logs
-        # lack ground-truth MITRE labels and create noise for Tier-2 LLM triage.
+        # Loại log DAPT2020 (dapt, dapt_max) khỏi phép đo Tier-2: log Sysmon
+        # không có nhãn MITRE chuẩn nên chỉ làm nhiễu phép chấm.
         if ev.get("source", "").startswith("dapt"):
             continue
         res = engine.evaluate(ev["log"])
         if res.get("tier1_action") != "ESCALATE":
             continue
         n_tier1_escalate += 1
-        if gateway.evaluate(ev["log"])[0]:  # Cổng ML tự quyết -> KHÔNG tới Tier-2
+        if gateway.evaluate(ev["log"])[0]:  # Cổng ML tự quyết -> không tới Tier-2
             n_ml_resolved += 1
             continue
         escalated.append({"log": dict(res), "source": ev["source"], "is_threat": _ground_truth(ev)})
@@ -125,15 +124,15 @@ def collect_escalated():
 
 
 def _tier2_decide(item: dict) -> dict:
-    """Chạy MỘT sự kiện escalate qua Tier-2 thật, lấy action + confidence cuối."""
+    """Chạy một sự kiện escalate qua Tier-2 thật, lấy action + confidence cuối."""
     state = SentinelState(
         current_batch_logs=[item["log"]], current_batch_size=1, narrative_summary=""
     )
     action, confidence, err = "AWAIT_HITL", 0.0, ""
-    # BẮT BUỘC (giống main.py:66 và eval_attack_mapper.py:162): loop-guard đếm CỘNG DỒN
+    # Bắt buộc (giống main.py:66 và eval_attack_mapper.py:162): loop-guard đếm cộng dồn
     # qua các invoke. Bộ đếm là thread-local nên reset ngay trong worker này là đúng phạm vi.
-    # Thiếu dòng này => sau max_iterations(=10) invoke/luồng, MỌI invoke sau đều FORCE_STOP
-    # -> RuntimeError -> rơi vào nhánh except -> AWAIT_HITL bị TÍNH LÀ "bắt đúng đe doạ".
+    # Thiếu dòng này => sau max_iterations(=10) invoke/luồng, mọi invoke sau đều FORCE_STOP
+    # -> RuntimeError -> rơi vào nhánh except -> AWAIT_HITL bị tính là "bắt đúng đe doạ".
     loop_detector.reset()
     invoke_error = ""
     try:
@@ -145,9 +144,9 @@ def _tier2_decide(item: dict) -> dict:
             confidence = float(d.get("confidence", 0.0) or 0.0)
             err = d.get("error", "") or ""
         else:
-            # Agent chạy xong nhưng KHÔNG sinh phán quyết nào -> KHÔNG có gì để chấm.
+            # Agent chạy xong nhưng không sinh phán quyết nào -> không có gì để chấm.
             invoke_error = "no_decision"
-    except Exception as exc:  # noqa: BLE001 — 1 sự kiện lỗi không được làm hỏng cả eval
+    except Exception as exc:  # noqa: BLE001 - 1 sự kiện lỗi không được làm hỏng cả eval
         invoke_error = f"invoke_error:{type(exc).__name__}"
     return {
         "source": item["source"],
@@ -156,8 +155,8 @@ def _tier2_decide(item: dict) -> dict:
         "confidence": round(confidence, 3),
         "flagged": _is_flagged(action),
         "error": err,
-        # != "" nghĩa là agent KHÔNG cho ra phán quyết hợp lệ. Ca này phải bị LOẠI khỏi
-        # mẫu số chất lượng phán quyết — nếu không, một cú crash rơi về mặc định
+        # != "" nghĩa là agent không cho ra phán quyết hợp lệ. Ca này phải bị loại khỏi
+        # mẫu số chất lượng phán quyết - nếu không, một cú crash rơi về mặc định
         # AWAIT_HITL sẽ được tính là "bắt đúng đe doạ" (TP) và bơm recall lên 1.00.
         "invoke_error": invoke_error,
     }
@@ -170,8 +169,8 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     print("=" * 72)
     escalated = collect_escalated()
     if limit and limit < len(escalated):
-        # Mẫu STRIDED đều trên TOÀN tập escalate (KHÔNG phải first-N): escalated gom
-        # theo nguồn nên first-N sẽ lệch về nguồn đầu. Bước đều giữ tỉ lệ 4 nguồn →
+        # Mẫu STRIDED đều trên toàn tập escalate (không phải first-N): escalated gom
+        # theo nguồn nên first-N sẽ lệch về nguồn đầu. Bước đều giữ tỉ lệ 4 nguồn ->
         # ước lượng đại diện, tất định (reproducible), không bịa dữ liệu.
         stride = len(escalated) / limit
         escalated = [escalated[int(i * stride)] for i in range(limit)]
@@ -181,8 +180,8 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
         print("[!] Không có sự kiện escalate — bỏ qua.")
         return None
 
-    # Xử lý song song (an toàn: agent đã hardened bằng khoá/thread-local); GOM theo
-    # index để kết quả TẤT ĐỊNH bất kể thứ tự hoàn thành.
+    # Xử lý song song (an toàn: agent đã hardened bằng khoá/thread-local); Gom theo
+    # index để kết quả tất định bất kể thứ tự hoàn thành.
     results: list[dict] = [dict() for _ in range(n)]
     done = 0
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
@@ -193,8 +192,8 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
             if done % 25 == 0 or done == n:
                 print(f"    ... {done}/{n} sự kiện đã phán quyết")
 
-    # --- ĐỘ TIN CẬY của agent: TÁCH khỏi chất lượng phán quyết ------------- #
-    # Ca mà agent không cho ra phán quyết (crash / no_decision) KHÔNG có gì để chấm.
+    # Độ tin cậy của agent: Tách khỏi chất lượng phán quyết
+    # Ca mà agent không cho ra phán quyết (crash / no_decision) không có gì để chấm.
     # Trộn chúng vào ma trận nhầm lẫn = tính một cú crash thành "bắt đúng đe doạ".
     errored = [r for r in results if r["invoke_error"]]
     scored = [r for r in results if not r["invoke_error"]]
@@ -216,8 +215,8 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     benign_specificity = tn / n_benign if n_benign else 0.0
 
     # Phân tách minh bạch chỉ số Chặn nhầm thực tế (False Block Rate):
-    # 1. False Block (FP_block): LLM thực sự ra lệnh CHẶN (BLOCK_IP/ALERT) trên log Benign -> TAI HẠI THỰC TẾ
-    # 2. HITL Deferral: LLM cẩn trọng chuyển AWAIT_HITL -> AN TOÀN VẬN HÀNH (Human-in-the-Loop)
+    # 1. False Block (FP_block): LLM thực sự ra lệnh chặn (BLOCK_IP/ALERT) trên log Benign -> TAI hại thực tế
+    # 2. HITL Deferral: LLM cẩn trọng chuyển AWAIT_HITL -> an toàn vận hành (Human-in-the-Loop)
     HARD_BLOCK_ACTIONS = {"BLOCK_IP", "ALERT", "QUARANTINE", "ISOLATE"}
     false_blocks = sum(
         1 for r in scored if not r["is_threat"] and r["llm_action"] in HARD_BLOCK_ACTIONS
@@ -225,12 +224,12 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     hitl_deferrals = sum(1 for r in scored if r["llm_action"] == "AWAIT_HITL")
     false_block_rate = round(false_blocks / n_benign, 4) if n_benign else 0.0
 
-    # --- PHÂN LOẠI CẢNH BÁO: cách SOC thật hỏi ---------------------------- #
-    # Việc của Tier-2 trong SOC là tách cảnh báo THẬT khỏi cảnh báo GIẢ mà Tier-1 đẩy lên.
+    # Phân loại cảnh báo: cách SOC thật hỏi
+    # Việc của Tier-2 trong SOC là tách cảnh báo thật khỏi cảnh báo giả mà Tier-1 đẩy lên.
     # Ma trận nhầm lẫn ở trên dùng giao ước "không hạ cấp im lặng = dương", nên nó gộp
-    # AWAIT_HITL vào dương — hợp lý cho câu hỏi "có bỏ sót không", nhưng SAI cho câu hỏi
-    # "LLM khẳng định nhầm bao nhiêu": chuyển cho người xem KHÔNG phải một lời khẳng định.
-    # Ba kết cục dưới đây tách hẳn, và FP chỉ tính trên phần LLM THỰC SỰ KẾT LUẬN.
+    # AWAIT_HITL vào dương - hợp lý cho câu hỏi "có bỏ sót không", nhưng sai cho câu hỏi
+    # "LLM khẳng định nhầm bao nhiêu": chuyển cho người xem không phải một lời khẳng định.
+    # Ba kết cục dưới đây tách hẳn, và FP chỉ tính trên phần LLM thực sự kết luận.
     DISMISS_ACTIONS = {"LOG", "DROP"}
     confirmed = [r for r in scored if r["llm_action"] in HARD_BLOCK_ACTIONS]
     dismissed = [r for r in scored if r["llm_action"] in DISMISS_ACTIONS]
@@ -239,7 +238,7 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     tp_conf = sum(1 for r in confirmed if r["is_threat"])
     fp_conf = len(confirmed) - tp_conf
     triage = {
-        # Thành phần cảnh báo ĐẾN — bắt buộc nêu kèm: FP là hàm của tỉ lệ này, y như xả tải.
+        # Thành phần cảnh báo đến - bắt buộc nêu kèm: FP là hàm của tỉ lệ này, y như xả tải.
         "n_alerts_in": n_scored,
         "true_alert_rate_in": round(n_threat / n_scored, 4) if n_scored else 0.0,
         "n_confirmed": len(confirmed),
@@ -247,19 +246,19 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
         "n_deferred": len(deferred),
         "n_decided": n_decided,
         "defer_rate": round(len(deferred) / n_scored, 4) if n_scored else 0.0,
-        # SỐ CHÍNH: trong những cảnh báo LLM khẳng định là thật, bao nhiêu phần là giả.
+        # Số chính: trong những cảnh báo LLM khẳng định là thật, bao nhiêu phần là giả.
         "fp_rate_on_confirmed": round(fp_conf / len(confirmed), 4) if confirmed else None,
         "fp_rate_ci95": wilson_ci(fp_conf, len(confirmed)) if confirmed else None,
         "precision_on_confirmed": round(tp_conf / len(confirmed), 4) if confirmed else None,
-        # GIÁ TRỊ GIA TĂNG: trong các cảnh báo GIẢ đi vào, bao nhiêu cái LLM lọc bỏ được.
+        # Giá trị GIA tăng: trong các cảnh báo giả đi vào, bao nhiêu cái LLM lọc bỏ được.
         # Bằng 0 nghĩa là Tier-2 không giảm được một chút tải cảnh báo nào.
         "false_alarm_dismissal_rate": (
             round(sum(1 for r in dismissed if not r["is_threat"]) / n_benign, 4)
             if n_benign
             else None
         ),
-        # HÀNG ĐỢI CHUYỂN NGƯỜI — đây mới là chỗ Tier-2 tạo ra giá trị, nếu có. Kênh khẳng
-        # định và kênh hoãn phải đo RIÊNG: một kênh có thể hỏng trong khi kênh kia vẫn tốt.
+        # Hàng đợi chuyển người - đây mới là chỗ Tier-2 tạo ra giá trị, nếu có. Kênh khẳng
+        # định và kênh hoãn phải đo riêng: một kênh có thể hỏng trong khi kênh kia vẫn tốt.
         # Nếu hàng đợi hoãn giàu đe doạ hơn dòng vào, analyst chỉ cần xem hàng đợi đó.
         "threat_recall_in_deferred": (
             round(sum(1 for r in deferred if r["is_threat"]) / n_threat, 4) if n_threat else None
@@ -308,13 +307,13 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
     confs = [r["confidence"] for r in scored if r["flagged"]]
     mean_conf_flagged = round(sum(confs) / len(confs), 3) if confs else 0.0
 
-    # --- HIỆU CHUẨN ĐỘ TIN CẬY -------------------------------------------- #
+    # Hiệu chuẩn độ tin cậy
     # Toàn bộ chính sách 4 dải (BLOCK >=0,85 / ESCALATE / ALERT / DROP) đứng trên giả định
-    # rằng `confidence` của LLM CÓ Ý NGHĨA — mà giả định đó chưa từng được kiểm. Quét ngưỡng
+    # rằng `confidence` của LLM có Ý nghĩa - mà giả định đó chưa từng được kiểm. Quét ngưỡng
     # chỉ chứng minh "0,85 không phải cherry-pick"; nó không chứng minh "0,85 nghĩa là đúng
-    # 85% số lần". Ở đây kết cục ĐÚNG được định nghĩa theo chính việc gắn cờ: khi agent gắn
-    # cờ thì đúng nghĩa là sự kiện THẬT là đe doạ, khi agent hạ cấp thì đúng nghĩa là lành
-    # tính. Dữ liệu đã có sẵn (confidence lưu theo từng ca) nên phép đo này KHÔNG tốn thêm
+    # 85% số lần". Ở đây kết cục đúng được định nghĩa theo chính việc gắn cờ: khi agent gắn
+    # cờ thì đúng nghĩa là sự kiện thật là đe doạ, khi agent hạ cấp thì đúng nghĩa là lành
+    # tính. Dữ liệu đã có sẵn (confidence lưu theo từng ca) nên phép đo này không tốn thêm
     # một lượt gọi LLM nào.
     cal_conf = [r["confidence"] for r in scored]
     cal_correct = [r["flagged"] == r["is_threat"] for r in scored]
@@ -348,11 +347,11 @@ def run(limit: int | None = None, workers: int = 2, out: str | None = None):
         "mean_confidence_flagged": mean_conf_flagged,
         "confidence_calibration": calibration,
         "by_source": by_source,
-        # SỨC KHOẺ LƯỢT CHẠY — KHÔNG phải chỉ số kết quả. Ba số này chứng minh phép đo
-        # SẠCH (agent không sập, JSON phân giải được), chứ không nói gì về năng lực phát
+        # Sức khoẻ lượt chạy - không phải chỉ số kết quả. Ba số này chứng minh phép đo
+        # Sạch (agent không sập, JSON phân giải được), chứ không nói gì về năng lực phát
         # hiện. Trước đây `agent_reliability` (= 1 − tỉ lệ lỗi) nằm lẫn giữa MCC và recall
-        # nên bị đọc như một thành tích 1.00; thực chất nó chỉ khẳng định lượt đo hợp lệ —
-        # nếu nó KHÔNG bằng 1 thì mọi con số còn lại đều phải vứt, chứ không phải "kém hơn".
+        # nên bị đọc như một thành tích 1.00; thực chất nó chỉ khẳng định lượt đo hợp lệ -
+        # nếu nó không bằng 1 thì mọi con số còn lại đều phải vứt, chứ không phải "kém hơn".
         "run_health": {
             "n_invoke_errors": n_err,
             "agent_reliability": agent_reliability,

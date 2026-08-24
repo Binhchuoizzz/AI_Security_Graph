@@ -2,14 +2,14 @@
 Integration tests cho Unified Streaming Evaluation (offline) + ONLINE publisher.
 
 Kiểm chứng 3 thuộc tính cốt lõi của phương pháp luồng gộp (thay cho 3 luồng cũ):
-  1. Luồng gộp dùng DATA THẬT và được TRỘN xen kẽ (không xếp khối theo nguồn).
-  2. Phát hiện APT là EMERGENT — bản án chỉ bật sau khi tích lũy đủ sự kiện
-     đa-ngày, KHÔNG phải nạp-sẵn đáp án (đã loại bỏ tính circular).
-  3. Publisher ONLINE phát CÙNG luồng gộp đó, enrich đủ metadata để subscriber
+  1. Luồng gộp dùng DATA thật và được trộn xen kẽ (không xếp khối theo nguồn).
+  2. Phát hiện APT là EMERGENT - bản án chỉ bật sau khi tích lũy đủ sự kiện
+     đa-ngày, không phải nạp-sẵn đáp án (đã loại bỏ tính circular).
+  3. Publisher ONLINE phát cùng luồng gộp đó, enrich đủ metadata để subscriber
      ghi chuỗi APT + định tuyến đúng queue (đường demo realtime end-to-end).
 
-Các test này offline + sạch (dùng DB tạm, KHÔNG ghi đè file kết quả tracked,
-KHÔNG cần Redis).
+Các test này offline + sạch (dùng DB tạm, không ghi đè file kết quả tracked,
+không cần Redis).
 """
 
 import json
@@ -26,13 +26,13 @@ from src.agent.threat_memory import ThreatMemoryStore
 def _built_or_skip(fn, *args, **kwargs):
     """Gọi `build_stream`/`build_sequence`, đổi "máy chạy không có dữ liệu nguồn" thành SKIP.
 
-    `unified_dataset` cố tình NÉM `FileNotFoundError` thay vì trả rỗng, và phải giữ nguyên
-    như vậy: đã có lỗi thật vì trả rỗng lặng lẽ — `data/csic.json` ghi xong sau `demo.json`
+    `unified_dataset` cố tình ném `FileNotFoundError` thay vì trả rỗng, và phải giữ nguyên
+    như vậy: đã có lỗi thật vì trả rỗng lặng lẽ - `data/csic.json` ghi xong sau `demo.json`
     hai giây nên luồng demo 99.867 sự kiện ra đời với đúng 0 bản ghi CSIC, không một cảnh
     báo nào (xem chú thích trong `unified_dataset._load_csic`).
 
-    Nhưng mọi bộ dữ liệu nguồn đều gitignore vì quá lớn, nên CI cài sạch từ repo KHÔNG BAO
-    GIỜ có chúng. Để ngoại lệ ấy nổi lên thì mỗi lần chạy CI đều đỏ vì thiếu dữ liệu —
+    Nhưng mọi bộ dữ liệu nguồn đều gitignore vì quá lớn, nên CI cài sạch từ repo không bao
+    Giờ có chúng. Để ngoại lệ ấy nổi lên thì mỗi lần chạy CI đều đỏ vì thiếu dữ liệu -
     đúng cái bẫy mà `test_synthesized_ip_pools_are_disjoint_by_label` đã tránh cho nhánh
     "luồng rỗng": nó biến "không có dữ liệu" thành "đỏ CI" và che mất hồi quy thật.
     Ở đây chỉ dịch ngoại lệ sang skip, không đụng vào hành vi của thư viện.
@@ -82,8 +82,8 @@ def test_stream_merges_real_sources_interleaved():
 
 
 def test_stream_data_hygiene_no_missing_ip_no_nonfinite():
-    """Bất biến VỆ SINH DATA (đầu vào cho Tier-1 + Cổng ML): mọi event luồng gộp phải có
-    Source IP, và KHÔNG feature số nào là Inf/NaN (đặc sản CSV CICIDS) lọt qua map — nếu lọt,
+    """Bất biến vệ sinh DATA (đầu vào cho Tier-1 + Cổng ML): mọi event luồng gộp phải có
+    Source IP, và không feature số nào là Inf/NaN (đặc sản CSV CICIDS) lọt qua map - nếu lọt,
     StandardScaler của Cổng ML sẽ raise và Tier-1 Welford tính sai."""
     import math
 
@@ -101,8 +101,8 @@ def test_stream_data_hygiene_no_missing_ip_no_nonfinite():
 
 
 def test_apt_detection_is_emergent_not_preseeded():
-    """Trên bộ nhớ SẠCH: 1 sự kiện ngày-1 CHƯA phải APT; chỉ khi có sự kiện
-    ngày khác cho cùng IP thì check_apt_chain mới BẬT (nổi lên dần)."""
+    """Trên bộ nhớ sạch: 1 sự kiện ngày-1 chưa phải APT; chỉ khi có sự kiện
+    ngày khác cho cùng IP thì check_apt_chain mới bật (nổi lên dần)."""
     db_path = os.path.join(tempfile.gettempdir(), "test_unified_emergent.db")
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -112,15 +112,15 @@ def test_apt_detection_is_emergent_not_preseeded():
 
     ip = "203.0.113.77"
     try:
-        # Sau sự kiện NGÀY 1 đầu tiên: CHƯA đủ bằng chứng đa-ngày -> chưa APT
+        # Sau sự kiện ngày 1 đầu tiên: Chưa đủ bằng chứng đa-ngày -> chưa APT
         store.record_apt_event(ip, apt_phase="Reconnaissance", apt_day=1)
         assert store.check_apt_chain(ip)["is_apt"] is False
 
-        # Thêm sự kiện cùng ngày 1: vẫn 1 ngày -> vẫn CHƯA APT
+        # Thêm sự kiện cùng ngày 1: vẫn 1 ngày -> vẫn chưa APT
         store.record_apt_event(ip, apt_phase="Reconnaissance", apt_day=1)
         assert store.check_apt_chain(ip)["is_apt"] is False
 
-        # Sự kiện NGÀY 2 cho cùng IP -> đủ đa-ngày -> bản án BẬT (emergent)
+        # Sự kiện ngày 2 cho cùng IP -> đủ đa-ngày -> bản án bật (emergent)
         store.record_apt_event(ip, apt_phase="Lateral_Movement", apt_day=2)
         verdict = store.check_apt_chain(ip)
         assert verdict["is_apt"] is True
@@ -131,8 +131,8 @@ def test_apt_detection_is_emergent_not_preseeded():
 
 
 def test_online_publisher_enriches_and_routes():
-    """Publisher ONLINE phát CÙNG luồng gộp, enrich đủ metadata theo nguồn và định
-    tuyến mọi event vào queue hợp lệ — điều kiện để subscriber ghi APT + agent xử lý."""
+    """Publisher ONLINE phát cùng luồng gộp, enrich đủ metadata theo nguồn và định
+    tuyến mọi event vào queue hợp lệ - điều kiện để subscriber ghi APT + agent xử lý."""
     seq, warmup, main, apt_truth, n_chains = _built_or_skip(build_sequence)
 
     srcs, queues = set(), set()
@@ -156,19 +156,19 @@ def test_online_publisher_enriches_and_routes():
     assert {"cicids", "dapt", "zeroday"}.issubset(srcs)
     # Định tuyến chỉ rơi vào các queue đã khai báo (không lạc queue)
     assert queues.issubset({"queue_waf", "queue_firewall"}), f"Queue lạ: {queues}"
-    # DAPT attack PHẢI mang apt metadata, nếu không subscriber sẽ không ghi chuỗi APT
+    # DAPT attack phải mang apt metadata, nếu không subscriber sẽ không ghi chuỗi APT
     assert dapt_attack_meta > 0
     # Mọi zero-day phải mang đủ marker
     assert zd_meta == zd_total and zd_total >= 1
 
 
 def test_every_attack_source_carries_ground_truth_label():
-    """Mọi nguồn TẤN CÔNG phải mang `expected_threat` — thống kê đếm bằng cờ này.
+    """Mọi nguồn tấn công phải mang `expected_threat` - thống kê đếm bằng cờ này.
 
-    HỒI QUY: `enrich()` từng gắn cờ cho nguồn biên soạn nhưng QUÊN `zeroday` và
+    Hồi quy: `enrich()` từng gắn cờ cho nguồn biên soạn nhưng quên `zeroday` và
     `adversarial`, dù cả hai là tấn công theo định nghĩa. Hệ quả: mọi phép đếm dùng
     `expected_threat` (gồm dòng báo cáo phân bổ của `build_demo.py`) bỏ sót trọn hai nhóm,
-    khiến tỉ lệ tấn công của luồng demo bị báo THẤP HƠN thực tế.
+    khiến tỉ lệ tấn công của luồng demo bị báo thấp hơn thực tế.
     """
     samples = {
         "zeroday": {"source": "zeroday", "id": "ZD-001", "mitre": "T1048", "name": "x", "log": {}},
@@ -179,9 +179,9 @@ def test_every_attack_source_carries_ground_truth_label():
         assert log.get("expected_threat") is True, f"nguồn '{src}' thiếu cờ expected_threat"
         assert log.get("gt_label") == "Attack", f"nguồn '{src}' thiếu nhãn gt_label"
 
-    # `csic` THAY hai nguồn biên soạn đã gỡ. Nó khác ở chỗ mang CẢ tấn công LẪN lành tính
-    # (bộ CSIC gán nhãn normal/anomalous), và `gt_label` giữ TÊN HỌ tấn công thay vì chuỗi
-    # phẳng "Attack" — nên phải canh riêng, không gộp vào vòng lặp trên.
+    # `csic` thay hai nguồn biên soạn đã gỡ. Nó khác ở chỗ mang cả tấn công lẫn lành tính
+    # (bộ CSIC gán nhãn normal/anomalous), và `gt_label` giữ tên họ tấn công thay vì chuỗi
+    # phẳng "Attack" - nên phải canh riêng, không gộp vào vòng lặp trên.
     csic_atk = enrich(
         {
             "source": "csic",
@@ -208,17 +208,17 @@ def test_every_attack_source_carries_ground_truth_label():
 
 
 def test_synthesized_ip_pools_are_disjoint_by_label():
-    """IP TỔNG HỢP của CICIDS/DAPT-volume: dải tấn công và dải benign phải RỜI NHAU.
+    """IP tổng hợp của CICIDS/DAPT-volume: dải tấn công và dải benign phải rời nhau.
 
-    HỒI QUY (đo được trên luồng demo cũ): IP gán theo `192.168.{ngày}.{i % 254}` với `i`
-    chạy trên khung đã nối tấn công-rồi-benign, nên cùng một IP quay vòng bất kể nhãn —
+    Hồi quy (đo được trên luồng demo cũ): IP gán theo `192.168.{ngày}.{i % 254}` với `i`
+    chạy trên khung đã nối tấn công-rồi-benign, nên cùng một IP quay vòng bất kể nhãn -
     2.159/2.286 IP "tấn công" của `cicids_max` đồng thời là IP lành tính, và 83,6% sự kiện
-    benign của toàn luồng đến từ một IP từng tấn công. Điều đó vừa làm mọi phép đo MỨC IP
+    benign của toàn luồng đến từ một IP từng tấn công. Điều đó vừa làm mọi phép đo mức IP
     trở nên vô nghĩa, vừa khiến cơ chế chặn-theo-uy-tín dựng lên một thác báo động giả
     thuần tuý do cách đánh số.
 
-    `dapt` (chuỗi APT) CỐ Ý nằm ngoài kiểm tra này: nó dùng IP THẬT của DAPT2020, nơi một
-    host bị chiếm quyền gửi cả lưu lượng lành lẫn tấn công — đó là hành vi thật và chính
+    `dapt` (chuỗi APT) cố Ý nằm ngoài kiểm tra này: nó dùng IP thật của DAPT2020, nơi một
+    host bị chiếm quyền gửi cả lưu lượng lành lẫn tấn công - đó là hành vi thật và chính
     là thứ mà liên kết chiến dịch phải bắt được.
     """
     warmup, main, _apt, _n = _built_or_skip(build_stream)
@@ -234,8 +234,8 @@ def test_synthesized_ip_pools_are_disjoint_by_label():
         by_source[src][bool(ev.get("expected_threat"))].add(ip)
 
     if not by_source:
-        # PHÂN BIỆT hai chuyện khác hẳn nhau: `build_stream` HỎNG, và MÁY CHẠY KHÔNG CÓ DỮ
-        # LIỆU. CI cài sạch từ repo nên không có CSV nguồn (gitignore vì quá lớn), luồng ra
+        # Phân biệt hai chuyện khác hẳn nhau: `build_stream` hỏng, và máy chạy không có dữ
+        # Liệu. CI cài sạch từ repo nên không có CSV nguồn (gitignore vì quá lớn), luồng ra
         # rỗng một cách hợp lệ. Khẳng định cứng ở đây biến "thiếu dữ liệu" thành "đỏ CI",
         # che mất lỗi thật. Phép kiểm này chỉ có nghĩa khi luồng thật sự được dựng.
         pytest.skip("chưa dựng dữ liệu nguồn cho build_stream — xem scripts/build_*.py")
@@ -248,10 +248,10 @@ def test_synthesized_ip_pools_are_disjoint_by_label():
 
 
 def test_adversarial_id_is_populated():
-    """HỒI QUY: `adv_id` từng LUÔN rỗng vì đọc `ev['log']['gt_id']` — khoá không tồn tại.
+    """hồi quy: `adv_id` từng luôn rỗng vì đọc `ev['log']['gt_id']` - khoá không tồn tại.
 
     Định danh nằm ở `ev['id']`. Không có nó thì không truy vết được mẫu đối kháng nào đã
-    gây ra phán quyết nào — mất khả năng hậu kiểm chính bộ đối kháng.
+    gây ra phán quyết nào - mất khả năng hậu kiểm chính bộ đối kháng.
     """
     log = enrich({"source": "adversarial", "id": "ADV-003", "mitre": "T1059", "log": {}})
     assert log["adv_id"] == "ADV-003"
@@ -260,7 +260,7 @@ def test_adversarial_id_is_populated():
 
 def test_online_apt_recording_contract_matches_subscriber():
     """Mô phỏng đúng nhánh subscriber: ghi từng sự kiện DAPT-attack (mang metadata)
-    của một IP vào bộ nhớ SẠCH theo thứ tự luồng -> bản án APT phải NỔI LÊN đúng
+    của một IP vào bộ nhớ sạch theo thứ tự luồng -> bản án APT phải nổi lên đúng
     thời điểm đủ đa-ngày (giống cơ chế offline, không nạp sẵn)."""
     seq, *_ = _built_or_skip(build_sequence)
 
@@ -298,7 +298,7 @@ def test_online_apt_recording_contract_matches_subscriber():
             after = store.check_apt_chain(multi_day_ip)
             if (not before["is_apt"]) and after["is_apt"] and fired_day is None:
                 fired_day = ev["day"]
-                # Tại thời điểm BẬT phải đã thấy >= 2 ngày khác nhau (emergent thật)
+                # Tại thời điểm bật phải đã thấy >= 2 ngày khác nhau (emergent thật)
                 assert len(days_recorded) >= 2
 
         assert fired_day is not None, "APT không bao giờ bật dù IP đa-ngày"
@@ -310,10 +310,10 @@ def test_online_apt_recording_contract_matches_subscriber():
 def test_zerodays_real_derived_invariants():
     """Bất biến của zero-day REAL-DERIVED (thay 3 mẫu hardcode cũ):
 
-    1. Đủ 7 mẫu theo ZD_SPECS, id duy nhất, RẢI qua ngày 2-5 (không dồn 1 ngày).
-    2. Mỗi mẫu: ĐÚNG feature trong spec bị đặt giá trị cực trị.
-    3. Nền là flow benign 'static-clean' (cổng KHÔNG nhạy cảm, fwd <= max_fwd_packets)
-       => luật TĨNH (đối chứng) phải BỎ SÓT (DROP) toàn bộ — tính signature-less.
+    1. Đủ 7 mẫu theo ZD_SPECS, id duy nhất, rải qua ngày 2-5 (không dồn 1 ngày).
+    2. Mỗi mẫu: Đúng feature trong spec bị đặt giá trị cực trị.
+    3. Nền là flow benign 'static-clean' (cổng không nhạy cảm, fwd <= max_fwd_packets)
+       => luật tĩnh (đối chứng) phải bỏ sót (DROP) toàn bộ - tính signature-less.
     """
     from experiments.unified_dataset import (
         GT_PATH,
@@ -327,7 +327,7 @@ def test_zerodays_real_derived_invariants():
         gt = json.load(f)
     zds = _build_zerodays(gt, tkey=lambda day: float(day))
 
-    # Số spec là biến (đã mở rộng 7 -> 15). Test bám THEO ZD_SPECS, không chốt cứng con số,
+    # Số spec là biến (đã mở rộng 7 -> 15). Test bám theo ZD_SPECS, không chốt cứng con số,
     # nhưng vẫn giữ các bất biến bản chất: đủ số, id duy nhất, rải nhiều ngày.
     assert len(zds) == len(ZD_SPECS) >= 7
     assert len({z["id"] for z in zds}) == len(ZD_SPECS), "id zero-day bị trùng"

@@ -1,5 +1,5 @@
 """
-Integration Test: End-to-End Pipeline (Tier 1 -> Guardrails -> LangGraph Agent).
+Kiểm thử tích hợp toàn tuyến: Tier-1 -> guardrails -> tác tử LangGraph.
 
 Kiểm tra toàn bộ luồng xử lý từ log đầu vào đến quyết định cuối cùng,
 không cần kết nối Redis hay LLM thực (dùng mock).
@@ -119,9 +119,9 @@ class TestEndToEndSecurityLayer:
     def test_overflow_guard_detects_overflow(self):
         """ContextOverflowGuard phải phát hiện khi vượt ngân sách token.
 
-        Số token phải suy ra TỪ `max_context_tokens` đang cấu hình, không viết cứng. Bản cũ
+        Số token phải suy ra từ `max_context_tokens` đang cấu hình, không viết cứng. Bản cũ
         cố định 7000+5000=12000 và ngầm giả định trần là 8192; khi trần đổi lên 16384 thì
-        12000 lọt trong ngân sách nên phép thử đỏ dù mã hoàn toàn đúng — phép thử hỏng chứ
+        12000 lọt trong ngân sách nên phép thử đỏ dù mã hoàn toàn đúng - phép thử hỏng chứ
         không phải hệ thống hỏng.
         """
         guard = ContextOverflowGuard()

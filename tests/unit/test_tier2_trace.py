@@ -1,12 +1,12 @@
 """Unit tests cho Tier-2 execution tracer (`src/agent/trace.py`).
 
-Tracer là công cụ ĐO, nên bản thân nó phải đáng tin hơn thứ nó đo. Ba nhóm bất biến:
+Tracer là công cụ đo, nên bản thân nó phải đáng tin hơn thứ nó đo. Ba nhóm bất biến:
 
-  1. TẮT nghĩa là TẮT — không tạo file, không dựng bản ghi, và mọi điểm cắm phải nằm sau
+  1. Tắt nghĩa là tắt - không tạo file, không dựng bản ghi, và mọi điểm cắm phải nằm sau
      một cổng `if trace.enabled():` (khoá bằng phép quét AST, không bằng niềm tin).
-  2. Đúng MỘT dòng JSON cho MỖI invoke, kể cả khi đồ thị ném lỗi, và không bao giờ trộn
-     trường giữa các luồng — vì Tier-2 chạy nhiều worker song song.
-  3. Hỏng thì im lặng tự tắt, TUYỆT ĐỐI không ném lỗi ra pipeline. Một cái đĩa đầy không
+  2. Đúng một dòng JSON cho mỗi invoke, kể cả khi đồ thị ném lỗi, và không bao giờ trộn
+     trường giữa các luồng - vì Tier-2 chạy nhiều worker song song.
+  3. Hỏng thì im lặng tự tắt, tuyệt đối không ném lỗi ra pipeline. Một cái đĩa đầy không
      được phép làm sập cả SOC.
 """
 
@@ -24,7 +24,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 @pytest.fixture
 def sink(tmp_path, monkeypatch):
-    """Bật tracer vào một file tạm; luôn trả module về TẮT + đóng fd sau mỗi test."""
+    """Bật tracer vào một file tạm; luôn trả module về tắt + đóng fd sau mỗi test."""
     path = tmp_path / "t.jsonl"
     monkeypatch.setenv("SENTINEL_TRACE", "1")
     monkeypatch.setenv("SENTINEL_TRACE_FILE", str(path))
@@ -39,11 +39,7 @@ def _lines(path):
     return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
 
 
-# ==============================================================================
-# 1. TẮT nghĩa là TẮT
-# ==============================================================================
-
-
+# Tắt nghĩa là tắt
 def test_disabled_by_default(tmp_path, monkeypatch):
     monkeypatch.delenv("SENTINEL_TRACE", raising=False)
     monkeypatch.setenv("SENTINEL_TRACE_FILE", str(tmp_path / "x.jsonl"))
@@ -62,7 +58,7 @@ def test_disabled_by_default(tmp_path, monkeypatch):
 def test_all_trace_add_calls_are_guarded():
     """Mọi `trace.add(...)` trong mã nguồn phải nằm trong `if trace.enabled():`.
 
-    Đây là bất biến giữ cho tracer thật sự ZERO-COST khi tắt. Quét bằng AST trên VĂN BẢN
+    Đây là bất biến giữ cho tracer thật sự ZERO-COST khi tắt. Quét bằng AST trên văn bản
     nguồn (không import) nên test chạy nhanh và không kéo theo FAISS/LLM. Thêm một
     `trace.add` không có cổng ở bất kỳ đâu -> test này đỏ ngay.
     """
@@ -104,16 +100,12 @@ def test_all_trace_add_calls_are_guarded():
                 problems.append(f"{f.relative_to(ROOT)}:{node.lineno} trace.{node.func.attr}")
 
     # `begin`/`flush` trong _TracedGraph.invoke nằm sau một `if not trace.enabled(): return`
-    # (cổng đảo) nên KHÔNG bị bọc trong `if trace.enabled():` — chấp nhận đúng các dòng đó.
+    # (cổng đảo) nên không bị bọc trong `if trace.enabled():` - chấp nhận đúng các dòng đó.
     problems = [p for p in problems if "workflow.py" not in p]
     assert not problems, "trace.add KHÔNG có cổng enabled(): " + ", ".join(problems)
 
 
-# ==============================================================================
-# 2. Bật: một dòng mỗi invoke, khoá nối đầy đủ
-# ==============================================================================
-
-
+# Bật: một dòng mỗi invoke, khoá nối đầy đủ
 def test_one_line_per_begin_flush(sink):
     for i in range(3):
         trace.begin({"current_batch_logs": [{"Source IP": f"10.0.0.{i}"}]})
@@ -135,8 +127,8 @@ def test_add_without_begin_is_noop(sink):
 
 
 def test_begin_flushes_stale_record(sink):
-    """begin() hai lần liên tiếp: bản ghi cũ phải được GHI RA với status 'abandoned',
-    không được nuốt mất — mất bản ghi là mất đúng lô bất thường."""
+    """begin() hai lần liên tiếp: bản ghi cũ phải được ghi ra với status 'abandoned',
+    không được nuốt mất - mất bản ghi là mất đúng lô bất thường."""
     trace.begin({"current_batch_logs": []})
     trace.add("llm", a=1)
     trace.begin({"current_batch_logs": []})
@@ -148,7 +140,7 @@ def test_begin_flushes_stale_record(sink):
 
 
 def test_batch_meta_captures_join_keys(sink):
-    """`gt_id` là khoá nối MẠNH NHẤT về Tier-1 (nó sống sót _strip_dataset_labels)."""
+    """`gt_id` là khoá nối mạnh nhất về Tier-1 (nó sống sót _strip_dataset_labels)."""
     trace.begin(
         {
             "current_batch_logs": [
@@ -187,11 +179,7 @@ def test_truncation_cap_and_uncapped(tmp_path, monkeypatch):
         trace.configure()
 
 
-# ==============================================================================
-# 3. An toàn đa luồng — Tier-2 chạy nhiều worker
-# ==============================================================================
-
-
+# An toàn đa luồng - Tier-2 chạy nhiều worker
 def test_concurrent_flush_never_interleaves(sink):
     """8 luồng × 20 bản ghi, mỗi bản ghi mang một blob 200 KB.
 
@@ -225,7 +213,7 @@ def test_record_survives_copied_context(sink):
     """Bản ghi phải sống qua `copy_context().run(...)`.
 
     LangGraph đẩy task sang executor thread bằng `copy_context()`. Với `threading.local`
-    thì section thêm trong thread đó sẽ MẤT LẶNG LẼ; với ContextVar + sửa-tại-chỗ thì còn.
+    thì section thêm trong thread đó sẽ mất lặng lẽ; với ContextVar + sửa-tại-chỗ thì còn.
     Đây là chốt hồi quy cho chính lựa chọn thiết kế đó.
     """
     import contextvars
@@ -239,13 +227,9 @@ def test_record_survives_copied_context(sink):
     assert _lines(sink)[0]["rag"]["technique_query"] == "q"
 
 
-# ==============================================================================
-# 4. Không bao giờ ném lỗi
-# ==============================================================================
-
-
+# Không bao giờ ném lỗi
 def test_unwritable_sink_never_raises_and_self_disables(tmp_path, monkeypatch):
-    """Trỏ sink vào một THƯ MỤC -> open() luôn hỏng kể cả khi chạy bằng root.
+    """Trỏ sink vào một thư mục -> open() luôn hỏng kể cả khi chạy bằng root.
 
     (Dùng chmod 0o500 sẽ pass giả khi test chạy dưới root trong Docker.)
     """
@@ -281,11 +265,7 @@ def test_add_replaces_non_dict_section(sink):
     assert _lines(sink)[0]["llm"] == {"a": 1}
 
 
-# ==============================================================================
-# 5. Proxy _TracedGraph — một invoke = một bản ghi, kể cả khi ném lỗi
-# ==============================================================================
-
-
+# Proxy _TracedGraph - một invoke = một bản ghi, kể cả khi ném lỗi
 class _Boom:
     def invoke(self, state, *a, **k):
         raise RuntimeError("nổ")
@@ -306,7 +286,7 @@ def _traced(app):
 
 
 def test_traced_graph_emits_record_on_raise(sink):
-    """Lô ném lỗi VẪN phải có bản ghi — đó chính là lô cần audit nhất."""
+    """Lô ném lỗi vẫn phải có bản ghi - đó chính là lô cần audit nhất."""
     with pytest.raises(RuntimeError):
         _traced(_Boom()).invoke({"current_batch_logs": []})
     r = _lines(sink)[0]
@@ -321,7 +301,7 @@ def test_traced_graph_records_final_state(sink):
 
 
 def test_traced_graph_transparent_when_disabled(tmp_path, monkeypatch):
-    """Khi tắt, proxy KHÔNG được chạm vào begin/flush."""
+    """Khi tắt, proxy không được chạm vào begin/flush."""
     monkeypatch.delenv("SENTINEL_TRACE", raising=False)
     trace.configure()
 
@@ -340,18 +320,14 @@ def test_traced_graph_delegates_other_attributes():
     assert hasattr(app, "invoke")
 
 
-# ==============================================================================
-# 6. Vòng lặp HITL — hai bản vá cắt "phiếu trùng" (hồi quy đo được trên luồng thật)
-# ==============================================================================
-
-
+# Vòng lặp HITL - hai bản vá cắt "phiếu trùng" (hồi quy đo được trên luồng thật)
 def test_await_hitl_verdict_is_cached():
-    """`AWAIT_HITL` PHẢI được ghi vào response cache.
+    """`AWAIT_HITL` phải được ghi vào response cache.
 
-    HỒI QUY THẬT (ba lượt chạy luồng demo, 2026-07-28): ở lượt KHÔNG reset, 163/338 lô
-    Tier-2 (48%) là IP ĐÃ phán quyết ở lượt trước, và 151/163 (93%) trong số đó đã nhận
+    Hồi quy thật (ba lượt chạy luồng demo, 2026-07-28): ở lượt không reset, 163/338 lô
+    Tier-2 (48%) là IP đã phán quyết ở lượt trước, và 151/163 (93%) trong số đó đã nhận
     AWAIT_HITL. Bản cũ cố ý bỏ qua cache cho AWAIT_HITL với lý do "cần dữ liệu tươi", nhưng
-    phiếu HITL đã được tạo rồi — gọi lại LLM chỉ đẻ thêm PHIẾU TRÙNG, tốn ~22 s mỗi lô để
+    phiếu HITL đã được tạo rồi - gọi lại LLM chỉ đẻ thêm phiếu trùng, tốn ~22 s mỗi lô để
     ra đúng kết luận cũ.
     """
     import ast
@@ -417,7 +393,7 @@ def _run_hitl_node(monkeypatch, *, total_incidents: int):
 
 
 def test_first_time_hitl_creates_ticket_and_logs_await_hitl(monkeypatch):
-    """Lần ĐẦU: ghi AWAIT_HITL, đẻ đúng một phiếu, KHÔNG gọi choke-point cảnh báo."""
+    """Lần đầu: ghi AWAIT_HITL, đẻ đúng một phiếu, không gọi choke-point cảnh báo."""
     calls, decision = _run_hitl_node(monkeypatch, total_incidents=0)
     assert calls["db"] == ["AWAIT_HITL"]
     assert len(calls["ticket"]) == 1
@@ -427,15 +403,15 @@ def test_first_time_hitl_creates_ticket_and_logs_await_hitl(monkeypatch):
 
 
 def test_repeat_hitl_escalates_and_does_not_duplicate_ticket(monkeypatch):
-    """TÁI PHẠM: đi vào `raise_alert`, KHÔNG đẻ phiếu trùng, và ghi ĐÚNG hành động đã làm.
+    """tái phạm: đi vào `raise_alert`, không đẻ phiếu trùng, và ghi đúng hành động đã làm.
 
-    LỖI ĐÃ SỬA 11/08/2026 — bản trước chỉ gán `latest_decision["action"] = "ALERT"` rồi rơi
+    Lỗi đã sửa 11/08/2026 - bản trước chỉ gán `latest_decision["action"] = "ALERT"` rồi rơi
     thẳng xuống `_log_to_db("AWAIT_HITL", ...)` ghi cứng và vẫn đẻ phiếu. Ba hệ quả đo được:
     20/336 lô trong `tier2_trace.jsonl` ghi ALERT trong khi hệ thống làm AWAIT_HITL; phiếu
     HITL trùng vẫn sinh ra; và `raise_alert` không bao giờ được gọi nên đường "ALERT lần 2
     -> tự BLOCK" không tồn tại.
 
-    Test cũ chỉ kiểm `'latest_decision["action"] = "ALERT"' in source` nên vẫn xanh suốt —
+    Test cũ chỉ kiểm `'latest_decision["action"] = "ALERT"' in source` nên vẫn xanh suốt -
     lý do nó phải được thay bằng test hành vi.
     """
     calls, decision = _run_hitl_node(monkeypatch, total_incidents=3)

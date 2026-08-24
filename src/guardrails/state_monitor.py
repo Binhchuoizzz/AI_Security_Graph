@@ -1,6 +1,4 @@
-"""
-Guardrails: State Monitor
-"""
+"""Theo dõi trạng thái tác tử và ghi mọi phán quyết vào sổ kiểm toán."""
 
 import atexit
 import json
@@ -65,8 +63,8 @@ class LoopDetector:
     def __init__(self, max_iterations: int = 10):
         self.max_iterations = max_iterations
         # node_counter là THREAD-LOCAL: mỗi luồng worker Tier-2 giữ bộ đếm riêng, để nhiều
-        # lần agent_app.invoke() chạy SONG SONG (nhiều slot LLM) KHÔNG lẫn trạng thái vòng
-        # lặp của nhau. Đơn luồng (production/test) hành vi Y HỆT như trước.
+        # lần agent_app.invoke() chạy song song (nhiều slot LLM) không lẫn trạng thái vòng
+        # lặp của nhau. Đơn luồng (production/test) hành vi Y hệt như trước.
         self._local = threading.local()
 
     @property
@@ -99,9 +97,9 @@ class AuditLogger:
     """
     Ghi lại toàn bộ quyết định của Agent vào SQLite DB (guardrails_audit.db).
 
-    LƯU Ý: DB này (metadata nghiên cứu, bảng `audit_log`) tách biệt với
+    Lưu Ý: DB này (metadata nghiên cứu, bảng `audit_log`) tách biệt với
     `config/audit_trail.db` (chuỗi HMAC pháp lý, bảng `audit_trail`) của
-    response/executor.py — tên file khác nhau để tránh nhầm lẫn.
+    response/executor.py - tên file khác nhau để tránh nhầm lẫn.
     """
 
     def __init__(self):
@@ -113,7 +111,7 @@ class AuditLogger:
         self._c: sqlite3.Connection | None = None
         self._last_flush: float = time.time()
         self._init_db()
-        # Chốt chặn cuối: thoát bình thường thì KHÔNG được mất phần đuôi trong bộ đệm.
+        # Chốt chặn cuối: thoát bình thường thì không được mất phần đuôi trong bộ đệm.
         atexit.register(self.flush)
 
     def _init_db(self):
@@ -123,8 +121,8 @@ class AuditLogger:
             try:
                 cursor = conn.cursor()
                 # synchronous=NORMAL: bỏ 1 fsync/commit -> ghi nhanh hơn khi nhiều worker
-                # Tier-2 log song song (serialize qua _db_lock). Mức KẾT NỐI (không ghi file
-                # header) nên AN TOÀN cả khi DB mở read-only (container). KHÔNG bật WAL: WAL
+                # Tier-2 log song song (serialize qua _db_lock). Mức kết nối (không ghi file
+                # header) nên an toàn cả khi DB mở read-only (container). Không bật WAL: WAL
                 # đổi header + bắt reader ghi -shm -> crash cross-UID Docker (container uid 999
                 # không ghi được logs/guardrails_audit.db).
                 cursor.execute("PRAGMA synchronous=NORMAL")
@@ -150,16 +148,16 @@ class AuditLogger:
             finally:
                 conn.close()
 
-    # Gom nhiều bản ghi vào MỘT giao dịch thay vì mở/đóng kết nối cho từng sự kiện.
+    # Gom nhiều bản ghi vào một giao dịch thay vì mở/đóng kết nối cho từng sự kiện.
     #
-    # LÝ DO HIỆU NĂNG, KHÔNG ĐÁNH ĐỔI TOÀN VẸN. Bảng `audit_log` này là nhật ký VẬN HÀNH —
-    # nó KHÔNG mang chuỗi băm HMAC. Sổ cái pháp y có chuỗi nằm ở bảng `audit_trail` khác
+    # Lý do hiệu năng, không đánh đổi toàn vẹn. Bảng `audit_log` này là nhật ký vận hành -
+    # nó không mang chuỗi băm HMAC. Sổ cái pháp y có chuỗi nằm ở bảng `audit_trail` khác
     # (`src/response/executor.py::_log_to_db`) và không bị đụng tới ở đây. Vì vậy gom giao
     # dịch không làm yếu bất kỳ bảo chứng chống giả mạo nào; đổi lại, một lần sập tiến trình
     # đột ngột có thể mất phần đuôi chưa đổ (tối đa `_FLUSH_EVERY` bản ghi hoặc `_FLUSH_SEC`).
     #
     # Đo được: 15,195 ms/lượt gọi khi mỗi lượt tự mở kết nối + commit riêng. Cổng ML ghi một
-    # bản ghi cho MỖI ca nó tự quyết, tức ~42,5% luồng — riêng khoản này là **53 phút** cho
+    # bản ghi cho mỗi ca nó tự quyết, tức ~42,5% luồng - riêng khoản này là 53 phút cho
     # lượt chạy 496.885 sự kiện, và nó chính là thứ ghìm subscriber ở 133–190 sự kiện/giây
     # trong khi CPU chỉ 18%: tiến trình đứng chờ đĩa chứ không tính toán gì.
     _FLUSH_EVERY = 200
@@ -191,7 +189,7 @@ class AuditLogger:
             )
             conn.commit()
         except Exception:
-            # Đóng kết nối hỏng để lượt sau mở lại; KHÔNG ném ra đường nóng.
+            # Đóng kết nối hỏng để lượt sau mở lại; Không ném ra đường nóng.
             try:
                 if self._c is not None:
                     self._c.close()

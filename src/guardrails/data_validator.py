@@ -1,6 +1,4 @@
-"""
-Guardrails: Data Validator
-"""
+"""Kiểm tính toàn vẹn log trước khi đưa vào đồ thị LangGraph."""
 
 import ipaddress
 import logging
@@ -13,22 +11,18 @@ REQUIRED_FIELDS = ["Source IP", "Destination Port", "Protocol"]
 
 
 class DataValidator:
-    """
-    Kiểm tra tính toàn vẹn dữ liệu trước khi đưa vào pipeline LangGraph.
-    """
+    """Kiểm tra tính toàn vẹn dữ liệu trước khi đưa vào pipeline LangGraph."""
 
     def __init__(self, required_fields: list | None = None):
         fields = required_fields or REQUIRED_FIELDS
-        # Normalize the required fields list using canonical mapping
+        # Chuẩn hoá danh sách trường bắt buộc theo bảng ánh xạ
         self.required_fields = []
         for f in fields:
             norm_f = KEY_ALIASES.get(f.lower(), f)
             self.required_fields.append(norm_f)
 
     def validate(self, log_entry: dict) -> dict:
-        """
-        Kiểm tra và làm sạch log entry đơn lẻ.
-        """
+        """Kiểm tra và làm sạch log entry đơn lẻ."""
         errors = []
 
         # 1. Chuẩn hóa log keys trước
@@ -98,9 +92,7 @@ class DataValidator:
     def validate_batch(
         self, batch: list[dict], filter_invalid: bool = False, raise_on_error: bool = False
     ) -> list[dict]:
-        """
-        Xác thực lô dữ liệu log (batch).
-        """
+        """Xác thực lô dữ liệu log (batch)."""
         validated_batch = []
         for i, log in enumerate(batch):
             validated_log = self.validate(log)

@@ -1,18 +1,17 @@
 """
-SENTINEL — Độ Bền LLM & Quy Trình (Determinism + Graceful Degradation)
-[Luận văn Ch.4 §Decision Determinism + §Graceful Degradation — LLM tất định + suy biến an toàn]
-======================================================================
+SENTINEL - Độ Bền LLM & Quy Trình (Determinism + Graceful Degradation)
+[Luận văn Ch.4 §Decision Determinism + §Graceful Degradation - LLM tất định + suy biến an toàn]
 Hai mối lo phản biện/TS về việc dùng LLM cục bộ trong quy trình SOC:
 
-  (A) TÁI LẬP: temp=0.1 vẫn lấy mẫu — kết quả có lặp lại được không?
-      -> Đặt seed cố định (config llm.seed) rồi gọi CÙNG prompt N lần, kiểm tra
-         output (và action sau parse) GIỐNG HỆT.
+  (A) tái lập: temp=0.1 vẫn lấy mẫu - kết quả có lặp lại được không?
+      -> Đặt seed cố định (config llm.seed) rồi gọi cùng prompt N lần, kiểm tra
+         output (và action sau parse) giống hệt.
 
-  (B) SUY BIẾN AN TOÀN: nếu LLM cục bộ CHẾT giữa chừng thì sao?
+  (B) suy biến an toàn: nếu LLM cục bộ chết giữa chừng thì sao?
       -> Giả lập LLM ném lỗi, chạy tác tử đầy đủ trên một mẫu tấn công, xác nhận
-         hệ KHÔNG vỡ mà suy biến về AWAIT_HITL (Tier-1 vẫn bảo vệ độc lập).
+         hệ không vỡ mà suy biến về AWAIT_HITL (Tier-1 vẫn bảo vệ độc lập).
 
-Cần LLM server cho phần (A) — model nào đang phục vụ cũng được, script đọc động. Chạy:
+Cần LLM server cho phần (A) - model nào đang phục vụ cũng được, script đọc động. Chạy:
     .venv/bin/python experiments/run_llm_robustness.py
 """
 
@@ -53,11 +52,11 @@ def test_determinism(n_runs=5):
         actions.append(str(llm_client.parse_llm_response(raw).get("action", "?")).upper())
         print(f"   run {i + 1}: action={actions[-1]} | len={len(raw)}")
 
-    # ĐÃ GỠ `raw_identical`. Nó luôn False vì batching GPU làm văn bản thô dao động ở mức
-    # ký tự, và điều đó KHÔNG liên quan tới tuyên bố cần chứng minh: cái phải tất định là
-    # QUYẾT ĐỊNH, không phải cách diễn đạt. Báo một cờ luôn False cạnh một cờ luôn True chỉ
+    # Đã gỡ `raw_identical`. Nó luôn False vì batching GPU làm văn bản thô dao động ở mức
+    # ký tự, và điều đó không liên quan tới tuyên bố cần chứng minh: cái phải tất định là
+    # Quyết định, không phải cách diễn đạt. Báo một cờ luôn False cạnh một cờ luôn True chỉ
     # tạo ấn tượng sai rằng hệ "chỉ tất định một nửa". `distinct_raw_outputs` được giữ vì
-    # nó ĐỊNH LƯỢNG mức dao động văn bản thay vì phán nhị phân.
+    # nó định lượng mức dao động văn bản thay vì phán nhị phân.
     action_identical = len(set(actions)) == 1
     print(f"   -> ACTION giống hệt:     {sum(a == actions[0] for a in actions)}/{n_runs}")
     print(f"   -> biến thể văn bản thô: {len(set(raws))}/{n_runs} (batching GPU, không tính lỗi)")
@@ -72,15 +71,15 @@ def test_determinism(n_runs=5):
 
 
 def test_seed_variance(n_samples: int = 10, seeds: tuple[int, ...] = (11, 42, 1337)):
-    """(A2) BIẾN THIÊN theo SEED trên NHIỀU mẫu — khác hẳn phép thử tất định ở trên.
+    """(A2) biến thiên theo SEED trên nhiều mẫu - khác hẳn phép thử tất định ở trên.
 
-    VÌ SAO CẦN: `test_determinism` chỉ chứng minh "cùng seed + cùng prompt -> cùng kết
-    quả", tức là tính TÁI LẬP. Nó KHÔNG trả lời câu hỏi khác và quan trọng hơn cho luận
-    văn: *"nếu đổi seed thì kết luận có đổi không?"* — tức mọi con số trong Chương 4 có
-    phải là một lần bốc thăm may mắn hay không. Trước đây chỉ đo 1 seed, n=5, trên ĐÚNG
-    MỘT mẫu, nên không có căn cứ nào cho tính ổn định.
+    Vì sao cần: `test_determinism` chỉ chứng minh "cùng seed + cùng prompt -> cùng kết
+    quả", tức là tính tái lập. Nó không trả lời câu hỏi khác và quan trọng hơn cho luận
+    văn: *"nếu đổi seed thì kết luận có đổi không?"* - tức mọi con số trong Chương 4 có
+    phải là một lần bốc thăm may mắn hay không. Trước đây chỉ đo 1 seed, n=5, trên đúng
+    một mẫu, nên không có căn cứ nào cho tính ổn định.
 
-    Cách đo: với mỗi mẫu, chạy qua các seed khác nhau và xem PHÁN QUYẾT có đổi không.
+    Cách đo: với mỗi mẫu, chạy qua các seed khác nhau và xem phán quyết có đổi không.
     `flip_rate` = tỉ lệ mẫu mà hành động thay đổi khi chỉ đổi seed. Đây là cận dưới của
     độ bất ổn: flip_rate cao nghĩa là chênh lệch nhỏ giữa các cấu hình trong ablation có
     thể chỉ là nhiễu lấy mẫu của LLM, không phải hiệu ứng thật.
@@ -88,7 +87,7 @@ def test_seed_variance(n_samples: int = 10, seeds: tuple[int, ...] = (11, 42, 13
     print(f"\n[A2] BIẾN THIÊN THEO SEED — {n_samples} mẫu × {len(seeds)} seed")
     with open(GT_PATH) as f:
         gt = json.load(f)
-    # Cùng dân số THẬT như mọi phép đo ground_truth khác — xem `drop_authored`.
+    # Cùng dân số thật như mọi phép đo ground_truth khác - xem `drop_authored`.
     gt, _ = drop_authored(gt)
     # Lấy mẫu phân tầng theo hành động kỳ vọng để không chỉ đo trên một loại ca.
     by_action: dict[str, list] = {}
@@ -141,7 +140,7 @@ def test_seed_variance(n_samples: int = 10, seeds: tuple[int, ...] = (11, 42, 13
 
 
 def test_graceful_degradation():
-    """(B) LLM chết -> tác tử suy biến về AWAIT_HITL, KHÔNG vỡ."""
+    """(B) LLM chết -> tác tử suy biến về AWAIT_HITL, không vỡ."""
     print("\n[B] SUY BIẾN AN TOÀN (graceful degradation) — giả lập LLM chết")
     with open(GT_PATH) as f:
         gt = json.load(f)
@@ -201,7 +200,7 @@ def main():
     except Exception:
         pass
 
-    # ── CHI PHÍ TÀI NGUYÊN — dùng token THẬT do server trả về, không ước lượng ──
+    # Chi phí tài nguyên - dùng token thật do server trả về, không ước lượng
     # `token_monitor.get_stats()` đọc file bền vững và trả None nếu chưa có lượt gọi nào;
     # schema là tổng luỹ kế (`calls`/`prompt_sum`/`completion_sum`), không phải trung bình.
     cost = None

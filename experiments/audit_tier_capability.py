@@ -1,8 +1,8 @@
-"""SENTINEL — AUDIT NĂNG LỰC TỪNG TẦNG trên ma trận nhiều loại tấn công.
+"""SENTINEL - AUDIT năng lực từng tầng trên ma trận nhiều loại tấn công.
 
-MỤC ĐÍCH: kiểm tra có hệ thống rằng mỗi tầng (luật Tier-1 · Cổng ML · LLM Tier-2) phản
-ứng ĐÚNG NĂNG LỰC của nó trên nhiều họ tấn công khác nhau, thay vì chỉ thử vài ca lẻ.
-Mỗi ca gồm: log THẬT theo định dạng hệ thống nhận, kỳ vọng có phải đe doạ hay không, và
+Mục đích: kiểm tra có hệ thống rằng mỗi tầng (luật Tier-1 · Cổng ML · LLM Tier-2) phản
+ứng đúng năng lực của nó trên nhiều họ tấn công khác nhau, thay vì chỉ thử vài ca lẻ.
+Mỗi ca gồm: log thật theo định dạng hệ thống nhận, kỳ vọng có phải đe doạ hay không, và
 họ kỹ thuật MITRE mong đợi (để đối chiếu ánh xạ).
 
 Chạy:
@@ -23,7 +23,7 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 # (tên, log, là_đe_doạ, tiền tố MITRE mong đợi hoặc None nếu không ràng buộc)
 CASES: list[tuple[str, dict, bool, str | None]] = [
-    # ── Họ tấn công tầng ỨNG DỤNG (có payload) ──────────────────────────────
+    # Họ tấn công tầng ứng dụng (có payload)
     (
         "SQLi union-based",
         {
@@ -90,7 +90,7 @@ CASES: list[tuple[str, dict, bool, str | None]] = [
         True,
         None,
     ),
-    # ── Họ tấn công tầng MẠNG (chỉ có đặc trưng luồng) ──────────────────────
+    # Họ tấn công tầng mạng (chỉ có đặc trưng luồng)
     (
         "Brute-force SSH",
         {
@@ -168,7 +168,7 @@ CASES: list[tuple[str, dict, bool, str | None]] = [
         True,
         None,
     ),
-    # ── ĐỐI CHỨNG LÀNH TÍNH (không được chặn) ───────────────────────────────
+    # đối chứng lành tính (không được chặn)
     (
         "HTTPS duyệt web bình thường",
         {
@@ -221,7 +221,7 @@ def main() -> None:
     if gw.pipeline is None:
         print("[!] CẢNH BÁO: Cổng ML KHÔNG nạp được model — kết quả sẽ không phản ánh đúng.")
 
-    # Any: ba thứ này nạp ĐỘNG (chỉ import khi bật LLM) nên type checker không thể suy ra
+    # Any: ba thứ này nạp động (chỉ import khi bật LLM) nên type checker không thể suy ra
     # kiểu; khai báo rõ thay vì để nó suy thành NoneType rồi báo lỗi ở chỗ dùng.
     agent_app: Any = None
     state_cls: Any = None
@@ -254,9 +254,9 @@ def main() -> None:
                 llm_action = f"LỖI:{type(e).__name__}"
 
         final = llm_action or ml_action or t1_action
-        # ESCALATE KHÔNG phải phán quyết cuối: nó có nghĩa "chuyển tầng sau xử lý". Khi chạy
-        # --no-llm thì tầng sau bị tắt, nên coi ESCALATE là HOÃN (không tính đúng/sai) thay
-        # vì tính là bỏ sót — nếu không, thước đo sẽ đổ lỗi oan cho hệ thống.
+        # ESCALATE không phải phán quyết cuối: nó có nghĩa "chuyển tầng sau xử lý". Khi chạy
+        # --no-llm thì tầng sau bị tắt, nên coi ESCALATE là hoãn (không tính đúng/sai) thay
+        # vì tính là bỏ sót - nếu không, thước đo sẽ đổ lỗi oan cho hệ thống.
         deferred = final == "ESCALATE" and agent_app is None
         blocked = final in ("BLOCK_IP", "ALERT", "AWAIT_HITL")
         ok = None if deferred else (blocked == is_threat)
@@ -310,9 +310,9 @@ def main() -> None:
             {
                 "total": len(rows),
                 "correct": n_ok,
-                # TỰ KHAI BẢN CHẤT. "15/15 = 100%" là con số dễ bị trích nhầm nhất trong cả
-                # dự án: nó KHÔNG đo trên tập benchmark nào, mà trên các ca do chính tác giả
-                # viết tay để kiểm CHỨC NĂNG (ba tầng có chạy đúng vai không). Đặt nó cạnh
+                # Tự khai bản chất. "15/15 = 100%" là con số dễ bị trích nhầm nhất trong cả
+                # dự án: nó không đo trên tập benchmark nào, mà trên các ca do chính tác giả
+                # viết tay để kiểm chức năng (ba tầng có chạy đúng vai không). Đặt nó cạnh
                 # F1/recall đo trên CSE-CIC-IDS2018 là so hai thứ khác loại.
                 "test_type": "functional",
                 "is_benchmark_metric": False,

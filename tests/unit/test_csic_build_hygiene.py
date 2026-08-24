@@ -1,18 +1,18 @@
-"""Vệ sinh khâu DỰNG dữ liệu CSIC — tín hiệu tấn công phải đến từ payload, không từ vỏ.
+"""Vệ sinh khâu dựng dữ liệu CSIC - tín hiệu tấn công phải đến từ payload, không từ vỏ.
 
-Hai lỗi dựng dữ liệu đo được ngày 17/08/2026, cả hai đều bơm tín hiệu GIẢ vào phép đo:
+Hai lỗi dựng dữ liệu đo được ngày 17/08/2026, cả hai đều bơm tín hiệu giả vào phép đo:
 
-1. `Destination Port` đóng cứng 8080 cho CẢ 36.000 bản ghi, benign lẫn tấn công. Tier-1
+1. `Destination Port` đóng cứng 8080 cho cả 36.000 bản ghi, benign lẫn tấn công. Tier-1
    coi 8080 là cổng bất thường -> mọi yêu cầu CSIC đều được cộng điểm rủi ro rồi leo thang
    lên Tier-2. Đo trên lượt chạy hôm đó: 68/90 lô Tier-2 là loại này, tất cả điểm Tier-1
    đúng 20, không chữ ký nào, và LLM buộc phải đoán T1571 "Non-Standard Port". Trong hàng
-   đợi HITL có cả phiếu cho `/tienda1/imagenes/nuestratierra.jpg` — một lượt tải ảnh.
+   đợi HITL có cả phiếu cho `/tienda1/imagenes/nuestratierra.jpg` - một lượt tải ảnh.
 
-2. IP nguồn dùng một TOÁN TỬ BA NGÔI mà hai nhánh giống hệt nhau, nên benign và tấn công
-   bốc từ CÙNG hồ 254 địa chỉ. Mỗi địa chỉ gánh ~142 sự kiện trộn lẫn -> danh tiếng IP
+2. IP nguồn dùng một toán tử ba ngôi mà hai nhánh giống hệt nhau, nên benign và tấn công
+   bốc từ cùng hồ 254 địa chỉ. Mỗi địa chỉ gánh ~142 sự kiện trộn lẫn -> danh tiếng IP
    nhiễm chéo, và mọi chỉ số tính theo IP mất nghĩa.
 
-Test chạy trên HÀM DỰNG, không trên tệp đã dựng: tệp có thể cũ, hàm mới là nguồn sự thật.
+Test chạy trên hàm dựng, không trên tệp đã dựng: tệp có thể cũ, hàm mới là nguồn sự thật.
 """
 
 import importlib.util
@@ -43,7 +43,7 @@ def _events(builder, n=400):
 
 
 def test_csic_uses_standard_http_port(builder):
-    """CSIC 2010 là HTTP cổng 80. Cổng lạ là TÍN HIỆU, không được phát cho toàn bộ corpus."""
+    """CSIC 2010 là HTTP cổng 80. Cổng lạ là tín hiệu, không được phát cho toàn bộ corpus."""
     for ev in _events(builder, 50):
         assert ev["Destination Port"] == 80, (
             "cổng phi chuẩn dán lên mọi bản ghi -> Tier-1 leo thang cả lưu lượng lành "
@@ -52,10 +52,10 @@ def test_csic_uses_standard_http_port(builder):
 
 
 def test_benign_and_attack_never_share_a_source_ip(builder):
-    """Hồ IP của benign và tấn công phải RỜI NHAU.
+    """Hồ IP của benign và tấn công phải rời nhau.
 
     Chung hồ thì chặn một IP vì payload độc của nó cũng chặn luôn lưu lượng lành của chính
-    địa chỉ đó — mọi chỉ số theo IP (precision lệnh chặn, danh tiếng) đều nhiễm chéo.
+    địa chỉ đó - mọi chỉ số theo IP (precision lệnh chặn, danh tiếng) đều nhiễm chéo.
     """
     evs = _events(builder, 600)
     benign = {e["Source IP"] for e in evs if not e["_label"]["expected_threat"]}
@@ -65,9 +65,9 @@ def test_benign_and_attack_never_share_a_source_ip(builder):
 
 
 def test_benign_clients_are_spread_wide_enough_to_not_look_like_a_flood(builder):
-    """Luật tần suất Tier-1 bắn từ sự kiện thứ BA của cùng một IP.
+    """Luật tần suất Tier-1 bắn từ sự kiện thứ ba của cùng một IP.
 
-    Hồ IP hẹp biến lưu lượng LÀNH thành "flood" thuần tuý do khâu dựng dữ liệu: 18.000 yêu
+    Hồ IP hẹp biến lưu lượng lành thành "flood" thuần tuý do khâu dựng dữ liệu: 18.000 yêu
     cầu benign chia cho 254 địa chỉ là ~71 yêu cầu/IP, nên gần như mọi địa chỉ đều vượt
     ngưỡng và leo thang lên Tier-2. Đo lượt chạy 17/08/2026: 68/90 lô Tier-2 đúng là loại
     này, và chúng chiếm trọn hàng đợi HITL.
@@ -84,7 +84,7 @@ def test_benign_clients_are_spread_wide_enough_to_not_look_like_a_flood(builder)
 
 
 def test_attackers_stay_concentrated_so_reputation_can_work(builder):
-    """Ngược lại với benign: kẻ tấn công PHẢI dồn vào ít địa chỉ.
+    """Ngược lại với benign: kẻ tấn công phải dồn vào ít địa chỉ.
 
     Trải mỏng kẻ tấn công thì trí nhớ danh tiếng không bao giờ tích đủ điểm, và cơ chế
     chặn-theo-IP mất luôn thứ để đo.
@@ -95,10 +95,10 @@ def test_attackers_stay_concentrated_so_reputation_can_work(builder):
 
 
 def test_attack_signal_lives_in_the_payload_not_the_envelope(builder):
-    """Bản ghi tấn công và bản ghi lành chỉ được khác nhau ở NỘI DUNG.
+    """Bản ghi tấn công và bản ghi lành chỉ được khác nhau ở nội dung.
 
     Nếu vỏ bọc (cổng, service, protocol) khác nhau theo nhãn thì bộ phân loại học được
-    nhãn từ vỏ — rò rỉ nhãn, và mọi con số sau đó là ảo.
+    nhãn từ vỏ - rò rỉ nhãn, và mọi con số sau đó là ảo.
     """
     rnd = random.Random(11)
     envelope = ("Destination Port", "Protocol", "service")

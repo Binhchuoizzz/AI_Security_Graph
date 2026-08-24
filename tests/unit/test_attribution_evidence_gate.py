@@ -1,18 +1,18 @@
-"""Cổng BẰNG CHỨNG QUY KẾT: Tier-2 chỉ được khẳng định kỹ thuật khi có căn cứ.
+"""Cổng bằng chứng quy kết: Tier-2 chỉ được khẳng định kỹ thuật khi có căn cứ.
 
-BỐI CẢNH ĐO ĐƯỢC (lượt chạy 11/08/2026, 496.885 sự kiện, 553 lô Tier-2). Trước bản vá:
+Bối cảnh đo được (lượt chạy 11/08/2026, 496.885 sự kiện, 553 lô Tier-2). Trước bản vá:
 
-  * 336 lô chỉ sinh 44 truy vấn RAG phân biệt; 187 lô (55,7%) dùng CHUNG một chuỗi
-    "high event frequency ... service http destination port 8080" — không mang tín hiệu
+  * 336 lô chỉ sinh 44 truy vấn RAG phân biệt; 187 lô (55,7%) dùng chung một chuỗi
+    "high event frequency ... service http destination port 8080" - không mang tín hiệu
     tấn công nào. Với truy vấn đó RAG chỉ trả về được kỹ thuật tầng mạng, nên T1190 thậm
     chí không có mặt để LLM chọn.
   * T1571 "Non-Standard Port" chiếm 139/327 quy kết (42,5%), và 136/136 lô một-log bị chặn
-    đều rơi vào bản ghi LÀNH — độ chính xác lệnh chặn 0,0%.
-  * Lá chắn `OVERLY_GENERIC_TECHNIQUES` có tồn tại nhưng điều kiện là "payload RỖNG", mà
+    đều rơi vào bản ghi lành - độ chính xác lệnh chặn 0,0%.
+  * Lá chắn `OVERLY_GENERIC_TECHNIQUES` có tồn tại nhưng điều kiện là "payload rỗng", mà
     lưu lượng web luôn có payload, nên nó chưa bao giờ bắn đúng nhóm nó nhắm tới.
 
-Các test dưới đây khoá HÀNH VI (đầu vào -> đầu ra), không khoá văn bản mã nguồn: một test
-kiểm `'chuỗi' in source` vẫn xanh trong khi hành vi đã hỏng — đúng cách mà lỗi trên lọt qua.
+Các test dưới đây khoá hành VI (đầu vào -> đầu ra), không khoá văn bản mã nguồn: một test
+kiểm `'chuỗi' in source` vẫn xanh trong khi hành vi đã hỏng - đúng cách mà lỗi trên lọt qua.
 """
 
 import json
@@ -45,9 +45,9 @@ def _log(payload="", uri="/tienda1/publico/anadir.jsp", reasons=None, **kw):
     return d
 
 
-# ── 1. Lô KHÔNG có căn cứ thì không có từ vựng quy kết ────────────────────────────
+# 1. Lô không có căn cứ thì không có từ vựng quy kết
 def test_frequency_only_batch_yields_no_attack_vocabulary():
-    """Lý do Tier-1 duy nhất là "tần suất cao" -> KHÔNG được suy ra kỹ thuật nào.
+    """Lý do Tier-1 duy nhất là "tần suất cao" -> không được suy ra kỹ thuật nào.
 
     Một ngưỡng bị vượt chỉ chứng minh khối lượng bất thường; DoS, C2 beaconing và rò rỉ dữ
     liệu đều khớp như nhau. Đây chính là 100% số lô đã bị chặn nhầm trong lượt đo.
@@ -56,7 +56,7 @@ def test_frequency_only_batch_yields_no_attack_vocabulary():
 
 
 def test_benign_ecommerce_form_yields_no_attack_vocabulary():
-    """Biểu mẫu đăng ký hợp lệ (có `login=`/`password=`) KHÔNG phải brute force.
+    """Biểu mẫu đăng ký hợp lệ (có `login=`/`password=`) không phải brute force.
 
     Mẫu cũ `login=|pwd=|password=` khớp mọi biểu mẫu thương mại điện tử và bơm từ vựng
     "brute force" vào 70/336 lô, kéo theo cụm quy kết T1110.x cho lưu lượng lành.
@@ -68,7 +68,7 @@ def test_benign_ecommerce_form_yields_no_attack_vocabulary():
 
 
 def test_repeated_authentication_does_become_brute_force_signal():
-    """Nhưng LẶP LẠI thì có: >=3 lần gửi thông tin xác thực trong cùng một lô."""
+    """Nhưng lặp lại thì có: >=3 lần gửi thông tin xác thực trong cùng một lô."""
     logs = [
         _log(payload=f"login=u{i}&password=p{i}", uri="/tienda1/publico/autenticar.jsp")
         for i in range(3)
@@ -77,7 +77,7 @@ def test_repeated_authentication_does_become_brute_force_signal():
     assert "brute force" in tech_q.lower()
 
 
-# ── 2. Chữ ký WAF của Tier-1 phải chảy vào truy vấn KỂ CẢ khi tier1_reasons thiếu ──
+# 2. Chữ ký WAF của Tier-1 phải chảy vào truy vấn kể cả khi tier1_reasons thiếu
 @pytest.mark.parametrize(
     "payload,uri,expect_term",
     [
@@ -97,7 +97,7 @@ def test_repeated_authentication_does_become_brute_force_signal():
 def test_waf_signature_recovered_when_tier1_reasons_lack_it(payload, uri, expect_term):
     """Log leo thang qua đường z-score chưa từng đi qua nhánh chữ ký -> Tier-2 soi lại.
 
-    `tier1_reasons` ở đây CỐ Ý chỉ có lý do tần suất, đúng như luồng thật: đây là đường mà
+    `tier1_reasons` ở đây cố Ý chỉ có lý do tần suất, đúng như luồng thật: đây là đường mà
     257/336 lô đã đi, và là lý do truy vấn RAG mất sạch từ vựng tấn công.
     """
     lg = _log(payload=payload, uri=uri, reasons=["Tần suất gửi yêu cầu cao: 1.00 req/s"])
@@ -109,17 +109,17 @@ def test_waf_signature_recovered_when_tier1_reasons_lack_it(payload, uri, expect
 
 
 def test_tier1_signature_still_wins_when_present():
-    """Có sẵn chữ ký trong `tier1_reasons` thì KHÔNG cần soi lại — giữ đường cũ."""
+    """Có sẵn chữ ký trong `tier1_reasons` thì không cần soi lại - giữ đường cũ."""
     lg = _log(reasons=["WAF: Phát hiện SQL Injection (SQLi) trong 'payload'"])
     voc = batch_attack_vocabulary([lg])
     assert any("sql injection" in v.lower() for v in voc)
 
 
-# ── 3. Lá chắn T1571: payload CÓ MẶT không phải là bằng chứng cho C2 ──────────────
+# 3. Lá chắn T1571: payload có mặt không phải là bằng chứng cho C2
 def test_t1571_with_web_attack_payload_is_downgraded():
-    """REGRESSION: payload SQLi là bằng chứng CHỐNG LẠI cách đọc C2, không phải ủng hộ.
+    """REGRESSION: payload SQLi là bằng chứng chống lại cách đọc C2, không phải ủng hộ.
 
-    Điều kiện cũ ("payload rỗng thì mới hạ cấp") giữ nguyên `resolved` cho đúng ca này —
+    Điều kiện cũ ("payload rỗng thì mới hạ cấp") giữ nguyên `resolved` cho đúng ca này -
     chế độ hỏng chiếm 42,5% quy kết trong lượt đo.
     """
     m = _from_triage_anchor(
@@ -136,7 +136,7 @@ def test_t1571_with_web_attack_payload_is_downgraded():
 
 
 def test_t1571_technique_name_alone_is_not_self_corroborating():
-    """Chuỗi "non-standard port" là TÊN của T1571 — không được tính là bằng chứng.
+    """Chuỗi "non-standard port" là tên của T1571 - không được tính là bằng chứng.
 
     Nhận nó thì lá chắn tự phản: model chỉ cần nêu tên kỹ thuật là tự chứng minh cho mình.
     """
@@ -147,12 +147,12 @@ def test_t1571_technique_name_alone_is_not_self_corroborating():
         assert m.mapping_status == "low_confidence"
 
 
-# ── 4. Cổng chỉ được ĐÓNG với lành, không được đóng với tấn công thật ─────────────
+# 4. Cổng chỉ được đóng với lành, không được đóng với tấn công thật
 def test_gate_separates_attack_from_benign_on_real_csic():
-    """Đo trên CSIC 2010 THẬT, cỡ lô 10 (đúng cỡ lô Tier-2 dùng).
+    """Đo trên CSIC 2010 thật, cỡ lô 10 (đúng cỡ lô Tier-2 dùng).
 
     Số chốt của lượt đo: lô tấn công giữ 97,6%, lô lành giữ 0,0%. Ngưỡng dưới đây nới rộng
-    để không đỏ vì nhiễu mẫu, nhưng bất biến "0 báo nhầm" thì KHÔNG nới.
+    để không đỏ vì nhiễu mẫu, nhưng bất biến "0 báo nhầm" thì không nới.
     """
     import ast
     import os
@@ -183,16 +183,14 @@ def test_gate_separates_attack_from_benign_on_real_csic():
     assert keep_rate(atk) >= 0.90, "lô tấn công phải giữ được quyền quy kết"
 
 
-# ==============================================================================
-# TRUY VẤN RAG — hai lỗi làm chệch vector, đo trên lượt chạy 12/08/2026
-# ==============================================================================
+# Truy vấn RAG - hai lỗi làm chệch vector, đo trên lượt chạy 12/08/2026
 def test_auth_vocabulary_suppressed_when_batch_has_specific_signature():
-    """Lô CÓ chữ ký cụ thể thì KHÔNG được nhét thêm cụm brute-force.
+    """Lô có chữ ký cụ thể thì không được nhét thêm cụm brute-force.
 
-    HỒI QUY LỖI THẬT. "Lặp lại gửi thông tin xác thực" là tín hiệu HÀNH VI, cùng hạng với các
+    Hồi quy lỗi thật. "Lặp lại gửi thông tin xác thực" là tín hiệu hành VI, cùng hạng với các
     cụm ngưỡng: nối nó cạnh một chữ ký cụ thể thì nó kéo tụt chữ ký ấy. CSIC nhúng payload
     CRLF/XSS vào chính form đăng ký nên `login=`/`password=` xuất hiện ở cả 10 log của lô,
-    cụm brute-force luôn được thêm, và truy xuất trả về họ T1110. Quy kết luật CHẶT của ba
+    cụm brute-force luôn được thêm, và truy xuất trả về họ T1110. Quy kết luật chặt của ba
     lớp đó: T1071.001 0/39 · T1059.007 0/16 · T1083 0/14.
     """
     from src.agent.nodes import build_rag_queries
@@ -216,14 +214,14 @@ def test_auth_vocabulary_suppressed_when_batch_has_specific_signature():
 
 
 def test_no_attack_term_names_a_different_technique():
-    """Cụm từ vựng không được chứa NGUYÊN TÊN của kỹ thuật KHÁC với đáp án của chính nó.
+    """Cụm từ vựng không được chứa nguyên tên của kỹ thuật khác với đáp án của chính nó.
 
-    HỒI QUY LỖI THẬT. Cụm XSS từng là "cross-site scripting XSS **drive-by compromise** web
-    client exploit" — "Drive-by Compromise" là tên của T1189. Truy vấn đó trả về
-    [T1189, T1608.004, T1190, T1203, T1571], KHÔNG có T1059.007; bỏ hai từ ấy thì T1059.007
+    Hồi quy lỗi thật. Cụm XSS từng là "cross-site scripting XSS drive-by compromise web
+    client exploit" - "Drive-by Compromise" là tên của T1189. Truy vấn đó trả về
+    [T1189, T1608.004, T1190, T1203, T1571], không có T1059.007; bỏ hai từ ấy thì T1059.007
     lên hạng 1. Cùng cái bẫy với lá chắn T1571 từng tự chứng minh bằng chính tên mình.
 
-    Test khoá ĐÚNG các cặp đã đo, không quét cả bảng: nhiều cụm CỐ Ý mang tên kỹ thuật đáp án
+    Test khoá đúng các cặp đã đo, không quét cả bảng: nhiều cụm cố Ý mang tên kỹ thuật đáp án
     của chúng (cụm SQLi chứa "exploit public-facing application" vì T1190 chính là đáp án).
     """
     from src.agent.nodes import _ATTACK_TERMS
@@ -242,19 +240,19 @@ def test_no_attack_term_names_a_different_technique():
 
 
 def test_chu_ky_tan_cong_tang_llm_duoc_tinh_la_bang_chung():
-    """Chữ ký tiêm nhiễm / jailbreak của Tier-1 PHẢI sinh từ vựng tấn công.
+    """Chữ ký tiêm nhiễm / jailbreak của Tier-1 phải sinh từ vựng tấn công.
 
-    LỖ HỔNG THẬT ĐÃ VÁ. `_ATTACK_TERMS` phủ 29 họ chữ ký WAF nhưng không có mục nào cho tấn
+    Lỗ hổng thật đã vá. `_ATTACK_TERMS` phủ 29 họ chữ ký WAF nhưng không có mục nào cho tấn
     công tầng LLM, trong khi `rule_engine` vẫn ghi `tier1_reasons` mang đúng hai chữ ký này.
-    Lô mang chữ ký tiêm nhiễm vì thế cho từ vựng RỖNG -> `shield_has_attack_evidence` False
+    Lô mang chữ ký tiêm nhiễm vì thế cho từ vựng rỗng -> `shield_has_attack_evidence` False
     -> lá chắn kẹp confidence xuống 0,84 -> Tier-2 không chặn được tiêm nhiễm dù Tier-1 đã
     nhận diện chắc chắn.
 
-    PHẠM VI: đo trên `data/demo.json` ngày 14/08/2026, bản vá đổi kết quả cho 0/730 mẫu
-    `adv_llm` — chúng không kích hoạt chữ ký injection của Tier-1. Test này giữ ĐƯỜNG ĐI cho
+    Phạm VI: đo trên `data/demo.json` ngày 14/08/2026, bản vá đổi kết quả cho 0/730 mẫu
+    `adv_llm` - chúng không kích hoạt chữ ký injection của Tier-1. Test này giữ đường đi cho
     đúng, không phải để chống lưng cho một con số nào trong luận văn.
 
-    Chuỗi lý do dưới đây lấy NGUYÊN VĂN khuôn mà `rule_engine.py` sinh ra; nếu ai đó sửa lời
+    Chuỗi lý do dưới đây lấy nguyên văn khuôn mà `rule_engine.py` sinh ra; nếu ai đó sửa lời
     chữ ký mà quên bảng từ vựng thì test này đỏ thay vì lỗi âm thầm quay lại.
     """
     from src.agent.nodes import batch_attack_vocabulary
@@ -268,9 +266,9 @@ def test_chu_ky_tan_cong_tang_llm_duoc_tinh_la_bang_chung():
 
 
 def test_lo_chi_vuot_nguong_van_khong_co_bang_chung_dac_trung():
-    """Chống vá quá tay: thêm mục LLM KHÔNG được làm lô ngưỡng thuần bỗng có bằng chứng.
+    """Chống vá quá tay: thêm mục LLM không được làm lô ngưỡng thuần bỗng có bằng chứng.
 
-    Một ngưỡng bị vượt chỉ chứng minh khối lượng bất thường — DoS, C2 beaconing và rò rỉ dữ
+    Một ngưỡng bị vượt chỉ chứng minh khối lượng bất thường - DoS, C2 beaconing và rò rỉ dữ
     liệu khớp như nhau. Đây là bất biến mà cả lá chắn dựa vào; nới nó ra là cho phép chặn
     NetFlow theo phỏng đoán, đúng thứ lá chắn sinh ra để cấm.
     """
@@ -283,17 +281,17 @@ def test_lo_chi_vuot_nguong_van_khong_co_bang_chung_dac_trung():
 
 
 def test_curated_map_ten_khop_ma():
-    """Mọi mục trong `WEB_ATTACK_MAP`: TÊN phải đi với đúng MÃ của chính nó.
+    """Mọi mục trong `WEB_ATTACK_MAP`: Tên phải đi với đúng mã của chính nó.
 
-    LỖI THẬT ĐÃ VÁ (đo lượt 14/08/2026). `active_scan` ghi mã CON `T1595.003` cạnh tên của
-    kỹ thuật CHA "Active Scanning"; `c2_web` ghi `T1071.001` cạnh "Application Layer
-    Protocol". `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` mà KHÔNG
-    đi qua `verify_technique_label`, nên nhãn sai đi thẳng ra Dashboard — 2/939 lô hiện
+    Lỗi thật đã vá (đo lượt 14/08/2026). `active_scan` ghi mã con `T1595.003` cạnh tên của
+    kỹ thuật cha "Active Scanning"; `c2_web` ghi `T1071.001` cạnh "Application Layer
+    Protocol". `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` mà không
+    đi qua `verify_technique_label`, nên nhãn sai đi thẳng ra Dashboard - 2/939 lô hiện
     "T1595.003 - Active Scanning" trong khi tên chính thức là "Wordlist Scanning".
 
-    Chấp nhận HAI dạng: tên trùng khít tên chuẩn, hoặc dạng "Cha: Con" có chứa tên chuẩn
+    Chấp nhận hai dạng: tên trùng khít tên chuẩn, hoặc dạng "Cha: Con" có chứa tên chuẩn
     (quy ước của mục `xss`: "Command and Scripting Interpreter: JavaScript" cho T1059.007).
-    Cấm đúng một thứ: tên KHÔNG chứa danh tính của mã con.
+    Cấm đúng một thứ: tên không chứa danh tính của mã con.
     """
     from src.agent.attack_mapper import WEB_ATTACK_MAP, canonical_technique_name
 

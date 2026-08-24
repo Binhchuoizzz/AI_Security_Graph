@@ -1,22 +1,21 @@
 #!/usr/bin/env python3
-"""Dựng 'golden baseline' Welford từ lưu lượng benign ĐÃ KIỂM ĐỊNH.
+"""Dựng 'golden baseline' Welford từ lưu lượng benign đã kiểm định.
 
 Tích lũy trạng thái Welford (n, mean, M2) cho từng feature Tầng 1, lưu vào
 ``config/golden_baseline.json``. RuleEngine seed baseline này lúc khởi tạo khi bật cờ
-``tier1.golden_baseline.enabled: true``; sau đó vẫn cập nhật online CÓ ĐIỀU KIỆN
+``tier1.golden_baseline.enabled: true``; sau đó vẫn cập nhật online có điều kiện
 (chỉ với phán quyết DROP/LOG).
 
-HAI THAY ĐỔI QUAN TRỌNG (2026-07-21)
-------------------------------------
-1. **Nguồn & cỡ mẫu.** Bản cũ chỉ lấy 300 flow benign từ ``ground_truth.json`` — chính là
-   tập BENCHMARK. Vừa quá nhỏ để ước lượng phương sai của phân phối đuôi dài, vừa RÒ RỈ
+Hai thay đổi quan trọng (2026-07-21)
+1. Nguồn & cỡ mẫu. Bản cũ chỉ lấy 300 flow benign từ ``ground_truth.json`` - chính là
+   tập BENCHMARK. Vừa quá nhỏ để ước lượng phương sai của phân phối đuôi dài, vừa rò rỉ
    dữ liệu (Tầng 1 học trên đúng tập nó bị chấm). Bản này đọc CSV CICIDS gốc và **loại
    trừ tường minh** mọi flow đã xuất hiện trong benchmark (đối chiếu bằng chữ ký đặc
    trưng), rồi lấy mặc định 10.000 flow.
 
-2. **Không gian thống kê.** Baseline được tích lũy ở CÙNG thang mà RuleEngine tính
+2. Không gian thống kê. Baseline được tích lũy ở cùng thang mà RuleEngine tính
    Z-score (``scale_feature``: log1p cho đặc trưng khối-lượng/thời-lượng/tốc-độ). File
-   kết quả ghi cờ ``transform`` để bên nạp TỪ CHỐI baseline dựng ở thang cũ thay vì suy
+   kết quả ghi cờ ``transform`` để bên nạp từ chối baseline dựng ở thang cũ thay vì suy
    biến im lặng.
 
 Chạy:
@@ -42,15 +41,15 @@ from src.tier1_filter.rule_engine import (  # noqa: E402
 )
 
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
-# datatest.json nằm ở data/, KHÔNG phải experiments/ (xem scripts/build_datatest.py:76 và
-# experiments/evaluate_ml_gate.py:36). Đường dẫn cũ trỏ vào file KHÔNG TỒN TẠI nên
-# _benchmark_signatures() lặng lẽ bỏ qua toàn bộ 3.204 flow của datatest — tức golden
+# datatest.json nằm ở data/, không phải experiments/ (xem scripts/build_datatest.py:76 và
+# experiments/evaluate_ml_gate.py:36). Đường dẫn cũ trỏ vào file không tồn tại nên
+# _benchmark_signatures() lặng lẽ bỏ qua toàn bộ 3.204 flow của datatest - tức golden
 # baseline vẫn có thể học trúng chính các flow dùng để chấm Cổng ML (rò rỉ dữ liệu).
 DATATEST_PATH = os.path.join(ROOT, "data", "datatest.json")
 CIC_DIR = os.path.join(ROOT, "data", "raw", "cicids2018")
 OUT_PATH = os.path.join(ROOT, "config", "golden_baseline.json")
 
-# Chữ ký nhận dạng một flow — dùng để LOẠI TRỪ flow đã nằm trong benchmark.
+# Chữ ký nhận dạng một flow - dùng để loại trừ flow đã nằm trong benchmark.
 _SIG_FIELDS = (
     "Flow Duration",
     "Total Fwd Packets",
@@ -75,12 +74,12 @@ def _flow_signature(d: dict) -> str:
 
 
 def _benchmark_signatures() -> set[str]:
-    """Chữ ký của MỌI flow xuất hiện trong tập benchmark (ground_truth + datatest)."""
+    """Chữ ký của mọi flow xuất hiện trong tập benchmark (ground_truth + datatest)."""
     sigs: set[str] = set()
     for path in (GT_PATH, DATATEST_PATH):
         if not os.path.exists(path):
-            # KHÔNG được bỏ qua im lặng: thiếu một tập benchmark ở đây nghĩa là golden
-            # baseline có thể HỌC TRÚNG chính flow dùng để CHẤM — rò rỉ dữ liệu, và không
+            # Không được bỏ qua im lặng: thiếu một tập benchmark ở đây nghĩa là golden
+            # baseline có thể học trúng chính flow dùng để chấm - rò rỉ dữ liệu, và không
             # có triệu chứng nào ngoài việc điểm số đẹp lên một cách vô căn cứ.
             print(
                 f"    [!] CẢNH BÁO: không thấy tập benchmark {path} — flow của nó sẽ KHÔNG"
@@ -110,21 +109,21 @@ def main() -> None:
     ap.add_argument("--n", type=int, default=10_000, help="số flow benign mục tiêu")
     args = ap.parse_args()
 
-    import pandas as pd  # nặng — chỉ nạp khi thật sự chạy
+    import pandas as pd  # nặng - chỉ nạp khi thật sự chạy
 
     exclude = _benchmark_signatures()
     print(f"[*] Chữ ký flow benchmark cần LOẠI TRỪ: {len(exclude)}")
 
-    # Bắt đầu từ Welford RỖNG: RuleEngine() tự seed golden lúc init nên nếu không reset
-    # ta sẽ tích lũy CHỒNG lên chính golden cũ (n gấp đôi).
+    # Bắt đầu từ Welford rỗng: RuleEngine() tự seed golden lúc init nên nếu không reset
+    # ta sẽ tích lũy chồng lên chính golden cũ (n gấp đôi).
     engine = RuleEngine()
     for _k in engine.global_stats:
         engine.global_stats[_k] = RunningStats()
 
     csvs = sorted(f for f in os.listdir(CIC_DIR) if f.endswith(".csv"))
-    # TRẢI ĐỀU qua MỌI ngày: lấy hết quota từ một ngày sẽ cho baseline chỉ phản ánh nhịp
+    # Trải đều qua mọi ngày: lấy hết quota từ một ngày sẽ cho baseline chỉ phản ánh nhịp
     # lưu lượng của ngày đó (giờ làm việc, dịch vụ đang chạy), không đại diện cho "bình
-    # thường" của cả mạng — đúng thứ Z-score cần.
+    # thường" của cả mạng - đúng thứ Z-score cần.
     per_day = max(1, args.n // max(1, len(csvs)))
     n_used = n_skipped = 0
     for csv_name in csvs:
@@ -145,7 +144,7 @@ def main() -> None:
                     break
                 if _flow_signature(row) in exclude:
                     n_skipped += 1
-                    continue  # RÒ RỈ: flow này đã nằm trong benchmark
+                    continue  # Rò rỉ: flow này đã nằm trong benchmark
                 engine.learn_baseline(map_cicids(row))
                 day_used += 1
                 n_used += 1

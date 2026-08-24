@@ -1,1 +1,1 @@
-# Integration tests kiem tra tuong tac giua cac module cua SENTINEL.
+# Kiểm thử tích hợp: tương tác giữa các module của SENTINEL.

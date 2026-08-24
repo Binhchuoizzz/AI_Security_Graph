@@ -54,7 +54,7 @@ def main():
     raw_dir = "data/adversarial_llm/raw"
     os.makedirs(raw_dir, exist_ok=True)
 
-    # 1. Prompt Injection (deepset/prompt-injections) -> Label 1 means malicious
+    # Tiêm nhiễm prompt (deepset/prompt-injections), nhãn 1 là độc hại
     fetch_hf_dataset(
         "deepset/prompt-injections",
         f"{raw_dir}/deepset_prompt_injections.json",
@@ -63,7 +63,7 @@ def main():
         condition=lambda r: r.get("label") == 1,
     )
 
-    # 2. Jailbreak (ShawnMenz/DAN_jailbreak)
+    # Vượt rào (ShawnMenz/DAN_jailbreak)
     fetch_hf_dataset(
         "ShawnMenz/DAN_jailbreak",
         f"{raw_dir}/shawnmenz_dan_jailbreak.json",
@@ -72,7 +72,7 @@ def main():
     )
 
     # 3. Prompt Leakage / System Prompt Extraction (E.g. from jailbreak datasets or toxic-chat)
-    # Using 'markush1/LLM-Jailbreak-Prompts' as another source for jailbreaks/leaks
+    # Lấy thêm nguồn 'markush1/LLM-Jailbreak-Prompts' cho vượt rào và rò prompt
     fetch_hf_dataset(
         "markush1/LLM-Jailbreak-Prompts",
         f"{raw_dir}/llm_jailbreak_prompts.json",

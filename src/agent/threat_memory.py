@@ -1,23 +1,23 @@
 """
 Kho lưu trữ bộ nhớ tình báo mối đe dọa dài hạn (Long-Term Threat Intelligence Memory Store)
 
-MỤC ĐÍCH:
+Mục đích:
   SENTINEL hiện tại chỉ có Session Memory (trong RAM, mất khi restart).
   Module này bổ sung PERSISTENT MEMORY (SQLite) cho 3 chức năng:
 
-  1. THEO DÕI DANH TIẾNG IP (IP REPUTATION TRACKING):
+  1. Theo dõi danh tiếng IP (IP REPUTATION TRACKING):
      Ghi nhận lịch sử hành vi IP qua nhiều ngày/tuần.
-     → Phát hiện APT low-and-slow (tấn công chậm, ít lưu lượng mỗi ngày).
+     -> Phát hiện APT low-and-slow (tấn công chậm, ít lưu lượng mỗi ngày).
 
-  2. BỐI CẢNH TỔ CHỨC (ORGANIZATIONAL CONTEXT):
+  2. Bối cảnh tổ chức (ORGANIZATIONAL CONTEXT):
      Lưu danh sách tools/services hợp pháp nội bộ (Nessus scanner, pentest IPs).
-     → Agent tự động nhận ra traffic từ internal security tools, tránh false positive.
+     -> Agent tự động nhận ra traffic từ internal security tools, tránh false positive.
 
-  3. TƯƠNG QUAN APT (APT CORRELATION):
+  3. Tương quan APT (APT CORRELATION):
      Tự động flag IP bị escalate > N lần trong M ngày.
-     → Tương quan sự kiện dài hạn mà Session Memory không làm được.
+     -> Tương quan sự kiện dài hạn mà Session Memory không làm được.
 
-  THIẾT KẾ:
+  Thiết kế:
   - Persistent Store: SQLite (nhẹ, không cần server, tích hợp Python stdlib)
   - Tables: ip_reputation, known_entities, apt_indicators
   - Cơ chế suy hao (Decay Mechanism): Điểm reputation score giảm dần theo thời gian nếu IP im lặng
@@ -36,20 +36,20 @@ logger = logging.getLogger(__name__)
 
 MEMORY_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "threat_memory.db")
 
-# Khóa GHI cấp MODULE (dùng chung cho MỌI ThreatMemoryStore vì cùng ghi 1 file DB): serialize
+# Khóa ghi cấp MODULE (dùng chung cho mọi ThreatMemoryStore vì cùng ghi 1 file DB): serialize
 # các thao tác read-modify-write (reputation) + INSERT (APT event) khi nhiều worker Tier-2 chạy
-# song song. Đơn luồng (production/test) không tranh chấp = chi phí ~0, hành vi Y HỆT như trước.
+# song song. Đơn luồng (production/test) không tranh chấp = chi phí ~0, hành vi Y hệt như trước.
 _write_lock = threading.Lock()
 
-# Khoá RIÊNG cho bộ đệm `blocked_hits` trong RAM. Tách khỏi `_write_lock` là có chủ đích: mục
-# đích của bộ đệm là để đường nóng KHÔNG phải xếp hàng sau các giao dịch SQLite dài.
+# Khoá riêng cho bộ đệm `blocked_hits` trong RAM. Tách khỏi `_write_lock` là có chủ đích: mục
+# đích của bộ đệm là để đường nóng không phải xếp hàng sau các giao dịch SQLite dài.
 _hits_lock = threading.Lock()
 
 
 def _parse_utc(ts: str) -> datetime | None:
-    """Đọc timestamp ISO về datetime AWARE-UTC, chịu được dữ liệu CŨ dạng naive.
+    """Đọc timestamp ISO về datetime AWARE-UTC, chịu được dữ liệu cũ dạng naive.
 
-    TẠI SAO CẦN: mọi timestamp mới đều aware-UTC, nhưng DB đã tồn tại từ trước có thể
+    Tại sao cần: mọi timestamp mới đều aware-UTC, nhưng DB đã tồn tại từ trước có thể
     còn dòng naive (bản cũ ghi bằng datetime.now()). Phép trừ `aware - naive` ném
     TypeError -> làm hỏng cả nhánh phát hiện ứng viên APT. Ở đây coi giá trị naive là
     UTC (đúng với ý định ghi ban đầu) thay vì để nổ.
@@ -75,12 +75,12 @@ class ThreatMemoryStore:
         self._init_db()
 
     def _connect(self) -> sqlite3.Connection:
-        """Mở kết nối SQLite với synchronous=NORMAL — bỏ bớt fsync/commit → ghi nhanh hơn khi
+        """Mở kết nối SQLite với synchronous=NORMAL - bỏ bớt fsync/commit -> ghi nhanh hơn khi
         nạp hàng nghìn sự kiện APT (ingest_dapt_chains) + ghi danh tiếng mỗi phán quyết. Mức
-        KẾT NỐI (không đụng header file) nên AN TOÀN cả khi mở read-only (container). Đánh đổi:
-        dưới rollback-journal, rủi ro rất nhỏ mất/hỏng giao dịch cuối khi MẤT ĐIỆN đột ngột —
-        chấp nhận được vì threat_memory là dữ liệu nghiên cứu TÁI TẠO được, không phải sổ cái
-        HMAC. KHÔNG bật WAL (xung khắc cross-UID Docker)."""
+        Kết nối (không đụng header file) nên an toàn cả khi mở read-only (container). Đánh đổi:
+        dưới rollback-journal, rủi ro rất nhỏ mất/hỏng giao dịch cuối khi mất điện đột ngột -
+        chấp nhận được vì threat_memory là dữ liệu nghiên cứu tái tạo được, không phải sổ cái
+        HMAC. Không bật WAL (xung khắc cross-UID Docker)."""
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA synchronous=NORMAL")
         return conn
@@ -88,8 +88,8 @@ class ThreatMemoryStore:
     def _ensure_db_writable(self):
         """Nới quyền file DB để ghi được bởi cả host (uid 1000) lẫn container (uid 999).
 
-        KHÔNG XOÁ file ở đây (đường runtime): threat_memory.db giữ tiền sử IP + chuỗi APT
-        đa-ngày — xoá thầm sẽ mất bằng chứng emergent. Chỉ chmod; không được thì cảnh báo.
+        Không xoá file ở đây (đường runtime): threat_memory.db giữ tiền sử IP + chuỗi APT
+        đa-ngày - xoá thầm sẽ mất bằng chứng emergent. Chỉ chmod; không được thì cảnh báo.
         Reset chủ đích: scripts/reset_all.py."""
         if not os.path.exists(self.db_path):
             return
@@ -110,10 +110,10 @@ class ThreatMemoryStore:
         with self._connect() as conn:
             c = conn.cursor()
 
-            # KHÔNG bật WAL: WAL đổi header + bắt READER ghi -shm -> crash cross-UID Docker
+            # Không bật WAL: WAL đổi header + bắt READER ghi -shm -> crash cross-UID Docker
             # (Dashboard container mở read-only). Giữ rollback-journal. Tối ưu an toàn: index
             # bên dưới + synchronous=NORMAL (mức kết nối, trong _connect()).
-            # Bảng 1: IP Reputation — theo dõi hành vi IP dài hạn
+            # Bảng 1: IP Reputation - theo dõi hành vi IP dài hạn
             c.execute("""
                 CREATE TABLE IF NOT EXISTS ip_reputation (
                     ip TEXT PRIMARY KEY,
@@ -129,31 +129,31 @@ class ThreatMemoryStore:
                 )
             """)
 
-            # Cột `blocked_hits`: số GÓI TIN đến từ một IP ĐÃ bị chặn (chặn tại chỗ, on-sight).
+            # Cột `blocked_hits`: số gói tin đến từ một IP đã bị chặn (chặn tại chỗ, on-sight).
             # Tách khỏi `total_blocks` vì hai thứ này khác nhau về bản chất và trước đây bị gộp:
-            # `mark_ip_blocked` cộng `total_blocks` MỖI gói khớp, nên một IP CSIC gửi 24 request
-            # dính chữ ký WAF hiện lên là "24 lần chặn" trong khi sổ kiểm toán có ĐÚNG 0 lệnh
-            # chặn cho nó. Chính sách thật: 2 ALERT -> 1 BLOCK, và đã chặn lần đầu thì KHÔNG có
-            # lần sau. `total_blocks` phải phản ánh SỐ QUYẾT ĐỊNH, không phải lưu lượng.
+            # `mark_ip_blocked` cộng `total_blocks` mỗi gói khớp, nên một IP CSIC gửi 24 request
+            # dính chữ ký WAF hiện lên là "24 lần chặn" trong khi sổ kiểm toán có đúng 0 lệnh
+            # chặn cho nó. Chính sách thật: 2 ALERT -> 1 BLOCK, và đã chặn lần đầu thì không có
+            # lần sau. `total_blocks` phải phản ánh số quyết định, không phải lưu lượng.
             c.execute("PRAGMA table_info(ip_reputation)")
             _cols = [col[1] for col in c.fetchall()]
             if "blocked_hits" not in _cols:
                 c.execute("ALTER TABLE ip_reputation ADD COLUMN blocked_hits INTEGER DEFAULT 0")
 
-            # Cột `last_incident`: mốc thời gian của SỰ CỐ MỚI gần nhất — khác `last_seen`, vốn
-            # là mốc LẦN CUỐI THẤY GÓI TIN (kể cả gói đã bị chặn on-sight).
+            # Cột `last_incident`: mốc thời gian của sự cố mới gần nhất - khác `last_seen`, vốn
+            # là mốc lần cuối thấy gói tin (kể cả gói đã bị chặn on-sight).
             #
-            # BẾ TẮC ĐÃ SỬA: `decay_reputation()` lọc `WHERE last_seen < now - 7 ngày`, trong khi
-            # nhánh `>= 100` của `mark_ip_blocked` lại đặt `last_seen = now` cho MỌI gói đến từ IP
+            # Bế tắc đã sửa: `decay_reputation()` lọc `WHERE last_seen < now - 7 ngày`, trong khi
+            # nhánh `>= 100` của `mark_ip_blocked` lại đặt `last_seen = now` cho mọi gói đến từ IP
             # đang bị chặn. Nghĩa là chính việc bị chặn làm mới cái đồng hồ mà suy giảm phụ thuộc
-            # vào -> một IP còn gửi lưu lượng thì KHÔNG BAO GIỜ đủ điều kiện suy giảm, dù nó đã
+            # vào -> một IP còn gửi lưu lượng thì không bao giờ đủ điều kiện suy giảm, dù nó đã
             # sạch từ lâu. Lối thoát duy nhất là Analyst gỡ tay. Đo được trên luồng demo 496.885
             # sự kiện: 2.830/3.044 IP nằm ở điểm 100 và 73,7% tổng lưu lượng bị chặn theo danh
-            # tiếng, phần lớn là lưu lượng LÀNH của những IP mà CICIDS2018 dùng chung cho cả hai
+            # tiếng, phần lớn là lưu lượng lành của những IP mà CICIDS2018 dùng chung cho cả hai
             # loại. Lời hứa "điểm suy giảm dần khi IP im lặng, tránh chặn vĩnh viễn IP đã sạch"
             # vì thế không đúng với bất kỳ IP nào còn hoạt động.
             #
-            # Tách mốc riêng là cách sửa đúng bản chất: lưu lượng mà CHÍNH HỆ chặn không phải là
+            # Tách mốc riêng là cách sửa đúng bản chất: lưu lượng mà chính hệ chặn không phải là
             # bằng chứng IP vẫn đang xấu, nên nó không được quyền kéo dài bản án của chính nó.
             if "last_incident" not in _cols:
                 c.execute("ALTER TABLE ip_reputation ADD COLUMN last_incident TEXT")
@@ -161,7 +161,7 @@ class ThreatMemoryStore:
                 # nào bỗng dưng đủ điều kiện suy giảm ngay lần chạy đầu sau khi nâng cấp.
                 c.execute("UPDATE ip_reputation SET last_incident = last_seen")
 
-            # Bảng 2: Known Entities — tools/services hợp pháp nội bộ
+            # Bảng 2: Known Entities - tools/services hợp pháp nội bộ
             c.execute("""
                 CREATE TABLE IF NOT EXISTS known_entities (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -174,7 +174,7 @@ class ThreatMemoryStore:
                 )
             """)
 
-            # Bảng 3: APT Indicators — correlation dài hạn
+            # Bảng 3: APT Indicators - correlation dài hạn
             c.execute("""
                 CREATE TABLE IF NOT EXISTS apt_indicators (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,7 +190,7 @@ class ThreatMemoryStore:
                 )
             """)
 
-            # Bảng 4: Threat Events — APT chain tracking from DAPT2020
+            # Bảng 4: Threat Events - APT chain tracking from DAPT2020
             c.execute("""
                 CREATE TABLE IF NOT EXISTS threat_events (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -207,7 +207,7 @@ class ThreatMemoryStore:
             # Nạp các thực thể đã biết mặc định nếu bảng trống
             c.execute("SELECT COUNT(*) FROM known_entities")
             if c.fetchone()[0] == 0:
-                # PHẢI aware-UTC cho khớp MỌI timestamp khác của file này (8 chỗ dùng
+                # Phải aware-UTC cho khớp mọi timestamp khác của file này (8 chỗ dùng
                 # datetime.now(timezone.utc)). Dùng datetime.now() naive ở đây khiến
                 # known_entities.added_at lệch +7h so với phần còn lại, và so sánh chuỗi
                 # ISO với cutoff aware mất tin cậy (chuỗi naive không có hậu tố '+00:00').
@@ -223,19 +223,17 @@ class ThreatMemoryStore:
                     (now_str, now_str, now_str),
                 )
 
-            # CHỈ MỤC threat_events: check_apt_chain(src_ip) chạy 2 LẦN mỗi sự kiện APT ngay
-            # trong VÒNG ĐỌC HOT của subscriber (before/after) và get_threat_events_for_ip
+            # Chỉ mục threat_events: check_apt_chain(src_ip) chạy 2 lần mỗi sự kiện APT ngay
+            # trong vòng đọc HOT của subscriber (before/after) và get_threat_events_for_ip
             # lọc src_ip OR dst_ip. Không index -> mỗi lần quét toàn bảng O(n); trên cả luồng
-            # thành O(n²). Index đưa về O(log n) — win LỚN nhất của DB khi demo chuỗi APT.
+            # thành O(n²). Index đưa về O(log n) - win lớn nhất của DB khi demo chuỗi APT.
             c.execute("CREATE INDEX IF NOT EXISTS idx_threat_events_src ON threat_events(src_ip)")
             c.execute("CREATE INDEX IF NOT EXISTS idx_threat_events_dst ON threat_events(dst_ip)")
 
             conn.commit()
         logger.info(f"[THREAT MEMORY] Initialized at {self.db_path}")
 
-    # =========================================================================
-    # DANH TIẾNG IP
-    # =========================================================================
+    # Danh tiếng IP
 
     def record_incident(
         self, ip: str, action: str, mitre_technique: str = "", score_delta: float | None = None
@@ -244,10 +242,10 @@ class ThreatMemoryStore:
         Ghi nhận một sự cố liên quan đến IP.
         Tự động tăng reputation score dựa trên mức độ nghiêm trọng (severity).
 
-        `score_delta` cho phép NGƯỜI GỌI hạ trọng số khi bằng chứng yếu hơn mức mà bảng mặc
+        `score_delta` cho phép người gọi hạ trọng số khi bằng chứng yếu hơn mức mà bảng mặc
         định giả định. Bảng dưới đây ngầm định mỗi `BLOCK_IP` là một phán quyết có nội dung
         (chữ ký/luật đã duyệt/quyết định Tier-2) nên cho thẳng 50 điểm; một lệnh chặn suy ra
-        THUẦN TUÝ từ đặc trưng luồng thì không xứng trọng số đó. Xem `_persist_block_evidence`
+        Thuần tuý từ đặc trưng luồng thì không xứng trọng số đó. Xem `_persist_block_evidence`
         trong `src/streaming/subscriber.py`.
         """
         ip = output_sanitizer.sanitize(ip)
@@ -309,11 +307,11 @@ class ThreatMemoryStore:
             conn.commit()
 
     def note_blocked_hit(self, ip: str) -> None:
-        """Đếm một gói đến từ IP ĐANG bị chặn — GOM TRONG RAM, chưa chạm đĩa.
+        """Đếm một gói đến từ IP đang bị chặn - gom trong RAM, chưa chạm đĩa.
 
-        LÝ DO THÔNG LƯỢNG. Đường cũ gọi `mark_ip_blocked` cho từng gói bị chặn on-sight, mà
-        mỗi lượt gọi là một giao dịch SQLite trọn vẹn dưới khoá ghi TOÀN CỤC: đo được
-        **1,469 ms/lượt**. Lượt chạy 2026-08-11 có 153.868 gói như vậy — tức **730 giây** chỉ
+        Lý do thông lượng. Đường cũ gọi `mark_ip_blocked` cho từng gói bị chặn on-sight, mà
+        mỗi lượt gọi là một giao dịch SQLite trọn vẹn dưới khoá ghi toàn cục: đo được
+        1,469 ms/lượt. Lượt chạy 2026-08-11 có 153.868 gói như vậy - tức 730 giây chỉ
         để cộng một biến đếm hiển thị. Ở luồng 500k sự kiện, đây là khoản tốn lớn nhất của cả
         đường nóng, lớn hơn cả Cổng ML chấm toàn bộ luồng (237 giây).
 
@@ -327,7 +325,7 @@ class ThreatMemoryStore:
             self._pending_hits[ip] = self._pending_hits.get(ip, 0) + 1
 
     def flush_blocked_hits(self) -> int:
-        """Đổ bộ đệm `note_blocked_hit` xuống đĩa trong MỘT giao dịch. Trả về số IP đã ghi."""
+        """Đổ bộ đệm `note_blocked_hit` xuống đĩa trong một giao dịch. Trả về số IP đã ghi."""
         with _hits_lock:
             if not self._pending_hits:
                 return 0
@@ -343,16 +341,16 @@ class ThreatMemoryStore:
                 )
                 conn.commit()
         except Exception:
-            # Mất số đếm hiển thị thì chấp nhận được; KHÔNG được để đường nóng chết vì nó.
+            # Mất số đếm hiển thị thì chấp nhận được; Không được để đường nóng chết vì nó.
             return 0
         return len(batch)
 
     def mark_ip_blocked(self, ip: str, mitre_technique: str = "") -> None:
-        """Đánh dấu IP là KNOWN-BAD DỨT KHOÁT: đặt reputation_score = 100 (>= ngưỡng block 70
-        của Tier-1) để LẦN SAU Tier-1 CHẶN NGAY on-sight, **VĨNH VIỄN** cho tới khi Analyst gỡ
+        """Đánh dấu IP là KNOWN-BAD dứt khoát: đặt reputation_score = 100 (>= ngưỡng block 70
+        của Tier-1) để lần sau Tier-1 chặn ngay on-sight, vĩnh viễn cho tới khi Analyst gỡ
         (unblock_ip reset về 0 / whitelist miễn trừ enforcement).
 
-        Đây là kho "nhớ mặt" BỀN + SCALABLE thay cho việc tạo 1 dynamic-rule YAML mỗi IP
+        Đây là kho "nhớ mặt" bền + SCALABLE thay cho việc tạo 1 dynamic-rule YAML mỗi IP
         (nguyên nhân phình config + nghẽn khi đẩy nhiều log). SQLite -> cả host lẫn container
         Dashboard đọc được; rule_engine đã có sẵn đường kiểm reputation (có cache TTL)."""
         ip = output_sanitizer.sanitize(ip)
@@ -372,18 +370,18 @@ class ThreatMemoryStore:
                     (ip, now, now, mitre_technique, now),
                 )
             elif float(row[0] or 0.0) >= 100.0:
-                # ĐÃ bị chặn từ trước -> KHÔNG có "lần chặn thứ hai". Gói này chỉ là lưu lượng
+                # Đã bị chặn từ trước -> không có "lần chặn thứ hai". Gói này chỉ là lưu lượng
                 # đến từ một IP đang nằm trong danh sách đen; ghi vào `blocked_hits` và cập nhật
-                # `last_seen`, KHÔNG đụng `total_blocks`/`total_incidents`.
+                # `last_seen`, không đụng `total_blocks`/`total_incidents`.
                 #
-                # VÀ TUYỆT ĐỐI KHÔNG ĐỘNG `last_incident`. Đây là mắt xích của bế tắc đã sửa:
+                # Và tuyệt đối không động `last_incident`. Đây là mắt xích của bế tắc đã sửa:
                 # `decay_reputation` đo "IP im lặng bao lâu rồi", mà lưu lượng bị chặn on-sight
                 # lại vẫn chảy vào đây. Nếu nó cũng đẩy mốc suy giảm lên, thì chính việc bị chặn
-                # sẽ gia hạn bản án của mình — IP không bao giờ được tha, kể cả khi đã sạch.
+                # sẽ gia hạn bản án của mình - IP không bao giờ được tha, kể cả khi đã sạch.
                 # `last_seen` vẫn cập nhật vì Dashboard cần biết lần cuối thấy gói tin.
                 #
-                # LỖI ĐÃ SỬA: bản cũ cộng dồn vô điều kiện, nên `198.51.100.38` hiện
-                # `total_blocks = 24` trong khi sổ kiểm toán có ĐÚNG 0 lệnh chặn cho nó — con số
+                # Lỗi đã sửa: bản cũ cộng dồn vô điều kiện, nên `198.51.100.38` hiện
+                # `total_blocks = 24` trong khi sổ kiểm toán có đúng 0 lệnh chặn cho nó - con số
                 # trên Dashboard mâu thuẫn thẳng với chính sách "2 ALERT -> 1 BLOCK, chặn rồi
                 # thì thôi", và không một phép hậu kiểm nào đối chiếu được.
                 c.execute(
@@ -393,7 +391,7 @@ class ThreatMemoryStore:
                     (now, mitre_technique, mitre_technique, ip),
                 )
             else:
-                # Lần chặn ĐẦU TIÊN của IP này -> đây mới là một quyết định chặn thật.
+                # Lần chặn đầu tiên của IP này -> đây mới là một quyết định chặn thật.
                 c.execute(
                     "UPDATE ip_reputation SET reputation_score = 100.0, "
                     "total_blocks = total_blocks + 1, total_incidents = total_incidents + 1, "
@@ -441,7 +439,7 @@ class ThreatMemoryStore:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=inactive_days)).isoformat()
         with self._connect() as conn:
             c = conn.cursor()
-            # Neo vào `last_incident` (SỰ CỐ MỚI gần nhất), KHÔNG phải `last_seen` (gói tin gần
+            # Neo vào `last_incident` (sự cố mới gần nhất), không phải `last_seen` (gói tin gần
             # nhất, kể cả gói đã bị chặn on-sight). Xem chú thích cột `last_incident` ở phần
             # khởi tạo lược đồ: dùng `last_seen` thì lưu lượng bị chặn tự gia hạn bản án của
             # chính nó và không IP nào từng đủ điều kiện suy giảm.
@@ -466,7 +464,7 @@ class ThreatMemoryStore:
                 c = conn.cursor()
                 # `blocked_hits` cũng về 0: analyst gỡ chặn là xoá trạng thái "đang bị chặn",
                 # nên bộ đếm gói-chặn-tại-chỗ của lần chặn cũ không còn ý nghĩa. Nếu IP tái
-                # phạm sau này thì đó là một lần chặn MỚI, đếm lại từ đầu.
+                # phạm sau này thì đó là một lần chặn mới, đếm lại từ đầu.
                 c.execute(
                     "UPDATE ip_reputation SET reputation_score = 0.0, blocked_hits = 0 "
                     "WHERE ip = ?",
@@ -477,9 +475,7 @@ class ThreatMemoryStore:
         except Exception as e:
             logger.error(f"[THREAT MEMORY] Failed to reset reputation for {ip}: {e}")
 
-    # =========================================================================
-    # ORGANIZATIONAL CONTEXT (Known Entities)
-    # =========================================================================
+    # Ngữ cảnh tổ chức (thực thể đã biết)
 
     def add_known_entity(
         self, entity_type: str, entity_value: str, description: str = "", added_by: str = "system"
@@ -552,9 +548,7 @@ class ThreatMemoryStore:
             self._init_db()
             return []
 
-    # =========================================================================
-    # THEO DÕI CHUỖI APT (Tích hợp DAPT2020)
-    # =========================================================================
+    # Theo dõi chuỗi APT (Tích hợp DAPT2020)
 
     def record_apt_event(
         self,
@@ -642,9 +636,7 @@ class ThreatMemoryStore:
         logger.info(f"[THREAT MEMORY] Ingested {count} DAPT2020 events")
         return count
 
-    # =========================================================================
-    # APT CORRELATION
-    # =========================================================================
+    # Tương quan chuỗi APT
 
     def check_apt_pattern(
         self, ip: str, threshold_incidents: int = 5, threshold_days: int = 7
@@ -688,10 +680,10 @@ class ThreatMemoryStore:
     ):
         """Ghi nhận APT indicator cho correlation dài hạn.
 
-        LƯU Ý về `mitre_chain`: tên cột là di sản — nó chứa HAI loại giá trị khác nhau tuỳ
+        Lưu Ý về `mitre_chain`: tên cột là di sản - nó chứa hai loại giá trị khác nhau tuỳ
         nơi gọi: (a) technique-id MITRE thật (nodes.py, đường quyết định LLM), hoặc
-        (b) nhãn giai đoạn kill-chain của DAPT2020 ("Establish Foothold"…) vốn KHÔNG phải
-        tên MITRE. Đừng hiển thị giá trị cột này như thể luôn là MITRE — xem
+        (b) nhãn giai đoạn kill-chain của DAPT2020 ("Establish Foothold"...) vốn không phải
+        tên MITRE. Đừng hiển thị giá trị cột này như thể luôn là MITRE - xem
         `get_threat_context` để biết cách gắn nhãn trung thực khi đưa vào prompt.
         """
         indicator_type = output_sanitizer.sanitize(indicator_type)
@@ -741,9 +733,7 @@ class ThreatMemoryStore:
                 )
             conn.commit()
 
-    # =========================================================================
-    # PROMPT CONTEXT GENERATION
-    # =========================================================================
+    # Sinh ngữ cảnh cho prompt
 
     def get_context_for_prompt(self, source_ip: str, max_tokens: int = 300) -> str:
         """
@@ -773,7 +763,7 @@ class ThreatMemoryStore:
                 f"{entity['description']}. Consider FALSE POSITIVE."
             )
 
-        # 3. Kiểm tra mẫu APT (APT check — dựa trên lịch sử incidents)
+        # 3. Kiểm tra mẫu APT (APT check - dựa trên lịch sử incidents)
         apt = self.check_apt_pattern(source_ip)
         if apt and apt["is_apt_candidate"]:
             parts.append(
@@ -781,13 +771,13 @@ class ThreatMemoryStore:
                 f"{apt['total_incidents']} incidents. ESCALATE SEVERITY."
             )
 
-        # 3b. Chuỗi APT đa-ngày từ threat_events (cơ chế EMERGENT của luồng gộp —
+        # 3b. Chuỗi APT đa-ngày từ threat_events (cơ chế EMERGENT của luồng gộp -
         # record_apt_event tích lũy dần; bản án bật khi đủ >=2 ngày tấn công).
         chain = self.check_apt_chain(source_ip)
         if chain.get("is_apt"):
-            # NÓI RÕ đây là nhãn GIAI ĐOẠN của bộ dữ liệu DAPT2020, KHÔNG phải tên kỹ
+            # Nói rõ đây là nhãn giai đoạn của bộ dữ liệu DAPT2020, không phải tên kỹ
             # thuật/tactic MITRE. Trước đây chỉ ghi "phases: Establish Foothold, ..." nên
-            # LLM tưởng là tên MITRE rồi dán ID lên, sinh ra cặp SAI kiểu
+            # LLM tưởng là tên MITRE rồi dán ID lên, sinh ra cặp sai kiểu
             # "T1087 - Establish Foothold" trong reasoning người dùng đọc trên dashboard.
             parts.append(
                 f"  🔴 APT CHAIN (multi-day): {chain['chain_length']} distinct days, "
@@ -803,7 +793,7 @@ class ThreatMemoryStore:
 
         context = "\n".join(parts)
         # Tỉ lệ ký tự/token ước lượng
-        if len(context) > max_tokens * 4:  # rough char-to-token ratio
+        if len(context) > max_tokens * 4:  # tỉ lệ ký tự trên token, ước lượng thô
             context = context[: max_tokens * 4] + "\n  ... [TRUNCATED]"
         return context
 

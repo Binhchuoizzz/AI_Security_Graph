@@ -1,9 +1,9 @@
 """
 LangGraph Agent: Bộ điều hợp Client LLM
 
-CHỨC NĂNG:
+Chức năng:
 - Giao tiếp với LLM cục bộ qua endpoint tương thích OpenAI (llama.cpp server). Tên model
-  đọc động từ `LLM_MODEL_FILE` / `llm.model_name` — KHÔNG viết cứng ở bất kỳ đâu.
+  đọc động từ `LLM_MODEL_FILE` / `llm.model_name` - không viết cứng ở bất kỳ đâu.
 - Sử dụng OpenAI API format (OpenAI-compatible endpoint tại port 5000).
 - Triển khai cơ chế Retry, Exponential Backoff, và xử lý Timeout để đảm bảo
   Agent không bị crash khi model đang bận tính toán.
@@ -46,16 +46,16 @@ API_KEY = os.getenv("LLM_API_KEY", "sk-placeholder-local-only")  # Giá trị gi
 # Tham số cấu hình cho Security Agent
 DEFAULT_MAX_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.1  # Nhiệt độ thấp = suy luận nhất quán (deterministic), ít ảo tưởng
-# Seed cố định -> với cùng prompt + temp thấp, llama.cpp cho output TẤT ĐỊNH (tái lập).
+# Seed cố định -> với cùng prompt + temp thấp, llama.cpp cho output tất định (tái lập).
 # None = không cố định (bỏ qua). Đọc từ config llm.seed.
 DEFAULT_SEED = _config.get("llm", {}).get("seed", 42)
 # Tên model đọc từ env LLM_MODEL_FILE (đồng bộ với model thực tế llama.cpp đang nạp
 # và tự khớp khi hot-swap qua scripts/switch_model.sh). llama.cpp bỏ qua tên này khi
 # chỉ nạp 1 model, nhưng giữ đồng bộ để chính xác và tương thích đa-model.
-# KHOÁ PHẢI LÀ `model_name` — config ghi `llm.model_name`, không phải `llm.model`. Bản cũ
-# đọc nhầm khoá nên LUÔN rơi về giá trị cứng "foundation-sec-8b.gguf": mọi nhật ký và vết
+# Khoá phải là `model_name` - config ghi `llm.model_name`, không phải `llm.model`. Bản cũ
+# đọc nhầm khoá nên luôn rơi về giá trị cứng "foundation-sec-8b.gguf": mọi nhật ký và vết
 # kiểm toán ghi tên model sai lệch trong khi Foundation-Sec mới là thứ đang chạy. llama.cpp
-# bỏ qua trường `model` khi chỉ nạp một model nên KHÔNG có gì báo lỗi — số đúng, tên sai,
+# bỏ qua trường `model` khi chỉ nạp một model nên không có gì báo lỗi - số đúng, tên sai,
 # và tên sai thì vẫn là số sai khi đem đi trích dẫn.
 DEFAULT_MODEL = os.getenv(
     "LLM_MODEL_FILE",
@@ -70,10 +70,10 @@ class IOCModel(BaseModel):
 
 
 class LLMDecision(BaseModel):
-    # CHỈ `action` bắt buộc — đây là quyết định lõi và Literal ép ĐÚNG enum (giá trị lạ ->
+    # Chỉ `action` bắt buộc - đây là quyết định lõi và Literal ép đúng enum (giá trị lạ ->
     # ValidationError -> tuồn xuống salvage/fallback an toàn). Các trường làm giàu để
     # OPTIONAL + default: LLM cục bộ đôi khi bỏ sót mitre/nist nhưng action+reasoning vẫn
-    # hợp lệ — KHÔNG hạ cấp cả quyết định rõ ràng xuống "parse_salvaged" chỉ vì thiếu enrich.
+    # hợp lệ - không hạ cấp cả quyết định rõ ràng xuống "parse_salvaged" chỉ vì thiếu enrich.
     action: Literal["BLOCK_IP", "ALERT", "LOG", "AWAIT_HITL"] = Field(
         ..., description="Hành động phân loại"
     )
@@ -85,11 +85,11 @@ class LLMDecision(BaseModel):
     extracted_iocs: list[IOCModel] | None = Field(default=[], description="Các IOC trích xuất được")
 
 
-# ── JSON SCHEMA cho quyết định triage ────────────────────────────────────────────────────────
-# Ép server llama.cpp XUẤT JSON HỢP LỆ (constrained decoding) — dứt điểm cảnh "JSON parse lỗi /
-# output bị cắt cụt" do mô hình tuồn prose ("**Analysis:** ...") thay vì JSON. Vì đi thẳng vào
-# field, model cũng BÁM chỉ dẫn "reasoning viết bằng TIẾNG VIỆT" của prompt tốt hơn (hết trường
-# "Lý do" tiếng Anh). Server này KHÔNG tôn trọng response_format={"type":"json_object"} nhưng CÓ
+# JSON SCHEMA cho quyết định triage
+# Ép server llama.cpp xuất JSON hợp lệ (constrained decoding) - dứt điểm cảnh "JSON parse lỗi /
+# output bị cắt cụt" do mô hình tuồn prose ("Analysis: ...") thay vì JSON. Vì đi thẳng vào
+# field, model cũng bám chỉ dẫn "reasoning viết bằng tiếng Việt" của prompt tốt hơn (hết trường
+# "Lý do" tiếng Anh). Server này không tôn trọng response_format={"type":"json_object"} nhưng có
 # tôn trọng {"type":"json_schema", ...} (đã kiểm thực tế). Thứ tự field khớp prompt để giữ hành vi.
 DECISION_JSON_SCHEMA: dict[str, Any] = {
     "type": "json_schema",
@@ -128,9 +128,7 @@ DECISION_JSON_SCHEMA: dict[str, Any] = {
 
 class LLMClient:
     def __init__(self, base_url: str = API_BASE_URL, max_retries: int = 3, timeout: int = 300):
-        """
-        Khởi tạo OpenAI Client trỏ về Local LLM server.
-        """
+        """Khởi tạo OpenAI Client trỏ về Local LLM server."""
         self.client = openai.OpenAI(base_url=base_url, api_key=API_KEY, timeout=timeout)
         self.max_retries = max_retries
 
@@ -167,7 +165,7 @@ class LLMClient:
                 }
             )
 
-        # Cổng quan sát ngữ cảnh (TRƯỚC khi gọi): ước lượng token input, cảnh báo nếu sát trần.
+        # Cổng quan sát ngữ cảnh (trước khi gọi): ước lượng token input, cảnh báo nếu sát trần.
         token_monitor.preflight_check(messages, max_tokens)
 
         for retries in range(self.max_retries + 1):
@@ -190,12 +188,12 @@ class LLMClient:
 
                 response: Any = self.client.chat.completions.create(**kwargs)  # type: ignore
 
-                # Ghi token THẬT do server trả về (prompt/completion) để quan sát & tinh chỉnh.
+                # Ghi token thật do server trả về (prompt/completion) để quan sát & tinh chỉnh.
                 token_monitor.record_usage(getattr(response, "usage", None))
 
                 # Trả về văn bản. `content` có thể là None theo schema OpenAI (vd
-                # finish_reason=length/content_filter, hay tool-call) → ép "" để
-                # parse_llm_response KHÔNG ném TypeError và suy biến an toàn AWAIT_HITL.
+                # finish_reason=length/content_filter, hay tool-call) -> ép "" để
+                # parse_llm_response không ném TypeError và suy biến an toàn AWAIT_HITL.
                 return response.choices[0].message.content or ""
 
             except openai.APITimeoutError as e:
@@ -259,8 +257,8 @@ class LLMClient:
                 # Nếu Pydantic báo lỗi cấu trúc (vd: missing reasoning, sai enum), chuyển xuống salvage
 
         # Nếu không có parsed_dict (JSON hỏng hoàn toàn) hoặc Pydantic fail
-        # Cứu vãn từng TRƯỜNG từ JSON bị CẮT CỤT (thường do max_tokens) hoặc lệch định
-        # dạng — thay vì mất trắng cả reasoning (đây là nguyên nhân #1 của thẻ hiển thị
+        # Cứu vãn từng trường từ JSON bị cắt cụt (thường do max_tokens) hoặc lệch định
+        # dạng - thay vì mất trắng cả reasoning (đây là nguyên nhân #1 của thẻ hiển thị
         # "No reasoning provided / tin cậy 0%").
         salvaged = self._salvage_fields(clean)
         if salvaged.get("action") or salvaged.get("reasoning"):
@@ -270,8 +268,8 @@ class LLMClient:
             logger.warning("JSON parse failed nhưng đã vớt được trường qua regex.")
             return salvaged
 
-        # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash. GẮN reasoning
-        # TRUNG THỰC để analyst hiểu (không để trống thành "No reasoning provided").
+        # Dự phòng cứng: trả về giá trị mặc định an toàn thay vì gây crash. Gắn reasoning
+        # Trung thực để analyst hiểu (không để trống thành "No reasoning provided").
         logger.error("All JSON parse attempts failed. Using safe default.")
         return {
             "action": "AWAIT_HITL",
@@ -287,7 +285,7 @@ class LLMClient:
 
     def _salvage_fields(self, text: str) -> dict:
         """Vớt action/confidence/reasoning/mitre_technique từ output LLM hỏng hoặc bị cắt cụt
-        bằng regex từng trường — để không mất reasoning khi JSON không parse trọn vẹn."""
+        bằng regex từng trường - để không mất reasoning khi JSON không parse trọn vẹn."""
         out: dict = {}
         m = re.search(r'"action"\s*:\s*"([^"]+)"', text)
         if m:

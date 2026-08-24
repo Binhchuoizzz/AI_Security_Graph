@@ -1,8 +1,8 @@
-"""Bất biến ĐỊNH TUYẾN ĐỐI KHÁNG: tấn công vào LLM và tấn công web là hai việc khác nhau.
+"""Bất biến định tuyến đối kháng: tấn công vào LLM và tấn công web là hai việc khác nhau.
 
-VÌ SAO CÓ FILE NÀY. Commit `b57cc43` thêm nhánh "phát hiện payload đối kháng -> bỏ qua RAG
+Vì sao có FILE này. Commit `b57cc43` thêm nhánh "phát hiện payload đối kháng -> bỏ qua RAG
 -> ép quy kết về prompt_injection". Ý định đúng (đừng để payload tiêm nhiễm lái kết quả
-truy xuất) nhưng ba khâu triển khai đều hở, và cả ba đều IM LẶNG:
+truy xuất) nhưng ba khâu triển khai đều hở, và cả ba đều im lặng:
 
   1. Cờ đọc từ `injection_detected`, mà danh sách chữ ký khi đó trộn cả `UNION SELECT`,
      `DROP TABLE`, `<script>`, `; exec`. Một câu SQLi dạng chữ vì thế bị coi là tấn công
@@ -10,14 +10,14 @@ truy xuất) nhưng ba khâu triển khai đều hở, và cả ba đều IM L�
 
   2. Bỏ RAG đặt `rag_mitre_context = ""`. Hạ nguồn, `node_attack_mapper` suy tập mã hợp lệ
      từ chính chuỗi đó: `_grounded(x) = not _rag_ids_pre or x in _rag_ids_pre`. Ngữ cảnh
-     rỗng ⇒ vế trái True ⇒ **mọi** mã đều "có neo". Lá chắn neo bằng chứng — bảo chứng
-     trung tâm của RQ2/RQ3 — bị tắt đúng ở những lô cần nó nhất.
+     rỗng => vế trái True => mọi mã đều "có neo". Lá chắn neo bằng chứng - bảo chứng
+     trung tâm của RQ2/RQ3 - bị tắt đúng ở những lô cần nó nhất.
 
   3. Cờ tính bằng `any()` trên cả lô 10 log, nên một payload tiêm nhiễm kéo theo 9 log vô
      can cùng mất ngữ cảnh và cùng bị gán nhãn.
 
 Trên dữ liệu hiện tại lỗi (1) chưa kích hoạt vì payload CSIC mã hoá URL và `scan()` chạy
-TRƯỚC `neutralize()`. Nhưng đó là may, không phải thiết kế: đổi thứ tự hai bước đó là
+trước `neutralize()`. Nhưng đó là may, không phải thiết kế: đổi thứ tự hai bước đó là
 82/250 mẫu quy kết đổ sai. Các test dưới đây khoá cả ba khâu.
 """
 
@@ -27,9 +27,7 @@ from src.agent.attack_mapper import AttackMapperInput, map_attack
 from src.guardrails.prompt_filter import PromptInjectionDetector
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. Hai họ chữ ký phải tách bạch
-# ─────────────────────────────────────────────────────────────────────────────
+# Hai họ chữ ký phải tách bạch
 @pytest.fixture(scope="module")
 def detector():
     return PromptInjectionDetector()
@@ -45,9 +43,9 @@ def detector():
     ],
 )
 def test_web_attack_does_not_flag_as_llm_attack(detector, payload):
-    """SQLi/XSS/cmd-inj là tấn công WEB — không được kích hoạt nhánh đối kháng LLM.
+    """SQLi/XSS/cmd-inj là tấn công WEB - không được kích hoạt nhánh đối kháng LLM.
 
-    Vẫn phải bật `_injection_detected` để lớp guardrail TĨNH giữ nguyên hành vi và
+    Vẫn phải bật `_injection_detected` để lớp guardrail tĩnh giữ nguyên hành vi và
     `robustness_results.json` còn so sánh được với các lượt đo trước.
     """
     r = detector.scan({"payload": payload})
@@ -66,7 +64,7 @@ def test_web_attack_does_not_flag_as_llm_attack(detector, payload):
     ],
 )
 def test_llm_attack_is_flagged(detector, payload):
-    """Chiều ngược lại: tấn công nhắm vào LLM PHẢI bật cờ, nếu không nhánh này vô dụng."""
+    """Chiều ngược lại: tấn công nhắm vào LLM phải bật cờ, nếu không nhánh này vô dụng."""
     r = detector.scan({"user_agent": payload})
     assert r["_llm_attack_detected"] is True
 
@@ -77,13 +75,11 @@ def test_benign_log_flags_nothing(detector):
     assert r["_llm_attack_detected"] is False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. Bộ ánh xạ không được nhại lại mã do LLM tự khai
-# ─────────────────────────────────────────────────────────────────────────────
+# Bộ ánh xạ không được nhại lại mã do LLM tự khai
 def test_fabricated_technique_id_is_not_anchored():
-    """Mã không có trong kho 433 mục KHÔNG được công bố là `resolved`.
+    """Mã không có trong kho 433 mục không được công bố là `resolved`.
 
-    `nodes.py` dựng `attack_type` từ `decision["mitre_technique"]` — free-text của LLM. Nếu
+    `nodes.py` dựng `attack_type` từ `decision["mitre_technique"]` - free-text của LLM. Nếu
     mapper neo bừa vào mã lạ thì một ảo giác đi thẳng ra vết kiểm toán. Đo trước khi vá:
     `attack_type='hoàn toàn bịa T9999'` -> `mitre_technique_id='T9999'`, status `resolved`.
     """
@@ -98,9 +94,9 @@ def test_fabricated_technique_id_is_not_anchored():
 
 
 def test_technique_ids_are_not_used_as_curated_keywords():
-    """Từ khoá curated phải mô tả HÀNH VI, không được là mã kỹ thuật.
+    """Từ khoá curated phải mô tả hành VI, không được là mã kỹ thuật.
 
-    Đây là phép quét CHUNG — nó bắt cả những mã ai đó thêm vào sau này, chứ không chỉ bốn
+    Đây là phép quét chung - nó bắt cả những mã ai đó thêm vào sau này, chứ không chỉ bốn
     mã đã gỡ (`t1595.003`, `t1595`, `t1071.001`, `t1083`).
     """
     import re
@@ -117,7 +113,7 @@ def test_technique_ids_are_not_used_as_curated_keywords():
 
 
 def test_behaviour_keyword_still_maps():
-    """Gỡ từ khoá dạng mã KHÔNG được làm hỏng đường ánh xạ theo hành vi."""
+    """Gỡ từ khoá dạng mã không được làm hỏng đường ánh xạ theo hành vi."""
     m = map_attack(
         AttackMapperInput(
             attack_type="wordlist scanning for backup files",
@@ -131,15 +127,13 @@ def test_behaviour_keyword_still_maps():
     assert m.mitre_technique_id == "T1595.003"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. Lá chắn neo bằng chứng phải còn hiệu lực trên lô đối kháng
-# ─────────────────────────────────────────────────────────────────────────────
+# Lá chắn neo bằng chứng phải còn hiệu lực trên lô đối kháng
 def test_rag_context_is_not_emptied_for_adversarial_batch():
-    """`node_rag_context` KHÔNG được trả ngữ cảnh rỗng cho lô có tấn công LLM.
+    """`node_rag_context` không được trả ngữ cảnh rỗng cho lô có tấn công LLM.
 
     Ngữ cảnh rỗng làm `_grounded()` trả True cho mọi mã. Test này đọc mã nguồn thay vì chạy
     đồ thị vì việc dựng `SentinelState` đầy đủ cần retriever + LLM; thứ cần khoá ở đây là
-    **hình dạng của luồng điều khiển**, và nó đọc được tĩnh.
+    hình dạng của luồng điều khiển, và nó đọc được tĩnh.
     """
     import inspect
 
@@ -155,8 +149,8 @@ def test_rag_context_is_not_emptied_for_adversarial_batch():
 def test_atlas_exception_is_limited_to_curated_source():
     """Ngoại lệ ATLAS chỉ dành cho bảng ánh xạ thủ công, không cho free-text của LLM.
 
-    Kho có **0** mục `AML.*` nên mã ATLAS không bao giờ neo được vào RAG. Bản trước xử lý
-    bằng cách cho MỌI mã `AML.` đi qua — nhưng regex bóc mã của LLM cũng nhận `AML.Txxxx`,
+    Kho có 0 mục `AML.*` nên mã ATLAS không bao giờ neo được vào RAG. Bản trước xử lý
+    bằng cách cho mọi mã `AML.` đi qua - nhưng regex bóc mã của LLM cũng nhận `AML.Txxxx`,
     nên model tự khai `AML.T9999` sẽ lọt thẳng ra quyết định.
     """
     import inspect
@@ -166,7 +160,7 @@ def test_atlas_exception_is_limited_to_curated_source():
     src = inspect.getsource(nodes.node_attack_mapper)
     assert "from_curated" in src, "ngoại lệ ATLAS phải phân biệt nguồn curated vs LLM"
     assert "_grounded(_mapper_id, from_curated=True)" in src
-    # Nhánh của LLM KHÔNG được hưởng ngoại lệ.
+    # Nhánh của LLM không được hưởng ngoại lệ.
     assert "_grounded(_llm_id, from_curated=True)" not in src
 
 

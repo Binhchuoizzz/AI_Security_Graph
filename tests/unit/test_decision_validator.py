@@ -1,6 +1,4 @@
-"""
-Unit Tests for DecisionValidator
-"""
+"""Kiểm thử đơn vị cho DecisionValidator"""
 
 from src.guardrails.decision_validator import DecisionValidator
 
@@ -35,7 +33,7 @@ def test_tier_consensus_guard_blocks_semantic_manipulation():
 
 
 def test_tier_consensus_guard_respects_legit_log():
-    """Tier-1 KHÔNG flag tấn công -> LLM nói LOG vẫn được giữ (không override)."""
+    """Tier-1 không flag tấn công -> LLM nói LOG vẫn được giữ (không override)."""
     validator = DecisionValidator()
     d = {"action": "LOG", "confidence": 0.6, "target": "10.0.0.5"}
     res = validator.enforce_tier_consensus(d, tier1_flagged_attack=False)
@@ -59,7 +57,7 @@ def test_decision_validator_confidence_gate():
     res1 = validator.validate_decision(d1)
     assert res1["action"] == "AWAIT_HITL"
 
-    # Confidence biên (== 0.5) KHÔNG bị hạ cấp
+    # Confidence biên (== 0.5) không bị hạ cấp
     d2 = {"action": "BLOCK_IP", "confidence": 0.5, "target": "1.2.3.4"}
     res2 = validator.validate_decision(d2)
     assert res2["action"] == "BLOCK_IP"

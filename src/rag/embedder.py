@@ -1,9 +1,9 @@
 """
-RAG: Knowledge Base Embedder (FAISS Index Builder)
+Dựng chỉ mục FAISS cho kho tri thức.
 
-CHỨC NĂNG:
-  Đọc knowledge base JSON (MITRE ATT&CK + NIST SP 800-61r2) → tạo text chunks
-  → embed bằng Sentence-Transformers → build FAISS index riêng cho mỗi nguồn.
+Chức năng:
+  Đọc knowledge base JSON (MITRE ATT&CK + NIST SP 800-61r2) -> tạo text chunks
+  -> embed bằng Sentence-Transformers -> build FAISS index riêng cho mỗi nguồn.
 
   Tạo ra 2 FAISS index:
     knowledge_base/faiss_index/mitre_attack.index
@@ -12,12 +12,12 @@ CHỨC NĂNG:
     knowledge_base/faiss_index/mitre_attack_metadata.json
     knowledge_base/faiss_index/nist_800_61r2_metadata.json
 
-  Metadata map: vector index position → original chunk text + source ID
+  Metadata map: vector index position -> original chunk text + source ID
 
-CHỈ CHẠY 1 LẦN (hoặc khi update knowledge base):
+Chỉ chạy 1 lần (hoặc khi update knowledge base):
   python -m src.rag.embedder
 
-MÔ HÌNH EMBEDDING:
+Mô hình EMBEDDING:
   all-MiniLM-L6-v2 (~90MB, chạy CPU, 384 dimensions)
   Lý do chọn: nhẹ, nhanh, chất lượng đủ cho semantic search trong domain security.
 """
@@ -97,7 +97,7 @@ def load_mitre_chunks() -> list[dict]:
 def load_nist_chunks_json() -> list[dict]:
     """
     [LEGACY] Chuyển mỗi NIST SP 800-61r2 phase/control thành 1 text chunk để embed.
-    Chỉ tạo ra 6 chunks từ curated JSON — không đủ granularity cho RAG.
+    Chỉ tạo ra 6 chunks từ curated JSON - không đủ granularity cho RAG.
     Giữ lại cho backward compatibility.
     """
     with open(NIST_JSON, encoding="utf-8") as f:
@@ -177,13 +177,13 @@ def load_nist_chunks() -> list[dict]:
     logger.info(f"NIST text loaded: {original_len} chars → {len(text)} chars after cleanup")
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1500,  # ~256 tokens for all-MiniLM-L6-v2
+        chunk_size=1500,  # ~256 token, vừa cửa sổ all-MiniLM-L6-v2
         chunk_overlap=190,  # ~32 tokens overlap
         separators=[
-            "\n\n",  # paragraph break (highest priority)
+            "\n\n",  # cắt theo đoạn (ưu tiên cao nhất)
             "\n",  # line break
             ". ",  # sentence break
-            " ",  # word break (fallback)
+            " ",  # cắt theo từ (phương án lùi)
         ],
         length_function=len,
     )
@@ -415,7 +415,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
         pickle.dump(bm25, f)
     logger.info(f"Saved BM25 corpus: {bm25_path}")
 
-    # Lưu siêu dữ liệu metadata (ánh xạ vị trí → thông tin chunk)
+    # Lưu siêu dữ liệu metadata (ánh xạ vị trí -> thông tin chunk)
     metadata = []
     for i, chunk in enumerate(chunks):
         metadata.append({"index_position": i, "text": chunk["text"], **chunk["metadata"]})
@@ -486,7 +486,7 @@ def build_all_indexes():
     logger.info("SENTINEL Knowledge Base Indexer")
     logger.info("=" * 60)
 
-    # Load model MỘT LẦN DUY NHẤT, dùng chung cho cả 2 indexes
+    # Load model một lần duy nhất, dùng chung cho cả 2 indexes
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL} (shared instance)")
     shared_model = SentenceTransformer(EMBEDDING_MODEL)
 

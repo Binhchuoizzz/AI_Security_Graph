@@ -1,35 +1,35 @@
 """
-Tier-2 Execution Tracer — BẬT THEO YÊU CẦU (opt-in), mặc định TẮT.
+Tier-2 Execution Tracer - bật theo yêu cầu (opt-in), mặc định tắt.
 
-VÌ SAO CÓ FILE NÀY. Một lượt chạy Tier-2 TÍNH RỒI VỨT gần hết bằng chứng trung gian: cờ
-injection/jailbreak theo từng log, hai truy vấn RAG, top-k tài liệu truy xuất, prompt ĐẦY
-ĐỦ, câu trả lời THÔ của LLM, và ba lớp kiểm duyệt hạ cấp quyết định (cổng confidence · lá
-chắn hạ tầng · consensus Tier-1/Tier-2). Sau lượt chạy KHÔNG có cách nào dựng lại "vì sao
-lô này ra verdict đó": `logs/guardrails_audit.db` chỉ giữ verdict GIỮA CHỪNG, còn
-`node_attack_mapper` chạy SAU khi dòng audit đã ghi nên không bao giờ vào DB đó.
+Vì sao có FILE này. Một lượt chạy Tier-2 tính rồi vứt gần hết bằng chứng trung gian: cờ
+injection/jailbreak theo từng log, hai truy vấn RAG, top-k tài liệu truy xuất, prompt đầy
+Đủ, câu trả lời thô của LLM, và ba lớp kiểm duyệt hạ cấp quyết định (cổng confidence · lá
+chắn hạ tầng · consensus Tier-1/Tier-2). Sau lượt chạy không có cách nào dựng lại "vì sao
+lô này ra verdict đó": `logs/guardrails_audit.db` chỉ giữ verdict giữa chừng, còn
+`node_attack_mapper` chạy sau khi dòng audit đã ghi nên không bao giờ vào DB đó.
 
-BỐN RÀNG BUỘC CỨNG:
-  1. TẮT mặc định — mỗi điểm cắm tốn ĐÚNG một phép đọc bool (`trace.enabled()`): không dựng
+Bốn ràng buộc cứng:
+  1. Tắt mặc định - mỗi điểm cắm tốn đúng một phép đọc bool (`trace.enabled()`): không dựng
      dict, không format chuỗi, không I/O.
-  2. MỘT dòng JSON cho MỖI `agent_app.invoke()`, kể cả khi đồ thị NÉM LỖI (lô lỗi là lô cần
+  2. Một dòng JSON cho mỗi `agent_app.invoke()`, kể cả khi đồ thị ném lỗi (lô lỗi là lô cần
      audit nhất).
-  3. Bản ghi sống trong `contextvars.ContextVar` — KHÔNG phải `threading.local` — vì
+  3. Bản ghi sống trong `contextvars.ContextVar` - không phải `threading.local` - vì
      LangGraph `copy_context()` khi đẩy task sang executor thread. ContextVar đi theo
      context nên node chạy ở luồng nào cũng bồi đúng bản ghi của lô mình, mà các worker
-     Tier-2 vẫn cô lập tuyệt đối (mỗi thread khởi đầu bằng context RỖNG). `add()` chỉ SỬA
-     TẠI CHỖ dict, KHÔNG BAO GIỜ `.set()` lại — nhờ vậy bản context đã copy vẫn trỏ chung
+     Tier-2 vẫn cô lập tuyệt đối (mỗi thread khởi đầu bằng context rỗng). `add()` chỉ sửa
+     Tại chỗ dict, không bao giờ `.set()` lại - nhờ vậy bản context đã copy vẫn trỏ chung
      một đối tượng.
-  4. KHÔNG BAO GIỜ ném lỗi ra ngoài. Sink hỏng -> tự tắt vĩnh viễn.
+  4. Không bao giờ ném lỗi ra ngoài. Sink hỏng -> tự tắt vĩnh viễn.
 
-KHÔNG đụng `SentinelState`: dataclass đó không có reducer, node sau sẽ ghi đè node trước.
+Không đụng `SentinelState`: dataclass đó không có reducer, node sau sẽ ghi đè node trước.
 
 ENV:
   SENTINEL_TRACE=1              bật (mặc định tắt)
   SENTINEL_TRACE_FILE=...       mặc định logs/tier2_trace.jsonl
-  SENTINEL_TRACE_MAX_CHARS=N    cắt MỌI chuỗi dài quá N (mặc định 12000; 0 = KHÔNG cắt —
-                                dùng khi cần soi rò rỉ nhãn trên prompt ĐẦY ĐỦ)
+  SENTINEL_TRACE_MAX_CHARS=N    cắt mọi chuỗi dài quá N (mặc định 12000; 0 = không cắt -
+                                dùng khi cần soi rò rỉ nhãn trên prompt đầy đủ)
 
-CẢNH BÁO BẢO MẬT: file trace chứa payload thô của kẻ tấn công và toàn văn system prompt.
+Cảnh báo bảo mật: file trace chứa payload thô của kẻ tấn công và toàn văn system prompt.
 `logs/` đã nằm trong .gitignore. Đừng render `llm.prompt` / `llm.raw_response` ra HTML mà
 không qua `output_sanitizer`.
 """
@@ -53,12 +53,12 @@ _TRUTHY = frozenset({"1", "true", "yes", "on"})
 _MAX_IDS = 50  # trần số IP/gt_id ghi lại (lô thường 10 log)
 _CLIP_MAX_DEPTH = 6  # trần đệ quy khi cắt chuỗi
 
-# ── Cấu hình + sink dùng chung toàn tiến trình ────────────────────────────────
+# Cấu hình + sink dùng chung toàn tiến trình
 _enabled: bool = False
 _path: str = DEFAULT_PATH
 _max_chars: int = DEFAULT_MAX_CHARS
 _write_lock = threading.Lock()
-_fh: Any = None  # mở LƯỜI: chỉ tạo file khi có bản ghi ĐẦU TIÊN
+_fh: Any = None  # mở lười: chỉ tạo file khi có bản ghi đầu tiên
 _sink_broken: bool = False  # hỏng -> tắt vĩnh viễn, không spam log, không ném lỗi
 
 _record: contextvars.ContextVar = contextvars.ContextVar(
@@ -66,11 +66,9 @@ _record: contextvars.ContextVar = contextvars.ContextVar(
 )
 
 
-# ==============================================================================
-# API CÔNG KHAI
-# ==============================================================================
+# Điểm vào công khai
 def configure() -> None:
-    """Nạp lại cấu hình từ env và đóng sink cũ. Dùng ở entrypoint/test — KHÔNG ở hot-path."""
+    """Nạp lại cấu hình từ env và đóng sink cũ. Dùng ở entrypoint/test - không ở hot-path."""
     global _enabled, _path, _max_chars, _fh, _sink_broken
     with _write_lock:
         if _fh is not None:
@@ -89,18 +87,18 @@ def configure() -> None:
 
 
 def enabled() -> bool:
-    """Cổng DUY NHẤT ở mọi điểm cắm. False ngay khi sink hỏng -> tự vô hiệu hoá."""
+    """Cổng duy nhất ở mọi điểm cắm. False ngay khi sink hỏng -> tự vô hiệu hoá."""
     return _enabled and not _sink_broken
 
 
 def begin(state: Any = None, **meta: Any) -> None:
-    """Mở bản ghi cho MỘT lần invoke. Gọi ở proxy `_TracedGraph.invoke` (workflow.py)."""
+    """Mở bản ghi cho một lần invoke. Gọi ở proxy `_TracedGraph.invoke` (workflow.py)."""
     if not enabled():
         return
     try:
         stale = _record.get()
         if stale is not None:
-            # Lần invoke trước không flush được -> KHÔNG nuốt bản ghi cũ, ghi ra rồi mở mới.
+            # Lần invoke trước không flush được -> không nuốt bản ghi cũ, ghi ra rồi mở mới.
             _emit(stale, status="abandoned")
         logs = _batch_logs(state)
         now = time.time()
@@ -121,15 +119,15 @@ def begin(state: Any = None, **meta: Any) -> None:
         if meta:
             rec["meta"] = dict(meta)
         _record.set(rec)
-    except Exception:  # tracer KHÔNG BAO GIỜ được làm vỡ pipeline
+    except Exception:  # tracer không bao giờ được làm vỡ pipeline
         pass
 
 
 def add(section: str, **fields: Any) -> None:
-    """Bồi dữ liệu vào bản ghi hiện tại. CHỈ gọi bên trong `if trace.enabled():`.
+    """Bồi dữ liệu vào bản ghi hiện tại. Chỉ gọi bên trong `if trace.enabled():`.
 
-    Gộp theo khoá (`dict.update`) và CHỈ sửa TẠI CHỖ — không bao giờ `_record.set()` — để
-    context đã copy sang thread khác vẫn bồi vào ĐÚNG một đối tượng.
+    Gộp theo khoá (`dict.update`) và chỉ sửa tại chỗ - không bao giờ `_record.set()` - để
+    context đã copy sang thread khác vẫn bồi vào đúng một đối tượng.
     """
     if not enabled():
         return
@@ -147,7 +145,7 @@ def add(section: str, **fields: Any) -> None:
 
 
 def flush(status: str = "ok", error: BaseException | None = None, final_state: Any = None) -> None:
-    """Đóng bản ghi và ghi ĐÚNG MỘT dòng JSON. Gọi thừa (không có bản ghi) -> no-op."""
+    """Đóng bản ghi và ghi đúng một dòng JSON. Gọi thừa (không có bản ghi) -> no-op."""
     if not enabled():
         return
     rec = None
@@ -166,9 +164,7 @@ def flush(status: str = "ok", error: BaseException | None = None, final_state: A
         _emit(rec, status=status)
 
 
-# ==============================================================================
-# NỘI BỘ
-# ==============================================================================
+# Nội bộ
 def _emit(rec: dict, status: str) -> None:
     global _sink_broken
     try:
@@ -177,13 +173,13 @@ def _emit(rec: dict, status: str) -> None:
         rec["ts_end"] = _iso(now)
         rec["ts_end_local"] = _local(now)
         rec["duration_ms"] = round((now - float(rec.get("ts_start_epoch") or now)) * 1000, 2)
-        # Tuần tự hoá NGOÀI lock: giữ vùng tới hạn chỉ còn một lệnh write.
+        # Tuần tự hoá ngoài lock: giữ vùng tới hạn chỉ còn một lệnh write.
         line = json.dumps(_clip(rec, _max_chars), ensure_ascii=False, default=str)
     except Exception as e:
         logger.warning(f"[TRACE] Không tuần tự hoá được bản ghi: {e}")
         return
     try:
-        with _write_lock:  # NỐI TIẾP mọi luồng: một dòng không bao giờ xen vào dòng khác
+        with _write_lock:  # Nối tiếp mọi luồng: một dòng không bao giờ xen vào dòng khác
             _sink().write(line + "\n")
     except Exception as e:
         _sink_broken = True
@@ -191,7 +187,7 @@ def _emit(rec: dict, status: str) -> None:
 
 
 def _sink():
-    """Mở lười, append, line-buffered (mỗi bản ghi chạm OS ngay). Gọi TRONG _write_lock."""
+    """Mở lười, append, line-buffered (mỗi bản ghi chạm OS ngay). Gọi trong _write_lock."""
     global _fh
     if _fh is None:
         d = os.path.dirname(_path)
@@ -202,7 +198,7 @@ def _sink():
 
 
 def _clip(obj: Any, cap: int, depth: int = 0) -> Any:
-    """Cắt MỌI chuỗi dài quá `cap` (cap<=0 -> không cắt), có ghi rõ đã cắt bao nhiêu."""
+    """Cắt mọi chuỗi dài quá `cap` (cap<=0 -> không cắt), có ghi rõ đã cắt bao nhiêu."""
     if cap <= 0 or depth > _CLIP_MAX_DEPTH:
         return obj
     if isinstance(obj, str):
@@ -225,7 +221,7 @@ def _local(epoch: float) -> str:
 
 
 def _batch_logs(state: Any) -> list:
-    """Nhận cả SentinelState (dataclass) lẫn dict — mọi nơi gọi invoke đều truyền 1 trong 2."""
+    """Nhận cả SentinelState (dataclass) lẫn dict - mọi nơi gọi invoke đều truyền 1 trong 2."""
     if state is None:
         return []
     logs = getattr(state, "current_batch_logs", None)
@@ -235,11 +231,11 @@ def _batch_logs(state: Any) -> list:
 
 
 def _batch_meta(logs: list) -> dict:
-    """Khoá NỐI về Tier-1.
+    """Khoá nối về Tier-1.
 
-    `gt_id` là khoá MẠNH NHẤT: nó sống sót `_strip_dataset_labels` (xem
+    `gt_id` là khoá mạnh nhất: nó sống sót `_strip_dataset_labels` (xem
     `subscriber._LABEL_KEY_ALLOW`), nên nối chuẩn hơn hẳn cách 'IP + gần nhau về thời gian'
-    — vốn là cách DUY NHẤT có thể làm trước khi có tracer, vì hệ không có ID tương quan nào.
+    - vốn là cách duy nhất có thể làm trước khi có tracer, vì hệ không có ID tương quan nào.
     """
     ips: list[str] = []
     gts: list[str] = []
@@ -269,7 +265,7 @@ def _batch_meta(logs: list) -> dict:
 
 
 def _final_meta(final_state: Any) -> dict:
-    """`decisions` bị THAY THẾ (state không có reducer) nên phần tử cuối là bản giàu nhất."""
+    """`decisions` bị thay thế (state không có reducer) nên phần tử cuối là bản giàu nhất."""
     decisions = (
         final_state.get("decisions")
         if isinstance(final_state, dict)
@@ -285,7 +281,7 @@ def _final_meta(final_state: Any) -> dict:
         "mitre_technique": d.get("mitre_technique", ""),
         "mitre_technique_id": d.get("mitre_technique_id", ""),
         "mapping_status": d.get("mapping_status", ""),
-        # Mã lý do chuyển người xử lý — để hậu kiểm thống kê được "hàng đợi HITL gồm gì"
+        # Mã lý do chuyển người xử lý - để hậu kiểm thống kê được "hàng đợi HITL gồm gì"
         # mà không phải khớp chuỗi tiếng Việt trong `reasoning`.
         "hitl_reason": d.get("hitl_reason", ""),
         "reasoning": d.get("reasoning", ""),

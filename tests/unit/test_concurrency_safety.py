@@ -1,10 +1,10 @@
 """Bằng chứng an toàn đa luồng cho đường Tier-2 song song (agent_workers>=2).
 
 Khi nhiều worker Tier-2 chạy song song, 4 vùng trạng thái dùng chung phải an toàn:
-  1. Chuỗi audit HMAC (executor._log_to_db) — read-modify-write prev_hash: KHÔNG được rẽ nhánh.
-  2. loop_detector (state_monitor) — bộ đếm phải THREAD-LOCAL (mỗi invoke cô lập).
-  3. SemanticCache (OrderedDict) — get/put đồng thời KHÔNG được vỡ.
-  4. threat_memory.record_incident — reputation RMW không mất cập nhật (serialize).
+  1. Chuỗi audit HMAC (executor._log_to_db) - read-modify-write prev_hash: Không được rẽ nhánh.
+  2. loop_detector (state_monitor) - bộ đếm phải THREAD-LOCAL (mỗi invoke cô lập).
+  3. SemanticCache (OrderedDict) - get/put đồng thời không được vỡ.
+  4. threat_memory.record_incident - reputation RMW không mất cập nhật (serialize).
 
 Các test này chạy N luồng đồng thời; nếu thiếu khóa/thread-local, chúng sẽ FAIL.
 """
@@ -19,8 +19,8 @@ def test_audit_hmac_chain_intact_under_concurrency(tmp_path, monkeypatch):
 
     db = tmp_path / "audit_trail.db"
     monkeypatch.setattr(executor, "DB_PATH", str(db))
-    # Dùng CHÍNH `_init_db()` thay vì chép tay câu CREATE TABLE. Bản cũ chép tay nên schema
-    # tồn tại ở HAI nơi: thêm cột `tier` vào sản phẩm là test đổ ngay với
+    # Dùng chính `_init_db()` thay vì chép tay câu CREATE TABLE. Bản cũ chép tay nên schema
+    # tồn tại ở hai nơi: thêm cột `tier` vào sản phẩm là test đổ ngay với
     # "table audit_trail has no column named tier". Test phải kiểm hành vi, không phải giữ
     # một bản sao schema tự trôi khỏi bản thật. (`test_executor.py` vốn đã làm đúng cách này.)
     executor._init_db()
@@ -46,7 +46,7 @@ def test_audit_hmac_chain_intact_under_concurrency(tmp_path, monkeypatch):
 
 
 def test_loop_detector_is_thread_local():
-    """Mỗi luồng reset+đếm riêng: phải thấy đúng bộ đếm của MÌNH, không lẫn."""
+    """Mỗi luồng reset+đếm riêng: phải thấy đúng bộ đếm của mình, không lẫn."""
     from src.guardrails.state_monitor import LoopDetector
 
     ld = LoopDetector(max_iterations=1000)
@@ -92,7 +92,7 @@ def test_semantic_cache_concurrent_no_corruption():
 
 
 def test_threat_memory_reputation_no_lost_updates(tmp_path):
-    """record_incident đồng thời cùng 1 IP: tổng số incident phải KHỚP (không mất cập nhật)."""
+    """record_incident đồng thời cùng 1 IP: tổng số incident phải khớp (không mất cập nhật)."""
     from src.agent.threat_memory import ThreatMemoryStore
 
     store = ThreatMemoryStore(db_path=str(tmp_path / "tm.db"))

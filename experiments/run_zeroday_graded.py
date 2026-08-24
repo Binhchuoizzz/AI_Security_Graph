@@ -1,18 +1,17 @@
 """
-SENTINEL — Zero-Day PHÂN CẤP (Graded Deviation Detection Curve)
-[Luận văn Ch.4 §Graded Detection Boundary — vượt "7/7 nhị phân", vẽ đường cong phát hiện]
-===============================================================
+Đường cong phát hiện zero-day theo mức lệch chuẩn.
+[Luận văn Ch.4 §Graded Detection Boundary - vượt "7/7 nhị phân", vẽ đường cong phát hiện]
 Thay vì chỉ 7 mẫu zero-day ở cực trị (lệch hàng trăm σ -> bắt 7/7 gần như hiển
-nhiên), ở đây ta QUÉT độ lệch k ∈ {2,3,3.5,4,5,6,8,10,20,50,100}·σ trên NHIỀU
-flow benign THẬT × NHIỀU feature Welford, rồi đo:
+nhiên), ở đây ta quét độ lệch k ∈ {2,3,3.5,4,5,6,8,10,20,50,100}·σ trên nhiều
+flow benign thật × nhiều feature Welford, rồi đo:
 
   - "noticed"  : Welford gắn cờ dị biệt (Z > 3.5σ)            -> tầng nhận biết
   - "escalated": điểm Tier-1 ≥ risk_threshold -> leo thang Tầng 2  -> tầng hành động
 
-Qua đó xác định RANH GIỚI PHÁT HIỆN thay vì một con số 7/7 tầm thường, và đặt 7
+Qua đó xác định RANH giới phát hiện thay vì một con số 7/7 tầm thường, và đặt 7
 zero-day tiêu biểu (z ≫ 100) vào đúng bối cảnh của đường cong này.
 
-Tất định, Tier-1 ONLY (KHÔNG LLM). Baseline Welford được ĐÓNG BĂNG (snapshot +
+Tất định, Tier-1 ONLY (không LLM). Baseline Welford được đóng băng (snapshot +
 restore) trước mỗi probe để mọi probe thấy cùng một baseline -> z = k chính xác.
 
 Chạy:  .venv/bin/python experiments/run_zeroday_graded.py
@@ -32,7 +31,7 @@ OUT_JSON = os.path.join(os.path.dirname(__file__), "results", "zeroday_graded_re
 K_LEVELS = [2.0, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 20.0, 50.0, 100.0]
 THREAT_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"}
 
-# Feature Welford để đẩy. KHÔNG dùng "Total Fwd Packets" (sẽ chạm luật tĩnh
+# Feature Welford để đẩy. Không dùng "Total Fwd Packets" (sẽ chạm luật tĩnh
 # max_fwd_packets) để cô lập đúng đóng góp của Z-score.
 PROBE_FEATURES = [
     "Flow Duration",
@@ -56,7 +55,7 @@ def restore_stats(engine, snap):
 
 
 def static_clean_pool(samples, limit=30):
-    """Flow benign THẬT, static-clean (cổng không nhạy cảm, fwd<=1000, không signature)."""
+    """Flow benign thật, static-clean (cổng không nhạy cảm, fwd<=1000, không signature)."""
     SENSITIVE = {21, 22, 23, 53, 139, 445, 3389}
     pool = []
     for s in samples:

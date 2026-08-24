@@ -1,6 +1,5 @@
 """
-Automated AI Red Teaming: Jailbreak & System Override Benchmark
-===============================================================
+Red team tự động: đo khả năng kháng vượt rào và chiếm quyền hệ thống
 Kiểm thử khả năng phòng vệ của SENTINEL Pydantic Validator & Output Sanitizer
 trước các kỹ thuật Jailbreak LLM (DAN, TAP, Roleplay, Persona Hijack).
 """

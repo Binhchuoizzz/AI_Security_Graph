@@ -1,37 +1,37 @@
-"""SENTINEL — So sánh với BASELINE NGOÀI (đối chứng cho kiến trúc 2 tầng).
+"""SENTINEL - So sánh với BASELINE ngoài (đối chứng cho kiến trúc 2 tầng).
 
-VÌ SAO CẦN: toàn bộ ablation A–F chỉ so SENTINEL với CHÍNH NÓ (bỏ bớt cấu phần). Không
+Vì sao cần: toàn bộ ablation A–F chỉ so SENTINEL với chính nó (bỏ bớt cấu phần). Không
 có một dòng nào trả lời câu hỏi mà hội đồng gần như chắc chắn đặt ra: *"so với một IDS
-thông thường thì hơn ở chỗ nào?"*. Script này bổ sung hai mốc đối chứng, chạy trên CÙNG
-`datatest.json` và CÙNG giao ước nhãn `_is_threat()` — nên số đặt cạnh nhau được.
+thông thường thì hơn ở chỗ nào?"*. Script này bổ sung hai mốc đối chứng, chạy trên cùng
+`datatest.json` và cùng giao ước nhãn `_is_threat()` - nên số đặt cạnh nhau được.
 
-  H0 — Đoán hằng (ZeroR)   : mốc sàn tuyệt đối, luôn hô một lớp.
-  H1 — Chữ ký tĩnh đơn thuần: proxy cho IDS truyền thống kiểu Snort/Suricata. Chỉ luật
-       cổng + ngưỡng khối lượng + 29 họ chữ ký WAF; KHÔNG Welford, KHÔNG ML, KHÔNG LLM.
+  H0 - Đoán hằng (ZeroR)   : mốc sàn tuyệt đối, luôn hô một lớp.
+  H1 - Chữ ký tĩnh đơn thuần: proxy cho IDS truyền thống kiểu Snort/Suricata. Chỉ luật
+       cổng + ngưỡng khối lượng + 29 họ chữ ký WAF; Không Welford, không ML, không LLM.
        Tái dùng `static_only_action()` đã có trong `unified_dataset.py`.
-  H2 — ML đơn tầng          : chính mô hình LightGBM đang dùng, nhưng áp NGƯỠNG PHẲNG 0.5
-       cho MỌI sự kiện — bỏ chính sách 4 dải, bỏ abstain/OOD, bỏ Tier-1, bỏ LLM. Đây là
+  H2 - ML đơn tầng          : chính mô hình LightGBM đang dùng, nhưng áp ngưỡng phẳng 0.5
+       cho mọi sự kiện - bỏ chính sách 4 dải, bỏ abstain/OOD, bỏ Tier-1, bỏ LLM. Đây là
        "chỉ ném một bộ phân loại vào bài toán", tức baseline học máy kinh điển.
-  H3 — LLM-only (`--with-llm`): MỌI sự kiện đi thẳng lên tác tử Tier-2, không Tier-1,
-       không Cổng ML. Đây là proxy TRUNG THỰC cho "một dự án chỉ ném LLM vào SOC" và là
-       cách HỢP LỆ DUY NHẤT để trả lời "hơn các hệ LLM-SOC khác ở đâu": cùng dữ liệu, cùng
-       mô hình, cùng prompt, cùng giao ước chấm, nên chênh lệch quy được về KIẾN TRÚC.
-       Chép số headline của CyberRAG/LanG/SplunkLLM vào một bảng thì KHÔNG hợp lệ — khác
+  H3 - LLM-only (`--with-llm`): Mọi sự kiện đi thẳng lên tác tử Tier-2, không Tier-1,
+       không Cổng ML. Đây là proxy trung thực cho "một dự án chỉ ném LLM vào SOC" và là
+       cách hợp lệ duy nhất để trả lời "hơn các hệ LLM-SOC khác ở đâu": cùng dữ liệu, cùng
+       mô hình, cùng prompt, cùng giao ước chấm, nên chênh lệch quy được về kiến trúc.
+       Chép số headline của CyberRAG/LanG/SplunkLLM vào một bảng thì không hợp lệ - khác
        tập, khác tác vụ, khác định nghĩa chỉ số, khác phần cứng. Vì mỗi sự kiện tốn một
-       lượt suy luận (~5 s), H3 chạy trên mẫu con phân tầng và MỌI cấu hình khác được chấm
-       LẠI trên đúng mẫu con đó.
+       lượt suy luận (~5 s), H3 chạy trên mẫu con phân tầng và mọi cấu hình khác được chấm
+       Lại trên đúng mẫu con đó.
 
-ĐỌC KẾT QUẢ CHO ĐÚNG: **kỳ vọng H2 thắng SENTINEL về F1/MCC thuần**, vì SENTINEL cố ý
-KHÔNG quyết những ca nó không chắc (abstain -> LLM/người). Đó không phải thất bại — luận
+Đọc kết quả cho đúng: kỳ vọng H2 thắng SENTINEL về F1/MCC thuần, vì SENTINEL cố ý
+không quyết những ca nó không chắc (abstain -> LLM/người). Đó không phải thất bại - luận
 điểm của luận văn là giảm tải LLM, độ trễ, và tính giải thích, chứ không phải "phân loại
-giỏi hơn". Một so sánh trung thực làm luận điểm SẮC hơn; giấu nó đi mới là điểm yếu.
+giỏi hơn". Một so sánh trung thực làm luận điểm sắc hơn; giấu nó đi mới là điểm yếu.
 
-Vì sao KHÔNG huấn luyện mô hình cổ điển mới: `ml_lab/train_and_compare.py` đã so 5 mô hình
-lúc CHỌN mô hình, nhưng đó là trên tập huấn luyện chứ không phải benchmark luận văn; và
+Vì sao không huấn luyện mô hình cổ điển mới: `ml_lab/train_and_compare.py` đã so 5 mô hình
+lúc chọn mô hình, nhưng đó là trên tập huấn luyện chứ không phải benchmark luận văn; và
 `ml_lab/dataset_1m.csv` không còn trong repo. Tái dùng artifact sẵn có vừa trung thực vừa
 tái lập được.
 
-H0–H2 thuần ĐỌC, KHÔNG cần LLM. Chạy:
+H0–H2 thuần đọc, không cần LLM. Chạy:
     .venv/bin/python experiments/run_baseline_comparison.py
     .venv/bin/python experiments/run_baseline_comparison.py --limit 500
     .venv/bin/python experiments/run_baseline_comparison.py --with-llm --llm-limit 150
@@ -56,7 +56,7 @@ DATA_PATH = os.path.join(ROOT, "data", "datatest.json")
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "baseline_comparison_results.json")
 
 THREAT_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"}
-# Ngưỡng nhị phân trung dung cho H2 — CỐ Ý không phải 0.85/0.65/0.40 của SENTINEL, vì
+# Ngưỡng nhị phân trung dung cho H2 - cố Ý không phải 0.85/0.65/0.40 của SENTINEL, vì
 # điểm của baseline là "không có chính sách nhiều dải".
 PLAIN_THRESHOLD = 0.5
 
@@ -78,7 +78,7 @@ def _score(preds: list[tuple[bool, bool]], elapsed: float, name: str, desc: str)
 
 
 def baseline_zero_r(events: list) -> dict:
-    """H0 — luôn hô lớp ĐA SỐ. Mốc sàn: mọi thứ phải vượt được cái này."""
+    """H0 - luôn hô lớp đa số. Mốc sàn: mọi thứ phải vượt được cái này."""
     t0 = time.perf_counter()
     labels = [_is_threat(e) for e in events]
     predict_attack = sum(labels) * 2 > len(labels)  # lớp đa số
@@ -92,7 +92,7 @@ def baseline_zero_r(events: list) -> dict:
 
 
 def baseline_static_signature(events: list) -> dict:
-    """H1 — IDS chữ ký truyền thống (proxy). Không thống kê, không học, không LLM."""
+    """H1 - IDS chữ ký truyền thống (proxy). Không thống kê, không học, không LLM."""
     engine = RuleEngine()
     t0 = time.perf_counter()
     preds = []
@@ -108,11 +108,11 @@ def baseline_static_signature(events: list) -> dict:
 
 
 def baseline_ml_flat(events: list) -> dict:
-    """H2 — ML đơn tầng, ngưỡng phẳng 0.5, KHÔNG abstain: mô hình buộc phải quyết mọi ca.
+    """H2 - ML đơn tầng, ngưỡng phẳng 0.5, không abstain: mô hình buộc phải quyết mọi ca.
 
     Khác Cổng ML thật ở đúng chỗ tạo nên kiến trúc: ở đây không có dải ESCALATE, không có
     OOD-abstain, không có kiểm tra phủ đặc trưng. Ca nào model không đủ dữ liệu thì vẫn
-    phải đoán — đúng như một bộ phân loại đơn thuần hành xử.
+    phải đoán - đúng như một bộ phân loại đơn thuần hành xử.
     """
     gw = MLGateway()
     if not gw.pipeline:
@@ -128,7 +128,7 @@ def baseline_ml_flat(events: list) -> dict:
             proba = model.predict_proba(scaler.transform(x))[0]
             pred_attack = float(proba[1]) >= PLAIN_THRESHOLD
         except Exception:
-            pred_attack = False  # baseline không có đường thoát an toàn — đoán benign
+            pred_attack = False  # baseline không có đường thoát an toàn - đoán benign
         preds.append((_is_threat(ev), pred_attack))
     out = _score(
         preds,
@@ -141,9 +141,9 @@ def baseline_ml_flat(events: list) -> dict:
 
 
 def sentinel_tier1_ml(events: list) -> dict:
-    """SENTINEL (phần tất định: Tier-1 + Cổng ML) trên CÙNG tập, để đặt cạnh baseline.
+    """SENTINEL (phần tất định: Tier-1 + Cổng ML) trên cùng tập, để đặt cạnh baseline.
 
-    Ca Cổng ML từ chối quyết (abstain/skip) được tính là **có gắn cờ**: trong hệ thật
+    Ca Cổng ML từ chối quyết (abstain/skip) được tính là có gắn cờ: trong hệ thật
     chúng đi tiếp lên LLM/người chứ không bị thả. Tính là "bỏ qua" sẽ thổi phồng
     specificity một cách gian lận.
     """
@@ -175,18 +175,18 @@ def sentinel_tier1_ml(events: list) -> dict:
 
 
 def baseline_llm_only(events: list) -> dict:
-    """H3 — "chỉ ném một LLM vào SOC": MỌI sự kiện đi thẳng lên tác tử Tier-2.
+    """H3 - "chỉ ném một LLM vào SOC": Mọi sự kiện đi thẳng lên tác tử Tier-2.
 
-    VÌ SAO ĐÂY LÀ BASELINE QUAN TRỌNG NHẤT. Câu hỏi hội đồng chắc chắn hỏi là "hơn các dự
-    án dùng LLM cho SOC ở chỗ nào?". KHÔNG thể trả lời bằng cách chép số headline của
+    Vì sao đây là BASELINE quan trọng nhất. Câu hỏi hội đồng chắc chắn hỏi là "hơn các dự
+    án dùng LLM cho SOC ở chỗ nào?". Không thể trả lời bằng cách chép số headline của
     CyberRAG/LanG/SplunkLLM vào một bảng: mỗi công trình đo trên tập khác, tác vụ khác,
     định nghĩa chỉ số khác và phần cứng khác, nên bảng đó sập ngay câu hỏi đầu tiên về tính
-    so sánh được. H3 trả lời đúng câu ấy một cách hợp lệ: CÙNG dữ liệu, CÙNG mô hình, CÙNG
-    prompt, CÙNG giao ước chấm — chỉ bỏ đi Tier-1 và Cổng ML. Chênh lệch quan sát được vì
-    vậy quy được về đúng KIẾN TRÚC, thứ duy nhất đã thay đổi.
+    so sánh được. H3 trả lời đúng câu ấy một cách hợp lệ: Cùng dữ liệu, cùng mô hình, cùng
+    prompt, cùng giao ước chấm - chỉ bỏ đi Tier-1 và Cổng ML. Chênh lệch quan sát được vì
+    vậy quy được về đúng kiến trúc, thứ duy nhất đã thay đổi.
 
-    ĐẮT: mỗi sự kiện là một lượt suy luận (~5 s). Luôn chạy trên mẫu con phân tầng, và mọi
-    cấu hình khác cũng được chấm lại trên ĐÚNG mẫu con đó — so 150 ca của H3 với 3.204 ca
+    Đắt: mỗi sự kiện là một lượt suy luận (~5 s). Luôn chạy trên mẫu con phân tầng, và mọi
+    cấu hình khác cũng được chấm lại trên đúng mẫu con đó - so 150 ca của H3 với 3.204 ca
     của SENTINEL là so hai thứ khác nhau.
     """
     from src.agent.state import SentinelState
@@ -198,7 +198,7 @@ def baseline_llm_only(events: list) -> dict:
     n_err = 0
     for i, ev in enumerate(events, 1):
         loop_detector.reset()  # bộ đếm cộng dồn theo luồng; thiếu -> FORCE_STOP sau 10 lượt
-        flagged = True  # suy biến an toàn: agent hỏng -> coi như CHƯA cho qua
+        flagged = True  # suy biến an toàn: agent hỏng -> coi như chưa cho qua
         try:
             final = agent_app.invoke(
                 SentinelState(current_batch_logs=[dict(ev)], current_batch_size=1)
@@ -208,7 +208,7 @@ def baseline_llm_only(events: list) -> dict:
                 flagged = str(decisions[-1].get("action", "")).upper() in THREAT_ACTIONS
             else:
                 n_err += 1
-        except Exception:  # noqa: BLE001 — một sự kiện lỗi không được giết cả phép so
+        except Exception:  # noqa: BLE001 - một sự kiện lỗi không được giết cả phép so
             n_err += 1
         preds.append((_is_threat(ev), flagged))
         if i % 25 == 0:
@@ -225,7 +225,7 @@ def baseline_llm_only(events: list) -> dict:
 
 
 def _stratified(events: list, n: int) -> list:
-    """Mẫu con BƯỚC ĐỀU trên toàn tập — giữ tỉ lệ lớp, tất định, không phải N mẫu đầu."""
+    """Mẫu con bước đều trên toàn tập - giữ tỉ lệ lớp, tất định, không phải N mẫu đầu."""
     if n >= len(events):
         return events
     stride = len(events) / n
@@ -284,7 +284,7 @@ def main():
         "với SENTINEL mới là phép so đúng trọng tâm 'hơn IDS chữ ký ở đâu'."
     )
 
-    # ---- H3 (LLM-only): chỉ khi được yêu cầu, và trên MẪU CON so được ----------- #
+    # H3 (LLM-only): chỉ khi được yêu cầu, và trên mẫu con so được
     llm_block = None
     if args.with_llm:
         subset = _stratified(events, args.llm_limit)

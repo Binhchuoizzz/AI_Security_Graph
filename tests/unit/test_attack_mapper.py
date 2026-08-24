@@ -1,13 +1,13 @@
 """
 Unit tests cho ATT&CK Mapper Node (src/agent/attack_mapper.py).
 
-THIẾT KẾ TEST:
+Thiết kế TEST:
   - CI-SAFE: chỉ import attack_mapper (không kéo theo retriever/LLM nặng).
-  - Đường XÁC ĐỊNH (curated) cho 10 loại tấn công web phổ biến KHÔNG cần LLM/KB
+  - Đường xác định (curated) cho 10 loại tấn công web phổ biến không cần LLM/KB
     -> tái lập 100%, chạy được offline.
-  - Đường RRF dùng retriever GIẢ + KB monkeypatch -> kiểm thử graceful fallback.
+  - Đường RRF dùng retriever giả + KB monkeypatch -> kiểm thử graceful fallback.
 
-Bảng kỳ vọng dưới đây do người soạn HAND-VERIFY là ATT&CK/ATLAS THẬT (không bịa).
+Bảng kỳ vọng dưới đây do người soạn HAND-VERIFY là ATT&CK/ATLAS thật (không bịa).
 """
 
 import pytest
@@ -30,16 +30,16 @@ SCHEMA_KEYS = set(MitreMapping.model_fields.keys())
 
 @pytest.fixture(autouse=True)
 def _reset_loop_guard():
-    """Trả bộ đếm loop-guard về 0 TRƯỚC MỖI test.
+    """Trả bộ đếm loop-guard về 0 trước mỗi test.
 
     Các test dưới đây gọi thẳng `node_attack_mapper` thay vì qua `agent_app.invoke`, nên
-    không có ai reset hộ. Bộ đếm cộng dồn theo TIẾN TRÌNH: sau `max_iterations`(=10) lần
+    không có ai reset hộ. Bộ đếm cộng dồn theo tiến trình: sau `max_iterations`(=10) lần
     thăm node, mọi lần sau đều FORCE_STOP -> `RuntimeError`, và test đỏ ở một chỗ hoàn toàn
     không liên quan tới thứ nó đang kiểm.
 
-    Đây KHÔNG phải giả thiết: chính lỗi quên reset này đã làm 631/651 ca của
+    Đây không phải giả thiết: chính lỗi quên reset này đã làm 631/651 ca của
     `evaluate_tier2_decision.py` crash và cho recall giả 1,00 lọt vào Ch4 (xem
-    `test_tier2_eval_loop_guard.py`). Thêm test gọi node là chạm trần — nên chặn ở fixture.
+    `test_tier2_eval_loop_guard.py`). Thêm test gọi node là chạm trần - nên chặn ở fixture.
     """
     from src.guardrails import loop_detector
 
@@ -79,12 +79,12 @@ def test_web_attack_tactic_mapping(attack_type, tactic, tactic_id, technique_id,
 
 @pytest.mark.parametrize("attack_type,tactic,tactic_id,technique_id,framework", WEB_ATTACK_CASES)
 def test_output_schema_always_valid(attack_type, tactic, tactic_id, technique_id, framework):
-    """Output LUÔN đủ trường schema + ràng buộc kiểu/khoảng giá trị."""
+    """Output luôn đủ trường schema + ràng buộc kiểu/khoảng giá trị."""
     mapping = map_attack(AttackMapperInput(attack_type=attack_type, confidence=0.94))
     dumped = mapping.model_dump()
 
     assert set(dumped.keys()) == SCHEMA_KEYS
-    assert mapping.confidence == 0.94  # độ tin cậy PHÁT HIỆN được giữ nguyên
+    assert mapping.confidence == 0.94  # độ tin cậy phát hiện được giữ nguyên
     assert 0.0 <= mapping.mapping_confidence <= 1.0
     assert mapping.recommended_response  # không rỗng
     assert mapping.mitre_url.startswith("https://")
@@ -97,7 +97,7 @@ def test_atlas_prompt_injection_is_flagged_cross_framework():
     assert mapping.framework == FRAMEWORK_ATLAS
     assert mapping.mitre_technique_id == "AML.T0051"
     assert mapping.mitre_url.startswith("https://atlas.mitre.org/techniques/")
-    assert mapping.mitre_tactic_id == ""  # ATLAS TA id chưa verify -> cố tình rỗng
+    assert mapping.mitre_tactic_id == ""  # ATLAS ta id chưa verify -> cố tình rỗng
 
 
 def test_xss_subtechnique_populated():
@@ -129,7 +129,7 @@ def test_normalize_attack_type_detects_from_payload():
     assert normalize_attack_type("normal GET /index.html") == ""
 
 
-# ---------- Đường RRF (attack_type lạ) — retriever GIẢ + KB monkeypatch ----------
+# Đường RRF (attack_type lạ) - retriever giả + KB monkeypatch
 class _FakeRetriever:
     def __init__(self, results):
         self._results = results
@@ -139,8 +139,8 @@ class _FakeRetriever:
 
 
 def test_rrf_path_attaches_top_candidate_as_hint_but_low_confidence(monkeypatch):
-    """attack_type lạ + KHÔNG có xác nhận LLM -> đính top-RRF làm GỢI Ý nhưng low_confidence
-    (lá chắn node ép AWAIT_HITL cho ca không khớp rõ). Mặc định KHÔNG gọi LLM lần 2 (tốc độ)."""
+    """attack_type lạ + không có xác nhận LLM -> đính top-RRF làm gợi Ý nhưng low_confidence
+    (lá chắn node ép AWAIT_HITL cho ca không khớp rõ). Mặc định không gọi LLM lần 2 (tốc độ)."""
     monkeypatch.setattr(
         "src.agent.attack_mapper._load_kb_index",
         lambda: {"T1110": {"id": "T1110", "name": "Brute Force", "tactic": "Credential Access"}},
@@ -179,13 +179,13 @@ def test_no_retriever_degrades_gracefully():
     assert set(mapping.model_dump().keys()) == SCHEMA_KEYS
 
 
-# ---------- Triết lý A: NEO vào verdict triage (không để RRF ghi đè) ----------
+# Triết lý A: Neo vào verdict triage (không để RRF ghi đè)
 def test_anchor_on_triage_technique_in_kb():
-    """attack_type chứa Txxxx (triage đã gán) + KB phủ -> NEO, không cần retriever/LLM."""
+    """attack_type chứa Txxxx (triage đã gán) + KB phủ -> neo, không cần retriever/LLM."""
     mapping = map_attack(
         AttackMapperInput(attack_type="T1071 - Application Layer Protocol", confidence=0.9)
     )
-    assert mapping.mitre_technique_id == "T1071"  # giữ verdict triage, KHÔNG đổi qua RRF
+    assert mapping.mitre_technique_id == "T1071"  # giữ verdict triage, không đổi qua RRF
     assert mapping.mitre_tactic == "Command and Control"
     assert mapping.mitre_tactic_id == "TA0011"
     assert mapping.mapping_status == "resolved"
@@ -193,7 +193,7 @@ def test_anchor_on_triage_technique_in_kb():
 
 
 def test_anchor_preserves_subtechnique_id():
-    """Triage gán sub-technique -> NEO giữ nguyên id + URL sub-technique."""
+    """Triage gán sub-technique -> neo giữ nguyên id + URL sub-technique."""
     mapping = map_attack(AttackMapperInput(attack_type="T1110.001 something brute", confidence=0.8))
     assert mapping.mitre_technique_id == "T1110.001"
     assert mapping.mitre_subtechnique_id == "T1110.001"
@@ -201,31 +201,31 @@ def test_anchor_preserves_subtechnique_id():
 
 
 def test_anchor_on_valid_id_not_in_kb_keeps_id_but_defers_to_human():
-    """Txxxx hợp lệ nhưng KB không phủ -> vẫn NEO id, nhưng KHÔNG được "resolved".
+    """Txxxx hợp lệ nhưng KB không phủ -> vẫn neo id, nhưng không được "resolved".
 
-    Dùng `T1650` — mã đúng ĐỊNH DẠNG nhưng CỐ Ý nằm ngoài kho. Trước đây test dùng
-    `T1110`; sau khi kho được bổ sung 43 kỹ thuật cha/sub (2026-07-27) thì T1110 ĐÃ có
+    Dùng `T1650` - mã đúng định dạng nhưng cố Ý nằm ngoài kho. Trước đây test dùng
+    `T1110`; sau khi kho được bổ sung 43 kỹ thuật cha/sub (2026-07-27) thì T1110 đã có
     mặt, nên nó không còn kiểm được tính chất cần kiểm. Nếu mai này T1650 cũng được thêm
-    vào kho, đổi sang một mã vắng mặt khác — ĐỪNG nới lỏng phần khẳng định.
+    vào kho, đổi sang một mã vắng mặt khác - đừng nới lỏng phần khẳng định.
 
-    ĐỔI KHẲNG ĐỊNH TRẠNG THÁI (2026-08-03), có lý do. Phần GIỮ ID không đổi — đó vẫn là
+    Đổi khẳng định trạng thái (2026-08-03), có lý do. Phần giữ ID không đổi - đó vẫn là
     tính chất chính test này canh. Nhưng `mapping_status` đổi `resolved` -> `low_confidence`:
 
     `attack_type` được `nodes.py` dựng từ `decision["mitre_technique"]`, tức free-text của
-    LLM. Với `conf = 0.60` cũ (trên ngưỡng 0.5), một mã BỊA cũng được công bố là đã phân
-    giải — đo được: `'hoàn toàn bịa T9999'` -> `T9999`, status `resolved`. Không có nguồn
+    LLM. Với `conf = 0.60` cũ (trên ngưỡng 0.5), một mã bịa cũng được công bố là đã phân
+    giải - đo được: `'hoàn toàn bịa T9999'` -> `T9999`, status `resolved`. Không có nguồn
     nào ngoài kho để tách "mã thật kho thiếu" khỏi "mã LLM bịa", nên cách trung thực là đối
     xử như nhau: giữ id để không mất quy kết đúng, hạ dưới ngưỡng để chuyển người xác minh.
     """
     mapping = map_attack(AttackMapperInput(attack_type="T1650 - Acquire Access", confidence=0.8))
-    assert mapping.mitre_technique_id == "T1650"  # KHÔNG để RRF chệch sang cổng/giao thức
+    assert mapping.mitre_technique_id == "T1650"  # Không để RRF chệch sang cổng/giao thức
     assert mapping.mitre_tactic == "Unknown"
     assert mapping.mitre_tactic_id == ""
     assert mapping.mapping_status == "low_confidence"
 
 
 def test_fabricated_id_is_never_resolved():
-    """Mã bịa hoàn toàn KHÔNG được mang nhãn `resolved`.
+    """Mã bịa hoàn toàn không được mang nhãn `resolved`.
 
     Cặp đôi với test trên: cùng một cơ chế, nhìn từ phía kẻ tấn công. Kho có 433 mã; bất kỳ
     mã nào ngoài đó đều phải qua người, dù nó là mã thật kho thiếu hay ảo giác của model.
@@ -235,7 +235,7 @@ def test_fabricated_id_is_never_resolved():
 
 
 def test_no_anchor_when_no_technique_id_falls_to_rrf(monkeypatch):
-    """Không có Txxxx trong attack_type -> KHÔNG neo, đi tiếp RRF (fallback)."""
+    """Không có Txxxx trong attack_type -> không neo, đi tiếp RRF (fallback)."""
     monkeypatch.setattr(
         "src.agent.attack_mapper._load_kb_index",
         lambda: {
@@ -249,9 +249,9 @@ def test_no_anchor_when_no_technique_id_falls_to_rrf(monkeypatch):
     assert mapping.mitre_technique_id == "T1046"  # đến từ RRF, không phải anchor
 
 
-# ── REGRESSION: lá chắn "quá tổng quát" T1571 + chữ ký payload THẬT của dự án ──────
+# REGRESSION: lá chắn "quá tổng quát" T1571 + chữ ký payload thật của dự án
 def test_generic_t1571_port_only_is_downgraded_to_hitl():
-    """T1571 (Non-Standard Port) chỉ dựa cổng lạ, KHÔNG payload -> low_confidence để
+    """T1571 (Non-Standard Port) chỉ dựa cổng lạ, không payload -> low_confidence để
     node_attack_mapper ép AWAIT_HITL (dự đoán + chờ người). Chống đơn-văn-hoá T1571."""
     from src.agent.attack_mapper import _from_triage_anchor
 
@@ -259,13 +259,13 @@ def test_generic_t1571_port_only_is_downgraded_to_hitl():
         AttackMapperInput(attack_type="T1571 - Non-Standard Port", confidence=0.75, payload="")
     )
     assert m is not None
-    assert m.mitre_technique_id == "T1571"  # VẪN giữ dự đoán
+    assert m.mitre_technique_id == "T1571"  # Vẫn giữ dự đoán
     assert m.mapping_status == "low_confidence"  # nhưng buộc người xác minh
     assert m.mapping_confidence <= 0.4
 
 
 def test_generic_t1571_with_payload_stays_resolved():
-    """T1571 CÓ bằng chứng app-layer (payload) -> giữ resolved (chặn bình thường)."""
+    """T1571 có bằng chứng app-layer (payload) -> giữ resolved (chặn bình thường)."""
     from src.agent.attack_mapper import _from_triage_anchor
 
     m = _from_triage_anchor(
@@ -281,7 +281,7 @@ def test_generic_t1571_with_payload_stays_resolved():
 
 
 def test_non_generic_technique_port_only_unaffected():
-    """Kỹ thuật KHÁC (không thuộc denylist) không bị hạ dù thiếu payload."""
+    """Kỹ thuật khác (không thuộc denylist) không bị hạ dù thiếu payload."""
     from src.agent.attack_mapper import _from_triage_anchor
 
     m = _from_triage_anchor(
@@ -293,7 +293,7 @@ def test_non_generic_technique_port_only_unaffected():
 
 
 def test_real_project_payload_signatures_map_correctly():
-    """Chữ ký payload THẬT trong dự án (ADV_SPECS) được đường XÁC ĐỊNH nhận đúng."""
+    """Chữ ký payload thật trong dự án (ADV_SPECS) được đường xác định nhận đúng."""
     assert (
         map_attack(
             AttackMapperInput(payload="SELECT * FROM users WHERE username = %s AND 1=1")
@@ -311,18 +311,16 @@ def test_real_project_payload_signatures_map_correctly():
 
 
 def test_benign_text_does_not_false_map():
-    """Văn bản lành (kể cả chứa 'select') KHÔNG bị gán nhầm kỹ thuật web."""
+    """Văn bản lành (kể cả chứa 'select') không bị gán nhầm kỹ thuật web."""
     assert normalize_attack_type("daily report select summary") == ""
     assert normalize_attack_type("user logged in normally") == ""
 
 
-# ==============================================================================
-# ĐỐI CHIẾU TÊN KỸ THUẬT — hồi quy lỗi "đúng ID, sai tên"
-# ==============================================================================
+# Đối chiếu tên kỹ thuật - hồi quy lỗi "đúng ID, sai tên"
 def test_wrong_technique_name_from_llm_is_corrected():
     """LLM gán T1087 nhãn 'Network Service Discovery' (thực ra là T1046) -> ép tên chuẩn.
 
-    Đây là lỗi THẬT quan sát được trên dashboard: regex chỉ kiểm technique-id nên nhãn
+    Đây là lỗi thật quan sát được trên dashboard: regex chỉ kiểm technique-id nên nhãn
     free-text của LLM đi thẳng ra UI mà không ai đối chiếu.
     """
     label, verified = verify_technique_label("T1087", "T1087 - Network Service Discovery")
@@ -332,7 +330,7 @@ def test_wrong_technique_name_from_llm_is_corrected():
 
 
 def test_correct_name_is_preserved():
-    """Nhãn ĐÚNG (kể cả khác cách viết/thiếu id) vẫn ra tên chuẩn, không báo động sai."""
+    """Nhãn đúng (kể cả khác cách viết/thiếu id) vẫn ra tên chuẩn, không báo động sai."""
     assert verify_technique_label("T1046", "Network Service Discovery") == (
         "T1046 - Network Service Discovery",
         True,
@@ -344,13 +342,13 @@ def test_correct_name_is_preserved():
 
 
 def test_parent_technique_name_derived_from_kb_convention():
-    """Id CHA vắng mặt trong KB nhưng suy được từ quy ước 'Cha: Con' của chính KB."""
+    """Id cha vắng mặt trong KB nhưng suy được từ quy ước 'Cha: Con' của chính KB."""
     assert canonical_technique_name("T1110") == "Brute Force"
     assert canonical_technique_name("T1059") == "Command and Scripting Interpreter"
 
 
 def test_unknown_id_is_flagged_not_fabricated():
-    """KB không phủ -> KHÔNG bịa tên, KHÔNG im lặng: giữ nhãn LLM + cờ chưa đối chiếu.
+    """KB không phủ -> không bịa tên, không im lặng: giữ nhãn LLM + cờ chưa đối chiếu.
 
     Dùng `T1650` vì lý do như test neo ở trên: `T1499` từng vắng mặt nhưng nay đã có
     trong kho, nên nó không còn kiểm được nhánh "không đối chiếu được tên".
@@ -361,13 +359,11 @@ def test_unknown_id_is_flagged_not_fabricated():
     assert UNVERIFIED_NAME_SUFFIX in label
 
 
-# ==============================================================================
-# HỒI QUY: _parse_json_object — llm_select từng KHÔNG BAO GIỜ chạy được
-# ==============================================================================
+# Hồi quy: _parse_json_object - llm_select từng không bao giờ chạy được
 def test_parse_json_object_handles_select_schema():
-    """Phản hồi chọn-MITRE có schema RIÊNG (technique_id), KHÔNG phải DECISION schema.
+    """Phản hồi chọn-MITRE có schema riêng (technique_id), không phải DECISION schema.
 
-    Bug thật: _llm_select dùng parse_llm_response (đòi field `action`) nên MỌI phản hồi
+    Bug thật: _llm_select dùng parse_llm_response (đòi field `action`) nên mọi phản hồi
     hợp lệ đều bị reject -> llm_select luôn rơi về low_confidence, tính năng chết âm thầm.
     """
     from src.agent.attack_mapper import _parse_json_object
@@ -384,26 +380,24 @@ def test_parse_json_object_handles_select_schema():
         _parse_json_object('Kết quả:\n```json\n{"technique_id": "T1571"}\n```')["technique_id"]
         == "T1571"
     )
-    # rác -> dict rỗng, KHÔNG ném lỗi
+    # rác -> dict rỗng, không ném lỗi
     assert _parse_json_object("không phải json") == {}
     assert _parse_json_object(None) == {}
 
 
-# ==============================================================================
-# LÁ CHẮN NEO BẰNG CHỨNG: không CHẶN TỰ ĐỘNG bằng kỹ thuật ngoài ngữ cảnh RAG
-# ==============================================================================
+# Lá chắn neo bằng chứng: không chặn tự động bằng kỹ thuật ngoài ngữ cảnh RAG
 #
-# Lá chắn chống-ảo-giác cũ chỉ hỏi "kỹ thuật này có trong kho không?", KHÔNG hỏi "nó có
+# Lá chắn chống-ảo-giác cũ chỉ hỏi "kỹ thuật này có trong kho không?", không hỏi "nó có
 # nằm trong tài liệu vừa truy xuất cho lô này không?". Đo trên lượt chạy nguội 274 lô:
-# 25 câu trả lời nằm NGOÀI ngữ cảnh RAG, độ chính xác 0/4 trên các lô có nhãn (so với
-# 8/25 khi có neo). Trong đó 3 ca thành BLOCK_IP TỰ ĐỘNG ở confidence 0.93-0.95 — chặn
+# 25 câu trả lời nằm ngoài ngữ cảnh RAG, độ chính xác 0/4 trên các lô có nhãn (so với
+# 8/25 khi có neo). Trong đó 3 ca thành BLOCK_IP tự động ở confidence 0.93-0.95 - chặn
 # vĩnh viễn một IP dựa trên kỹ thuật mà bộ truy xuất chưa từng đưa ra.
 
 
 def _mapper_state(technique: str, rag_ctx: str, action: str = "BLOCK_IP", *, attack_evidence=False):
     """`attack_evidence=True` cho lô một payload khớp chữ ký WAF của Tier-1.
 
-    Đích đến của hai lá chắn PHỤ THUỘC vào điều này: lô có bằng chứng tấn công mà không đặt
+    Đích đến của hai lá chắn phụ thuộc vào điều này: lô có bằng chứng tấn công mà không đặt
     tên được kỹ thuật thì người phải xem (AWAIT_HITL); lô không có bằng chứng nào thì mã kỹ
     thuật chỉ là phỏng đoán và đẻ phiếu HITL cho nó chính là nạn ngập hàng đợi (-> ALERT).
     """
@@ -428,10 +422,10 @@ def _mapper_state(technique: str, rag_ctx: str, action: str = "BLOCK_IP", *, att
 
 
 def test_block_never_survives_an_ungrounded_technique():
-    """BẤT BIẾN AN TOÀN: kỹ thuật ngoài ngữ cảnh RAG thì KHÔNG được tự động chặn.
+    """bất biến an toàn: kỹ thuật ngoài ngữ cảnh RAG thì không được tự động chặn.
 
     Đích hạ cấp phụ thuộc bằng chứng (xem test kế), nhưng `BLOCK_IP` thì không bao giờ được
-    sống sót ở cả hai nhánh — đó mới là điều lá chắn tồn tại để bảo đảm.
+    sống sót ở cả hai nhánh - đó mới là điều lá chắn tồn tại để bảo đảm.
     """
     from src.agent.nodes import node_attack_mapper
 
@@ -449,12 +443,12 @@ def test_block_never_survives_an_ungrounded_technique():
 
 
 def test_ungrounded_shield_routes_by_attack_evidence():
-    """Lô CÓ bằng chứng tấn công -> người xem; lô KHÔNG có -> chỉ cảnh báo.
+    """Lô có bằng chứng tấn công -> người xem; lô không có -> chỉ cảnh báo.
 
-    VÌ SAO TÁCH. Cả hai nhánh đều nói "không khẳng định được kỹ thuật", nhưng chỉ nhánh đầu
+    Vì sao tách. Cả hai nhánh đều nói "không khẳng định được kỹ thuật", nhưng chỉ nhánh đầu
     là một cuộc tấn công thật chưa phân loại được. Đo trên lượt chạy 12/08/2026, 49 lô đầu
-    (toàn bộ nằm ở vùng lưu lượng LÀNH): 23 lô bị đẩy sang HITL, không lô nào có bằng chứng
-    tấn công — tỉ lệ HITL 47% cho một cửa sổ 100% lành, đúng nạn ngập hàng đợi mà đề tài đặt
+    (toàn bộ nằm ở vùng lưu lượng lành): 23 lô bị đẩy sang HITL, không lô nào có bằng chứng
+    tấn công - tỉ lệ HITL 47% cho một cửa sổ 100% lành, đúng nạn ngập hàng đợi mà đề tài đặt
     ra để giải quyết.
     """
     from src.agent.nodes import node_attack_mapper
@@ -470,12 +464,12 @@ def test_ungrounded_shield_routes_by_attack_evidence():
 
 
 def test_shield_never_pulls_a_hitl_ticket_back_down():
-    """Lá chắn chỉ được HẠ cấp, không được kéo một ca đã giao cho người trở lại tự động.
+    """Lá chắn chỉ được hạ cấp, không được kéo một ca đã giao cho người trở lại tự động.
 
-    BẪY THỨ TỰ. `node_attack_mapper` chạy SAU `node_llm_triage` và ghi thẳng vào
+    Bẫy thứ tự. `node_attack_mapper` chạy sau `node_llm_triage` và ghi thẳng vào
     `decision["action"]`. Từ 17/08/2026 triage đẩy ca "model khẳng định tấn công mà không
-    chữ ký nào xác nhận" sang `AWAIT_HITL`. Những lô đó theo định nghĩa là KHÔNG có bằng
-    chứng, nên nhánh lá chắn dành cho chúng là `ALERT` — gán đè vô điều kiện sẽ xoá phiếu
+    chữ ký nào xác nhận" sang `AWAIT_HITL`. Những lô đó theo định nghĩa là không có bằng
+    chứng, nên nhánh lá chắn dành cho chúng là `ALERT` - gán đè vô điều kiện sẽ xoá phiếu
     khỏi hàng đợi người, im lặng, ở một node khác hẳn node ra quyết định.
     """
     from src.agent.nodes import node_attack_mapper
@@ -495,12 +489,12 @@ def test_shield_never_pulls_a_hitl_ticket_back_down():
 
 
 def test_shield_wording_matches_the_real_destination():
-    """Đoạn biện giải KHÔNG được hứa "chuyển người xử lý" khi phán quyết thật là ALERT.
+    """Đoạn biện giải không được hứa "chuyển người xử lý" khi phán quyết thật là ALERT.
 
     Lá chắn từng ghi cứng một câu duy nhất từ thời nó chỉ có một nhánh. Sau khi tách nhánh
     theo bằng chứng, câu đó thành lời hứa sai: đo trên lượt chạy 17/08/2026, lá chắn khai
-    hoả 126 lần, CẢ 126 đi nhánh ALERT nhưng vẫn in "chuyển người xử lý". Analyst đọc thẻ
-    rồi mở tab HITL thì không có phiếu nào — thẻ và hàng đợi nói hai chuyện khác nhau.
+    hoả 126 lần, cả 126 đi nhánh ALERT nhưng vẫn in "chuyển người xử lý". Analyst đọc thẻ
+    rồi mở tab HITL thì không có phiếu nào - thẻ và hàng đợi nói hai chuyện khác nhau.
     """
     from src.agent.nodes import node_attack_mapper
 
@@ -534,7 +528,7 @@ def test_ungrounded_technique_becomes_NA_not_a_plausible_guess():
 
     Đo thật: model chỉ tự trả 'N/A' 2/136 lần (1,5%); còn lại nó chọn một kỹ thuật nghe
     hợp lý. Nhật ký kiểm toán không được khẳng định điều bằng chứng không đỡ. Phần này đúng
-    ở CẢ HAI nhánh định tuyến — việc xoá mã kỹ thuật không phụ thuộc vào ai xử lý tiếp.
+    ở cả hai nhánh định tuyến - việc xoá mã kỹ thuật không phụ thuộc vào ai xử lý tiếp.
     """
     from src.agent.nodes import node_attack_mapper
 
@@ -549,7 +543,7 @@ def test_ungrounded_technique_becomes_NA_not_a_plausible_guess():
 
 
 def _fake_mapping(technique_id: str, technique: str):
-    """Bộ ánh xạ giả, để cô lập TRANH CHẤP giữa mã của mapper và mã LLM tự khai."""
+    """Bộ ánh xạ giả, để cô lập TRANH chấp giữa mã của mapper và mã LLM tự khai."""
     from src.agent.attack_mapper import MitreMapping
 
     return MitreMapping(
@@ -567,14 +561,14 @@ def _fake_mapping(technique_id: str, technique: str):
 
 
 def test_llm_selfclaimed_technique_must_not_override_deterministic_mapper(monkeypatch):
-    """LỖI GỐC của khoảng cách rrf 67,33% -> e2e 2,33%.
+    """lỗi gốc của khoảng cách rrf 67,33% -> e2e 2,33%.
 
-    Bản cũ: hễ LLM nêu một mã hợp lệ là mã đó THẮNG bộ ánh xạ RRF và đi thẳng ra
-    `mitre_technique_id` — trường được chấm điểm và ghi vào vết kiểm toán — mà KHÔNG hề
-    đối chiếu với tài liệu RAG của lô. Chỉ TÊN được kiểm, nên một mã bịa vẫn lọt.
+    Bản cũ: hễ LLM nêu một mã hợp lệ là mã đó thắng bộ ánh xạ RRF và đi thẳng ra
+    `mitre_technique_id` - trường được chấm điểm và ghi vào vết kiểm toán - mà không hề
+    đối chiếu với tài liệu RAG của lô. Chỉ tên được kiểm, nên một mã bịa vẫn lọt.
 
     Ở đây: RAG chỉ nói về T1498; mapper chốt T1498 (có neo); LLM tự khai T1030 (không neo).
-    Quy kết PHẢI là T1498, và lời tự khai của model phải được giữ riêng để đối chiếu.
+    Quy kết phải là T1498, và lời tự khai của model phải được giữ riêng để đối chiếu.
     """
     from src.agent import nodes
 
@@ -590,7 +584,7 @@ def test_llm_selfclaimed_technique_must_not_override_deterministic_mapper(monkey
 
 
 def test_llm_technique_accepted_only_when_grounded(monkeypatch):
-    """Mapper không neo được nhưng LLM nêu mã CÓ trong RAG -> nhận mã của LLM.
+    """Mapper không neo được nhưng LLM nêu mã có trong RAG -> nhận mã của LLM.
 
     Vẫn truy nguyên được về bằng chứng, nên không có lý do vứt đi.
     """
@@ -621,5 +615,5 @@ def test_attribution_never_leaves_the_rag_context(monkeypatch):
 
         assert d["mitre_technique_id"] == ""
         assert d["mapping_status"] == "ungrounded_in_rag"
-        # Đích đến theo bằng chứng; bất biến ở TRÊN (mã quy kết rỗng) đúng ở cả hai nhánh.
+        # Đích đến theo bằng chứng; bất biến ở trên (mã quy kết rỗng) đúng ở cả hai nhánh.
         assert d["action"] == expect_action

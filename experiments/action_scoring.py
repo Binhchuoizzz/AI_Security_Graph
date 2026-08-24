@@ -1,23 +1,23 @@
-"""Chấm theo HÀNH ĐỘNG CUỐI CÙNG — thước đo chính của ablation.
+"""Chấm theo hành động cuối cùng - thước đo chính của ablation.
 
-TÁCH RIÊNG khỏi `run_ablation.py` có chủ đích: file đó import cả agent/LLM/retriever nên
+Tách riêng khỏi `run_ablation.py` có chủ đích: file đó import cả agent/LLM/retriever nên
 không thể unit-test và không script eval nào khác dùng lại được. Module này thuần Python,
 không phụ thuộc gì, nên vừa test được trong CI vừa dùng chung cho mọi phép đo.
 
-BỐI CẢNH (vì sao cần thước đo này):
+Bối cảnh (vì sao cần thước đo này):
 Thước đo nhị phân "có gắn cờ hay không" gộp `ESCALATE` (Tầng 1 chuyển tiếp) và
-`AWAIT_HITL` (hoãn cho người) vào CÙNG Ô với `BLOCK_IP`. Đo thật ngày 2026-07-21 trên
+`AWAIT_HITL` (hoãn cho người) vào cùng Ô với `BLOCK_IP`. Đo thật ngày 2026-07-21 trên
 `ablation_results.json` + `ablation_bcde_results.json`: Config A ≡ F từng bit, và
-B ≡ C ≡ D ≡ E từng bit — mọi cấu hình đều "gắn cờ tất cả", nên F1 = 0.9655 chính là điểm
+B ≡ C ≡ D ≡ E từng bit - mọi cấu hình đều "gắn cờ tất cả", nên F1 = 0.9655 chính là điểm
 của một hàm `return True` trên tập 93.3% tấn công. Ablation mất sạch khả năng phân biệt và
 McNemar cho p = 1.0.
 """
 
-# NGUYÊN TẮC: `expected_action` trong ground_truth có ĐỦ 4 nhãn (ALERT 770 · BLOCK_IP 320 ·
-# AWAIT_HITL 80 · LOG 80). AWAIT_HITL là ĐÁP ÁN ĐÚNG cho 80 mẫu — hoãn cho người đôi khi
-# CHÍNH LÀ hành động đúng. Vậy phải chấm bằng KHỚP HÀNH ĐỘNG, không phải 'có gắn cờ hay
-# không'. Và `ESCALATE` KHÔNG phải phán quyết: nó nghĩa là pipeline CHƯA quyết xong, nên
-# tính riêng thành 'chưa phân giải' — tuyệt đối không tính là phát hiện.
+# Nguyên tắc: `expected_action` trong ground_truth có đủ 4 nhãn (ALERT 770 · BLOCK_IP 320 ·
+# AWAIT_HITL 80 · LOG 80). AWAIT_HITL là đáp án đúng cho 80 mẫu - hoãn cho người đôi khi
+# Chính là hành động đúng. Vậy phải chấm bằng khớp hành động, không phải 'có gắn cờ hay
+# không'. Và `ESCALATE` không phải phán quyết: nó nghĩa là pipeline chưa quyết xong, nên
+# tính riêng thành 'chưa phân giải' - tuyệt đối không tính là phát hiện.
 TERMINAL_ACTIONS = ("BLOCK_IP", "ALERT", "LOG", "DROP")
 DEFER_ACTIONS = ("AWAIT_HITL",)
 UNRESOLVED_ACTIONS = ("ESCALATE", "ERROR", "UNKNOWN")
@@ -29,7 +29,7 @@ _ACTION_ALIAS = {"DROP": "LOG", "TIER1_DROP": "LOG"}
 def _canon_action(raw: object) -> str:
     """Chuẩn hoá tên hành động (bỏ tiền tố TIER1_, gộp DROP≡LOG) trước khi so khớp.
 
-    Nhận `object` chứ không phải `str`: giá trị tới từ `dict.get()` nên có thể là None —
+    Nhận `object` chứ không phải `str`: giá trị tới từ `dict.get()` nên có thể là None -
     ép kiểu ở đây để một bản ghi thiếu trường không làm hỏng cả lượt chấm.
     """
     a = str(raw or "UNKNOWN").strip().upper()
@@ -39,17 +39,17 @@ def _canon_action(raw: object) -> str:
 
 
 def score_actions(expected: list, actual: list) -> dict:
-    """Chấm theo HÀNH ĐỘNG CUỐI CÙNG — thước đo phân biệt được các cấu hình.
+    """Chấm theo hành động cuối cùng - thước đo phân biệt được các cấu hình.
 
     Trả về:
-      action_accuracy   — tỉ lệ khớp CHÍNH XÁC hành động kỳ vọng (thước đo CHÍNH)
-      autonomy_rate     — tỉ lệ hệ TỰ QUYẾT (ra hành động cuối, không hoãn/không treo)
-      defer_rate        — tỉ lệ hoãn cho người (AWAIT_HITL)
-      unresolved_rate   — tỉ lệ pipeline CHƯA quyết xong (ESCALATE/ERROR) — chỉ Config A
-                          thiếu tầng sau mới có; KHÔNG được tính là phát hiện
-      autonomous_precision — trong các ca TỰ QUYẾT, bao nhiêu phần trăm quyết ĐÚNG. Đây là
+      action_accuracy   - tỉ lệ khớp chính xác hành động kỳ vọng (thước đo chính)
+      autonomy_rate     - tỉ lệ hệ tự quyết (ra hành động cuối, không hoãn/không treo)
+      defer_rate        - tỉ lệ hoãn cho người (AWAIT_HITL)
+      unresolved_rate   - tỉ lệ pipeline chưa quyết xong (ESCALATE/ERROR) - chỉ Config A
+                          thiếu tầng sau mới có; Không được tính là phát hiện
+      autonomous_precision - trong các ca tự quyết, bao nhiêu phần trăm quyết đúng. Đây là
                           câu hỏi vận hành thật: "khi hệ dám tự hành động, nó có đáng tin?"
-      confusion         — bảng chéo kỳ vọng × thực tế, để soi hệ sai kiểu gì
+      confusion         - bảng chéo kỳ vọng × thực tế, để soi hệ sai kiểu gì
     """
     n = len(expected)
     if not n:
@@ -70,10 +70,10 @@ def score_actions(expected: list, actual: list) -> dict:
         confusion.setdefault(e, {}).setdefault(a, 0)
         confusion[e][a] += 1
 
-    # KHOẢNG TIN CẬY cho thước đo chính. Ablation cân bằng chỉ có n~160, nên chênh lệch
-    # vài phần nghìn giữa hai cấu hình HOÀN TOÀN có thể là nhiễu lấy mẫu. Không có CI thì
+    # Khoảng tin cậy cho thước đo chính. Ablation cân bằng chỉ có n~160, nên chênh lệch
+    # vài phần nghìn giữa hai cấu hình hoàn toàn có thể là nhiễu lấy mẫu. Không có CI thì
     # không được phép nói "C tốt hơn A". Import cục bộ để module giữ nguyên tính thuần
-    # (không phụ thuộc lúc nạp) — `metrics_core` cũng thuần nên không có vòng lặp import.
+    # (không phụ thuộc lúc nạp) - `metrics_core` cũng thuần nên không có vòng lặp import.
     from experiments.metrics_core import bootstrap_ci, wilson_ci
 
     pairs = list(zip(exp, act, strict=False))

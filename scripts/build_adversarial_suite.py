@@ -2,14 +2,14 @@
 Bộ kiểm thử Adversarial mở rộng & khó hơn cho Guardrails của SENTINEL.
 
 Thay vì 45 mẫu cơ bản (base64 'ignore instructions', <script> kinh điển), bộ này
-phủ các kỹ thuật tấn công THẬT theo OWASP LLM Top 10 (LLM01 Prompt Injection,
+phủ các kỹ thuật tấn công thật theo OWASP LLM Top 10 (LLM01 Prompt Injection,
 LLM02 Insecure Output, LLM06 Sensitive Info Disclosure) và các jailbreak/encoding
 bypass được ghi nhận trong thực tế.
 
 5 nhóm:
   encoding_bypass   - né phát hiện bằng mã hóa (đa lớp, homoglyph, bidi, leet, base32, rot13...)
   structural_attacks- phá vỡ cấu trúc/delimiter, giả mạo system prompt, nested injection
-  semantic_confusion- thao túng ngữ nghĩa (authority, false context, urgency...) — KHÓ nhất
+  semantic_confusion- thao túng ngữ nghĩa (authority, false context, urgency...) - khó nhất
   jailbreak         - DAN / Developer Mode / roleplay / hypothetical / token smuggling
   rag_poisoning     - indirect prompt injection nhúng trong tài liệu RAG được truy xuất
 
@@ -213,7 +213,7 @@ def build_structural_attacks():
 
 
 def build_semantic_confusion():
-    # KHÓ nhất: ngữ nghĩa tự nhiên, không có pattern/encoding để bắt — cần Tier-2 LLM
+    # Khó nhất: ngữ nghĩa tự nhiên, không có pattern/encoding để bắt - cần Tier-2 LLM
     samples = [
         (
             "benign_framing",

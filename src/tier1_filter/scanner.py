@@ -1,11 +1,11 @@
 """
-DevSecOps SCA Scanner Utility
+Quét thành phần phụ thuộc (SCA) bằng Trivy.
 
 Module này thực hiện quét lỗ hổng tĩnh (Software Composition Analysis - SCA)
 trên mã nguồn và các dependencies phụ thuộc của chính hệ thống (ví dụ: requirements.txt)
 bằng công cụ Trivy.
 
-LƯU Ý: Đây KHÔNG PHẢI là module sinh log quét mạng giả lập hay tương tác
+Lưu Ý: Đây không phải là module sinh log quét mạng giả lập hay tương tác
 trực tiếp với runtime pipeline của SENTINEL. Mục đích của module này là:
   1. Quét lỗ hổng của chính hệ thống trước khi triển khai (Self-Securing).
   2. Xuất báo cáo dạng JSON lưu trữ tại data/trivy-results.json.
@@ -120,7 +120,7 @@ class VulnerabilityScanner:
             ]
             subprocess.run(
                 cmd, check=False, capture_output=True
-            )  # Bandit returns non-zero if issues found
+            )  # Bandit trả mã khác 0 khi phát hiện vấn đề
             logger.info(f"Bandit SAST scan completed. Results saved to {self.sast_output_file}")
             return self.sast_output_file
         except Exception as e:

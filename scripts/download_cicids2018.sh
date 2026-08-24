@@ -1,5 +1,4 @@
 #!/bin/bash
-# ============================================================
 # CSE-CIC-IDS2018 Dataset Downloader
 #
 # Source: AWS Open Data Registry
@@ -11,7 +10,6 @@
 #
 # OUTPUT:
 #   data/raw/cicids2018/*.csv (~8GB total)
-# ============================================================
 
 set -e
 

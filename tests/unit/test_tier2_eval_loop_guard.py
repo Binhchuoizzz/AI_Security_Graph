@@ -1,15 +1,15 @@
 """Chống hồi quy cho sự cố đo Tier-2 (phát hiện 2026-07-15).
 
-Sự cố: `evaluate_tier2_decision.py` gọi `agent_app.invoke()` liên tiếp mà QUÊN
+Sự cố: `evaluate_tier2_decision.py` gọi `agent_app.invoke()` liên tiếp mà quên
 `loop_detector.reset()`. Bộ đếm loop-guard cộng dồn qua các invoke, nên sau
-`max_iterations`(=10) invoke/luồng, MỌI invoke sau đều FORCE_STOP -> RuntimeError.
+`max_iterations`(=10) invoke/luồng, mọi invoke sau đều FORCE_STOP -> RuntimeError.
 Nhánh `except` hạ về AWAIT_HITL, và AWAIT_HITL lại nằm trong FLAG_ACTIONS -> một cú
 CRASH bị tính là "bắt đúng đe doạ" (TP). Kết quả: 631/651 ca crash, recall giả 1.00,
 accuracy 0.9124 = đúng base rate. Số hỏng này đã lọt vào luận văn Ch4.
 
 Hai test dưới khoá lại hai lớp phòng thủ:
-  1. `_tier2_decide` phải reset loop-guard -> >10 invoke liên tiếp KHÔNG sinh lỗi.
-  2. Ca agent không cho ra phán quyết KHÔNG được tính là TP; phải bị loại khỏi mẫu số
+  1. `_tier2_decide` phải reset loop-guard -> >10 invoke liên tiếp không sinh lỗi.
+  2. Ca agent không cho ra phán quyết không được tính là TP; phải bị loại khỏi mẫu số
      và làm `metric_valid=false`.
 
 Không cần LLM/GPU: stub `agent_app.invoke` mô phỏng đúng hành vi thăm node của đồ thị.
@@ -50,7 +50,7 @@ def test_tier2_decide_resets_loop_guard_across_invokes(monkeypatch):
 
 
 def test_crash_is_not_counted_as_a_correct_detection(monkeypatch):
-    """Agent crash -> KHÔNG được thành TP; phải bị loại khỏi mẫu số và cờ metric_valid=false."""
+    """Agent crash -> không được thành TP; phải bị loại khỏi mẫu số và cờ metric_valid=false."""
 
     def always_crash(_state):
         raise RuntimeError("Infinite loop detected: Node 'node_guardrails' visited 11 times")
@@ -84,8 +84,8 @@ def test_summary_flags_invalid_metric_when_agent_mostly_crashes(monkeypatch, tmp
 
     assert summary is not None
     assert summary["metric_valid"] is False, "run toàn crash PHẢI bị đánh dấu không hợp lệ"
-    # Ba số sức khoẻ lượt chạy nay sống trong khối `run_health`, TÁCH khỏi nhóm chỉ số kết
-    # quả: chúng chứng minh phép đo có SẠCH hay không, chứ không nói gì về năng lực phát
+    # Ba số sức khoẻ lượt chạy nay sống trong khối `run_health`, tách khỏi nhóm chỉ số kết
+    # quả: chúng chứng minh phép đo có sạch hay không, chứ không nói gì về năng lực phát
     # hiện. Nằm lẫn giữa MCC và recall thì `agent_reliability = 1.00` bị đọc như thành tích.
     assert summary["run_health"]["n_invoke_errors"] == 20
     assert summary["run_health"]["agent_reliability"] == 0.0

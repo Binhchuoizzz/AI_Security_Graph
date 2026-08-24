@@ -1,6 +1,4 @@
-"""
-LangGraph Nodes for SENTINEL Agent
-"""
+"""Các node của đồ thị LangGraph ở Tier-2."""
 
 import hashlib
 import logging
@@ -44,20 +42,20 @@ logger = logging.getLogger(__name__)
 # Khởi tạo Retriever (Singleton)
 retriever = DualRetriever(use_cache=True)
 
-# Số ký tự payload thô tối đa đưa vào truy vấn NGỮ CẢNH (truy vấn KỸ THUẬT không nhận
-# payload — xem `node_rag_context`). LLM vẫn luôn nhận log đầy đủ, đây chỉ là truy vấn RAG.
+# Số ký tự payload thô tối đa đưa vào truy vấn ngữ cảnh (truy vấn kỹ thuật không nhận
+# payload - xem `node_rag_context`). LLM vẫn luôn nhận log đầy đủ, đây chỉ là truy vấn RAG.
 PAYLOAD_QUERY_CHARS = 120
 
-# Chừa chỗ cho phần LLM SINH RA. Trần ngữ cảnh là trần cho (prompt + đáp án), nên cắt prompt
+# Chừa chỗ cho phần LLM sinh ra. Trần ngữ cảnh là trần cho (prompt + đáp án), nên cắt prompt
 # vừa khít trần là đảm bảo model không còn chỗ trả lời. 1.024 token đủ cho một phán quyết
 # JSON kèm đoạn biện giải dài nhất quan sát được.
 _CTX_RESERVE_TOK = 1024
 
 # Cache khối `tier2` của config, làm mới theo mtime.
 #
-# KHÔNG dùng lại lối đọc-mỗi-lần-gọi của `attack_mapper._llm_select_enabled`: hệ thật ghi
+# Không dùng lại lối đọc-mỗi-lần-gọi của `attack_mapper._llm_select_enabled`: hệ thật ghi
 # luật động vào chính `system_settings.yaml`, nên tệp phình lên hàng nghìn dòng (đo được
-# 8.109 dòng sau một lượt demo). Parse lại toàn bộ YAML cho MỖI lô Tier-2 là chi phí thuần
+# 8.109 dòng sau một lượt demo). Parse lại toàn bộ YAML cho mỗi lô Tier-2 là chi phí thuần
 # tuý lãng phí. Vẫn giữ hot-reload bằng cách so mtime, nên sửa config lúc đang chạy vẫn ăn.
 _TIER2_CFG_CACHE: dict[str, Any] = {}
 _TIER2_CFG_MTIME: float = -1.0
@@ -84,33 +82,31 @@ def _cfg_tier2() -> dict[str, Any]:
     return _TIER2_CFG_CACHE
 
 
-# ==============================================================================
-# ÁNH XẠ NHÃN PHÁT HIỆN (tiếng Việt) -> CỤM TỪ VỰNG MITRE (tiếng Anh)
-# ==============================================================================
-# Nhãn của Tier-1 là TIẾNG VIỆT ("WAF: Phát hiện SQL Injection (SQLi) trong 'message'"),
-# còn kho MITRE/NIST là TIẾNG ANH và embedder all-MiniLM-L6-v2 thiên tiếng Anh -> chuỗi
-# Việt gần như KHÔNG đóng góp tín hiệu truy xuất. Bảng này dịch nhãn sang đúng từ vựng
-# MITRE để truy vấn neo vào KỸ THUẬT.
+# Ánh xạ nhãn phát hiện (tiếng Việt) -> cụm từ vựng MITRE (tiếng Anh)
+# Nhãn của Tier-1 là tiếng Việt ("WAF: Phát hiện SQL Injection (SQLi) trong 'message'"),
+# còn kho MITRE/NIST là tiếng Anh và embedder all-MiniLM-L6-v2 thiên tiếng Anh -> chuỗi
+# Việt gần như không đóng góp tín hiệu truy xuất. Bảng này dịch nhãn sang đúng từ vựng
+# MITRE để truy vấn neo vào kỹ thuật.
 #
-# BẮT BUỘC PHỦ ĐỦ 29 HỌ của `_WAF_PATTERNS` (rule_engine.py). Trước đây bảng chỉ có 11
+# Bắt buộc phủ đủ 29 họ của `_WAF_PATTERNS` (rule_engine.py). Trước đây bảng chỉ có 11
 # needle phủ 7/29 họ; 22 họ còn lại sinh nhãn thuần Việt -> truy vấn rơi hoàn toàn về
 # payload thô -> truy xuất trượt sang nhóm kỹ thuật sai. Test
-# `test_attack_terms_cover_all_waf_families` KHOÁ bất biến này: thêm họ chữ ký mà quên
+# `test_attack_terms_cover_all_waf_families` khoá bất biến này: thêm họ chữ ký mà quên
 # ánh xạ thì CI đỏ.
 #
-# Khoá tra là chuỗi con VIẾT THƯỜNG của tên họ trong `_WAF_PATTERNS`, nên khớp trực tiếp
+# Khoá tra là chuỗi con viết thường của tên họ trong `_WAF_PATTERNS`, nên khớp trực tiếp
 # với chuỗi lý do mà `_check_waf_signatures` sinh ra.
 #
-# CẤM ĐƯA TÊN CỦA MỘT KỸ THUẬT KHÁC VÀO CỤM. Cụm đi thẳng vào truy vấn vector, nên mỗi từ
+# Cấm đưa tên của một kỹ thuật khác vào cụm. Cụm đi thẳng vào truy vấn vector, nên mỗi từ
 # thừa đều kéo kết quả về phía kỹ thuật mang từ đó. Bản trước ánh xạ XSS thành "cross-site
-# scripting XSS **drive-by compromise** web client exploit" — mà "Drive-by Compromise" đúng
-# là TÊN của T1189. Đo 12/08/2026: truy vấn đó trả về [T1189, T1608.004, T1190, T1203, T1571]
-# và **không có** T1059.007; bỏ hai từ ấy thì T1059.007 lên hạng 1. Hậu quả trên lượt chạy:
-# 0/16 lô XSS được quy kết đúng, phần lớn bị gán T1189 — tức hệ thống trả về đúng thứ mà
+# scripting XSS drive-by compromise web client exploit" - mà "Drive-by Compromise" đúng
+# là tên của T1189. Đo 12/08/2026: truy vấn đó trả về [T1189, T1608.004, T1190, T1203, T1571]
+# và không có T1059.007; bỏ hai từ ấy thì T1059.007 lên hạng 1. Hậu quả trên lượt chạy:
+# 0/16 lô XSS được quy kết đúng, phần lớn bị gán T1189 - tức hệ thống trả về đúng thứ mà
 # truy vấn đã tự khai. Cùng một cái bẫy với lá chắn T1571 từng tự chứng minh bằng chính tên
-# mình. Viết cụm bằng NGỮ NGHĨA của đòn tấn công, không bằng tên kỹ thuật hàng xóm.
+# mình. Viết cụm bằng ngữ nghĩa của đòn tấn công, không bằng tên kỹ thuật hàng xóm.
 _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
-    # ── Tiêm nhiễm web kinh điển ──
+    # Tiêm nhiễm web kinh điển
     ("sql injection", "SQL injection exploit public-facing application web vulnerability"),
     ("sqli", "SQL injection exploit public-facing application web vulnerability"),
     ("nosql injection", "NoSQL injection exploit public-facing application database query"),
@@ -144,7 +140,7 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
     ),
     ("graphql", "GraphQL introspection abuse exploit public-facing application data discovery"),
     ("jwt", "forge web credentials JSON web token authentication bypass"),
-    # ── Thực thi mã / web shell / RCE ──
+    # Thực thi mã / web shell / RCE
     ("log4shell", "exploit public-facing application JNDI lookup remote code execution Log4j"),
     ("jndi injection", "exploit public-facing application JNDI lookup remote code execution"),
     ("web shell", "server software component web shell persistence remote command execution"),
@@ -157,37 +153,37 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
     ("encoded powershell", "command and scripting interpreter PowerShell obfuscated execution"),
     ("living-off-the-land", "signed binary proxy execution system binary abuse LOLBin"),
     ("lolbin", "signed binary proxy execution system binary abuse LOLBin"),
-    # ── Trinh sát / công cụ tấn công ──
+    # Trinh sát / công cụ tấn công
     ("scanner", "active scanning vulnerability scanning reconnaissance attack tooling"),
     ("attack tooling", "active scanning vulnerability scanning reconnaissance attack tooling"),
     ("quét cổng", "network service discovery port scanning reconnaissance"),
     ("port scan", "network service discovery port scanning reconnaissance"),
     ("cổng nhạy cảm", "remote services SSH RDP SMB valid accounts lateral movement"),
     ("brute", "brute force password guessing valid accounts remote services"),
-    # ── Truy cập thông tin xác thực / tệp nhạy cảm ──
+    # Truy cập thông tin xác thực / tệp nhạy cảm
     ("đánh cắp thông tin xác thực", "OS credential dumping LSASS memory DCSync Kerberoasting"),
     ("sensitive file access", "unsecured credentials credentials in files configuration discovery"),
-    # ── Tấn công tầng LLM (chữ ký `rule_engine` tự sinh) ───────────────────────────
-    # LỖ HỔNG ĐÃ VÁ. Bảng này phủ 29 họ chữ ký WAF nhưng KHÔNG có mục nào cho tấn công tầng
+    # Tấn công tầng LLM (chữ ký `rule_engine` tự sinh)
+    # Lỗ hổng đã vá. Bảng này phủ 29 họ chữ ký WAF nhưng không có mục nào cho tấn công tầng
     # LLM, trong khi `rule_engine` vẫn ghi ra `tier1_reasons` mang đúng hai chữ ký dưới đây.
-    # Hệ quả: lô mang chữ ký tiêm nhiễm cho từ vựng RỖNG -> `shield_has_attack_evidence=False`
+    # Hệ quả: lô mang chữ ký tiêm nhiễm cho từ vựng rỗng -> `shield_has_attack_evidence=False`
     # -> lá chắn neo bằng chứng kẹp lệnh chặn xuống 0,84 -> Tier-2 không chặn được tiêm nhiễm
     # dù Tier-1 đã nhận diện chắc chắn.
     #
-    # PHẠM VI THẬT, đo trên `data/demo.json` ngày 14/08/2026 — nêu ra để không ai trích quá
-    # tay: bản vá đổi kết quả cho **0/730** mẫu `adv_llm` của tập demo. 196/730 mẫu vốn ĐÃ có
+    # Phạm VI thật, đo trên `data/demo.json` ngày 14/08/2026 - nêu ra để không ai trích quá
+    # tay: bản vá đổi kết quả cho 0/730 mẫu `adv_llm` của tập demo. 196/730 mẫu vốn đã có
     # từ vựng qua chữ ký WAF khác, số còn lại không kích hoạt chữ ký injection của Tier-1
     # (toàn luồng 496.885 sự kiện chỉ ghi nhận 38 lần `t1_injection_signature`). Đây là vá
     # một đường đi có thật nhưng kịch bản demo hiện tại không chạm tới.
     #
-    # CẢNH BÁO CHẨN ĐOÁN SAI đã mắc: đừng suy nguồn dữ liệu từ TIỀN TỐ IP. `push_flow.py` cấp
+    # Cảnh báo chẩn đoán sai đã mắc: đừng suy nguồn dữ liệu từ tiền tố IP. `push_flow.py` cấp
     # dải TEST-NET `198.51.100.x` cho luồng đối kháng, nhưng trong `demo.json` `198.51` là
     # 30.514 bản ghi CSIC (phần lớn nhãn Benign); mẫu tiêm nhiễm nằm ở `198.18`/`198.20`.
-    # 108 lệnh chặn bị lá chắn hạ ở lượt đo từng bị quy oan cho lỗ hổng này — tra nhãn thật
-    # thì cả 35/35 log trong các lô đó đều là **Benign**, tức lá chắn làm ĐÚNG.
+    # 108 lệnh chặn bị lá chắn hạ ở lượt đo từng bị quy oan cho lỗ hổng này - tra nhãn thật
+    # thì cả 35/35 log trong các lô đó đều là Benign, tức lá chắn làm đúng.
     #
     # Khoá phải khớp SUBSTRING của lý do Tier-1 ("Prompt Injection Pattern: Phát hiện ...").
-    # Cụm viết theo NGỮ NGHĨA, KHÔNG nhắc mã kỹ thuật nào — cùng luật với cả bảng: để bộ
+    # Cụm viết theo ngữ nghĩa, không nhắc mã kỹ thuật nào - cùng luật với cả bảng: để bộ
     # truy xuất tự quyết, đừng để truy vấn tự khai đáp án rồi đọc lại lời mình.
     (
         "prompt injection",
@@ -197,10 +193,10 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
         "jailbreak",
         "safety guardrail bypass persona roleplay override of model operating instructions",
     ),
-    # ── Né tránh ──
+    # Né tránh
     ("mã hoá né tránh", "obfuscated files or information encoding evasion defense evasion"),
     ("encoding evasion", "obfuscated files or information encoding evasion defense evasion"),
-    # ── Tác động / hậu khai thác ──
+    # Tác động / hậu khai thác
     ("ransomware", "data encrypted for impact inhibit system recovery shadow copy deletion"),
     ("phá huỷ", "data destruction inhibit system recovery disk wipe impact"),
     ("đào tiền mã hoá", "resource hijacking cryptocurrency mining compute abuse"),
@@ -208,22 +204,22 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
         "rò rỉ ra dịch vụ ngoài",
         "exfiltration over web service to cloud storage alternative protocol",
     ),
-    # ── Phát hiện KHÔNG-CHỮ-KÝ của Tier-1 (NetFlow thuần) ──────────────────────────
-    # Bảng trên phủ 29 họ chữ ký WAF, tức chỉ sự kiện CÓ payload. Ba mục dưới đây bổ sung
-    # các lý do NGƯỠNG/NHỊP ĐỘ mà Tier-1 sinh ra cho NetFlow thuần — nhóm chiếm đa số lưu
+    # Phát hiện không-chữ-ký của Tier-1 (NetFlow thuần)
+    # Bảng trên phủ 29 họ chữ ký WAF, tức chỉ sự kiện có payload. Ba mục dưới đây bổ sung
+    # các lý do ngưỡng/nhịp độ mà Tier-1 sinh ra cho NetFlow thuần - nhóm chiếm đa số lưu
     # lượng leo thang. (Quét cổng · cổng nhạy cảm · brute đã có ở phần trên, đừng thêm lại:
-    # `_canonical_attack_terms` khử trùng theo GIÁ TRỊ, nên hai cụm gần-giống-nhau đều được
+    # `_canonical_attack_terms` khử trùng theo giá trị, nên hai cụm gần-giống-nhau đều được
     # nối vào và chỉ làm truy vấn loãng đi.)
-    # CHỈ MÔ TẢ HIỆN TƯỢNG ĐO ĐƯỢC — KHÔNG tự khai một họ kỹ thuật nào.
+    # Chỉ mô tả hiện tượng đo được - không tự khai một họ kỹ thuật nào.
     #
     # Bản trước nhét thẳng "network denial of service ..." vào cả ba cụm ngưỡng. Đó đúng là
     # hành vi mà ghi chú của `_ANOMALY_FEATURE_TERMS` ngay bên dưới đã cấm ("đoán kỹ thuật từ
     # một con số"), chỉ khác là nó nằm ở bảng ngưỡng nên không ai để ý. Hậu quả đo được trên
-    # luồng sống: 82% truy vấn RAG trả top-1 = T1498, và LLM — vốn được dặn chọn kỹ thuật TỪ
-    # ngữ cảnh RAG — đọc lại chính lời tự khai đó như thể là bằng chứng. Vòng lặp tự khẳng
+    # luồng sống: 82% truy vấn RAG trả top-1 = T1498, và LLM - vốn được dặn chọn kỹ thuật từ
+    # ngữ cảnh RAG - đọc lại chính lời tự khai đó như thể là bằng chứng. Vòng lặp tự khẳng
     # định: truy vấn nói "DoS" -> RAG trả DoS -> LLM kết luận DoS.
     #
-    # Một ngưỡng bị vượt CHỈ chứng minh "khối lượng/nhịp độ bất thường". DoS, C2 beaconing và
+    # Một ngưỡng bị vượt chỉ chứng minh "khối lượng/nhịp độ bất thường". DoS, C2 beaconing và
     # rò rỉ dữ liệu đều khớp như nhau; chọn giúp một cái là bịa bằng chứng. Để bộ truy xuất
     # tự quyết kỹ thuật nào gần nhất, và khi không đủ căn cứ thì AWAIT_HITL mới là đáp án đúng.
     ("vượt ngưỡng", "connection count above learned baseline repeated requests from single source"),
@@ -231,20 +227,20 @@ _ATTACK_TERMS: tuple[tuple[str, str], ...] = (
     ("tần suất", "high event frequency short interval repeated network connections"),
 )
 
-# Các KHOÁ ngưỡng/nhịp-độ: cụm của chúng là "chung chung" và phải bị loại khi lô đã có chữ
-# ký cụ thể. Giữ DANH SÁCH KHOÁ ở đây rồi SUY RA cụm từ `_ATTACK_TERMS`, thay vì chép lại
-# chuỗi — bản trước chép tay vào `_GENERIC_TERMS`, nên khi sửa lời trong bảng thì tập khử
-# vẫn trỏ vào chuỗi cũ và cơ chế khử tắt IM LẶNG, không có gì đỏ lên để báo.
+# Các khoá ngưỡng/nhịp-độ: cụm của chúng là "chung chung" và phải bị loại khi lô đã có chữ
+# ký cụ thể. Giữ danh sách khoá ở đây rồi suy ra cụm từ `_ATTACK_TERMS`, thay vì chép lại
+# chuỗi - bản trước chép tay vào `_GENERIC_TERMS`, nên khi sửa lời trong bảng thì tập khử
+# vẫn trỏ vào chuỗi cũ và cơ chế khử tắt im lặng, không có gì đỏ lên để báo.
 _THRESHOLD_KEYS = frozenset({"vượt ngưỡng", "tốc độ yêu cầu cao", "tần suất"})
 
 
-# Đặc trưng Welford -> mô tả tiếng Anh của HIỆN TƯỢNG QUAN SÁT ĐƯỢC.
+# Đặc trưng Welford -> mô tả tiếng Anh của hiện tượng quan sát được.
 #
-# CỐ Ý KHÔNG GÁN MÃ ATT&CK. Bản nháp trước ánh xạ mọi dị biệt thống kê thành
+# Cố Ý không gán mã ATT&CK. Bản nháp trước ánh xạ mọi dị biệt thống kê thành
 # "beaconing command and control" và hậu quả đo được rất rõ: một flow brute-force web
-# (nhãn thật T1110) chỉ lệch ở `Total Fwd Packets` lại truy xuất ra T1071.001/T1041/T1571 —
+# (nhãn thật T1110) chỉ lệch ở `Total Fwd Packets` lại truy xuất ra T1071.001/T1041/T1571 -
 # tức chính lỗi "đoán kỹ thuật từ một con số" mà dự án đã cấm ở chỗ khác. Welford biết
-# DUY NHẤT một điều: đặc trưng nào lệch bao nhiêu độ lệch chuẩn. Vậy thì truy vấn chỉ được
+# Duy nhất một điều: đặc trưng nào lệch bao nhiêu độ lệch chuẩn. Vậy thì truy vấn chỉ được
 # nói đúng chừng đó, và để bộ truy xuất tự quyết kỹ thuật nào gần nhất.
 _ANOMALY_FEATURE_TERMS: dict[str, str] = {
     "total fwd packets": "high outbound packet count repeated connection attempts",
@@ -264,9 +260,9 @@ _ANOMALY_FEATURE_TERMS: dict[str, str] = {
 _ANOMALY_FEATURE_RE = re.compile(r"dị biệt thống kê[^\[]*\[([^\]]+)\]", re.IGNORECASE)
 
 
-# Cụm từ vựng CHUNG CHUNG — mô tả "có gì đó bất thường về khối lượng/nhịp độ", KHÔNG chỉ ra
-# một kỹ thuật cụ thể nào. Chúng hữu ích khi đó là TẤT CẢ những gì ta biết (NetFlow thuần),
-# nhưng phải BỊ LOẠI khi đã có chữ ký cụ thể — xem `_canonical_attack_terms`.
+# Cụm từ vựng chung chung - mô tả "có gì đó bất thường về khối lượng/nhịp độ", không chỉ ra
+# một kỹ thuật cụ thể nào. Chúng hữu ích khi đó là tất cả những gì ta biết (NetFlow thuần),
+# nhưng phải bị loại khi đã có chữ ký cụ thể - xem `_canonical_attack_terms`.
 _GENERIC_TERMS = frozenset(
     {en for vi, en in _ATTACK_TERMS if vi in _THRESHOLD_KEYS} | set(_ANOMALY_FEATURE_TERMS.values())
 )
@@ -275,9 +271,9 @@ _GENERIC_TERMS = frozenset(
 def _canonical_attack_terms(reasons: list) -> list[str]:
     """Suy cụm từ MITRE tiếng Anh từ các lý do phát hiện (tiếng Việt) của Tier-1.
 
-    ƯU TIÊN CHỮ KÝ CỤ THỂ HƠN TỪ VỰNG CHUNG. Một log có thể vừa khớp chữ ký WAF ("SQL
+    Ưu tiên chữ ký cụ thể hơn từ vựng chung. Một log có thể vừa khớp chữ ký WAF ("SQL
     Injection") vừa vượt ngưỡng khối lượng. Nếu nối cả hai vào một truy vấn, phần "network
-    denial of service traffic flooding…" sẽ kéo vector về phía họ DoS và ĐẨY TỤT kỹ thuật
+    denial of service traffic flooding..." sẽ kéo vector về phía họ DoS và đẩy tụt kỹ thuật
     đúng: đo được trên bộ web-attack, T1190 tụt từ hạng 1 xuống hạng 3 sau T1499.002/T1498
     cho payload SQLi, khiến ánh xạ chọn sai. Một chữ ký cụ thể luôn giàu thông tin hơn
     "có gì đó vượt ngưỡng", nên khi đã có chữ ký thì bỏ hẳn phần chung.
@@ -288,7 +284,7 @@ def _canonical_attack_terms(reasons: list) -> list[str]:
     for needle, terms in _ATTACK_TERMS:
         if needle in low and terms not in out:
             out.append(terms)
-    # Dị biệt Welford: mô tả ĐẶC TRƯNG đã lệch, không gán kỹ thuật (xem chú thích ở trên).
+    # Dị biệt Welford: mô tả đặc trưng đã lệch, không gán kỹ thuật (xem chú thích ở trên).
     for feat in _ANOMALY_FEATURE_RE.findall(joined):
         terms = _ANOMALY_FEATURE_TERMS.get(feat.strip().lower())
         if terms and terms not in out:
@@ -299,13 +295,13 @@ def _canonical_attack_terms(reasons: list) -> list[str]:
 
 
 def evidence_layer_of(logs) -> str:
-    """Lô này mang bằng chứng tầng ỨNG DỤNG hay chỉ có FLOW?
+    """Lô này mang bằng chứng tầng ứng dụng hay chỉ có FLOW?
 
     Quyết định mức chi tiết mà Tier-2 được phép quy kết. ATT&CK định nghĩa phần lớn kỹ thuật
     trên hành vi endpoint/ứng dụng; NetFlow thuần chỉ có số đếm gói/byte/cổng, mà từ đó thì
-    DoS · C2 beaconing · rò rỉ dữ liệu khớp NHƯ NHAU. Ép mô hình trả một mã kỹ thuật cho lô
-    không có payload là ép nó đoán — nên ở đây ta phân luồng để prompt hỏi đúng câu:
-    có payload -> hỏi KỸ THUẬT; chỉ có flow -> hỏi TACTIC + bước ứng phó.
+    DoS · C2 beaconing · rò rỉ dữ liệu khớp như nhau. Ép mô hình trả một mã kỹ thuật cho lô
+    không có payload là ép nó đoán - nên ở đây ta phân luồng để prompt hỏi đúng câu:
+    có payload -> hỏi kỹ thuật; chỉ có flow -> hỏi TACTIC + bước ứng phó.
 
     Cùng bộ trường mà `build_rag_queries` coi là "nội dung ứng dụng", giữ một định nghĩa duy
     nhất để hai nơi không trôi khỏi nhau.
@@ -322,7 +318,7 @@ def evidence_layer_of(logs) -> str:
 
 
 def _waf_vocabulary(logs: list) -> list[str]:
-    """Từ vựng MITRE tiếng Anh suy từ CHỮ KÝ WAF của Tier-1, chạy lại trên chính lô này."""
+    """Từ vựng MITRE tiếng Anh suy từ chữ ký WAF của Tier-1, chạy lại trên chính lô này."""
     from src.tier1_filter.rule_engine import match_waf_family
 
     hits: list[str] = []
@@ -338,17 +334,17 @@ def _waf_vocabulary(logs: list) -> list[str]:
 
 
 def batch_attack_vocabulary(logs: dict | list) -> list[str]:
-    """Từ vựng tấn công ĐẶC TRƯNG của lô. Rỗng = KHÔNG có căn cứ để quy kết kỹ thuật.
+    """Từ vựng tấn công đặc trưng của lô. Rỗng = không có căn cứ để quy kết kỹ thuật.
 
-    Hai nguồn, theo thứ tự: (1) `tier1_reasons` — chữ ký mà đường nóng Tier-1 đã ghi;
-    (2) chạy LẠI bộ chữ ký WAF trên chính lô, bắt các log leo thang qua đường z-score nên
+    Hai nguồn, theo thứ tự: (1) `tier1_reasons` - chữ ký mà đường nóng Tier-1 đã ghi;
+    (2) chạy lại bộ chữ ký WAF trên chính lô, bắt các log leo thang qua đường z-score nên
     chưa từng đi qua nhánh chữ ký.
 
-    Cụm "vượt ngưỡng / tần suất cao / lệch đặc trưng Welford" KHÔNG tính là đặc trưng: một
+    Cụm "vượt ngưỡng / tần suất cao / lệch đặc trưng Welford" không tính là đặc trưng: một
     ngưỡng bị vượt chỉ chứng minh khối lượng bất thường, mà DoS · C2 beaconing · rò rỉ dữ
     liệu đều khớp như nhau (xem `_ANOMALY_FEATURE_TERMS`).
 
-    Đây là điều kiện được dùng để CẤM Tier-2 tự khẳng định một kỹ thuật — xem chỗ gọi trong
+    Đây là điều kiện được dùng để cấm Tier-2 tự khẳng định một kỹ thuật - xem chỗ gọi trong
     `node_triage_decision`.
     """
     if isinstance(logs, dict):
@@ -366,7 +362,7 @@ def batch_attack_vocabulary(logs: dict | list) -> list[str]:
 
 
 def _policy_override_tag(decision: dict, executed: str) -> str:
-    """Nhãn `[CHÍNH SÁCH: ...]` khi hành động THỰC THI khác hành động model YÊU CẦU.
+    """Nhãn `[chính sách: ...]` khi hành động thực thi khác hành động model yêu cầu.
 
     Trả chuỗi rỗng khi hai thứ trùng nhau (phần lớn trường hợp), nên nhãn chỉ xuất hiện
     đúng lúc có chuyện để giải thích. Xem `_policy_action_before` ở `node_llm_triage`.
@@ -378,23 +374,23 @@ def _policy_override_tag(decision: dict, executed: str) -> str:
 
 
 def batch_has_attack_evidence(state: Any) -> bool:
-    """Lô có bằng chứng tấn công không — MỘT định nghĩa dùng chung cho MỌI chốt quyết định.
+    """Lô có bằng chứng tấn công không - một định nghĩa dùng chung cho mọi chốt quyết định.
 
     Ba nguồn, hợp bằng OR:
-      1. `tier1_reasons` — chữ ký đường nóng Tier-1 đã ghi.
+      1. `tier1_reasons` - chữ ký đường nóng Tier-1 đã ghi.
       2. chữ ký WAF chạy lại trên chính lô (bắt log leo thang qua z-score).
-      3. `_llm_injection_strict` — chữ ký tiêm nhiễm khớp NGUYÊN VĂN từ node rào chắn.
+      3. `_llm_injection_strict` - chữ ký tiêm nhiễm khớp nguyên văn từ node rào chắn.
 
     Nguồn (3) thêm ngày 17/08/2026. Trước đó hàm này chỉ có (1)+(2), tức chỉ nhìn tấn công
-    MẠNG/WEB; một payload tiêm nhiễm là văn xuôi tự nhiên nên không khớp chữ ký WAF nào và
-    luôn bị chấm "không có bằng chứng" — kể cả khi node rào chắn ngay trước đó đã khẳng định
+    Mạng/WEB; một payload tiêm nhiễm là văn xuôi tự nhiên nên không khớp chữ ký WAF nào và
+    luôn bị chấm "không có bằng chứng" - kể cả khi node rào chắn ngay trước đó đã khẳng định
     dương tính.
 
-    CỐ Ý KHÔNG nhận `_llm_attack_flags` (gộp cả bộ dò jailbreak): `role_play_re` khớp cả
+    Cố Ý không nhận `_llm_attack_flags` (gộp cả bộ dò jailbreak): `role_play_re` khớp cả
     `step by step` / `disrupt` / `cause chaos`, những cụm có mặt bình thường trong văn bản
     lành. Xem `SentinelState._llm_injection_strict`.
 
-    Gom thành hàm vì trước đây có BỐN bản sao của cùng phép thử này rải trong file, và chỉ
+    Gom thành hàm vì trước đây có bốn bản sao của cùng phép thử này rải trong file, và chỉ
     cần sửa ba trong bốn là hệ tự mâu thuẫn với chính nó mà không test nào bắt được.
     """
     if batch_attack_vocabulary(getattr(state, "current_batch_logs", None) or []):
@@ -403,46 +399,46 @@ def batch_has_attack_evidence(state: Any) -> bool:
 
 
 def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
-    """Dựng HAI truy vấn RAG tách biệt: (truy vấn KỸ THUẬT, truy vấn NGỮ CẢNH).
+    """Dựng hai truy vấn RAG tách biệt: (truy vấn kỹ thuật, truy vấn ngữ cảnh).
 
-    VÌ SAO PHẢI TÁCH — đây là nguyên nhân gốc của Context Precision thấp.
-    Bản trước nối cụm chuẩn tiếng Anh RỒI payload thô vào CÙNG một chuỗi, với lập luận
-    "đặt nhãn phát hiện lên trước thì nó thắng". Lập luận đó SAI: embedding câu là túi
-    ngữ nghĩa, KHÔNG có trọng số theo vị trí — thêm payload vào là dời cả vector.
+    Vì sao phải tách - đây là nguyên nhân gốc của Context Precision thấp.
+    Bản trước nối cụm chuẩn tiếng Anh rồi payload thô vào cùng một chuỗi, với lập luận
+    "đặt nhãn phát hiện lên trước thì nó thắng". Lập luận đó sai: embedding câu là túi
+    ngữ nghĩa, không có trọng số theo vị trí - thêm payload vào là dời cả vector.
 
     Đo thật trên chính bộ truy xuất này với payload SQLi `' UNION SELECT password FROM users--`:
         chỉ cụm EN            -> T1190 hạng 1                     ✅
-        cụm EN + payload      -> T1212, T1110.004, T1539 …        ❌ T1190 rớt khỏi top-5
-        chỉ payload           -> T1555, T1110.001 …               ❌
-    Chữ `password` trong payload kéo vector sang nhóm ĐÁNH CẮP THÔNG TIN XÁC THỰC. Vì
+        cụm EN + payload      -> T1212, T1110.004, T1539 ...        ❌ T1190 rớt khỏi top-5
+        chỉ payload           -> T1555, T1110.001 ...               ❌
+    Chữ `password` trong payload kéo vector sang nhóm đánh cắp thông tin xác thực. Vì
     prompt dặn LLM đặt `N/A` + `AWAIT_HITL` khi không khớp technique nào, RAG trượt kéo
     theo LLM không bao giờ chặn được.
 
-    GIẢI PHÁP: hai truy vấn, hai mục đích.
-      1. KỸ THUẬT — thuần tiếng Anh (cụm chuẩn + metadata flow), TUYỆT ĐỐI không payload.
+    Giải pháp: hai truy vấn, hai mục đích.
+      1. Kỹ thuật - thuần tiếng Anh (cụm chuẩn + metadata flow), tuyệt đối không payload.
          Đây là khối LLM dùng để chọn technique.
-      2. NGỮ CẢNH — có payload, dùng để bồi thêm ngữ cảnh vận hành ở ưu tiên THẤP HƠN.
+      2. Ngữ cảnh - có payload, dùng để bồi thêm ngữ cảnh vận hành ở ưu tiên thấp hơn.
          Giữ lại tín hiệu từ vựng của cuộc tấn công mà không để nó lái phần ánh xạ.
 
-    Trả `("", "")` khi log rỗng. Truy vấn ngữ cảnh trả "" khi log không có payload —
+    Trả `("", "")` khi log rỗng. Truy vấn ngữ cảnh trả "" khi log không có payload -
     đại đa số lưu lượng là NetFlow thuần nên nhánh đó thường không tốn lượt truy xuất nào.
     """
-    # Nhận MỘT log (tương thích ngược) hoặc CẢ LÔ.
+    # Nhận một log (tương thích ngược) hoặc cả lô.
     #
-    # LỖI ĐÃ SỬA — đo được trên luồng demo thật: hàm này từng chỉ đọc `current_batch_logs[0]`,
+    # Lỗi đã sửa - đo được trên luồng demo thật: hàm này từng chỉ đọc `current_batch_logs[0]`,
     # trong khi một lô Tier-2 gộp tới 10 log của cùng một IP. Với chuỗi DAPT, chín log đầu là
-    # NetFlow trần và chỉ log thứ 9-10 mang `message="…Hoạt động ghi nhận: Account Discovery…"`.
-    # Hệ quả quan sát được: truy vấn kỹ thuật rơi về từ vựng NGƯỠNG/KHỐI-LƯỢNG, RAG trả về
-    # T1498/T1499/T1571 (toàn DoS), và LLM — vốn được prompt dặn "chọn technique TỪ ngữ cảnh
-    # RAG" — trả lời T1498 cho một sự kiện Account Discovery (thật là T1087). Không phải LLM
+    # NetFlow trần và chỉ log thứ 9-10 mang `message="...Hoạt động ghi nhận: Account Discovery..."`.
+    # Hệ quả quan sát được: truy vấn kỹ thuật rơi về từ vựng ngưỡng/khối-lượng, RAG trả về
+    # T1498/T1499/T1571 (toàn DoS), và LLM - vốn được prompt dặn "chọn technique từ ngữ cảnh
+    # RAG" - trả lời T1498 cho một sự kiện Account Discovery (thật là T1087). Không phải LLM
     # suy luận kém: nó không bao giờ được thấy dòng chữ quyết định.
     logs = [first_log] if isinstance(first_log, dict) else list(first_log or [])
     logs = [x for x in logs if isinstance(x, dict)]
     if not logs:
         return "", ""
 
-    # ── Phần THUẦN ANH: nhãn phát hiện đã chuẩn hoá + metadata flow thật ──
-    # Gom lý do của TOÀN LÔ (khử trùng, giữ thứ tự) — một lô là một chuỗi hành vi của cùng
+    # Phần thuần anh: nhãn phát hiện đã chuẩn hoá + metadata flow thật
+    # Gom lý do của toàn lô (khử trùng, giữ thứ tự) - một lô là một chuỗi hành vi của cùng
     # một IP, nên tín hiệu ở log thứ 10 cũng thuộc về nó như log thứ nhất.
     reasons: list = []
     for lg in logs:
@@ -451,42 +447,42 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
                 reasons.append(rs)
     parts: list[str] = list(_canonical_attack_terms(reasons[:8]))
 
-    # SOI LẠI CHỮ KÝ WAF KHI `tier1_reasons` KHÔNG MANG TỪ VỰNG TẤN CÔNG.
+    # Soi lại chữ ký WAF khi `tier1_reasons` không mang từ vựng tấn công.
     #
-    # VÌ SAO. Một log leo thang qua đường z-score (Welford) KHÔNG đi qua nhánh chữ ký, nên
+    # Vì sao. Một log leo thang qua đường z-score (Welford) không đi qua nhánh chữ ký, nên
     # `tier1_reasons` chỉ có "tần suất gửi yêu cầu cao" và truy vấn kỹ thuật rơi về đúng hai
     # mảnh vô nghĩa: nhịp độ + số cổng. Đo trên lượt chạy 11/08/2026: 336 lô chỉ sinh 44 truy
-    # vấn phân biệt, trong đó 187 lô (55,7%) dùng CHUNG một chuỗi không có tín hiệu tấn công
-    # nào. Với truy vấn đó, RAG chỉ trả về được T1046/T1571/T1498/T1499/T1568 — T1190 thậm
+    # vấn phân biệt, trong đó 187 lô (55,7%) dùng chung một chuỗi không có tín hiệu tấn công
+    # nào. Với truy vấn đó, RAG chỉ trả về được T1046/T1571/T1498/T1499/T1568 - T1190 thậm
     # chí không có mặt trong danh sách để LLM chọn. Hệ quả: T1571 "Non-Standard Port" chiếm
     # 42,5% toàn bộ quy kết, gồm 4/5 ca SQL Injection và 2/2 ca XSS có payload rõ ràng.
     #
-    # BẢN TRƯỚC dùng 5 regex tự viết ở ĐÂY thay vì gọi lại bộ chữ ký của Tier-1 — tức nuôi
+    # Bản trước dùng 5 regex tự viết ở đây thay vì gọi lại bộ chữ ký của Tier-1 - tức nuôi
     # hai bản sao của cùng một nhiệm vụ, và bản ở đây yếu hơn hẳn (5 mẫu so với 30 họ). Tệ
-    # hơn, mẫu `login=|pwd=|password=` khớp MỌI biểu mẫu thương mại điện tử, kể cả đăng ký
+    # hơn, mẫu `login=|pwd=|password=` khớp mọi biểu mẫu thương mại điện tử, kể cả đăng ký
     # hợp lệ, nên nó bơm từ vựng "brute force" vào 70/336 lô và kéo theo cụm T1110.x.
-    # Nay gọi thẳng `match_waf_family` — cùng phép so khớp Tier-1 dùng, đo được 0 báo nhầm
+    # Nay gọi thẳng `match_waf_family` - cùng phép so khớp Tier-1 dùng, đo được 0 báo nhầm
     # trên 3.049 bản ghi lành.
     if not any(t not in _GENERIC_TERMS for t in parts):
         waf_terms = _waf_vocabulary(logs)
         if waf_terms:
             parts = waf_terms + [p for p in parts if p in _GENERIC_TERMS]
 
-    # Từ vựng XÁC THỰC: chỉ thêm khi có LẶP LẠI, vì một lần gửi biểu mẫu đăng nhập là hành
-    # vi bình thường của mọi ứng dụng web — chính chỗ này từng biến 70 lô lành thành "brute
+    # Từ vựng xác thực: chỉ thêm khi có lặp lại, vì một lần gửi biểu mẫu đăng nhập là hành
+    # vi bình thường của mọi ứng dụng web - chính chỗ này từng biến 70 lô lành thành "brute
     # force". Ba lần trở lên trong cùng một lô (cùng một IP) mới là tín hiệu hành vi.
     #
-    # VÀ CHỈ KHI LÔ KHÔNG CÓ CHỮ KÝ CỤ THỂ. "Lặp lại gửi thông tin xác thực" là tín hiệu HÀNH
+    # Và chỉ khi lô không có chữ ký cụ thể. "Lặp lại gửi thông tin xác thực" là tín hiệu hành
     # VI, cùng hạng với các cụm ngưỡng ở `_GENERIC_TERMS`: nó mô tả nhịp độ, không mô tả đòn
-    # tấn công. Nối nó cạnh một chữ ký cụ thể thì nó KÉO TỤT chữ ký ấy, đúng cơ chế mà chú
+    # tấn công. Nối nó cạnh một chữ ký cụ thể thì nó kéo tụt chữ ký ấy, đúng cơ chế mà chú
     # thích của `_canonical_attack_terms` đã cảnh báo cho nhóm ngưỡng.
     #
-    # Đo trên lượt chạy 12/08/2026, quy kết luật CHẶT theo lớp: hai lớp mà payload nằm NGOÀI
+    # Đo trên lượt chạy 12/08/2026, quy kết luật chặt theo lớp: hai lớp mà payload nằm ngoài
     # tham số đăng nhập đạt gần tuyệt đối (T1595.003 132/138 · T1190 64/64), còn ba lớp mà
-    # CSIC nhúng payload VÀO chính form đăng ký thì trượt sạch — T1071.001 0/39, T1059.007
-    # 0/16, T1083 0/14 — và phần lớn bị gán T1110.x. Truy vấn của một lô CRLF cho thấy rõ:
-    # "HTTP response splitting header injection … **repeated authentication attempts brute
-    # force password guessing** … " — chữ ký đúng đứng đầu nhưng vẫn thua.
+    # CSIC nhúng payload vào chính form đăng ký thì trượt sạch - T1071.001 0/39, T1059.007
+    # 0/16, T1083 0/14 - và phần lớn bị gán T1110.x. Truy vấn của một lô CRLF cho thấy rõ:
+    # "HTTP response splitting header injection ... **repeated authentication attempts brute
+    # force password guessing** ... " - chữ ký đúng đứng đầu nhưng vẫn thua.
     _auth_logs = sum(
         1
         for lg in logs
@@ -507,7 +503,7 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
         if pt not in parts:
             parts.append(pt)
 
-    # KHÔNG đưa chuỗi lý do THÔ (tiếng Việt) vào: KB và embedder đều thiên tiếng Anh nên
+    # Không đưa chuỗi lý do thô (tiếng Việt) vào: KB và embedder đều thiên tiếng Anh nên
     # nó gần như 0 tín hiệu truy xuất mà vẫn làm nhiễu vector.
     head = logs[0]
     svc = head.get("service") or head.get("Service")
@@ -518,9 +514,9 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
         parts.append(f"destination port {port}")
     technique_q = " ".join(parts).strip()[:300]
 
-    # ── Truy vấn NGỮ CẢNH: payload + URI. URI thuộc về đây chứ không phải truy vấn kỹ
-    # thuật, vì nó mang từ vựng do KẺ TẤN CÔNG kiểm soát (đúng bản chất như payload). ──
-    # Chọn log GIÀU NỘI DUNG NHẤT trong lô, không phải log đầu: log đầu thường là NetFlow trần.
+    # Truy vấn ngữ cảnh: payload + URI. URI thuộc về đây chứ không phải truy vấn kỹ
+    # thuật, vì nó mang từ vựng do kẻ tấn công kiểm soát (đúng bản chất như payload).
+    # Chọn log giàu nội dung nhất trong lô, không phải log đầu: log đầu thường là NetFlow trần.
     def _payload_of(lg: dict) -> str:
         return (str(lg.get("message", "")) + " " + str(lg.get("payload", ""))).strip()
 
@@ -539,11 +535,9 @@ def build_rag_queries(first_log: dict | list) -> tuple[str, str]:
     return technique_q, context_q
 
 
-# ==============================================================================
 # Hàm phụ cho TRACER (chỉ được gọi bên trong `if trace.enabled():`)
-# ==============================================================================
 def _trace_rag_hits(results: list | None, top: int = 5) -> list[dict]:
-    """Rút gọn kết quả truy xuất: chỉ id/tên/điểm RRF. BỎ `text` — độ dài đã đo riêng bằng
+    """Rút gọn kết quả truy xuất: chỉ id/tên/điểm RRF. Bỏ `text` - độ dài đã đo riêng bằng
     `*_context_chars`, còn nội dung thì đã nằm nguyên trong `llm.prompt`."""
     return [
         {
@@ -557,24 +551,24 @@ def _trace_rag_hits(results: list | None, top: int = 5) -> list[dict]:
 
 _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
-# Mã kỹ thuật ATT&CK trong khối ngữ cảnh RAG — dùng để kiểm tra câu trả lời của LLM có
-# THỰC SỰ neo vào tài liệu vừa truy xuất hay không (xem lá chắn neo bằng chứng ở
+# Mã kỹ thuật ATT&CK trong khối ngữ cảnh RAG - dùng để kiểm tra câu trả lời của LLM có
+# Thực sự neo vào tài liệu vừa truy xuất hay không (xem lá chắn neo bằng chứng ở
 # `node_attack_mapper`).
 _TECHNIQUE_ID_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
 
 
 def _annotate_reused_verdict(reasoning: str, decision: dict, target: str) -> str:
-    """Ghi rõ khi phần lập luận được TÁI SỬ DỤNG từ một luồng có IP khác.
+    """Ghi rõ khi phần lập luận được tái sử dụng từ một luồng có IP khác.
 
-    LỖI THẬT quan sát được trên luật động sinh ra ở lượt chạy 2026-07-28: luật chặn
+    Lỗi thật quan sát được trên luật động sinh ra ở lượt chạy 2026-07-28: luật chặn
     `172.20.0.122` mang phần lý do nói về `10.200.4.164`; luật chặn `192.168.41.100` và
     `192.168.41.5` đều mang lý do viết cho `192.168.42.174`. Nguồn gốc là cache lớp-2 (gộp
-    theo ĐẶC TRƯNG, cố ý bỏ IP/timestamp khỏi khoá): `target` THỰC THI đã được bảo vệ đúng
-    (xem chú thích ở `node_llm_triage`), nhưng chuỗi `reasoning` do LLM viết cho IP GỐC thì
+    theo đặc trưng, cố ý bỏ IP/timestamp khỏi khoá): `target` thực thi đã được bảo vệ đúng
+    (xem chú thích ở `node_llm_triage`), nhưng chuỗi `reasoning` do LLM viết cho IP gốc thì
     đi thẳng vào nhật ký kiểm toán, lý do của luật động và giao diện analyst.
 
-    Ta KHÔNG viết lại câu chữ của LLM để nó nhắc tên IP mới: làm vậy là bịa ra một lời giải
-    thích mà model chưa từng đưa ra cho IP này — với một hệ thống lấy tính GIẢI THÍCH ĐƯỢC
+    Ta không viết lại câu chữ của LLM để nó nhắc tên IP mới: làm vậy là bịa ra một lời giải
+    thích mà model chưa từng đưa ra cho IP này - với một hệ thống lấy tính giải thích được
     làm đóng góp chính thì đó là cái giá quá đắt. Thay vào đó ta nói thẳng xuất xứ, giữ
     nguyên văn phần lập luận gốc.
     """
@@ -599,7 +593,7 @@ def _annotate_reused_verdict(reasoning: str, decision: dict, target: str) -> str
 
 
 def _trace_verdict(d: dict | None) -> dict:
-    """Ảnh chụp gọn một verdict, để so TRƯỚC/SAU mỗi lớp kiểm duyệt."""
+    """Ảnh chụp gọn một verdict, để so trước/sau mỗi lớp kiểm duyệt."""
     d = d or {}
     return {
         "action": d.get("action", ""),
@@ -616,12 +610,9 @@ decision_validator = DecisionValidator()
 
 
 def node_guardrails(state: SentinelState) -> dict[str, Any]:
-    """
-    Guardrails Node: Nén log và làm sạch trước khi đưa vào RAG/LLM.
-    """
+    """Guardrails Node: Nén log và làm sạch trước khi đưa vào RAG/LLM."""
     logger.info("--- NODE: GUARDRAILS (MINING & FILTERING) ---")
 
-    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_guardrails")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
@@ -631,9 +622,9 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
 
     # 2. Xử lý và nén log qua pipeline
     #
-    # `gt_id` BỊ LOẠI KHỎI PROMPT, nhưng vẫn ở lại `state.current_batch_logs` cho tracer.
+    # `gt_id` bị loại khỏi PROMPT, nhưng vẫn ở lại `state.current_batch_logs` cho tracer.
     # Nó là khoá nối hậu kiểm (xem `scripts/stamp_demo_ids.py`): tracer cần nó để chấm kết
-    # quả với đáp án, còn LLM thì không được lợi gì từ một định danh mờ — đưa vào chỉ tổ
+    # quả với đáp án, còn LLM thì không được lợi gì từ một định danh mờ - đưa vào chỉ tổ
     # thêm nhiễu và cho người phản biện một cái cớ hỏi "sao dữ liệu chấm điểm lại nằm trong
     # prompt?". Tách ở đây là chỗ hẹp nhất: mọi thứ vào prompt đều đi qua `process_batch`.
     _prompt_logs = [
@@ -645,9 +636,9 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
 
     if trace.enabled():
         trace.add("nodes", guardrails=round(time.time(), 6))
-        # `individual_results` bị VỨT ngay sau dòng này ở bản gốc — cùng với mọi cờ
+        # `individual_results` bị vứt ngay sau dòng này ở bản gốc - cùng với mọi cờ
         # injection/jailbreak theo từng log. Đó là lý do cột `guardrail_injected` trong
-        # logs/guardrails_audit.db LUÔN bằng 0 trên toàn bộ 3.261 dòng đã lưu.
+        # logs/guardrails_audit.db luôn bằng 0 trên toàn bộ 3.261 dòng đã lưu.
         _res = processed_data.get("individual_results", []) or []
         _levels = {r.get("isolation_level", "NORMAL") for r in _res if isinstance(r, dict)}
         trace.add(
@@ -657,7 +648,7 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
             jailbreak_count=sum(
                 1 for r in _res if isinstance(r, dict) and r.get("jailbreak_detected")
             ),
-            # `process_batch` KHÔNG trả isolation_level ở mức trên -> phải suy ra từ từng log.
+            # `process_batch` không trả isolation_level ở mức trên -> phải suy ra từ từng log.
             isolation_level=(
                 "CRITICAL" if "CRITICAL" in _levels else ("HIGH" if "HIGH" in _levels else "NORMAL")
             ),
@@ -698,18 +689,18 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
             encapsulated_chars_final=len(batch_enc),
         )
 
-    # ── CỜ TẤN CÔNG NHẮM VÀO LLM — THEO TỪNG LOG, KHÔNG THEO CẢ LÔ ──
+    # cờ tấn công nhắm vào LLM - theo từng LOG, không theo cả lô
     #
-    # HAI LỖI ĐÃ VÁ Ở ĐÂY.
+    # Hai lỗi đã vá Ở đây.
     #
-    # (1) SAI HỌ CHỮ KÝ. Bản trước đọc `injection_detected`, mà cờ đó gộp cả chữ ký tấn
+    # (1) sai họ chữ ký. Bản trước đọc `injection_detected`, mà cờ đó gộp cả chữ ký tấn
     #     công WEB (`UNION SELECT`, `<script>`, `; exec`). Một câu SQLi dạng chữ vì thế bị
     #     coi là tấn công vào LLM và bị ép quy kết sang AML.T0051 thay vì T1190. Nay đọc
-    #     `llm_attack_detected` — cờ chỉ bật với chữ ký nhắm vào LLM.
+    #     `llm_attack_detected` - cờ chỉ bật với chữ ký nhắm vào LLM.
     #
-    # (2) SAI PHẠM VI. Bản trước dùng `any(...)` trên CẢ LÔ 10 log, nên một payload tiêm
+    # (2) sai phạm VI. Bản trước dùng `any(...)` trên cả lô 10 log, nên một payload tiêm
     #     nhiễm làm 9 log còn lại cùng mất ngữ cảnh và cùng bị ép nhãn. Nay giữ cờ theo
-    #     từng log; cờ mức lô chỉ còn để ghi vết, KHÔNG dùng để định tuyến quy kết.
+    #     từng log; cờ mức lô chỉ còn để ghi vết, không dùng để định tuyến quy kết.
     _res = processed_data.get("individual_results", []) or []
     adv_flags = [
         bool(r.get("llm_attack_detected") or r.get("jailbreak_detected"))
@@ -718,22 +709,22 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
         for r in _res
     ]
 
-    # ── CỜ CHẶT: CHỈ chữ ký khớp NGUYÊN VĂN, KHÔNG gồm bộ dò jailbreak ──
+    # cờ chặt: Chỉ chữ ký khớp nguyên văn, không gồm bộ dò jailbreak
     #
-    # Hai cờ trên không cùng chất lượng, nên chỉ MỘT trong hai được phép làm BẰNG CHỨNG cho
+    # Hai cờ trên không cùng chất lượng, nên chỉ một trong hai được phép làm bằng chứng cho
     # quyết định chặn:
     #
     #   `llm_attack_detected`  <- `injection_patterns`, so khớp bằng `re.escape` (nguyên văn,
     #                             không phân biệt hoa thường). Đo trên 230 log lành CSIC:
-    #                             lớp khớp mẫu **0 báo nhầm**.
+    #                             lớp khớp mẫu 0 báo nhầm.
     #   `jailbreak_detected`   <- thêm `role_play_re`, mà biểu thức đó có các nhánh
     #                             `step\s+by\s+step`, `disrupt`, `cause\s+chaos`. Ba cụm này
-    #                             xuất hiện thường xuyên trong văn bản LÀNH, nên cờ này KHÔNG
+    #                             xuất hiện thường xuyên trong văn bản lành, nên cờ này không
     #                             đủ chắc để tự động chặn một địa chỉ IP.
     #
-    # `adv_flags` (gộp) giữ nguyên cho định tuyến QUY KẾT và bỏ truy vấn payload — hai việc
+    # `adv_flags` (gộp) giữ nguyên cho định tuyến quy kết và bỏ truy vấn payload - hai việc
     # đó chỉ làm hệ thận trọng hơn, đoán sai thì mất chút chất lượng truy xuất chứ không
-    # chặn nhầm ai. `adv_strict` mới là thứ được dùng làm bằng chứng cho phép CHẶN.
+    # chặn nhầm ai. `adv_strict` mới là thứ được dùng làm bằng chứng cho phép chặn.
     adv_strict = [
         bool(r.get("llm_attack_detected")) if isinstance(r, dict) else False for r in _res
     ]
@@ -752,7 +743,7 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
         "_llm_attack_flags": adv_flags,
         "_llm_injection_strict": adv_strict,
         "_guardrails_system_instruction": processed_data["system_instruction"],
-        # Giữ khoá cũ cho tương thích, nhưng nay nó CHỈ mang nghĩa "lô có ít nhất một log
+        # Giữ khoá cũ cho tương thích, nhưng nay nó chỉ mang nghĩa "lô có ít nhất một log
         # bị tấn công nhắm vào LLM" và chỉ dùng để ghi vết / hiển thị. Mọi quyết định quy
         # kết phải đọc `_llm_attack_flags` theo đúng chỉ số log.
         "_is_adversarial": any(adv_flags),
@@ -760,42 +751,39 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
 
 
 def node_rag_context(state: SentinelState) -> dict[str, Any]:
-    """
-    RAG Context Node: Trích xuất thông tin từ batch log để query RAG.
-    """
+    """RAG Context Node: Trích xuất thông tin từ batch log để query RAG."""
     logger.info("--- NODE: RAG CONTEXT ---")
 
-    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_rag_context")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
 
-    # Truyền CẢ LÔ (không phải mỗi log đầu) — xem chú thích lỗi trong build_rag_queries.
+    # Truyền cả lô (không phải mỗi log đầu) - xem chú thích lỗi trong build_rag_queries.
     technique_q, context_q = build_rag_queries(state.current_batch_logs or [])
 
     if not technique_q:
         technique_q = state.narrative_summary or "suspicious network activity"
 
     if trace.enabled():
-        # HAI truy vấn này trước đây KHÔNG được log ở bất kỳ mức nào — không có chúng thì
+        # Hai truy vấn này trước đây không được log ở bất kỳ mức nào - không có chúng thì
         # không thể phân biệt "bộ truy xuất tồi" với "truy vấn đưa vào đã rỗng nghĩa".
         trace.add("nodes", rag_context=round(time.time(), 6))
         trace.add("rag", technique_query=technique_q, context_query=context_q)
 
-    # ── LÔ BỊ TẤN CÔNG NHẮM VÀO LLM: BỎ TRUY VẤN 2, KHÔNG BỎ CẢ RAG ──
+    # lô bị tấn công nhắm vào LLM: Bỏ truy vấn 2, không bỏ cả RAG
     #
-    # LỖI ĐÃ VÁ. Bản trước `return {"rag_mitre_context": "", ...}` cho cả lô. Ý định đúng
+    # Lỗi đã vá. Bản trước `return {"rag_mitre_context": "", ...}` cho cả lô. Ý định đúng
     # (đừng để payload tiêm nhiễm lái kết quả truy xuất) nhưng cách làm phá một bất biến
-    # lớn hơn: `node_attack_mapper` suy ra tập mã được phép từ CHÍNH chuỗi này —
+    # lớn hơn: `node_attack_mapper` suy ra tập mã được phép từ chính chuỗi này -
     #
     #     _rag_ids_pre = set(_TECHNIQUE_ID_RE.findall(state.rag_mitre_context or ""))
     #     _grounded(x) = not _rag_ids_pre or x in _rag_ids_pre
     #
-    # Ngữ cảnh rỗng ⇒ `_rag_ids_pre` rỗng ⇒ `_grounded()` trả True cho MỌI mã. Tức mỗi lô
-    # đối kháng là một lô lá chắn neo bằng chứng bị TẮT — đúng những lô cần nó nhất.
+    # Ngữ cảnh rỗng => `_rag_ids_pre` rỗng => `_grounded()` trả True cho mọi mã. Tức mỗi lô
+    # đối kháng là một lô lá chắn neo bằng chứng bị tắt - đúng những lô cần nó nhất.
     #
-    # Chỗ nhiễm độc thật sự chỉ nằm ở TRUY VẤN 2 (mang payload). Truy vấn 1 đã thuần tiếng
-    # Anh và tuyệt đối không payload — xem `build_rag_queries`. Nên chỉ cần bỏ truy vấn 2.
+    # Chỗ nhiễm độc thật sự chỉ nằm ở truy vấn 2 (mang payload). Truy vấn 1 đã thuần tiếng
+    # Anh và tuyệt đối không payload - xem `build_rag_queries`. Nên chỉ cần bỏ truy vấn 2.
     _adv_flags = getattr(state, "_llm_attack_flags", None) or []
     _skip_payload_query = any(_adv_flags)
     if _skip_payload_query:
@@ -806,7 +794,7 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
         if trace.enabled():
             trace.add("rag", payload_query_skipped_for_llm_attack=True)
 
-    # ── TRUY VẤN 1 (KỸ THUẬT): thuần tiếng Anh, KHÔNG payload -> ánh xạ MITRE ──
+    # truy vấn 1 (kỹ thuật): thuần tiếng Anh, không payload -> ánh xạ MITRE
     results = retriever.retrieve(technique_q)
     mitre_context = results.get("mitre_context", "")
     nist_context = results.get("nist_context", "")
@@ -821,8 +809,8 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
             nist_context_chars=len(nist_context),
         )
 
-    # ── TRUY VẤN 2 (NGỮ CẢNH): có payload -> bồi thêm ngữ cảnh vận hành ──
-    # Chỉ chạy khi log THỰC SỰ có payload và nội dung khác truy vấn kỹ thuật, để không
+    # truy vấn 2 (ngữ cảnh): có payload -> bồi thêm ngữ cảnh vận hành
+    # Chỉ chạy khi log thực sự có payload và nội dung khác truy vấn kỹ thuật, để không
     # tốn một lượt truy xuất vô ích trên NetFlow thuần (đại đa số lưu lượng).
     if context_q and context_q != technique_q and not _skip_payload_query:
         ctx = retriever.retrieve(context_q)
@@ -833,7 +821,7 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
                 context_cache_hit=bool(ctx.get("cache_hit")),
                 context_mitre=_trace_rag_hits(ctx.get("mitre_results")),
             )
-        # NỐI THÊM, không thay thế: khối kỹ thuật giữ nguyên thứ hạng của truy vấn thuần
+        # Nối thêm, không thay thế: khối kỹ thuật giữ nguyên thứ hạng của truy vấn thuần
         # EN (đó là khối LLM dùng để chọn technique), khối payload chỉ là phụ lục tham chiếu.
         extra = ctx.get("mitre_context", "")
         if extra and extra not in mitre_context:
@@ -850,15 +838,15 @@ def node_rag_context(state: SentinelState) -> dict[str, Any]:
 
 
 def _degraded_reason(decision: dict) -> str:
-    """Câu giải thích cho analyst khi quyết định KHÔNG có phần lập luận của LLM.
+    """Câu giải thích cho analyst khi quyết định không có phần lập luận của LLM.
 
     Chỉ xảy ra ở đường suy biến an toàn (LLM trả JSON hỏng / rỗng). Nói rõ nguyên nhân
-    thay vì "No reasoning provided." — analyst cần biết đây là LỖI ĐỊNH DẠNG của model,
+    thay vì "No reasoning provided." - analyst cần biết đây là lỗi định dạng của model,
     không phải hệ thống đánh giá sự cố là vô hại, và vì sao độ tin cậy = 0.
     """
     err = str(decision.get("error", "") or "")
     if err == "llm_unavailable":
-        # Nguyên nhân HẠ TẦNG — tách hẳn khỏi "model trả JSON hỏng". Gộp hai thứ này vào một
+        # Nguyên nhân hạ tầng - tách hẳn khỏi "model trả JSON hỏng". Gộp hai thứ này vào một
         # câu là đẩy analyst đi truy sai hướng (đã xảy ra: thông điệp đổ lỗi max_tokens trong
         # khi máy chủ LLM đơn giản là không chạy).
         return (
@@ -886,12 +874,9 @@ def _degraded_reason(decision: dict) -> str:
 
 
 def node_llm_triage(state: SentinelState) -> dict[str, Any]:
-    """
-    LLM Triage Node: Phân tích toàn bộ cụm log (Incident-Level) và đưa ra 1 quyết định duy nhất.
-    """
+    """LLM Triage Node: Phân tích toàn bộ cụm log (Incident-Level) và đưa ra 1 quyết định duy nhất."""
     logger.info("--- NODE: LLM TRIAGE ---")
 
-    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_llm_triage")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
@@ -899,29 +884,27 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     if trace.enabled():
         trace.add("nodes", llm_triage=round(time.time(), 6))
 
-    # ------------------------------------------------------------------ #
-    # LỐI TẮT: lô CHỈ có flow, không một byte payload nào
-    # ------------------------------------------------------------------ #
-    # MẶC ĐỊNH TẮT. Bật bằng `tier2.skip_llm_for_flow_only: true`.
+    # Lối tắt: lô chỉ có flow, không một byte payload nào
+    # Mặc định tắt. Bật bằng `tier2.skip_llm_for_flow_only: true`.
     #
-    # PHẢI để mặc định tắt: mọi con số Tier-2 trong luận văn được đo với lô flow VẪN đi qua
-    # LLM. Bật cờ này rồi chạy lại benchmark sẽ ra bộ số khác — đó là một hệ khác, không phải
+    # Phải để mặc định tắt: mọi con số Tier-2 trong luận văn được đo với lô flow vẫn đi qua
+    # LLM. Bật cờ này rồi chạy lại benchmark sẽ ra bộ số khác - đó là một hệ khác, không phải
     # hệ đã báo cáo. Cờ này dành cho vận hành/demo, nơi thông lượng đáng giá hơn 3,9% quyết
     # định thu thêm được.
     #
-    # ĐO ĐƯỢC trên 300 lô đầu của luồng demo 496.885 sự kiện:
-    #   flow-only    282 lô (94%) → AWAIT_HITL 88,3% · ALERT 7,8% · BLOCK_IP 3,9%
+    # Đo được trên 300 lô đầu của luồng demo 496.885 sự kiện:
+    #   flow-only    282 lô (94%) -> AWAIT_HITL 88,3% · ALERT 7,8% · BLOCK_IP 3,9%
     #                              tiêu 2.981 giây LLM = 89% toàn bộ thời gian suy luận
-    #   application   18 lô  (6%) → AWAIT_HITL 61,1% ·               BLOCK_IP 38,9%
+    #   application   18 lô  (6%) -> AWAIT_HITL 61,1% ·               BLOCK_IP 38,9%
     #
     # Nói cách khác: NetFlow thuần đốt gần 90% ngân sách LLM để 88% số lần trả về đúng cái
     # kết luận mà lối tắt này cho ngay lập tức. Bản thân mô hình cũng nói thẳng lý do trong
     # phần biện giải: "không có dữ liệu tầng ứng dụng, bằng chứng yếu". `evidence_layer_of`
-    # đã mã hoá sẵn nhận định đó — ATT&CK định nghĩa phần lớn kỹ thuật trên hành vi ứng
+    # đã mã hoá sẵn nhận định đó - ATT&CK định nghĩa phần lớn kỹ thuật trên hành vi ứng
     # dụng, nên lô không payload thì không có gì để quy kết.
     #
     # Cái mất là thật và phải nêu: 33/282 lô flow từng ra BLOCK_IP hoặc ALERT nay thành
-    # AWAIT_HITL. Đây là đánh đổi về phía AN TOÀN (analyst vẫn thấy chúng trong hàng đợi),
+    # AWAIT_HITL. Đây là đánh đổi về phía an toàn (analyst vẫn thấy chúng trong hàng đợi),
     # không phải bỏ sót.
     if _cfg_tier2().get("skip_llm_for_flow_only", False):
         if evidence_layer_of(state.current_batch_logs) == "flow":
@@ -969,11 +952,11 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     threat_memory_context = "\n".join(threat_context_parts)
 
     if trace.enabled():
-        # LỖI ĐÃ SỬA (2026-07-28): chuỗi này từng được TÍNH ở đây, cất vào state — rồi thôi.
+        # Lỗi đã sửa (2026-07-28): chuỗi này từng được tính ở đây, cất vào state - rồi thôi.
         # `build_triage_prompt()` chỉ nhận (log_data, rag_context), còn
-        # `SentinelState.get_memory_for_prompt()` thì KHÔNG có nơi nào gọi. Nghĩa là Bộ nhớ
+        # `SentinelState.get_memory_for_prompt()` thì không có nơi nào gọi. Nghĩa là Bộ nhớ
         # Đe doạ dài hạn chưa bao giờ tới được LLM, dù đó là đóng góp chính của RQ3. Nay đã
-        # truyền xuống prompt, nên cờ dưới đây phản ánh SỰ THẬT thay vì hằng số False.
+        # truyền xuống prompt, nên cờ dưới đây phản ánh sự thật thay vì hằng số False.
         trace.add(
             "threat_memory",
             ips_queried=sorted(seen_ips)[:50],
@@ -993,7 +976,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     rag_combined = (
         f"MITRE ATT&CK:\n{state.rag_mitre_context}\n\nNIST SP 800-61r2:\n{state.rag_nist_context}"
     )
-    # Ghi ra tracer để bộ chấm hậu kiểm dùng CHÍNH định nghĩa mà hệ thống đã dùng lúc chạy,
+    # Ghi ra tracer để bộ chấm hậu kiểm dùng chính định nghĩa mà hệ thống đã dùng lúc chạy,
     # thay vì suy lại từ tên nguồn dataset (hai cách suy sẽ trôi khỏi nhau lúc nào không hay).
     _layer = evidence_layer_of(state.current_batch_logs)
     if trace.enabled():
@@ -1009,8 +992,8 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
             threat_memory_context=threat_memory_context,
             evidence_layer=_layer,
         )
-        # Chỉ dẫn an toàn của Guardrails PHẢI đứng đầu system prompt: nó là thứ dặn model coi
-        # nội dung giữa hai data-marker là DỮ LIỆU, không phải mệnh lệnh.
+        # Chỉ dẫn an toàn của Guardrails phải đứng đầu system prompt: nó là thứ dặn model coi
+        # nội dung giữa hai data-marker là dữ liệu, không phải mệnh lệnh.
         if guardrails_instruction:
             _m[0]["content"] = guardrails_instruction + "\n\n" + _m[0]["content"]
         if state.narrative_summary:
@@ -1019,24 +1002,24 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
 
     messages = _assemble_prompt(raw_logs_str)
 
-    # ── TRÀN NGỮ CẢNH: ĐO PROMPT THẬT, KHÔNG ĐOÁN BẰNG HẰNG SỐ ────────────────────
+    # tràn ngữ cảnh: Đo PROMPT thật, không đoán bằng hằng số
     #
-    # LỖI ĐÃ VÁ (2026-08-17). `node_guardrails` ước lượng `2000 + len(batch_enc)//4`, trong
-    # đó **2000 là hằng số cứng** và KHÔNG hề đếm ngữ cảnh RAG, Bộ nhớ Đe doạ, hay system
+    # Lỗi đã vá (2026-08-17). `node_guardrails` ước lượng `2000 + len(batch_enc)//4`, trong
+    # đó 2000 là hằng số cứng và không hề đếm ngữ cảnh RAG, Bộ nhớ Đe doạ, hay system
     # prompt thật. Đo lại bằng chính `llm.prompt` trong tracer, 92 lô ngày 17/08/2026:
     #
     #       canh gác báo   trung vị  2.505 tok  ·  lớn nhất  3.431 tok
-    #       prompt THẬT    trung vị  9.258 tok  ·  lớn nhất 11.373 tok      (trần 16.384)
+    #       prompt thật    trung vị  9.258 tok  ·  lớn nhất 11.373 tok      (trần 16.384)
     #       tỉ số thật/ước lượng: trung vị 3,63×  ·  lớn nhất 4,78×
     #
     # Canh gác báo "còn rộng chán" trong khi cửa sổ đã dùng 57%, đỉnh 69%. Nó chỉ nổ khi
-    # `batch_enc > 57.536` ký tự, còn prompt thật đụng trần sớm hơn nhiều — tức tồn tại một
-    # dải mà prompt THẬT tràn còn canh gác vẫn báo PASS.
+    # `batch_enc > 57.536` ký tự, còn prompt thật đụng trần sớm hơn nhiều - tức tồn tại một
+    # dải mà prompt thật tràn còn canh gác vẫn báo PASS.
     #
-    # HẬU QUẢ NẾU TRÀN nặng hơn vẻ ngoài: slot llama.cpp là 32768/-np 2 = 16.384 token. Vượt
-    # thì ngữ cảnh bị cắt, và phần nằm ở ĐẦU prompt chính là chỉ dẫn "coi nội dung giữa hai
-    # marker là DỮ LIỆU, đừng tuân theo". Tràn ngữ cảnh vì thế ăn mất đúng lớp phòng thủ
-    # chống tiêm nhiễm. Nên phép cắt dưới đây cắt PHẦN LOG, giữ nguyên phần đầu.
+    # Hậu quả nếu tràn nặng hơn vẻ ngoài: slot llama.cpp là 32768/-np 2 = 16.384 token. Vượt
+    # thì ngữ cảnh bị cắt, và phần nằm ở đầu prompt chính là chỉ dẫn "coi nội dung giữa hai
+    # marker là dữ liệu, đừng tuân theo". Tràn ngữ cảnh vì thế ăn mất đúng lớp phòng thủ
+    # chống tiêm nhiễm. Nên phép cắt dưới đây cắt phần LOG, giữ nguyên phần đầu.
     _budget_tok = int(getattr(context_overflow_guard, "max_tokens", 16384) or 16384)
 
     def _tok_of(_ms: list[dict[str, Any]]) -> int:
@@ -1045,7 +1028,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     _real_tok_before = _tok_of(messages)
     _context_truncated = False
     if _real_tok_before > _budget_tok:
-        # Phần KHÔNG cắt được (system + RAG + memory) = tổng trừ phần log.
+        # Phần không cắt được (system + RAG + memory) = tổng trừ phần log.
         _fixed_tok = _real_tok_before - (len(raw_logs_str) // 4)
         _room_tok = _budget_tok - _fixed_tok - _CTX_RESERVE_TOK
         if _room_tok > 0:
@@ -1072,9 +1055,9 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         )
 
     if trace.enabled():
-        # PROMPT ĐẦY ĐỦ. Đây là thứ DUY NHẤT cho phép kiểm chứng hậu kiểm rằng không mẩu
+        # PROMPT đầy đủ. Đây là thứ duy nhất cho phép kiểm chứng hậu kiểm rằng không mẩu
         # nhãn dataset nào (mã T####, 'zero-day-probe', 'grayzone'...) lọt vào đầu vào LLM.
-        # sha256 tính trên bản CHƯA cắt nên vẫn đối chiếu được kể cả khi tracer cắt bớt.
+        # sha256 tính trên bản chưa cắt nên vẫn đối chiếu được kể cả khi tracer cắt bớt.
         _joined = "\n\n".join(str(m.get("content", "")) for m in messages)
         trace.add(
             "llm",
@@ -1086,14 +1069,14 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     decision_json = {}
     _feature_log = state.current_batch_logs[0] if state.current_batch_logs else {}
     _cache_layer = "exact"
-    # Prompt nay CÓ chứa tiền sử IP, nên rổ cache lớp-2 phải tách theo "đã có tiền sử hay
-    # chưa" — nếu không, verdict của một IP sạch sẽ được tái dùng cho kẻ tái phạm và tính
+    # Prompt nay có chứa tiền sử IP, nên rổ cache lớp-2 phải tách theo "đã có tiền sử hay
+    # chưa" - nếu không, verdict của một IP sạch sẽ được tái dùng cho kẻ tái phạm và tính
     # năng vừa bật coi như vô hiệu. Xem `ExactMatchResponseCache._history_token`.
     _has_history = bool(threat_memory_context.strip())
     cached_decision = response_cache.get(raw_logs_str)
     if not cached_decision:
-        # Lớp 2 — gộp theo ĐẶC TRƯNG: các flow cùng bản chất (khác mỗi IP/timestamp, vd
-        # hàng trăm DAPT nền benign) dùng chung 1 verdict -> KHÔNG tốn 1 call LLM mỗi cái.
+        # Lớp 2 - gộp theo đặc trưng: các flow cùng bản chất (khác mỗi IP/timestamp, vd
+        # hàng trăm DAPT nền benign) dùng chung 1 verdict -> không tốn 1 call LLM mỗi cái.
         cached_decision = response_cache.get_by_features(_feature_log, has_history=_has_history)
         _cache_layer = "feature"
     if cached_decision:
@@ -1103,19 +1086,19 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         latency_sec = 0.001
         logger.info("[NODE LLM] Trả về quyết định từ Response Cache (Bypass LLM)")
         if trace.enabled():
-            # Trước đây chỉ suy được cache-hit qua `latency_sec == 0.001`, và KHÔNG biết
+            # Trước đây chỉ suy được cache-hit qua `latency_sec == 0.001`, và không biết
             # trúng lớp nào. Phân biệt exact/feature mới trả lời được "cache gộp theo đặc
             # trưng có thực sự đóng góp không, hay chỉ là trùng khớp nguyên văn".
             trace.add("llm", cache_hit=True, cache_layer=_cache_layer, latency_sec=latency_sec)
     else:
         start_time = time.time()
         # Suy biến có kiểm soát (graceful degradation): nếu LLM cục bộ chết/không kết nối
-        # được (connection refused, timeout sau retry), KHÔNG để vỡ đồ thị — chuyển AWAIT_HITL
+        # được (connection refused, timeout sau retry), không để vỡ đồ thị - chuyển AWAIT_HITL
         # an toàn. Tier-1 (xác định) vẫn bảo vệ độc lập.
         llm_unavailable_err = ""
         try:
             # response_format=json_schema -> server ép JSON hợp lệ (hết "parse lỗi"/prose) và
-            # reasoning bám tiếng Việt; max_tokens rộng để JSON reasoning dài KHÔNG bị cắt cụt.
+            # reasoning bám tiếng Việt; max_tokens rộng để JSON reasoning dài không bị cắt cụt.
             raw_response = llm_client.invoke(
                 messages=messages,
                 temperature=0.1,
@@ -1133,10 +1116,10 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         latency_sec = end_time - start_time
 
         if llm_unavailable_err:
-            # KHÔNG parse chuỗi rỗng. LỖI ĐÃ SỬA: trước đây nhánh này rơi thẳng vào
+            # Không parse chuỗi rỗng. Lỗi đã sửa: trước đây nhánh này rơi thẳng vào
             # `parse_llm_response("")`, chạy hết cascade salvage rồi trả thông điệp mặc định
             # đổ lỗi cho "output bị cắt cụt theo max_tokens hoặc sai định dạng". Thực tế máy
-            # chủ LLM không phản hồi — không có output nào để mà cắt cụt. Đo được ngày
+            # chủ LLM không phản hồi - không có output nào để mà cắt cụt. Đo được ngày
             # 2026-08-03: container restart, 10 lần `APIConnectionError`, 3 bản ghi
             # AWAIT_HITL mang lý do sai khiến analyst đi truy một vấn đề không tồn tại.
             decision_json = {
@@ -1167,15 +1150,15 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         if trace.enabled():
             trace.add("validator", pre=_trace_verdict(decision_json))
 
-        # 2. CHẠY QUYẾT ĐỊNH QUA LLM DECISION VALIDATOR (Enforce Enum, Shield critical, Sanitize reasoning)
+        # 2. Chạy quyết định qua LLM DECISION VALIDATOR (Enforce Enum, Shield critical, Sanitize reasoning)
         validated_decision = decision_validator.validate_decision(decision_json)
 
         if trace.enabled():
             trace.add("validator", post_validate=_trace_verdict(validated_decision))
 
-        # 2b. LÁ CHẮN BẤT ĐỒNG TIER-1/TIER-2 (chống social-engineering ngữ nghĩa):
+        # 2b. Lá chắn bất đồng TIER-1/TIER-2 (chống social-engineering ngữ nghĩa):
         # Nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM hạ cấp xuống bỏ qua,
-        # buộc AWAIT_HITL — Tier-1 không thể bị "nói chuyện" hạ cấp như LLM.
+        # buộc AWAIT_HITL - Tier-1 không thể bị "nói chuyện" hạ cấp như LLM.
         tier1_flagged_attack = any(
             log.get("tier1_action") in ("BLOCK_IP", "ESCALATE", "AWAIT_HITL", "ALERT")
             or float(log.get("tier1_score", 0) or 0) >= 30
@@ -1192,15 +1175,15 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
                 post_consensus=_trace_verdict(validated_decision),
             )
 
-        # LỖI ĐÃ SỬA — cache CẢ `AWAIT_HITL`.
+        # Lỗi đã sửa - cache cả `AWAIT_HITL`.
         #
-        # Bản trước cố ý BỎ QUA AWAIT_HITL với lý do "mỗi ca cần người xem luôn tươi". Lập
-        # luận đó sai về hệ quả: phiếu HITL cho IP đó ĐÃ được tạo ngay ở node bên dưới, nên
-        # gọi lại LLM không cho analyst dữ liệu tươi hơn — nó tạo THÊM MỘT PHIẾU TRÙNG cho
+        # Bản trước cố ý bỏ qua AWAIT_HITL với lý do "mỗi ca cần người xem luôn tươi". Lập
+        # luận đó sai về hệ quả: phiếu HITL cho IP đó đã được tạo ngay ở node bên dưới, nên
+        # gọi lại LLM không cho analyst dữ liệu tươi hơn - nó tạo thêm một phiếu trùng cho
         # đúng cùng một sự việc. Đó chính là "mệt mỏi cảnh báo" mà luận văn mở đầu bằng.
         #
-        # Đo được trên ba lượt chạy luồng demo (2026-07-28): ở lượt KHÔNG reset, 163/338 lô
-        # Tier-2 (48%) là IP ĐÃ phán quyết ở lượt trước, và 151/163 (93%) trong số đó đã
+        # Đo được trên ba lượt chạy luồng demo (2026-07-28): ở lượt không reset, 163/338 lô
+        # Tier-2 (48%) là IP đã phán quyết ở lượt trước, và 151/163 (93%) trong số đó đã
         # nhận AWAIT_HITL. Mỗi lô như vậy tốn thêm một lượt suy luận ~22 s để ra đúng kết
         # luận cũ. Cache lại là cách duy nhất cắt vòng lặp đó mà không mất phiếu HITL nào.
         response_cache.set(raw_logs_str, validated_decision)
@@ -1209,46 +1192,46 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     action = validated_decision.get("action", "AWAIT_HITL")
     confidence = validated_decision.get("confidence", 0.0)
 
-    # GHI LẠI HÀNH ĐỘNG MODEL YÊU CẦU, TRƯỚC MỌI BƯỚC CHÍNH SÁCH.
+    # Ghi lại hành động MODEL yêu cầu, trước mọi bước chính sách.
     #
-    # VÌ SAO PHẢI GHI, KHÔNG SUY LẠI TỪ VĂN BẢN. Phần biện giải của model thường kết bằng
-    # câu "Therefore, the action is BLOCK_IP…", trong khi chính sách hạ xuống ALERT. Thẻ
+    # Vì sao phải ghi, không suy lại từ văn bản. Phần biện giải của model thường kết bằng
+    # câu "Therefore, the action is BLOCK_IP...", trong khi chính sách hạ xuống ALERT. Thẻ
     # cảnh báo trên Dashboard vì thế hiện tiêu đề `[HIGH] ALERT` ngay trên một đoạn văn nói
-    # phải BLOCK_IP, và KHÔNG có dòng nào giải thích. Người đọc chỉ có hai cách hiểu, và cả
+    # phải BLOCK_IP, và không có dòng nào giải thích. Người đọc chỉ có hai cách hiểu, và cả
     # hai đều xấu: hoặc hệ mâu thuẫn, hoặc màn hình hiển thị sai.
     #
     # Suy ngược từ câu chữ của model là đúng cái bẫy đã sinh ra lỗi đảo dấu ở badge neo bằng
-    # chứng. Nên lưu thẳng vào phán quyết ở đây — nguồn có thẩm quyền, không phải suy đoán.
+    # chứng. Nên lưu thẳng vào phán quyết ở đây - nguồn có thẩm quyền, không phải suy đoán.
     validated_decision["_policy_action_before"] = action
 
-    # ── TRẦN TỰ-TIN KHI KHÔNG CÓ CĂN CỨ QUY KẾT ───────────────────────────────────
+    # trần tự-tin khi không có căn cứ quy kết
     # Lô không suy ra được từ vựng tấn công đặc trưng nào (không chữ ký Tier-1, và soi lại
     # chữ ký WAF cũng trượt) thì thứ duy nhất hệ thống biết là "khối lượng/nhịp độ bất
-    # thường". Từ đó mà khẳng định một kỹ thuật ATT&CK rồi CHẶN là bịa ra sự chắc chắn.
+    # thường". Từ đó mà khẳng định một kỹ thuật ATT&CK rồi chặn là bịa ra sự chắc chắn.
     #
-    # VÌ SAO CẦN, đo trên lượt chạy 11/08/2026. Trên 136 lô một-log (phán quyết chấm được
-    # tuyệt đối vì log đại diện CHÍNH LÀ cả lô): 67 chặn đúng, 69 chặn nhầm vào bản ghi
-    # lành — độ chính xác 49,3%, tức ngang tung đồng xu. Và CẢ 136 lô đều KHÔNG có từ vựng
+    # Vì sao cần, đo trên lượt chạy 11/08/2026. Trên 136 lô một-log (phán quyết chấm được
+    # tuyệt đối vì log đại diện chính là cả lô): 67 chặn đúng, 69 chặn nhầm vào bản ghi
+    # lành - độ chính xác 49,3%, tức ngang tung đồng xu. Và cả 136 lô đều không có từ vựng
     # đặc trưng: hệ thống không hề nắm bằng chứng nào phân biệt 67 ca đúng với 69 ca sai,
     # nên 67 lệnh chặn kia đúng do may chứ không do năng lực. 45/69 ca sai mang nhãn T1571.
     #
     # Hạ trần xuống dải ALERT thay vì AWAIT_HITL: ALERT không chặn và không chất thêm việc
-    # cho người. Cảnh báo này KHÔNG được phép tự tích luỹ thành lệnh chặn ở lần sau — xem
+    # cho người. Cảnh báo này không được phép tự tích luỹ thành lệnh chặn ở lần sau - xem
     # `_batch_has_attack_evidence` ngay dưới đây.
     #
-    # ── NGUỒN BẰNG CHỨNG THỨ BA (vá 2026-08-17) ───────────────────────────────────
-    # `batch_attack_vocabulary` chỉ đọc HAI nguồn: `tier1_reasons` và chữ ký WAF chạy lại.
-    # Cả hai đều nhắm vào tấn công MẠNG/WEB. Một payload tiêm nhiễm câu lệnh là văn xuôi
-    # tự nhiên: nó không khớp chữ ký WAF nào, nên lô luôn bị chấm "không có bằng chứng" —
-    # kể cả khi node rào chắn NGAY TRƯỚC ĐÓ đã khẳng định dương tính và ghi hẳn vào trace.
+    # nguồn bằng chứng thứ ba (vá 2026-08-17)
+    # `batch_attack_vocabulary` chỉ đọc hai nguồn: `tier1_reasons` và chữ ký WAF chạy lại.
+    # Cả hai đều nhắm vào tấn công mạng/WEB. Một payload tiêm nhiễm câu lệnh là văn xuôi
+    # tự nhiên: nó không khớp chữ ký WAF nào, nên lô luôn bị chấm "không có bằng chứng" -
+    # kể cả khi node rào chắn ngay trước đó đã khẳng định dương tính và ghi hẳn vào trace.
     #
     # Đo trên lượt chạy 17/08/2026, 99 lô Tier-2: 40 lô bị trần hạ BLOCK_IP -> ALERT, trong
-    # đó **4 lô** rào chắn đã gắn cờ tấn công LLM. Hệ tự bịt mắt: nó cố ý không dùng payload
-    # để truy xuất (đúng — nạp jailbreak vào truy vấn RAG là tự đầu độc), rồi trừ điểm chính
+    # đó 4 lô rào chắn đã gắn cờ tấn công LLM. Hệ tự bịt mắt: nó cố ý không dùng payload
+    # để truy xuất (đúng - nạp jailbreak vào truy vấn RAG là tự đầu độc), rồi trừ điểm chính
     # lô đó vì thiếu bằng chứng truy xuất được.
     #
-    # CHỈ nhận `_llm_injection_strict` (khớp nguyên văn, 0 báo nhầm trên 230 log lành).
-    # KHÔNG nhận `_llm_attack_flags` gộp: bộ dò jailbreak khớp cả `step by step` / `disrupt`,
+    # Chỉ nhận `_llm_injection_strict` (khớp nguyên văn, 0 báo nhầm trên 230 log lành).
+    # Không nhận `_llm_attack_flags` gộp: bộ dò jailbreak khớp cả `step by step` / `disrupt`,
     # đưa nó vào đây là mở đường cho một câu văn lành tự chặn một địa chỉ IP.
     _strict_injection = any(getattr(state, "_llm_injection_strict", None) or [])
     _batch_has_attack_evidence = batch_has_attack_evidence(state)
@@ -1256,18 +1239,18 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         if _strict_injection:
             trace.add("policy", evidence_from_strict_injection=True)
 
-    # ── LÔ BỊ CẮT NGỮ CẢNH: PHÁN QUYẾT CHỈ KHI CÓ BẰNG CHỨNG TIÊM NHIỄM ───────────
+    # lô bị cắt ngữ cảnh: Phán quyết chỉ khi có bằng chứng tiêm nhiễm
     #
-    # Khi prompt vượt trần, phần log bị cắt — nghĩa là model kết luận trên bằng chứng KHÔNG
+    # Khi prompt vượt trần, phần log bị cắt - nghĩa là model kết luận trên bằng chứng không
     # đầy đủ. Quy tắc:
     #
-    #   cắt + CÓ bằng chứng tiêm nhiễm  -> giữ phán quyết. Chữ ký khớp nguyên văn là bằng
-    #                                      chứng ĐỦ tự thân: nó không cần phần log bị cắt
+    #   cắt + có bằng chứng tiêm nhiễm  -> giữ phán quyết. Chữ ký khớp nguyên văn là bằng
+    #                                      chứng đủ tự thân: nó không cần phần log bị cắt
     #                                      để đứng vững.
-    #   cắt + KHÔNG có bằng chứng nào   -> AWAIT_HITL. Hệ không được kết luận trên dữ liệu
+    #   cắt + không có bằng chứng nào   -> AWAIT_HITL. Hệ không được kết luận trên dữ liệu
     #                                      mà chính nó biết là thiếu.
     #
-    # Đặt TRƯỚC trần tự tin và trước banding, vì đây là điều kiện MẠNH HƠN: thiếu dữ liệu thì
+    # Đặt trước trần tự tin và trước banding, vì đây là điều kiện mạnh hơn: thiếu dữ liệu thì
     # mọi tranh luận về ngưỡng đều vô nghĩa.
     if _context_truncated and not _batch_has_attack_evidence:
         logger.warning(
@@ -1287,13 +1270,13 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         and not validated_decision.get("_critical_shield")
         and not _batch_has_attack_evidence
     ):
-        # ĐỔI ĐÍCH ĐẾN 17/08/2026: KHÔNG chắc thì đưa NGƯỜI, không hạ xuống cảnh báo.
+        # Đổi đích đến 17/08/2026: Không chắc thì đưa người, không hạ xuống cảnh báo.
         #
         # Bản trước hạ trần tự tin xuống 0,84 để banding tự đẩy về ALERT. Lập luận khi đó
         # là "ALERT không chặn và không chất việc cho người". Nhưng đo lượt chạy 17/08/2026
         # (220 lô Tier-2) cho thấy cái giá thật: 130 lô mà model kết luận là tấn công với
-        # độ tin cậy >= 0,85 (cao nhất 0,98) rơi hết vào ALERT — một kênh không ai hành
-        # động. Hệ và model BẤT ĐỒNG mà không ai phân xử.
+        # độ tin cậy >= 0,85 (cao nhất 0,98) rơi hết vào ALERT - một kênh không ai hành
+        # động. Hệ và model bất đồng mà không ai phân xử.
         #
         # Bất đồng giữa model và bằng chứng chính là định nghĩa của "không chắc", và ca
         # không chắc thuộc về con người. Trần tự tin bị bỏ hẳn: nó là một quyền phủ quyết
@@ -1309,15 +1292,15 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         validated_decision["action"] = "AWAIT_HITL"
         validated_decision["hitl_reason"] = "unverified_llm_claim"
 
-    # ── CHÍNH SÁCH ĐỘ-TIN-CẬY THỐNG NHẤT (chung Cổng ML + LLM) ────────────────────
-    # Confidence LÁI action thay vì để LLM tự chọn (sửa lỗi "0.75 + T1571 chung chung -> BLOCK").
-    #   LLM cho là ĐE DOẠ (BLOCK_IP/ALERT) -> map theo ngưỡng: >=0.85 BLOCK · 0.65–0.85 ALERT ·
+    # chính sách độ-tin-cậy thống nhất (chung Cổng ML + LLM)
+    # Confidence lái action thay vì để LLM tự chọn (sửa lỗi "0.75 + T1571 chung chung -> BLOCK").
+    #   LLM cho là đe doạ (BLOCK_IP/ALERT) -> map theo ngưỡng: >=0.85 BLOCK · 0.65–0.85 ALERT ·
     #     <0.65 AWAIT_HITL (không chắc -> người).  DROP/LOG (sạch) và AWAIT_HITL (LLM tự thấy
-    #   không chắc) GIỮ NGUYÊN. Chạy SAU validate + enforce_tier_consensus + shield (vẫn ưu tiên).
-    # QUAN TRỌNG: nếu shield critical-asset đã hạ BLOCK->ALERT thì KHÔNG remap (tránh đẩy ngược
+    #   không chắc) giữ nguyên. Chạy sau validate + enforce_tier_consensus + shield (vẫn ưu tiên).
+    # Quan trọng: nếu shield critical-asset đã hạ BLOCK->ALERT thì không remap (tránh đẩy ngược
     # ALERT->BLOCK, phá bảo vệ hạ tầng).
     if action in ("BLOCK_IP", "ALERT") and not validated_decision.get("_critical_shield"):
-        # Bước banding này trước đây KHÔNG có một dòng log nào, nên chuyển đổi
+        # Bước banding này trước đây không có một dòng log nào, nên chuyển đổi
         # "LLM nói BLOCK -> chính sách hạ xuống ALERT" là hoàn toàn vô hình sau khi chạy.
         if trace.enabled():
             trace.add("policy", action_before=action, confidence=float(confidence or 0.0))
@@ -1337,15 +1320,15 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
             skipped_critical_shield=bool(validated_decision.get("_critical_shield")),
         )
 
-    # MỌI đường dẫn tới AWAIT_HITL phải mang MỘT mã lý do máy đọc được (xem
+    # Mọi đường dẫn tới AWAIT_HITL phải mang một mã lý do máy đọc được (xem
     # `decision_policy.HITL_REASONS`). Không có mã thì hàng đợi HITL chỉ là một đống việc
     # không phân loại được, và không thống kê được "hệ chuyển người vì lý do gì".
-    # Đặt ở ĐÂY, sau khi action đã chốt, để bắt cả hai đường còn lại: mô hình TỰ chọn
+    # Đặt ở đây, sau khi action đã chốt, để bắt cả hai đường còn lại: mô hình tự chọn
     # AWAIT_HITL, và suy biến an toàn khi không đọc được phản hồi.
     if action == "AWAIT_HITL" and not validated_decision.get("hitl_reason"):
         _err = str(validated_decision.get("error") or "")
         if _err == "llm_unavailable":
-            # Máy chủ không phản hồi — sự cố VẬN HÀNH. Tách khỏi "model trả JSON hỏng" vì
+            # Máy chủ không phản hồi - sự cố vận hành. Tách khỏi "model trả JSON hỏng" vì
             # hai thứ này cần hai cách sửa khác hẳn nhau (bật lại dịch vụ vs. sửa prompt).
             validated_decision["hitl_reason"] = "llm_unavailable"
         elif _err in ("parse_failed", "parse_salvaged"):
@@ -1356,9 +1339,9 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         if validated_decision.get("hitl_reason"):
             trace.add("policy", hitl_reason=validated_decision["hitl_reason"])
 
-    # Khi LLM trả JSON hỏng, parse_llm_response suy biến an toàn về AWAIT_HITL và KHÔNG có
+    # Khi LLM trả JSON hỏng, parse_llm_response suy biến an toàn về AWAIT_HITL và không có
     # khoá 'reasoning'. Mặc định cũ ("No reasoning provided.") khiến Dashboard trông như
-    # agent im lặng/hỏng, trong khi thực tế là: agent ĐÃ chạy, LLM ĐÃ trả lời, nhưng câu
+    # agent im lặng/hỏng, trong khi thực tế là: agent đã chạy, LLM đã trả lời, nhưng câu
     # trả lời sai định dạng -> chuyển người xử lý. Nói thẳng điều đó cho analyst.
     reasoning = validated_decision.get("reasoning") or _degraded_reason(validated_decision)
     new_iocs = validated_decision.get("extracted_iocs", [])
@@ -1375,21 +1358,21 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     except Exception as e:
         logger.warning(f"MLflow tracking failed: {e}")
 
-    # Target để THỰC THI (block/alert) LUÔN lấy từ Source IP của batch HIỆN TẠI, KHÔNG
-    # lấy từ extracted_iocs của quyết định: khi Response Cache HIT trên một IP KHÁC có
-    # cùng vân log (cùng payload/flow), IOC trong cache là IP CŨ -> nếu dùng làm target
-    # sẽ CHẶN NHẦM IP cũ. IOC chỉ là metadata làm giàu, không phải mục tiêu thực thi.
+    # Target để thực thi (block/alert) luôn lấy từ Source IP của batch hiện tại, không
+    # lấy từ extracted_iocs của quyết định: khi Response Cache HIT trên một IP khác có
+    # cùng vân log (cùng payload/flow), IOC trong cache là IP cũ -> nếu dùng làm target
+    # sẽ chặn nhầm IP cũ. IOC chỉ là metadata làm giàu, không phải mục tiêu thực thi.
     target = "UNKNOWN_TARGET"
     if state.current_batch_logs:
         log_entry = state.current_batch_logs[0]
         target = log_entry.get("Source IP") or log_entry.get("src_ip") or "UNKNOWN_TARGET"
 
-    # Chỉ log lớp-ứng-dụng THUẦN payload (không có Source IP flow) mới rơi về IOC trích xuất.
+    # Chỉ log lớp-ứng-dụng thuần payload (không có Source IP flow) mới rơi về IOC trích xuất.
     if target == "UNKNOWN_TARGET" and new_iocs and isinstance(new_iocs, list) and len(new_iocs) > 0:
         target = new_iocs[0].get("value", "UNKNOWN_TARGET")
 
-    # Nếu verdict đến TỪ CACHE và lô hiện tại là một IP khác, nói rõ xuất xứ trong phần lập
-    # luận — nếu không, nhật ký kiểm toán sẽ khẳng định một điều về IP mà LLM chưa từng nói.
+    # Nếu verdict đến từ CACHE và lô hiện tại là một IP khác, nói rõ xuất xứ trong phần lập
+    # luận - nếu không, nhật ký kiểm toán sẽ khẳng định một điều về IP mà LLM chưa từng nói.
     if cached_decision:
         reasoning = _annotate_reused_verdict(reasoning, validated_decision, target)
         if trace.enabled():
@@ -1403,7 +1386,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         "mitre_technique": validated_decision.get("mitre_technique", ""),
         "nist_control": validated_decision.get("nist_control", ""),
         "cycle_count": state.cycle_count + 1,
-        # Cờ tình trạng parse LLM (parse_failed/parse_salvaged) — để attack_mapper KHÔNG
+        # Cờ tình trạng parse LLM (parse_failed/parse_salvaged) - để attack_mapper không
         # dập một technique "tự tin" lên một triage rỗng/hỏng (tránh MITRE gây hiểu lầm).
         "error": validated_decision.get("error", ""),
         # Mã lý do chuyển người xử lý (rỗng nếu action không phải AWAIT_HITL).
@@ -1415,7 +1398,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     # Đã sanitize trong decision_validator, nhưng vẫn bảo vệ kép cho narrative summary
     new_narrative = output_sanitizer.sanitize(new_narrative)
 
-    # 3. GHI LOG KIỂM TOÁN (Audit Trail)
+    # 3. Ghi LOG kiểm toán (Audit Trail)
     # Lấy thông số từ Tier-1 log để đối chiếu trong ablation study
     t1_score = 0
     t1_action = "LOG"
@@ -1446,7 +1429,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     }
     audit_logger.log_event(audit_event)
 
-    # Record incident logic moved to node_action_executor & node_human_in_the_loop
+    # Phần ghi sự cố đã chuyển sang node_action_executor và node_human_in_the_loop
 
     return {
         "decisions": [decision_entry],
@@ -1459,18 +1442,17 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
 
 def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     """
-    ATT&CK Mapper Node: chạy SAU node_llm_triage cho các quyết định tin cậy cao.
+    ATT&CK Mapper Node: chạy sau node_llm_triage cho các quyết định tin cậy cao.
 
-    Biến `mitre_technique` free-text của triage thành bản đồ MITRE ATT&CK CÓ CẤU
-    TRÚC (tactic/technique/sub-technique/URL/mapping_confidence/recommended_response),
+    Biến `mitre_technique` free-text của triage thành bản đồ MITRE ATT&CK có cấu
+    Trúc (tactic/technique/sub-technique/URL/mapping_confidence/recommended_response),
     bồi đắp vào quyết định mới nhất để node HITL / Action Executor dùng được.
 
-    TÁI DÙNG hạ tầng sẵn có: `retriever` (DualRetriever) + `llm_client`. KHÔNG gọi
-    LLM thêm trong đường XÁC ĐỊNH (web attack phổ biến) -> giữ độ trễ thấp.
+    Tái dùng hạ tầng sẵn có: `retriever` (DualRetriever) + `llm_client`. Không gọi
+    LLM thêm trong đường xác định (web attack phổ biến) -> giữ độ trễ thấp.
     """
     logger.info("--- NODE: ATT&CK MAPPER ---")
 
-    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_attack_mapper")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
@@ -1485,10 +1467,10 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
 
     decision = dict(state.decisions[-1])  # copy để bồi đắp, giữ action/target/confidence
 
-    # GATE: nếu triage KHÔNG đọc được (parse_failed) thì KHÔNG dập một MITRE "tự tin" lên một
-    # triage rỗng — sẽ gây hiểu lầm (vd T1548.003 "Sudo Caching" trên một flow mạng). Để
+    # GATE: nếu triage không đọc được (parse_failed) thì không dập một MITRE "tự tin" lên một
+    # triage rỗng - sẽ gây hiểu lầm (vd T1548.003 "Sudo Caching" trên một flow mạng). Để
     # technique NEUTRAL, giữ reasoning trung thực; con người xác minh (đã AWAIT_HITL).
-    # `llm_unavailable` phải nằm CÙNG cổng này: triage khi máy chủ LLM chết cũng rỗng y hệt
+    # `llm_unavailable` phải nằm cùng cổng này: triage khi máy chủ LLM chết cũng rỗng y hệt
     # lúc JSON hỏng, nên dập một mã MITRE lên nó cũng gây hiểu lầm y hệt.
     _triage_err = str(decision.get("error") or "")
     if _triage_err in ("parse_failed", "llm_unavailable"):
@@ -1518,8 +1500,8 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         )
         return {"decisions": [decision]}
 
-    # Kỹ thuật LLM tự suy (GIỮ LẠI trước khi mapper chuẩn hoá). Nếu triage đã nêu 1
-    # technique CỤ THỂ (Txxxx / AML.Txxxx) thì ƯU TIÊN giữ nó cho badge — để badge KHỚP
+    # Kỹ thuật LLM tự suy (giữ lại trước khi mapper chuẩn hoá). Nếu triage đã nêu 1
+    # technique cụ thể (Txxxx / AML.Txxxx) thì ưu tiên giữ nó cho badge - để badge khớp
     # với phần reasoning người xem đọc, và tránh mọi alert bị gom hết về AML.T0051 chỉ vì
     # tín hiệu injection lọt trong tier1_reasons. Chỉ dùng kết quả mapper khi LLM để N/A.
     import re as _re
@@ -1539,9 +1521,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         ]
     ).strip()
 
-    # Ép `type_hint` về prompt_injection CHỈ khi chính log đang xét bị tấn công nhắm vào
-    # LLM. Bản trước dùng cờ mức LÔ (`any()` trên 10 log), nên một payload tiêm nhiễm lẫn
-    # trong lô đủ để mọi log còn lại bị gán nhãn ATLAS — kể cả một SQLi thật đáng ra phải
+    # Ép `type_hint` về prompt_injection chỉ khi chính log đang xét bị tấn công nhắm vào
+    # LLM. Bản trước dùng cờ mức lô (`any()` trên 10 log), nên một payload tiêm nhiễm lẫn
+    # trong lô đủ để mọi log còn lại bị gán nhãn ATLAS - kể cả một SQLi thật đáng ra phải
     # là T1190. `first_log` là log mapper đang xét, nên lấy cờ ở đúng chỉ số 0.
     _adv_flags_m = getattr(state, "_llm_attack_flags", None) or []
     if _adv_flags_m and _adv_flags_m[0]:
@@ -1557,31 +1539,31 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     try:
         mapping = map_attack(mapper_input, retriever=retriever, llm=llm_client)
     except Exception as e:
-        # Suy biến an toàn: mapping hỏng KHÔNG được phá đồ thị — giữ quyết định gốc.
+        # Suy biến an toàn: mapping hỏng không được phá đồ thị - giữ quyết định gốc.
         logger.error(f"[ATT&CK MAPPER] Lỗi ánh xạ ({e}). Giữ nguyên quyết định triage.")
         return {}
 
     # _ATTRIBUTION_MUST_BE_DETERMINISTIC_AND_GROUNDED
     #
-    # LỖI ĐÃ VÁ (đo được, không phải suy đoán). Bản trước cho kỹ thuật LLM TỰ KHAI thắng bộ
+    # Lỗi đã vá (đo được, không phải suy đoán). Bản trước cho kỹ thuật LLM tự khai thắng bộ
     # ánh xạ RRF bất cứ khi nào nó nêu một mã hợp lệ, vì mục đích hiển thị: "badge phải khớp
-    # reasoning". Nhưng `mitre_technique_id` không chỉ để hiển thị — nó là ĐẦU RA QUY KẾT của
+    # reasoning". Nhưng `mitre_technique_id` không chỉ để hiển thị - nó là đầu ra quy kết của
     # hệ, thứ được chấm điểm và ghi vào vết kiểm toán. Hậu quả trên 300 mẫu CSIC:
     #
     #     rrf (llm=None, chỉ RRF)       exact 67,33%   tactic 67,33%
     #     e2e (toàn tuyến, LLM thắng)   exact  2,33%   tactic 24,33%
     #
-    # `tactic` chỉ tụt một nửa vì nó vẫn lấy từ `mapping` — đúng theo cách mã cũ quy định.
-    # Nói cách khác: RAG lấy ĐÚNG tài liệu (trần độ phủ KB = 100%), RRF chọn ĐÚNG kỹ thuật,
+    # `tactic` chỉ tụt một nửa vì nó vẫn lấy từ `mapping` - đúng theo cách mã cũ quy định.
+    # Nói cách khác: RAG lấy đúng tài liệu (trần độ phủ KB = 100%), RRF chọn đúng kỹ thuật,
     # rồi free-text của LLM ghi đè lên ở bước cuối.
     #
-    # Nặng hơn: lá chắn neo bằng chứng phía dưới CHỈ nằm ở nhánh "LLM trả N/A". Khi LLM CÓ
-    # nêu mã, mã đó đi thẳng ra quyết định mà không hề đối chiếu với tài liệu RAG của lô —
-    # chỉ TÊN được kiểm. Một mã bịa hoàn toàn vẫn lọt. Lá chắn canh đúng cái cửa mà kẻ gian
+    # Nặng hơn: lá chắn neo bằng chứng phía dưới chỉ nằm ở nhánh "LLM trả N/A". Khi LLM có
+    # nêu mã, mã đó đi thẳng ra quyết định mà không hề đối chiếu với tài liệu RAG của lô -
+    # chỉ tên được kiểm. Một mã bịa hoàn toàn vẫn lọt. Lá chắn canh đúng cái cửa mà kẻ gian
     # không đi qua.
     #
-    # NGUYÊN TẮC MỚI: quy kết là việc của bộ ánh xạ tất định; mọi mã — dù của mapper hay của
-    # LLM — đều phải CÓ NEO trong `rag_mitre_context` của chính lô này. Free-text của LLM vẫn
+    # Nguyên tắc mới: quy kết là việc của bộ ánh xạ tất định; mọi mã - dù của mapper hay của
+    # LLM - đều phải có neo trong `rag_mitre_context` của chính lô này. Free-text của LLM vẫn
     # được giữ nguyên ở `llm_claimed_technique` để trang hiển thị đối chiếu được hai nguồn,
     # tức vẫn đạt mục đích ban đầu mà không đánh đổi tính đúng đắn.
     #
@@ -1591,20 +1573,20 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     _llm_id = _llm_tech_m.group(1).upper() if _llm_tech_m and _llm_tech_raw.upper() != "N/A" else ""
 
     def _grounded(tech_id: str, from_curated: bool = False) -> bool:
-        """Không có ngữ cảnh RAG thì không có gì để đối chiếu — không kết tội được.
+        """Không có ngữ cảnh RAG thì không có gì để đối chiếu - không kết tội được.
 
-        NGOẠI LỆ ATLAS, VÀ VÌ SAO NÓ PHẢI HẸP. Kho tri thức hiện có **0 mục `AML.*`**
+        Ngoại lệ ATLAS, và vì sao nó phải hẹp. Kho tri thức hiện có **0 mục `AML.*`**
         (toàn bộ 433 mục là ATT&CK Enterprise), và `_TECHNIQUE_ID_RE` cũng chỉ khớp
-        `T\\d{4}`. Nên một mã ATLAS hợp lệ như `AML.T0051` (Prompt Injection) KHÔNG BAO GIỜ
-        neo được vào RAG — không phải vì nó sai, mà vì KB không chứa khung đó.
+        `T\\d{4}`. Nên một mã ATLAS hợp lệ như `AML.T0051` (Prompt Injection) không bao giờ
+        neo được vào RAG - không phải vì nó sai, mà vì KB không chứa khung đó.
 
-        Bản trước xử lý bằng cách cho MỌI mã bắt đầu `AML.` đi qua. Quá rộng: regex bóc mã
+        Bản trước xử lý bằng cách cho mọi mã bắt đầu `AML.` đi qua. Quá rộng: regex bóc mã
         của LLM là `(AML\\.T\\d{4}|T\\d{4}...)`, nên model tự khai `AML.T9999` cũng lọt
-        thẳng ra quyết định — đúng thứ lá chắn sinh ra để chặn.
+        thẳng ra quyết định - đúng thứ lá chắn sinh ra để chặn.
 
-        Nay ngoại lệ chỉ áp cho mã đến từ **bảng ánh xạ thủ công tất định**
+        Nay ngoại lệ chỉ áp cho mã đến từ bảng ánh xạ thủ công tất định
         (`WEB_ATTACK_MAP`), là nguồn do con người soạn và kiểm được. Free-text của LLM
-        KHÔNG được hưởng ngoại lệ này. Đường `_from_triage_anchor` và đường RRF đều không
+        không được hưởng ngoại lệ này. Đường `_from_triage_anchor` và đường RRF đều không
         thể sinh mã `AML.*` (một bên regex chỉ bắt `T\\d{4}`, một bên tra KB không có ATLAS),
         nên `from_curated` là điều kiện đủ chặt.
         """
@@ -1616,9 +1598,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
 
     _name_verified = True
     _rejected_id = ""
-    # Ứng viên đã bị loại vì KHÔNG neo được. Lá chắn phía dưới cần biết để còn ghi đúng
-    # `mapping_status` + lý do vào vết kiểm toán — nếu chỉ lặng lẽ trả "" thì kết quả đúng
-    # nhưng nhật ký mất dấu VÌ SAO nó thành N/A.
+    # Ứng viên đã bị loại vì không neo được. Lá chắn phía dưới cần biết để còn ghi đúng
+    # `mapping_status` + lý do vào vết kiểm toán - nếu chỉ lặng lẽ trả "" thì kết quả đúng
+    # nhưng nhật ký mất dấu vì sao nó thành N/A.
     _ungrounded_candidate = ""
     if _grounded(_mapper_id, from_curated=True):
         # Đường chính: bộ ánh xạ tất định thắng. Đây là cấu hình đo được 67,33%.
@@ -1627,10 +1609,10 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         if _llm_id and _llm_id != _mapper_id:
             _rejected_id = _llm_id
     elif _grounded(_llm_id):
-        # Mapper không neo được nhưng LLM nêu một mã CÓ trong tài liệu RAG của lô -> nhận,
-        # vì nó vẫn truy nguyên được về bằng chứng. TÊN phải khớp nguồn sự thật cục bộ:
+        # Mapper không neo được nhưng LLM nêu một mã có trong tài liệu RAG của lô -> nhận,
+        # vì nó vẫn truy nguyên được về bằng chứng. Tên phải khớp nguồn sự thật cục bộ:
         # trước đây nhãn free-text đi thẳng ra dashboard nên lọt ca "đúng id, sai tên"
-        # (T1087 gắn nhãn "Network Service Discovery" — thực ra là T1046).
+        # (T1087 gắn nhãn "Network Service Discovery" - thực ra là T1046).
         _final_tech, _name_verified = verify_technique_label(_llm_id, _llm_tech_raw)
         _final_tech_id = _llm_id
         _rejected_id = _mapper_id
@@ -1639,8 +1621,8 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         # AWAIT_HITL với đúng lý do `technique_unmappable`.
         #
         # Đo trên lượt chạy sống 281 lô: lá chắn khai hoả 96 lần, 93 lần do MAPPER đoán từ
-        # TỪ KHOÁ (T1590.005, T1527, T1595, T1056.003...) khi LLM đã đúng đắn trả N/A. Nếu
-        # lấy tỉ lệ "không neo" làm chỉ số ảo giác của LLM thì SAI ĐỊA CHỈ hoàn toàn.
+        # Từ khoá (T1590.005, T1527, T1595, T1056.003...) khi LLM đã đúng đắn trả N/A. Nếu
+        # lấy tỉ lệ "không neo" làm chỉ số ảo giác của LLM thì sai địa chỉ hoàn toàn.
         _final_tech, _final_tech_id = "N/A", ""
         _rejected_id = _mapper_id or _llm_id
         _ungrounded_candidate = _rejected_id
@@ -1659,8 +1641,8 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
                 rag_grounded_ids=sorted(_rag_ids_pre)[:12],
             )
 
-    # URL phải trỏ ĐÚNG technique đang hiển thị: khi badge lấy id của LLM (khác id mapper),
-    # dùng lại mitre_url của mapper sẽ link sang một kỹ thuật KHÁC.
+    # URL phải trỏ đúng technique đang hiển thị: khi badge lấy id của LLM (khác id mapper),
+    # dùng lại mitre_url của mapper sẽ link sang một kỹ thuật khác.
     _final_url = (
         mapping.mitre_url
         if _final_tech_id == mapping.mitre_technique_id
@@ -1672,7 +1654,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         {
             "mitre_technique": _final_tech,
             "mitre_technique_name_verified": _name_verified,
-            # Kỹ thuật do MODEL tự khai, giữ NGUYÊN VĂN và TÁCH RIÊNG khỏi đầu ra quy kết.
+            # Kỹ thuật do MODEL tự khai, giữ nguyên văn và tách riêng khỏi đầu ra quy kết.
             # Trang hiển thị đối chiếu được hai nguồn (bộ ánh xạ vs model) mà không để lời
             # tự khai lọt vào trường được chấm điểm và ghi vết kiểm toán.
             "llm_claimed_technique": _llm_tech_raw,
@@ -1694,9 +1676,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     )
 
     if trace.enabled():
-        # Node này chạy SAU khi dòng `audit_log` đã được ghi ở node_llm_triage, nên toàn bộ
-        # kết quả ánh xạ (kể cả việc nó ÉP action về AWAIT_HITL) không bao giờ tới
-        # logs/guardrails_audit.db. Đây là nơi DUY NHẤT ghi lại nó.
+        # Node này chạy sau khi dòng `audit_log` đã được ghi ở node_llm_triage, nên toàn bộ
+        # kết quả ánh xạ (kể cả việc nó ép action về AWAIT_HITL) không bao giờ tới
+        # logs/guardrails_audit.db. Đây là nơi duy nhất ghi lại nó.
         trace.add(
             "attack_mapper",
             ran=True,
@@ -1711,77 +1693,77 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
             action_before=decision.get("action", ""),
         )
 
-    # ── LÁ CHẮN NEO BẰNG CHỨNG: không CHẶN TỰ ĐỘNG bằng kỹ thuật KHÔNG có trong RAG ──
+    # lá chắn neo bằng chứng: không chặn tự động bằng kỹ thuật không có trong RAG
     #
-    # Lá chắn cũ (ngay dưới) chỉ hỏi "kỹ thuật này có tồn tại trong kho không?". Nó KHÔNG
+    # Lá chắn cũ (ngay dưới) chỉ hỏi "kỹ thuật này có tồn tại trong kho không?". Nó không
     # hỏi "kỹ thuật này có nằm trong những tài liệu vừa truy xuất cho lô này không?". Một
     # mã có thật trong KB nhưng chưa bao giờ được truy xuất vẫn đi lọt với trạng thái
-    # `resolved`, dù prompt đã dặn rõ "chọn technique TỪ ngữ cảnh RAG".
+    # `resolved`, dù prompt đã dặn rõ "chọn technique từ ngữ cảnh RAG".
     #
-    # ĐO ĐƯỢC trên lượt chạy nguội (274 lô): 25 câu trả lời nằm NGOÀI ngữ cảnh RAG, và độ
-    # chính xác của chúng là 0/4 trên các lô có nhãn — so với 8/25 khi câu trả lời có neo
-    # trong RAG. Đáng lo nhất: 3 trong số đó thành BLOCK_IP TỰ ĐỘNG với confidence
+    # Đo được trên lượt chạy nguội (274 lô): 25 câu trả lời nằm ngoài ngữ cảnh RAG, và độ
+    # chính xác của chúng là 0/4 trên các lô có nhãn - so với 8/25 khi câu trả lời có neo
+    # trong RAG. Đáng lo nhất: 3 trong số đó thành BLOCK_IP tự động với confidence
     # 0.93/0.93/0.95. Tức là hệ thống chặn vĩnh viễn một IP dựa trên một kỹ thuật mà bộ
-    # truy xuất chưa từng đưa ra — đúng định nghĩa "ảo giác tự tin".
+    # truy xuất chưa từng đưa ra - đúng định nghĩa "ảo giác tự tin".
     #
-    # THI HÀNH ĐÚNG HỢP ĐỒNG CỦA CHÍNH PROMPT. Prompt đã dặn: "nếu KHÔNG khớp technique nào
-    # trong ngữ cảnh RAG thì PHẢI đặt action='AWAIT_HITL' và mitre_technique='N/A'". Đo thật:
-    # model chỉ trả 'N/A' 2/136 lần (1,5%) — còn lại nó chọn một kỹ thuật "nghe hợp lý" từ
-    # trí nhớ tham số. Lời dặn trong prompt là điều kiện MỀM; ta thi hành nó bằng MÃ.
+    # Thi hành đúng hợp đồng của chính PROMPT. Prompt đã dặn: "nếu không khớp technique nào
+    # trong ngữ cảnh RAG thì phải đặt action='AWAIT_HITL' và mitre_technique='N/A'". Đo thật:
+    # model chỉ trả 'N/A' 2/136 lần (1,5%) - còn lại nó chọn một kỹ thuật "nghe hợp lý" từ
+    # trí nhớ tham số. Lời dặn trong prompt là điều kiện mềm; ta thi hành nó bằng mã.
     #
     # Hạ `mitre_technique` về 'N/A' thay vì để một mã sai nằm lại: nhật ký kiểm toán và giao
-    # diện analyst KHÔNG được khẳng định một kỹ thuật mà bằng chứng không đỡ. "Không biết"
+    # diện analyst không được khẳng định một kỹ thuật mà bằng chứng không đỡ. "Không biết"
     # là câu trả lời đúng và hữu ích hơn một phán đoán sai nghe có vẻ chắc chắn.
     _rag_ids = set(_TECHNIQUE_ID_RE.findall(state.rag_mitre_context or ""))
     # Hai đường vào lá chắn:
     #   (a) một mã đã lọt tới đây nhưng không có trong tài liệu RAG của lô;
-    #   (b) khâu quy kết phía trên ĐÃ loại hết ứng viên vì không neo được (_ungrounded_candidate).
-    # Thiếu (b) thì kết quả vẫn là N/A nhưng `mapping_status` ở lại "resolved" — vết kiểm toán
-    # mất dấu VÌ SAO, và đó đúng là thứ hội đồng sẽ hỏi.
+    #   (b) khâu quy kết phía trên đã loại hết ứng viên vì không neo được (_ungrounded_candidate).
+    # Thiếu (b) thì kết quả vẫn là N/A nhưng `mapping_status` ở lại "resolved" - vết kiểm toán
+    # mất dấu vì sao, và đó đúng là thứ hội đồng sẽ hỏi.
     _is_aml = bool(_final_tech_id) and _final_tech_id.upper().startswith("AML.")
     _ungrounded = (
         bool(_final_tech_id) and not _is_aml and bool(_rag_ids) and _final_tech_id not in _rag_ids
     ) or bool(_ungrounded_candidate)
     _shield_target = _final_tech_id or _ungrounded_candidate
 
-    # ĐÍCH ĐẾN CỦA HAI LÁ CHẮN DƯỚI ĐÂY: người xử lý, hay chỉ là cảnh báo?
+    # Đích đến của hai lá chắn dưới đây: người xử lý, hay chỉ là cảnh báo?
     #
     # Cả hai lá chắn đều trả lời cùng một câu: "không khẳng định được kỹ thuật". Nhưng câu đó
     # có hai nghĩa rất khác nhau, và trước đây cả hai cùng đổ vào hàng đợi HITL:
-    #   * Lô CÓ bằng chứng tấn công (chữ ký WAF khớp) mà không đặt tên được kỹ thuật -> đây là
-    #     tấn công thật chưa phân loại được. Người PHẢI xem.
-    #   * Lô KHÔNG có bằng chứng tấn công nào -> thứ duy nhất hệ thống biết là "nhịp độ bất
+    #   * Lô có bằng chứng tấn công (chữ ký WAF khớp) mà không đặt tên được kỹ thuật -> đây là
+    #     tấn công thật chưa phân loại được. Người phải xem.
+    #   * Lô không có bằng chứng tấn công nào -> thứ duy nhất hệ thống biết là "nhịp độ bất
     #     thường", còn mã kỹ thuật chỉ là phỏng đoán. Đẻ một phiếu HITL cho mỗi lô như vậy
     #     chính là nạn ngập hàng đợi mà đề tài này đặt ra để giải quyết.
     #
-    # Đo trên lượt chạy 12/08/2026, 49 lô đầu (toàn bộ nằm ở vùng lưu lượng LÀNH trước mốc
+    # Đo trên lượt chạy 12/08/2026, 49 lô đầu (toàn bộ nằm ở vùng lưu lượng lành trước mốc
     # tấn công): 23 lô vào HITL, trong đó 14 do `technique_not_in_rag` và 8 do lá chắn ảo
-    # giác — không lô nào có bằng chứng tấn công. Tỉ lệ HITL 47% cho một cửa sổ 100% lành.
+    # giác - không lô nào có bằng chứng tấn công. Tỉ lệ HITL 47% cho một cửa sổ 100% lành.
     _has_attack_evidence = batch_has_attack_evidence(state)
     _shield_action = "AWAIT_HITL" if _has_attack_evidence else "ALERT"
 
     def _apply_shield_action(dec: dict) -> None:
-        """Hạ cấp theo lá chắn, nhưng KHÔNG BAO GIỜ kéo ngược một phiếu đã lên người.
+        """Hạ cấp theo lá chắn, nhưng không bao giờ kéo ngược một phiếu đã lên người.
 
-        BẪY THỨ TỰ. `node_attack_mapper` chạy SAU `node_llm_triage` và ghi thẳng vào
+        Bẫy thứ tự. `node_attack_mapper` chạy sau `node_llm_triage` và ghi thẳng vào
         `decision["action"]`. Từ 17/08/2026, triage đẩy ca "model khẳng định tấn công mà
         không chữ ký nào xác nhận" sang `AWAIT_HITL`. Nếu lá chắn ở đây vẫn gán đè
-        `_shield_action` vô điều kiện thì đúng những lô đó — vốn cũng không có bằng chứng,
-        nên rơi vào nhánh `ALERT` — sẽ bị kéo tụt từ HITL xuống cảnh báo. Phiếu biến mất
+        `_shield_action` vô điều kiện thì đúng những lô đó - vốn cũng không có bằng chứng,
+        nên rơi vào nhánh `ALERT` - sẽ bị kéo tụt từ HITL xuống cảnh báo. Phiếu biến mất
         khỏi hàng đợi người, im lặng, ở một node hoàn toàn khác node ra quyết định.
 
-        Lá chắn chỉ được HẠ cấp, không được NÂNG một ca đã giao cho người trở lại tự động.
+        Lá chắn chỉ được hạ cấp, không được nâng một ca đã giao cho người trở lại tự động.
         """
         if dec.get("action") == "AWAIT_HITL":
             return
         dec["action"] = _shield_action
 
     def _shield_dest(dec: dict) -> str:
-        """Câu mô tả đích đến — đọc từ HÀNH ĐỘNG THẬT sau khi đã áp lá chắn.
+        """Câu mô tả đích đến - đọc từ hành động thật sau khi đã áp lá chắn.
 
-        CÂU CHỮ PHẢI KHỚP ĐÍCH ĐẾN THẬT (vá 2026-08-17). Đoạn `[NEO BẰNG CHỨNG: ...]` từng
+        Câu chữ phải khớp đích đến thật (vá 2026-08-17). Đoạn `[neo bằng chứng: ...]` từng
         ghi cứng "chuyển người xử lý" từ thời lá chắn chỉ có một nhánh; đo lượt chạy
-        17/08/2026 thì lá chắn khai hoả 126 lần, cả 126 đi nhánh ALERT mà vẫn in câu đó —
+        17/08/2026 thì lá chắn khai hoả 126 lần, cả 126 đi nhánh ALERT mà vẫn in câu đó -
         analyst mở tab HITL không thấy phiếu nào.
 
         Suy câu chữ từ `_shield_action` cũng chưa đủ: sau khi triage biết đẩy ca không
@@ -1810,9 +1792,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
             f"[NEO BẰNG CHỨNG] {_shield_target} KHÔNG có trong ngữ cảnh RAG của lô này — "
             f"đặt kỹ thuật về N/A và {_shield_dest(decision)} (đúng hợp đồng prompt)."
         )
-        # Mã lý do bám vào HÀNH ĐỘNG CUỐI, không bám vào `_shield_action`. Hai thứ đó nay
+        # Mã lý do bám vào hành động cuối, không bám vào `_shield_action`. Hai thứ đó nay
         # có thể khác nhau (xem `_apply_shield_action`), và gán theo cái sau sẽ xoá trắng
-        # lý do của một phiếu HITL do node trước đã lập — phá bất biến "mọi đường tới
+        # lý do của một phiếu HITL do node trước đã lập - phá bất biến "mọi đường tới
         # AWAIT_HITL đều mang một mã máy đọc được".
         if decision.get("action") == "AWAIT_HITL":
             decision.setdefault("hitl_reason", "")
@@ -1825,9 +1807,9 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         decision["mitre_technique_name_verified"] = False
         decision["mapping_status"] = "ungrounded_in_rag"
         decision["mitre_url"] = ""
-        # Nói ĐÚNG ai đề xuất: đo được 93/96 ca là do bộ ánh xạ tự suy sau khi LLM đã trả
+        # Nói đúng ai đề xuất: đo được 93/96 ca là do bộ ánh xạ tự suy sau khi LLM đã trả
         # N/A, chỉ 3 ca là do LLM. Ghi "do model đề xuất" cho cả hai là quy sai trách nhiệm
-        # trong nhật ký kiểm toán — và nếu ai đó lấy tỉ lệ này làm chỉ số ảo giác của LLM thì
+        # trong nhật ký kiểm toán - và nếu ai đó lấy tỉ lệ này làm chỉ số ảo giác của LLM thì
         # con số sẽ sai gấp nhiều lần.
         _who = "model" if (_llm_tech_m and _llm_tech_raw.upper() != "N/A") else "bộ ánh xạ"
         decision["reasoning"] = (
@@ -1843,7 +1825,7 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
                 grounding_shield_rejected_technique=_shield_target,
             )
 
-    # LÁ CHẮN BẢO VỆ CHỐNG HALLUCINATION (TỰ CHÉM):
+    # Lá chắn bảo vệ chống HALLUCINATION (tự chém):
     # Nếu LLM phân tích nhưng mapper không thể khớp với bất kỳ kỹ thuật MITRE nào,
     # hoặc độ tin cậy của việc khớp rất thấp, ép hành động về AWAIT_HITL để con người duyệt.
     if (
@@ -1857,11 +1839,11 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
         if trace.enabled():
             trace.add("attack_mapper", hallucination_shield=True)
         _apply_shield_action(decision)
-        # `setdefault` KHÔNG ghi đè chuỗi rỗng — khoá đã tồn tại với giá trị "" thì nó im lặng
+        # `setdefault` không ghi đè chuỗi rỗng - khoá đã tồn tại với giá trị "" thì nó im lặng
         # bỏ qua. Đo được 8/23 lô AWAIT_HITL không có mã lý do, phá đúng bất biến mà chú thích
-        # ở `node_llm_triage` tuyên bố ("MỌI đường tới AWAIT_HITL phải mang một mã máy đọc
+        # ở `node_llm_triage` tuyên bố ("mọi đường tới AWAIT_HITL phải mang một mã máy đọc
         # được"). Gán tường minh khi giá trị hiện tại rỗng.
-        # Bám HÀNH ĐỘNG CUỐI chứ không phải `_shield_action` — xem chú thích cùng loại ở
+        # Bám hành động cuối chứ không phải `_shield_action` - xem chú thích cùng loại ở
         # lá chắn neo phía trên.
         if decision.get("action") == "AWAIT_HITL":
             if not decision.get("hitl_reason"):
@@ -1879,15 +1861,15 @@ def node_attack_mapper(state: SentinelState) -> dict[str, Any]:
     return {"decisions": [decision]}
 
 
-# ── Học "kỹ thuật" (behavioral signature) — không chỉ nhớ IP ─────────────────
-# Điểm cho luật hành vi: đủ vượt risk_threshold để Tier-1 CỜ (flag/ESCALATE) IP
-# mới cùng ngón đòn, nhưng KHÔNG cao như luật IP (100) để tránh hard-block mù trên
+# Học "kỹ thuật" (behavioral signature) - không chỉ nhớ IP
+# Điểm cho luật hành vi: đủ vượt risk_threshold để Tier-1 cờ (flag/ESCALATE) IP
+# mới cùng ngón đòn, nhưng không cao như luật IP (100) để tránh hard-block mù trên
 # một heuristic hành vi (an toàn: vẫn PENDING + HITL duyệt trước khi ACTIVE).
 BEHAVIORAL_RULE_SCORE = 50
 
-# Chữ ký công cụ tấn công RÕ RÀNG trên User-Agent (an toàn, khái quát hoá tốt —
-# bất kỳ IP nào dùng công cụ này đều đáng ngờ). CỐ Ý loại "curl"/"python-requests"
-# vì quá phổ biến trong automation hợp lệ → tránh dương-tính-giả.
+# Chữ ký công cụ tấn công rõ ràng trên User-Agent (an toàn, khái quát hoá tốt -
+# bất kỳ IP nào dùng công cụ này đều đáng ngờ). Cố Ý loại "curl"/"python-requests"
+# vì quá phổ biến trong automation hợp lệ -> tránh dương-tính-giả.
 _TOOL_SIGNATURES = (
     "sqlmap",
     "nikto",
@@ -1925,8 +1907,8 @@ _URI_ATTACK_TOKENS = (
 
 def _check_apt_signal(target: str, mitre_technique: str, confidence: float):
     """Kiểm tra tín hiệu APT (persistent-IP / multi-day chain) và ghi indicator.
-    KHÔNG record_incident ở đây — nơi gọi đã ghi (raise_alert / _handle_threat_memory_incident)
-    nên tránh đếm TRÙNG total_alerts (điều kiện repeat-offender phụ thuộc số này)."""
+    Không record_incident ở đây - nơi gọi đã ghi (raise_alert / _handle_threat_memory_incident)
+    nên tránh đếm trùng total_alerts (điều kiện repeat-offender phụ thuộc số này)."""
     if target == "UNKNOWN_TARGET":
         return
     apt_check = threat_memory.check_apt_pattern(target)
@@ -1962,7 +1944,7 @@ def _handle_threat_memory_incident(
     target: str, action: str, mitre_technique: str, confidence: float
 ):
     """Ghi incident (tăng reputation/total_*) rồi kiểm tra APT. Dùng cho BLOCK_IP/AWAIT_HITL.
-    Lưu ý: nhánh ALERT KHÔNG dùng hàm này nữa — raise_alert là choke-point ghi ALERT +
+    Lưu ý: nhánh ALERT không dùng hàm này nữa - raise_alert là choke-point ghi ALERT +
     tự leo thang repeat-offender (tránh đếm trùng total_alerts)."""
     if target == "UNKNOWN_TARGET" or action not in ["BLOCK_IP", "ALERT", "AWAIT_HITL"]:
         return
@@ -1972,12 +1954,12 @@ def _handle_threat_memory_incident(
 
 def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
     """
-    Trích một CHỮ KÝ HÀNH VI an toàn từ log gây ra BLOCK để Tier-1 có thể bắt
-    nhanh một IP KHÁC dùng CÙNG kỹ thuật (không chỉ nhớ đúng IP cũ).
+    Trích một chữ ký hành VI an toàn từ log gây ra BLOCK để Tier-1 có thể bắt
+    nhanh một IP khác dùng cùng kỹ thuật (không chỉ nhớ đúng IP cũ).
 
     Ưu tiên chữ ký công cụ trên User-Agent (khái quát nhất); fallback token tấn
-    công trên URI. Trả `None` nếu không có chữ ký an toàn → chỉ ghi luật IP
-    (suy biến nhẹ nhàng). Field trả về LUÔN là nơi token thực sự nằm, để luật
+    công trên URI. Trả `None` nếu không có chữ ký an toàn -> chỉ ghi luật IP
+    (suy biến nhẹ nhàng). Field trả về luôn là nơi token thực sự nằm, để luật
     khớp đúng field của log tương lai. Mọi field/score đều qua FeedbackValidator.
     """
     norm = normalize_log_keys(log_entry)
@@ -1995,7 +1977,7 @@ def _derive_behavioral_rule(log_entry: dict) -> tuple[str, str, int] | None:
 
 
 def _serialize_repr_log(batch_logs: list, target_ip: str) -> str:
-    """Chọn LOG THÔ đại diện cho một quyết định (khớp Source IP == target, fallback log
+    """Chọn LOG thô đại diện cho một quyết định (khớp Source IP == target, fallback log
     đầu batch) và tuần tự hoá JSON để đính kèm audit -> Dashboard hiển thị đầu vào thô.
     Suy biến an toàn: batch rỗng / lỗi serialize -> '{}'."""
     import json as _json
@@ -2015,12 +1997,9 @@ def _serialize_repr_log(batch_logs: list, target_ip: str) -> str:
 
 
 def node_action_executor(state: SentinelState) -> dict[str, Any]:
-    """
-    Action Executor Node: Xử lý các action BLOCK_IP hoặc ALERT.
-    """
+    """Action Executor Node: Xử lý các action BLOCK_IP hoặc ALERT."""
     logger.info("--- NODE: ACTION EXECUTOR ---")
 
-    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_action_executor")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
@@ -2040,8 +2019,8 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
         f"[MITRE: {mitre}] [Độ tin cậy: {conf:.2%}] {safe_reasoning}"
     )
 
-    # LOG THÔ đại diện (khớp target, fallback log đầu batch) -> đính kèm audit để Dashboard
-    # hiển thị "cái gì đã vào Tier-1/LLM". Đây là đặc trưng luồng ĐÃ LOẠI nhãn (label leak).
+    # LOG thô đại diện (khớp target, fallback log đầu batch) -> đính kèm audit để Dashboard
+    # hiển thị "cái gì đã vào Tier-1/LLM". Đây là đặc trưng luồng đã loại nhãn (label leak).
     raw_log_json = _serialize_repr_log(
         state.current_batch_logs, str(latest_decision.get("target", ""))
     )
@@ -2050,19 +2029,19 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
     mitre_tech = latest_decision.get("mitre_technique", "")
     confidence = latest_decision.get("confidence", 0.0)
 
-    # Cờ: block ĐÃ thực thi bên trong raise_alert (repeat-offender) -> KHÔNG chặn lại ở dưới.
+    # Cờ: block đã thực thi bên trong raise_alert (repeat-offender) -> không chặn lại ở dưới.
     _alert_escalated_block = False
 
-    # Tính LẠI ở đây thay vì mang biến từ node chính sách sang: `batch_attack_vocabulary` là
-    # hàm THUẦN trên chính lô log, chi phí vài nghìn phép regex — không đáng kể cạnh một lượt
+    # Tính lại ở đây thay vì mang biến từ node chính sách sang: `batch_attack_vocabulary` là
+    # hàm thuần trên chính lô log, chi phí vài nghìn phép regex - không đáng kể cạnh một lượt
     # gọi LLM ~20 giây, và tránh thêm một trường trạng thái có thể lệch giữa hai node.
     _batch_has_attack_evidence = batch_has_attack_evidence(state)
 
-    # ALERT: raise_alert là CHOKE-POINT THỐNG NHẤT (chung với Cổng ML) — ghi ALERT, và nếu IP
-    # TÁI PHẠM (đã cảnh báo trước) / known-bad thì TỰ leo thang -> BLOCK ngay bên trong.
+    # ALERT: raise_alert là CHOKE-POINT thống nhất (chung với Cổng ML) - ghi ALERT, và nếu IP
+    # Tái phạm (đã cảnh báo trước) / known-bad thì tự leo thang -> BLOCK ngay bên trong.
     if action == "ALERT":
-        # ALERT của LLM theo classify_llm LUÔN nằm dải [0.65, 0.85) nên vẫn được tính vào
-        # bộ đếm tái phạm; truyền tường minh để chính sách nằm ở MỘT chỗ (decision_policy)
+        # ALERT của LLM theo classify_llm luôn nằm dải [0.65, 0.85) nên vẫn được tính vào
+        # bộ đếm tái phạm; truyền tường minh để chính sách nằm ở một chỗ (decision_policy)
         # thay vì phụ thuộc ngầm vào việc dải nào gọi hàm này.
         result_action = raise_alert(
             target,
@@ -2072,7 +2051,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
             tier=TIER_LLM,
             evidence_backed=_batch_has_attack_evidence,
         )
-        # Tín hiệu APT (persistent-IP / multi-day) — đọc incident vừa ghi, KHÔNG record trùng.
+        # Tín hiệu APT (persistent-IP / multi-day) - đọc incident vừa ghi, không record trùng.
         _check_apt_signal(target, mitre_tech, confidence)
         if result_action == "BLOCK_IP":
             logger.warning(f"[*] Escalate ALERT -> BLOCK_IP for {target} (tái phạm cảnh báo)")
@@ -2082,7 +2061,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
             _alert_escalated_block = True
 
     if trace.enabled():
-        # `raise_alert` có thể TỰ leo thang ALERT -> BLOCK_IP khi IP tái phạm. Chuyển đổi đó
+        # `raise_alert` có thể tự leo thang ALERT -> BLOCK_IP khi IP tái phạm. Chuyển đổi đó
         # chỉ để lại một logger.warning; nếu không ghi ở đây thì hậu kiểm sẽ thấy một lệnh
         # BLOCK "từ trên trời rơi xuống" mà LLM không hề yêu cầu.
         trace.add(
@@ -2094,8 +2073,8 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
         )
 
     if action == "BLOCK_IP":
-        # Ghi incident cho BLOCK_IP TRỰC TIẾP từ LLM. Nếu do leo thang ALERT thì raise_alert đã
-        # xử lý reputation/incident -> KHÔNG ghi lại (tránh đếm trùng).
+        # Ghi incident cho BLOCK_IP trực tiếp từ LLM. Nếu do leo thang ALERT thì raise_alert đã
+        # xử lý reputation/incident -> không ghi lại (tránh đếm trùng).
         if not _alert_escalated_block:
             _handle_threat_memory_incident(target, action, mitre_tech, confidence)
             block_ip(
@@ -2108,7 +2087,7 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
         rule_pattern = target
         rule_source = "ml_triage" if getattr(state, "_ml_bypass", False) else "langgraph_agent"
 
-        # (1) Luật theo IP — "nhớ mặt" kẻ tấn công (chạy qua FeedbackValidator ngầm định)
+        # (1) Luật theo IP - "nhớ mặt" kẻ tấn công (chạy qua FeedbackValidator ngầm định)
         FeedbackListener().receive_new_rule(
             "Source IP",
             rule_pattern,
@@ -2118,9 +2097,9 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
             status="ACTIVE",
         )
 
-        # (2) Luật theo CHỮ KÝ HÀNH VI — "nhớ ngón đòn": trích chữ ký công cụ/URI từ
-        # log gây ra block để Tier-1 CỜ nhanh một IP KHÁC dùng CÙNG kỹ thuật. Suy biến
-        # nhẹ nhàng: không có log hoặc không có chữ ký an toàn → bỏ qua, chỉ giữ luật IP.
+        # (2) Luật theo chữ ký hành VI - "nhớ ngón đòn": trích chữ ký công cụ/URI từ
+        # log gây ra block để Tier-1 cờ nhanh một IP khác dùng cùng kỹ thuật. Suy biến
+        # nhẹ nhàng: không có log hoặc không có chữ ký an toàn -> bỏ qua, chỉ giữ luật IP.
         offending = next(
             (
                 lg
@@ -2150,12 +2129,9 @@ def node_action_executor(state: SentinelState) -> dict[str, Any]:
 
 
 def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
-    """
-    HITL Node: Treo lại các cảnh báo phức tạp hoặc Parse Failures.
-    """
+    """HITL Node: Treo lại các cảnh báo phức tạp hoặc Parse Failures."""
     logger.info("--- NODE: HUMAN IN THE LOOP (AWAIT_HITL) ---")
 
-    # 1. Phát hiện vòng lặp vô hạn (Loop Detection)
     visit_res = loop_detector.record_visit("node_human_in_the_loop")
     if visit_res["action"] == "FORCE_STOP":
         raise RuntimeError(visit_res["reason"])
@@ -2168,7 +2144,7 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     mitre = latest_decision.get("mitre_technique", "N/A")
     conf = latest_decision.get("confidence", 0.0)
     raw_reasoning = latest_decision.get("reasoning") or _degraded_reason(latest_decision)
-    # LÝ DO chuyển người, ngay ở đầu chuỗi: analyst nhìn hàng đợi phải phân loại được ngay
+    # Lý do chuyển người, ngay ở đầu chuỗi: analyst nhìn hàng đợi phải phân loại được ngay
     # việc nào là "kho thiếu kỹ thuật" (việc của kỹ sư tri thức), việc nào là "bằng chứng
     # yếu" (cần thêm telemetry), việc nào là "LLM hỏng" (việc của kỹ sư vận hành).
     _reason_code = str(latest_decision.get("hitl_reason") or "")
@@ -2184,28 +2160,28 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
 
     target = latest_decision.get("target", "UNKNOWN_TARGET")
 
-    # LEO THANG KHI TÁI PHẠM (khớp cơ chế repeat-offender đã có ở `raise_alert`): một IP ĐÃ
-    # được chuyển cho người xử lý mà QUAY LẠI vẫn đáng ngờ thì không nên tiếp tục đẻ thêm
-    # phiếu HITL trùng nhau — nó phải LEO THANG.
+    # Leo thang khi tái phạm (khớp cơ chế repeat-offender đã có ở `raise_alert`): một IP đã
+    # được chuyển cho người xử lý mà quay lại vẫn đáng ngờ thì không nên tiếp tục đẻ thêm
+    # phiếu HITL trùng nhau - nó phải leo thang.
     #
     # Vì sao cần: `AWAIT_HITL` chỉ cộng +5 điểm uy tín, trong khi ngưỡng ép ESCALATE là 50
-    # và ngưỡng tự chặn là 70 — tức phải lặp 10-14 lần mới hội tụ. Đo thật cho thấy IP cứ
+    # và ngưỡng tự chặn là 70 - tức phải lặp 10-14 lần mới hội tụ. Đo thật cho thấy IP cứ
     # quay lại Tier-2 mãi mà điểm không bao giờ tới ngưỡng.
     #
-    # LỖI ĐÃ SỬA 11/08/2026 — bản trước chỉ gán `latest_decision["action"] = "ALERT"` rồi
-    # RƠI THẲNG xuống `_log_to_db("AWAIT_HITL", ...)` ghi cứng, và vẫn đẻ phiếu HITL. Ba hệ
+    # Lỗi đã sửa 11/08/2026 - bản trước chỉ gán `latest_decision["action"] = "ALERT"` rồi
+    # Rơi thẳng xuống `_log_to_db("AWAIT_HITL", ...)` ghi cứng, và vẫn đẻ phiếu HITL. Ba hệ
     # quả đo được trên luồng sống: (a) 20/336 lô ghi trong `tier2_trace.jsonl` là ALERT
-    # trong khi hệ thống thật sự làm AWAIT_HITL — tệp pháp y nói sai phán quyết; (b) phiếu
-    # HITL trùng vẫn sinh ra, đúng thứ chú thích nói là phải tránh; (c) `raise_alert` KHÔNG
+    # trong khi hệ thống thật sự làm AWAIT_HITL - tệp pháp y nói sai phán quyết; (b) phiếu
+    # HITL trùng vẫn sinh ra, đúng thứ chú thích nói là phải tránh; (c) `raise_alert` không
     # bao giờ được gọi nên đường "ALERT lần 2 -> tự BLOCK" mà chú thích hứa hẹn không tồn
     # tại. Việc gán action ở đây cũng vô nghĩa về định tuyến: `route_triage_decision` đã
-    # chạy xong từ trước, không có vòng nào quay lại. Nay đi THẲNG vào choke-point ALERT.
+    # chạy xong từ trước, không có vòng nào quay lại. Nay đi thẳng vào choke-point ALERT.
     _repeat_hitl = False
     if target and target != "UNKNOWN_TARGET":
         try:
             _rep = threat_memory.get_ip_reputation(target) or {}
             _repeat_hitl = int(_rep.get("total_incidents", 0) or 0) >= 1
-        except Exception:  # noqa: BLE001 — không có trí nhớ thì cứ xử lý như lần đầu
+        except Exception:  # noqa: BLE001 - không có trí nhớ thì cứ xử lý như lần đầu
             _repeat_hitl = False
 
     raw_log_json = _serialize_repr_log(
@@ -2213,15 +2189,15 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     )
 
     if _repeat_hitl:
-        # `raise_alert` TỰ ghi audit và TỰ leo thang lên BLOCK_IP nếu IP đã cảnh báo trước
-        # đó, nên ở nhánh này KHÔNG ghi thêm dòng AWAIT_HITL và KHÔNG đẻ phiếu HITL trùng.
+        # `raise_alert` tự ghi audit và tự leo thang lên BLOCK_IP nếu IP đã cảnh báo trước
+        # đó, nên ở nhánh này không ghi thêm dòng AWAIT_HITL và không đẻ phiếu HITL trùng.
         from src.response.executor import raise_alert
 
-        # Nhánh này thi hành cái `raise_alert` trả về, KHÁC với `AWAIT_HITL` đã dùng để
+        # Nhánh này thi hành cái `raise_alert` trả về, khác với `AWAIT_HITL` đã dùng để
         # dựng `formatted_reasoning` ở trên, nên nhãn ghi đè dựng ở đó không khớp và bị bỏ.
         # Đo lượt 17/08/2026: 4/550 bản ghi hiện "ALERT" ngay trên một đoạn văn kết bằng
         # "the action is BLOCK_IP", không dòng nào nói ai đã hạ cấp.
-        # Nêu ĐỀ NGHỊ của model (biết chắc) và LÝ DO leo thang (biết chắc), không đoán
+        # Nêu đề nghị của model (biết chắc) và lý do leo thang (biết chắc), không đoán
         # trước kết quả của `raise_alert`.
         _want = str(latest_decision.get("_policy_action_before") or "")
         _note = (
@@ -2238,7 +2214,7 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
             tier=TIER_LLM,
             evidence_backed=batch_has_attack_evidence(state),
         )
-        # Ghi SỰ THẬT đã thực thi, không ghi ý định: `raise_alert` trả "ALERT" hoặc
+        # Ghi sự thật đã thực thi, không ghi ý định: `raise_alert` trả "ALERT" hoặc
         # "BLOCK_IP" tuỳ lịch sử của IP.
         latest_decision["action"] = executed
         logger.warning(
@@ -2260,8 +2236,8 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
         formatted_reasoning,
         raw_log=raw_log_json,
         # Ba lời gọi `_log_to_db` khác của tệp này đều truyền `tier=TIER_LLM`; nhánh hoãn
-        # thì quên, nên MỌI bản ghi AWAIT_HITL có cột `tier` rỗng. Dashboard rơi về heuristic
-        # và dán nhãn "Luật Tier-1 🟢" — tức gán ca KHÓ NHẤT của Tier-2 cho tầng rẻ nhất.
+        # thì quên, nên mọi bản ghi AWAIT_HITL có cột `tier` rỗng. Dashboard rơi về heuristic
+        # và dán nhãn "Luật Tier-1 🟢" - tức gán ca khó nhất của Tier-2 cho tầng rẻ nhất.
         tier=TIER_LLM,
     )
 
@@ -2284,15 +2260,8 @@ def node_human_in_the_loop(state: SentinelState) -> dict[str, Any]:
     return {}
 
 
-# ==============================================================================
-# CONDITIONAL EDGES (ROUTING)
-# ==============================================================================
-
-
 def route_triage_decision(state: SentinelState) -> str:
-    """
-    Quyết định nhánh đi tiếp theo dựa trên Action từ LLM.
-    """
+    """Quyết định nhánh đi tiếp theo dựa trên Action từ LLM."""
     latest_decision = state.decisions[-1] if state.decisions else {}
     action = latest_decision.get("action", "LOG")
 
@@ -2304,17 +2273,17 @@ def route_triage_decision(state: SentinelState) -> str:
         return "end_cycle"
 
 
-# Action cần làm giàu MITRE (bỏ qua LOG/benign — ánh xạ ATT&CK cho benign vô nghĩa).
+# Action cần làm giàu MITRE (bỏ qua LOG/benign - ánh xạ ATT&CK cho benign vô nghĩa).
 _MAPPABLE_ACTIONS = {"BLOCK_IP", "ALERT", "AWAIT_HITL"}
 
 
 def route_after_triage(state: SentinelState) -> str:
     """
-    Cổng điều kiện SAU triage — gate theo ACTION:
+    Cổng điều kiện sau triage - gate theo ACTION:
       - Nếu là verdict đáng-hành-động (BLOCK_IP/ALERT/AWAIT_HITL) -> attack_mapper ("map").
       - Ngược lại (LOG/benign) -> giữ nguyên định tuyến theo action.
 
-    GHI CHÚ THIẾT KẾ: trước đây cổng còn đòi confidence > 0.7, nhưng đo thực tế
+    Ghi chú thiết kế: trước đây cổng còn đòi confidence > 0.7, nhưng đo thực tế
     cho thấy triage gán ALERT với confidence ~0.6-0.7 cho bất thường flow, nên
     ngưỡng strict đó lọc mất gần như mọi verdict thật. ALERT vẫn là threat verdict
     đáng làm giàu ATT&CK cho analyst -> gate theo ACTION (không theo confidence).

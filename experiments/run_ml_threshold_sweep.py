@@ -1,26 +1,26 @@
-"""SENTINEL — Độ nhạy NGƯỠNG CỔNG ML (chính sách 4 dải).
+"""SENTINEL - Độ nhạy ngưỡng Cổng ML (chính sách 4 dải).
 
-ĐỐI XỨNG với `run_threshold_sensitivity.py` (vốn quét ngưỡng Welford τ để bác bỏ nghi ngờ
-"3.5σ là cherry-pick"). Cùng câu hỏi phản biện đó áp cho Cổng ML — *"0.85 / 0.65 / 0.40 lấy
-ở đâu ra?"* — nhưng trước đây KHÔNG có phép đo nào trả lời. Script này lấp chỗ trống.
+Đối xứng với `run_threshold_sensitivity.py` (vốn quét ngưỡng Welford τ để bác bỏ nghi ngờ
+"3.5σ là cherry-pick"). Cùng câu hỏi phản biện đó áp cho Cổng ML - *"0.85 / 0.65 / 0.40 lấy
+ở đâu ra?"* - nhưng trước đây không có phép đo nào trả lời. Script này lấp chỗ trống.
 
-CHÍNH SÁCH ĐANG QUÉT (xem `src/guardrails/decision_policy.py`):
+Chính sách đang quét (xem `src/guardrails/decision_policy.py`):
     C >= block     -> BLOCK_IP          (tự chặn, dứt khoát)
-    escalate<=C<block -> ESCALATE       (đẩy LLM — đây là CHI PHÍ)
+    escalate<=C<block -> ESCALATE       (đẩy LLM - đây là chi phí)
     alert <= C < escalate -> ALERT      (cảnh báo yếu)
     C < alert      -> DROP              (dừng ở Tier-1)
 
-ĐÁNH ĐỔI ĐƯỢC ĐO
-    block  ↑ -> auto-BLOCK sạch hơn nhưng ÍT ca tự quyết -> tải LLM TĂNG.
+Đánh đổi được đo
+    block  ↑ -> auto-BLOCK sạch hơn nhưng ít ca tự quyết -> tải LLM tăng.
     escalate ↓ -> bypass nhiều hơn (đỡ LLM) nhưng ML phải quyết cả ca mơ hồ -> dễ sai.
-    Chỉ số ĐẦU BẢNG là `auto_block_precision`: lệnh chặn tự động KHÔNG THỂ đảo, nên một
+    Chỉ số đầu bảng là `auto_block_precision`: lệnh chặn tự động không thể đảo, nên một
     ngưỡng làm nó tụt là ngưỡng không dùng được, dù F1 gộp có đẹp lên.
 
-CHẠY TRỰC TIẾP TRÊN XÁC SUẤT: mỗi sự kiện chỉ suy luận MỘT lần, xác suất được lưu lại rồi
+Chạy trực tiếp trên xác suất: mỗi sự kiện chỉ suy luận một lần, xác suất được lưu lại rồi
 áp mọi ngưỡng lên cùng bộ xác suất đó. Nhờ vậy quét 10 cấu hình vẫn chỉ tốn 1 lượt inference,
-và mọi ngưỡng nhìn ĐÚNG CÙNG một tập mẫu (khác biệt là do ngưỡng, không do nhiễu lấy mẫu).
+và mọi ngưỡng nhìn đúng cùng một tập mẫu (khác biệt là do ngưỡng, không do nhiễu lấy mẫu).
 
-Thuần ĐỌC, KHÔNG cần LLM. Chạy:
+Thuần đọc, không cần LLM. Chạy:
     .venv/bin/python experiments/run_ml_threshold_sweep.py
 """
 
@@ -40,7 +40,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(ROOT, "data", "datatest.json")
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "ml_threshold_sweep_results.json")
 
-# Điểm vận hành hiện tại — mốc so sánh.
+# Điểm vận hành hiện tại - mốc so sánh.
 OPERATING = (
     decision_policy.ML_BLOCK_CONF,
     decision_policy.ML_ESCALATE_CONF,
@@ -54,10 +54,10 @@ ALERT_FIXED = decision_policy.ML_ALERT_CONF
 
 
 def collect_probabilities(gw: MLGateway, events: list) -> list[dict]:
-    """Suy luận MỘT lần cho cả sweep: trả [(p_attack, nhãn thật, có bị abstain không)].
+    """Suy luận một lần cho cả sweep: trả [(p_attack, nhãn thật, có bị abstain không)].
 
-    Ca ML từ chối (thiếu phủ đặc trưng / OOD) được giữ lại với `abstain=True` — chúng
-    KHÔNG phụ thuộc ngưỡng nên phải nằm ngoài ma trận nhầm lẫn ở mọi cấu hình, nhưng vẫn
+    Ca ML từ chối (thiếu phủ đặc trưng / OOD) được giữ lại với `abstain=True` - chúng
+    không phụ thuộc ngưỡng nên phải nằm ngoài ma trận nhầm lẫn ở mọi cấu hình, nhưng vẫn
     tính vào tải LLM.
     """
     out: list[dict] = []
@@ -73,7 +73,7 @@ def collect_probabilities(gw: MLGateway, events: list) -> list[dict]:
         elif action is not None or sec.get("reason") == "":
             # Cổng ML đã ra quyết định -> tái tạo p_attack từ độ tin cậy trả về.
             # `evaluate_detailed` trả confidence_benign cho DROP, confidence_attack cho
-            # BLOCK/ALERT, nên phải quy về CÙNG một trục "xác suất tấn công".
+            # BLOCK/ALERT, nên phải quy về cùng một trục "xác suất tấn công".
             rec["p_attack"] = (1.0 - _c) if action == "DROP" else _c
         else:
             rec["p_attack"] = _c
@@ -82,7 +82,7 @@ def collect_probabilities(gw: MLGateway, events: list) -> list[dict]:
 
 
 def eval_at(records: list[dict], block: float, escalate: float, alert: float) -> dict:
-    """Áp một bộ ngưỡng lên bộ xác suất ĐÃ TÍNH SẴN."""
+    """Áp một bộ ngưỡng lên bộ xác suất đã tính sẵn."""
     tp = fp = tn = fn = 0
     n_llm = 0  # ca phải lên LLM = ESCALATE + abstain -> chi phí thật
     blk_tp = blk_fp = 0
@@ -98,7 +98,7 @@ def eval_at(records: list[dict], block: float, escalate: float, alert: float) ->
             blk_tp += int(threat)
             blk_fp += int(not threat)
         elif p >= escalate:
-            n_llm += 1  # dải ESCALATE = đẩy LLM, KHÔNG tính vào phân loại của ML
+            n_llm += 1  # dải ESCALATE = đẩy LLM, không tính vào phân loại của ML
             continue
         elif p >= alert:
             pred, decided = True, True
@@ -128,7 +128,7 @@ def eval_at(records: list[dict], block: float, escalate: float, alert: float) ->
         "f1": rep["f1"],
         "precision": rep["precision"],
         "recall": rep["recall"],
-        # CHỈ SỐ ĐẦU BẢNG: lệnh chặn tự động không thể đảo -> ngưỡng nào làm nó tụt là loại.
+        # Chỉ số đầu bảng: lệnh chặn tự động không thể đảo -> ngưỡng nào làm nó tụt là loại.
         "auto_block_precision": round(blk_tp / n_blk, 4) if n_blk else None,
         "auto_block_precision_ci95": list(wilson_ci(blk_tp, n_blk)) if n_blk else None,
         "auto_block_n": n_blk,

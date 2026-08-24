@@ -12,26 +12,26 @@ load_dotenv()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
-# determine_queue dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
+# determine_queue dùng chung từ unified_dataset - không copy tay (1 nguồn chân lý)
 from experiments.unified_dataset import determine_queue  # noqa: E402
 from src.streaming.backpressure import LAG_UNKNOWN, consumer_group_lag  # noqa: E402
 
-# Cho phép chỉ định file luồng khác (demo ngắn dùng data/demo_small.json — tập con PHÂN
-# TẦNG đủ 4 nguồn + chuỗi APT đa-ngày; xem scripts/build_demo_small.py).
+# Cho phép chỉ định file luồng khác (demo ngắn dùng data/demo_small.json - tập con phân
+# Tầng đủ 4 nguồn + chuỗi APT đa-ngày; xem scripts/build_demo_small.py).
 DATA_FILE = os.getenv("UNIFIED_STREAM_FILE") or os.path.join(ROOT, "data", "demo.json")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 BATCH_SIZE = int(os.getenv("UNIFIED_STREAM_BATCH", "50"))
 BATCH_DELAY = float(os.getenv("UNIFIED_STREAM_DELAY", "0.3"))
-# Giới hạn số event đẩy (demo NGẮN để soi UI). 0 = đẩy hết (mặc định, giữ nguyên hành vi cũ).
+# Giới hạn số event đẩy (demo ngắn để soi UI). 0 = đẩy hết (mặc định, giữ nguyên hành vi cũ).
 STREAM_LIMIT = int(os.getenv("UNIFIED_STREAM_LIMIT", "0"))
 MAX_QUEUE_SIZE = 10_000
-# Backpressure: các stream subscriber đang đọc + file thống kê THẬT (subscriber ghi).
+# Backpressure: các stream subscriber đang đọc + file thống kê thật (subscriber ghi).
 QUEUES = ("queue_firewall", "queue_waf", "queue_sysmon")
 STATS_PATH = os.path.join(ROOT, "config", "pipeline_stats.json")
 # Trần backlog LLM (hàng đợi Tier-2 trong RAM). Vượt -> tạm dừng đẩy để không phình RAM.
 MAX_LLM_BACKLOG = int(os.getenv("UNIFIED_STREAM_MAX_LLM_BACKLOG", "2000"))
-# Trần độ trễ consumer-group (số entry CHƯA được subscriber nhận). Đo bằng lag của
-# consumer-group, KHÔNG bằng xlen — xlen KHÔNG giảm khi dùng xreadgroup+xack nên sẽ
+# Trần độ trễ consumer-group (số entry chưa được subscriber nhận). Đo bằng lag của
+# consumer-group, không bằng xlen - xlen không giảm khi dùng xreadgroup+xack nên sẽ
 # "kẹt" ở mức cao dù subscriber đã xử lý xong (gây dừng OAN, đúng lỗi đã gặp).
 STREAM_LAG_MAX = int(os.getenv("UNIFIED_STREAM_MAX_LAG", "5000"))
 
@@ -39,18 +39,18 @@ STREAM_LAG_MAX = int(os.getenv("UNIFIED_STREAM_MAX_LAG", "5000"))
 def _redact_redis_url(url: str) -> str:
     """Ẩn mật khẩu trong REDIS_URL trước khi in/log (redis://:pass@host -> redis://:***@host).
 
-    Mật khẩu Redis CHỈ được sống trong .env — không bao giờ để rò ra stdout/journald.
+    Mật khẩu Redis chỉ được sống trong .env - không bao giờ để rò ra stdout/journald.
     """
     return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
 
 
 def _wait_for_capacity(redis_client) -> None:
-    """BACKPRESSURE — cho phép đẩy 'vô số' log AN TOÀN: producer TỰ chậm lại theo năng lực
+    """BACKPRESSURE - cho phép đẩy 'vô số' log an toàn: producer tự chậm lại theo năng lực
     consumer, thay vì tràn Redis stream / phình RAM hàng đợi LLM.
 
-    Tạm dừng khi: độ trễ consumer-group (lag) vượt STREAM_LAG_MAX HOẶC backlog LLM
+    Tạm dừng khi: độ trễ consumer-group (lag) vượt STREAM_LAG_MAX hoặc backlog LLM
     (pending_llm_queue do subscriber ghi vào config/pipeline_stats.json) vượt MAX_LLM_BACKLOG.
-    Bọc lỗi toàn bộ để KHÔNG bao giờ làm hỏng luồng đẩy (thiếu file/redis coi như 'còn chỗ')."""
+    Bọc lỗi toàn bộ để không bao giờ làm hỏng luồng đẩy (thiếu file/redis coi như 'còn chỗ')."""
     warned = False
     for _ in range(3000):  # trần chờ ~10 phút/batch (đủ để Tier-2 tiêu hoá backlog)
         lag = consumer_group_lag(redis_client, QUEUES)
@@ -81,7 +81,7 @@ def _wait_for_capacity(redis_client) -> None:
 
 
 def _consumed_total() -> int:
-    """Số log Tier-1 đã THẬT SỰ xử lý, do subscriber ghi ra (luỹ kế, sống qua restart)."""
+    """Số log Tier-1 đã thật sự xử lý, do subscriber ghi ra (luỹ kế, sống qua restart)."""
     try:
         with open(STATS_PATH) as f:
             return int(json.load(f).get("raw_logs_total", 0))
@@ -90,17 +90,17 @@ def _consumed_total() -> int:
 
 
 def _verify_no_loss(redis_client, pushed: int, consumed_before: int) -> None:
-    """Đối chiếu ĐẨY vào với TIÊU THỤ ra — mất log KHÔNG được phép im lặng.
+    """Đối chiếu đẩy vào với tiêu thụ ra - mất log không được phép im lặng.
 
-    VÌ SAO PHẢI ĐỐI CHIẾU THỦ CÔNG. Không một chỉ số nào của Redis tự tố cáo được việc này:
-    khi `MAXLEN` cắt entry chưa ai đọc, Redis DỜI LUÔN `entries-read` của consumer-group cho
-    khớp, nên `lag` về 0 và `entries-added == entries-read` — nhìn y hệt "giao đủ".
+    Vì sao phải đối chiếu thủ công. Không một chỉ số nào của Redis tự tố cáo được việc này:
+    khi `MAXLEN` cắt entry chưa ai đọc, Redis dời luôn `entries-read` của consumer-group cho
+    khớp, nên `lag` về 0 và `entries-added == entries-read` - nhìn y hệt "giao đủ".
     Thí nghiệm 17/08/2026: đẩy 700 entry vào stream `maxlen=200`, không ai đọc; `lag` báo
     200, `entries-added` báo 700, `xreadgroup` nhận đúng 200. 500 bản ghi biến mất không dấu.
 
     Trong sự cố cùng ngày, 91.500/496.885 sự kiện (18,4%) bị huỷ như vậy và lượt chạy vẫn
-    "thành công" — mọi tỉ lệ tính trên lượt đó đều sai mẫu số mà không ai biết. Với một luận
-    văn thì đó là hỏng ở mức không cứu được sau khi đã trích số, nên chốt chặn nằm ở ĐÂY.
+    "thành công" - mọi tỉ lệ tính trên lượt đó đều sai mẫu số mà không ai biết. Với một luận
+    văn thì đó là hỏng ở mức không cứu được sau khi đã trích số, nên chốt chặn nằm ở đây.
     """
     print("[*] Đối chiếu đẩy-vào / tiêu-thụ-ra (chờ consumer rút hết)…")
     stable = 0
@@ -159,7 +159,7 @@ def main():
 
     print(f"[*] Connected to Redis. Starting push (Batch: {BATCH_SIZE}, Delay: {BATCH_DELAY}s)...")
 
-    # Chụp TRƯỚC khi đẩy: `raw_logs_total` là bộ đếm luỹ kế sống qua restart, nên chỉ phần
+    # Chụp trước khi đẩy: `raw_logs_total` là bộ đếm luỹ kế sống qua restart, nên chỉ phần
     # chênh lệch mới thuộc về lượt này.
     consumed_before = _consumed_total()
     total_pushed = 0

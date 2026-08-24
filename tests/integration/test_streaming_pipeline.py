@@ -1,5 +1,5 @@
 """
-Integration Tests: Streaming Pipeline (Publisher → Redis → Subscriber → RuleEngine)
+Kiểm thử tích hợp đường ống luồng: publisher -> Redis -> subscriber -> RuleEngine
 Kiểm thử end-to-end luồng dữ liệu từ Redis queue tới Tier 1 filter.
 """
 
@@ -17,7 +17,7 @@ load_dotenv()
 
 
 class TestMultiSourceRouting:
-    """Test Multi-source Log Correlation routing logic."""
+    """Định tuyến log nhiều nguồn về đúng hàng đợi."""
 
     def test_firewall_routing(self):
         from experiments.unified_dataset import determine_queue
@@ -51,7 +51,7 @@ class TestMultiSourceRouting:
 
 
 class TestRuleEngineIntegration:
-    """Test RuleEngine processes logs with provenance tags correctly."""
+    """RuleEngine xử lý đúng log có gắn nhãn xuất xứ."""
 
     def test_provenance_tag_preserved(self):
         from src.tier1_filter.rule_engine import RuleEngine
@@ -67,7 +67,7 @@ class TestRuleEngineIntegration:
         assert result.get("log_source") == "queue_firewall"
 
     def test_multi_source_batch_processing(self):
-        """Simulate a batch of logs from different sources."""
+        """Dựng một lô log từ nhiều nguồn khác nhau."""
         from src.tier1_filter.rule_engine import RuleEngine
 
         engine = RuleEngine()
@@ -104,7 +104,7 @@ class TestRuleEngineIntegration:
 
 
 class TestRedisConnectivity:
-    """Test Redis connection and stream operations (xadd/xreadgroup/xack)."""
+    """Kết nối Redis và các thao tác stream (xadd/xreadgroup/xack)."""
 
     TEST_STREAM = "test_sentinel_stream"
     TEST_GROUP = "test_group"
@@ -124,7 +124,7 @@ class TestRedisConnectivity:
 
     @pytest.fixture(autouse=True)
     def cleanup_streams(self, redis_client):
-        """Clean up test streams before and after each test."""
+        """Dọn stream thử nghiệm trước và sau mỗi ca."""
         streams = [self.TEST_STREAM, "test_s_fw", "test_s_waf", "test_s_sys"]
         for s in streams:
             redis_client.delete(s)
@@ -136,17 +136,17 @@ class TestRedisConnectivity:
         assert redis_client.ping() is True
 
     def test_stream_xadd_and_xreadgroup(self, redis_client):
-        """Test xadd → xreadgroup → xack round-trip (core streaming mechanism)."""
+        """Vòng tròn xadd -> xreadgroup -> xack, cơ chế lõi của luồng."""
         test_data = json.dumps({"Source IP": "1.1.1.1", "test": True})
 
-        # Create consumer group
+        # Tạo consumer group
         redis_client.xgroup_create(self.TEST_STREAM, self.TEST_GROUP, id="0", mkstream=True)
 
-        # Publish via xadd
+        # Đẩy vào bằng xadd
         msg_id = redis_client.xadd(self.TEST_STREAM, {"log": test_data})
         assert msg_id is not None
 
-        # Consume via xreadgroup
+        # Đọc ra bằng xreadgroup
         response = redis_client.xreadgroup(
             self.TEST_GROUP,
             self.TEST_CONSUMER,
@@ -171,19 +171,19 @@ class TestRedisConnectivity:
         assert ack_count == 1
 
     def test_multi_stream_consumer_group(self, redis_client):
-        """Test xreadgroup across multiple streams (multi-source SIEM)."""
+        """xreadgroup đọc được nhiều stream cùng lúc."""
         streams = ["test_s_fw", "test_s_waf", "test_s_sys"]
         group = "test_multi_group"
         consumer = "test_multi_consumer"
 
-        # Create consumer groups
+        # Tạo các consumer group
         for s in streams:
             redis_client.xgroup_create(s, group, id="0", mkstream=True)
 
-        # Publish to WAF stream only
+        # Chỉ đẩy vào stream WAF
         redis_client.xadd("test_s_waf", {"log": json.dumps({"event": "sql_injection"})})
 
-        # xreadgroup must consume from WAF stream
+        # xreadgroup phải đọc được từ stream WAF
         streams_dict = {s: ">" for s in streams}
         response = redis_client.xreadgroup(group, consumer, streams_dict, count=10, block=1000)
         assert response is not None
@@ -193,13 +193,13 @@ class TestRedisConnectivity:
         assert stream_name == "test_s_waf"
         assert len(messages) == 1
 
-        # Verify data integrity
+        # Kiểm dữ liệu còn nguyên vẹn
         _, data = messages[0]
         parsed = json.loads(data["log"])
         assert parsed["event"] == "sql_injection"
 
     def test_stream_xlen_backpressure(self, redis_client):
-        """Test xlen reports accurate stream length for backpressure control."""
+        """xlen báo đúng độ dài stream để điều tiết backpressure."""
         assert redis_client.xlen(self.TEST_STREAM) == 0
 
         # Publish 5 messages

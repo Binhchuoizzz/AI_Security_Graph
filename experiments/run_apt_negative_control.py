@@ -1,20 +1,19 @@
 """
-SENTINEL — APT: Đối chứng ÂM tính + Khoảng tin cậy (Negative Control + CI)
-[Luận văn Ch.4 §Emergent APT (đối chứng âm) — chứng minh KHÔNG báo APT nhầm, specificity]
-=========================================================================
-Bổ sung cho phần APT (vốn chỉ báo recall=1.0 trên n nhỏ, KHÔNG có đối chứng âm).
+SENTINEL - APT: Đối chứng âm tính + Khoảng tin cậy (Negative Control + CI)
+[Luận văn Ch.4 §Emergent APT (đối chứng âm) - chứng minh không báo APT nhầm, specificity]
+Bổ sung cho phần APT (vốn chỉ báo recall=1.0 trên n nhỏ, không có đối chứng âm).
 Hai câu hỏi phản biện:
 
-  (a) "recall=1.0 trên n=? — có ý nghĩa thống kê không?"  -> báo Wilson 95% CI.
-  (b) "Bộ phát hiện APT có BÁO NHẦM trên IP benign xuất hiện NHIỀU NGÀY không?"
-      -> đối chứng âm: đếm IP có mặt ≥2 ngày phân biệt trong luồng nhưng KHÔNG phải
+  (a) "recall=1.0 trên n=? - có ý nghĩa thống kê không?"  -> báo Wilson 95% CI.
+  (b) "Bộ phát hiện APT có báo nhầm trên IP benign xuất hiện nhiều ngày không?"
+      -> đối chứng âm: đếm IP có mặt ≥2 ngày phân biệt trong luồng nhưng không phải
          APT thật, rồi xác nhận 0 IP nào kích hoạt check_apt_chain (specificity).
 
-Cơ chế phân biệt nằm ở CỔNG GHI: chỉ sự kiện bị gắn cờ tấn công mới được ghi vào
-kho APT; check_apt_chain bật khi đủ ≥2 NGÀY-TẤN-CÔNG phân biệt. Đối chứng âm chứng
-minh: hiện diện đa-ngày benign KHÔNG đủ để bật cảnh báo.
+Cơ chế phân biệt nằm ở cổng ghi: chỉ sự kiện bị gắn cờ tấn công mới được ghi vào
+kho APT; check_apt_chain bật khi đủ ≥2 ngày-tấn-công phân biệt. Đối chứng âm chứng
+minh: hiện diện đa-ngày benign không đủ để bật cảnh báo.
 
-Tier-1 + Memory, tất định, KHÔNG LLM.  Chạy:
+Tier-1 + Memory, tất định, không LLM.  Chạy:
     .venv/bin/python experiments/run_apt_negative_control.py
 """
 
@@ -57,7 +56,7 @@ def main():
 
     warmup, main_events, apt_truth, n_chains = build_stream()
 
-    # Theo dõi: với mỗi IP -> tập NGÀY có mặt (mọi sự kiện) và tập NGÀY-TẤN-CÔNG.
+    # Theo dõi: với mỗi IP -> tập ngày có mặt (mọi sự kiện) và tập ngày-tấn-công.
     all_days = defaultdict(set)
     attack_days = defaultdict(set)
     fired = {}
@@ -72,7 +71,7 @@ def main():
             ev.get("label") not in BENIGN_PHASES
         )
         if not is_attack:
-            continue  # CỔNG GHI: chỉ sự kiện tấn công mới vào kho APT
+            continue  # Cổng ghi: chỉ sự kiện tấn công mới vào kho APT
         attack_days[ip].add(day)
         before = memory.check_apt_chain(ip)
         memory.record_apt_event(
@@ -94,7 +93,7 @@ def main():
     recall = len(detected) / len(positives) if positives else 0.0
     rec_lo, rec_hi = wilson_ci(len(detected), len(positives))
 
-    # Âm tính = IP hiện diện ≥2 NGÀY phân biệt nhưng KHÔNG phải APT thật
+    # Âm tính = IP hiện diện ≥2 ngày phân biệt nhưng không phải APT thật
     multiday_ips = {ip for ip, days in all_days.items() if len(days) >= 2}
     negatives = multiday_ips - apt_truth
     false_fires = negatives & set(fired.keys())

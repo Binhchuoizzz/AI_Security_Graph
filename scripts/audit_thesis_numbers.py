@@ -1,23 +1,23 @@
-"""Đối chiếu TỪNG CON SỐ trong luận văn với đúng khoá JSON đã sinh ra nó.
+"""Đối chiếu từng con số trong luận văn với đúng khoá JSON đã sinh ra nó.
 
-VÌ SAO CÓ TỆP NÀY (06/08/2026). Người dùng đặt một ràng buộc nghiệm thu: *"Đừng để lần sau tôi
-nói đồng bộ lại, check lại, lại soi thấy lỗi."* Rà bằng mắt không đáp ứng được ràng buộc đó — mỗi
+Vì sao có tệp này (06/08/2026). Người dùng đặt một ràng buộc nghiệm thu: *"Đừng để lần sau tôi
+nói đồng bộ lại, check lại, lại soi thấy lỗi."* Rà bằng mắt không đáp ứng được ràng buộc đó - mỗi
 lượt chạy lại benchmark là hàng chục con số đổi, nằm rải trong 10 tệp `.tex` của hai ngôn ngữ, và
 số cũ thì trông y hệt số mới.
 
 Cách duy nhất bền là biến việc "đồng bộ" thành một phép kiểm chạy được. Bảng `CLAIMS` dưới đây
 khai báo: mỗi tuyên bố số trong luận văn ⇄ đúng tệp kết quả và đúng khoá sinh ra nó. Script dựng
-lại chuỗi mà `.tex` PHẢI chứa (dạng EN `90.6\\%` và dạng VI `90{,}6\\%`) rồi tìm trong đúng những
+lại chuỗi mà `.tex` phải chứa (dạng EN `90.6\\%` và dạng VI `90{,}6\\%`) rồi tìm trong đúng những
 tệp đã khai.
 
-BA TRẠNG THÁI:
-  OK      — chuỗi đúng có mặt ở mọi tệp đã khai.
-  THIẾU   — JSON có giá trị này, `.tex` không nhắc tới. Hoặc quên đồng bộ, hoặc khai thừa.
-  NGHI CŨ — không tìm thấy giá trị mới, NHƯNG trong tệp có số khác cùng phần nguyên. Gần như
+Ba trạng thái:
+  OK      - chuỗi đúng có mặt ở mọi tệp đã khai.
+  Thiếu   - JSON có giá trị này, `.tex` không nhắc tới. Hoặc quên đồng bộ, hoặc khai thừa.
+  Nghi cũ - không tìm thấy giá trị mới, nhưng trong tệp có số khác cùng phần nguyên. Gần như
             chắc chắn đó là giá trị của lượt đo trước còn sót lại. Đây là ca nguy hiểm nhất, vì
             đọc lên vẫn thấy hợp lý.
 
-Phép kiểm thứ hai, độc lập: đối chiếu TOÀN BỘ token số giữa bản EN và bản VI. Hai bản là gương
+Phép kiểm thứ hai, độc lập: đối chiếu toàn bộ token số giữa bản EN và bản VI. Hai bản là gương
 1:1 nên mọi con số phải trùng khớp; lệch một token là một bản đã sửa còn bản kia thì chưa.
 
 Chạy:  .venv/bin/python scripts/audit_thesis_numbers.py
@@ -35,7 +35,7 @@ TEX = os.path.join(ROOT, "docs", "Thesis", "latex")
 OUT_JSON = os.path.join(R, "thesis_number_audit.json")
 
 
-# ── bộ định dạng: JSON -> chuỗi mà .tex phải chứa ────────────────────────────
+# Bộ định dạng: JSON -> chuỗi mà .tex phải chứa
 def pct(nd=1, scale=1.0):
     """Tỉ lệ phần trăm, nd chữ số thập phân. scale=100 khi JSON lưu dạng 0..1."""
     return lambda v: f"{v * scale:.{nd}f}\\%"
@@ -55,7 +55,7 @@ EN_ALL = ["ch4", "ch5", "main"]
 
 # (nhãn, tệp kết quả, đường dẫn khoá, hàm định dạng, các tệp .tex phải xuất hiện)
 CLAIMS = [
-    # ── RQ1 ──
+    # RQ1
     (
         "xả tải benchmark",
         "offload_vs_baserate_stream.json",
@@ -302,7 +302,7 @@ CLAIMS = [
         pct(1, 100),
         ["ch4", "ch5"],
     ),
-    # ── Bóc tách thành phần (chấm theo hành động, đã loại mẫu tự soạn) ──
+    # Bóc tách thành phần (chấm theo hành động, đã loại mẫu tự soạn)
     (
         "ablation A đúng hành động",
         "ablation_action_scores.json",
@@ -363,7 +363,7 @@ CLAIMS = [
 
 
 def dig(obj, path):
-    """Đi theo đường dẫn khoá. Chấp nhận cả CHỈ SỐ MẢNG: `sweep.3.noticed_rate` lấy phần tử
+    """Đi theo đường dẫn khoá. Chấp nhận cả chỉ số mảng: `sweep.3.noticed_rate` lấy phần tử
     thứ 4 của danh sách `sweep`. Cần thiết vì các phép quét (ngưỡng ML, k-sigma zero-day) lưu
     kết quả dạng danh sách chứ không dạng từ điển."""
     for k in path.split("."):
@@ -377,11 +377,11 @@ def dig(obj, path):
 
 
 def render(s: str, lang: str) -> list[str]:
-    """Chuỗi dạng EN (1,234.5) -> MỌI dạng hợp lệ của ngôn ngữ đích.
+    """Chuỗi dạng EN (1,234.5) -> mọi dạng hợp lệ của ngôn ngữ đích.
 
     Bản VI dùng dấu chấm phần nghìn và dấu phẩy thập phân. Trong LaTeX, dấu phẩy thập phân
-    được bọc `{,}` khi ở CHẾ ĐỘ TOÁN (để TeX không chèn khoảng trắng sau nó) nhưng viết
-    trần trong văn xuôi. Cả hai đều đúng, nên chấp nhận cả hai — nếu chỉ chấp nhận một dạng
+    được bọc `{,}` khi ở chế độ toán (để TeX không chèn khoảng trắng sau nó) nhưng viết
+    trần trong văn xuôi. Cả hai đều đúng, nên chấp nhận cả hai - nếu chỉ chấp nhận một dạng
     thì bộ kiểm sẽ báo động giả hàng loạt và người đọc sẽ học cách phớt lờ nó.
     """
     if lang == "en":
@@ -409,7 +409,7 @@ def read(p):
 
 
 def nghi_cu(body: str, want: str, lang: str):
-    """Không thấy giá trị mới — có số nào CÙNG PHẦN NGUYÊN trong tệp không?
+    """Không thấy giá trị mới - có số nào cùng phần nguyên trong tệp không?
 
     Đây là dấu hiệu của giá trị lượt đo trước còn sót: `2{,}68` khi đáng ra phải là `2{,}54`.
     """
@@ -488,13 +488,13 @@ def main() -> int:
                     print(f"  {tag} [{lang}/{key}] {label}: cần `{want}`{extra}")
                     print(f"          nguồn: {fname} → {path}")
 
-    # ── gương EN ↔ VI ────────────────────────────────────────────────────────
+    # gương EN ↔ VI
     print("\n── Gương EN ↔ VI: mọi token số phải trùng ──")
 
     def toks(p):
         s = read(p)
         s = s.replace("{,}", ",")
-        # Bỏ các con số THUỘC VỀ TRÌNH BÀY, không phải dữ liệu: bề rộng cột, tỉ lệ hình.
+        # Bỏ các con số thuộc về trình bày, không phải dữ liệu: bề rộng cột, tỉ lệ hình.
         s = re.sub(r"[0-9.]+\s*(cm|pt|em|ex|in|mm)\b", " ", s)
         s = re.sub(r"(width|height|scale)\s*=\s*[0-9.]+", " ", s)
         s = re.sub(r"\\[a-zA-Z]+", " ", s)  # bỏ lệnh LaTeX (\ref, \textbf, ...)

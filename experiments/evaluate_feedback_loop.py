@@ -1,34 +1,34 @@
-"""SENTINEL — Đo VÒNG PHẢN HỒI (Tier-2 → luật động → Tier-1).
+"""SENTINEL - Đo vòng phản hồi (Tier-2 -> luật động -> Tier-1).
 
-KHOẢNG TRỐNG ĐANG LẤP: README gọi đây là *"The loop that matters"* và Chương 3 mô tả kiến
-trúc chi tiết, nhưng rà toàn bộ `experiments/` thì **không có một phép đo nào**. Tức đóng
-góp trung tâm được TUYÊN BỐ mà chưa từng được CHỨNG MINH bằng số. Script này lấp đúng chỗ đó.
+Khoảng trống đang lấp: README gọi đây là *"The loop that matters"* và Chương 3 mô tả kiến
+trúc chi tiết, nhưng rà toàn bộ `experiments/` thì không có một phép đo nào. Tức đóng
+góp trung tâm được tuyên bố mà chưa từng được chứng minh bằng số. Script này lấp đúng chỗ đó.
 
-GIẢ THUYẾT KIỂM ĐỊNH
+Giả thuyết kiểm định
     Sau khi analyst duyệt các luật do Tier-2 đề xuất, Tier-1 hấp thụ được phần lưu lượng
-    mà trước đó phải leo thang — nên **tỉ lệ leo thang giảm** và **tải LLM giảm**, trong
-    khi **năng lực phát hiện không tụt**.
+    mà trước đó phải leo thang - nên tỉ lệ leo thang giảm và tải LLM giảm, trong
+    khi năng lực phát hiện không tụt.
 
-THIẾT KẾ (hai vòng trên CÙNG một luồng, cùng hạt giống)
-    Vòng 1 — luật động RỖNG, danh tiếng RỖNG. Ghi tỉ lệ leo thang nền.
-    Nạp luật — mô phỏng analyst DUYỆT: mỗi IP mà **Cổng ML** phán `BLOCK_IP` (trên các ca
-      Tier-1 đã ESCALATE) trở thành một luật `Source IP` `status=ACTIVE` — khớp từng bước
-      với `subscriber.py:535`. Đây là một trong ba nguồn sinh luật CÓ THẬT; hai nguồn còn
+Thiết kế (hai vòng trên cùng một luồng, cùng hạt giống)
+    Vòng 1 - luật động rỗng, danh tiếng rỗng. Ghi tỉ lệ leo thang nền.
+    Nạp luật - mô phỏng analyst duyệt: mỗi IP mà Cổng ML phán `BLOCK_IP` (trên các ca
+      Tier-1 đã ESCALATE) trở thành một luật `Source IP` `status=ACTIVE` - khớp từng bước
+      với `subscriber.py:535`. Đây là một trong ba nguồn sinh luật có thật; hai nguồn còn
       lại là tác tử Tier-2 (`nodes.py:1627`) và analyst bấm UI (`app.py:263`), đều cần LLM
-      nên nằm ngoài phép đo offline này -> kết quả là cận DƯỚI.
-    Vòng 2 — cùng luồng, engine mới mang luật vừa duyệt. Đo Δ.
+      nên nằm ngoài phép đo offline này -> kết quả là cận dưới.
+    Vòng 2 - cùng luồng, engine mới mang luật vừa duyệt. Đo Δ.
 
-CÁCH LY (quan trọng — nếu không sẽ làm hỏng hệ đang chạy)
-    KHÔNG đụng `config/system_settings.yaml` thật và KHÔNG đụng `threat_memory.db` thật.
-    Luật được tiêm THẲNG vào thuộc tính của `RuleEngine` trong bộ nhớ, danh tiếng tắt hẳn.
+Cách LY (quan trọng - nếu không sẽ làm hỏng hệ đang chạy)
+    Không đụng `config/system_settings.yaml` thật và không đụng `threat_memory.db` thật.
+    Luật được tiêm thẳng vào thuộc tính của `RuleEngine` trong bộ nhớ, danh tiếng tắt hẳn.
     Nhờ vậy script an toàn khi chạy song song với demo/dịch vụ.
 
-ĐỌC KẾT QUẢ CHO ĐÚNG
-    Đây là cận TRÊN lạc quan của vòng phản hồi: analyst được giả định duyệt ĐÚNG mọi luật,
-    và luồng vòng 2 y hệt vòng 1 (kẻ tấn công không đổi IP). Nó chứng minh CƠ CHẾ hoạt
-    động và đo được, KHÔNG phải dự báo mức giảm tải ngoài đời. Phải nêu đúng như vậy.
+Đọc kết quả cho đúng
+    Đây là cận trên lạc quan của vòng phản hồi: analyst được giả định duyệt đúng mọi luật,
+    và luồng vòng 2 y hệt vòng 1 (kẻ tấn công không đổi IP). Nó chứng minh cơ chế hoạt
+    động và đo được, không phải dự báo mức giảm tải ngoài đời. Phải nêu đúng như vậy.
 
-Thuần Tier-1, KHÔNG cần LLM. Chạy:
+Thuần Tier-1, không cần LLM. Chạy:
     .venv/bin/python experiments/evaluate_feedback_loop.py
 """
 
@@ -52,18 +52,18 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "feedback_loop_results.json")
 
-# Hành động chứng tỏ Tier-1 đã TỰ kết luận IP này đáng chặn -> ứng viên sinh luật.
+# Hành động chứng tỏ Tier-1 đã tự kết luận IP này đáng chặn -> ứng viên sinh luật.
 BLOCKWORTHY = {"BLOCK_IP"}
-# Điểm luật IP đã duyệt — khớp `FeedbackListener.receive_new_rule(score=100)` ở đường thật.
+# Điểm luật IP đã duyệt - khớp `FeedbackListener.receive_new_rule(score=100)` ở đường thật.
 APPROVED_RULE_SCORE = 100
 
 
 def _fresh_engine() -> RuleEngine:
-    """Engine CÁCH LY: luật động rỗng + TẮT danh tiếng.
+    """Engine cách LY: luật động rỗng + tắt danh tiếng.
 
-    Tắt reputation là bắt buộc: nếu bật, `threat_memory.db` THẬT sẽ can thiệp vào phán
-    quyết và ta không còn phân biệt được "Tier-1 hấp thụ nhờ LUẬT vừa duyệt" với "Tier-1
-    chặn nhờ tiền sử tích luỹ từ những lần chạy trước" — tức là đo nhầm thứ.
+    Tắt reputation là bắt buộc: nếu bật, `threat_memory.db` thật sẽ can thiệp vào phán
+    quyết và ta không còn phân biệt được "Tier-1 hấp thụ nhờ luật vừa duyệt" với "Tier-1
+    chặn nhờ tiền sử tích luỹ từ những lần chạy trước" - tức là đo nhầm thứ.
     """
     engine = RuleEngine()
     engine.dynamic_ip_blocks = set()
@@ -78,17 +78,17 @@ def _run_round(engine, warmup, main) -> dict:
     cls = scored["confusion"]
     rep = confusion_report(cls["tp"], cls["fp"], cls["tn"], cls["fn"])
     n_events = scored["n_stream_events"]
-    # LEO THANG = số ca Tier-1 KHÔNG tự xử được, phải đẩy lên Cổng ML/LLM — tức đúng
-    # `action == "ESCALATE"`. KHÔNG dùng `n_flagged`: nó gộp cả `BLOCK_IP`, vốn là điểm
-    # CUỐI tại Tier-1. Lấy `n_flagged` thì mỗi luật mới biến một ca escalate thành BLOCK_IP
-    # (vòng phản hồi THÀNH CÔNG, tải LLM về 0) lại làm "leo thang" TĂNG — thước đo tăng
+    # Leo thang = số ca Tier-1 không tự xử được, phải đẩy lên Cổng ML/LLM - tức đúng
+    # `action == "ESCALATE"`. Không dùng `n_flagged`: nó gộp cả `BLOCK_IP`, vốn là điểm
+    # Cuối tại Tier-1. Lấy `n_flagged` thì mỗi luật mới biến một ca escalate thành BLOCK_IP
+    # (vòng phản hồi thành công, tải LLM về 0) lại làm "leo thang" tăng - thước đo tăng
     # đúng lúc thứ nó đo được cải thiện, nên kết luận ngược dấu.
     n_esc = scored["n_escalated"]
     return {
         "n_stream_events": n_events,
         "n_escalated": n_esc,
         "n_await_hitl": scored["n_await_hitl"],
-        "n_flagged": scored["n_flagged"],  # giữ để đối chiếu: PHÁT HIỆN, không phải TẢI
+        "n_flagged": scored["n_flagged"],  # giữ để đối chiếu: Phát hiện, không phải tải
         "escalation_rate": round(n_esc / n_events, 4) if n_events else 0.0,
         "hitl_rate": round(scored["n_await_hitl"] / n_events, 4) if n_events else 0.0,
         "action_counts": scored["action_counts"],
@@ -98,26 +98,26 @@ def _run_round(engine, warmup, main) -> dict:
 
 
 def _harvest_rules(engine, warmup, main, rule_source: str = "ml_gate") -> tuple[set, dict]:
-    """Chạy lại luồng để THU các IP sẽ trở thành luật động — MÔ PHỎNG ĐÚNG nguồn của hệ thật.
+    """Chạy lại luồng để THU các IP sẽ trở thành luật động - mô phỏng đúng nguồn của hệ thật.
 
     Cần một lượt riêng vì `score_stream()` chỉ trả phán quyết đã gộp, không trả IP nguồn.
-    Engine truyền vào phải là engine ĐÃ chạy vòng 1 (baseline đã ấm) để phán quyết khớp.
+    Engine truyền vào phải là engine đã chạy vòng 1 (baseline đã ấm) để phán quyết khớp.
 
-    `rule_source="ml_gate"` (MẶC ĐỊNH, đúng hệ thật)
-        Chỉ ca Tier-1 ĐẨY LÊN (`action == "ESCALATE"`) mới tới Cổng ML; Cổng ML phán
+    `rule_source="ml_gate"` (mặc định, đúng hệ thật)
+        Chỉ ca Tier-1 đẩy lên (`action == "ESCALATE"`) mới tới Cổng ML; Cổng ML phán
         `BLOCK_IP` thì sinh luật. Khớp từng bước với `subscriber.py:535`
         (`FeedbackListener().receive_new_rule(..., source="ml_triage")`).
 
-    `rule_source="tier1"` (hành vi CŨ, giữ để đối chiếu — KHÔNG dùng để trích số)
-        Thu từ chính `BLOCK_IP` của Tier-1. Đây là LỖI MÔ HÌNH: rà `receive_new_rule` trong
-        `src/` cho đúng ba nơi gọi — tác tử Tier-2 (`nodes.py:1627`), Cổng ML
-        (`subscriber.py:535`), analyst bấm UI (`app.py:263`). KHÔNG nơi nào sinh luật từ
+    `rule_source="tier1"` (hành vi cũ, giữ để đối chiếu - không dùng để trích số)
+        Thu từ chính `BLOCK_IP` của Tier-1. Đây là lỗi mô hình: rà `receive_new_rule` trong
+        `src/` cho đúng ba nơi gọi - tác tử Tier-2 (`nodes.py:1627`), Cổng ML
+        (`subscriber.py:535`), analyst bấm UI (`app.py:263`). Không nơi nào sinh luật từ
         phán quyết của Tier-1. Lấy nguồn precision 0,356 thay cho nguồn precision ~99,9%
         nên tập luật nạp vào toàn rác mà hệ thật không bao giờ tạo ra (đo được: 54,8% luật
         chặn nhầm IP lành tính, kéo MCC vòng 2 xuống -0,16).
 
-    KHÔNG bao gồm đường LLM: thực nghiệm này chạy offline, không gọi Tier-2. Vì vậy tập luật
-    thu được là TẬP CON của tập hệ thật sinh ra -> kết quả là cận DƯỚI của vòng phản hồi.
+    Không bao gồm đường LLM: thực nghiệm này chạy offline, không gọi Tier-2. Vì vậy tập luật
+    thu được là tập con của tập hệ thật sinh ra -> kết quả là cận dưới của vòng phản hồi.
     """
     ips: set[str] = set()
     n_seen = n_escalated = n_ml_block = 0
@@ -135,7 +135,7 @@ def _harvest_rules(engine, warmup, main, rule_source: str = "ml_gate") -> tuple[
                 ips.add(str(ip))
             continue
 
-        # Đường THẬT: Tier-1 tự xử xong (BLOCK/DROP/ALERT) thì KHÔNG sinh luật và cũng
+        # Đường thật: Tier-1 tự xử xong (BLOCK/DROP/ALERT) thì không sinh luật và cũng
         # không tới Cổng ML. Chỉ ESCALATE mới đi tiếp.
         if act != ESCALATE_ACTION:
             continue
@@ -163,7 +163,7 @@ def run(limit_rules: int | None = None, rule_source: str = "ml_gate") -> dict:
     warmup, main, _apt_truth, _n_chains = build_stream()
     print(f"[*] Luồng: {len(warmup)} warmup + {len(main)} sự kiện chính\n")
 
-    # ---- VÒNG 1: chưa có luật nào -------------------------------------------- #
+    # Vòng 1: chưa có luật nào
     print("[1/3] Vòng 1 — luật động RỖNG (nền đối chứng)…")
     engine1 = _fresh_engine()
     r1 = _run_round(engine1, warmup, main)
@@ -173,7 +173,7 @@ def run(limit_rules: int | None = None, rule_source: str = "ml_gate") -> dict:
         f"· MCC={r1['detection']['mcc']}"
     )
 
-    # ---- Thu luật + "analyst duyệt" ------------------------------------------ #
+    # Thu luật + "analyst duyệt"
     _nhan = "Cổng ML (như subscriber.py)" if rule_source == "ml_gate" else "Tier-1 (bản CŨ, sai)"
     print(f"[2/3] Thu luật từ {_nhan}, mô phỏng analyst DUYỆT…")
     harvested, meta = _harvest_rules(engine1, warmup, main, rule_source=rule_source)
@@ -182,7 +182,7 @@ def run(limit_rules: int | None = None, rule_source: str = "ml_gate") -> dict:
         rules = rules[:limit_rules]
     print(f"      {len(rules)} luật Source IP được duyệt (ACTIVE, score={APPROVED_RULE_SCORE})")
 
-    # ---- VÒNG 2: engine mới MANG luật đã duyệt ------------------------------- #
+    # Vòng 2: engine mới mang luật đã duyệt
     print("[3/3] Vòng 2 — cùng luồng, Tier-1 đã học luật…")
     engine2 = _fresh_engine()
     engine2.dynamic_ip_blocks = set(rules)  # đúng dạng RuleEngine nạp từ YAML
@@ -193,7 +193,7 @@ def run(limit_rules: int | None = None, rule_source: str = "ml_gate") -> dict:
         f"· MCC={r2['detection']['mcc']}"
     )
 
-    # ---- Δ ------------------------------------------------------------------- #
+    # Δ
     # "Hấp thụ" = ca vòng 1 phải leo thang lên Tier-2 mà vòng 2 Tier-1 tự xử xong.
     # Đây chính là đại lượng mà tuyên bố "vòng phản hồi giảm tải LLM" nói tới.
     esc1, esc2 = r1["n_escalated"], r2["n_escalated"]
@@ -226,19 +226,19 @@ def run(limit_rules: int | None = None, rule_source: str = "ml_gate") -> dict:
             "precision": d2["precision"],
         },
         "delta": {
-            # Chỉ số ĐẦU BẢNG của vòng phản hồi.
+            # Chỉ số đầu bảng của vòng phản hồi.
             "escalation_rate_abs": round(r2["escalation_rate"] - r1["escalation_rate"], 4),
             "escalation_reduction_pct": round(100 * absorbed / esc1, 2) if esc1 else 0.0,
             "n_absorbed_by_tier1": absorbed,
             "absorption_ci95": list(wilson_ci(absorbed, esc1)) if esc1 else None,
             "hitl_delta_abs": round(r2["hitl_rate"] - r1["hitl_rate"], 4),
             "n_hitl_delta": r2["n_await_hitl"] - r1["n_await_hitl"],
-            # Chốt an toàn: giảm tải mà mất khả năng phát hiện thì KHÔNG phải cải thiện.
+            # Chốt an toàn: giảm tải mà mất khả năng phát hiện thì không phải cải thiện.
             #
-            # LỖI ĐÃ VÁ: cờ này từng chỉ xét `recall`. Recall CHỈ TĂNG khi gắn cờ nhiều hơn,
-            # nên một luật chặn nhầm hàng loạt IP lành tính vẫn làm nó bật "CÓ" — tức cờ
+            # Lỗi đã vá: cờ này từng chỉ xét `recall`. Recall chỉ tăng khi gắn cờ nhiều hơn,
+            # nên một luật chặn nhầm hàng loạt IP lành tính vẫn làm nó bật "có" - tức cờ
             # không bao giờ bắt được đúng ca hỏng mà nó sinh ra để bắt. Thực tế đo được:
-            # nó in "CÓ" trong khi MCC rơi 0,16. Nay phải giữ CẢ recall LẪN MCC, vì MCC là
+            # nó in "có" trong khi MCC rơi 0,16. Nay phải giữ cả recall lẫn MCC, vì MCC là
             # đại lượng duy nhất ở đây phạt cả FP lẫn FN.
             "mcc_delta": round(d2["mcc"] - d1["mcc"], 4),
             "recall_delta": round(d2["recall"] - d1["recall"], 4),
@@ -275,8 +275,8 @@ def run(limit_rules: int | None = None, rule_source: str = "ml_gate") -> dict:
     )
     print("-" * 84)
     if not d["detection_preserved"]:
-        # Nêu ĐÚNG vế nào hỏng. Bản trước in cứng "Recall TỤT" cho mọi ca, nên khi thủ phạm
-        # là precision (recall còn TĂNG) thì thông điệp chỉ sai đường điều tra.
+        # Nêu đúng vế nào hỏng. Bản trước in cứng "Recall tụt" cho mọi ca, nên khi thủ phạm
+        # là precision (recall còn tăng) thì thông điệp chỉ sai đường điều tra.
         ve = []
         if d["recall_delta"] < -0.01:
             ve.append(f"Recall tụt {d['recall_delta']:+.4f}")

@@ -1,5 +1,5 @@
 """
-Guardrails: LLM Decision Validator (Action Enum, Anti-DoS Shield, Confidence Gate, Reasoning Sanitization)
+Kiểm phán quyết LLM: enum hành động, lá chắn chống DoS, cổng độ tin cậy, làm sạch lập luận.
 """
 
 import ipaddress
@@ -20,21 +20,19 @@ class DecisionValidator:
 
     def __init__(self):
         config = load_config()
-        # Lá chắn chống TỰ CHẶN HẠ TẦNG (Anti-Self-DoS): CHỈ bảo vệ các IP/dải HẠ TẦNG
-        # TRỌNG YẾU cụ thể (loopback, gateway, DNS, DC, host giám sát) khỏi bị BLOCK_IP.
-        # KHÔNG dùng `trusted_internal_subnets` (toàn bộ RFC1918) ở đây — nếu coi cả 10/8,
-        # 172.16/12, 192.168/16 là "không được chặn" thì hệ thống KHÔNG THỂ cô lập kẻ tấn
+        # Lá chắn chống tự chặn hạ tầng (Anti-Self-DoS): Chỉ bảo vệ các IP/dải hạ tầng
+        # Trọng yếu cụ thể (loopback, gateway, DNS, DC, host giám sát) khỏi bị BLOCK_IP.
+        # Không dùng `trusted_internal_subnets` (toàn bộ RFC1918) ở đây - nếu coi cả 10/8,
+        # 172.16/12, 192.168/16 là "không được chặn" thì hệ thống không thể cô lập kẻ tấn
         # công nội bộ (lateral movement / insider / host bị chiếm), và luồng HITL sinh-luật
-        # (chỉ kích hoạt khi BLOCK_IP) sẽ không bao giờ chạy. Dải này phải HẸP và tường minh.
+        # (chỉ kích hoạt khi BLOCK_IP) sẽ không bao giờ chạy. Dải này phải hẹp và tường minh.
         self.critical_infra_subnets = config.get("guardrails", {}).get(
             "critical_infrastructure_subnets", ["127.0.0.0/8", "10.0.0.99/32", "192.168.1.254/32"]
         )
         self.allowed_actions = ["BLOCK_IP", "ALERT", "AWAIT_HITL", "LOG", "DROP"]
 
     def validate_decision(self, decision: dict) -> dict:
-        """
-        Xác thực và giảm cấp hành động nếu vi phạm các chính sách an toàn.
-        """
+        """Xác thực và giảm cấp hành động nếu vi phạm các chính sách an toàn."""
         validated = dict(decision)
 
         # 1. Ép buộc Action Enum hợp lệ
@@ -100,7 +98,7 @@ class DecisionValidator:
                         val = int(addr_str, 8)
                         if 0 <= val <= 4294967295:
                             return ipaddress.ip_address(val)
-                    # Integer address (Decimal)
+                    # Địa chỉ dạng số nguyên (thập phân)
                     elif addr_str.isdigit():
                         val = int(addr_str)
                         if 0 <= val <= 4294967295:
@@ -124,9 +122,9 @@ class DecisionValidator:
                                 is_critical = True
                                 break
                     except ValueError:
-                        # Subnet trong CẤU HÌNH sai định dạng -> subnet đó KHÔNG còn được
+                        # Subnet trong cấu hình sai định dạng -> subnet đó không còn được
                         # lá chắn bảo vệ. Im lặng ở đây rất nguy hiểm: một typo trong
-                        # config khiến SENTINEL có thể TỰ CHẶN hạ tầng trọng yếu của
+                        # config khiến SENTINEL có thể tự chặn hạ tầng trọng yếu của
                         # chính mình (self-DoS) mà không ai biết. Phải báo động.
                         logger.error(
                             f"[DecisionValidator] Subnet hạ tầng trọng yếu SAI ĐỊNH DẠNG "
@@ -142,14 +140,14 @@ class DecisionValidator:
                 logger.warning(
                     f"[DecisionValidator] BLOCK_IP on critical asset '{target}' downgraded to ALERT"
                 )
-                # Lá chắn này KHÔNG chèn dấu vào reasoning (khác consensus guard) và cờ
+                # Lá chắn này không chèn dấu vào reasoning (khác consensus guard) và cờ
                 # `_critical_shield` bị vứt trước khi ghi DB -> trước tracer, số lần nó nổ là
-                # KHÔNG THỂ đếm được sau khi chạy.
+                # không thể đếm được sau khi chạy.
                 if trace.enabled():
                     trace.add("validator", critical_shield=True, critical_shield_target=target)
                 validated["action"] = "ALERT"
                 action = "ALERT"
-                # Cờ để lớp remap-theo-confidence (nodes.py) KHÔNG đẩy NGƯỢC ALERT->BLOCK,
+                # Cờ để lớp remap-theo-confidence (nodes.py) không đẩy ngược ALERT->BLOCK,
                 # phá lá chắn hạ tầng khi confidence>=ngưỡng block.
                 validated["_critical_shield"] = True
 
@@ -170,9 +168,9 @@ class DecisionValidator:
         """
         Lá chắn chống Social-Engineering ngữ nghĩa (Tier-1/Tier-2 Consensus Guard).
 
-        Tier-1 (rule engine xác định) KHÔNG thể bị thao túng bằng ngôn ngữ thuyết phục.
-        Nếu Tier-1 đã đánh giá luồng này là TẤN CÔNG nhưng LLM (có thể bị giả mạo thẩm
-        quyền/ngữ cảnh) lại HẠ CẤP xuống LOG/DROP (bỏ qua), KHÔNG tin LLM — buộc chuyển
+        Tier-1 (rule engine xác định) không thể bị thao túng bằng ngôn ngữ thuyết phục.
+        Nếu Tier-1 đã đánh giá luồng này là tấn công nhưng LLM (có thể bị giả mạo thẩm
+        quyền/ngữ cảnh) lại hạ cấp xuống LOG/DROP (bỏ qua), không tin LLM - buộc chuyển
         AWAIT_HITL để con người xác minh. Đây là hiện thực hóa defense-in-depth: tầng
         deterministic làm trọng tài kiểm tra tầng có thể bị thao túng.
         """

@@ -1,14 +1,14 @@
 """
-RAG: Dual-RAG Retriever with Hybrid Search (FAISS + BM25) & RRF
+Bộ truy xuất lai FAISS + BM25, hợp nhất thứ hạng bằng RRF.
 + RAG Security Guardrails
 
-CHỨC NĂNG:
-  Nhận query text (từ escalated log) → embed & tokenize
-  → Hybrid Search (Dense FAISS + Sparse BM25)
-  → Reciprocal Rank Fusion (RRF) để ra kết quả tốt nhất.
-  → Áp dụng Structural Sanitization trước khi nhúng vào LLM Prompt (chống RAG Poisoning).
+Chức năng:
+  Nhận query text (từ escalated log) -> embed & tokenize
+  -> Hybrid Search (Dense FAISS + Sparse BM25)
+  -> Reciprocal Rank Fusion (RRF) để ra kết quả tốt nhất.
+  -> Áp dụng Structural Sanitization trước khi nhúng vào LLM Prompt (chống RAG Poisoning).
 
-CÁCH DÙNG:
+Cách dùng:
   from src.rag.retriever import DualRetriever
   retriever = DualRetriever()
   context = retriever.retrieve("brute force SSH port 22 CVE-2014-0160")
@@ -36,11 +36,11 @@ INDEX_DIR = os.path.join(BASE_DIR, "knowledge_base", "faiss_index")
 
 # Cấu hình mặc định.
 #
-# `top_k` LẤY TỪ CẤU HÌNH, không hằng số cứng. Lỗi đã đo: `nodes.py` dựng
-# `DualRetriever(use_cache=True)` mà KHÔNG truyền `top_k`, nên hệ thống chạy thật bằng
+# `top_k` lấy từ cấu hình, không hằng số cứng. Lỗi đã đo: `nodes.py` dựng
+# `DualRetriever(use_cache=True)` mà không truyền `top_k`, nên hệ thống chạy thật bằng
 # `DEFAULT_TOP_K = 5` trong khi `config/system_settings.yaml` ghi `rag.top_k_results: 3`.
-# Cấu hình bị BỎ QUA hoàn toàn — ai đọc cấu hình để hiểu hệ thống (kể cả hội đồng) đều bị
-# dẫn sai. Đo trên tracer xác nhận đúng 5 tài liệu mỗi lô. Ta giữ NGUYÊN hành vi (5) và
+# Cấu hình bị bỏ qua hoàn toàn - ai đọc cấu hình để hiểu hệ thống (kể cả hội đồng) đều bị
+# dẫn sai. Đo trên tracer xác nhận đúng 5 tài liệu mỗi lô. Ta giữ nguyên hành vi (5) và
 # sửa cấu hình cho khớp sự thật, thay vì đổi hành vi ngay trước lúc bảo vệ.
 def _configured_top_k(default: int = 5) -> int:
     try:
@@ -56,7 +56,7 @@ def _configured_top_k(default: int = 5) -> int:
 
 
 DEFAULT_TOP_K = _configured_top_k()
-MIN_SCORE_THRESHOLD = 0.15  # Cho FAISS dense search
+MIN_SCORE_THRESHOLD = 0.15  # Dùng cho tìm kiếm vector FAISS
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 
@@ -120,13 +120,13 @@ class DualRetriever:
         bm25_path = os.path.join(INDEX_DIR, f"{index_name}_bm25.pkl")
         metadata_path = os.path.join(INDEX_DIR, f"{index_name}_metadata.json")
 
-        # Thiếu BẤT KỲ file nào trong bộ ba đều phải dừng nạp nguồn này. Trước đây
-        # metadata_path KHÔNG được kiểm -> nếu chỉ thiếu mỗi metadata thì hàm đi tiếp
+        # Thiếu bất kỳ file nào trong bộ ba đều phải dừng nạp nguồn này. Trước đây
+        # metadata_path không được kiểm -> nếu chỉ thiếu mỗi metadata thì hàm đi tiếp
         # tới open() bên dưới và ném FileNotFoundError làm chết cả DualRetriever.
         missing = [p for p in (faiss_path, bm25_path, metadata_path) if not os.path.exists(p)]
         if missing:
             # CRITICAL chứ không phải WARNING: RAG tắt âm thầm nghĩa là LLM mất toàn bộ
-            # ngữ cảnh MITRE/NIST mà vẫn chạy — đúng kiểu suy biến im lặng đã từng khiến
+            # ngữ cảnh MITRE/NIST mà vẫn chạy - đúng kiểu suy biến im lặng đã từng khiến
             # Cổng ML chết mà không ai biết. Phải hét lên trong log.
             logger.critical(
                 f"[RAG] NGUỒN '{source_key}' BỊ TẮT — thiếu index: {', '.join(missing)}. "
@@ -136,7 +136,7 @@ class DualRetriever:
             return
 
         self.faiss_indexes[source_key] = self.faiss.read_index(faiss_path)
-        # BẢO MẬT: pickle.load có thể chạy mã độc nếu tệp bị sửa đổi (CWE-502).
+        # Bảo mật: pickle.load có thể chạy mã độc nếu tệp bị sửa đổi (CWE-502).
         # Ở đây BM25 index được tạo nội bộ và lưu ở phân vùng chỉ đọc, rủi ro thấp.
         with open(bm25_path, "rb") as f:
             self.bm25_indexes[source_key] = pickle.load(f)  # nosec B301
@@ -150,9 +150,9 @@ class DualRetriever:
         index = self.faiss_indexes[source_key]
         scores, indices = index.search(query_embedding, fetch_k)
 
-        # RRF cần THỨ HẠNG TRONG DANH SÁCH TRẢ VỀ. Tài liệu bị lọc dưới ngưỡng không nằm
-        # trong danh sách đó, nên hạng phải DỒN LẠI (giống _sparse_search) chứ không giữ
-        # vị trí gốc của enumerate — nếu không, nhánh dense bị phạt hạng một cách vô lý so
+        # RRF cần thứ hạng trong danh sách trả về. Tài liệu bị lọc dưới ngưỡng không nằm
+        # trong danh sách đó, nên hạng phải dồn lại (giống _sparse_search) chứ không giữ
+        # vị trí gốc của enumerate - nếu không, nhánh dense bị phạt hạng một cách vô lý so
         # với nhánh sparse và điểm RRF của hai nhánh không còn cùng thang.
         results = {}
         rank = 1
@@ -191,7 +191,7 @@ class DualRetriever:
         # 1. Tìm kiếm Vector Ngữ nghĩa (Dense Search)
         # np.asarray(..., dtype) thay cho .astype(): encode() có kiểu trả về union
         # (Tensor|ndarray) nên .astype không type-safe khi thiếu venv (CI). Runtime
-        # encode trả ndarray → np.asarray là no-op cùng kết quả, nhưng type tất định.
+        # encode trả ndarray -> np.asarray là no-op cùng kết quả, nhưng type tất định.
         query_embedding = np.asarray(
             self.model.encode([query_text], normalize_embeddings=True), dtype="float32"
         )
@@ -229,7 +229,7 @@ class DualRetriever:
         for idx in sorted_indices:
             entry = meta[idx]
 
-            # --- TẦNG BẢO MẬT: LÀM SẠCH CÁC ĐOẠN DỮ LIỆU TRUY XUẤT ---
+            # Tầng bảo mật: Làm sạch các đoạn dữ liệu truy xuất
             # Ngăn chặn gián tiếp Prompt Injection từ KB nếu KB bị nhiễm,
             # hoặc đảm bảo format an toàn trước khi vào LLM.
             safe_text = self.rag_sanitizer.sanitize_retrieve(entry["text"])
@@ -250,7 +250,7 @@ class DualRetriever:
                 }
             )
 
-        # Level 3: Cross-Encoder Reranker with RRF Score Blending (Anti-Domain Shift)
+        # Tầng 3: xếp hạng lại bằng Cross-Encoder, trộn điểm với RRF
         try:
             from sentence_transformers import CrossEncoder  # type: ignore
 
@@ -262,13 +262,13 @@ class DualRetriever:
             pairs = [[query_text, c["text"]] for c in top_candidates]
             if pairs:
                 scores = self._reranker.predict(pairs)
-                # Max-normalize scores
+                # Chuẩn hoá điểm theo giá trị lớn nhất
                 max_rrf = max((c["rrf_score"] for c in top_candidates), default=1.0) or 1.0
                 max_ce = max(scores, default=1.0) or 1.0
                 for c, score in zip(top_candidates, scores, strict=False):
                     norm_rrf = c["rrf_score"] / max_rrf
                     norm_ce = float(score) / max_ce if max_ce > 0 else 0.0
-                    # 80% RRF weight + 20% Cross-Encoder weight
+                    # Trọng số 80% RRF + 20% Cross-Encoder
                     c["blended_score"] = 0.8 * norm_rrf + 0.2 * norm_ce
                 top_candidates = sorted(
                     top_candidates, key=lambda x: x.get("blended_score", 0.0), reverse=True

@@ -1,27 +1,27 @@
 """
-LLM-as-Judge: Reasoning Quality Evaluation (Cross-Family)
+Chấm chất lượng lập luận bằng một mô hình trọng tài khác họ (LLM-as-Judge).
 
-Một model KHÁC HỌ với model tác tử làm trọng tài độc lập — đó là toàn bộ giá trị của phương
+Một model khác họ với model tác tử làm trọng tài độc lập - đó là toàn bộ giá trị của phương
 pháp này (Zheng et al., 2023): model chấm chính mình luôn tự cho điểm cao (Self-Enhancement
-Bias). Tên model KHÔNG viết cứng ở đâu cả: trọng tài đọc thật từ `/v1/models`, model tác tử
-lấy từ `SENTINEL_AGENT_MODEL` (hoặc `LLM_MODEL_FILE`), và `assert_cross_family()` CHẶN CỨNG
+Bias). Tên model không viết cứng ở đâu cả: trọng tài đọc thật từ `/v1/models`, model tác tử
+lấy từ `SENTINEL_AGENT_MODEL` (hoặc `LLM_MODEL_FILE`), và `assert_cross_family()` chặn cứng
 khi hai bên trùng nhau.
 
 WORKFLOW:
-  1. Chạy run_ablation.py --mode af bằng model TÁC TỬ → `reasoning_outputs` được lưu sẵn
-     trong ablation_results.json (bước 3 KHÔNG cần chạy lại ablation)
-  2. Nạp model TRỌNG TÀI khác họ lên LLM server. PHẢI xuất biến ra môi trường, không chỉ
-     sửa `.env` — docker-compose ưu tiên biến môi trường hơn tệp:
+  1. Chạy run_ablation.py --mode af bằng model tác tử -> `reasoning_outputs` được lưu sẵn
+     trong ablation_results.json (bước 3 không cần chạy lại ablation)
+  2. Nạp model trọng tài khác họ lên LLM server. Phải xuất biến ra môi trường, không chỉ
+     sửa `.env` - docker-compose ưu tiên biến môi trường hơn tệp:
        LLM_MODEL_FILE=Meta-Llama-3-8B-Instruct-Q5_K_M.gguf LLAMA_ARG_CTX_SIZE=32768 \
          docker-compose up -d --force-recreate --no-deps llm
   3. SENTINEL_AGENT_MODEL=<model tác tử> python experiments/evaluate_reasoning.py
   4. Kết quả: reasoning_eval_results.json + MLflow metrics. Đọc kèm
-     `run_health.n_incomplete_schema` — lớn hơn 0 nghĩa là lượt đo KHÔNG đáng tin.
-     ĐỌC KÈM `run_health.n_deliberate_abstention`: ca hệ CHỦ Ý trả "N/A" (rào chắn neo-RAG
-     hoạt động đúng) được đếm RIÊNG, không tính là thiếu schema. Lượt 2026-07-30 báo
-     `n_incomplete_schema = 69/277` và tự tuyên bố không đáng tin — hoá ra toàn bộ 69 ca đều
+     `run_health.n_incomplete_schema` - lớn hơn 0 nghĩa là lượt đo không đáng tin.
+     Đọc kèm `run_health.n_deliberate_abstention`: ca hệ chủ Ý trả "N/A" (rào chắn neo-RAG
+     hoạt động đúng) được đếm riêng, không tính là thiếu schema. Lượt 2026-07-30 báo
+     `n_incomplete_schema = 69/277` và tự tuyên bố không đáng tin - hoá ra toàn bộ 69 ca đều
      ở đúng 80% (4/5 trường), tức chỉ khuyết `mitre_technique = "N/A"`. Cổng khi đó đang
-     PHẠT hệ vì từ chối bịa kỹ thuật.
+     Phạt hệ vì từ chối bịa kỹ thuật.
 
 EVALUATION RUBRIC (4 chiều RAGAS-aligned, thang 1-5):
   - Context Precision: Xác định đúng kỹ thuật tấn công (MITRE)?
@@ -100,7 +100,7 @@ Respond ONLY in this JSON format:
 
 
 def served_model() -> str:
-    """Tên model LLM server ĐANG phục vụ — đọc thật từ `/v1/models`, không đoán."""
+    """Tên model LLM server đang phục vụ - đọc thật từ `/v1/models`, không đoán."""
     import urllib.request
 
     try:
@@ -111,17 +111,17 @@ def served_model() -> str:
 
 
 def assert_cross_family(agent_model: str) -> str:
-    """Chặn TRỌNG TÀI CHÍNH LÀ BỊ CÁO. Trả về tên model trọng tài thật.
+    """Chặn trọng tài chính là bị cáo. Trả về tên model trọng tài thật.
 
-    LỖI ĐÃ VÁ (phát hiện 2026-07-29): `call_llm_judge` gọi thẳng `LLM_API_BASE` với
-    `"model": "judge"`, nhưng llama.cpp BỎ QUA trường đó và phục vụ model đang nạp. Runner
-    không hề đổi model — docstring đầu file khi đó liệt kê "Unload … → Load …" như một bước
+    Lỗi đã vá (phát hiện 2026-07-29): `call_llm_judge` gọi thẳng `LLM_API_BASE` với
+    `"model": "judge"`, nhưng llama.cpp bỏ qua trường đó và phục vụ model đang nạp. Runner
+    không hề đổi model - docstring đầu file khi đó liệt kê "Unload ... -> Load ..." như một bước
     của quy trình, nhưng đó là thao tác TAY mà không ai làm. Hệ quả đo được: lượt 2026-07-29
     chạy Foundation-Sec chấm điểm chính Foundation-Sec, trong khi tệp kết quả ghi:
 
         "bias_mitigation": "Different model family eliminates Self-Enhancement Bias"
 
-    Tức tuyên bố đã loại trừ ĐÚNG cái thiên lệch mà nó đang mắc — và không có gì đỏ lên để
+    Tức tuyên bố đã loại trừ đúng cái thiên lệch mà nó đang mắc - và không có gì đỏ lên để
     báo. Điểm số kiểu này chép vào luận văn là hỏng cả chương đánh giá.
     """
     judge = served_model()
@@ -143,7 +143,7 @@ def assert_cross_family(agent_model: str) -> str:
 
 
 def call_llm_judge(system_prompt: str, user_prompt: str) -> dict:
-    """Gọi API LLM Judge (đã nạp model KHÁC HỌ với tác tử) để chấm chất lượng suy luận."""
+    """Gọi API LLM Judge (đã nạp model khác họ với tác tử) để chấm chất lượng suy luận."""
     import requests
 
     content = ""
@@ -235,7 +235,7 @@ def run_judge_evaluation():
     print(f"[*] Total samples: {len(reasoning_outputs)}")
     print(f"    Escalated to LLM (will judge): {len(escalated)}")
     print(f"    Not escalated (Tier 1 only): {len(not_escalated)}")
-    # Tên model PHẢI đọc từ hệ thống, KHÔNG viết cứng tên cũ
+    # Tên model phải đọc từ hệ thống, không viết cứng tên cũ
     # Số đúng + tên sai = vẫn là số sai.
     agent_model = os.getenv("SENTINEL_AGENT_MODEL") or os.getenv("LLM_MODEL_FILE") or "?"
     judge_model = assert_cross_family(agent_model)
@@ -284,25 +284,25 @@ def run_judge_evaluation():
         scores = call_llm_judge(JUDGE_SYSTEM_PROMPT, user_prompt)
         elapsed = time.time() - start
 
-        # --- (a) Kiểm tra SCHEMA (đổi tên từ "audit completeness") ---------------------
-        # HẠ CẤP CÓ CHỦ ĐÍCH. Chỉ số này đếm 5 trường trong dict do CHÍNH hệ sinh ra, nên
-        # nó LUÔN đạt 100% — một phép đo không thể trượt thì không đo được gì. Nó là kiểm
-        # tra schema (hữu ích để bắt lỗi hồi quy), KHÔNG phải thước đo chất lượng giải
+        # (a) Kiểm tra SCHEMA (đổi tên từ "audit completeness")
+        # Hạ cấp có chủ đích. Chỉ số này đếm 5 trường trong dict do chính hệ sinh ra, nên
+        # nó luôn đạt 100% - một phép đo không thể trượt thì không đo được gì. Nó là kiểm
+        # tra schema (hữu ích để bắt lỗi hồi quy), không phải thước đo chất lượng giải
         # thích. Trước đây nó được trích vào bảng 5D như bằng chứng "Tính giải thích 100%".
         latest_decision = sample.get("decisions", [{}])[-1] if sample.get("decisions") else {}
         required_fields = ["action", "confidence", "reasoning", "target", "mitre_technique"]
 
-        # TỪ CHỐI CÓ CHỦ Ý ≠ THIẾU TRƯỜNG.
+        # Từ chối có chủ Ý ≠ thiếu trường.
         #
-        # Bản cũ coi `mitre_technique = "N/A"` là trường KHUYẾT, nên cổng hợp lệ báo
+        # Bản cũ coi `mitre_technique = "N/A"` là trường khuyết, nên cổng hợp lệ báo
         # `n_incomplete_schema = 69/277` và tự tuyên bố cả lượt đo không đáng tin. Nhưng
-        # "N/A" chính là hành vi ĐÚNG mà rào chắn neo-RAG được thiết kế để tạo ra: khi không
-        # có kỹ thuật nào có neo trong tài liệu truy xuất, hệ PHẢI nói "không biết" thay vì
+        # "N/A" chính là hành vi đúng mà rào chắn neo-RAG được thiết kế để tạo ra: khi không
+        # có kỹ thuật nào có neo trong tài liệu truy xuất, hệ phải nói "không biết" thay vì
         # bịa. Đo trên lượt chạy sống: 99/239 lô kết thúc ở N/A vì đúng lý do đó.
         #
-        # Tức cổng đang PHẠT hệ vì làm đúng, rồi con số phạt ấy lại được dùng để nghi ngờ
-        # toàn bộ kết quả. Tách hẳn hai khái niệm: trường THIẾU (hồi quy schema thật, phải
-        # báo động) và trường TỪ CHỐI (thiết kế, phải đếm riêng như một chỉ số).
+        # Tức cổng đang phạt hệ vì làm đúng, rồi con số phạt ấy lại được dùng để nghi ngờ
+        # toàn bộ kết quả. Tách hẳn hai khái niệm: trường thiếu (hồi quy schema thật, phải
+        # báo động) và trường từ chối (thiết kế, phải đếm riêng như một chỉ số).
         ABSTAIN_VALUES = {"N/A", "UNKNOWN_TARGET"}
         missing = [f for f in required_fields if latest_decision.get(f) in (None, "")]
         abstained = [
@@ -312,11 +312,11 @@ def run_judge_evaluation():
         ]
         schema_completeness = ((len(required_fields) - len(missing)) / len(required_fields)) * 100
 
-        # --- (b) NEO BẰNG CHỨNG — chỉ số giải thích CHÍNH ------------------------------
-        # Prompt triage BẮT BUỘC mỗi luận điểm về hành vi phải kèm ít nhất một giá trị
-        # `field=value` TRÍCH NGUYÊN VĂN từ log, và CẤM tường minh kiểu lập luận rỗng
+        # (b) neo bằng chứng - chỉ số giải thích chính
+        # Prompt triage bắt buộc mỗi luận điểm về hành vi phải kèm ít nhất một giá trị
+        # `field=value` trích nguyên văn từ log, và cấm tường minh kiểu lập luận rỗng
         # "confirmed by MITRE nên phải chặn". Đo tỉ lệ tuân thủ điều đó mới là phép đo
-        # thật: nó kiểm chứng giá trị có KHỚP log (chống bịa số) và CÓ THỂ trượt.
+        # thật: nó kiểm chứng giá trị có khớp log (chống bịa số) và có thể trượt.
         grounding = evidence_grounding(
             str(latest_decision.get("reasoning", "")), sample.get("log", {}) or {}
         )
@@ -326,7 +326,7 @@ def run_judge_evaluation():
             "scores": scores,
             "schema_completeness_pct": schema_completeness,
             "missing_fields": missing,
-            # Trường TỪ CHỐI có chủ ý (N/A) — thiết kế, không phải lỗi. Ghi ra để lượt sau
+            # Trường từ chối có chủ ý (N/A) - thiết kế, không phải lỗi. Ghi ra để lượt sau
             # truy nguyên được ngay thay vì chỉ thấy một con số 80% không rõ vì sao.
             "abstained_fields": abstained,
             "evidence_grounding": grounding,
@@ -380,16 +380,16 @@ def run_judge_evaluation():
                 "min": int(min(all_recall)),
                 "max": int(max(all_recall)),
             },
-            # ĐÃ GỠ KHỎI NHÓM CHỈ SỐ. `schema_completeness` đếm 5 trường trong dict do CHÍNH
-            # hệ sinh ra nên luôn đạt tối đa — nó khẳng định hàm có trả về đủ khoá, không
+            # Đã gỡ khỏi nhóm chỉ số. `schema_completeness` đếm 5 trường trong dict do chính
+            # hệ sinh ra nên luôn đạt tối đa - nó khẳng định hàm có trả về đủ khoá, không
             # đo chất lượng gì. Báo nó cạnh bốn chiều LLM-Judge khiến người đọc tưởng đây
-            # là chiều thứ năm ("Tính giải thích 100%"). Nay nó sống dưới dạng CỔNG HỢP LỆ:
-            # chỉ đếm số ca THIẾU trường. Khác 0 nghĩa là có hồi quy schema và toàn bộ lượt
-            # đo phải bị nghi ngờ — đó mới là công dụng thật của nó.
+            # là chiều thứ năm ("Tính giải thích 100%"). Nay nó sống dưới dạng cổng hợp lệ:
+            # chỉ đếm số ca thiếu trường. Khác 0 nghĩa là có hồi quy schema và toàn bộ lượt
+            # đo phải bị nghi ngờ - đó mới là công dụng thật của nó.
             "run_health": {
                 "n_incomplete_schema": sum(1 for v in all_schema_completeness if v < 100.0),
                 "n_scored": len(all_schema_completeness),
-                # Đếm RIÊNG các ca hệ CHỦ Ý trả "N/A" — đó là rào chắn neo-RAG hoạt động
+                # Đếm riêng các ca hệ chủ Ý trả "N/A" - đó là rào chắn neo-RAG hoạt động
                 # đúng, không phải hồi quy schema. Gộp chung vào n_incomplete_schema là
                 # lý do lượt đo trước tự gắn cờ "không đáng tin" một cách oan uổng.
                 "n_deliberate_abstention": sum(1 for a in all_abstained if a),
@@ -402,7 +402,7 @@ def run_judge_evaluation():
                     "thiếu trường bắt buộc => kết quả lượt đo này không đáng tin."
                 ),
             },
-            # CHỈ SỐ GIẢI THÍCH CHÍNH: lập luận có neo vào giá trị THẬT trong log không.
+            # Chỉ số giải thích chính: lập luận có neo vào giá trị thật trong log không.
             "evidence_grounding": {
                 "grounding_rate": round(
                     sum(1 for g in all_grounding if g["grounded"]) / len(all_grounding), 4

@@ -1,6 +1,5 @@
 """
-Automated AI Red Teaming: Direct & Indirect Prompt Injection Benchmark
-======================================================================
+Red team tự động: đo khả năng kháng tiêm nhiễm prompt trực tiếp và gián tiếp
 Kiểm thử tính bền vững của SENTINEL Guardrails trước các payload Prompt Injection
 ẩn trong Log Headers (User-Agent, Referer, URI) hoặc Payload thô (OWASP LLM01).
 """

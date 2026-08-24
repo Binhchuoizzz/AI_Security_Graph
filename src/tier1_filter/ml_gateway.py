@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Model được fit trên DataFrame có tên cột; ở runtime ta truyền ndarray (nhanh hơn, không
 # cần pandas mỗi sự kiện) -> sklearn phát UserWarning "X does not have valid feature names"
-# cho MỖI lần predict, làm nghẽn log SOC. Chặn đúng cảnh báo VÔ HẠI này (giá trị dự đoán
+# cho mỗi lần predict, làm nghẽn log SOC. Chặn đúng cảnh báo vô hại này (giá trị dự đoán
 # không đổi vì thứ tự feature đã khớp `features` trong pkl).
 warnings.filterwarnings(
     "ignore",
@@ -22,23 +22,23 @@ warnings.filterwarnings(
     module="sklearn",
 )
 
-# ── Ngưỡng LỚP BẢO MẬT Cổng ML (chống né-tránh / evasion) ─────────────────────
+# Ngưỡng lớp bảo mật Cổng ML (chống né-tránh / evasion)
 # StandardScaler biến mỗi feature thành z-score = (x - mean)/std. Kẻ tấn công có thể
-# bơm giá trị CỰC ĐOAN (hoặc Inf/NaN) để đẩy z-score ra xa, lật nhãn ML hoặc ép ML
-# im lặng (né BLOCK / tốn LLM). Ba tuyến phòng thủ (dùng mean_/scale_ của scaler, KHÔNG
+# bơm giá trị cực đoan (hoặc Inf/NaN) để đẩy z-score ra xa, lật nhãn ML hoặc ép ML
+# im lặng (né BLOCK / tốn LLM). Ba tuyến phòng thủ (dùng mean_/scale_ của scaler, không
 # cần data train):
 #   1) Sanitize: NaN/±Inf/không-parse-được -> thay bằng mean của feature (z-score ≈ 0).
 #   2) Clamp: kẹp z-score về [-CLIP_SIGMA, CLIP_SIGMA] -> 1 feature cực đoan không thể
 #      một mình chi phối dự đoán.
-#   3) OOD abstain: nếu QUÁ NHIỀU feature lệch > OOD_SIGMA (input xa phân bố train, dấu
-#      hiệu đối kháng/drift) -> KHÔNG tin ML, trả None để escalate LLM.
-# Ngưỡng nới rộng để KHÔNG kích hoạt trên lưu lượng THẬT sạch (giữ nguyên bypass rate);
+#   3) OOD abstain: nếu quá nhiều feature lệch > OOD_SIGMA (input xa phân bố train, dấu
+#      hiệu đối kháng/drift) -> không tin ML, trả None để escalate LLM.
+# Ngưỡng nới rộng để không kích hoạt trên lưu lượng thật sạch (giữ nguyên bypass rate);
 # chỉ bật với input bất thường.
 CLIP_SIGMA = 8.0  # kẹp |z| tối đa (8 lần độ lệch chuẩn)
 OOD_SIGMA = 6.0  # ngưỡng coi 1 feature là "lệch cực mạnh"
 OOD_FRACTION = 0.30  # nếu > 30% feature vượt OOD_SIGMA -> abstain (escalate LLM)
-# Phủ feature tối thiểu: model học 76 feature CICIDS. Log KHÔNG cùng phân bố (vd DAPT chỉ
-# có ~1/76 feature) -> vector toàn-mean -> dự đoán VÔ NGHĨA. Yêu cầu tối thiểu MIN_COVERAGE
+# Phủ feature tối thiểu: model học 76 feature CICIDS. Log không cùng phân bố (vd DAPT chỉ
+# có ~1/76 feature) -> vector toàn-mean -> dự đoán vô nghĩa. Yêu cầu tối thiểu MIN_COVERAGE
 # feature thực-sự-có-mặt; thiếu -> abstain (escalate LLM) thay vì đoán bừa.
 MIN_FEATURE_COVERAGE = 0.5
 
@@ -48,29 +48,29 @@ class MLGateway:
     Tier-1 ML Gateway (Cổng ML)
     Dời từ Tier-2 sang Tier-1 để giải quyết bài toán Head-of-Line (HOL) Blocking.
     Đánh giá nhanh feature số học bằng LightGBM + StandardScaler (76 features).
-    Quyết định theo 4 DẢI (C = độ tin cậy tấn công): C>=0.85 BLOCK · 0.65–0.85 ESCALATE(LLM) ·
-    0.40–0.65 ALERT · <0.40 PASS/DROP — VÀ input phải vượt qua lớp bảo mật chống né-tránh
+    Quyết định theo 4 dải (C = độ tin cậy tấn công): C>=0.85 BLOCK · 0.65–0.85 ESCALATE(LLM) ·
+    0.40–0.65 ALERT · <0.40 PASS/DROP - và input phải vượt qua lớp bảo mật chống né-tránh
     (low-coverage / OOD-abstain / clamp) nếu không sẽ escalate LLM.
     """
 
     @staticmethod
     def _force_single_thread(pipeline) -> None:
-        """Ép LightGBM/sklearn suy luận MỘT LUỒNG. Không phải vi tối ưu — là sửa lỗi hiệu năng.
+        """Ép LightGBM/sklearn suy luận một luồng. Không phải vi tối ưu - là sửa lỗi hiệu năng.
 
         LightGBM dựng một nhóm luồng OpenMP bằng số lõi máy, và giữa các lượt dự đoán các
-        luồng thợ **quay bận** (`OMP_WAIT_POLICY` mặc định là active) chứ không ngủ. Với suy
-        luận theo TỪNG DÒNG — đúng hình dạng của một cổng lọc luồng thời gian thực — chúng
+        luồng thợ quay bận (`OMP_WAIT_POLICY` mặc định là active) chứ không ngủ. Với suy
+        luận theo từng dòng - đúng hình dạng của một cổng lọc luồng thời gian thực - chúng
         gần như chỉ quay: chia một cây quyết định cho 13 luồng không nhanh hơn, mà chi phí
         đồng bộ thì có thật.
 
         Đo trên máy này (2026-08-11), subscriber đang đẩy luồng demo:
-          * `%CPU` của tiến trình = **1328%** (13 lõi bận) trong khi chỉ xử lý **75 sự
+          * `%CPU` của tiến trình = 1328% (13 lõi bận) trong khi chỉ xử lý **75 sự
             kiện/giây**, tức ~177 ms CPU cho mỗi sự kiện có ~1,5 ms việc thật;
-          * 13 luồng đứng đầu bảng đều tên `python` và tiêu tốn CPU NGANG NHAU (~148 giây
-            mỗi luồng) — dấu hiệu của nhóm luồng quay bận, không phải công việc thật;
+          * 13 luồng đứng đầu bảng đều tên `python` và tiêu tốn CPU ngang nhau (~148 giây
+            mỗi luồng) - dấu hiệu của nhóm luồng quay bận, không phải công việc thật;
           * vòng đọc Redis nằm cùng tiến trình nên bị chính nhóm luồng ấy tranh mất lõi.
 
-        Đo riêng Cổng ML: 1,684 ms/sự kiện khi để mặc định, **1,405 ms khi ép một luồng** —
+        Đo riêng Cổng ML: 1,684 ms/sự kiện khi để mặc định, 1,405 ms khi ép một luồng -
         một luồng vừa nhanh hơn vừa trả lại 12 lõi cho phần còn lại của hệ.
         """
         if not isinstance(pipeline, dict):
@@ -81,8 +81,8 @@ class MLGateway:
                     obj.set_params(n_jobs=1)
             except Exception:
                 pass
-            # CHỈ sửa `params` của booster. KHÔNG gọi `reset_parameter()`: trên booster khôi
-            # phục từ pickle, lệnh đó làm tiến trình **segfault** (đo được: exit 139).
+            # Chỉ sửa `params` của booster. Không gọi `reset_parameter()`: trên booster khôi
+            # phục từ pickle, lệnh đó làm tiến trình segfault (đo được: exit 139).
             booster = getattr(obj, "booster_", None)
             if booster is not None:
                 try:
@@ -92,7 +92,7 @@ class MLGateway:
 
     def __init__(self):
         self.pipeline = self._load_pipeline()
-        # Ngưỡng lấy từ chính sách THỐNG NHẤT (chung với LLM) — 1 nguồn sự thật.
+        # Ngưỡng lấy từ chính sách thống nhất (chung với LLM) - 1 nguồn sự thật.
         # (giữ 2 thuộc tính này để hiển thị/tương thích; quyết định thực tế dùng classify_ml 4 dải).
         self.conf_threshold_block = decision_policy.ML_BLOCK_CONF
         self.conf_threshold_alert = decision_policy.ML_ALERT_CONF
@@ -106,7 +106,7 @@ class MLGateway:
                 self._scale = np.asarray(sc.scale_, dtype=float)
 
     def _load_pipeline(self) -> dict[str, Any] | None:
-        # Dựng đường dẫn NGOÀI try để nhánh except luôn có biến này khi ghi log.
+        # Dựng đường dẫn ngoài try để nhánh except luôn có biến này khi ghi log.
         model_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "ml_lab",
@@ -121,9 +121,9 @@ class MLGateway:
             MLGateway._force_single_thread(model)
             return model
         except ModuleNotFoundError as e:
-            # Nguyên nhân THƯỜNG GẶP NHẤT: thiếu scikit-learn/lightgbm (model được pickle
-            # từ 2 thư viện này). Trước đây chỉ log 1 dòng chung chung nên Cổng ML TẮT ÂM
-            # THẦM: hệ vẫn chạy nhưng MỌI ca leo thang dồn lên LLM, không ai biết vì sao.
+            # Nguyên nhân thường gặp nhất: thiếu scikit-learn/lightgbm (model được pickle
+            # từ 2 thư viện này). Trước đây chỉ log 1 dòng chung chung nên Cổng ML tắt âm
+            # Thầm: hệ vẫn chạy nhưng mọi ca leo thang dồn lên LLM, không ai biết vì sao.
             logger.critical(
                 f"[TIER-1 ML GATE] TẮT — thiếu thư viện để giải mã model: {e}. "
                 f"Cài đặt: pip install -r requirements.txt (cần scikit-learn + lightgbm). "
@@ -138,7 +138,7 @@ class MLGateway:
             return None
 
     def _build_raw_vector(self, log: dict, features: list) -> tuple[np.ndarray, int, int]:
-        """Dựng vector feature THÔ + đếm ô sanitize (non-finite/hỏng) + ô có-mặt-hợp-lệ.
+        """Dựng vector feature thô + đếm ô sanitize (non-finite/hỏng) + ô có-mặt-hợp-lệ.
 
         Ô hỏng/thiếu -> thay bằng mean của feature (nếu có scaler) hoặc 0.0 (trung tính).
         Trả (X, n_sanitized, n_present)."""
@@ -157,7 +157,7 @@ class MLGateway:
                     parsed = None
             if parsed is None:
                 # Giá trị thiếu/hỏng/Inf/NaN -> dùng mean (z-score ≈ 0). Chỉ tính là
-                # "sanitized" (dấu hiệu tấn công) khi ô CÓ dữ liệu nhưng không hợp lệ.
+                # "sanitized" (dấu hiệu tấn công) khi ô có dữ liệu nhưng không hợp lệ.
                 n_sanitized += 1 if (val is not None and val != "") else 0
                 X[i] = self._mean[i] if self._mean is not None else 0.0
             else:
@@ -201,11 +201,11 @@ class MLGateway:
             sec["reason"] = "no_numeric_features"
             return None, None, 0.0, sec
 
-        # ── LỚP BẢO MẬT 1: Sanitize (chặn NaN/Inf trước khi vào scaler) ──
+        # lớp bảo mật 1: Sanitize (chặn NaN/Inf trước khi vào scaler)
         X_arr, n_sanitized, n_present = self._build_raw_vector(log, features)
         sec["sanitized"] = n_sanitized
 
-        # ── LỚP BẢO MẬT 0: Phủ feature — vector toàn-mean (vd DAPT ~1/76) là dự đoán rác ──
+        # lớp bảo mật 0: Phủ feature - vector toàn-mean (vd DAPT ~1/76) là dự đoán rác
         coverage = n_present / len(features) if features else 0.0
         sec["coverage"] = round(coverage, 4)
         if coverage < MIN_FEATURE_COVERAGE:
@@ -221,17 +221,17 @@ class MLGateway:
         try:
             X_scaled = scaler.transform(X_arr)
         except Exception as e:
-            # Sau sanitize KHÔNG nên còn Inf; nếu vẫn lỗi -> abstain an toàn.
+            # Sau sanitize không nên còn Inf; nếu vẫn lỗi -> abstain an toàn.
             logger.error(f"[TIER-1 ML GATE] Lỗi scale sau sanitize: {e}")
             sec["skipped"] = True
             sec["reason"] = "scale_error"
             return None, None, 0.0, sec
 
-        # X_scaled CHÍNH LÀ z-score (StandardScaler). Dùng cho OOD + clamp.
+        # X_scaled chính là z-score (StandardScaler). Dùng cho OOD + clamp.
         z = X_scaled[0]
         abs_z = np.abs(z)
 
-        # ── LỚP BẢO MẬT 3: OOD abstain (input xa phân bố train -> không tin ML) ──
+        # lớp bảo mật 3: OOD abstain (input xa phân bố train -> không tin ML)
         n_ood = int(np.sum(abs_z > OOD_SIGMA))
         ood_fraction = n_ood / len(features) if features else 0.0
         sec["ood_fraction"] = round(ood_fraction, 4)
@@ -245,7 +245,7 @@ class MLGateway:
             )
             return None, None, 0.0, sec
 
-        # ── LỚP BẢO MẬT 2: Clamp z-score (1 feature cực đoan không chi phối được) ──
+        # lớp bảo mật 2: Clamp z-score (1 feature cực đoan không chi phối được)
         n_clamped = int(np.sum(abs_z > CLIP_SIGMA))
         sec["clamped"] = n_clamped
         if n_clamped > 0:
@@ -270,7 +270,7 @@ class MLGateway:
         reasoning = None
         confidence = 0.0
 
-        # Cổng ML — 4 DẢI theo chính sách (C = confidence_attack):
+        # Cổng ML - 4 dải theo chính sách (C = confidence_attack):
         #   C>=0.85 BLOCK · 0.65–0.85 ESCALATE(LLM) · 0.40–0.65 ALERT · <0.40 PASS/DROP.
         # Lưu ý: "Cổng ML" là marker để UI bắt được (từ components.py).
         verdict = decision_policy.classify_ml(confidence_attack)
@@ -283,7 +283,7 @@ class MLGateway:
             reasoning = f"Cảnh báo rủi ro (low-priority) bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_attack:.2%}"
             confidence = confidence_attack
         elif verdict == "DROP":
-            # C < 0.40 -> PASS/audit log: dừng ngay ở Tier-1, KHÔNG tốn LLM (noise reduction thật).
+            # C < 0.40 -> PASS/audit log: dừng ngay ở Tier-1, không tốn LLM (noise reduction thật).
             action = "DROP"
             reasoning = f"Xác nhận an toàn (PASS) bởi Cổng ML Tier-1 (LightGBM). Độ tin cậy: {confidence_benign:.2%}"
             confidence = confidence_benign

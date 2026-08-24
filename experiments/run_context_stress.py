@@ -1,15 +1,14 @@
 """
-SENTINEL — Stress Ngữ cảnh: Token Input vs Số lượng Log (Context Budget Curve)
-[Luận văn Ch.4 §Context-Budget Observability & Stress — token vs số log, nén Drain, tránh tràn n_ctx]
-==============================================================================
+SENTINEL - Stress Ngữ cảnh: Token Input vs Số lượng Log (Context Budget Curve)
+[Luận văn Ch.4 §Context-Budget Observability & Stress - token vs số log, nén Drain, tránh tràn n_ctx]
 Trả lời "log quá dài/nhiều thì tràn ngữ cảnh không, và biết tinh chỉnh thế nào":
-đẩy số log tăng dần N ∈ {1..2000} và đo token đưa vào LLM theo HAI cách:
+đẩy số log tăng dần N ∈ {1..2000} và đo token đưa vào LLM theo hai cách:
 
-  - RAW (nối thẳng mọi log)            -> tăng TUYẾN TÍNH, vượt n_ctx rất nhanh.
-  - COMPRESSED (Drain template mining) -> BÃO HÒA, bị chặn BẰNG THIẾT KẾ.
+  - RAW (nối thẳng mọi log)            -> tăng tuyến tính, vượt n_ctx rất nhanh.
+  - COMPRESSED (Drain template mining) -> bão hòa, bị chặn bằng thiết kế.
 
 Chứng minh kiến trúc giữ ngữ cảnh trong ngân sách (token_budget=4000, n_ctx=32768)
-bất kể số log, nên local LLM KHÔNG bị tràn vì "log quá nhiều". Tất định, KHÔNG LLM.
+bất kể số log, nên local LLM không bị tràn vì "log quá nhiều". Tất định, không LLM.
 
 Chạy:  .venv/bin/python experiments/run_context_stress.py
 """
@@ -39,17 +38,17 @@ N_LEVELS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2000]
 def load_log_pool(limit=2000, diverse=False):
     """Pool log để nén.
 
-    `diverse=False` — lấy N log ĐẦU TIÊN của ground_truth. Vì tệp gom theo lớp, N log đầu
-    gần như cùng một loại nên Drain gộp hết về **một** template: kết quả đo được là
-    `n_templates = 1` ở MỌI mức N, kể cả N=1000. "Nén 1000×" đó là kịch bản DỄ NHẤT có thể,
+    `diverse=False` - lấy N log đầu tiên của ground_truth. Vì tệp gom theo lớp, N log đầu
+    gần như cùng một loại nên Drain gộp hết về một template: kết quả đo được là
+    `n_templates = 1` ở mọi mức N, kể cả N=1000. "Nén 1000×" đó là kịch bản dễ nhất có thể,
     không phải đại diện cho log SOC thật.
 
-    `diverse=True` — lấy MẪU RẢI ĐỀU trên toàn tệp để chạm mọi lớp tấn công. Đây mới là
+    `diverse=True` - lấy mẫu rải đều trên toàn tệp để chạm mọi lớp tấn công. Đây mới là
     phép thử thật của khâu nén, và là con số phải báo cùng.
     """
     with open(GT_PATH) as f:
         gt = json.load(f)
-    # Cùng dân số THẬT như mọi phép đo ground_truth khác — xem `drop_authored`. Payload đối
+    # Cùng dân số thật như mọi phép đo ground_truth khác - xem `drop_authored`. Payload đối
     # địch tự viết có hình thái rất khác log thật nên sẽ làm lệch tỉ lệ nén.
     gt, _ = drop_authored(gt)
     if not diverse:
@@ -61,9 +60,9 @@ def load_log_pool(limit=2000, diverse=False):
                     return pool
         return pool
 
-    # XÁO TRỘN CÓ SEED, không dùng bước nhảy. Bản nháp đầu dùng `gt[::stride]` với
-    # `stride = len(gt) // (limit // 2)`; với 1.750 mẫu và limit 2.000 thì stride ra **1**,
-    # tức không rải gì cả và pool "đa dạng" trùng khít pool đồng nhất — hai cột số giống hệt
+    # Xáo trộn có SEED, không dùng bước nhảy. Bản nháp đầu dùng `gt[::stride]` với
+    # `stride = len(gt) // (limit // 2)`; với 1.750 mẫu và limit 2.000 thì stride ra 1,
+    # tức không rải gì cả và pool "đa dạng" trùng khít pool đồng nhất - hai cột số giống hệt
     # nhau, đúng thứ phép thử này sinh ra để tránh. Xáo trộn không phụ thuộc cỡ tệp.
     order = list(range(len(gt)))
     random.Random(42).shuffle(order)
@@ -160,7 +159,7 @@ def main():
     )
     print(f"\n[+] Saved -> {OUT_JSON}")
 
-    # ---- Plot ----
+    # Plot
     try:
         import matplotlib.pyplot as plt
 

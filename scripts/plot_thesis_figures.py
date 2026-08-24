@@ -1,12 +1,12 @@
-"""Sinh HÌNH KẾT QUẢ cho Chương 4, cả bản EN và VI, THẲNG TỪ `experiments/results/*.json`.
+"""Sinh hình kết quả cho Chương 4, cả bản EN và VI, thẳng từ `experiments/results/*.json`.
 
-VÌ SAO PHẢI CÓ TỆP NÀY. Thư mục `images/` từng chứa năm ảnh kết quả đề ngày 22/07 — trước mọi
+Vì sao phải có tệp này. Thư mục `images/` từng chứa năm ảnh kết quả đề ngày 22/07 - trước mọi
 lần chạy lại, và hai trong số đó thuộc chỉ số đã bị loại khỏi luận văn. Ảnh là artefact tĩnh: nó
 không tự biết mình đã cũ. Cách duy nhất để hình không bao giờ lệch số là **không gõ tay con số
 nào trong tệp này**; mọi giá trị đều đọc từ JSON, nên chạy lại script sau mỗi lượt đo là hình tự
 đúng theo.
 
-Quy ước trình bày: xám + MỘT màu nhấn để in đen trắng vẫn đọc được; nhãn trục luôn kèm mẫu số;
+Quy ước trình bày: xám + một màu nhấn để in đen trắng vẫn đọc được; nhãn trục luôn kèm mẫu số;
 số liệu EN và VI giống hệt nhau, chỉ khác chữ.
 
 Chạy:  .venv/bin/python scripts/plot_thesis_figures.py
@@ -33,7 +33,7 @@ OUT = {
 # DejaVu Sans có đủ dấu tiếng Việt; Helvetica/Arial trên máy này thì không chắc.
 plt.rcParams.update(
     {
-        # Thân bài luận văn chạy Times (mathptmx). Chữ trong hình phải CÙNG HỌ serif,
+        # Thân bài luận văn chạy Times (mathptmx). Chữ trong hình phải cùng họ serif,
         # không thì mỗi trang có hình lại lộ ra hai kiểu chữ. DejaVu Serif đi kèm
         # matplotlib và có đủ dấu tiếng Việt; Times thật thì không chắc máy nào cũng có.
         "font.family": "DejaVu Serif",
@@ -49,9 +49,9 @@ plt.rcParams.update(
     }
 )
 
-INK = "#2f3b40"  # xám đậm — mặc định
-GREY = "#b9c2c6"  # xám nhạt — nền/phụ
-ACCENT = "#b5341f"  # MỘT màu nhấn duy nhất
+INK = "#2f3b40"  # xám đậm - mặc định
+GREY = "#b9c2c6"  # xám nhạt - nền/phụ
+ACCENT = "#b5341f"  # Một màu nhấn duy nhất
 ACCENT2 = "#7a8b91"  # xám trung gian, cho cột thứ ba
 
 
@@ -72,7 +72,7 @@ def save_one(fig, stem, lang):
     print(f"  ✓ {lang}/{stem}.pdf")
 
 
-# ── Hình 1 — phễu xả tải theo tầng, hai luồng ────────────────────────────────
+# Hình 1 - phễu xả tải theo tầng, hai luồng
 T1 = {
     "en": dict(
         title="Offload by tier, two streams with different attack base rates",
@@ -95,7 +95,7 @@ T1 = {
 }
 
 
-# ── Hình 2 — phân phối độ trễ, thang log ─────────────────────────────────────
+# Hình 2 - phân phối độ trễ, thang log
 T2 = {
     "en": dict(
         title="End-to-end latency, {n} events (log scale)",
@@ -169,8 +169,8 @@ def fig_latency(lang):
         fontsize=8,
         ha="left",
     )
-    # Kết quả ngược chiều phải ĐỌC ĐƯỢC, không phải nhét vào góc: đuôi của hệ hai tầng
-    # nằm BÊN PHẢI đường đơn tầng, tức p95 xấu hơn.
+    # Kết quả ngược chiều phải đọc được, không phải nhét vào góc: đuôi của hệ hai tầng
+    # nằm bên phải đường đơn tầng, tức p95 xấu hơn.
     ax.text(
         0.985,
         0.055,
@@ -194,7 +194,7 @@ def _num(x, lang, nd=1):
     return s if lang == "en" else s.replace(",", " ").replace(".", ",").replace(" ", ".")
 
 
-# ── Hình 3 — rào chắn tĩnh: chặn theo xuất xứ, kèm ĐỐI CHỨNG ÂM ──────────────
+# Hình 3 - rào chắn tĩnh: chặn theo xuất xứ, kèm đối chứng âm
 T3 = {
     "en": dict(
         title="Static pre-filter: block rate by provenance, against its false-flag rate",
@@ -263,7 +263,7 @@ def fig_guardrail(lang):
     save_one(fig, "fig_guardrail_rates", lang)
 
 
-# ── Hình 4 — quy kết theo kỹ thuật: trần truy xuất / RRF / toàn tuyến ────────
+# Hình 4 - quy kết theo kỹ thuật: trần truy xuất / RRF / toàn tuyến
 T4 = {
     "en": dict(
         title="Attribution by technique against the retrieval ceiling",
@@ -314,7 +314,7 @@ def fig_attribution(lang):
     save_one(fig, "fig_rq3_attribution", lang)
 
 
-# ── Hình 5 — phễu phân loại của Tier-2 ───────────────────────────────────────
+# Hình 5 - phễu phân loại của Tier-2
 T5 = {
     "en": dict(
         title="Tier 2 alert triage: the value is in the deferral channel, not the verdict",
@@ -410,7 +410,7 @@ def fig_triage(lang):
     save_one(fig, "fig_triage_funnel", lang)
 
 
-# ── Hình 6 — bóc tách thành phần + chất lượng lập luận ───────────────────────
+# Hình 6 - bóc tách thành phần + chất lượng lập luận
 # Hai khối kết quả này trước đây chỉ có bảng và chữ. Vẽ ra để đọc được bằng mắt:
 # trái là đóng góp từng tầng (kèm KTC 95%), phải là bốn trục chấm lập luận.
 T6 = {

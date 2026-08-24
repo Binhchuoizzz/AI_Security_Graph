@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# =============================================================================
 # SENTINEL — CHẠY FULL DEMO BẰNG **MỘT LỆNH**
-# =============================================================================
 # Dựng hạ tầng + UI rồi đẩy LUỒNG TEST (push_datatest.py) chảy qua pipeline đầy đủ.
 #
 # ⚠️ Script này KHÔNG tự reset. Hãy TỰ chạy reset_all TRƯỚC (dọn DB + luật động trong
@@ -21,7 +19,6 @@
 #
 # Sau khi chạy: mở http://localhost:8501 (đăng nhập: manager).
 # Tắt để giải phóng RAM:  pkill -f "main.py --mode server" ; docker-compose stop
-# =============================================================================
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

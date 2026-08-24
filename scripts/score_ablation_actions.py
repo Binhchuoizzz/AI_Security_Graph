@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Chấm lại ablation THEO HÀNH ĐỘNG trên dân số đã loại mẫu tự soạn.
+"""Chấm lại ablation theo hành động trên dân số đã loại mẫu tự soạn.
 
-VÌ SAO CẦN SCRIPT NÀY (đọc trước khi sửa):
+Vì sao cần SCRIPT này (đọc trước khi sửa):
 
-1. **Thước nhị phân bão hoà, không dùng được.** Trên `ground_truth.json` tỉ lệ tấn công là
-   86,86%, nên F1/Accuracy nhị phân xấp xỉ base rate và MỌI cấu hình cho gần như cùng một
-   con số — `ablation_results.json → metric_health` đã tự gắn cờ
-   `binary_f1_trustworthy: false`. Thước dùng được là **chấm theo hành động**: phán quyết
+1. Thước nhị phân bão hoà, không dùng được. Trên `ground_truth.json` tỉ lệ tấn công là
+   86,86%, nên F1/Accuracy nhị phân xấp xỉ base rate và mọi cấu hình cho gần như cùng một
+   con số - `ablation_results.json -> metric_health` đã tự gắn cờ
+   `binary_f1_trustworthy: false`. Thước dùng được là chấm theo hành động: phán quyết
    cuối (`BLOCK_IP` / `ALERT` / `LOG` / `AWAIT_HITL`) có trùng hành động kỳ vọng không.
 
-2. **`run_ablation.py` chấm A/F trên CẢ 1.750 mẫu, tức GỒM 50 mẫu tác giả tự soạn.**
-   `drop_authored()` trong tệp đó chỉ áp cho *tập chấm quy kết* (550 → 250), không áp cho
-   vòng ablation. Mà 50 mẫu ấy đều kỳ vọng `ALERT` cả 50 — đưa vào là để thước đo tự chấm
-   văn mình viết. Luận văn đã tuyên bố loại chúng khỏi **mọi** tỉ lệ, nên phải loại thật.
+2. `run_ablation.py` chấm A/F trên cả 1.750 mẫu, tức gồm 50 mẫu tác giả tự soạn.
+   `drop_authored()` trong tệp đó chỉ áp cho *tập chấm quy kết* (550 -> 250), không áp cho
+   vòng ablation. Mà 50 mẫu ấy đều kỳ vọng `ALERT` cả 50 - đưa vào là để thước đo tự chấm
+   văn mình viết. Luận văn đã tuyên bố loại chúng khỏi mọi tỉ lệ, nên phải loại thật.
 
-Script này KHÔNG chạy lại mô hình. Nó đọc mảng dự đoán ĐÃ LƯU trong
-`ablation_{results,bcde_results}.json` — đã kiểm chứng thứ tự phần tử trùng khít
-`ground_truth.json` — rồi bỏ đúng các chỉ số của mẫu tự soạn và tính lại. Tất định, không
+Script này không chạy lại mô hình. Nó đọc mảng dự đoán đã lưu trong
+`ablation_{results,bcde_results}.json` - đã kiểm chứng thứ tự phần tử trùng khít
+`ground_truth.json` - rồi bỏ đúng các chỉ số của mẫu tự soạn và tính lại. Tất định, không
 tốn token, chạy được offline.
 
 Chạy: `.venv/bin/python scripts/score_ablation_actions.py`
@@ -32,11 +32,11 @@ import sys
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
-# DÙNG LẠI bộ chấm CHÍNH THỨC, không viết lại. Tự định nghĩa "hành động kết thúc" ở đây là
+# Dùng lại bộ chấm chính thức, không viết lại. Tự định nghĩa "hành động kết thúc" ở đây là
 # cách chắc chắn nhất để ra số lệch: bản nháp đầu của script này bỏ sót `DROP` (hệ sinh
 # `DROP` cho lưu lượng lành, ground_truth ghi nhãn di sản `LOG`) nên Config F tụt từ 0,3434
-# xuống 0,0706 — không phải phát hiện gì cả, chỉ là chấm sai. `action_scoring` đã có sẵn
-# bí danh DROP≡LOG và có unit test trong CI; mọi thay đổi ngữ nghĩa phải sửa ở ĐÓ.
+# xuống 0,0706 - không phải phát hiện gì cả, chỉ là chấm sai. `action_scoring` đã có sẵn
+# bí danh DROP≡LOG và có unit test trong CI; mọi thay đổi ngữ nghĩa phải sửa ở đó.
 from experiments.action_scoring import score_actions  # noqa: E402
 
 RESULTS = os.path.join(BASE_DIR, "experiments", "results")
@@ -45,7 +45,7 @@ OUT = os.path.join(RESULTS, "ablation_action_scores.json")
 
 
 def load_authored_mask() -> tuple[list[bool], list[str]]:
-    """Trả về (mặt nạ tự-soạn, hành động kỳ vọng) theo ĐÚNG thứ tự của ground_truth."""
+    """Trả về (mặt nạ tự-soạn, hành động kỳ vọng) theo đúng thứ tự của ground_truth."""
     with open(GROUND_TRUTH, encoding="utf-8") as fh:
         gt = json.load(fh)
     items = gt if isinstance(gt, list) else gt.get("samples") or gt.get("data") or []
@@ -75,7 +75,7 @@ def main() -> int:
         "configs": {},
     }
 
-    # ── A và F: mảng dài 1.750, khớp thứ tự ground_truth ─────────────────────────
+    # A và F: mảng dài 1.750, khớp thứ tự ground_truth
     path_af = os.path.join(RESULTS, "ablation_results.json")
     with open(path_af, encoding="utf-8") as fh:
         af = json.load(fh)
@@ -91,7 +91,7 @@ def main() -> int:
             return 1
         out["configs"][cfg.replace("Config_", "")] = score(actions, gt_expected, keep)
 
-    # ── B-E: lát 300 mẫu riêng, expected_actions của CHÍNH tệp đó ────────────────
+    # B-E: lát 300 mẫu riêng, expected_actions của chính tệp đó
     # Không dùng mặt nạ 1.750 ở đây: lát này được chọn lại, chỉ số không tương ứng.
     path_bcde = os.path.join(RESULTS, "ablation_bcde_results.json")
     if os.path.exists(path_bcde):
@@ -105,7 +105,7 @@ def main() -> int:
             out["configs"][cfg] = score(actions, exp_b, [True] * len(actions))
             out["configs"][cfg]["note_population"] = "lát 300 mẫu, không so trực tiếp với A/F"
 
-    # ── Bão hoà: C, D, E có khác nhau không? Ghi thẳng vào tệp, đừng để người đọc tự đoán.
+    # Bão hoà: C, D, E có khác nhau không? Ghi thẳng vào tệp, đừng để người đọc tự đoán.
     cde = [out["configs"].get(c, {}).get("action_accuracy") for c in ("C", "D", "E")]
     out["cde_identical"] = len({v for v in cde if v is not None}) == 1
     out["cde_note"] = (

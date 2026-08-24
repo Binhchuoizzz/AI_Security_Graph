@@ -1,6 +1,4 @@
-"""
-Guardrails: Log Template Miner (Volume Compression Engine using Drain3)
-"""
+"""Gom log về khuôn mẫu bằng Drain3 để nén khối lượng trước khi vào LLM."""
 
 import logging
 import math
@@ -14,13 +12,13 @@ from src.guardrails.constants import normalize_log_keys
 
 logger = logging.getLogger(__name__)
 
-# Trần ký tự cho MỖI trường bằng chứng (message/payload/uri…) khi đưa vào Drain. Đủ dài để
-# giữ chuỗi tấn công (UNION SELECT…, <script>…), đủ ngắn để một payload khổng lồ không phá
+# Trần ký tự cho mỗi trường bằng chứng (message/payload/uri...) khi đưa vào Drain. Đủ dài để
+# giữ chuỗi tấn công (UNION SELECT..., <script>...), đủ ngắn để một payload khổng lồ không phá
 # ngân sách ngữ cảnh. TokenBudgetManager vẫn cắt tỉa lần cuối ở tầng trên.
 EVIDENCE_FIELD_CHARS = 300
 
 
-# Lazy config loader to avoid circular dependency
+# Nạp cấu hình trễ để tránh phụ thuộc vòng
 def load_config():
     from src.guardrails.prompt_filter import load_config as pf_load_config
 
@@ -30,7 +28,7 @@ def load_config():
 class LogTemplateMiner:
     """
     Thuật toán nén log sử dụng thư viện Drain3 chính thức từ IBM.
-    GOM NHÓM các dòng log có cùng cấu trúc tĩnh -> 1 Template + freq + samples.
+    Gom nhóm các dòng log có cùng cấu trúc tĩnh -> 1 Template + freq + samples.
     """
 
     def __init__(self, max_samples: int = 3):
@@ -63,8 +61,8 @@ class LogTemplateMiner:
 
         self.miner = TemplateMiner(config=cfg)
         self.max_samples = max_samples
-        self.samples = {}  # cluster_id -> list of raw logs
-        self.time_ranges = {}  # cluster_id -> [min_time, max_time]
+        self.samples = {}  # cluster_id -> danh sách log thô
+        self.time_ranges = {}  # cluster_id -> [thời điểm sớm nhất, muộn nhất]
         self.total_logs_processed = 0
 
     @property
@@ -114,14 +112,14 @@ class LogTemplateMiner:
         """Thêm log dạng dict, chuẩn hóa keys trước khi trích xuất."""
         normalized = normalize_log_keys(log_entry)
 
-        # BUG ĐÃ SỬA (nghiêm trọng): danh sách này TRƯỚC ĐÂY chỉ có 5 trường mạng, KHÔNG có
-        # message/payload/uri — tức là mọi BẰNG CHỨNG TẦNG ỨNG DỤNG bị vứt bỏ trước khi tới
-        # LLM. Một tấn công SQLi rõ ràng đến Tier-2 chỉ còn "Source IP=… Destination Port=80",
-        # nên LLM KHÔNG THỂ nhận ra (đo thật: cấp payload thì LLM cho 0.93/BLOCK, còn qua
+        # BUG đã sửa (nghiêm trọng): danh sách này trước đây chỉ có 5 trường mạng, không có
+        # message/payload/uri - tức là mọi bằng chứng tầng ứng dụng bị vứt bỏ trước khi tới
+        # LLM. Một tấn công SQLi rõ ràng đến Tier-2 chỉ còn "Source IP=... Destination Port=80",
+        # nên LLM không thể nhận ra (đo thật: cấp payload thì LLM cho 0.93/BLOCK, còn qua
         # pipeline chỉ 0.45/AWAIT_HITL). Đây là lý do LLM gần như không bao giờ chặn được các
         # lớp tấn công web (SQLi/XSS/LFI/command injection).
-        # AN TOÀN: payload vẫn được prompt_filter làm sạch và bọc trong <<<DATA_BEGIN…>>> kèm
-        # cảnh báo injection — phòng thủ nằm ở ĐÓNG GÓI, không phải ở việc xoá bằng chứng.
+        # An toàn: payload vẫn được prompt_filter làm sạch và bọc trong <<<DATA_BEGIN...>>> kèm
+        # cảnh báo injection - phòng thủ nằm ở đóng gói, không phải ở việc xoá bằng chứng.
         key_fields = [
             "Source IP",
             "Destination Port",
@@ -201,9 +199,7 @@ class LogTemplateMiner:
 
 
 class EntropyScorer:
-    """
-    Shannon Entropy scorer cho log strings.
-    """
+    """Shannon Entropy scorer cho log strings."""
 
     def __init__(self, threshold: float | None = None):
         if threshold is not None:
@@ -234,9 +230,7 @@ class EntropyScorer:
 
 
 class TokenBudgetManager:
-    """
-    Quản lý ngân sách token.
-    """
+    """Quản lý ngân sách token."""
 
     def __init__(self, budget: int | None = None):
         # Tham số tường minh được ưu tiên hơn config; config chỉ là mặc định
@@ -265,7 +259,7 @@ class TokenBudgetManager:
         output_lines = []
         current_tokens = 0
 
-        # Priority 1: High-entropy logs (40% budget)
+        # Ưu tiên 1: log entropy cao (40% hạn mức)
         if high_entropy_logs:
             output_lines.append("--- HIGH-PRIORITY LOGS (anomalous entropy) ---")
             for log in high_entropy_logs:
@@ -276,7 +270,7 @@ class TokenBudgetManager:
                 output_lines.append(line)
                 current_tokens += t
 
-        # Priority 2: Template summaries (remaining 60%)
+        # Ưu tiên 2: bản tóm tắt theo khuôn (60% còn lại)
         output_lines.append("--- COMPRESSED TEMPLATES ---")
         for line in template_text.split("\n"):
             t = self.estimate_tokens(line)

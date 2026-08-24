@@ -1,6 +1,4 @@
-"""
-Tests for Output Sanitizer (Data Exfiltration Defense — Attack Vector #04)
-"""
+"""Kiểm thử bộ làm sạch đầu ra, chống rò rỉ dữ liệu (vector tấn công #04)"""
 
 import pytest  # type: ignore
 
@@ -79,7 +77,7 @@ class TestDataURIStripping:
 
 
 class TestSanitizeForDB:
-    """Test DB-safe sanitization (using parameterized queries, no manual escaping)."""
+    """Làm sạch an toàn cho DB: dùng truy vấn tham số, không tự escape."""
 
     def test_retains_single_quotes(self, sanitizer):
         text = "O'Malley's attack"
@@ -94,7 +92,7 @@ class TestSanitizeForDB:
 
 
 class TestStripCounter:
-    """Verify strip counting."""
+    """Kiểm số lượng đã bóc."""
 
     def test_counts_stripped_patterns(self, sanitizer):
         text = "![a](http://evil.com) and <script>x</script>"
@@ -144,14 +142,14 @@ class TestEdgeCases:
         assert result == "Red Alert"
 
     def test_base64_obfuscation(self, sanitizer):
-        # PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg== is Base64 for <script>alert(1)</script>
+        # PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg== là base64 của <script>alert(1)</script>
         text = "Payload: PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="
         result = sanitizer.sanitize(text)
         assert "[BASE64_OBFUSCATED_STRIPPED]" in result
         assert "PHNjcmlwd" not in result
 
     def test_hex_obfuscation(self, sanitizer):
-        # 3c7363726970743e is hex representation of <script>
+        # 3c7363726970743e là dạng hex của <script>
         text = "Hex: 3c7363726970743e"
         result = sanitizer.sanitize(text)
         assert "[HEX_OBFUSCATED_STRIPPED]" in result

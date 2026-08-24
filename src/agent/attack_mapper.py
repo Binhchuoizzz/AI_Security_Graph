@@ -1,30 +1,30 @@
 """
-SENTINEL Tier-2 — MITRE ATT&CK Mapping Layer (structured enrichment)
+Quy kết kỹ thuật MITRE ATT&CK cho phán quyết Tier-2.
 
-MỤC ĐÍCH:
+Mục đích:
   node_llm_triage đã xuất `mitre_technique` dạng FREE-TEXT (vd "T1190 - ...").
-  Lớp này biến nó thành bản đồ ATT&CK CÓ CẤU TRÚC, kiểm chứng được:
+  Lớp này biến nó thành bản đồ ATT&CK có cấu trúc, kiểm chứng được:
   tactic / tactic_id / technique / technique_id / sub-technique / URL /
   mapping_confidence / recommended_response.
 
-THIẾT KẾ (đã chốt với chủ nhiệm đề tài):
-  - TÁI DÙNG hạ tầng có sẵn: knowledge_base/mitre_attack.json (299 kỹ thuật) +
+Thiết kế (đã chốt với chủ nhiệm đề tài):
+  - tái dùng hạ tầng có sẵn: knowledge_base/mitre_attack.json (299 kỹ thuật) +
     DualRetriever (FAISS+BM25, RRF k=60) + llm_client (llama.cpp Foundation-Sec-8B @ :5000).
-    KHÔNG tải lại STIX, KHÔNG tạo KB/endpoint song song.
-  - Đường XÁC ĐỊNH (deterministic) cho các tấn công web phổ biến: tra
-    WEB_ATTACK_MAP (do người soạn, mọi technique/tactic đều là ATT&CK THẬT).
-    => test tái lập được, KHÔNG cần LLM/CI server.
+    Không tải lại STIX, không tạo KB/endpoint song song.
+  - Đường xác định (deterministic) cho các tấn công web phổ biến: tra
+    WEB_ATTACK_MAP (do người soạn, mọi technique/tactic đều là ATT&CK thật).
+    => test tái lập được, không cần LLM/CI server.
   - Đường suy luận: nếu attack_type lạ -> RRF lấy top-3 ứng viên từ KB ->
     LLM chọn cái khớp nhất (graceful fallback về top-RRF nếu LLM chết).
-  - Fallback "C + cờ trạng thái": LUÔN ghi structured fields từ ứng viên tốt
-    nhất + mapping_confidence THẬT + mapping_status ∈ {resolved, low_confidence};
-    KHÔNG bịa độ tin cậy, KHÔNG vứt thông tin.
+  - Fallback "C + cờ trạng thái": Luôn ghi structured fields từ ứng viên tốt
+    nhất + mapping_confidence thật + mapping_status ∈ {resolved, low_confidence};
+    Không bịa độ tin cậy, không vứt thông tin.
   - recommended_response: rule-based theo tactic (xác định, đúng cho web). KB
     response_actions chỉ override khi đặc thù (250/299 kỹ thuật là generic).
 
-LƯU Ý TRUNG THỰC (no-fabrication):
-  - Prompt Injection KHÔNG thuộc ATT&CK Enterprise -> ánh xạ sang MITRE ATLAS
-    AML.T0051. tactic_id của ATLAS CỐ TÌNH để trống vì chưa verify được số TA
+Lưu Ý trung thực (no-fabrication):
+  - Prompt Injection không thuộc ATT&CK Enterprise -> ánh xạ sang MITRE ATLAS
+    AML.T0051. tactic_id của ATLAS cố tình để trống vì chưa verify được số ta
     chính xác (không bịa). Có thể điền sau khi tra atlas.mitre.org.
   - IDOR không có kỹ thuật ATT&CK riêng -> ánh xạ T1190 với confidence thấp hơn
     và ghi chú rõ giới hạn.
@@ -45,9 +45,9 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_json_object(raw: Any) -> dict:
-    """Parse phản hồi LLM về một dict JSON, chịu lỗi (KHÔNG dùng schema triage).
+    """Parse phản hồi LLM về một dict JSON, chịu lỗi (không dùng schema triage).
 
-    Dùng cho _llm_select — phản hồi chọn-MITRE có schema riêng, không phải DECISION schema.
+    Dùng cho _llm_select - phản hồi chọn-MITRE có schema riêng, không phải DECISION schema.
     Bóc khối JSON đầu tiên nếu mô hình bọc thêm văn bản/markdown quanh nó.
     """
     if isinstance(raw, dict):
@@ -66,29 +66,29 @@ def _parse_json_object(raw: Any) -> dict:
         return {}
 
 
-# === Đường dẫn KB tái dùng (không tạo store mới) ===
+# Đường dẫn KB tái dùng (không tạo store mới)
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 KB_PATH = os.path.join(_BASE_DIR, "knowledge_base", "mitre_attack.json")
 
 # Dưới ngưỡng này => mapping_status = "low_confidence".
-# (Cổng KÍCH HOẠT mapper nằm ở nodes.route_after_triage và gate theo ACTION threat,
-#  không theo confidence — xem ghi chú thiết kế ở đó.)
+# (Cổng kích hoạt mapper nằm ở nodes.route_after_triage và gate theo ACTION threat,
+#  không theo confidence - xem ghi chú thiết kế ở đó.)
 LOW_CONFIDENCE_THRESHOLD = 0.5
 
-# Kỹ thuật "QUÁ TỔNG QUÁT": chỉ dựa vào MỘT tín hiệu yếu (một cổng lạ) mà KHÔNG có bằng
-# chứng bổ trợ (payload/message app-layer) thì KHÔNG đủ chắc để tự-hành-động (auto-BLOCK).
+# Kỹ thuật "quá tổng quát": chỉ dựa vào một tín hiệu yếu (một cổng lạ) mà không có bằng
+# chứng bổ trợ (payload/message app-layer) thì không đủ chắc để tự-hành-động (auto-BLOCK).
 # Điển hình: T1571 (Non-Standard Port / C2). LLM hay "chốt" T1571 cho mọi flow cổng cao dù
-# đó có thể chỉ là dịch vụ hợp lệ trên cổng ephemeral. Khi neo vào các id này mà THIẾU
-# corroboration -> hạ về low_confidence -> lá chắn node_attack_mapper ép AWAIT_HITL NHƯNG
-# vẫn GIỮ technique dự đoán trong reasoning (đúng "vẫn dự đoán + trả HITL"). Mở rộng khi cần.
+# đó có thể chỉ là dịch vụ hợp lệ trên cổng ephemeral. Khi neo vào các id này mà thiếu
+# corroboration -> hạ về low_confidence -> lá chắn node_attack_mapper ép AWAIT_HITL nhưng
+# vẫn giữ technique dự đoán trong reasoning (đúng "vẫn dự đoán + trả HITL"). Mở rộng khi cần.
 OVERLY_GENERIC_TECHNIQUES: frozenset[str] = frozenset({"T1571"})
 
-# Bằng chứng DUY NHẤT biện minh được cho T1571: dấu hiệu kênh điều khiển. Một số cổng thì
-# không — xem `_corroborates_c2`.
+# Bằng chứng duy nhất biện minh được cho T1571: dấu hiệu kênh điều khiển. Một số cổng thì
+# không - xem `_corroborates_c2`.
 #
-# CỐ Ý KHÔNG có "non-standard port" trong danh sách: đó là TÊN của chính T1571, nên nhận nó
-# làm bằng chứng thì lá chắn tự phản — model chỉ cần nêu tên kỹ thuật là tự chứng minh cho
-# mình. Bằng chứng phải ĐỘC LẬP với kết luận.
+# Cố Ý không có "non-standard port" trong danh sách: đó là tên của chính T1571, nên nhận nó
+# làm bằng chứng thì lá chắn tự phản - model chỉ cần nêu tên kỹ thuật là tự chứng minh cho
+# mình. Bằng chứng phải độc lập với kết luận.
 _C2_EVIDENCE_RE = re.compile(
     r"(?i)(command[ -]and[ -]control|\bc2\b|\bc&c\b|beacon|callback|exfiltrat|tunnel"
     r"|reverse shell|infiltrat)"
@@ -96,15 +96,15 @@ _C2_EVIDENCE_RE = re.compile(
 
 
 def _corroborates_c2(attack_type: str, payload: str = "") -> bool:
-    """Đầu vào có dấu hiệu KÊNH ĐIỀU KHIỂN không (ở phân loại HOẶC ở payload)?
+    """Đầu vào có dấu hiệu kênh điều khiển không (ở phân loại hoặc ở payload)?
 
     T1571 (Non-Standard Port) là kỹ thuật COMMAND AND CONTROL. Nó chỉ đúng khi có dấu hiệu
     kênh điều khiển; một con số cổng thì không bao giờ đủ, và `prompts.py` đã dặn thẳng LLM
     điều đó ("If a non-standard port is the ONLY signal you have, you MUST choose
-    AWAIT_HITL"). Ở đây là chỗ THI HÀNH lời dặn ấy thay vì tin model tự tuân thủ.
+    AWAIT_HITL"). Ở đây là chỗ thi hành lời dặn ấy thay vì tin model tự tuân thủ.
 
-    Xét NỘI DUNG payload chứ không xét payload CÓ TỒN TẠI hay không: một payload beacon là
-    bằng chứng ủng hộ, một payload SQLi là bằng chứng CHỐNG LẠI cách đọc C2. Điều kiện cũ
+    Xét nội dung payload chứ không xét payload có tồn tại hay không: một payload beacon là
+    bằng chứng ủng hộ, một payload SQLi là bằng chứng chống lại cách đọc C2. Điều kiện cũ
     ("có payload là đủ") không phân biệt được hai thứ đối lập ấy.
     """
     return bool(_C2_EVIDENCE_RE.search(f"{attack_type or ''} {payload or ''}"))
@@ -116,10 +116,10 @@ FRAMEWORK_ATLAS = "MITRE ATLAS"
 
 @functools.lru_cache(maxsize=1)
 def _llm_select_enabled() -> bool:
-    """Có gọi LLM lần 2 (chọn MITRE trong ứng viên RRF) cho ca MƠ HỒ không.
+    """Có gọi LLM lần 2 (chọn MITRE trong ứng viên RRF) cho ca mơ hồ không.
 
-    Mặc định TẮT (tối ưu tốc độ): ca không phải web-attack curated và triage KHÔNG nêu
-    technique-id -> KHÔNG tốn thêm 1 inference LLM để đoán. Đính top-RRF làm GỢI Ý nhưng để
+    Mặc định tắt (tối ưu tốc độ): ca không phải web-attack curated và triage không nêu
+    technique-id -> không tốn thêm 1 inference LLM để đoán. Đính top-RRF làm gợi Ý nhưng để
     low_confidence -> lá chắn node_attack_mapper ép AWAIT_HITL (log không khớp rõ -> người
     duyệt). Bật lại bằng config `tier2.attack_mapper.llm_select: true` (phục vụ ablation)."""
     try:
@@ -133,9 +133,7 @@ def _llm_select_enabled() -> bool:
         return False
 
 
-# ==============================================================================
-# PYDANTIC MODELS (schema luôn hợp lệ — pydantic validate khi khởi tạo)
-# ==============================================================================
+# Lược đồ Pydantic - luôn hợp lệ vì được validate ngay khi khởi tạo
 class AttackMapperInput(BaseModel):
     """Đầu vào: kết quả phân loại của node_llm_triage."""
 
@@ -149,7 +147,7 @@ class MitreMapping(BaseModel):
     """Đầu ra có cấu trúc của lớp mapping."""
 
     attack_type: str
-    confidence: float  # độ tin cậy PHÁT HIỆN (từ triage), giữ nguyên
+    confidence: float  # độ tin cậy phát hiện (từ triage), giữ nguyên
     framework: str = FRAMEWORK_ATTACK
     mitre_tactic: str
     mitre_tactic_id: str
@@ -158,14 +156,12 @@ class MitreMapping(BaseModel):
     mitre_subtechnique: str | None = None
     mitre_subtechnique_id: str | None = None
     mitre_url: str
-    mapping_confidence: float  # độ tin cậy của riêng phép ÁNH XẠ (heuristic, [0,1])
+    mapping_confidence: float  # độ tin cậy của riêng phép ánh xạ (heuristic, [0,1])
     mapping_status: str  # "resolved" | "low_confidence"
     recommended_response: str
 
 
-# ==============================================================================
-# BẢNG TACTIC CHÍNH THỨC (sự thật công khai, ổn định của ATT&CK Enterprise)
-# ==============================================================================
+# Bảng TACTIC chính thức (sự thật công khai, ổn định của ATT&CK Enterprise)
 TACTIC_IDS: dict[str, str] = {
     "Initial Access": "TA0001",
     "Execution": "TA0002",
@@ -191,8 +187,8 @@ TACTIC_ALIASES: dict[str, str] = {
     "command & control": "Command and Control",
 }
 
-# Recommended response per TACTIC (rule-based, deterministic). Written in ENGLISH to stay
-# consistent with the English reasoning field shown on the SOC dashboard.
+# Khuyến nghị phản hồi theo TACTIC (luật, tất định). Viết bằng tiếng Anh cho khớp
+# với trường reasoning tiếng Anh hiện trên dashboard.
 TACTIC_RESPONSE: dict[str, str] = {
     "Initial Access": "Block the source IP at the WAF/firewall, patch/isolate the exploited endpoint, escalate to HITL to verify scope.",
     "Execution": "Block the source IP, isolate or terminate the suspicious process, collect artefacts, escalate to HITL.",
@@ -211,7 +207,7 @@ TACTIC_RESPONSE: dict[str, str] = {
 }
 DEFAULT_RESPONSE = "Alert and escalate to HITL for manual analysis."
 
-# Attack-type-specific response (takes precedence over TACTIC_RESPONSE when present).
+# Phản hồi riêng theo loại tấn công, ưu tiên hơn TACTIC_RESPONSE nếu có.
 SPECIAL_RESPONSE: dict[str, str] = {
     "prompt_injection": (
         "Quarantine the request, neutralize the injected instructions, do NOT execute "
@@ -220,9 +216,7 @@ SPECIAL_RESPONSE: dict[str, str] = {
 }
 
 
-# ==============================================================================
-# BẢN ĐỒ XÁC ĐỊNH cho tấn công WEB phổ biến (mọi giá trị là ATT&CK/ATLAS THẬT)
-# ==============================================================================
+# Bản đồ xác định cho tấn công WEB phổ biến (mọi giá trị là ATT&CK/ATLAS thật)
 def _entry(
     attack_type: str,
     technique_id: str,
@@ -310,7 +304,7 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         0.85,
     ),
     # Command Injection -> T1059 (parent) / Execution. T1059 cha không nằm trong KB,
-    # nhưng đây là kỹ thuật ATT&CK THẬT và là ánh xạ chuẩn cho command injection.
+    # nhưng đây là kỹ thuật ATT&CK thật và là ánh xạ chuẩn cho command injection.
     "command_injection": _entry(
         "Command Injection",
         "T1059",
@@ -319,7 +313,7 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         "TA0002",
         0.90,
     ),
-    # IDOR: ATT&CK KHÔNG có kỹ thuật riêng -> gần nhất là T1190; hạ confidence + ghi chú.
+    # IDOR: ATT&CK không có kỹ thuật riêng -> gần nhất là T1190; hạ confidence + ghi chú.
     "idor": _entry(
         "Insecure Direct Object Reference (IDOR)",
         "T1190",
@@ -328,8 +322,8 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         "TA0001",
         0.60,
     ),
-    # Prompt Injection: KHÔNG thuộc ATT&CK Enterprise -> MITRE ATLAS AML.T0051.
-    # tactic_id CỐ TÌNH để trống (chưa verify số AML.TA — không bịa).
+    # Prompt Injection: Không thuộc ATT&CK Enterprise -> MITRE ATLAS AML.T0051.
+    # tactic_id cố tình để trống (chưa verify số AML.Ta - không bịa).
     "prompt_injection": _entry(
         "LLM Prompt Injection",
         "AML.T0051",
@@ -339,9 +333,9 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         0.85,
         framework=FRAMEWORK_ATLAS,
     ),
-    # Jailbreak KHÁC tiêm nhiễm câu lệnh, và ATLAS tách hẳn hai mã. Trước đây mọi đòn đánh
+    # Jailbreak khác tiêm nhiễm câu lệnh, và ATLAS tách hẳn hai mã. Trước đây mọi đòn đánh
     # vào LLM đều đổ chung vào AML.T0051, nên một payload chiếm vai / gỡ ràng buộc bị ghi
-    # vào hồ sơ sự cố dưới nhãn "LLM Prompt Injection" — sai kỹ thuật ngay trong chứng cứ.
+    # vào hồ sơ sự cố dưới nhãn "LLM Prompt Injection" - sai kỹ thuật ngay trong chứng cứ.
     # Tên lấy đúng nguyên văn ATLAS, thống nhất với hợp đồng đã nêu ở `prompts.py`.
     "llm_jailbreak": _entry(
         "LLM Jailbreak",
@@ -352,12 +346,12 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
         0.85,
         framework=FRAMEWORK_ATLAS,
     ),
-    # TÊN PHẢI ĐI VỚI ĐÚNG MÃ. Hai mục dưới từng ghi tên của kỹ thuật CHA cạnh mã của kỹ
-    # thuật CON ("T1595.003 - Active Scanning", "T1071.001 - Application Layer Protocol").
-    # `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` và KHÔNG đi qua
+    # Tên phải đi với đúng mã. Hai mục dưới từng ghi tên của kỹ thuật cha cạnh mã của kỹ
+    # thuật con ("T1595.003 - Active Scanning", "T1071.001 - Application Layer Protocol").
+    # `_from_curated` dựng nhãn cuối bằng `f"{technique_id} - {technique}"` và không đi qua
     # `verify_technique_label`, nên nhãn sai đi thẳng ra Dashboard. Đo lượt 14/08/2026:
     # 2/939 lô hiện "T1595.003 - Active Scanning" trong khi tên chính thức của T1595.003 là
-    # "Wordlist Scanning". Dùng quy ước "Cha: Con" y như mục `xss` — giữ được cả ngữ cảnh cha
+    # "Wordlist Scanning". Dùng quy ước "Cha: Con" y như mục `xss` - giữ được cả ngữ cảnh cha
     # lẫn danh tính con. `test_curated_map_ten_khop_ma` khoá bất biến này.
     "active_scan": _entry(
         "Active Scanning: Wordlist Scanning",
@@ -392,21 +386,21 @@ WEB_ATTACK_MAP: dict[str, dict[str, Any]] = {
 # Từ khoá -> khoá chuẩn (quét trên attack_type + payload + features). Thứ tự ưu
 # tiên xử lý trường hợp chồng lấn (vd "../" rất chung).
 #
-# TUYỆT ĐỐI KHÔNG ĐƯA MÃ KỸ THUẬT ("t1595", "t1083"…) VÀO DANH SÁCH NÀY.
+# Tuyệt đối không đưa mã kỹ thuật ("t1595", "t1083"...) vào danh sách này.
 #
 # Lý do, đo được chứ không suy đoán. `nodes.py` dựng `type_hint` bằng cách nối
-# `decision["mitre_technique"]` — tức mã LLM TỰ KHAI — với reasoning và tier1_reasons, rồi
+# `decision["mitre_technique"]` - tức mã LLM tự khai - với reasoning và tier1_reasons, rồi
 # truyền vào `AttackMapperInput.attack_type`. Nếu ở đây có từ khoá là mã, bộ ánh xạ sẽ khớp
 # đúng cái mã mà LLM vừa nêu và trả lại y nguyên:
 #
 #     LLM tự khai 'T1595.003 Wordlist Scanning'  -> mapper trả 'T1595.003'
 #     LLM tự khai 'hoàn toàn bịa T9999'          -> mapper trả 'T9999'
 #
-# Khi đó "bộ ánh xạ tất định" không còn tất định — nó thành cái loa nhại lại LLM, và toàn
+# Khi đó "bộ ánh xạ tất định" không còn tất định - nó thành cái loa nhại lại LLM, và toàn
 # bộ lập luận "quy kết do bộ ánh xạ quyết, không do LLM quyết" sụp đổ. Bốn từ khoá dạng mã
 # (`t1595.003`, `t1595`, `t1071.001`, `t1083`) đã bị gỡ vì lý do này.
 #
-# Chỉ dùng từ khoá HÀNH VI: "wordlist scanning", "web protocols", "directory enumeration"…
+# Chỉ dùng từ khoá hành VI: "wordlist scanning", "web protocols", "directory enumeration"...
 _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
     (
         "prompt_injection",
@@ -527,11 +521,9 @@ _ATTACK_KEYWORDS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 
-# ==============================================================================
-# HÀM HỖ TRỢ
-# ==============================================================================
+# Hàm hỗ trợ
 def _kw_hit(kw: str, haystack: str) -> bool:
-    """Khớp keyword. Keyword 'từ' (chỉ chữ/số/space) phải khớp NGUYÊN TỪ (word
+    """Khớp keyword. Keyword 'từ' (chỉ chữ/số/space) phải khớp nguyên từ (word
     boundary) để tránh dương-tính-giả như 'rce' lọt trong 'fo[rce]' (brute force).
     Keyword chứa ký tự đặc biệt (../, <script, $(, javascript:) thì khớp substring."""
     if all(c.isalnum() or c.isspace() for c in kw):
@@ -550,12 +542,12 @@ def normalize_attack_type(*texts: str) -> str:
     for key, kws in _ATTACK_KEYWORDS:
         if any(_kw_hit(kw, haystack) or _kw_hit(kw, raw_haystack) for kw in kws):
             return key
-    # Chữ ký CẤU TRÚC cho đòn đánh vào LLM — chạy SAU vòng từ khoá, không bao giờ trước.
+    # Chữ ký cấu trúc cho đòn đánh vào LLM - chạy sau vòng từ khoá, không bao giờ trước.
     # Thứ tự này giữ đúng bất biến đã vá một lần: một câu SQLi phải ra `sqli`/T1190, không
     # được rơi vào họ ATLAS. Vòng từ khoá nhận diện tấn công web trước, nên tới được đây
     # nghĩa là không có chữ ký web nào khớp.
     #
-    # VÌ SAO CẦN Ở ĐÂY, không chỉ ở guardrail: quy kết đi đường riêng. Trước đây bảng từ
+    # Vì sao cần Ở đây, không chỉ ở guardrail: quy kết đi đường riêng. Trước đây bảng từ
     # khoá `prompt_injection` chỉ có 7 chuỗi, nên một payload chiếm vai không nằm trong 7
     # chuỗi đó sẽ không được bộ ánh xạ tất định nhận -> rơi xuống đường RRF -> RRF tra kho
     # ATT&CK mạng (kho không có ATLAS) -> lá chắn neo bác bỏ -> `N/A`. Đo lượt 17/08/2026:
@@ -569,7 +561,7 @@ def normalize_attack_type(*texts: str) -> str:
 
 
 def normalize_tactic(raw: str) -> tuple[str, str]:
-    """Chuẩn hoá nhãn tactic (kể cả nhãn phi chuẩn của KB) -> (tên chính thức, TA id)."""
+    """Chuẩn hoá nhãn tactic (kể cả nhãn phi chuẩn của KB) -> (tên chính thức, ta id)."""
     if not raw:
         return ("Unknown", "")
     low = raw.strip().lower()
@@ -599,27 +591,25 @@ def _response_for(key: str, tactic: str) -> str:
     return TACTIC_RESPONSE.get(tactic, DEFAULT_RESPONSE)
 
 
-# ==============================================================================
-# ĐỐI CHIẾU TÊN KỸ THUẬT (chống "đúng ID, sai tên")
-# ==============================================================================
-# LLM hay ghép một technique-id ĐÚNG với một cái tên của kỹ thuật KHÁC — quan sát thật:
+# Đối chiếu tên kỹ thuật (chống "đúng ID, sai tên")
+# LLM hay ghép một technique-id đúng với một cái tên của kỹ thuật khác - quan sát thật:
 # "T1087 - Network Service Discovery" (T1087 = Account Discovery; Network Service Discovery
-# là T1046). ID vào được vì regex chỉ bắt Txxxx, còn TÊN thì trước đây không ai kiểm.
-# Lớp này ép tên về nguồn sự thật cục bộ, và khi KB không phủ thì NÓI THẲNG là chưa đối
+# là T1046). ID vào được vì regex chỉ bắt Txxxx, còn tên thì trước đây không ai kiểm.
+# Lớp này ép tên về nguồn sự thật cục bộ, và khi KB không phủ thì nói thẳng là chưa đối
 # chiếu được thay vì đưa tên do LLM đặt ra như thể đó là sự thật.
 UNVERIFIED_NAME_SUFFIX = "(tên chưa đối chiếu được với KB)"
 
 
 @functools.lru_cache(maxsize=1)
 def _canonical_names() -> dict[str, str]:
-    """id -> tên chính thức. BA nguồn, đều là dữ liệu ĐÃ CÓ trong repo (không bịa):
+    """id -> tên chính thức. Ba nguồn, đều là dữ liệu đã có trong repo (không bịa):
 
-    1. `knowledge_base/mitre_attack.json` (299 kỹ thuật) — nguồn chính.
-    2. Tên kỹ thuật CHA suy ra từ quy ước đặt tên "Cha: Con" của chính KB (vd
+    1. `knowledge_base/mitre_attack.json` (299 kỹ thuật) - nguồn chính.
+    2. Tên kỹ thuật cha suy ra từ quy ước đặt tên "Cha: Con" của chính KB (vd
        "Brute Force: Password Spraying" => T1110 = "Brute Force"). KB thiếu 37 id cha;
        cách này khôi phục được 3 cái xuất hiện nhiều nhất (T1059/T1110/T1505), 34 cái
-       còn lại CỐ Ý bỏ trống — thà báo "chưa đối chiếu" còn hơn đoán tên.
-    3. `WEB_ATTACK_MAP` — bảng người soạn, đã verify (gồm cả ATLAS AML.T0051).
+       còn lại cố Ý bỏ trống - thà báo "chưa đối chiếu" còn hơn đoán tên.
+    3. `WEB_ATTACK_MAP` - bảng người soạn, đã verify (gồm cả ATLAS AML.T0051).
     """
     names: dict[str, str] = {}
     for tid, rec in _load_kb_index().items():
@@ -635,7 +625,7 @@ def _canonical_names() -> dict[str, str]:
 
 
 def canonical_technique_name(technique_id: str) -> str | None:
-    """Tên chính thức của một technique-id, hoặc None nếu KB không phủ (KHÔNG đoán)."""
+    """Tên chính thức của một technique-id, hoặc None nếu KB không phủ (không đoán)."""
     return _canonical_names().get((technique_id or "").strip().upper())
 
 
@@ -643,7 +633,7 @@ def verify_technique_label(technique_id: str, llm_label: str) -> tuple[str, bool
     """Đối chiếu nhãn free-text của LLM với tên chính thức của technique-id.
 
     Returns:
-        (nhãn hiển thị, đã_đối_chiếu_được). Nếu id có trong nguồn sự thật thì nhãn LUÔN
+        (nhãn hiển thị, đã_đối_chiếu_được). Nếu id có trong nguồn sự thật thì nhãn luôn
         được dựng lại thành "<id> - <tên chuẩn>" (kể cả khi LLM đặt đúng, để định dạng
         đồng nhất). Nếu không, giữ nhãn LLM nhưng gắn hậu tố cảnh báo.
     """
@@ -654,7 +644,7 @@ def verify_technique_label(technique_id: str, llm_label: str) -> tuple[str, bool
         return (f"{tid} - {raw}" if raw and tid not in raw else raw or tid) + (
             f" {UNVERIFIED_NAME_SUFFIX}" if tid else ""
         ), False
-    # So khớp lỏng: bỏ id/dấu câu để không báo động vì khác cách viết ("T1190 — Exploit
+    # So khớp lỏng: bỏ id/dấu câu để không báo động vì khác cách viết ("T1190 - Exploit
     # Public-Facing Application" vs "Exploit Public-Facing Application").
     said = re.sub(r"[^a-z0-9 ]+", " ", raw.replace(tid, "").lower())
     said = " ".join(said.split())
@@ -711,7 +701,7 @@ def _unresolved(inp: AttackMapperInput, free_text: str = "") -> MitreMapping:
     # Cố trích technique id (Txxxx[.yyy]) từ free-text nếu có.
     m = re.search(r"\bT\d{4}(?:\.\d{3})?\b", tech)
     tech_id = m.group(0) if m else ""
-    # Trích được id mà KB có phủ -> lấy TÊN CHUẨN thay vì giữ free-text của LLM.
+    # Trích được id mà KB có phủ -> lấy tên chuẩn thay vì giữ free-text của LLM.
     if tech_id and (official := canonical_technique_name(tech_id)):
         tech = official
     return MitreMapping(
@@ -761,13 +751,13 @@ def _llm_select(inp: AttackMapperInput, candidates: list[dict], llm: Any) -> str
         raw = llm.invoke(
             messages=messages, temperature=0.1, response_format={"type": "json_object"}
         )
-    except Exception as e:  # graceful degradation — khớp triết lý node_llm_triage
+    except Exception as e:  # graceful degradation - khớp triết lý node_llm_triage
         logger.warning(f"[attack_mapper] LLM chọn ứng viên thất bại ({e}); dùng top-RRF.")
         return None
-    # KHÔNG dùng llm.parse_llm_response ở đây: hàm đó validate theo schema của TRIAGE
-    # (bắt buộc có field `action`), trong khi phản hồi chọn-MITRE có schema RIÊNG
-    # (`technique_id` + `mapping_confidence`). Dùng nhầm parser khiến MỌI lần llm_select
-    # đều fail-validate rồi rơi về low_confidence — tức tính năng này CHƯA BAO GIỜ chạy
+    # Không dùng llm.parse_llm_response ở đây: hàm đó validate theo schema của TRIAGE
+    # (bắt buộc có field `action`), trong khi phản hồi chọn-MITRE có schema riêng
+    # (`technique_id` + `mapping_confidence`). Dùng nhầm parser khiến mọi lần llm_select
+    # đều fail-validate rồi rơi về low_confidence - tức tính năng này chưa bao giờ chạy
     # được (nó mặc định off nên bug ẩn). Parse JSON độc lập, chịu lỗi.
     parsed = _parse_json_object(raw)
     chosen = str(parsed.get("technique_id", "")).strip()
@@ -775,27 +765,27 @@ def _llm_select(inp: AttackMapperInput, candidates: list[dict], llm: Any) -> str
 
 
 def _prefer_subtechnique(candidates: list[dict]) -> list[dict]:
-    """Đưa KỸ THUẬT CON lên trước KỸ THUẬT CHA của chính nó trong danh sách ứng viên.
+    """Đưa kỹ thuật con lên trước kỹ thuật cha của chính nó trong danh sách ứng viên.
 
-    LỖI ĐÃ VÁ (đo 2026-07-29): khâu chọn lấy `candidates[0]`, nên khi cha và con cùng được
-    truy xuất thì luôn nhặt phải CHA — mất một cấp độ mịn mà bộ truy xuất đã tìm ra đúng.
+    Lỗi đã vá (đo 2026-07-29): khâu chọn lấy `candidates[0]`, nên khi cha và con cùng được
+    truy xuất thì luôn nhặt phải cha - mất một cấp độ mịn mà bộ truy xuất đã tìm ra đúng.
 
-    Vì sao cha luôn thắng hạng, và vì sao đây KHÔNG phải lỗi của bộ truy xuất:
-      - ATT&CK viết mô tả kỹ thuật cha bằng cách LIỆT KÊ các con. Đo trên chính KB này: 47
-        cặp cha-con mà mô tả/chỉ báo của CHA chứa NGUYÊN CỤM tên CON. Cha vì thế khớp mọi
-        truy vấn của mọi con, và thắng nhờ độ phủ từ vựng rộng hơn — đúng như BM25/dense
+    Vì sao cha luôn thắng hạng, và vì sao đây không phải lỗi của bộ truy xuất:
+      - ATT&CK viết mô tả kỹ thuật cha bằng cách liệt kê các con. Đo trên chính KB này: 47
+        cặp cha-con mà mô tả/chỉ báo của cha chứa nguyên cụm tên con. Cha vì thế khớp mọi
+        truy vấn của mọi con, và thắng nhờ độ phủ từ vựng rộng hơn - đúng như BM25/dense
         được thiết kế để làm.
-      - Đo trực tiếp trên 15 mẫu CSIC nhãn T1595.003: con nằm HẠNG 2 ở 14/15 ca, cha T1595
-        hạng 1. Bộ truy xuất ĐÚNG; chỉ khâu chọn sai.
+      - Đo trực tiếp trên 15 mẫu CSIC nhãn T1595.003: con nằm hạng 2 ở 14/15 ca, cha T1595
+        hạng 1. Bộ truy xuất đúng; chỉ khâu chọn sai.
 
-    Vì sao ưu tiên con là ĐÚNG chứ không phải chỉnh cho vừa benchmark: kỹ thuật cha là một
-    PHẠM TRÙ, không phải một quy kết. Khi bằng chứng đã kéo được con ra NẰM CẠNH cha trong
-    cùng tập truy xuất, con vừa cụ thể hơn vừa được hậu thuẫn ngang bằng — nói "T1595 Active
+    Vì sao ưu tiên con là đúng chứ không phải chỉnh cho vừa benchmark: kỹ thuật cha là một
+    Phạm trù, không phải một quy kết. Khi bằng chứng đã kéo được con ra nằm cạnh cha trong
+    cùng tập truy xuất, con vừa cụ thể hơn vừa được hậu thuẫn ngang bằng - nói "T1595 Active
     Scanning" trong khi "T1595.003 Wordlist Scanning" đứng ngay hạng dưới thì kém thông tin
     hơn cho analyst mà không đúng hơn chút nào.
 
-    CHỈ đổi thứ tự, KHÔNG thêm/bớt ứng viên: `_llm_select` vẫn thấy đủ tập cũ, và khi LLM
-    tắt thì `candidates[0]` giờ là con. Chỉ nâng con của ĐÚNG cha đang đứng đầu — không gom
+    Chỉ đổi thứ tự, không thêm/bớt ứng viên: `_llm_select` vẫn thấy đủ tập cũ, và khi LLM
+    tắt thì `candidates[0]` giờ là con. Chỉ nâng con của đúng cha đang đứng đầu - không gom
     mọi kỹ thuật con lên đầu bảng.
     """
     if len(candidates) < 2:
@@ -848,8 +838,8 @@ def _from_rrf(inp: AttackMapperInput, retriever: Any, llm: Any) -> MitreMapping:
         chosen = next(c for c in candidates if c["id"] == chosen_id)
         mapping_conf, status = 0.75, "resolved"
     else:
-        # KHÔNG có xác nhận LLM -> đính top-RRF làm GỢI Ý cho analyst nhưng để low_confidence:
-        # lá chắn node_attack_mapper ép AWAIT_HITL (log không khớp CHẮC -> người duyệt), thay vì
+        # Không có xác nhận LLM -> đính top-RRF làm gợi Ý cho analyst nhưng để low_confidence:
+        # lá chắn node_attack_mapper ép AWAIT_HITL (log không khớp chắc -> người duyệt), thay vì
         # auto-act trên một match RRF mờ (khớp yêu cầu "không match rõ -> HITL").
         chosen = candidates[0]
         mapping_conf, status = 0.40, "low_confidence"
@@ -875,10 +865,10 @@ def _from_rrf(inp: AttackMapperInput, retriever: Any, llm: Any) -> MitreMapping:
 
 def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
     """
-    NEO vào technique-id mà TRIAGE đã gán (nếu attack_type chứa Txxxx hợp lệ).
+    Neo vào technique-id mà TRIAGE đã gán (nếu attack_type chứa Txxxx hợp lệ).
 
-    Triết lý A (đã chốt): mapper KHÔNG ghi đè verdict của triage — triage đã
-    grounded trên RAG MITRE; mapper chỉ CẤU TRÚC HOÁ (thêm tactic/url/response).
+    Triết lý A (đã chốt): mapper không ghi đè verdict của triage - triage đã
+    grounded trên RAG MITRE; mapper chỉ cấu trúc hoá (thêm tactic/url/response).
     Trả None nếu không tìm thấy id -> đi tiếp đường RRF (fallback khi triage mơ hồ).
     """
     m = re.search(r"\bT\d{4}(?:\.\d{3})?\b", inp.attack_type or "")
@@ -892,44 +882,44 @@ def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
         tactic, tactic_id = normalize_tactic(rec.get("tactic", ""))
         conf = 0.80  # triage grounded + KB xác nhận id
     else:
-        # MÃ ĐÚNG ĐỊNH DẠNG NHƯNG KHO KHÔNG PHỦ -> vẫn GIỮ id, nhưng KHÔNG được "resolved".
+        # Mã đúng định dạng nhưng kho không phủ -> vẫn giữ id, nhưng không được "resolved".
         #
         # Giữ id là có chủ ý: kho chỉ có 433 mã, còn ATT&CK Enterprise nhiều hơn thế. `T1650`
-        # (Acquire Access) là mã THẬT mà kho chưa phủ — bỏ neo rồi để RRF chọn thay sẽ đổi
-        # một quy kết ĐÚNG lấy một quy kết SAI (thường chệch sang kỹ thuật cổng/giao thức).
+        # (Acquire Access) là mã thật mà kho chưa phủ - bỏ neo rồi để RRF chọn thay sẽ đổi
+        # một quy kết đúng lấy một quy kết sai (thường chệch sang kỹ thuật cổng/giao thức).
         #
-        # LỖI ĐÃ VÁ LÀ Ở NHÃN TRẠNG THÁI, KHÔNG PHẢI Ở VIỆC GIỮ ID. Bản trước gán
+        # Lỗi đã vá là Ở nhãn trạng thái, không phải Ở việc giữ ID. Bản trước gán
         # `conf = 0.60`, mà `LOW_CONFIDENCE_THRESHOLD = 0.5`, nên `mapping_status` thành
-        # **"resolved"** — hệ tuyên bố đã phân giải xong một mã mà chính nó không kiểm được.
+        # "resolved" - hệ tuyên bố đã phân giải xong một mã mà chính nó không kiểm được.
         # Vì `inp.attack_type` do `nodes.py` dựng từ `decision["mitre_technique"]` (free-text
         # của LLM), một mã bịa cũng hưởng nhãn ấy:
         #
         #     attack_type='hoàn toàn bịa T9999'  ->  mitre_technique_id='T9999', resolved
         #
         # Không có nguồn nào ngoài kho để phân biệt "mã thật kho thiếu" với "mã bịa", nên
-        # cách trung thực duy nhất là đối xử NHƯ NHAU: giữ id, hạ xuống dưới ngưỡng để thành
+        # cách trung thực duy nhất là đối xử như nhau: giữ id, hạ xuống dưới ngưỡng để thành
         # `low_confidence` -> chuyển người xác minh. Lá chắn neo bằng chứng ở `nodes.py` vẫn
         # là chốt chặn thứ hai khi lô có ngữ cảnh RAG.
         name = tid
         tactic, tactic_id = ("Unknown", "")
-        conf = 0.45  # DƯỚI LOW_CONFIDENCE_THRESHOLD (0.5) — cố ý, xem giải thích trên
+        conf = 0.45  # Dưới LOW_CONFIDENCE_THRESHOLD (0.5) - cố ý, xem giải thích trên
         logger.warning(
             f"[ATT&CK MAPPER] Mã '{tid}' do triage nêu KHÔNG có trong kho {len(kb)} mục "
             f"-> giữ id nhưng hạ xuống low_confidence (chuyển người xác minh)."
         )
 
-    # LÁ CHẮN "quá tổng quát": neo vào kỹ thuật chỉ-dựa-cổng (T1571...) mà KHÔNG có dấu
+    # Lá chắn "quá tổng quát": neo vào kỹ thuật chỉ-dựa-cổng (T1571...) mà không có dấu
     # hiệu kênh điều khiển -> hạ về low_confidence để buộc con người xác minh (cổng lạ này
     # có thực sự là C2 hay chỉ là dịch vụ hợp lệ?). Vẫn giữ technique dự đoán -> "dự đoán +
     # AWAIT_HITL".
     #
-    # LỖI ĐÃ SỬA 11/08/2026 — điều kiện cũ là `not payload.strip()`, tức lá chắn CHỈ bắn khi
-    # payload RỖNG. Nhưng chế độ hỏng thật lại ngược hẳn: payload CÓ, giàu, là một đòn tấn
+    # Lỗi đã sửa 11/08/2026 - điều kiện cũ là `not payload.strip()`, tức lá chắn chỉ bắn khi
+    # payload rỗng. Nhưng chế độ hỏng thật lại ngược hẳn: payload có, giàu, là một đòn tấn
     # công web rõ ràng, và model vẫn bỏ qua nó để bám vào số cổng. Đo trên lượt chạy
-    # 11/08/2026: T1571 chiếm 139/327 quy kết (42,5%), TẤT CẢ đều có payload nên lá chắn
-    # chưa bao giờ bắn, và 136 trong số đó ra lệnh chặn ở độ tin cậy 0,93 — gồm 4/5 ca SQL
+    # 11/08/2026: T1571 chiếm 139/327 quy kết (42,5%), tất cả đều có payload nên lá chắn
+    # chưa bao giờ bắn, và 136 trong số đó ra lệnh chặn ở độ tin cậy 0,93 - gồm 4/5 ca SQL
     # Injection và 2/2 ca XSS. Payload không phải là bằng chứng bổ trợ cho C2; một payload
-    # SQLi trên cổng 8080 là bằng chứng CHỐNG LẠI cách đọc C2. Nay hỏi đúng câu cần hỏi:
+    # SQLi trên cổng 8080 là bằng chứng chống lại cách đọc C2. Nay hỏi đúng câu cần hỏi:
     # phân loại có nói tới kênh điều khiển không?
     parent_id = tid.split(".")[0]
     if (
@@ -954,9 +944,7 @@ def _from_triage_anchor(inp: AttackMapperInput) -> MitreMapping | None:
     )
 
 
-# ==============================================================================
-# API CHÍNH
-# ==============================================================================
+# Điểm vào chính
 def map_attack(
     inp: AttackMapperInput,
     retriever: Any = None,
@@ -971,21 +959,21 @@ def map_attack(
         retriever: DualRetriever (tái dùng singleton). None -> bỏ đường RRF.
         llm: llm_client. None -> bỏ bước LLM chọn (vẫn dùng top-RRF/curated).
         use_llm_select: có gọi LLM lần 2 chọn MITRE cho ca mơ hồ không. None -> đọc
-            config `tier2.attack_mapper.llm_select` (mặc định TẮT); True/False -> ép rõ
+            config `tier2.attack_mapper.llm_select` (mặc định tắt); True/False -> ép rõ
             (test/ablation).
 
     Returns:
-        MitreMapping — schema LUÔN hợp lệ (pydantic validate khi khởi tạo).
+        MitreMapping - schema luôn hợp lệ (pydantic validate khi khởi tạo).
     """
-    # 1) NEO vào verdict của triage nếu attack_type chứa technique-id hợp lệ (triết lý A).
+    # 1) neo vào verdict của triage nếu attack_type chứa technique-id hợp lệ (triết lý A).
     anchored = _from_triage_anchor(inp)
     if anchored is not None:
         return anchored
-    # 2) Đường XÁC ĐỊNH: dò loại tấn công web phổ biến trên mọi tín hiệu sẵn có.
+    # 2) Đường xác định: dò loại tấn công web phổ biến trên mọi tín hiệu sẵn có.
     key = normalize_attack_type(inp.attack_type, inp.payload, str(inp.features))
     if key in WEB_ATTACK_MAP:
         return _from_curated(key, inp)
-    # 3) Đường suy luận RRF. Mặc định KHÔNG gọi LLM lần 2 (tốc độ): ca mơ hồ đằng nào cũng
+    # 3) Đường suy luận RRF. Mặc định không gọi LLM lần 2 (tốc độ): ca mơ hồ đằng nào cũng
     #    ra AWAIT_HITL nên không cần thêm 1 inference để đoán technique.
     if use_llm_select is None:
         use_llm_select = _llm_select_enabled()

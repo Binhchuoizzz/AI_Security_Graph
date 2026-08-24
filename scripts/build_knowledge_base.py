@@ -1,14 +1,14 @@
 """
-Xây dựng / mở rộng TOÀN BỘ tri thức RAG trong MỘT lần chạy (single source of truth).
+Xây dựng / mở rộng toàn bộ tri thức RAG trong một lần chạy (single source of truth).
 
-File TỰ-CHỨA: dữ liệu (67 kỹ thuật MITRE ATT&CK phủ đủ 14 tactic + 7 playbook NIST
-SP 800-61r2) inline trực tiếp, append idempotent vào knowledge_base, RỒI rebuild
-FAISS/BM25 index + checksum — "một lần xây dựng tri thức" duy nhất.
+File tự-chứa: dữ liệu (67 kỹ thuật MITRE ATT&CK phủ đủ 14 tactic + 7 playbook NIST
+SP 800-61r2) inline trực tiếp, append idempotent vào knowledge_base, rồi rebuild
+FAISS/BM25 index + checksum - "một lần xây dựng tri thức" duy nhất.
 (Đã gộp từ expand_knowledge_base + supplement_knowledge_base, nay đã xóa.)
 
 Chạy:
     .venv/bin/python scripts/build_knowledge_base.py            # mở rộng KB + rebuild index
-    .venv/bin/python scripts/build_knowledge_base.py --no-index # chỉ mở rộng KB, KHÔNG rebuild
+    .venv/bin/python scripts/build_knowledge_base.py --no-index # chỉ mở rộng KB, không rebuild
 """
 
 import argparse
@@ -1195,20 +1195,18 @@ ALL_MITRE = [
             "block source and review remote-access logs",
         ],
     },
-    # =========================================================================
-    # KỸ THUẬT CHA (parent techniques) — bổ sung 2026-07-27
-    # =========================================================================
-    # VÌ SAO CẦN: kho có sẵn 155 sub-technique nhưng THIẾU 37 kỹ thuật CHA của chúng.
+    # Kỹ thuật cha (parent techniques) - bổ sung 2026-07-27
+    # Vì sao cần: kho có sẵn 155 sub-technique nhưng thiếu 37 kỹ thuật cha của chúng.
     # Hệ quả đo được:
-    #   - Lớp `Brute Force -Web` trong ground_truth kỳ vọng `T1110` — mã KHÔNG tồn tại
+    #   - Lớp `Brute Force -Web` trong ground_truth kỳ vọng `T1110` - mã không tồn tại
     #     trong kho, nên 80 mẫu không bao giờ khớp đúng được.
     #   - 12/37 mẫu thăm dò của chính dự án (zero-day / gray-zone / adversarial) trỏ tới
     #     mã cha không có trong kho (T1498, T1059, T1071.001, T1021.00x, T1074, ...).
     # Vì prompt triage dặn LLM trả `N/A` + `AWAIT_HITL` khi không khớp kỹ thuật nào trong
-    # ngữ cảnh RAG, những ca này VỀ CẤU TRÚC không thể trả lời đúng — chúng đội tỉ lệ
+    # ngữ cảnh RAG, những ca này về cấu trúc không thể trả lời đúng - chúng đội tỉ lệ
     # AWAIT_HITL và dìm Context Precision, mà nhìn từ ngoài lại giống "LLM kém".
     #
-    # Trường `tactic` dùng ĐÚNG từ vựng đang có trong kho (vd "Stealth", "Defense
+    # Trường `tactic` dùng đúng từ vựng đang có trong kho (vd "Stealth", "Defense
     # Impairment") thay vì tên chiến thuật chuẩn của MITRE, để không tạo ra hai hệ nhãn
     # song song trong cùng một kho.
     {
@@ -1981,7 +1979,7 @@ ALL_MITRE = [
             "hunt for hosts that already retrieved the staged payload",
         ],
     },
-    # T1685/T1686: kỹ thuật CHA của nhóm sub-technique vô hiệu hoá phòng thủ đã có sẵn
+    # T1685/T1686: kỹ thuật cha của nhóm sub-technique vô hiệu hoá phòng thủ đã có sẵn
     # trong kho (Disable or Modify Windows Event Log / Cloud Log / Linux Audit / Windows
     # Host Firewall). Tên đặt theo đúng tập sub-technique của chúng.
     {
@@ -2006,9 +2004,9 @@ ALL_MITRE = [
             "alert on any logging-service modification in real time",
         ],
     },
-    # ── Bổ sung đợt 2: các mã mà chính bộ thăm dò của dự án trỏ tới nhưng kho chưa có.
-    # Khác đợt trên (kỹ thuật CHA bị thiếu), đây chủ yếu là SUB-TECHNIQUE cụ thể mà
-    # ZD/GZ/ADV specs dùng làm nhãn kỳ vọng — thiếu chúng thì những ca đó không thể chấm
+    # Bổ sung đợt 2: các mã mà chính bộ thăm dò của dự án trỏ tới nhưng kho chưa có.
+    # Khác đợt trên (kỹ thuật cha bị thiếu), đây chủ yếu là SUB-TECHNIQUE cụ thể mà
+    # ZD/GZ/ADV specs dùng làm nhãn kỳ vọng - thiếu chúng thì những ca đó không thể chấm
     # đúng dù bộ ánh xạ hoạt động hoàn hảo.
     {
         "id": "T1102",
@@ -2296,19 +2294,17 @@ def main():
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from src.rag.embedder import build_all_indexes, update_checksums_file
 
-    # NIEM PHONG LAI checksum nguon TRUOC khi build index.
+    # Niêm phong lại checksum nguồn trước khi dựng index.
     #
-    # VI SAO CAN: `build_all_indexes()` tu kiem tra toan ven KB va NEM LOI neu checksum
-    # lech (chot chong dau doc RAG). Nhung `extend_knowledge_base()` vua sua KB mot cach
-    # HOP LE -> checksum chac chan lech -> script tu chan chinh no. Truoc day day la be
-    # tac: khong the mo rong KB roi rebuild index trong cung mot lan chay.
+    # `build_all_indexes()` tự kiểm toàn vẹn KB và ném lỗi nếu checksum lệch. Mà
+    # `extend_knowledge_base()` vừa sửa KB một cách hợp lệ nên checksum chắc chắn lệch:
+    # script tự chặn chính nó, không thể mở rộng KB rồi dựng lại index trong cùng lượt chạy.
     #
-    # AN TOAN: chot toan ven bao ve DUONG CHAY (DualRetriever doc KB da niem phong). Cong
-    # cu nay CHINH LA duong sua doi hop phap duy nhat, nen viec no tu niem phong lai sau
-    # khi sua la dung vai tro. Ke tan cong sua tay file KB van bi chan o runtime.
-    # Dieu kien la "checksum CO LECH khong", KHONG phai "lan chay NAY co them gi khong":
-    # mot lan chay truoc bi dut giua chung (da ghi KB, chua kip build index) se de lai KB
-    # moi voi checksum cu, va khi do added_m = 0 nen kiem tra theo added_* se bo sot.
+    # Làm vậy vẫn an toàn: chốt toàn vẹn bảo vệ đường chạy (DualRetriever đọc KB đã niêm
+    # phong), còn công cụ này là đường sửa đổi hợp lệ duy nhất. Kẻ tấn công sửa tay tệp KB
+    # vẫn bị chặn ở runtime. Điều kiện xét là "checksum có lệch không", không phải "lượt
+    # này có thêm gì không": một lượt trước bị đứt giữa chừng (đã ghi KB, chưa kịp dựng
+    # index) để lại KB mới với checksum cũ, khi đó added_m = 0 nên xét theo added_* sẽ sót.
     from src.rag.security import verify_document_integrity
 
     if not verify_document_integrity(exclude_generated=True)["verified"]:
@@ -2317,9 +2313,9 @@ def main():
         )
         update_checksums_file()
 
-    print("\n=== [3/3] Rebuild FAISS + BM25 index + checksum ===")
+    print("\n=== [3/3] Dựng lại index FAISS + BM25 và checksum ===")
     build_all_indexes()
-    update_checksums_file()  # niem phong ca file nguon LAN index vua sinh
+    update_checksums_file()  # niêm phong cả tệp nguồn lẫn index vừa sinh
     print("\nDone: tri thuc da mo rong + index/checksum da rebuild (1 lan xay dung).")
 
 

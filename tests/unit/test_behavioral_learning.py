@@ -1,15 +1,15 @@
 """
-Unit tests — Học "kỹ thuật" (Behavioral Signature Learning).
+Unit tests - Học "kỹ thuật" (Behavioral Signature Learning).
 
 Kiểm chứng tính năng: khi Tier-2 (LLM) chặn một IP, ngoài luật theo IP nó còn
-trích một CHỮ KÝ HÀNH VI (công cụ trên User-Agent / token tấn công trên URI) để
-Tier-1 bắt nhanh một IP KHÁC dùng CÙNG kỹ thuật — không chỉ "nhớ mặt" IP cũ.
+trích một chữ ký hành VI (công cụ trên User-Agent / token tấn công trên URI) để
+Tier-1 bắt nhanh một IP khác dùng cùng kỹ thuật - không chỉ "nhớ mặt" IP cũ.
 
 Bao phủ:
   1. `_derive_behavioral_rule` trích đúng chữ ký an toàn (và loại benign/quá-phổ-biến).
   2. Tier-1 `_KEY_ALIASES` normalize `user_agent`/`uri` (để luật khớp log lowercase).
-  3. Tier-1 với luật hành vi ACTIVE CỜ một IP HOÀN TOÀN MỚI cùng ngón đòn.
-  4. Không over-block: traffic benign KHÔNG dính luật hành vi.
+  3. Tier-1 với luật hành vi ACTIVE cờ một IP hoàn toàn mới cùng ngón đòn.
+  4. Không over-block: traffic benign không dính luật hành vi.
 
 Không cần LLM server (thuần Tier-1 + hàm trích chữ ký).
 """
@@ -20,7 +20,7 @@ from src.agent.nodes import _derive_behavioral_rule
 from src.tier1_filter.rule_engine import _KEY_ALIASES, RuleEngine
 
 
-# ── 1. Trích chữ ký hành vi ────────────────────────────────────────────────
+# 1. Trích chữ ký hành vi
 @pytest.mark.parametrize(
     "log_entry,expected",
     [
@@ -31,9 +31,9 @@ from src.tier1_filter.rule_engine import _KEY_ALIASES, RuleEngine
         # Token tấn công trên URI
         ({"uri": "/p?id=1 UNION SELECT pass FROM users"}, ("URI", "union select", 50)),
         ({"URI": "/cgi-bin/../../../etc/passwd"}, ("URI", "../../", 50)),
-        # KHÔNG có chữ ký an toàn -> None (chỉ giữ luật IP)
+        # Không có chữ ký an toàn -> None (chỉ giữ luật IP)
         ({"user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64)"}, None),  # browser benign
-        ({"user_agent": "curl/8.1.2", "uri": "/health"}, None),  # curl CỐ Ý loại
+        ({"user_agent": "curl/8.1.2", "uri": "/health"}, None),  # curl cố Ý loại
         ({"user_agent": "python-requests/2.31", "uri": "/api/v1"}, None),  # loại
         ({"Source IP": "10.0.0.5", "Destination Port": 22}, None),  # không có field chữ ký
     ],
@@ -55,18 +55,18 @@ def test_derive_returns_valid_field_for_feedback_validator():
         assert is_valid, f"Behavioral rule bị FeedbackValidator từ chối: {errors}"
 
 
-# ── 2. Tier-1 alias chuẩn hoá field lớp-ứng-dụng ──────────────────────────
+# 2. Tier-1 alias chuẩn hoá field lớp-ứng-dụng
 def test_tier1_aliases_cover_application_fields():
     """Sau vá: Tier-1 phải normalize user_agent/uri (đồng bộ Guardrails)."""
     assert _KEY_ALIASES.get("user_agent") == "User-Agent"
     assert _KEY_ALIASES.get("uri") == "URI"
 
 
-# ── 3. Tier-1 bắt IP MỚI cùng kỹ thuật ────────────────────────────────────
+# 3. Tier-1 bắt IP mới cùng kỹ thuật
 def _engine_with_behavioral_rule():
     e = RuleEngine()
-    # Mô phỏng luật hành vi ĐÃ được HITL duyệt (ACTIVE) — inject trực tiếp,
-    # KHÔNG ghi vào config thật. Sau refactor: luật KHÔNG-phải-Source-IP nằm ở
+    # Mô phỏng luật hành vi đã được HITL duyệt (ACTIVE) - inject trực tiếp,
+    # không ghi vào config thật. Sau refactor: luật không-phải-Source-IP nằm ở
     # dynamic_behavioral_rules (list tuple field/pattern/score); luật Source IP
     # nằm ở dynamic_ip_blocks (set) để tra O(1).
     e.dynamic_behavioral_rules = [("User-Agent", "sqlmap", 50)]
@@ -74,7 +74,7 @@ def _engine_with_behavioral_rule():
 
 
 def test_new_ip_same_technique_is_caught():
-    """IP HOÀN TOÀN MỚI dùng User-Agent 'sqlmap' -> Tier-1 CỜ (không DROP)."""
+    """IP hoàn toàn mới dùng User-Agent 'sqlmap' -> Tier-1 cờ (không DROP)."""
     e = _engine_with_behavioral_rule()
     new_log = {
         "Source IP": "203.0.113.77",  # IP chưa từng thấy
@@ -103,9 +103,9 @@ def test_new_ip_lowercase_key_is_caught():
     assert any("Luật động" in r for r in res["tier1_reasons"])
 
 
-# ── 4. Không over-block traffic benign ────────────────────────────────────
+# 4. Không over-block traffic benign
 def test_benign_not_over_blocked_by_behavioral_rule():
-    """Trình duyệt benign KHÔNG dính luật 'sqlmap' -> DROP/LOG."""
+    """Trình duyệt benign không dính luật 'sqlmap' -> DROP/LOG."""
     e = _engine_with_behavioral_rule()
     benign = {
         "Source IP": "192.168.100.5",

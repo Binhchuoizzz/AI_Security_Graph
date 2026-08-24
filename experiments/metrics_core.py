@@ -1,35 +1,35 @@
-"""Chỉ số đánh giá dùng chung — thuần Python, không phụ thuộc agent/LLM/RAG.
+"""Chỉ số đánh giá dùng chung - thuần Python, không phụ thuộc agent/LLM/RAG.
 
-TÁCH RIÊNG có chủ đích, cùng khuôn với `action_scoring.py`: mọi script eval đều cần
+Tách riêng có chủ đích, cùng khuôn với `action_scoring.py`: mọi script eval đều cần
 những phép tính này, nhưng nếu để lẫn trong file eval thì chúng import cả agent + LLM
 client + retriever, không unit-test được trong CI và không nơi nào dùng lại được.
 
-BỐI CẢNH (vì sao cần từng nhóm hàm):
+Bối cảnh (vì sao cần từng nhóm hàm):
 
-1. **MCC thay Accuracy.** Accuracy vô nghĩa trên dữ liệu lệch lớp, và benchmark của dự án
-   lệch theo CẢ HAI chiều tuỳ tập: `ground_truth` phân tầng có ~94% tấn công (một hàm
+1. MCC thay Accuracy. Accuracy vô nghĩa trên dữ liệu lệch lớp, và benchmark của dự án
+   lệch theo cả hai chiều tuỳ tập: `ground_truth` phân tầng có ~94% tấn công (một hàm
    `return True` đạt accuracy 0,94), còn tập escalate của Tier-2 có ~98% lành tính (một
    hàm `return False` đạt 0,98). Cùng một hệ, đổi tập là accuracy nhảy từ 0,94 xuống 0,02
-   — chỉ số biến động theo DỮ LIỆU hơn theo HỆ THỐNG thì không so sánh được. Hệ số tương
-   quan Matthews dùng cả 4 ô nên chỉ cao khi hệ làm tốt ở CẢ hai lớp.
+   - chỉ số biến động theo dữ liệu hơn theo hệ thống thì không so sánh được. Hệ số tương
+   quan Matthews dùng cả 4 ô nên chỉ cao khi hệ làm tốt ở cả hai lớp.
 
-2. **Khoảng tin cậy.** Trước đây chỉ APT có Wilson CI; F1/precision/recall/action_accuracy
+2. Khoảng tin cậy. Trước đây chỉ APT có Wilson CI; F1/precision/recall/action_accuracy
    đều là ước lượng điểm trần trụi. Với ablation n~160 và Tier-2 n=800, chênh lệch
-   0,4391 vs 0,4435 giữa hai cấu hình HOÀN TOÀN có thể là nhiễu — không có CI thì không
-   kết luận được gì. Bootstrap chạy trên kết quả ĐÃ LƯU nên không tốn thêm lượt gọi LLM.
+   0,4391 vs 0,4435 giữa hai cấu hình hoàn toàn có thể là nhiễu - không có CI thì không
+   kết luận được gì. Bootstrap chạy trên kết quả đã lưu nên không tốn thêm lượt gọi LLM.
 
-3. **Bóc theo lớp.** Recall gộp 0,47 có thể là "bắt 100% DoS, 0% Infiltration". Bộ dữ liệu
-   có 15 lớp tấn công nhưng trước đây `cicids_label` CHỈ dùng để lấy mẫu phân tầng, chưa
-   bao giờ dùng để báo cáo — nên điểm mù không lộ ra.
+3. Bóc theo lớp. Recall gộp 0,47 có thể là "bắt 100% DoS, 0% Infiltration". Bộ dữ liệu
+   có 15 lớp tấn công nhưng trước đây `cicids_label` chỉ dùng để lấy mẫu phân tầng, chưa
+   bao giờ dùng để báo cáo - nên điểm mù không lộ ra.
 
-4. **Gánh nặng cảnh báo.** Luận văn mở đầu bằng "SOC Alert Fatigue" nhưng lại đo bằng
-   precision — đơn vị mà SOC không dùng. Quy về cảnh báo/giờ và cảnh báo/ca trực đóng lại
+4. Gánh nặng cảnh báo. Luận văn mở đầu bằng "SOC Alert Fatigue" nhưng lại đo bằng
+   precision - đơn vị mà SOC không dùng. Quy về cảnh báo/giờ và cảnh báo/ca trực đóng lại
    đúng vòng lập luận đã mở.
 
-5. **Neo bằng chứng thay "độ đầy đủ audit".** Chỉ số cũ đếm 5 trường trong dict do CHÍNH
-   hệ sinh ra nên luôn đạt 100% — đó là kiểm tra schema, không phải phép đo. Prompt triage
-   BẮT BUỘC mỗi luận điểm phải kèm ít nhất một giá trị `field=value` trích nguyên văn từ
-   log; đo tỉ lệ tuân thủ điều đó mới là phép đo giải thích THẬT, và nó CÓ THỂ trượt.
+5. Neo bằng chứng thay "độ đầy đủ audit". Chỉ số cũ đếm 5 trường trong dict do chính
+   hệ sinh ra nên luôn đạt 100% - đó là kiểm tra schema, không phải phép đo. Prompt triage
+   Bắt buộc mỗi luận điểm phải kèm ít nhất một giá trị `field=value` trích nguyên văn từ
+   log; đo tỉ lệ tuân thủ điều đó mới là phép đo giải thích thật, và nó có thể trượt.
 """
 
 from __future__ import annotations
@@ -39,19 +39,16 @@ import random
 import re
 from collections.abc import Callable, Sequence
 
-# ==============================================================================
-# 1. Chỉ số từ ma trận nhầm lẫn
-# ==============================================================================
 
-
+# Chỉ số từ ma trận nhầm lẫn
 def mcc(tp: int, fp: int, tn: int, fn: int) -> float:
-    """Hệ số tương quan Matthews ∈ [-1, 1] — thay thế Accuracy trên dữ liệu lệch lớp.
+    """Hệ số tương quan Matthews ∈ [-1, 1] - thay thế Accuracy trên dữ liệu lệch lớp.
 
         MCC = (TP·TN − FP·FN) / sqrt((TP+FP)(TP+FN)(TN+FP)(TN+FN))
 
-    Cách đọc:  +1 hoàn hảo · 0 = **không hơn đoán bừa** · −1 sai hệ thống.
+    Cách đọc:  +1 hoàn hảo · 0 = không hơn đoán bừa · −1 sai hệ thống.
     Tính chất quyết định: một hệ luôn hô "tấn công" (hoặc luôn hô "lành tính") cho MCC = 0
-    BẤT KỂ tỉ lệ lớp — đúng thứ mà Accuracy và F1 không làm được.
+    Bất kể tỉ lệ lớp - đúng thứ mà Accuracy và F1 không làm được.
 
     Mẫu số bằng 0 khi có một hàng/cột rỗng (hệ chỉ đoán một lớp) -> trả 0.0 theo quy ước.
     """
@@ -63,10 +60,10 @@ def mcc(tp: int, fp: int, tn: int, fn: int) -> float:
 def balanced_accuracy(tp: int, fp: int, tn: int, fn: int) -> float:
     """Trung bình của recall trên lớp tấn công và recall trên lớp lành tính.
 
-        BA = (TPR + TNR) / 2
+        Ba = (TPR + TNR) / 2
 
-    Đọc KÈM MCC: dễ diễn giải hơn ("đúng bao nhiêu % nếu hai lớp cân bằng") nhưng không
-    phạt nặng bằng MCC khi hệ thiên hẳn về một lớp. Đoán bừa cho 0,5 — không phải 0.
+    Đọc kèm MCC: dễ diễn giải hơn ("đúng bao nhiêu % nếu hai lớp cân bằng") nhưng không
+    phạt nặng bằng MCC khi hệ thiên hẳn về một lớp. Đoán bừa cho 0,5 - không phải 0.
     """
     tpr = tp / (tp + fn) if (tp + fn) else 0.0
     tnr = tn / (tn + fp) if (tn + fp) else 0.0
@@ -74,10 +71,10 @@ def balanced_accuracy(tp: int, fp: int, tn: int, fn: int) -> float:
 
 
 def prf1(tp: int, fp: int, tn: int, fn: int) -> dict[str, float]:
-    """Precision / Recall / F1 / Accuracy — bộ bốn cổ điển, gom một chỗ để khỏi chép lại.
+    """Precision / Recall / F1 / Accuracy - bộ bốn cổ điển, gom một chỗ để khỏi chép lại.
 
-    Accuracy VẪN được trả về nhưng phải đọc kèm `majority_baseline` (xem hàm dưới); nó có
-    mặt để đối chiếu với tài liệu cũ, KHÔNG phải để trích làm kết luận.
+    Accuracy vẫn được trả về nhưng phải đọc kèm `majority_baseline` (xem hàm dưới); nó có
+    mặt để đối chiếu với tài liệu cũ, không phải để trích làm kết luận.
     """
     p = tp / (tp + fp) if (tp + fp) else 0.0
     r = tp / (tp + fn) if (tp + fn) else 0.0
@@ -91,19 +88,19 @@ def prf1(tp: int, fp: int, tn: int, fn: int) -> dict[str, float]:
 
 
 def majority_baseline(n_positive: int, n_total: int) -> float:
-    """Điểm của một stub hô "tấn công" cho MỌI đầu vào = tỉ lệ dương của tập.
+    """Điểm của một stub hô "tấn công" cho mọi đầu vào = tỉ lệ dương của tập.
 
-    BẮT BUỘC in cạnh mọi accuracy. Giữ đúng ngữ nghĩa đang dùng ở
+    Bắt buộc in cạnh mọi accuracy. Giữ đúng ngữ nghĩa đang dùng ở
     `evaluate_tier2_decision.py` để không phá tính so sánh với số đã trích.
     """
     return round(n_positive / n_total, 4) if n_total else 0.0
 
 
 def zero_r_accuracy(n_positive: int, n_total: int) -> float:
-    """Accuracy của bộ phân loại hằng TỐT NHẤT (ZeroR) = max(tỉ lệ dương, tỉ lệ âm).
+    """Accuracy của bộ phân loại hằng tốt nhất (ZeroR) = max(tỉ lệ dương, tỉ lệ âm).
 
-    Đây mới là mốc ĐÚNG để so với accuracy. `majority_baseline` (tỉ lệ dương) chỉ là mốc
-    của stub luôn hô "tấn công" — trên tập ÁP ĐẢO LÀNH TÍNH thì stub khôn hơn là hô "lành
+    Đây mới là mốc đúng để so với accuracy. `majority_baseline` (tỉ lệ dương) chỉ là mốc
+    của stub luôn hô "tấn công" - trên tập áp đảo lành tính thì stub khôn hơn là hô "lành
     tính", đạt accuracy bằng tỉ lệ âm. Nếu so accuracy với mỗi tỉ lệ dương, một hệ hô
     "lành tính" cho tất cả trên tập 98% benign sẽ "vượt mốc 0,02" và trông như có năng
     lực, trong khi thực chất nó không phân biệt được gì (MCC = 0).
@@ -129,25 +126,21 @@ def confusion_report(tp: int, fp: int, tn: int, fn: int) -> dict:
         "majority_baseline": majority_baseline(tp + fn, n),
         "zero_r_accuracy": zero_r,
         "specificity": round(tn / (tn + fp), 4) if (tn + fp) else 0.0,
-        # Cờ tự chẩn: accuracy không vượt được bộ phân loại HẰNG tốt nhất
-        # -> chỉ số KHÔNG có năng lực phân biệt, đừng trích như một thành tích.
+        # Cờ tự chẩn: accuracy không vượt được bộ phân loại hằng tốt nhất
+        # -> chỉ số không có năng lực phân biệt, đừng trích như một thành tích.
         "accuracy_beats_baseline": acc > zero_r,
     }
 
 
-# ==============================================================================
-# 2. Khoảng tin cậy
-# ==============================================================================
-
-
+# Khoảng tin cậy
 def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    """Khoảng tin cậy Wilson cho một TỈ LỆ k/n (mặc định 95%).
+    """Khoảng tin cậy Wilson cho một tỉ lệ k/n (mặc định 95%).
 
-    Dùng cho recall/precision/specificity khi n NHỎ — đây chính là lý do "3/3 = 1,00"
+    Dùng cho recall/precision/specificity khi n nhỏ - đây chính là lý do "3/3 = 1,00"
     không được đọc là "hoàn hảo": Wilson cho cận dưới quanh 0,44 với n=3.
 
     Ưu điểm so với khoảng Wald thông thường: không bao giờ tràn ra ngoài [0,1] và vẫn có
-    nghĩa khi k=0 hoặc k=n — đúng hai trường hợp hay gặp nhất ở n nhỏ.
+    nghĩa khi k=0 hoặc k=n - đúng hai trường hợp hay gặp nhất ở n nhỏ.
     """
     if n <= 0:
         return (0.0, 0.0)
@@ -165,14 +158,14 @@ def bootstrap_ci(
     alpha: float = 0.05,
     seed: int = 42,
 ) -> tuple[float, float]:
-    """Khoảng tin cậy bootstrap phần trăm cho MỘT thống kê bất kỳ tính trên `records`.
+    """Khoảng tin cậy bootstrap phần trăm cho một thống kê bất kỳ tính trên `records`.
 
-    Dùng khi chỉ số không phải tỉ lệ đơn giản nên Wilson không áp được — F1, MCC,
-    action_accuracy. Lấy mẫu lại CÓ HOÀN LẠI `n_resamples` lần, tính thống kê mỗi lần,
+    Dùng khi chỉ số không phải tỉ lệ đơn giản nên Wilson không áp được - F1, MCC,
+    action_accuracy. Lấy mẫu lại có hoàn lại `n_resamples` lần, tính thống kê mỗi lần,
     rồi cắt phân vị.
 
-    `seed` cố định -> **tất định**, chạy lại cho đúng số cũ. Chạy hoàn toàn trên kết quả
-    ĐÃ LƯU nên KHÔNG tốn thêm lượt gọi LLM nào.
+    `seed` cố định -> tất định, chạy lại cho đúng số cũ. Chạy hoàn toàn trên kết quả
+    Đã lưu nên không tốn thêm lượt gọi LLM nào.
 
     Ví dụ:
         bootstrap_ci(list(zip(y_true, y_pred)), lambda s: f1_from_pairs(s))
@@ -196,25 +189,21 @@ def bootstrap_ci(
     return (round(lo, 4), round(hi, 4))
 
 
-# ==============================================================================
-# 3. Bóc theo lớp tấn công
-# ==============================================================================
-
-
+# Bóc theo lớp tấn công
 def per_class_report(
     records: Sequence[dict],
     label_key: str = "label",
     flagged_key: str = "flagged",
     threat_key: str = "is_threat",
 ) -> dict[str, dict]:
-    """Recall (và số ca) cho TỪNG lớp tấn công, thay vì một con số gộp.
+    """Recall (và số ca) cho từng lớp tấn công, thay vì một con số gộp.
 
     Vì sao cần: recall gộp 0,47 có thể là "bắt 100% DoS, bỏ sót sạch Infiltration". Bộ dữ
-    liệu có 15 lớp — không bóc ra thì không chứng minh được tính khái quát, và điểm mù
+    liệu có 15 lớp - không bóc ra thì không chứng minh được tính khái quát, và điểm mù
     không bao giờ lộ.
 
     Mỗi bản ghi cần: nhãn lớp, cờ hệ có gắn cờ không, và nhãn thật là tấn công hay không.
-    Lớp LÀNH TÍNH cũng được báo, nhưng dưới dạng specificity (không phải recall).
+    Lớp lành tính cũng được báo, nhưng dưới dạng specificity (không phải recall).
     """
     groups: dict[str, list[dict]] = {}
     for r in records:
@@ -240,21 +229,17 @@ def per_class_report(
 
 
 def weakest_classes(report: dict[str, dict], k: int = 3) -> list[tuple[str, float]]:
-    """k lớp có recall THẤP NHẤT — điểm mù cần nêu thẳng ở mục Hạn chế của luận văn."""
+    """k lớp có recall thấp nhất - điểm mù cần nêu thẳng ở mục Hạn chế của luận văn."""
     scored = [(lbl, e["recall"]) for lbl, e in report.items() if "recall" in e]
     return sorted(scored, key=lambda x: x[1])[:k]
 
 
-# ==============================================================================
-# 4. Hiệu năng vận hành
-# ==============================================================================
-
-
+# Hiệu năng vận hành
 def throughput(n_events: int, elapsed_seconds: float) -> float:
     """Sự kiện xử lý mỗi giây.
 
-    Độ trễ MỖI SỰ KIỆN không trả lời được câu hỏi vận hành "hệ chịu được bao nhiêu EPS?"
-    — đó là con số một SOC dùng để quyết định có triển khai được hay không. Tuyên bố trung
+    Độ trễ mỗi sự kiện không trả lời được câu hỏi vận hành "hệ chịu được bao nhiêu EPS?"
+    - đó là con số một SOC dùng để quyết định có triển khai được hay không. Tuyên bố trung
     tâm của luận văn là "làm suy luận LLM cục bộ khả thi", nên đây là chỉ số phải có.
     """
     return round(n_events / elapsed_seconds, 2) if elapsed_seconds > 0 else 0.0
@@ -266,12 +251,12 @@ def alert_burden(
     elapsed_seconds: float,
     shift_hours: float = 8.0,
 ) -> dict[str, float]:
-    """Quy tải cảnh báo về ĐƠN VỊ MÀ SOC THẬT DÙNG: cảnh báo/giờ và cảnh báo/ca trực.
+    """Quy tải cảnh báo về đơn vị mà SOC thật dùng: cảnh báo/giờ và cảnh báo/ca trực.
 
     Precision 0,91 không cho analyst biết họ phải xử bao nhiêu cảnh báo rác mỗi ca. Luận
     văn mở đầu bằng nghịch lý mệt-mỏi-cảnh-báo thì phải đóng lại bằng chính đơn vị đó.
 
-    LƯU Ý khi trích: con số này tỉ lệ thuận với TỐC ĐỘ PHÁT của benchmark, không phải tốc
+    Lưu Ý khi trích: con số này tỉ lệ thuận với tốc độ phát của benchmark, không phải tốc
     độ lưu lượng thật của một mạng doanh nghiệp. Phải nêu là "trên nhịp phát của benchmark",
     hoặc chuẩn hoá lại theo EPS mục tiêu trước khi so với số liệu ngành.
     """
@@ -286,16 +271,14 @@ def alert_burden(
     }
 
 
-# ==============================================================================
-# 5. Chất lượng giải thích
-# ==============================================================================
+# Chất lượng giải thích
 
-# `field=value`, `field="value"`, `field='value'` — đúng dạng mà prompt triage YÊU CẦU.
+# `field=value`, `field="value"`, `field='value'` - đúng dạng mà prompt triage yêu cầu.
 #
-# Tên cột CICIDS CÓ khoảng trắng ("Total Fwd Packets") nên lớp ký tự của phần tên buộc
+# Tên cột CICIDS có khoảng trắng ("Total Fwd Packets") nên lớp ký tự của phần tên buộc
 # phải cho phép space; hệ quả là nó nuốt luôn từ đứng trước trong văn xuôi ("with Total
 # Fwd Packets"). Không siết regex được mà không làm hỏng tên cột nhiều từ, nên xử lý ở
-# bước TRA CỨU: thử lần lượt các hậu tố của chuỗi tên (xem `_lookup_field`).
+# bước TRA cứu: thử lần lượt các hậu tố của chuỗi tên (xem `_lookup_field`).
 # Phần giá trị loại thêm backtick/ngoặc vuông-nhọn vì model hay bọc `field=value` trong
 # markdown inline-code, khiến giá trị bắt được thành "22`" và không khớp gì cả.
 _EVIDENCE_TOKEN = re.compile(r"([A-Za-z][\w /\.\-]{1,40})\s*=\s*([\"']?)([^\s\"',;)\]}`]{1,60})\2")
@@ -305,8 +288,8 @@ _VALUE_TRAILING = "`.,;:)]}\"'"
 def _lookup_field(field: str, flat: dict[str, str]) -> str | None:
     """Tra giá trị thật của một tên trường bắt được từ văn xuôi.
 
-    Thử từ CHUỖI ĐẦY ĐỦ rồi bỏ dần từ ở ĐẦU: "with Total Fwd Packets" -> "Total Fwd
-    Packets" -> "Fwd Packets" -> "Packets". Lấy khớp DÀI NHẤT tìm được, nên "with" bị
+    Thử từ chuỗi đầy đủ rồi bỏ dần từ ở đầu: "with Total Fwd Packets" -> "Total Fwd
+    Packets" -> "Fwd Packets" -> "Packets". Lấy khớp dài nhất tìm được, nên "with" bị
     loại mà tên cột nhiều từ vẫn nguyên vẹn.
     """
     tokens = field.strip().split()
@@ -317,7 +300,7 @@ def _lookup_field(field: str, flat: dict[str, str]) -> str | None:
     return None
 
 
-# Cụm "viện dẫn thẩm quyền" — lập luận rỗng mà prompt CẤM tường minh. Đếm riêng để thấy
+# Cụm "viện dẫn thẩm quyền" - lập luận rỗng mà prompt cấm tường minh. Đếm riêng để thấy
 # model có đang thay bằng chứng bằng lời khẳng định suông hay không.
 _APPEAL_PHRASES = (
     "confirmed by mitre",
@@ -331,18 +314,18 @@ _APPEAL_PHRASES = (
 
 
 def evidence_grounding(reasoning: str, log: dict) -> dict:
-    """Lập luận có NEO vào bằng chứng thật trong log không? — thay `audit_completeness`.
+    """Lập luận có neo vào bằng chứng thật trong log không? - thay `audit_completeness`.
 
-    Chỉ số cũ đếm 5 trường trong dict do chính hệ sinh ra nên LUÔN đạt 100%: đó là kiểm
+    Chỉ số cũ đếm 5 trường trong dict do chính hệ sinh ra nên luôn đạt 100%: đó là kiểm
     tra schema, không phải phép đo chất lượng (một phép đo không thể trượt thì không đo
-    được gì). Ở đây ta kiểm ĐÚNG điều prompt bắt buộc: mỗi luận điểm về hành vi phải kèm
-    ít nhất một giá trị `field=value` **lấy nguyên văn từ log**.
+    được gì). Ở đây ta kiểm đúng điều prompt bắt buộc: mỗi luận điểm về hành vi phải kèm
+    ít nhất một giá trị `field=value` lấy nguyên văn từ log.
 
     Trả:
-      n_citations       — số cặp field=value trích được trong lập luận
-      n_verified        — số cặp KHỚP giá trị thật trong log (chống bịa số)
-      grounded          — có >=1 trích dẫn ĐÃ XÁC MINH
-      n_appeals         — số cụm viện-dẫn-thẩm-quyền rỗng (prompt cấm)
+      n_citations       - số cặp field=value trích được trong lập luận
+      n_verified        - số cặp khớp giá trị thật trong log (chống bịa số)
+      grounded          - có >=1 trích dẫn đã xác minh
+      n_appeals         - số cụm viện-dẫn-thẩm-quyền rỗng (prompt cấm)
     """
     text = str(reasoning or "")
     # So khớp không phân biệt hoa/thường và bỏ khoảng trắng, vì tên cột CICIDS có dấu cách
@@ -358,7 +341,7 @@ def evidence_grounding(reasoning: str, log: dict) -> dict:
         actual = _lookup_field(field, flat)
         if actual is None or not value:
             continue
-        # Số: so theo GIÁ TRỊ (1000 == 1000.0). Chuỗi: khớp con, không phân biệt hoa/thường.
+        # Số: so theo giá trị (1000 == 1000.0). Chuỗi: khớp con, không phân biệt hoa/thường.
         try:
             if math.isclose(float(actual), float(value), rel_tol=1e-6):
                 n_ver += 1
@@ -394,11 +377,9 @@ def evidence_grounding_rate(pairs: Sequence[tuple[str, dict]]) -> dict:
     }
 
 
-# ==============================================================================
-# 6. Chi phí tài nguyên
-# ==============================================================================
+# Chi phí tài nguyên
 
-# Giá tham chiếu API thương mại ($/1 triệu token) — CHỈ để đối chiếu bậc độ lớn, không
+# Giá tham chiếu API thương mại ($/1 triệu token) - chỉ để đối chiếu bậc độ lớn, không
 # phải báo giá. Phải nêu rõ mốc thời gian khi trích vì giá thay đổi liên tục.
 _REF_API_USD_PER_MTOK_IN = 3.0
 _REF_API_USD_PER_MTOK_OUT = 15.0
@@ -413,15 +394,15 @@ def resource_cost(
 ) -> dict:
     """Chi phí xử lý quy về đơn vị so sánh được: token/1k sự kiện và $ tương đương API.
 
-    VÌ SAO CẦN: luận điểm trung tâm là "suy luận LLM CỤC BỘ khả thi về vận hành". Vế
-    "khả thi" có hai mặt — độ trễ (đã đo) và CHI PHÍ (chưa đo). Nếu không quy ra con số
+    Vì sao cần: luận điểm trung tâm là "suy luận LLM cục bộ khả thi về vận hành". Vế
+    "khả thi" có hai mặt - độ trễ (đã đo) và chi phí (chưa đo). Nếu không quy ra con số
     thì không trả lời được câu hỏi hiển nhiên của hội đồng: *"vì sao không gọi thẳng API
     thương mại cho nhanh?"*.
 
-    Con số $ ở đây là CHI PHÍ TRÁNH ĐƯỢC (avoided cost) nếu cùng khối lượng đó chạy trên
-    API thương mại — KHÔNG phải chi phí thực của hệ (hệ chạy cục bộ, chi phí biên ≈ điện
+    Con số $ ở đây là chi phí tránh được (avoided cost) nếu cùng khối lượng đó chạy trên
+    API thương mại - không phải chi phí thực của hệ (hệ chạy cục bộ, chi phí biên ≈ điện
     năng). Đó chính là điều làm nó có sức thuyết phục: nó định giá phần việc mà kiến trúc
-    hai tầng đã LOẠI BỎ khỏi tầng đắt tiền.
+    hai tầng đã loại bỏ khỏi tầng đắt tiền.
 
     Phải nêu kèm khi trích: giá API là mốc tham chiếu tại thời điểm viết, và VRAM là yêu
     cầu phần cứng tối thiểu để tái lập chứ không phải mức tiêu thụ đo được.
@@ -450,18 +431,14 @@ def resource_cost(
     }
 
 
-# ==============================================================================
-# 7. Độ đồng thuận giữa hai người/máy chấm
-# ==============================================================================
-
-
+# Độ đồng thuận giữa hai người/máy chấm
 def cohens_kappa(rater_a: Sequence, rater_b: Sequence) -> float:
-    """Độ đồng thuận Cohen's κ giữa HAI người/máy chấm, đã trừ phần trùng do may rủi.
+    """Độ đồng thuận Cohen's κ giữa hai người/máy chấm, đã trừ phần trùng do may rủi.
 
         κ = (Pₒ − Pₑ) / (1 − Pₑ)
 
-    Vì sao luận văn cần: điểm LLM-as-Judge hiện dựa vào MỘT trọng tài duy nhất, không mẫu
-    nào được người đối chiếu. Nếu Context Precision thấp, ta KHÔNG phân biệt được "agent
+    Vì sao luận văn cần: điểm LLM-as-Judge hiện dựa vào một trọng tài duy nhất, không mẫu
+    nào được người đối chiếu. Nếu Context Precision thấp, ta không phân biệt được "agent
     kém" với "trọng tài kém". Cho người chấm một mẫu con rồi tính κ là cách rẻ nhất để
     biết điểm của trọng tài có đáng tin không.
 
@@ -480,18 +457,14 @@ def cohens_kappa(rater_a: Sequence, rater_b: Sequence) -> float:
     return round((observed - expected) / (1 - expected), 4)
 
 
-# ==============================================================================
-# Hiệu chuẩn độ tin cậy — confidence có ĐÁNG TIN không?
-# ==============================================================================
-
-
+# Hiệu chuẩn độ tin cậy - confidence có đáng tin không?
 def brier_score(confidences: Sequence[float], outcomes: Sequence[bool]) -> float:
     """Sai số bình phương trung bình giữa độ tin cậy dự báo và kết cục thực tế.
 
         Brier = (1/n) · Σ (pᵢ − oᵢ)²      với oᵢ ∈ {0, 1}
 
     Đọc: 0,0 là hoàn hảo; 0,25 là mức của một hệ luôn hô 0,5; càng thấp càng tốt. Khác
-    accuracy ở chỗ nó phạt cả sự QUÁ TỰ TIN: đoán đúng với p=0,55 tốt hơn đoán sai với
+    accuracy ở chỗ nó phạt cả sự quá tự tin: đoán đúng với p=0,55 tốt hơn đoán sai với
     p=0,95, và Brier phản ánh đúng thứ tự đó.
     """
     n = min(len(confidences), len(outcomes))
@@ -503,18 +476,18 @@ def brier_score(confidences: Sequence[float], outcomes: Sequence[bool]) -> float
 def expected_calibration_error(
     confidences: Sequence[float], outcomes: Sequence[bool], n_bins: int = 10
 ) -> dict:
-    """ECE — độ lệch trung bình giữa "hệ nói chắc bao nhiêu" và "hệ đúng bao nhiêu".
+    """ECE - độ lệch trung bình giữa "hệ nói chắc bao nhiêu" và "hệ đúng bao nhiêu".
 
-    Chia [0,1] thành `n_bins` khoảng, mỗi khoảng so ĐỘ TIN CẬY TRUNG BÌNH với TỈ LỆ ĐÚNG
-    THỰC TẾ, rồi lấy trung bình có trọng số theo số mẫu::
+    Chia [0,1] thành `n_bins` khoảng, mỗi khoảng so độ tin cậy trung bình với tỉ lệ đúng
+    Thực tế, rồi lấy trung bình có trọng số theo số mẫu::
 
         ECE = Σ_b (n_b / n) · |acc(b) − conf(b)|
 
-    VÌ SAO LUẬN VĂN CẦN CHỈ SỐ NÀY. Chính sách 4 dải (BLOCK ≥0,85 · ESCALATE 0,65–0,85 ·
-    ALERT 0,40–0,65 · DROP <0,40) là một đóng góp được tuyên bố, và nó đứng trên MỘT giả
+    Vì sao luận văn cần chỉ số này. Chính sách 4 dải (BLOCK ≥0,85 · ESCALATE 0,65–0,85 ·
+    ALERT 0,40–0,65 · DROP <0,40) là một đóng góp được tuyên bố, và nó đứng trên một giả
     định chưa từng được kiểm: rằng con số `confidence` có ý nghĩa. Quét ngưỡng chỉ trả lời
-    "chọn 0,85 có phải cherry-pick không"; nó KHÔNG trả lời "0,85 có thật sự nghĩa là đúng
-    85% số lần không". ECE trả lời đúng câu đó, và nó CÓ THỂ TRƯỢT — một mô hình quá tự tin
+    "chọn 0,85 có phải cherry-pick không"; nó không trả lời "0,85 có thật sự nghĩa là đúng
+    85% số lần không". ECE trả lời đúng câu đó, và nó có thể trượt - một mô hình quá tự tin
     (hô 0,95 nhưng chỉ đúng 60%) cho ECE lớn, và khi đó ngưỡng BLOCK tự động đang đứng trên
     cát bất kể quét ngưỡng đẹp tới đâu.
 
@@ -553,7 +526,7 @@ def expected_calibration_error(
                 "mean_confidence": round(conf, 4),
                 "actual_accuracy": round(acc, 4),
                 "gap": round(gap, 4),
-                # Dấu của (acc − conf): âm = QUÁ TỰ TIN (nói chắc hơn thực lực) — chiều
+                # Dấu của (acc − conf): âm = quá tự tin (nói chắc hơn thực lực) - chiều
                 # nguy hiểm, vì nó đẩy ca sai vào dải tự động BLOCK.
                 "overconfident": acc < conf,
             }
@@ -565,7 +538,7 @@ def calibration_report(confidences: Sequence[float], outcomes: Sequence[bool]) -
     """Gói hiệu chuẩn đầy đủ: Brier + ECE + kiểm tra riêng dải tự động BLOCK.
 
     `high_conf_*` là phần đắt giá nhất trong thực tế: chỉ xét các ca có độ tin cậy ≥ 0,85
-    (ngưỡng tự động BLOCK). Một lệnh chặn KHÔNG THỂ ĐẢO, nên sai ở dải này tốn kém hơn hẳn
+    (ngưỡng tự động BLOCK). Một lệnh chặn không thể đảo, nên sai ở dải này tốn kém hơn hẳn
     sai ở dải ALERT. ECE gộp có thể đẹp trong khi riêng dải cao vẫn hỏng.
     """
     n = min(len(confidences), len(outcomes))
@@ -583,37 +556,33 @@ def calibration_report(confidences: Sequence[float], outcomes: Sequence[bool]) -
     }
 
 
-# ==============================================================================
-# Ngăn chặn ở MỨC IP — "kẻ tấn công có bị chặn không, và sau bao nhiêu sự kiện?"
-# ==============================================================================
-
-
+# Ngăn chặn ở mức IP - "kẻ tấn công có bị chặn không, và sau bao nhiêu sự kiện?"
 def ip_containment(events: Sequence[dict]) -> dict:
-    """Quy trách nhiệm ở mức ĐỊA CHỈ NGUỒN thay vì mức từng sự kiện.
+    """Quy trách nhiệm ở mức địa chỉ nguồn thay vì mức từng sự kiện.
 
-    `events` là chuỗi theo ĐÚNG thứ tự luồng, mỗi phần tử::
+    `events` là chuỗi theo đúng thứ tự luồng, mỗi phần tử::
 
         {"ip": str, "is_attack": bool, "blocked": bool}
 
     `blocked` = sự kiện này khiến hệ ra lệnh chặn (BLOCK_IP), không phải chỉ cảnh báo.
 
-    VÌ SAO CẦN — và vì sao thiếu nó thì bộ chỉ số đang tự làm hại luận văn. Mọi chỉ số hiện
-    có đều đếm theo SỰ KIỆN. Một kẻ tấn công gửi 500 flow bị đếm thành 500 sự kiện, nên nếu
+    Vì sao cần - và vì sao thiếu nó thì bộ chỉ số đang tự làm hại luận văn. Mọi chỉ số hiện
+    có đều đếm theo sự kiện. Một kẻ tấn công gửi 500 flow bị đếm thành 500 sự kiện, nên nếu
     hệ chặn nó ở flow thứ 3 thì F1 mức-sự-kiện vẫn phạt đủ 497 lần còn lại. Vận hành thật
-    thì đó là THÀNH CÔNG — kẻ tấn công đã bị cắt — nhưng thước đo ghi nhận là thất bại.
+    thì đó là thành công - kẻ tấn công đã bị cắt - nhưng thước đo ghi nhận là thất bại.
     Kiến trúc của hệ (uy tín IP, chặn-khi-thấy-lại, liên kết chiến dịch đa ngày) vận hành ở
     mức IP, nên phải có thước đo ở đúng mức đó.
 
-    Bộ bốn chỉ số phải đọc CÙNG NHAU:
-      * `containment_rate` — bao nhiêu IP tấn công rốt cuộc bị chặn;
-      * `leak_rate`        — phần bù, tức "tỉ lệ IP lọt qua hệ thống";
-      * `events_before_containment` — sự kiện lọt được TRƯỚC khi lệnh chặn có hiệu lực,
-        tức THIỆT HẠI THỰC; chặn ở sự kiện thứ 2 khác hẳn chặn ở sự kiện thứ 400;
-      * `benign_ip_false_block_rate` — đối trọng BẮT BUỘC. Không có nó thì một hệ chặn
+    Bộ bốn chỉ số phải đọc cùng nhau:
+      * `containment_rate` - bao nhiêu IP tấn công rốt cuộc bị chặn;
+      * `leak_rate`        - phần bù, tức "tỉ lệ IP lọt qua hệ thống";
+      * `events_before_containment` - sự kiện lọt được trước khi lệnh chặn có hiệu lực,
+        tức thiệt hại thực; chặn ở sự kiện thứ 2 khác hẳn chặn ở sự kiện thứ 400;
+      * `benign_ip_false_block_rate` - đối trọng bắt buộc. Không có nó thì một hệ chặn
         sạch mọi IP đạt containment 1,00 và trông như hoàn hảo.
 
-    CẢNH BÁO ĐỌC SỐ: chỉ số này chỉ có nghĩa khi ĐỊNH DANH IP có nghĩa. Với dữ liệu mà địa
-    chỉ nguồn là tổng hợp, nó đo CƠ CHẾ (lệnh chặn có bật và có dính không) chứ không đo độ
+    Cảnh báo đọc số: chỉ số này chỉ có nghĩa khi định danh IP có nghĩa. Với dữ liệu mà địa
+    chỉ nguồn là tổng hợp, nó đo cơ chế (lệnh chặn có bật và có dính không) chứ không đo độ
     khó. Hãy tách nhóm nguồn IP thật và IP tổng hợp khi báo cáo.
     """
     order: list[str] = []
@@ -637,7 +606,7 @@ def ip_containment(events: Sequence[dict]) -> dict:
             is_attacker[ip] = True
             attack_seq[ip].append(True)
         if bool(ev.get("blocked")) and blocked_at[ip] is None:
-            # Vị trí = số sự kiện TẤN CÔNG của IP này đã đi qua trước lệnh chặn.
+            # Vị trí = số sự kiện tấn công của IP này đã đi qua trước lệnh chặn.
             blocked_at[ip] = len(attack_seq[ip]) - (1 if atk else 0)
 
     attackers = [ip for ip in order if is_attacker[ip]]
@@ -673,13 +642,9 @@ def ip_containment(events: Sequence[dict]) -> dict:
     }
 
 
-# ==============================================================================
-# Chất lượng TRUY XUẤT — đo thẳng bộ RAG, không qua trung gian LLM
-# ==============================================================================
-
-
+# Chất lượng truy xuất - đo thẳng bộ RAG, không qua trung gian LLM
 def _rank_of(retrieved: Sequence[str], relevant: set) -> int | None:
-    """Hạng 1-based của tài liệu liên quan ĐẦU TIÊN; None nếu không có trong danh sách."""
+    """Hạng 1-based của tài liệu liên quan đầu tiên; None nếu không có trong danh sách."""
     for i, doc_id in enumerate(retrieved, start=1):
         if doc_id in relevant:
             return i
@@ -691,23 +656,23 @@ def retrieval_report(
 ) -> dict:
     """Recall@k · MRR · nDCG@k trên tập truy vấn đã chạy.
 
-    `queries` là chuỗi cặp `(danh sách id đã truy xuất theo THỨ TỰ HẠNG, tập id liên quan)`.
+    `queries` là chuỗi cặp `(danh sách id đã truy xuất theo thứ tự hạng, tập id liên quan)`.
 
-    VÌ SAO CẦN. Chất lượng truy xuất hiện chỉ được đo GIÁN TIẾP, qua điểm "Context
+    Vì sao cần. Chất lượng truy xuất hiện chỉ được đo gián tiếp, qua điểm "Context
     Precision" mà một LLM khác chấm. Cách đó trộn ba thứ vào một con số: bộ truy xuất lấy
     đúng chưa, tác tử dùng ngữ cảnh khéo không, và trọng tài chấm có chuẩn không. Khi điểm
-    thấp, ta KHÔNG biết phải sửa cái nào. Ba chỉ số dưới đây đo THẲNG bộ truy xuất, chạy
-    offline trong vài giây và KHÔNG cần LLM — nên chúng cũng là cách rẻ nhất để chứng minh
+    thấp, ta không biết phải sửa cái nào. Ba chỉ số dưới đây đo thẳng bộ truy xuất, chạy
+    offline trong vài giây và không cần LLM - nên chúng cũng là cách rẻ nhất để chứng minh
     hiệu quả của RAG lai (FAISS + BM25 hợp nhất bằng RRF), vốn là một đóng góp được tuyên bố
     nhưng chưa từng có phép đo riêng.
 
     Ba chỉ số trả lời ba câu khác nhau, phải đọc cùng nhau:
-      * `recall@k` — tài liệu đúng có LỌT vào k đầu không? (có/không)
-      * `mrr`      — nó nằm ở hạng bao nhiêu? (1/hạng, trung bình) — nhạy với việc leo hạng
+      * `recall@k` - tài liệu đúng có lọt vào k đầu không? (có/không)
+      * `mrr`      - nó nằm ở hạng bao nhiêu? (1/hạng, trung bình) - nhạy với việc leo hạng
                      mà recall@k không thấy, vì hạng 5 lên hạng 1 vẫn giữ recall@5 = 1,0.
-      * `ndcg@k`   — có tính CHIẾT KHẤU theo log vị trí, chuẩn của ngành truy xuất thông tin.
+      * `ndcg@k`   - có tính chiết khấu theo log vị trí, chuẩn của ngành truy xuất thông tin.
 
-    Prompt chỉ nạp 3 đoạn hợp nhất đầu bảng, nên **recall@3 mới là con số vận hành**:
+    Prompt chỉ nạp 3 đoạn hợp nhất đầu bảng, nên recall@3 mới là con số vận hành:
     tài liệu đúng nằm ở hạng 7 thì với LLM nó không tồn tại.
     """
     n = len(queries)
@@ -717,7 +682,7 @@ def retrieval_report(
     ranks: list[int | None] = [_rank_of(r, rel) for r, rel in queries]
     recall = {f"@{k}": round(sum(1 for r in ranks if r is not None and r <= k) / n, 4) for k in ks}
     mrr = round(sum((1.0 / r) if r else 0.0 for r in ranks), 4) / n
-    # nDCG với MỘT tài liệu liên quan lý tưởng ở hạng 1 => IDCG = 1, nên DCG = 1/log2(1+hạng).
+    # nDCG với một tài liệu liên quan lý tưởng ở hạng 1 => IDCG = 1, nên DCG = 1/log2(1+hạng).
     ndcg = {
         f"@{k}": round(sum(1.0 / math.log2(1 + r) if (r and r <= k) else 0.0 for r in ranks) / n, 4)
         for k in ks

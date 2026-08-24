@@ -1,6 +1,4 @@
-"""
-Tests for Long-Term Threat Memory Store (APT Detection + Organizational Context)
-"""
+"""Kiểm thử bộ nhớ đe doạ dài hạn: phát hiện APT và ngữ cảnh tổ chức"""
 
 import pytest  # type: ignore
 
@@ -16,7 +14,7 @@ def memory_store(tmp_path):
 
 
 class TestIPReputation:
-    """Test IP Reputation Tracking."""
+    """Theo dõi điểm danh tiếng của IP."""
 
     def test_record_single_incident(self, memory_store):
         memory_store.record_incident("192.168.1.100", "ALERT", "T1110")
@@ -59,7 +57,7 @@ class TestIPReputation:
 
 
 class TestOrganizationalContext:
-    """Test Known Entities (internal tools, pentest IPs)."""
+    """Thực thể đã biết: công cụ nội bộ, IP đội kiểm thử."""
 
     def test_add_known_entity(self, memory_store):
         memory_store.add_known_entity(
@@ -91,18 +89,18 @@ class TestOrganizationalContext:
 
 
 class TestAPTCorrelation:
-    """Test APT Detection Logic."""
+    """Logic phát hiện chuỗi APT."""
 
     def test_no_apt_for_new_ip(self, memory_store):
         memory_store.record_incident("10.0.0.50", "ALERT")
         apt = memory_store.check_apt_pattern("10.0.0.50")
-        assert apt is None  # Not enough incidents
+        assert apt is None  # Chưa đủ số sự cố
 
     def test_apt_detection_threshold(self, memory_store):
-        # Simulate many incidents
+        # Giả lập nhiều sự cố
         for _ in range(10):
             memory_store.record_incident("172.16.0.100", "ALERT")
-        # Won't trigger APT because threshold_days requires first_seen to be old enough
+        # Chưa bật APT vì threshold_days đòi first_seen phải đủ cũ
         apt = memory_store.check_apt_pattern(
             "172.16.0.100", threshold_incidents=5, threshold_days=0
         )
@@ -118,7 +116,7 @@ class TestAPTCorrelation:
             related_ips="172.16.0.100",
             mitre_chain="T1110→T1078",
         )
-        # Record again — should increment
+        # Ghi lại lần nữa, số đếm phải tăng
         memory_store.record_apt_indicator(
             "persistent_ip",
             "172.16.0.100",
@@ -143,7 +141,7 @@ class TestAPTCorrelation:
 
 
 class TestPromptContextGeneration:
-    """Test context generation for LLM prompt injection."""
+    """Sinh ngữ cảnh để chèn vào prompt của LLM."""
 
     def test_empty_context_for_unknown_ip(self, memory_store):
         ctx = memory_store.get_context_for_prompt("255.255.255.0")
@@ -164,13 +162,13 @@ class TestPromptContextGeneration:
 
     def test_context_includes_multiday_apt_chain(self, memory_store):
         """Mục 3b: chuỗi APT EMERGENT (threat_events, >=2 ngày) phải được
-        inject vào LLM context — cầu nối memory đa-ngày -> Tier-2 suy luận."""
+        inject vào LLM context - cầu nối memory đa-ngày -> Tier-2 suy luận."""
         ip = "10.9.9.9"
-        # 1 ngày: chưa có chuỗi -> context KHÔNG nhắc APT CHAIN
+        # 1 ngày: chưa có chuỗi -> context không nhắc APT CHAIN
         memory_store.record_apt_event(ip, apt_phase="Reconnaissance", apt_day=1)
         assert "APT CHAIN" not in memory_store.get_context_for_prompt(ip)
 
-        # Ngày thứ 2 (cùng IP): bản án bật -> context PHẢI có chuỗi + phases
+        # Ngày thứ 2 (cùng IP): bản án bật -> context phải có chuỗi + phases
         memory_store.record_apt_event(ip, apt_phase="Lateral Movement", apt_day=2)
         ctx = memory_store.get_context_for_prompt(ip)
         assert "APT CHAIN" in ctx
@@ -180,7 +178,7 @@ class TestPromptContextGeneration:
 
 
 class TestStats:
-    """Test dashboard statistics."""
+    """Số liệu thống kê cho dashboard."""
 
     def test_initial_stats(self, memory_store):
         import sqlite3
@@ -208,11 +206,11 @@ class TestStats:
 
 
 class TestReputationDecay:
-    """Test reputation decay mechanism."""
+    """Cơ chế suy giảm điểm danh tiếng theo thời gian."""
 
     def test_decay_does_not_crash(self, memory_store):
         memory_store.record_incident("10.0.0.1", "BLOCK_IP")
-        # Should not raise
+        # Không được ném lỗi
         memory_store.decay_reputation(decay_rate=0.5, inactive_days=0)
 
 

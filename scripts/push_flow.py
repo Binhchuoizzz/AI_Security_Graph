@@ -1,27 +1,27 @@
-"""push_flow.py — Đẩy RIÊNG TỪNG luồng dữ liệu lên Redis để demo tách bạch từng kịch bản.
+"""push_flow.py - Đẩy riêng từng luồng dữ liệu lên Redis để demo tách bạch từng kịch bản.
 
-Khác `scripts/demo.py` (đẩy luồng GỘP cicids+dapt+zeroday+adversarial), script này cho phép
-đẩy CHỈ MỘT nguồn để trình diễn tách bạch qua FULL pipeline live (Tier-1 → Tier-2 → Dashboard):
+Khác `scripts/demo.py` (đẩy luồng gộp cicids+dapt+zeroday+adversarial), script này cho phép
+đẩy chỉ một nguồn để trình diễn tách bạch qua FULL pipeline live (Tier-1 -> Tier-2 -> Dashboard):
 
   --source cicids       Phân loại lưu lượng CIC-IDS2018 (BLOCK/ALERT/DROP + giảm tải nhiễu)
   --source dapt         Chuỗi APT đa ngày DAPT2020 (APT emergent trong Threat Memory)
-  --source zeroday      Zero-day REAL-derived — Welford Z-score bắt cái luật tĩnh bỏ sót
-  --source adversarial  723 payload OWASP LLM Top-10 (Tier-1 chặn/escalate → Tier-2 guardrails)
+  --source zeroday      Zero-day REAL-derived - Welford Z-score bắt cái luật tĩnh bỏ sót
+  --source adversarial  723 payload OWASP LLM Top-10 (Tier-1 chặn/escalate -> Tier-2 guardrails)
 
-TÁI DÙNG data đã build + logic đã kiểm thử — KHÔNG bịa số liệu:
-  - cicids/dapt/zeroday: LỌC từ `data/demo.json` theo `unified_source` (đã enrich sẵn bởi
-    `build_demo.py` → `unified_dataset.enrich`). Dựng demo.json trước: `.venv/bin/python
+Tái dùng data đã build + logic đã kiểm thử - không bịa số liệu:
+  - cicids/dapt/zeroday: Lọc từ `data/demo.json` theo `unified_source` (đã enrich sẵn bởi
+    `build_demo.py` -> `unified_dataset.enrich`). Dựng demo.json trước: `.venv/bin/python
     scripts/build_demo.py`.
   - adversarial: 723 payload từ `experiments/adversarial/*/samples.json`, dựng event đúng shape
     `_build_adversarials` rồi `enrich()` + `determine_queue()` của `unified_dataset` (1 nguồn chân lý).
     Mỗi payload 1 IP TEST-NET riêng (198.51.100.x / 203.0.113.x) để lệnh chặn hiện rõ trên UI.
 
-LƯU Ý QUAN TRỌNG:
+Lưu Ý quan trọng:
   - dapt & zeroday luôn được PREPEND benign warmup (mặc định 150, cờ --warmup) để Welford có
-    baseline — nếu không, Z-score zero-day sẽ vô nghĩa (chưa học nền).
+    baseline - nếu không, Z-score zero-day sẽ vô nghĩa (chưa học nền).
   - Cần subscriber chạy trên HOST (`python main.py --mode server`) để Tier-1+Tier-2 xử lý và ghi
-    DB/config cho Dashboard đọc. Dashboard container KHÔNG reach Redis.
-  - REDIS_URL (kèm mật khẩu) CHỈ lấy từ .env — không bao giờ in ra stdout/log.
+    DB/config cho Dashboard đọc. Dashboard container không reach Redis.
+  - REDIS_URL (kèm mật khẩu) chỉ lấy từ .env - không bao giờ in ra stdout/log.
 
 Chạy:
   .venv/bin/python scripts/push_flow.py --source cicids --limit 300
@@ -44,7 +44,7 @@ import redis  # type: ignore
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
-# Secret chỉ sống trong .env — nạp trước khi đọc REDIS_URL (script chạy standalone).
+# Secret chỉ sống trong .env - nạp trước khi đọc REDIS_URL (script chạy standalone).
 from dotenv import load_dotenv  # noqa: E402
 
 from experiments.unified_dataset import determine_queue, enrich  # noqa: E402
@@ -54,24 +54,24 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 DEMO_FILE = os.path.join(ROOT, "data", "demo.json")
 ADV_GLOB = os.path.join(ROOT, "experiments", "adversarial", "*", "samples.json")
 
-# Năm bộ do `scripts/build_adversarial_suite.py` SINH RA bằng template Python tất định — tức
-# do tác giả tự soạn, không phải lưu lượng thu thập được. Ba bộ còn lại là dữ liệu THẬT công
+# Năm bộ do `scripts/build_adversarial_suite.py` sinh ra bằng template Python tất định - tức
+# do tác giả tự soạn, không phải lưu lượng thu thập được. Ba bộ còn lại là dữ liệu thật công
 # khai: `advbench_gcg` (AdvBench), `jailbreak_hf` (jackhhao), `prompt_injection_hf` (deepset),
 # nạp qua `scripts/ingest_adversarial_datasets.py`. Tỉ lệ: 603 thật / 120 tự soạn.
 #
-# VÌ SAO CẦN TÁCH. `_adversarial_logs` nạp theo `sorted(glob)` rồi cắt TIỀN TỐ, nên `--limit`
+# Vì sao cần tách. `_adversarial_logs` nạp theo `sorted(glob)` rồi cắt tiền tố, nên `--limit`
 # lấy gì phụ thuộc thứ tự chữ cái của tên thư mục chứ không phụ thuộc xuất xứ. Tài liệu demo
 # từng ghi `--limit 120` = "encoding 45 · structural 20 · semantic 20 · jailbreak 20 ·
-# rag_poison 15" — đúng ở thời điểm chỉ có 120 mẫu tự soạn, nhưng sau khi thêm 603 mẫu thật
+# rag_poison 15" - đúng ở thời điểm chỉ có 120 mẫu tự soạn, nhưng sau khi thêm 603 mẫu thật
 # thì `advbench_gcg` sắp lên đầu và `--limit 120` thực ra lấy trọn 120 mẫu AdvBench. Số cũ
-# không đỏ lên ở đâu cả. `--real-only` cho phép chọn theo XUẤT XỨ thay vì theo thứ tự.
+# không đỏ lên ở đâu cả. `--real-only` cho phép chọn theo xuất xứ thay vì theo thứ tự.
 _AUTHORED_ADV_SETS = frozenset(
     {"encoding_bypass", "structural_attacks", "semantic_confusion", "jailbreak", "rag_poisoning"}
 )
 MAX_QUEUE_SIZE = 10_000
 
 # user-facing source -> giá trị unified_source trong demo.json.
-# cicids = tập ĐÃ GẮN NHÃN 1250 mẫu (không lấy cicids_max 87k để demo gọn); dapt = 402 sự kiện
+# cicids = tập đã gắn nhãn 1250 mẫu (không lấy cicids_max 87k để demo gọn); dapt = 402 sự kiện
 # chuỗi APT curated (không lấy dapt_max); zeroday = biến thể real-derived.
 SOURCE_MAP = {
     "cicids": ("cicids",),
@@ -94,7 +94,7 @@ def _load_demo() -> list[dict]:
 
 
 def _benign_warmup(demo: list[dict], n: int) -> list[dict]:
-    """n log benign (cicids) làm baseline Welford — lấy từ chính demo.json (data THẬT)."""
+    """n log benign (cicids) làm baseline Welford - lấy từ chính demo.json (data thật)."""
     warm = [
         e
         for e in demo
@@ -104,7 +104,7 @@ def _benign_warmup(demo: list[dict], n: int) -> list[dict]:
 
 
 def _unified_logs(source: str, limit: int, warmup: int):
-    """(queue, log) cho cicids/dapt/zeroday — lọc demo.json (đã enrich); prepend warmup nếu cần."""
+    """(queue, log) cho cicids/dapt/zeroday - lọc demo.json (đã enrich); prepend warmup nếu cần."""
     demo = _load_demo()
     srcs = SOURCE_MAP[source]
     events = [e for e in demo if e.get("unified_source") in srcs]
@@ -117,10 +117,10 @@ def _unified_logs(source: str, limit: int, warmup: int):
 
 
 def _adversarial_logs(limit: int, real_only: bool = False):
-    """(queue, log) cho 723 payload adversarial — mỗi mẫu 1 IP TEST-NET riêng.
+    """(queue, log) cho 723 payload adversarial - mỗi mẫu 1 IP TEST-NET riêng.
 
     `real_only=True` bỏ 120 mẫu do `build_adversarial_suite.py` tự sinh, chỉ giữ 603 mẫu từ
-    AdvBench / jackhhao / deepset — xem `_AUTHORED_ADV_SETS`.
+    AdvBench / jackhhao / deepset - xem `_AUTHORED_ADV_SETS`.
     """
     samples: list[dict] = []
     for path in sorted(glob.glob(ADV_GLOB)):

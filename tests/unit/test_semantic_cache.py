@@ -1,5 +1,5 @@
 """
-Unit tests cho SemanticCache (LRU + TTL) — tầng tối ưu độ trễ RAG.
+Unit tests cho SemanticCache (LRU + TTL) - tầng tối ưu độ trễ RAG.
 
 Cache key = SHA-256 của query template; hit rate là metric MLflow nên
 hành vi hit/miss/eviction phải chính xác tuyệt đối.
@@ -40,7 +40,7 @@ class TestTTL:
     def test_expired_entry_is_miss_and_evicted(self, cache):
         cache.put("stale query", {"r": "old"})
         key = cache._make_key("stale query")
-        # Giả lập entry đã quá TTL (không sleep — test tất định)
+        # Giả lập entry đã quá TTL (không sleep - test tất định)
         cache.cache[key]["timestamp"] -= cache.ttl_seconds + 1
         res = cache.get("stale query")
         assert res["hit"] is False
@@ -61,7 +61,7 @@ class TestLRU:
     def test_update_existing_key_does_not_evict(self, cache):
         for i in range(3):
             cache.put(f"q{i}", {"i": i})
-        cache.put("q1", {"i": "updated"})  # update, KHÔNG phải insert mới
+        cache.put("q1", {"i": "updated"})  # update, không phải insert mới
         assert len(cache.cache) == 3
         assert cache.get("q1")["result"] == {"i": "updated"}
 

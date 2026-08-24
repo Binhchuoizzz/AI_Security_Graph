@@ -2,7 +2,7 @@
 Mock Executor Module cho Hệ thống Phản hồi tự động.
 Mô phỏng các hành động khóa IP, cách ly Host và gửi Cảnh báo.
 
-TĂNG CƯỜNG BẢO MẬT (Attack Vector #07 — Sandbox Escape / Phòng thủ RCE):
+Tăng cường bảo mật (Attack Vector #07 - Sandbox Escape / Phòng thủ RCE):
   - ActionValidator: Chỉ cho phép các hành động trong allowlist, từ chối lệnh lạ
   - Làm sạch đầu vào (Input Sanitization): Chặn command injection trong các trường target/reason
   - Làm sạch đầu ra (Output Sanitizer): Loại bỏ markdown/HTML trước khi ghi DB
@@ -27,21 +27,21 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "config", "audit_trail.db")
 
-# Khóa GHI chuỗi audit HMAC: _log_to_db là read-modify-write (đọc prev_hash → tính HMAC →
-# INSERT). Hai worker Tier-2 song song mà không khóa sẽ CÙNG móc vào một prev_hash → chuỗi
-# HMAC BỊ RẼ NHÁNH và verify_audit_trail_integrity() báo gãy. Khóa này serialize đúng đoạn
-# tối hậu đó; đơn luồng (production/test) không tranh chấp = chi phí ~0, chuỗi Y HỆT như trước.
+# Khóa ghi chuỗi audit HMAC: _log_to_db là read-modify-write (đọc prev_hash -> tính HMAC ->
+# INSERT). Hai worker Tier-2 song song mà không khóa sẽ cùng móc vào một prev_hash -> chuỗi
+# HMAC bị rẽ nhánh và verify_audit_trail_integrity() báo gãy. Khóa này serialize đúng đoạn
+# tối hậu đó; đơn luồng (production/test) không tranh chấp = chi phí ~0, chuỗi Y hệt như trước.
 _audit_lock = threading.Lock()
 CONFIG_YAML_PATH = os.path.join(
     os.path.dirname(__file__), "..", "..", "config", "system_settings.yaml"
 )
 
-# ── Khóa HMAC của sổ kiểm toán ────────────────────────────────────────────────────────
-# Khóa mặc định nằm TRONG mã nguồn công khai, nên khi thiếu env thì chuỗi băm KHÔNG còn
+# Khóa HMAC của sổ kiểm toán
+# Khóa mặc định nằm trong mã nguồn công khai, nên khi thiếu env thì chuỗi băm không còn
 # giá trị chống giả mạo: ai đọc repo cũng tính lại được hash hợp lệ cho bản ghi đã sửa và
-# verify_audit_trail_integrity() vẫn báo "toàn vẹn". Trước đây điều này diễn ra IM LẶNG ở
+# verify_audit_trail_integrity() vẫn báo "toàn vẹn". Trước đây điều này diễn ra im lặng ở
 # mọi lượt chạy (biến không có trong .env lẫn .env.example), trong khi tài liệu lại tuyên
-# bố "no hardcoded credentials". Nay cảnh báo MỘT lần lúc khởi động để trạng thái thật của
+# bố "no hardcoded credentials". Nay cảnh báo một lần lúc khởi động để trạng thái thật của
 # tính toàn vẹn luôn hiện rõ.
 _FALLBACK_LOG_SECRET = "sentinel_secure_fallback_log_secret_2026"  # noqa: S105
 
@@ -51,25 +51,25 @@ def _log_secret() -> bytes:
     return os.getenv("SENTINEL_LOG_SECRET", _FALLBACK_LOG_SECRET).encode()
 
 
-# ĐÃ GỠ: `generate_action_token` / `verify_action_token`.
+# Đã gỡ: `generate_action_token` / `verify_action_token`.
 #
-# Cặp hàm này mang docstring "OWASP LLM06 Excessive Agency Defense" nhưng KHÔNG NƠI NÀO
-# GỌI — `verify_action_token` có 0 tham chiếu trên toàn repo, `generate_action_token` chỉ
+# Cặp hàm này mang docstring "OWASP LLM06 Excessive Agency Defense" nhưng không nơi nào
+# Gọi - `verify_action_token` có 0 tham chiếu trên toàn repo, `generate_action_token` chỉ
 # được gọi từ trong chính `verify_action_token`. Mã bảo mật chết mà tự xưng là một lớp
 # phòng vệ thì tệ hơn không có mã: người đọc (và hội đồng) tin rằng có một chốt kiểm mà
 # thực tế đường thực thi không đi qua.
 #
-# VÀ NÓ KHÔNG ĐÁNG ĐỂ NỐI VÀO. Token chỉ có giá trị khi vượt một ranh giới tin cậy. Ở đây
-# tác tử và bộ thực thi nằm CÙNG một tiến trình, ký bằng CÙNG một khóa: thứ gì gọi được
+# Và nó không đáng để nối vào. Token chỉ có giá trị khi vượt một ranh giới tin cậy. Ở đây
+# tác tử và bộ thực thi nằm cùng một tiến trình, ký bằng cùng một khóa: thứ gì gọi được
 # `block_ip` thì cũng gọi được `generate_action_token`. Thêm token không chặn được gì.
 #
-# Chốt chặn excessive-agency THẬT của hệ, đang chạy: lá chắn neo bằng chứng (bác lệnh
+# Chốt chặn excessive-agency thật của hệ, đang chạy: lá chắn neo bằng chứng (bác lệnh
 # BLOCK_IP không truy được về tài liệu đã truy xuất), `sanitize_target`, đối chiếu
 # whitelist trong `block_ip`, và hàng đợi HITL. Đó mới là thứ nên trích khi nói về LLM06.
 
 
 def audit_key_is_default() -> bool:
-    """True nếu đang ký bằng khóa mặc định công khai (chuỗi audit KHÔNG chống giả mạo)."""
+    """True nếu đang ký bằng khóa mặc định công khai (chuỗi audit không chống giả mạo)."""
     return not os.getenv("SENTINEL_LOG_SECRET")
 
 
@@ -81,15 +81,15 @@ if audit_key_is_default():
         'python -c "import secrets; print(secrets.token_hex(32))" rồi đặt vào .env'
     )
 
-# Cache whitelist (đọc từ YAML) để phòng vệ chiều sâu KHÔNG tốn I/O mỗi lần chặn.
+# Cache whitelist (đọc từ YAML) để phòng vệ chiều sâu không tốn I/O mỗi lần chặn.
 # Khử cache theo MTIME của file: hễ whitelist đổi (vd approve_rule vừa gỡ 1 IP) là
-# đọc lại NGAY — tránh đua dữ liệu khi block ngay sau khi gỡ khỏi whitelist.
+# đọc lại ngay - tránh đua dữ liệu khi block ngay sau khi gỡ khỏi whitelist.
 _wl_cache: dict = {"mtime": None, "ips": frozenset()}
 
 
 def _whitelisted_ips() -> frozenset:
-    """Đọc whitelist_ips từ config, cache theo mtime. Dùng để executor KHÔNG chặn nhầm IP
-    đã whitelist — nhất quán với Tier-1 dù suy luận LLM có nêu tên IP đó."""
+    """Đọc whitelist_ips từ config, cache theo mtime. Dùng để executor không chặn nhầm IP
+    đã whitelist - nhất quán với Tier-1 dù suy luận LLM có nêu tên IP đó."""
     try:
         mtime = os.path.getmtime(CONFIG_YAML_PATH)
     except OSError:
@@ -108,20 +108,18 @@ def _whitelisted_ips() -> frozenset:
     return ips
 
 
-# =========================================================================
-# ACTION VALIDATOR — Sandbox Escape / RCE Defense (Attack Vector #07)
-# =========================================================================
+# Xác thực hành động: phòng thoát sandbox và RCE (vector tấn công #07)
 class ActionValidator:
     """
     Trình xác thực hành động dựa trên danh sách cho phép (allowlist).
-    CHỈ cho phép các hành động đã được định nghĩa trước.
+    Chỉ cho phép các hành động đã được định nghĩa trước.
     Từ chối các hành động khác -> ngăn LLM bị thao túng để thực thi lệnh tùy ý.
     """
 
     # WHITELIST: bản ghi audit cho truy cập được đặc cách cho qua (không phải hành động
     # phản ứng, chỉ để ghi nhận + hiển thị thẻ riêng trên UI).
-    # DROP = hành động lành tính đầu-cuối của chính sách 4 dải (log sạch/C<0.40) — thêm vào
-    # allowlist để nếu có audit-log DROP thì KHÔNG bị nhận nhầm là "sandbox escape". "LOG" giữ
+    # DROP = hành động lành tính đầu-cuối của chính sách 4 dải (log sạch/C<0.40) - thêm vào
+    # allowlist để nếu có audit-log DROP thì không bị nhận nhầm là "sandbox escape". "LOG" giữ
     # cho các nút thao tác thủ công trên UI (whitelist/block tay).
     ALLOWED_ACTIONS = frozenset({"BLOCK_IP", "ALERT", "DROP", "LOG", "AWAIT_HITL", "WHITELIST"})
 
@@ -141,7 +139,7 @@ class ActionValidator:
     @classmethod
     def sanitize_target(cls, target: str) -> str:
         """
-        Làm sạch trường target — chặn command injection.
+        Làm sạch trường target - chặn command injection.
         Target chỉ nên là IP, hostname, hoặc định danh (identifier).
         """
         if cls.DANGEROUS_PATTERNS.search(target):
@@ -169,9 +167,9 @@ _validator = ActionValidator()
 def _ensure_db_writable(db_path: str):
     """Nới quyền file DB để ghi được bởi cả host (uid 1000) lẫn container (uid 999).
 
-    KHÔNG bao giờ XOÁ file DB ở đây: đây là đường chạy runtime (_init_db) — xoá thầm lặng
+    Không bao giờ xoá file DB ở đây: đây là đường chạy runtime (_init_db) - xoá thầm lặng
     audit_trail.db sẽ mất toàn bộ lịch sử kiểm toán đã ký HMAC. Chỉ chmod; nếu vẫn không
-    ghi được thì CẢNH BÁO to để người vận hành xử lý (việc reset chủ đích nằm ở reset_all.py)."""
+    ghi được thì cảnh báo to để người vận hành xử lý (việc reset chủ đích nằm ở reset_all.py)."""
     if not os.path.exists(db_path):
         return
     try:
@@ -191,7 +189,7 @@ def _init_db():
     _ensure_db_writable(DB_PATH)
     with sqlite3.connect(DB_PATH) as conn:
         c = conn.cursor()
-        # KHÔNG bật WAL: WAL đổi header DB + bắt READER ghi -wal/-shm -> crash cross-UID Docker
+        # Không bật WAL: WAL đổi header DB + bắt READER ghi -wal/-shm -> crash cross-UID Docker
         # (Dashboard container uid 999 mở read-only). Giữ rollback-journal mặc định (reader
         # chờ writer qua timeout=5s, không crash). Tối ưu an toàn còn lại: index bên dưới.
         # Tạo bảng audit_trail
@@ -219,34 +217,34 @@ def _init_db():
         columns = [col[1] for col in c.fetchall()]
         if "integrity_hash" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN integrity_hash TEXT")
-        # Cột raw_log: lưu LOG THÔ đầu vào (đặc trưng luồng đã loại nhãn) để Dashboard hiển
-        # thị minh bạch "cái gì đã vào Tier-1/LLM". KHÔNG nằm trong HMAC — chữ ký chỉ phủ
-        # QUYẾT ĐỊNH (action/target/reason); raw_log là ngữ cảnh đầu vào đính kèm.
+        # Cột raw_log: lưu LOG thô đầu vào (đặc trưng luồng đã loại nhãn) để Dashboard hiển
+        # thị minh bạch "cái gì đã vào Tier-1/LLM". Không nằm trong HMAC - chữ ký chỉ phủ
+        # Quyết định (action/target/reason); raw_log là ngữ cảnh đầu vào đính kèm.
         if "raw_log" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN raw_log TEXT")
-        # Cột tier: TẦNG đã ra quyết định, ghi TƯỜNG MINH lúc quyết thay vì để Dashboard đoán.
+        # Cột tier: Tầng đã ra quyết định, ghi tường minh lúc quyết thay vì để Dashboard đoán.
         # Trước đây UI xếp cảnh báo vào 3 tab bằng cách dò chuỗi trong câu lý do, nên một sự cố
         # của Tier-2 mà câu lý do có nhắc "Tier-1 vẫn bảo vệ độc lập" là rơi nhầm sang tab
-        # Tier-1. Phân loại phải đến từ nơi BIẾT sự thật, không phải từ việc đọc văn xuôi.
-        # Ngoài phạm vi HMAC — chữ ký phủ QUYẾT ĐỊNH (action/target/reason), tier là siêu dữ liệu.
+        # Tier-1. Phân loại phải đến từ nơi biết sự thật, không phải từ việc đọc văn xuôi.
+        # Ngoài phạm vi HMAC - chữ ký phủ quyết định (action/target/reason), tier là siêu dữ liệu.
         if "tier" not in columns:
             c.execute("ALTER TABLE audit_trail ADD COLUMN tier TEXT DEFAULT ''")
 
-        # CHỈ MỤC target: get_audit_trail_for_ip() lọc WHERE target=? (UI gọi nhiều lần mỗi
-        # lượt refresh — mỗi luật chờ duyệt, mỗi lần điều tra IP). Không index -> quét toàn
+        # Chỉ mục target: get_audit_trail_for_ip() lọc WHERE target=? (UI gọi nhiều lần mỗi
+        # lượt refresh - mỗi luật chờ duyệt, mỗi lần điều tra IP). Không index -> quét toàn
         # bảng O(n); có index -> O(log n). Sổ cái audit phình dần nên đây là win rõ rệt.
         c.execute("CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_trail(target)")
 
-        # CHỈ MỤC (tier, id): ba tab nhật ký lấy N dòng mới nhất CỦA TỪNG TẦNG. Không có chỉ
-        # mục thì mỗi truy vấn quét ngược từ id lớn nhất cho tới khi gom đủ N dòng khớp — với
+        # Chỉ mục (tier, id): ba tab nhật ký lấy N dòng mới nhất của từng tầng. Không có chỉ
+        # mục thì mỗi truy vấn quét ngược từ id lớn nhất cho tới khi gom đủ N dòng khớp - với
         # tầng ghi thưa, đó là quét gần trọn bảng. Đo trên 35.856 dòng: `tier2_llm` mất 44,2 ms
-        # còn `tier1_manual` 31,1 ms, và cả năm truy vấn cộng lại ~135 ms cho MỖI lượt làm mới
-        # (cache TTL 2 giây) — chính là cảm giác giật của Dashboard. Chi phí đó tăng tuyến tính
+        # còn `tier1_manual` 31,1 ms, và cả năm truy vấn cộng lại ~135 ms cho mỗi lượt làm mới
+        # (cache TTL 2 giây) - chính là cảm giác giật của Dashboard. Chi phí đó tăng tuyến tính
         # theo độ dài sổ, nên càng chạy lâu càng giật.
         c.execute("CREATE INDEX IF NOT EXISTS idx_audit_tier_id ON audit_trail(tier, id DESC)")
 
-        # CHỈ MỤC action: `count_audit_alerts` đếm `WHERE action NOT IN (...)` mỗi 2 giây để
-        # nuôi thẻ chỉ số. Không chỉ mục là quét toàn bảng — 52,1 ms trên 35.856 dòng.
+        # Chỉ mục action: `count_audit_alerts` đếm `WHERE action NOT IN (...)` mỗi 2 giây để
+        # nuôi thẻ chỉ số. Không chỉ mục là quét toàn bảng - 52,1 ms trên 35.856 dòng.
         c.execute("CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_trail(action)")
 
         conn.commit()
@@ -258,10 +256,10 @@ _init_db()
 def _log_to_db(action: str, target: str, reason: str, raw_log: str = "", tier: str = ""):
     """Ghi nhật ký kiểm toán (audit trail) kèm xác thực, làm sạch đầu vào và liên kết mã HMAC.
 
-    raw_log: chuỗi JSON của LOG THÔ đầu vào (đặc trưng luồng đã loại nhãn) — chỉ để hiển
-    thị minh bạch trên Dashboard, KHÔNG tham gia HMAC (chữ ký phủ quyết định).
+    raw_log: chuỗi JSON của LOG thô đầu vào (đặc trưng luồng đã loại nhãn) - chỉ để hiển
+    thị minh bạch trên Dashboard, không tham gia HMAC (chữ ký phủ quyết định).
 
-    tier: tầng ĐÃ ra quyết định — `tier1_rule` / `tier1_ml` / `tier2_llm`. Cũng ngoài phạm vi
+    tier: tầng đã ra quyết định - `tier1_rule` / `tier1_ml` / `tier2_llm`. Cũng ngoài phạm vi
     HMAC. Bỏ trống thì Dashboard rơi về heuristic dò chuỗi cũ (dành cho bản ghi trước migration)."""
     # Xác thực hành động
     if not _validator.validate_action(action):
@@ -328,9 +326,9 @@ def _redis_url() -> str:
 
 
 def _add_to_blacklist(ip: str, ttl: int = 3600) -> None:
-    """Ghi IP vào Redis blacklist (TTL 1h) để Tier-1 NHỚ MẶT và chặn ngay lần tái phạm mà
-    KHÔNG cần leo thang Tier-2 lại. Best-effort: agent chạy trên host reach được Redis;
-    dashboard container KHÔNG reach -> bỏ qua im lặng (block vẫn ghi audit + tạo luật)."""
+    """Ghi IP vào Redis blacklist (TTL 1h) để Tier-1 nhớ mặt và chặn ngay lần tái phạm mà
+    không cần leo thang Tier-2 lại. Best-effort: agent chạy trên host reach được Redis;
+    dashboard container không reach -> bỏ qua im lặng (block vẫn ghi audit + tạo luật)."""
     try:
         import redis  # type: ignore
 
@@ -371,7 +369,7 @@ def unblock_ip(ip: str):
 
 def block_ip(ip: str, reason: str, raw_log: str = "", tier: str = ""):
     safe_ip = _validator.sanitize_target(ip)
-    # ĐỒNG BỘ WHITELIST (phòng vệ chiều sâu): IP đã whitelist KHÔNG BAO GIỜ bị chặn thật —
+    # Đồng bộ WHITELIST (phòng vệ chiều sâu): IP đã whitelist không bao giờ bị chặn thật -
     # dù suy luận LLM/Tier-2 có nêu tên nó trong 1 batch nhiều IP. Ghi bản WHITELIST (cho
     # qua) thay vì BLOCK_IP để UI nhất quán, tránh mâu thuẫn "vừa whitelist vừa bị chặn".
     if safe_ip in _whitelisted_ips():
@@ -387,11 +385,11 @@ def block_ip(ip: str, reason: str, raw_log: str = "", tier: str = ""):
         return
     logger.warning(f" [FIREWALL MOCK] BLOCKING IP: {safe_ip} | Lý do: {reason}")
     _log_to_db("BLOCK_IP", safe_ip, reason, raw_log, tier)
-    # TRÍ NHỚ: đưa vào blacklist để Tier-1 chặn thẳng lần sau (Tier-2 không phải xử lại).
+    # Trí nhớ: đưa vào blacklist để Tier-1 chặn thẳng lần sau (Tier-2 không phải xử lại).
     _add_to_blacklist(safe_ip)
-    # KHO KNOWN-BAD BỀN (reputation=100): Tier-1 chặn on-sight VĨNH VIỄN cho tới khi Analyst
-    # gỡ — thay cho việc tạo 1 dynamic-rule YAML mỗi IP (chống phình config + nghẽn). Bọc lỗi:
-    # thất bại ghi bộ nhớ dài hạn KHÔNG được làm hỏng luồng chặn.
+    # Kho KNOWN-BAD bền (reputation=100): Tier-1 chặn on-sight vĩnh viễn cho tới khi Analyst
+    # gỡ - thay cho việc tạo 1 dynamic-rule YAML mỗi IP (chống phình config + nghẽn). Bọc lỗi:
+    # thất bại ghi bộ nhớ dài hạn không được làm hỏng luồng chặn.
     try:
         from src.agent.threat_memory import threat_memory
 
@@ -408,34 +406,34 @@ def raise_alert(
     tier: str = "",
     evidence_backed: bool = True,
 ) -> str:
-    """Ghi CẢNH BÁO — CHOKE-POINT chung cho cả Cổng ML (Tier-1) và LLM (Tier-2).
+    """Ghi cảnh báo - CHOKE-POINT chung cho cả Cổng ML (Tier-1) và LLM (Tier-2).
 
-    Chính sách REPEAT-OFFENDER (thống nhất): một IP ĐÃ từng cảnh báo ĐỦ MẠNH trước đó (hoặc
-    đã là known-bad, reputation>=100) mà nay lại ALERT tiếp -> **tự động BLOCK** thay vì chỉ
-    báo. IP đã whitelist được MIỄN TRỪ (không bao giờ auto-block).
+    Chính sách REPEAT-OFFENDER (thống nhất): một IP đã từng cảnh báo đủ mạnh trước đó (hoặc
+    đã là known-bad, reputation>=100) mà nay lại ALERT tiếp -> tự động BLOCK thay vì chỉ
+    báo. IP đã whitelist được miễn trừ (không bao giờ auto-block).
 
-    `confidence`: độ tin cậy của CHÍNH cảnh báo này. Cảnh báo YẾU (< REPEAT_OFFENDER_MIN_CONF)
-    vẫn được ghi vào audit trail bình thường NHƯNG **không tính vào bộ đếm tái phạm** — vì đo
+    `confidence`: độ tin cậy của chính cảnh báo này. Cảnh báo yếu (< REPEAT_OFFENDER_MIN_CONF)
+    vẫn được ghi vào audit trail bình thường nhưng không tính vào bộ đếm tái phạm - vì đo
     thật cho thấy dải ALERT yếu của Cổng ML chỉ chính xác 5,21%, nạp vào luật tái phạm thì
     biến nhiễu thành lệnh chặn (0/10 đúng). None = không rõ -> giữ hành vi cũ (vẫn tính), để
     caller chưa cập nhật không bị âm thầm đổi ngữ nghĩa.
 
-    `evidence_backed=False`: lô KHÔNG suy ra được từ vựng tấn công đặc trưng nào, thứ duy
+    `evidence_backed=False`: lô không suy ra được từ vựng tấn công đặc trưng nào, thứ duy
     nhất hệ thống nắm là "khối lượng/nhịp độ bất thường". Cảnh báo loại này vừa **không được
-    leo thang**, vừa **không vào bộ đếm tái phạm**.
+    leo thang**, vừa không vào bộ đếm tái phạm.
 
-    VÌ SAO KHÔNG DÙNG RIÊNG `confidence` ĐỂ LỌC. Trần tự-tin ở Tier-2 đỗ độ tin cậy tại
-    LLM_BLOCK_CONF-0.01 = 0,84 — cố ý sát dưới ngưỡng chặn để hạ đúng một bậc dải. 0,84 lại
+    Vì sao không dùng riêng `confidence` để lọc. Trần tự-tin ở Tier-2 đỗ độ tin cậy tại
+    LLM_BLOCK_CONF-0.01 = 0,84 - cố ý sát dưới ngưỡng chặn để hạ đúng một bậc dải. 0,84 lại
     vượt xa REPEAT_OFFENDER_MIN_CONF (0,65), nên luật tái phạm đọc số thấy "cảnh báo mạnh" và
-    hiểu NGƯỢC hẳn ý của trần. Đo lượt chạy 12/08/2026: 9 lệnh chặn Tier-2 đầu tiên đều mang
-    `escalated_alert_to_block=true` trên lô `shield_has_attack_evidence=false` — cả chuỗi cap
+    hiểu ngược hẳn ý của trần. Đo lượt chạy 12/08/2026: 9 lệnh chặn Tier-2 đầu tiên đều mang
+    `escalated_alert_to_block=true` trên lô `shield_has_attack_evidence=false` - cả chuỗi cap
     -> hạ dải -> lá chắn đều chạy đúng rồi bị bước cuối lật lại. Cộng dồn N cảnh báo vô căn
-    cứ vẫn ra vô căn cứ, nên tín hiệu phải đi bằng CỜ chứ không bằng con số.
+    cứ vẫn ra vô căn cứ, nên tín hiệu phải đi bằng cờ chứ không bằng con số.
 
-    Trả về action THẬT đã thực thi: "ALERT" (lần đầu) hoặc "BLOCK_IP" (tái phạm)."""
+    Trả về action thật đã thực thi: "ALERT" (lần đầu) hoặc "BLOCK_IP" (tái phạm)."""
     ip = _validator.sanitize_target(msg)
 
-    # Whitelist: miễn trừ leo thang — chỉ ghi ALERT.
+    # Whitelist: miễn trừ leo thang - chỉ ghi ALERT.
     if ip in _whitelisted_ips():
         logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
         _log_to_db("ALERT", msg, reason, raw_log, tier)
@@ -453,18 +451,18 @@ def raise_alert(
     except Exception as e:
         logger.warning(f"[ALERT] get_ip_reputation lỗi cho {ip}: {e}")
 
-    # Tái phạm (đã ALERT >=1 lần) hoặc known-bad -> leo thang BLOCK ngay. Lô KHÔNG có bằng
-    # chứng tấn công thì miễn trừ HOÀN TOÀN, kể cả khi IP đã là known-bad.
+    # Tái phạm (đã ALERT >=1 lần) hoặc known-bad -> leo thang BLOCK ngay. Lô không có bằng
+    # chứng tấn công thì miễn trừ hoàn toàn, kể cả khi IP đã là known-bad.
     #
-    # BẢN TRƯỚC CHỪA NHÁNH `prior_score >= 100` với lý lẽ "danh tiếng 100 là bằng chứng NGOÀI
-    # lô (Analyst hoặc một lệnh chặn có căn cứ)". Lý lẽ đó SAI ở hai điểm, đo trên lượt chạy
+    # Bản trước chừa nhánh `prior_score >= 100` với lý lẽ "danh tiếng 100 là bằng chứng ngoài
+    # lô (Analyst hoặc một lệnh chặn có căn cứ)". Lý lẽ đó sai ở hai điểm, đo trên lượt chạy
     # 12/08/2026 (18 lệnh leo thang lọt qua đúng nhánh này):
     #
-    #   1. `mark_ip_blocked` được gọi từ MỌI lệnh chặn, gồm cả Cổng ML chấm theo thống kê
-    #      luồng — tức 100 điểm KHÔNG chứng minh có bằng chứng tấn công.
-    #   2. Quan trọng hơn: `reputation >= 100` nghĩa là Tier-1 ĐÃ chặn on-sight IP đó VĨNH
-    #      VIỄN (ngưỡng 70, không phụ thuộc TTL 1h của sổ đen Redis). Nên lệnh chặn thứ hai
-    #      của Tier-2 KHÔNG tăng thêm chút ngăn chặn nào — cả 18/18 ca đều tái-chặn IP đã bị
+    #   1. `mark_ip_blocked` được gọi từ mọi lệnh chặn, gồm cả Cổng ML chấm theo thống kê
+    #      luồng - tức 100 điểm không chứng minh có bằng chứng tấn công.
+    #   2. Quan trọng hơn: `reputation >= 100` nghĩa là Tier-1 đã chặn on-sight IP đó vĩnh
+    #      Viễn (ngưỡng 70, không phụ thuộc TTL 1h của sổ đen Redis). Nên lệnh chặn thứ hai
+    #      của Tier-2 không tăng thêm chút ngăn chặn nào - cả 18/18 ca đều tái-chặn IP đã bị
     #      chặn sẵn. Đổi lại, mỗi ca ghi vào sổ một dòng `BLOCK_IP` mang quy kết bịa (T1571
     #      kèm đúng chữ "Unable to confidently map technique"), làm hỏng cả bảng thống kê
     #      chặn lẫn bảng chấm quy kết.
@@ -479,12 +477,12 @@ def raise_alert(
             ip,
             f"Tái phạm: IP đã bị CẢNH BÁO {prior_alerts} lần trước đó -> tự động CHẶN. {reason}",
             raw_log,
-            tier,  # leo thang GIỮ NGUYÊN tầng đã phát hiện, không đổi chủ sở hữu quyết định
+            tier,  # leo thang giữ nguyên tầng đã phát hiện, không đổi chủ sở hữu quyết định
         )
         return "BLOCK_IP"
 
-    # Lần đầu: ghi CẢNH BÁO. Chỉ cảnh báo ĐỦ MẠNH mới tăng total_alerts (bộ đếm tái phạm) —
-    # cảnh báo yếu vẫn vào audit trail để analyst thấy, nhưng KHÔNG được phép tự tích luỹ
+    # Lần đầu: ghi cảnh báo. Chỉ cảnh báo đủ mạnh mới tăng total_alerts (bộ đếm tái phạm) -
+    # cảnh báo yếu vẫn vào audit trail để analyst thấy, nhưng không được phép tự tích luỹ
     # thành một lệnh chặn ở lần sau.
     logger.info(f" [SIEM MOCK] ALERT: {msg} | Lý do: {reason}")
     _log_to_db("ALERT", msg, reason, raw_log, tier)
@@ -513,10 +511,10 @@ def get_audit_trail(limit=50, tier=None):
     """`limit` bản ghi mới nhất. `tier` lọc theo tầng ra quyết định (chuỗi rỗng = bản ghi cũ
     chưa có cột `tier`); bỏ trống thì lấy mọi tầng.
 
-    VÌ SAO CẦN LỌC THEO TẦNG Ở TẦNG SQL. Màn hình chia sự cố thành ba tab theo tầng, nhưng
-    trước đây nó lấy 2.000 dòng mới nhất của TOÀN sổ rồi mới tách. Tầng nào ghi nhiều thì
+    Vì sao cần lọc theo tầng Ở tầng SQL. Màn hình chia sự cố thành ba tab theo tầng, nhưng
+    trước đây nó lấy 2.000 dòng mới nhất của toàn sổ rồi mới tách. Tầng nào ghi nhiều thì
     chiếm sạch hạn mức, và tab của tầng ghi thưa hiện "Không có sự cố nào ở Tier này" trong
-    khi hàng chỉ số ngay phía trên vẫn đếm được sự cố của chính tầng đó — người xem thấy hai
+    khi hàng chỉ số ngay phía trên vẫn đếm được sự cố của chính tầng đó - người xem thấy hai
     con số mâu thuẫn trên cùng một màn hình. Đo ở lượt chạy 11/08/2026: 2.000 dòng mới nhất
     toàn là ALERT của Tier-1, nên tab Tier-2 trống trơn dù đã có 67 lệnh chặn từ LLM.
     """
@@ -530,8 +528,8 @@ def get_audit_trail(limit=50, tier=None):
                     (limit,),
                 )
             elif tier == "":
-                # Bản ghi CŨ chưa có cột `tier`. Tách riêng nhánh này để nhánh còn lại so sánh
-                # TRỰC TIẾP trên cột — `WHERE COALESCE(tier,'')=?` bọc cột trong hàm nên SQLite
+                # Bản ghi cũ chưa có cột `tier`. Tách riêng nhánh này để nhánh còn lại so sánh
+                # Trực tiếp trên cột - `WHERE COALESCE(tier,'')=?` bọc cột trong hàm nên SQLite
                 # bỏ qua `idx_audit_tier_id` và quay lại quét bảng (đo được: 135,3 ms cho năm
                 # tầng, thêm chỉ mục cũng chỉ xuống 116,4 ms vì nó không hề được dùng).
                 c.execute(
@@ -563,11 +561,11 @@ def get_audit_trail(limit=50, tier=None):
 
 
 def count_audit_alerts(exclude_actions: tuple[str, ...] = ("AWAIT_HITL",)) -> int:
-    """Đếm TỔNG số cảnh báo trong audit trail (KHÔNG giới hạn số dòng).
+    """Đếm tổng số cảnh báo trong audit trail (không giới hạn số dòng).
 
-    TẠI SAO CẦN RIÊNG: dashboard tính "giảm tải" bằng len(get_audit_trail(limit=2000)).
-    Khi luồng vượt 2000 cảnh báo, len() BÃO HOÀ ở 2000 nên tỷ lệ giảm tải tự phồng lên
-    (vd 100k log thô -> luôn ~98%) BẤT KỂ thực tế. Đếm bằng COUNT(*) cho số đúng mà
+    Tại sao cần riêng: dashboard tính "giảm tải" bằng len(get_audit_trail(limit=2000)).
+    Khi luồng vượt 2000 cảnh báo, len() bão hoà ở 2000 nên tỷ lệ giảm tải tự phồng lên
+    (vd 100k log thô -> luôn ~98%) bất kể thực tế. Đếm bằng COUNT(*) cho số đúng mà
     không phải nạp toàn bộ hàng về RAM.
     """
     try:
@@ -588,10 +586,10 @@ def count_audit_alerts(exclude_actions: tuple[str, ...] = ("AWAIT_HITL",)) -> in
 
 
 def count_blocks_by_tier() -> dict[str, int]:
-    """Số lệnh BLOCK_IP theo từng tầng — nguồn DUY NHẤT cho phễu chặn của Dashboard.
+    """Số lệnh BLOCK_IP theo từng tầng - nguồn duy nhất cho phễu chặn của Dashboard.
 
-    VÌ SAO PHẢI ĐẾM Ở ĐÂY. Phễu từng in `ml_gate_resolved` (1.881) và `escalated_to_llm`
-    (1.403) từ `pipeline_stats.json`, nhưng hai bộ đếm đó đếm SỰ KIỆN ĐI QUA, không phải
+    Vì sao phải đếm Ở đây. Phễu từng in `ml_gate_resolved` (1.881) và `escalated_to_llm`
+    (1.403) từ `pipeline_stats.json`, nhưng hai bộ đếm đó đếm sự kiện đi qua, không phải
     lệnh chặn: Cổng ML "giải quyết" phần lớn bằng nhánh DROP vốn không ghi sổ, còn phần đẩy
     sang Tier-2 thì bị nén spam và xếp hàng. Người xem đối chiếu với nhật ký (210 và 77 dòng)
     thấy lệch cả chục lần. COUNT(*) trên chính bảng mà nhật ký đọc thì không thể lệch.
@@ -655,8 +653,8 @@ def get_tampered_audit_ids() -> set[int]:
             if not integrity_hash or not hmac.compare_digest(integrity_hash, expected_hash):
                 tampered.add(row_id)
 
-            # Phục hồi prev_hash bằng hash THẬT SỰ TỒN TẠI trong DB để cô lập lỗi tại từng dòng,
-            # KHÔNG truyền lỗi dây chuyền làm hỏng toàn bộ các dòng sau nó (vì ta chỉ quan tâm
+            # Phục hồi prev_hash bằng hash thật sự tồn tại trong DB để cô lập lỗi tại từng dòng,
+            # không truyền lỗi dây chuyền làm hỏng toàn bộ các dòng sau nó (vì ta chỉ quan tâm
             # đánh dấu dòng nào bị kẻ gian đụng tay vào sửa).
             prev_hash = integrity_hash or "genesis_block_hash_sentinel_soc"
 
@@ -704,8 +702,8 @@ def verify_audit_trail_integrity() -> tuple[bool, str]:
             prev_hash = integrity_hash
 
         if audit_key_is_default():
-            # Nói đúng mức bảo đảm thực tế: với khóa công khai, đây là kiểm tra TÍNH NHẤT
-            # QUÁN chứ chưa phải bằng chứng chống giả mạo có chủ đích.
+            # Nói đúng mức bảo đảm thực tế: với khóa công khai, đây là kiểm tra tính nhất
+            # Quán chứ chưa phải bằng chứng chống giả mạo có chủ đích.
             return True, (
                 "✅ Chuỗi nhật ký nhất quán (0 sửa đổi). ⚠️ Đang ký bằng khóa MẶC ĐỊNH công "
                 "khai — đặt SENTINEL_LOG_SECRET trong .env để có bảo đảm chống giả mạo thật."

@@ -1,6 +1,4 @@
-"""
-Bộ làm sạch đầu ra (Output Sanitizer): Phòng thủ rò rỉ dữ liệu (Vector tấn công #04)
-"""
+"""Bộ làm sạch đầu ra (Output Sanitizer): Phòng thủ rò rỉ dữ liệu (Vector tấn công #04)"""
 
 import base64
 import logging
@@ -12,19 +10,19 @@ logger = logging.getLogger(__name__)
 
 class OutputSanitizer:
     """
-    Sanitize LLM output TRƯỚC khi render trên UI hoặc ghi DB.
+    Sanitize LLM output trước khi render trên UI hoặc ghi DB.
     Chống Data Exfiltration và bypass bằng Obfuscation/Invisible Characters.
     """
 
-    # Patterns nguy hiểm trong output. ClassVar: hằng CHỈ-ĐỌC dùng chung cho mọi instance
-    # (chỉ được duyệt trong _strip_dangerous) — đánh dấu rõ để không ai vô tình mutate
+    # Patterns nguy hiểm trong output. ClassVar: hằng chỉ-đọc dùng chung cho mọi instance
+    # (chỉ được duyệt trong _strip_dangerous) - đánh dấu rõ để không ai vô tình mutate
     # list dùng chung, và để type-checker không coi đây là field của instance.
     DANGEROUS_PATTERNS: ClassVar[list[tuple[str, str]]] = [
         # Markdown image (exfil vector chính - hỗ trợ khoảng trắng tùy chọn)
         (r"!\[[^\]]*\]\s*\([^\)]+\)", "[IMG_STRIPPED]"),
         # Markdown links to external domains (hỗ trợ khoảng trắng tùy chọn)
         (r"\[[^\]]*\]\s*\(https?://[^\)]+\)", "[LINK_STRIPPED]"),
-        # HTML img tags
+        # Thẻ img HTML
         (r"<img[^>]*>", "[IMG_STRIPPED]"),
         # Thẻ HTML anchor
         (r"<a\s[^>]*>.*?</a>", "[LINK_STRIPPED]"),
@@ -104,8 +102,8 @@ class OutputSanitizer:
         if not text:
             return text
 
-        # Đếm CỤC BỘ (không phải self.*): OutputSanitizer là singleton dùng bởi nhiều
-        # worker Tier-2 SONG SONG — nếu đếm trên self._strip_count thì các thread ghi
+        # Đếm cục bộ (không phải self.*): OutputSanitizer là singleton dùng bởi nhiều
+        # worker Tier-2 song song - nếu đếm trên self._strip_count thì các thread ghi
         # đè lẫn nhau (đua). Text sạch vốn đã đúng (biến local), nhưng đếm/log phải cục bộ.
         strip_count = 0
         clean = text
@@ -116,7 +114,7 @@ class OutputSanitizer:
         # 2. Loại bỏ các mã escape định dạng thiết bị cuối (ANSI escape codes)
         clean = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
 
-        # 3. Quét các cấu trúc Markdown/HTML nguy hiểm tĩnh TRƯỚC
+        # 3. Quét các cấu trúc Markdown/HTML nguy hiểm tĩnh trước
         # (để bắt được Data URIs)
         for compiled_re, replacement in self.compiled_patterns:
             matches = compiled_re.findall(clean)
@@ -124,7 +122,7 @@ class OutputSanitizer:
                 strip_count += len(matches)
                 clean = compiled_re.sub(replacement, clean)
 
-        # 4. Quét giải mã Base64/Hex SÂU để phát hiện payload ẩn
+        # 4. Quét giải mã Base64/Hex sâu để phát hiện payload ẩn
         clean, b64_count = self._sanitize_base64(clean)
         clean, hex_count = self._sanitize_hex(clean)
         strip_count += b64_count + hex_count
@@ -142,7 +140,7 @@ class OutputSanitizer:
     def sanitize_for_db(self, text: str) -> str:
         """
         Sanitize text trước khi ghi vào SQLite.
-        SQLite dùng parameterized queries — không cần manual escape.
+        SQLite dùng parameterized queries - không cần manual escape.
         """
         if not text:
             return text

@@ -68,7 +68,7 @@ def strip_html_tags_fallback(text: str) -> str:
 
 
 def strip_dangerous_tags_recursive(text: str) -> str:
-    # 1. Strip script tags recursively
+    # Bóc thẻ script, lặp tới khi hết
     while True:
         lower = text.lower()
         start = lower.find("<script")
@@ -81,7 +81,7 @@ def strip_dangerous_tags_recursive(text: str) -> str:
             text = text[:start] + "[SCRIPT_STRIPPED]"
             break
 
-    # 2. Strip iframe tags recursively
+    # Bóc thẻ iframe, lặp tới khi hết
     while True:
         lower = text.lower()
         start = lower.find("<iframe")
@@ -94,7 +94,7 @@ def strip_dangerous_tags_recursive(text: str) -> str:
             text = text[:start] + "[IFRAME_STRIPPED]"
             break
 
-    # 3. Strip img tags (self-closing or standard)
+    # Bóc thẻ img (cả dạng tự đóng)
     while True:
         lower = text.lower()
         start = lower.find("<img")
@@ -165,42 +165,39 @@ def load_config():
     }
 
 
-# =========================================================================
-# 1. PATTERN-BASED INJECTION DETECTOR
-# =========================================================================
 class PromptInjectionDetector:
     """
     Tầng 1: Phát hiện chuỗi Prompt Injection đã biết (Known Patterns).
 
-    HAI HỌ CHỮ KÝ, HAI MỤC ĐÍCH KHÁC NHAU:
+    Hai họ chữ ký, hai mục đích khác nhau:
 
-      * `injection_patterns`  — tấn công nhắm vào LLM (ignore instructions, roleplay, …)
-      * `web_attack_patterns` — tấn công web thật (`UNION SELECT`, `<script>`, …)
+      * `injection_patterns`  - tấn công nhắm vào LLM (ignore instructions, roleplay, ...)
+      * `web_attack_patterns` - tấn công web thật (`UNION SELECT`, `<script>`, ...)
 
-    LỖI ĐÃ VÁ. Bốn chữ ký web từng nằm chung `injection_patterns`. Hạ nguồn,
+    Lỗi đã vá. Bốn chữ ký web từng nằm chung `injection_patterns`. Hạ nguồn,
     `node_guardrails` đọc `injection_detected` để bật `_is_adversarial`, rồi
     `node_attack_mapper` ép `type_hint = "prompt_injection"`. Hậu quả: một câu SQLi dạng
-    chữ thường bị quy kết thành **AML.T0051** thay vì **T1190** — sai cả họ khung (ATLAS
+    chữ thường bị quy kết thành AML.T0051 thay vì T1190 - sai cả họ khung (ATLAS
     thay vì ATT&CK Enterprise). Trên dữ liệu hiện tại lỗi chưa kích hoạt (payload CSIC mã
-    hoá URL, và `scan()` chạy TRƯỚC `neutralize()`), nhưng chỉ cần đổi thứ tự hai bước đó
+    hoá URL, và `scan()` chạy trước `neutralize()`), nhưng chỉ cần đổi thứ tự hai bước đó
     là 82/250 mẫu quy kết đổ sai.
 
-    `_injection_detected` vẫn hợp nhất CẢ HAI họ để lớp guardrail tĩnh giữ nguyên hành vi
-    và `robustness_results.json` vẫn so sánh được với các lượt đo cũ. Cờ MỚI
+    `_injection_detected` vẫn hợp nhất cả hai họ để lớp guardrail tĩnh giữ nguyên hành vi
+    và `robustness_results.json` vẫn so sánh được với các lượt đo cũ. Cờ mới
     `_llm_attack_detected` mới là thứ nhánh đối kháng được phép dùng.
     """
 
-    # ── CỤM QUÁ LỎNG ĐỂ LÀM BẰNG CHỨNG TỰ CHẶN (chốt 17/08/2026) ──────────────────
-    # Ba cụm này là MẢNH câu, không phải ngữ pháp tấn công, nên chúng khớp cả văn xuôi lành:
+    # cụm quá lỏng để làm bằng chứng tự chặn (chốt 17/08/2026)
+    # Ba cụm này là mảnh câu, không phải ngữ pháp tấn công, nên chúng khớp cả văn xuôi lành:
     #     "The secondary node will act as a backup"        -> khớp "act as"
     #     "Please show disregard for legacy timeouts"      -> khớp "disregard"
     #     "We updated the system prompt for the deploy bot" -> khớp "system prompt"
-    # Cả ba đều bật `_llm_attack_detected`, mà từ 17/08/2026 cờ đó là giấy phép CHẶN CỨNG
+    # Cả ba đều bật `_llm_attack_detected`, mà từ 17/08/2026 cờ đó là giấy phép chặn cứng
     # một địa chỉ IP. Ba câu vô hại ở trên đủ để chặn nhầm.
     #
     # Chúng vẫn được giữ cho `_injection_detected` (lớp vô hiệu hoá): đóng gói thừa một log
-    # lành không tốn gì, còn chặn nhầm một IP thì có. Dạng TẤN CÔNG THẬT của cả ba cụm đã
-    # được `llm_attack_signatures` bắt chặt hơn — "act as" phải đi cùng ngôi thứ hai, "moi
+    # lành không tốn gì, còn chặn nhầm một IP thì có. Dạng tấn công thật của cả ba cụm đã
+    # được `llm_attack_signatures` bắt chặt hơn - "act as" phải đi cùng ngôi thứ hai, "moi
     # system prompt" phải có động từ moi, "disregard" phải có tân ngữ chỉ dẫn.
     _AMBIGUOUS_FOR_EVIDENCE = frozenset({"act as", "disregard", "system prompt"})
 
@@ -213,21 +210,19 @@ class PromptInjectionDetector:
             if web_patterns is not None
             else guardrails_cfg.get("web_attack_patterns", [])
         )
-        # `self.patterns` giữ nguyên nghĩa CŨ (hợp nhất) — có mã bên ngoài đọc thuộc tính này.
+        # `self.patterns` giữ nguyên nghĩa cũ (hợp nhất) - có mã bên ngoài đọc thuộc tính này.
         self.patterns = list(self.llm_patterns) + list(self.web_patterns)
         self.compiled = [re.compile(re.escape(p), re.IGNORECASE) for p in self.patterns]
         self._n_llm = len(self.llm_patterns)
 
     def scan(self, log_entry: dict) -> dict:
-        """
-        Quét log và ĐÁNH DẤU (không xóa).
-        """
+        """Quét log và đánh dấu (không xóa)."""
         is_injected = False
         is_llm_attack = False
         detected_patterns = []
         injection_fields = []
 
-        # Normalize keys prior to scanning
+        # Chuẩn hoá khoá trước khi quét
         normalized_log = normalize_log_keys(log_entry)
 
         for key, value in normalized_log.items():
@@ -245,11 +240,11 @@ class PromptInjectionDetector:
                     detected_patterns.append(self.patterns[i])
                     injection_fields.append(key)
 
-            # TẦNG CHỮ KÝ CẤU TRÚC (thêm 17/08/2026). Danh sách nguyên văn ở trên là danh
+            # Tầng chữ ký cấu trúc (thêm 17/08/2026). Danh sách nguyên văn ở trên là danh
             # sách đen từ khoá: nó mù trước mọi cách diễn đạt chưa liệt kê. Đo trên 403 mẫu
-            # đối kháng, nó trượt 84,2% mẫu tiêm nhiễm và 30,5% mẫu jailbreak — mà đây là
+            # đối kháng, nó trượt 84,2% mẫu tiêm nhiễm và 30,5% mẫu jailbreak - mà đây là
             # đúng cái cờ quyết định "lô này có bằng chứng tấn công hay không" ở hạ nguồn.
-            # `llm_attack_signatures` bắt theo NGỮ PHÁP đòn đánh thay vì theo chuỗi con.
+            # `llm_attack_signatures` bắt theo ngữ pháp đòn đánh thay vì theo chuỗi con.
             for family in llm_sig.detect_families(str_value):
                 is_injected = True
                 is_llm_attack = True
@@ -265,13 +260,8 @@ class PromptInjectionDetector:
         return result
 
 
-# =========================================================================
-# 1b. JAILBREAK DETECTOR (Attack Vector #01)
-# =========================================================================
 class JailbreakDetector:
-    """
-    Phát hiện các kỹ thuật Jailbreak hiện đại nhắm vào LLM.
-    """
+    """Phát hiện kỹ thuật vượt rào (jailbreak) nhắm vào LLM - vector tấn công #01."""
 
     def __init__(self, patterns: list | None = None):
         config = load_config()
@@ -287,13 +277,11 @@ class JailbreakDetector:
         )
 
     def scan(self, log_entry: dict) -> dict:
-        """
-        Quét log cho jailbreak patterns.
-        """
+        """Quét log cho jailbreak patterns."""
         jailbreak_detected = False
         jailbreak_patterns = []
 
-        # Normalize keys prior to scanning
+        # Chuẩn hoá khoá trước khi quét
         normalized_log = normalize_log_keys(log_entry)
 
         for key, value in normalized_log.items():
@@ -320,11 +308,9 @@ class JailbreakDetector:
         return result
 
 
-# =========================================================================
-# 2. ENCODING NEUTRALIZER
-# =========================================================================
+# Trung hoà mã hoá
 
-# Cyrillic / Greek look-alike characters -> ASCII Latin (homoglyph folding).
+# Ký tự Cyrillic/Hy Lạp nhìn giống Latin -> gập về ASCII.
 _CONFUSABLE_MAP = str.maketrans(
     {
         # Cyrillic lowercase
@@ -382,7 +368,7 @@ _CONFUSABLE_MAP = str.maketrans(
     }
 )
 
-# Common leetspeak substitutions -> ASCII letters.
+# Các phép thay leetspeak thông dụng -> chữ ASCII.
 _LEET_MAP = str.maketrans(
     {
         "0": "o",
@@ -398,7 +384,7 @@ _LEET_MAP = str.maketrans(
     }
 )
 
-# Substrings that mark a decoded payload as an injection/jailbreak attempt.
+# Chuỗi con đánh dấu payload sau giải mã là tiêm nhiễm hoặc vượt rào.
 _DECODE_TRIGGERS = (
     "ignore",
     "disregard",
@@ -423,22 +409,20 @@ _DECODE_TRIGGERS = (
 
 
 def _looks_malicious(text: str) -> bool:
-    """True if the (decoded) text contains an injection/jailbreak indicator."""
+    """True nếu văn bản (đã giải mã) chứa dấu hiệu tiêm nhiễm hoặc vượt rào."""
     low = text.lower()
     return any(trigger in low for trigger in _DECODE_TRIGGERS)
 
 
 class EncodingNeutralizer:
-    """
-    Tầng 2: Vô hiệu hóa Encoding Bypass tricks.
-    """
+    """Tầng 2: Vô hiệu hóa Encoding Bypass tricks."""
 
     @staticmethod
     def decode_if_base64(text: str) -> str:
         try:
-            # Clean up potential padding or structure
+            # Dọn phần đệm và ký tự cấu trúc
             clean_text = text.strip()
-            # Basic validation check for base64 structure
+            # Kiểm sơ bộ xem có đúng dạng base64 không
             if re.match(r"^[A-Za-z0-9+/=]+$", clean_text) and len(clean_text) > 4:
                 decoded = base64.b64decode(clean_text, validate=True).decode(
                     "utf-8", errors="ignore"
@@ -463,25 +447,25 @@ class EncodingNeutralizer:
 
     @staticmethod
     def normalize_unicode(text: str) -> str:
-        # NFKC fold neutralizes fullwidth/compatibility homoglyphs (ｉｇｎｏｒｅ -> ignore)
+        # Gập NFKC khử ký tự đồng hình dạng fullwidth (ｉｇｎｏｒｅ -> ignore)
         text = unicodedata.normalize("NFKC", text)
-        # Strip zero-width joiners, spaces, control characters
+        # Bóc ký tự nối rỗng, khoảng trắng rỗng và ký tự điều khiển
         cleaned = re.sub(r"[\u200b\u200c\u200d\ufeff\u00ad\x00]", "", text)
         return cleaned
 
     @staticmethod
     def fold_homoglyphs(text: str) -> str:
-        """Map Cyrillic/Greek look-alike chars to their ASCII Latin equivalents."""
+        """Ánh xạ ký tự Cyrillic/Hy Lạp nhìn giống Latin về ASCII tương ứng."""
         return text.translate(_CONFUSABLE_MAP)
 
     @staticmethod
     def normalize_leetspeak(text: str) -> str:
-        """Fold common leetspeak substitutions (1gn0r3 -> ignore)."""
+        """Gập các phép thay leetspeak thông dụng (1gn0r3 -> ignore)."""
         return text.translate(_LEET_MAP)
 
     @staticmethod
     def decode_rot13(text: str) -> str:
-        """ROT13 only shifts ASCII letters; digits/symbols are untouched."""
+        """ROT13 chỉ dịch chữ ASCII; chữ số và ký hiệu giữ nguyên."""
         return codecs.encode(text, "rot_13")
 
     @staticmethod
@@ -512,7 +496,7 @@ class EncodingNeutralizer:
     def _expose_obfuscated(self, text: str) -> str:
         """Reveal base32/rot13/leetspeak/homoglyph payloads that decode to an
         injection attempt. Guarded: only appends a marker when the *decoded*
-        variant looks malicious AND the original did not — so benign text and
+        variant looks malicious AND the original did not - so benign text and
         already-flagged text are never mangled (keeps false-positive rate low)."""
         if _looks_malicious(text):
             return text
@@ -545,13 +529,9 @@ class EncodingNeutralizer:
         return neutralized
 
 
-# =========================================================================
-# 3. DELIMITED DATA ENCAPSULATOR (Core Defense — Dynamic Delimiters)
-# =========================================================================
 class DelimitedDataEncapsulator:
-    """
-    Tầng 3: Đóng gói dữ liệu trong delimiter ngẫu nhiên động.
-    """
+    """Tầng 3 và là cơ chế phòng thủ chính: bọc log thô giữa cặp dấu phân định ngẫu
+    nhiên sinh mới mỗi lô, nên chỉ thị nằm trong log luôn là dữ liệu, không là mệnh lệnh."""
 
     DELIMITER_PREFIX = "DATA"
 
@@ -561,7 +541,7 @@ class DelimitedDataEncapsulator:
         self.data_end = f"<<<{self.DELIMITER_PREFIX}_END_{self._nonce}>>>"
 
     def _sanitize_delimiter_smuggling(self, text: str) -> str:
-        # Strip any pattern matching <<<...>>>
+        # Bóc mọi cụm khớp dạng <<<...>>>
         sanitized = re.sub(r"<<<[^>]*>>>", "[DELIMITER_STRIPPED]", text)
         return sanitized
 
@@ -637,33 +617,26 @@ class DelimitedDataEncapsulator:
         return self.encapsulate(content, normalized_log.get("_isolation_level", "NORMAL"))
 
 
-# =========================================================================
-# 5. GUARDRAILS PIPELINE (Orchestrator)
-# =========================================================================
 class GuardrailsPipeline:
-    """
-    Orchestrator chạy toàn bộ pipeline Guardrails.
-    """
+    """Điều phối lần lượt bộ dò mẫu, bộ dò vượt rào, trung hoà mã hoá và lớp bọc nonce."""
 
     def __init__(self):
         self.detector = PromptInjectionDetector()
         self.jailbreak_detector = JailbreakDetector()
         self.neutralizer = EncodingNeutralizer()
-        # KHÔNG giữ encapsulator dạng thuộc-tính singleton: mỗi lô tạo nonce MỚI trong
+        # Không giữ encapsulator dạng thuộc-tính singleton: mỗi lô tạo nonce mới trong
         # process()/process_batch() (dynamic per-batch + thread-safe cho worker song song).
 
     def process(self, log_entry: dict) -> dict:
-        """
-        Chạy full pipeline Guardrails trên 1 log entry.
-        """
+        """Chạy full pipeline Guardrails trên 1 log entry."""
         normalized = normalize_log_keys(log_entry)
         flagged = self.detector.scan(normalized)
         flagged = self.jailbreak_detector.scan(flagged)
         neutralized = self.neutralizer.neutralize(flagged)
-        # Nonce ĐỘNG mỗi lần gọi: mỗi lô có delimiter riêng (attacker không đoán được mốc
-        # kết thúc để smuggle) — đúng tuyên bố "dynamic per-batch" & thread-safe (không dùng
+        # Nonce động mỗi lần gọi: mỗi lô có delimiter riêng (attacker không đoán được mốc
+        # kết thúc để smuggle) - đúng tuyên bố "dynamic per-batch" & thread-safe (không dùng
         # chung self.encapsulator giữa các worker song song). encapsulate + system_instruction
-        # PHẢI dùng CÙNG một enc để nonce khớp trong prompt.
+        # phải dùng cùng một enc để nonce khớp trong prompt.
         enc = DelimitedDataEncapsulator()
         encapsulated = enc.encapsulate_fields(neutralized)
 
@@ -671,7 +644,7 @@ class GuardrailsPipeline:
             "sanitized_log": neutralized,
             "encapsulated_text": encapsulated,
             "injection_detected": flagged.get("_injection_detected", False),
-            # Chỉ cờ này mới được dùng để định tuyến nhánh đối kháng — xem docstring
+            # Chỉ cờ này mới được dùng để định tuyến nhánh đối kháng - xem docstring
             # `PromptInjectionDetector`. `injection_detected` bao gồm cả chữ ký web thật.
             "llm_attack_detected": flagged.get("_llm_attack_detected", False),
             "injection_patterns": flagged.get("_injection_patterns", []),
@@ -683,9 +656,7 @@ class GuardrailsPipeline:
         }
 
     def process_batch(self, logs: list) -> dict:
-        """
-        Xử lý batch log kết hợp nén cấu trúc và token budget.
-        """
+        """Xử lý batch log kết hợp nén cấu trúc và token budget."""
         normalized_logs = [normalize_log_keys(log) for log in logs]
         results = [self.process(log) for log in normalized_logs]
         injection_count = sum(1 for r in results if r["injection_detected"])
@@ -735,7 +706,7 @@ class GuardrailsPipeline:
             elif r["isolation_level"] == "HIGH":
                 max_isolation = "HIGH"
 
-        # 5. Đóng gói trong delimiter ngẫu nhiên ĐỘNG (nonce mới mỗi lô — xem process()).
+        # 5. Đóng gói trong delimiter ngẫu nhiên động (nonce mới mỗi lô - xem process()).
         enc = DelimitedDataEncapsulator()
         batch_encapsulated = enc.encapsulate(budgeted_text, max_isolation)
 

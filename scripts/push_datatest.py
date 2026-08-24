@@ -12,7 +12,7 @@ load_dotenv()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ROOT)
 
-# determine_queue dùng chung từ unified_dataset — KHÔNG copy tay (1 nguồn chân lý)
+# determine_queue dùng chung từ unified_dataset - không copy tay (1 nguồn chân lý)
 from experiments.unified_dataset import determine_queue  # noqa: E402
 
 DATA_FILE = os.path.join(ROOT, "data", "datatest.json")
@@ -21,24 +21,24 @@ BATCH_SIZE = int(os.getenv("UNIFIED_STREAM_BATCH", "50"))
 BATCH_DELAY = float(os.getenv("UNIFIED_STREAM_DELAY", "0.3"))
 MAX_QUEUE_SIZE = 10_000
 QUEUES = ("queue_firewall", "queue_waf", "queue_sysmon")
-GROUP_NAME = "sentinel_group"  # PHẢI khớp subscriber.py (đo lag đúng consumer-group)
+GROUP_NAME = "sentinel_group"  # Phải khớp subscriber.py (đo lag đúng consumer-group)
 STATS_PATH = os.path.join(ROOT, "config", "pipeline_stats.json")
 MAX_LLM_BACKLOG = int(os.getenv("UNIFIED_STREAM_MAX_LLM_BACKLOG", "2000"))
-# Trần độ trễ consumer-group (đo bằng lag, KHÔNG bằng xlen — xlen không giảm khi xack).
+# Trần độ trễ consumer-group (đo bằng lag, không bằng xlen - xlen không giảm khi xack).
 STREAM_LAG_MAX = int(os.getenv("UNIFIED_STREAM_MAX_LAG", "5000"))
 
 
 def _redact_redis_url(url: str) -> str:
     """Ẩn mật khẩu trong REDIS_URL trước khi in/log (redis://:pass@host -> redis://:***@host).
 
-    Mật khẩu Redis CHỈ được sống trong .env — không bao giờ để rò ra stdout/journald.
+    Mật khẩu Redis chỉ được sống trong .env - không bao giờ để rò ra stdout/journald.
     """
     return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
 
 
 def _consumer_lag(redis_client) -> int:
-    """Độ trễ THẬT của consumer-group `sentinel_group` (lag) — xem chú thích ở scripts/demo.py.
-    KHÔNG dùng xlen: xreadgroup+xack không xoá entry nên xlen kẹt cao → dừng OAN."""
+    """Độ trễ thật của consumer-group `sentinel_group` (lag) - xem chú thích ở scripts/demo.py.
+    Không dùng xlen: xreadgroup+xack không xoá entry nên xlen kẹt cao -> dừng OAN."""
     total = 0
     for q in QUEUES:
         try:
@@ -59,9 +59,9 @@ def _consumer_lag(redis_client) -> int:
 
 
 def _wait_for_capacity(redis_client) -> None:
-    """BACKPRESSURE — producer tự chậm lại theo năng lực consumer (xem scripts/demo.py):
-    dừng khi độ trễ consumer-group (lag) vượt STREAM_LAG_MAX HOẶC backlog LLM
-    (pipeline_stats.json) vượt trần. Bọc lỗi toàn bộ để KHÔNG làm hỏng luồng đẩy."""
+    """BACKPRESSURE - producer tự chậm lại theo năng lực consumer (xem scripts/demo.py):
+    dừng khi độ trễ consumer-group (lag) vượt STREAM_LAG_MAX hoặc backlog LLM
+    (pipeline_stats.json) vượt trần. Bọc lỗi toàn bộ để không làm hỏng luồng đẩy."""
     warned = False
     for _ in range(3000):
         lag = _consumer_lag(redis_client)

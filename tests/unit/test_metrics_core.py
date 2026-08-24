@@ -1,6 +1,6 @@
 """Unit tests cho `experiments/metrics_core.py`.
 
-Các test dưới KHOÁ LẠI đúng những tính chất khiến bộ chỉ số mới đáng tin hơn bộ cũ —
+Các test dưới khoá lại đúng những tính chất khiến bộ chỉ số mới đáng tin hơn bộ cũ -
 đặc biệt là tính chất "một hệ đoán một lớp phải bị chấm 0", thứ mà Accuracy và F1 không
 làm được và là lý do luận văn từng có những con số đẹp vô nghĩa.
 """
@@ -27,16 +27,13 @@ from experiments.metrics_core import (
     wilson_ci,
 )
 
-# ==============================================================================
-# MCC — tính chất khiến nó thay được Accuracy
-# ==============================================================================
 
-
+# MCC - tính chất khiến nó thay được Accuracy
 def test_mcc_zero_for_always_positive_regardless_of_class_balance():
-    """LÕI VẤN ĐỀ: hệ luôn hô 'tấn công' phải bị chấm 0, dù tập lệch cỡ nào.
+    """lõi vấn đề: hệ luôn hô 'tấn công' phải bị chấm 0, dù tập lệch cỡ nào.
 
     Đây chính là ca đã sinh ra 'F1 = 0,967' vô nghĩa trong luận văn: trên tập 94% tấn
-    công, một hàm `return True` được F1 rất cao. MCC phải trả 0 ở CẢ hai tỉ lệ lớp.
+    công, một hàm `return True` được F1 rất cao. MCC phải trả 0 ở cả hai tỉ lệ lớp.
     """
     # Tập 94% tấn công: hô "tấn công" hết -> tn=fn=0
     assert mcc(tp=940, fp=60, tn=0, fn=0) == 0.0
@@ -63,7 +60,7 @@ def test_mcc_perfect_and_inverted():
 
 
 def test_mcc_symmetric_under_class_swap():
-    """MCC không đổi khi hoán vị hai lớp — F1 thì đổi. Tính chất này khiến MCC trung lập."""
+    """MCC không đổi khi hoán vị hai lớp - F1 thì đổi. Tính chất này khiến MCC trung lập."""
     assert mcc(tp=30, fp=10, tn=45, fn=15) == mcc(tp=45, fp=15, tn=30, fn=10)
 
 
@@ -76,20 +73,16 @@ def test_majority_baseline_equals_positive_rate():
 
 
 def test_confusion_report_flags_when_accuracy_only_matches_baseline():
-    """Ca thật của Tier-2: accuracy bằng ĐÚNG base rate => không có năng lực phân biệt."""
+    """Ca thật của Tier-2: accuracy bằng đúng base rate => không có năng lực phân biệt."""
     rep = confusion_report(tp=19, fp=781, tn=0, fn=0)
     assert rep["accuracy"] == rep["majority_baseline"]
     assert rep["accuracy_beats_baseline"] is False
     assert rep["mcc"] == 0.0
 
 
-# ==============================================================================
 # Khoảng tin cậy
-# ==============================================================================
-
-
 def test_wilson_ci_wide_for_tiny_n():
-    """'3/3 = 1,00' KHÔNG phải 'hoàn hảo' — cận dưới phải thấp rõ rệt."""
+    """'3/3 = 1,00' không phải 'hoàn hảo' - cận dưới phải thấp rõ rệt."""
     lo, hi = wilson_ci(3, 3)
     assert hi == 1.0
     assert lo < 0.5, f"cận dưới {lo} phải phản ánh n=3 quá nhỏ để kết luận"
@@ -112,7 +105,7 @@ def test_wilson_ci_handles_zero_n():
 
 
 def test_bootstrap_ci_is_deterministic_for_fixed_seed():
-    """Tất định theo seed — chạy lại luận văn phải ra đúng số cũ."""
+    """Tất định theo seed - chạy lại luận văn phải ra đúng số cũ."""
     data = [1] * 60 + [0] * 40
 
     def mean(s):
@@ -138,17 +131,13 @@ def test_bootstrap_ci_degenerate_input():
     assert bootstrap_ci([1], lambda s: 0.0) == (0.0, 0.0)
 
 
-# ==============================================================================
 # Bóc theo lớp
-# ==============================================================================
-
-
 def _rec(label, is_threat, flagged):
     return {"label": label, "is_threat": is_threat, "flagged": flagged}
 
 
 def test_per_class_report_exposes_blind_spot_hidden_by_pooled_recall():
-    """Recall gộp 0,5 che mất việc một lớp bị bỏ sót SẠCH — đây là lý do phải bóc lớp."""
+    """Recall gộp 0,5 che mất việc một lớp bị bỏ sót sạch - đây là lý do phải bóc lớp."""
     records = [_rec("DoS", True, True) for _ in range(10)]
     records += [_rec("Infiltration", True, False) for _ in range(10)]
 
@@ -186,11 +175,7 @@ def test_weakest_classes_orders_by_recall():
     assert weakest_classes(per_class_report(records), k=2) == [("B", 0.0), ("C", 0.5)]
 
 
-# ==============================================================================
 # Hiệu năng vận hành
-# ==============================================================================
-
-
 def test_throughput_and_zero_guard():
     assert throughput(1000, 4.0) == 250.0
     assert throughput(1000, 0.0) == 0.0
@@ -208,9 +193,7 @@ def test_alert_burden_zero_guard():
     assert alert_burden(0, 0, 0)["alerts_per_hour"] == 0.0
 
 
-# ==============================================================================
-# Neo bằng chứng — thay cho audit_completeness vốn luôn 100%
-# ==============================================================================
+# Neo bằng chứng - thay cho audit_completeness vốn luôn 100%
 
 _LOG = {"Destination Port": 22, "Total Fwd Packets": 900, "Source IP": "10.0.0.5"}
 
@@ -223,7 +206,7 @@ def test_grounding_detects_verified_citation():
 
 
 def test_grounding_rejects_fabricated_value():
-    """Model bịa số phải KHÔNG được tính là có bằng chứng — đây là điểm khác cốt lõi
+    """Model bịa số phải không được tính là có bằng chứng - đây là điểm khác cốt lõi
     so với audit_completeness (vốn chỉ đếm trường có mặt, không kiểm giá trị)."""
     g = evidence_grounding("Observed Destination Port=443 which is benign", _LOG)
     assert g["n_citations"] == 1
@@ -232,7 +215,7 @@ def test_grounding_rejects_fabricated_value():
 
 
 def test_grounding_zero_for_empty_appeal_to_authority():
-    """Lập luận rỗng mà prompt CẤM tường minh -> phải trượt, và bị đếm là 'viện dẫn'."""
+    """Lập luận rỗng mà prompt cấm tường minh -> phải trượt, và bị đếm là 'viện dẫn'."""
     g = evidence_grounding(
         "This is dangerous and confirmed by MITRE ATT&CK, must be blocked.", _LOG
     )
@@ -245,7 +228,7 @@ def test_grounding_matches_numeric_value_across_formats():
 
 
 def test_grounding_tolerates_field_name_spacing_variants():
-    """Model hay viết `total_fwd_packets` thay vì `Total Fwd Packets` — vẫn phải khớp."""
+    """Model hay viết `total_fwd_packets` thay vì `Total Fwd Packets` - vẫn phải khớp."""
     assert evidence_grounding("total_fwd_packets=900", _LOG)["n_verified"] == 1
 
 
@@ -266,11 +249,7 @@ def test_grounding_rate_empty():
     assert evidence_grounding_rate([]) == {"n": 0}
 
 
-# ==============================================================================
-# Cohen's kappa — kiểm định trọng tài LLM
-# ==============================================================================
-
-
+# Cohen's kappa - kiểm định trọng tài LLM
 def test_kappa_one_for_identical_ratings():
     assert cohens_kappa([1, 2, 3, 4, 5], [1, 2, 3, 4, 5]) == 1.0
 
@@ -292,11 +271,7 @@ def test_kappa_empty_and_constant_input():
     assert cohens_kappa([3, 3, 3], [3, 3, 3]) == 1.0
 
 
-# ==============================================================================
 # Chi phí tài nguyên
-# ==============================================================================
-
-
 def test_resource_cost_scales_with_llm_call_rate():
     """Cùng khối lượng sự kiện, gọi LLM ít hơn -> chi phí thấp hơn. Đây chính là đại
     lượng mà kiến trúc hai tầng tác động, nên nó phải phản ứng đúng chiều."""
@@ -316,7 +291,7 @@ def test_resource_cost_zero_guard():
 
 
 def test_resource_cost_reports_pricing_assumption():
-    """Con số $ vô nghĩa nếu không kèm mốc giá — bắt buộc phải xuất ra cùng kết quả."""
+    """Con số $ vô nghĩa nếu không kèm mốc giá - bắt buộc phải xuất ra cùng kết quả."""
     c = resource_cost(
         n_events=10, n_llm_calls=10, mean_prompt_tokens=1000, mean_completion_tokens=100
     )
@@ -331,11 +306,7 @@ def test_all_zero_confusion_does_not_crash(bad):
     assert not math.isnan(rep["accuracy"])
 
 
-# ==============================================================================
 # Hiệu chuẩn độ tin cậy
-# ==============================================================================
-
-
 def test_brier_perfect_and_worst():
     """Dự báo hoàn hảo -> 0; dự báo ngược hoàn toàn -> 1."""
     assert mc.brier_score([1.0, 0.0, 1.0], [True, False, True]) == 0.0
@@ -343,7 +314,7 @@ def test_brier_perfect_and_worst():
 
 
 def test_brier_penalises_overconfidence_more_than_hedging():
-    """Sai mà nói chắc phải bị phạt NẶNG hơn sai mà lưỡng lự.
+    """Sai mà nói chắc phải bị phạt nặng hơn sai mà lưỡng lự.
 
     Đây chính là tính chất khiến Brier hơn accuracy khi thẩm định chính sách 4 dải: một
     lệnh tự động BLOCK ở độ tin cậy 0,95 mà sai tốn kém hơn hẳn một ca lưỡng lự 0,55.
@@ -362,7 +333,7 @@ def test_ece_zero_when_perfectly_calibrated():
 
 
 def test_ece_detects_overconfidence():
-    """Luôn hô 0,99 nhưng chỉ đúng một nửa -> ECE ~0,49 và bị gắn cờ QUÁ TỰ TIN."""
+    """Luôn hô 0,99 nhưng chỉ đúng một nửa -> ECE ~0,49 và bị gắn cờ quá tự tin."""
     conf = [0.99] * 100
     outcomes = [True] * 50 + [False] * 50
     rep = mc.expected_calibration_error(conf, outcomes, n_bins=10)
@@ -371,11 +342,11 @@ def test_ece_detects_overconfidence():
 
 
 def test_ece_weights_by_sample_count_not_bin_count():
-    """Khoảng RỖNG không được làm loãng ECE.
+    """Khoảng rỗng không được làm loãng ECE.
 
     Hai mẫu, mỗi mẫu lệch 0,05, nằm ở hai khoảng khác nhau; 8 khoảng còn lại rỗng. Đáp số
-    đúng là 0,05 (trung bình có trọng số theo SỐ MẪU). Nếu ai đó cài nhầm thành chia cho
-    `n_bins` thì ra 0,01 — nghe như hiệu chuẩn tốt gấp 5 lần thực tế, đúng kiểu sai lệch
+    đúng là 0,05 (trung bình có trọng số theo số mẫu). Nếu ai đó cài nhầm thành chia cho
+    `n_bins` thì ra 0,01 - nghe như hiệu chuẩn tốt gấp 5 lần thực tế, đúng kiểu sai lệch
     âm thầm mà không ai soi ra từ một con số đơn lẻ.
     """
     rep = mc.expected_calibration_error([0.05, 0.95], [False, True], n_bins=10)
@@ -400,13 +371,9 @@ def test_calibration_report_handles_empty_input():
     assert rep["high_conf_accuracy"] is None
 
 
-# ==============================================================================
 # Ngăn chặn mức IP
-# ==============================================================================
-
-
 def test_containment_counts_ip_not_events():
-    """Chặn kẻ tấn công ở sự kiện thứ 3 là THÀNH CÔNG, dù 497 flow sau vẫn chảy qua.
+    """Chặn kẻ tấn công ở sự kiện thứ 3 là thành công, dù 497 flow sau vẫn chảy qua.
 
     Đây chính là điều mà F1 mức-sự-kiện không diễn đạt được: nó phạt 497 lần cho một ca mà
     vận hành thật coi là đã xử lý xong.
@@ -432,7 +399,7 @@ def test_containment_reports_leak_rate():
 
 
 def test_block_everything_is_caught_by_false_block_counterweight():
-    """Chặn sạch mọi IP đạt containment 1,00 — chỉ đối trọng mới lộ ra là hỏng.
+    """Chặn sạch mọi IP đạt containment 1,00 - chỉ đối trọng mới lộ ra là hỏng.
 
     Không có `benign_ip_false_block_rate` thì một hệ `return BLOCK` trông hoàn hảo.
     """
@@ -454,9 +421,9 @@ def test_benign_ip_never_attacking_is_not_counted_as_attacker():
 
 
 def test_compromised_host_sending_both_counts_as_attacker():
-    """Host bị chiếm quyền gửi cả lưu lượng lành lẫn tấn công vẫn là KẺ TẤN CÔNG.
+    """Host bị chiếm quyền gửi cả lưu lượng lành lẫn tấn công vẫn là kẻ tấn công.
 
-    Đây là hình thái THẬT trong DAPT2020 và là ca khó nhất — không được xếp nhầm sang phía
+    Đây là hình thái thật trong DAPT2020 và là ca khó nhất - không được xếp nhầm sang phía
     lành tính chỉ vì phần lớn lưu lượng của nó vô hại.
     """
     evs = [

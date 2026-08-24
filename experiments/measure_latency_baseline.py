@@ -1,21 +1,21 @@
 """
 Đánh giá Hiệu năng Độ trễ: Hệ thống 2 Lớp (Two-Tier) so với LLM-only
-[Luận văn Ch.4 §Two-Tier Latency Trade-off — claim độ trễ chủ đạo ~0.6ms / −99% vs LLM]
+[Luận văn Ch.4 §Two-Tier Latency Trade-off - claim độ trễ chủ đạo ~0.6ms / −99% vs LLM]
 
-CHỨC NĂNG:
+Chức năng:
   Đo độ trễ của 2 chế độ:
-    - Two-Tier:  Tier1 → Guardrail → RAG → LLM
-    - Baseline:  Mỗi sự kiện → LLM trực tiếp (không lọc, không RAG)
+    - Two-Tier:  Tier1 -> Guardrail -> RAG -> LLM
+    - Baseline:  Mỗi sự kiện -> LLM trực tiếp (không lọc, không RAG)
 
-  Mẫu lấy THEO BƯỚC NHẢY trên `build_stream()` để giữ nguyên tỉ lệ lành/độc của luồng thật.
-  Bản cũ ép 50 benign + 50 tấn công — xoá đúng điều kiện làm nên lợi thế của kiến trúc hai
+  Mẫu lấy theo bước nhảy trên `build_stream()` để giữ nguyên tỉ lệ lành/độc của luồng thật.
+  Bản cũ ép 50 benign + 50 tấn công - xoá đúng điều kiện làm nên lợi thế của kiến trúc hai
   tầng, nên đo ra SENTINEL chậm hơn LLM-only 7,8% (p = 1,000).
   Mục tiêu: Giảm thiểu độ trễ ≥ 60% so với baseline chỉ dùng LLM.
 
-  LƯU Ý: Yêu cầu llama.cpp server chạy tại port 5000.
+  Lưu Ý: Yêu cầu llama.cpp server chạy tại port 5000.
   Nếu server không hoạt động, kiểm thử sẽ được bỏ qua (SKIP) an toàn.
 
-KẾT QUẢ ĐẦU RA:
+Kết quả đầu ra:
   experiments/results/latency_benchmark.json
 """
 
@@ -50,15 +50,15 @@ def check_llm_server():
 
 
 def load_test_events(n=100):
-    """Lấy mẫu từ LUỒNG THẬT, giữ nguyên tỉ lệ lành/độc.
+    """Lấy mẫu từ luồng thật, giữ nguyên tỉ lệ lành/độc.
 
-    BẢN CŨ ÉP 50 benign + 50 tấn công. Đó là chỗ chết của phép đo: lợi thế của kiến trúc hai
-    tầng ĐẾN TỪ việc đại đa số lưu lượng SOC là vô hại và bị loại rẻ tiền ở Tier-1. Ép về
-    50/50 là xoá đúng cái điều kiện làm nên lợi thế — Tier-1 chỉ loại được 11/100, 89 ca vẫn
-    gọi LLM và phải trả thêm chi phí đi qua tầng lọc, nên hệ "hai tầng" đo ra CHẬM HƠN
+    Bản cũ ép 50 benign + 50 tấn công. Đó là chỗ chết của phép đo: lợi thế của kiến trúc hai
+    tầng đến từ việc đại đa số lưu lượng SOC là vô hại và bị loại rẻ tiền ở Tier-1. Ép về
+    50/50 là xoá đúng cái điều kiện làm nên lợi thế - Tier-1 chỉ loại được 11/100, 89 ca vẫn
+    gọi LLM và phải trả thêm chi phí đi qua tầng lọc, nên hệ "hai tầng" đo ra chậm hơn
     LLM-only 7,8% (p = 1,000). Con số đó tả một kịch bản không tồn tại trong vận hành.
 
-    Lấy mẫu THEO BƯỚC NHẢY trên `build_stream()` để tỉ lệ lớp đúng như luồng thật, và để mẫu
+    Lấy mẫu theo bước nhảy trên `build_stream()` để tỉ lệ lớp đúng như luồng thật, và để mẫu
     trải đều toàn bộ dòng thời gian thay vì dồn vào một đoạn.
     """
     from experiments.unified_dataset import build_stream
@@ -73,24 +73,24 @@ def load_test_events(n=100):
         f"  Lấy {len(events)}/{len(main)} sự kiện (bước nhảy {stride}) — "
         f"tấn công {n_attack} ({100 * n_attack / max(len(events), 1):.1f}%), giữ nguyên tỉ lệ luồng thật"
     )
-    # `warmup` phải chạy qua Tier-1 TRƯỚC để Welford có nền thống kê. Không mồi thì Z-score
-    # tính trên n nhỏ và Tier-1 hành xử khác hẳn lúc vận hành — sai luôn đại lượng đang đo.
+    # `warmup` phải chạy qua Tier-1 trước để Welford có nền thống kê. Không mồi thì Z-score
+    # tính trên n nhỏ và Tier-1 hành xử khác hẳn lúc vận hành - sai luôn đại lượng đang đo.
     return events, warmup
 
 
 def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, dict]:
-    """Chạy ĐÚNG đường nóng đang triển khai; trả (độ trễ mỗi sự kiện ms, phân rã theo chặng).
+    """Chạy đúng đường nóng đang triển khai; trả (độ trễ mỗi sự kiện ms, phân rã theo chặng).
 
-    BẢN CŨ THIẾU HAI TẦNG LỌC RẺ NHẤT. Nó chỉ có `RuleEngine -> guardrails -> RAG -> LLM`:
-    không Cổng ML LightGBM, và `DualRetriever(use_cache=False)` tức TẮT luôn Semantic Cache.
-    Mà RQ1 hỏi đích danh cả ba — "Welford O(1), Cổng Học máy LightGBM và Bộ đệm Semantic
+    Bản cũ thiếu hai tầng lọc rẻ nhất. Nó chỉ có `RuleEngine -> guardrails -> RAG -> LLM`:
+    không Cổng ML LightGBM, và `DualRetriever(use_cache=False)` tức tắt luôn Semantic Cache.
+    Mà RQ1 hỏi đích danh cả ba - "Welford O(1), Cổng Học máy LightGBM và Bộ đệm Semantic
     Cache Tầng 1.75". Nói cách khác, phép đo cũ không đo kiến trúc mà luận văn đang tuyên bố:
     nó đo một hệ đã bị gỡ mất hai chặng loại rẻ, nên mọi ca ESCALATE đều rơi thẳng xuống LLM.
 
     Đường nóng thật, theo `src/streaming/subscriber.py`:
         RuleEngine.evaluate  -> DROP/WHITELIST_DROP thì dừng
         ESCALATE             -> MLGateway.evaluate -> tự quyết được thì dừng
-        còn lại              -> guardrails -> RAG (CÓ cache) -> LLM
+        còn lại              -> guardrails -> RAG (có cache) -> LLM
     """
     from src.agent.llm_client import LLMClient
     from src.guardrails.prompt_filter import GuardrailsPipeline
@@ -101,11 +101,11 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
     engine = RuleEngine()
     ml_gateway = MLGateway()
     guardrails = GuardrailsPipeline()
-    retriever = DualRetriever(use_cache=True)  # Tier-1.75: cache BẬT, đúng như vận hành
+    retriever = DualRetriever(use_cache=True)  # Tier-1.75: cache bật, đúng như vận hành
     llm = LLMClient()
 
-    # Mồi Welford bằng lưu lượng lành tính, KHÔNG tính vào độ trễ.
-    # `ev["log"]` chứ không phải `ev`: phần tử của `build_stream()` là VỎ BỌC
+    # Mồi Welford bằng lưu lượng lành tính, không tính vào độ trễ.
+    # `ev["log"]` chứ không phải `ev`: phần tử của `build_stream()` là vỏ bọc
     # {source, log, expected_threat, label, t}. Truyền cả vỏ thì Tier-1 không thấy trường nào
     # nó biết -> score 0 -> DROP sạch, kể cả tấn công, mà không ném lỗi nào. Nguồn sự thật:
     # `unified_dataset.score_stream()`.
@@ -116,7 +116,7 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
             pass
 
     latencies: list[float] = []
-    # Đếm ca THOÁT ở từng chặng + tổng thời gian chặng đó, để biết lợi thế đến từ đâu chứ
+    # Đếm ca thoát ở từng chặng + tổng thời gian chặng đó, để biết lợi thế đến từ đâu chứ
     # không chỉ biết tổng nhanh/chậm.
     stage_n = {"tier1_drop": 0, "ml_gate": 0, "llm": 0}
     stage_ms: dict[str, list[float]] = {"tier1_drop": [], "ml_gate": [], "llm": []}
@@ -126,14 +126,14 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
         t_start = time.perf_counter()
 
         result = engine.evaluate(log)
-        # Tier-1 XONG VIỆC với mọi hành động TRỪ `ESCALATE`. Nguồn sự thật là `subscriber.py`:
+        # Tier-1 xong việc với mọi hành động trừ `ESCALATE`. Nguồn sự thật là `subscriber.py`:
         # toàn bộ nhánh Cổng ML/LLM nằm trong `if action == "ESCALATE"`, và chính nó đếm mọi
         # hành động khác là "đã gỡ tải".
         #
-        # LỖI ĐÃ VÁ (04/08/2026): điều kiện cũ là `in ("DROP", "WHITELIST_DROP")`, tức coi
-        # `BLOCK_IP` · `ALERT` · `AWAIT_HITL` là CHƯA xử lý xong. Hậu quả kép: (1) tỉ lệ xả tải
-        # bị hạ thấp — đo 74,0% trong khi cùng luồng, cùng engine, đếm đúng thì là 90,6%;
-        # (2) những ca Tier-1 ĐÃ CHẶN vẫn bị gửi lên LLM trong phép đo, nên độ trễ hai tầng
+        # Lỗi đã vá (04/08/2026): điều kiện cũ là `in ("DROP", "WHITELIST_DROP")`, tức coi
+        # `BLOCK_IP` · `ALERT` · `AWAIT_HITL` là chưa xử lý xong. Hậu quả kép: (1) tỉ lệ xả tải
+        # bị hạ thấp - đo 74,0% trong khi cùng luồng, cùng engine, đếm đúng thì là 90,6%;
+        # (2) những ca Tier-1 đã chặn vẫn bị gửi lên LLM trong phép đo, nên độ trễ hai tầng
         # cộng thêm hàng chục giây không có thật. Cùng họ với lỗi ở `evaluate_feedback_loop`.
         if result.get("tier1_action") != "ESCALATE":
             dt = (time.perf_counter() - t_start) * 1000
@@ -142,7 +142,7 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
             latencies.append(dt)
             continue
 
-        # ── TIER-1 CỔNG ML (LightGBM) ──
+        # TIER-1 Cổng ML (LightGBM)
         ml_action, _ml_reason, _ml_conf = ml_gateway.evaluate(log)
         if ml_action:
             dt = (time.perf_counter() - t_start) * 1000
@@ -151,7 +151,7 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
             latencies.append(dt)
             continue
 
-        # ── TIER-2 ──
+        # TIER-2
         guard_result = guardrails.process_batch([log])
         safe_log = guard_result.get("batch_encapsulated", str(log))
         context = retriever.retrieve(safe_log[:500])
@@ -200,7 +200,7 @@ def measure_llm_only_baseline(events: list) -> list:
     for event in events:
         t_start = time.perf_counter()
 
-        # Suy luận trực tiếp bằng LLM — không lọc, không RAG.
+        # Suy luận trực tiếp bằng LLM - không lọc, không RAG.
         # Cùng nội dung log như nhánh hai tầng (`ev["log"]`), nếu không thì hai nhánh nhận
         # prompt dài ngắn khác nhau và phép so độ trễ mất tính công bằng.
         raw_log = json.dumps(event["log"], default=str)[:1500]
@@ -215,12 +215,12 @@ def measure_llm_only_baseline(events: list) -> list:
 
 
 def derive_stats(two_tier: list, baseline: list) -> dict:
-    """Thống kê phái sinh từ độ trễ thô — MỘT chỗ tính duy nhất.
+    """Thống kê phái sinh từ độ trễ thô - một chỗ tính duy nhất.
 
-    Tách khỏi `run()` để lượt đo cũ (JSON đã lưu `per_event_*_ms`) tính bù được bằng ĐÚNG
-    công thức này thay vì chép số từ log — chép tay là đúng chỗ số liệu bị sai lệch.
+    Tách khỏi `run()` để lượt đo cũ (JSON đã lưu `per_event_*_ms`) tính bù được bằng đúng
+    công thức này thay vì chép số từ log - chép tay là đúng chỗ số liệu bị sai lệch.
 
-    Mann-Whitney U một phía (`alternative="less"`): giả thuyết đối là hai tầng NHANH HƠN.
+    Mann-Whitney U một phía (`alternative="less"`): giả thuyết đối là hai tầng nhanh hơn.
     Dùng phi tham số vì độ trễ ở đây hai đỉnh và lệch nặng, t-test giả định sai phân bố.
     """
     out: dict[str, float | bool | None] = {
@@ -252,9 +252,9 @@ def run(n_events: int = 100):
         print("         hoặc đặt LLM_API_BASE=http://127.0.0.1:8080/v1")
         print("       Then re-run this script.")
 
-        # Lưu kết quả bỏ qua (skip) — KHÔNG được xoá mất số đo THẬT đã có.
-        # BUG CŨ: ghi đè thẳng latency_benchmark.json bằng {"status": "SKIPPED"} nên chỉ
-        # cần lỡ chạy script lúc LLM chưa bật là MẤT TRẮNG kết quả đã đo (số này đang được
+        # Lưu kết quả bỏ qua (skip) - không được xoá mất số đo thật đã có.
+        # BUG cũ: ghi đè thẳng latency_benchmark.json bằng {"status": "SKIPPED"} nên chỉ
+        # cần lỡ chạy script lúc LLM chưa bật là mất trắng kết quả đã đo (số này đang được
         # UI và luận văn trích dẫn). Nay giữ kết quả cũ dưới `previous_result`, và dùng
         # context manager để file luôn được đóng/flush.
         Path("experiments/results").mkdir(parents=True, exist_ok=True)
@@ -318,17 +318,17 @@ Status:            {"✅ PASS" if reduction_pct >= 60 else "❌ FAIL"}
         "latency_reduction_pct": round(reduction_pct, 2),
         "target_pct": 60,
         "pass": bool(reduction_pct >= 60),
-        # Median/P95/Mann-Whitney từng CHỈ được in ra màn hình rồi mất theo phiên terminal.
+        # Median/P95/Mann-Whitney từng chỉ được in ra màn hình rồi mất theo phiên terminal.
         # Với phân bố hai đỉnh như ở đây (đa số ca xong trong ~1 ms, số ít phải chờ LLM ~23 s)
         # thì mean một mình mô tả sai; median và P95 mới nói được đuôi. Ghi vào JSON để báo cáo
         # đọc thẳng, không ai phải chép tay từ log.
         **derive_stats(two_tier_latencies, baseline_latencies),
-        # Phân rã theo chặng: tổng nhanh/chậm KHÔNG cho biết lợi thế đến từ đâu. Nếu số ca
+        # Phân rã theo chặng: tổng nhanh/chậm không cho biết lợi thế đến từ đâu. Nếu số ca
         # thoát ở Tier-1 + Cổng ML thấp thì con số tổng chỉ đang tả tập mẫu, không tả kiến trúc.
         "stage_breakdown": stage_breakdown,
-        # CỜ TỰ KIỂM. Lợi thế của kiến trúc hai tầng ĐẾN TỪ việc phần lớn lưu lượng bị loại
+        # Cờ tự kiểm. Lợi thế của kiến trúc hai tầng đến từ việc phần lớn lưu lượng bị loại
         # rẻ tiền trước LLM. Nếu tỉ lệ xả tải trong chính lượt đo này thấp bất thường thì
-        # con số độ trễ đang tả một kịch bản không tồn tại trong vận hành — đúng chỗ bản đo
+        # con số độ trễ đang tả một kịch bản không tồn tại trong vận hành - đúng chỗ bản đo
         # cũ sập (ép 50/50 -> xả tải 11% -> kết luận "chậm hơn 7,8%").
         "metric_valid": bool(stage_breakdown["offload_pct"] >= 50.0),
         "metric_valid_reason": (
@@ -359,14 +359,14 @@ Status:            {"✅ PASS" if reduction_pct >= 60 else "❌ FAIL"}
 
 
 if __name__ == "__main__":
-    # LỖI ĐÃ SỬA: script KHÔNG có argparse, nên `--n 1000` mà tài liệu hướng dẫn bị nuốt IM
-    # LẶNG qua sys.argv và mọi lượt đo vẫn chạy n=100. Tức con số độ trễ đang trích trong luận
-    # văn là mẫu 100 — dưới ngưỡng mà chính tài liệu đặt ra (cần ~1000 để đủ ca chạm LLM), và
+    # Lỗi đã sửa: script không có argparse, nên `--n 1000` mà tài liệu hướng dẫn bị nuốt im
+    # Lặng qua sys.argv và mọi lượt đo vẫn chạy n=100. Tức con số độ trễ đang trích trong luận
+    # văn là mẫu 100 - dưới ngưỡng mà chính tài liệu đặt ra (cần ~1000 để đủ ca chạm LLM), và
     # cái cờ lẽ ra để sửa điều đó thì chưa bao giờ có tác dụng.
     #
-    # CHI PHÍ: nhánh baseline gửi MỌI sự kiện thẳng lên LLM (~18,9 s/lần đo được ở lượt gần
+    # Chi phí: nhánh baseline gửi mọi sự kiện thẳng lên LLM (~18,9 s/lần đo được ở lượt gần
     # nhất). n=100 mất ~30 phút; n=1000 mất ~5 giờ. Giữ mặc định 100 để không ai vô tình khởi
-    # động một lượt 5 giờ, nhưng cờ nay CÓ THẬT.
+    # động một lượt 5 giờ, nhưng cờ nay có thật.
     _ap = argparse.ArgumentParser(description="Độ trễ hai tầng vs LLM-only")
     _ap.add_argument(
         "--n",

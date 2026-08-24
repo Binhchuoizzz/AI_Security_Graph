@@ -161,7 +161,7 @@ def build_chains():
     output_path = Path(DAPT_PROCESSED_FILE)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w") as f:
-        # Ưu tiên giữ NHIỀU sự kiện TẤN CÔNG (tối đa 50/chuỗi) + ít benign làm ngữ cảnh,
+        # Ưu tiên giữ nhiều sự kiện tấn công (tối đa 50/chuỗi) + ít benign làm ngữ cảnh,
         # để có càng nhiều log tấn công APT càng tốt.
         MAX_ATTACK_PER_CHAIN = 50
         MAX_BENIGN_PER_CHAIN = 10

@@ -1,7 +1,7 @@
 """
 Unit tests cho lớp xác thực Dashboard (PBKDF2-HMAC-SHA256 + constant-time compare).
 
-Chỉ test các hàm thuần (hash/compare/cấu hình RBAC) — KHÔNG test luồng Streamlit UI
+Chỉ test các hàm thuần (hash/compare/cấu hình RBAC) - không test luồng Streamlit UI
 (login_screen cần session_state, thuộc phạm vi kiểm thử thủ công/demo).
 """
 

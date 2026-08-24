@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
 """
-scripts/eval_attack_mapper.py — Đo chất lượng ATT&CK Mapper trên ground_truth.json.
+scripts/eval_attack_mapper.py - Đo chất lượng ATT&CK Mapper trên ground_truth.json.
 
-HAI MODE (chọn bằng --mode):
-  rrf  : OFFLINE, KHÔNG gọi LLM. Dựng query flow (service/port/...) y như
+Hai MODE (chọn bằng --mode):
+  rrf  : OFFLINE, không gọi LLM. Dựng query flow (service/port/...) y như
          node_rag_context -> map_attack(retriever, llm=None) -> RRF top-1.
-         Tất định, tái lập 100%, không cần llama.cpp. CÔ LẬP đóng góp của KB
+         Tất định, tái lập 100%, không cần llama.cpp. Cô lập đóng góp của KB
          => đúng công cụ đo delta khi nạp G0129/PlugX (#2a): chạy tag=baseline
          rồi tag=with_g0129 và lấy hiệu.
   e2e  : Chạy FULL agent (triage -> attack_mapper) mỗi sample. Cần llama.cpp
-         server (:5000). Đo hệ TRIỂN KHAI thật (đã lẫn accuracy của triage).
+         server (:5000). Đo hệ triển khai thật (đã lẫn accuracy của triage).
          Vì ~5.7s/sample, nên dùng --per-class để subsample phân tầng.
 
-TRUNG THỰC (no-fabrication):
-  - In KÈM "trần KB-coverage": % expected technique có trong KB. Exact-match
-    KHÔNG THỂ vượt trần này -> diễn giải số cho đúng, không đổ lỗi cho mapper.
-  - Script CHỈ sinh số từ run thật; không có hằng số kết quả nào hard-code.
-  - Đo cả exact-match VÀ parent-level match (vd T1110.001 ~ T1110) vì KB và GT
+Trung thực (no-fabrication):
+  - In kèm "trần KB-coverage": % expected technique có trong KB. Exact-match
+    không thể vượt trần này -> diễn giải số cho đúng, không đổ lỗi cho mapper.
+  - Script chỉ sinh số từ run thật; không có hằng số kết quả nào hard-code.
+  - Đo cả exact-match và parent-level match (vd T1110.001 ~ T1110) vì KB và GT
     đôi khi lệch mức technique/sub-technique.
 
-CÁCH DÙNG:
+Cách dùng:
   python scripts/eval_attack_mapper.py --mode rrf --tag baseline
   python scripts/eval_attack_mapper.py --mode e2e --per-class 20 --tag e2e_subsample
 """
@@ -64,7 +64,7 @@ def _parent(tid: str) -> str:
 
 
 def build_flow_query(log: dict) -> str:
-    """Dựng query từ log flow — MIRROR node_rag_context (service/port/uri/reasons)."""
+    """Dựng query từ log flow - MIRROR node_rag_context (service/port/uri/reasons)."""
     parts = []
     msg = (str(log.get("message", "")) + " " + str(log.get("payload", ""))).strip()
     if msg:
@@ -130,22 +130,22 @@ def subsample(gt: list, per_class: int | None, limit: int | None) -> list:
     return gt
 
 
-# RuleEngine dùng chung cho mode rrf — khởi tạo LƯỜI (chỉ khi thực sự chạy rrf).
+# RuleEngine dùng chung cho mode rrf - khởi tạo lười (chỉ khi thực sự chạy rrf).
 _RRF_ENGINE = None
 
 
 def predict_rrf(sample: dict, retriever) -> tuple[str, str, str, bool, float, dict]:
     """1 sample -> (pred_id, pred_tactic, mapping_status, curated_path, latency_s, extra).
 
-    LỖI ĐO ĐÃ SỬA: bản trước gọi thẳng `build_flow_query(log)` trên log THÔ, tức BỎ QUA
-    Tier-1. Nhưng ở production `node_rag_context` LUÔN chạy sau Tier-1, và truy vấn kỹ thuật
-    được dựng từ `tier1_reasons` — nguồn DUY NHẤT cấp từ vựng MITRE tiếng Anh
+    Lỗi đo đã sửa: bản trước gọi thẳng `build_flow_query(log)` trên log thô, tức bỏ qua
+    Tier-1. Nhưng ở production `node_rag_context` luôn chạy sau Tier-1, và truy vấn kỹ thuật
+    được dựng từ `tier1_reasons` - nguồn duy nhất cấp từ vựng MITRE tiếng Anh
     (`_canonical_attack_terms`). Không có nó, truy vấn tụt về "service X port N" và bộ truy
     xuất mất gần hết tín hiệu.
 
-    Đo được trên bộ 69 web-attack (2026-07-28): đường CŨ báo exact 26%, trong khi đường THẬT
+    Đo được trên bộ 69 web-attack (2026-07-28): đường cũ báo exact 26%, trong khi đường thật
     (chạy Tier-1 trước, dùng `build_rag_queries`) cho technique đúng ở top-1 55% / top-3 62%.
-    Chênh 2,4 lần — đủ để đưa một con số sai vào luận văn.
+    Chênh 2,4 lần - đủ để đưa một con số sai vào luận văn.
     """
     global _RRF_ENGINE
     logs = sample.get("logs") or []
@@ -192,7 +192,7 @@ def predict_e2e(
 
     response_cache.clear()  # Ép Zero-Cache 100%: mọi mẫu bắt buộc LLM suy luận từ đầu
     logs = sample.get("logs") or []
-    loop_detector.reset()  # BẮT BUỘC: tránh loop-guard cộng dồn qua các invoke
+    loop_detector.reset()  # Bắt buộc: tránh loop-guard cộng dồn qua các invoke
     t0 = time.time()
     final = agent_app.invoke(
         SentinelState(current_batch_logs=logs, current_batch_size=len(logs), narrative_summary="")
@@ -204,7 +204,7 @@ def predict_e2e(
     pred_tactic = dec.get("mitre_tactic", "")
     status = dec.get("mapping_status", "")  # "" nếu mapper bị gate bỏ qua (conf<=0.7/benign)
     curated = pred_id in CURATED_TECH_IDS and status == "resolved"
-    # extra: phân rã NGUYÊN NHÂN — action/confidence của triage + technique free-text.
+    # extra: phân rã nguyên nhân - action/confidence của triage + technique free-text.
     extra = {
         "action": dec.get("action", ""),
         "confidence": dec.get("confidence", 0.0),
@@ -215,13 +215,13 @@ def predict_e2e(
 
 def isolate_for_e2e() -> str:
     """
-    CÔ LẬP side-effect của mode e2e khỏi DỮ LIỆU LUẬN VĂN đã commit.
+    Cô lập side-effect của mode e2e khỏi dữ liệu luận văn đã commit.
 
     e2e gọi full agent -> sẽ ghi threat_memory.db, audit_trail.db,
     guardrails_audit.db và (khi BLOCK_IP) cả config/system_settings.yaml.
-    Ở đây: (1) trỏ threat_memory sang DB TẠM, (2) no-op mọi hàm GHI bền vững
+    Ở đây: (1) trỏ threat_memory sang DB tạm, (2) no-op mọi hàm ghi bền vững
     (block/alert/HITL qua _log_to_db; feedback-config; audit-chain), (3) trỏ
-    MLflow sang thư mục tạm để khỏi gọi mạng. KHÔNG file thesis nào bị chạm.
+    MLflow sang thư mục tạm để khỏi gọi mạng. Không file thesis nào bị chạm.
 
     Trả về temp_dir (để dọn).
     """
@@ -238,10 +238,10 @@ def isolate_for_e2e() -> str:
     tmp = tempfile.mkdtemp(prefix="mapper_e2e_")
     os.environ["MLFLOW_TRACKING_URI"] = "file:" + os.path.join(tmp, "mlruns")
 
-    # 1) threat_memory -> store TẠM (schema tự tạo trong __init__)
+    # 1) threat_memory -> store tạm (schema tự tạo trong __init__)
     nodes_mod.threat_memory = ThreatMemoryStore(db_path=os.path.join(tmp, "threat_memory.db"))
 
-    # 2) no-op mọi hàm GHI bền vững
+    # 2) no-op mọi hàm ghi bền vững
     def _noop(*a, **k):
         return None
 
@@ -249,7 +249,7 @@ def isolate_for_e2e() -> str:
     FeedbackListener.receive_new_rule = _noop  # type: ignore  # chặn ghi system_settings.yaml
     audit_logger.log_event = _noop  # type: ignore  # chặn ghi logs/guardrails_audit.db
 
-    # 3) CÔ LẬP CẢ CHIỀU ĐỌC, không chỉ chiều ghi.
+    # 3) cô lập cả chiều đọc, không chỉ chiều ghi.
     import src.agent.threat_memory as tm_mod
 
     tm_mod.threat_memory = ThreatMemoryStore(db_path=os.path.join(tmp, "threat_memory.db"))
@@ -260,17 +260,17 @@ def isolate_for_e2e() -> str:
 
 
 def _assert_kb_covers_answers(coverage: dict, kb_path: str) -> None:
-    """Chặn phép chấm khi ĐÁP ÁN KHÔNG NẰM TRONG KHO TRI THỨC.
+    """Chặn phép chấm khi đáp án không nằm trong kho TRI thức.
 
     Cùng loại bẫy đã chặn ở `scripts/compare_llm_models.py::_assert_trace_matches_labels`,
     nhưng ở đây cặp lệch pha là (đề bài, kho tri thức).
 
     Vì sao im lặng mà nguy hiểm: nếu `ground_truth.json` mang mã kỹ thuật mà KB chưa có, bộ
-    truy xuất KHÔNG THỂ trả đúng — và bảng kết quả trông y hệt "hệ thống truy xuất kém".
+    truy xuất không thể trả đúng - và bảng kết quả trông y hệt "hệ thống truy xuất kém".
     Đã cắn một lần: KB thiếu T1595.003 khiến 130 mẫu không bao giờ đúng được.
 
-    KIỂM CHÍNH ĐẠI LƯỢNG, KHÔNG KIỂM PROXY. Bản nháp đầu của chốt này so `mtime` giữa hai
-    tệp, và nó lập tức báo động giả: KB dựng 14:31, đề bài 14:42 — lệch 11 phút nhưng độ phủ
+    Kiểm chính đại lượng, không kiểm PROXY. Bản nháp đầu của chốt này so `mtime` giữa hai
+    tệp, và nó lập tức báo động giả: KB dựng 14:31, đề bài 14:42 - lệch 11 phút nhưng độ phủ
     đo thật vẫn 100%. Một chốt hay kêu oan sẽ bị người ta tắt đi, nên nó phải đọc đúng con
     số mà nó bảo vệ.
     """
@@ -330,22 +330,22 @@ def main():
     )
     args = ap.parse_args()
 
-    # Tên tệp kết quả PHẢI tự nói lên nó đo cấu hình nào. `rrf` (tắt LLM) và `e2e` (toàn
-    # tuyến) trên `payload` và `flow` là bốn con số KHÁC NHAU, không thay thế nhau được.
+    # Tên tệp kết quả phải tự nói lên nó đo cấu hình nào. `rrf` (tắt LLM) và `e2e` (toàn
+    # tuyến) trên `payload` và `flow` là bốn con số khác nhau, không thay thế nhau được.
     if not args.tag:
         args.tag = f"{args.mode}_{args.evidence_layer}"
 
     with open(args.ground_truth, encoding="utf-8") as f:
         gt_all = json.load(f)
 
-    # KHÔNG TRỘN HAI TẦNG BẰNG CHỨNG TRONG MỘT CON SỐ.
+    # Không trộn hai tầng bằng chứng trong một con số.
     # Mẫu NetFlow thuần không mang một ký tự payload nào, nên "kỹ thuật kỳ vọng" của chúng
-    # KHÔNG suy ra được từ đầu vào bằng bất kỳ phương pháp nào — gộp chung sẽ kéo tụt chỉ số
+    # không suy ra được từ đầu vào bằng bất kỳ phương pháp nào - gộp chung sẽ kéo tụt chỉ số
     # quy kết vì một lý do không liên quan đến năng lực hệ thống, và làm con số vô nghĩa.
     if args.evidence_layer != "all":
         from src.agent.nodes import evidence_layer_of
 
-        # `evidence_layer_of` trả về "application" | "flow" — cùng thứ mà prompt gọi là tầng
+        # `evidence_layer_of` trả về "application" | "flow" - cùng thứ mà prompt gọi là tầng
         # ứng dụng. Cờ CLI dùng chữ "payload" cho dễ đọc, nên phải ánh xạ; so thẳng chuỗi sẽ
         # lọc ra 0 mẫu trong im lặng.
         want = {"payload": "application", "flow": "flow"}[args.evidence_layer]
@@ -353,9 +353,9 @@ def main():
         gt_all = [s for s in gt_all if evidence_layer_of(s.get("logs") or []) == want]
         print(f"[i] Lọc tầng bằng chứng '{want}': {len(gt_all)}/{before} mẫu")
 
-    # LOẠI MẪU DO TÁC GIẢ BIÊN SOẠN — chạy SAU bộ lọc tầng bằng chứng vì chúng đều mang
+    # Loại mẫu do tác giả biên soạn - chạy sau bộ lọc tầng bằng chứng vì chúng đều mang
     # payload nên đều lọt vào lát `application`. Đo được: 50 mẫu đối địch tự viết, chiếm
-    # 16,7% dân số CÓ đáp án ATT&CK, và cả 50 cùng đáp án `T1190` (đẩy T1190 từ 52 lên 102).
+    # 16,7% dân số có đáp án ATT&CK, và cả 50 cùng đáp án `T1190` (đẩy T1190 từ 52 lên 102).
     # Không loại thì `technique_exact_match_pct` vừa thưởng cho việc khớp khuôn mẫu của
     # chính tác giả, vừa thưởng cho thiên vị một mã duy nhất.
     from experiments.unified_dataset import drop_authored
@@ -364,11 +364,11 @@ def main():
     if _n_authored:
         print(f"[i] Loại {_n_authored} mẫu BIÊN SOẠN -> còn {len(gt_all)} mẫu dữ liệu thật.")
 
-    # Kiểm rỗng ĐẶT SAU CẢ HAI bộ lọc, và KHÔNG còn gói trong `if evidence_layer != "all"`:
+    # Kiểm rỗng đặt sau cả hai bộ lọc, và không còn gói trong `if evidence_layer != "all"`:
     # `drop_authored` cũng có thể vét cạn tập, nên guard cũ sẽ bỏ lọt đúng trường hợp đó.
     # SystemExit chứ không `return 1`: `main()` được gọi trần ở cuối tệp (không qua
     # `sys.exit(main())`) nên giá trị trả về bị bỏ qua, và runner bash sẽ tưởng bước này
-    # THÀNH CÔNG rồi ghi đè kết quả cũ bằng một lượt chạy rỗng.
+    # Thành công rồi ghi đè kết quả cũ bằng một lượt chạy rỗng.
     if not gt_all:
         raise SystemExit(
             "[!] Không còn mẫu nào sau khi lọc tầng bằng chứng + mẫu biên soạn — dừng."
@@ -378,11 +378,11 @@ def main():
     kb_index = {t["id"]: t for t in kb if isinstance(t, dict) and t.get("id")}
     kb_ids = set(kb_index)
 
-    coverage = compute_kb_coverage(gt_all, kb_ids)  # trần tính trên TOÀN GT
+    coverage = compute_kb_coverage(gt_all, kb_ids)  # trần tính trên toàn GT
     gt = subsample(gt_all, args.per_class, args.limit)
 
     # Nạp phụ thuộc theo mode (e2e cần server; rrf chỉ cần retriever).
-    # CẢ HAI mode đều phải cô lập: mode rrf cũng chạy `RuleEngine.evaluate()` để dựng truy
+    # Cả hai mode đều phải cô lập: mode rrf cũng chạy `RuleEngine.evaluate()` để dựng truy
     # vấn, mà engine đọc `ip_reputation` từ SQLite thật -> kết quả phụ thuộc lượt chạy trước.
     isolate_for_e2e()
     if args.mode == "rrf":
@@ -408,7 +408,7 @@ def main():
     n_tech = n_exact = n_parent = 0  # mẫu có technique kỳ vọng
     n_tac = n_tac_match = 0  # mẫu có tactic kỳ vọng suy được
     n_benign = 0
-    n_fired = n_fired_tech = 0  # mapper THỰC SỰ chạy (qua cổng) / trong đó là mẫu có technique
+    n_fired = n_fired_tech = 0  # mapper thực sự chạy (qua cổng) / trong đó là mẫu có technique
     latencies: list[float] = []
     per_type: dict = defaultdict(lambda: {"n": 0, "exact": 0, "parent": 0, "tactic": 0, "fired": 0})
 
@@ -471,14 +471,14 @@ def main():
         "technique_parent_match_pct": pct(n_parent, n_tech),
         "tactic_match_pct": pct(n_tac_match, n_tac),
         "tactic_eval_n": n_tac,
-        # PHÂN RÃ NGUYÊN NHÂN: khi mapper THỰC SỰ chạy thì exact-match bao nhiêu
+        # Phân rã nguyên nhân: khi mapper thực sự chạy thì exact-match bao nhiêu
         # (tách 'mapper sai' khỏi 'triage gated').
         #
-        # ĐÃ GỠ ba chỉ số: `mapper_fired_rate_pct`, `mapping_resolved_rate_pct`,
-        # `curated_path_rate_pct`. Hai cái đầu bằng đúng 100,0 ở CẢ BỐN lần chạy đã lưu —
+        # Đã gỡ ba chỉ số: `mapper_fired_rate_pct`, `mapping_resolved_rate_pct`,
+        # `curated_path_rate_pct`. Hai cái đầu bằng đúng 100,0 ở cả bốn lần chạy đã lưu -
         # một chỉ số không bao giờ khác 100 thì không đo gì cả, nó chỉ khẳng định hàm có
         # trả về giá trị. Cái thứ ba trùng khít `technique_exact_match_pct` từng chữ số
-        # (64,0/64,0 rồi 62,0/62,0) vì mọi khớp chính xác đều đi qua đường curated — hai
+        # (64,0/64,0 rồi 62,0/62,0) vì mọi khớp chính xác đều đi qua đường curated - hai
         # tên cho cùng một số làm bảng dài ra mà không thêm thông tin.
         "exact_when_fired_pct": pct(n_exact, n_fired_tech),
         "n_fired_with_technique": n_fired_tech,

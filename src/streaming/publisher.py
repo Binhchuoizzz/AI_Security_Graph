@@ -1,14 +1,14 @@
 """
-Data Publisher — stream CSV THÔ lên Redis (production-scale ingestion).
+Data Publisher - stream CSV thô lên Redis (production-scale ingestion).
 
-Vai trò trong bộ HAI PUBLISHER (không trùng nhau):
+Vai trò trong bộ hai PUBLISHER (không trùng nhau):
   - src/streaming/publisher.py (file này): đọc CSV thô CHUNKED (chunksize=500,
     file hàng triệu dòng/GB không nạp hết RAM), backpressure + chống Redis OOM.
-    Dùng cho LOAD TEST / chứng minh tầng ingestion; KHÔNG mang nhãn ground-truth
+    Dùng cho LOAD TEST / chứng minh tầng ingestion; Không mang nhãn ground-truth
     hay metadata APT.
   - scripts/demo.py + push_datatest.py (dựng bởi scripts/build_demo.py /
-    build_datatest.py): phát LUỒNG GỘP CICIDS+DAPT+zero-day kèm
-    metadata APT (demo end-to-end APT emergent — khuyến nghị cho demo luồng gộp).
+    build_datatest.py): phát luồng gộp CICIDS+DAPT+zero-day kèm
+    metadata APT (demo end-to-end APT emergent - khuyến nghị cho demo luồng gộp).
 """
 
 import hashlib
@@ -44,7 +44,7 @@ MAX_QUEUE_SIZE = 10000  # Giới hạn hàng đợi để chống nghẽn và ng
 def _redact_redis_url(url: str) -> str:
     """Ẩn mật khẩu trong REDIS_URL trước khi in/log (redis://:pass@host -> redis://:***@host).
 
-    Mật khẩu Redis CHỈ được sống trong .env — không bao giờ để rò ra stdout/journald.
+    Mật khẩu Redis chỉ được sống trong .env - không bao giờ để rò ra stdout/journald.
     """
     return re.sub(r"(://[^:/@]*:)[^@/]*@", r"\1***@", url)
 
@@ -139,7 +139,7 @@ def stream_logs_to_redis(csv_path: str):
             # Kiểm soát nghẽn: Kiểm tra kích thước hàng đợi trước khi xử lý chunk để tránh gọi Redis ở mỗi dòng
             wait_count = 0
             backpressure_threshold = int(MAX_QUEUE_SIZE * 0.9)
-            # Đo bằng LAG của consumer-group, KHÔNG bằng xlen: xreadgroup+xack không xoá
+            # Đo bằng LAG của consumer-group, không bằng xlen: xreadgroup+xack không xoá
             # entry nên xlen dính ~maxlen vĩnh viễn => vòng lặp này sẽ treo mãi dù
             # subscriber hoàn toàn khoẻ. Xem src/streaming/backpressure.py.
             while consumer_group_lag(r, (QUEUE_NAME,)) > backpressure_threshold:

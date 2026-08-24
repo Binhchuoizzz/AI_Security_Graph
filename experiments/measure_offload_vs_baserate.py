@@ -1,22 +1,22 @@
-"""SENTINEL — Tỉ lệ xả tải là HÀM của base-rate tấn công, không phải hằng số của hệ.
+"""SENTINEL - Tỉ lệ xả tải là hàm của base-rate tấn công, không phải hằng số của hệ.
 
-KHOẢNG TRỐNG ĐANG LẤP. `measure_latency_baseline.py` cho một con số xả tải duy nhất (74,0%) đo
-trên luồng benchmark có 26% tấn công. Câu hỏi hiển nhiên tiếp theo — *"lưu lượng doanh nghiệp thật
-chỉ vài phần trăm tấn công thì xả tải bao nhiêu?"* — trước đây chỉ trả lời được bằng phỏng đoán
+Khoảng trống đang lấp. `measure_latency_baseline.py` cho một con số xả tải duy nhất (74,0%) đo
+trên luồng benchmark có 26% tấn công. Câu hỏi hiển nhiên tiếp theo - *"lưu lượng doanh nghiệp thật
+chỉ vài phần trăm tấn công thì xả tải bao nhiêu?"* - trước đây chỉ trả lời được bằng phỏng đoán
 (">90%"), mà phỏng đoán thì không trích vào luận văn được.
 
-CÁCH LÀM. Xả tải không phải một số, nó là trung bình có trọng số của HAI số:
+Cách làm. Xả tải không phải một số, nó là trung bình có trọng số của hai số:
 
     xả_tải(p) = (1 − p) · xả_tải_trên_LÀNH  +  p · xả_tải_trên_TẤN_CÔNG
 
-`p` là tỉ lệ tấn công của luồng. Hai vế bên phải là tính chất CỦA HỆ, đo một lần là xong; `p` là
-tính chất CỦA MÔI TRƯỜNG. Tách ra rồi thì mọi tuyên bố về base-rate khác đều SUY RA ĐƯỢC từ số đo,
-không phải đoán — và cũng thấy ngay vì sao con số benchmark thấp: nó lấy `p = 0,26`.
+`p` là tỉ lệ tấn công của luồng. Hai vế bên phải là tính chất của hệ, đo một lần là xong; `p` là
+tính chất của môi trường. Tách ra rồi thì mọi tuyên bố về base-rate khác đều suy ra được từ số đo,
+không phải đoán - và cũng thấy ngay vì sao con số benchmark thấp: nó lấy `p = 0,26`.
 
-Đường đi mô phỏng ĐÚNG `subscriber.py`: Tier-1 tự xử (BLOCK/DROP/ALERT/HITL) là XONG; chỉ
+Đường đi mô phỏng đúng `subscriber.py`: Tier-1 tự xử (BLOCK/DROP/ALERT/HITL) là xong; chỉ
 `action == "ESCALATE"` mới tới Cổng ML; Cổng ML trả `None` mới thật sự tốn một lần gọi LLM.
 
-Thuần offline, KHÔNG cần LLM. Chạy:
+Thuần offline, không cần LLM. Chạy:
     .venv/bin/python experiments/measure_offload_vs_baserate.py
 """
 
@@ -39,15 +39,15 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "offload_vs_baserate.json")
 DEMO_JSON = os.path.join(ROOT, "data", "demo.json")
-N_WARMUP = 150  # số flow LÀNH đầu tiên chỉ dùng học baseline Welford, KHÔNG chấm
+N_WARMUP = 150  # số flow lành đầu tiên chỉ dùng học baseline Welford, không chấm
 
 # Base-rate để chiếu. 0,26 = luồng benchmark hiện tại (giữ để đối chiếu); các mốc còn lại lấy
-# theo dải thường gặp ở lưu lượng doanh nghiệp — nêu là KỊCH BẢN, không phải số đo môi trường.
+# theo dải thường gặp ở lưu lượng doanh nghiệp - nêu là kịch bản, không phải số đo môi trường.
 BASE_RATES = [0.26, 0.20, 0.15, 0.10, 0.05, 0.02, 0.01]
 
 
 def _engine() -> RuleEngine:
-    """Engine sạch: TẮT danh tiếng để tiền sử tích luỹ từ lượt trước không nhiễm vào phép đo."""
+    """Engine sạch: Tắt danh tiếng để tiền sử tích luỹ từ lượt trước không nhiễm vào phép đo."""
     e = RuleEngine()
     e.dynamic_ip_blocks = set()
     e.dynamic_behavioral_rules = []
@@ -56,11 +56,11 @@ def _engine() -> RuleEngine:
 
 
 def _nap_demo():
-    """`data/demo.json` — 99.867 sự kiện, ~9,7% tấn công: dạng luồng SOC THẬT (nền lành áp đảo).
+    """`data/demo.json` - 99.867 sự kiện, ~9,7% tấn công: dạng luồng SOC thật (nền lành áp đảo).
 
-    Mỗi dòng ĐÃ là log phẳng (không bọc trong khoá `log` như `build_stream`), kèm `expected_threat`
-    và `unified_source`. Lấy `N_WARMUP` flow LÀNH đầu tiên làm mồi Welford rồi loại khỏi phép chấm
-    — chấm trên chính tập đã học baseline là test-on-train.
+    Mỗi dòng đã là log phẳng (không bọc trong khoá `log` như `build_stream`), kèm `expected_threat`
+    và `unified_source`. Lấy `N_WARMUP` flow lành đầu tiên làm mồi Welford rồi loại khỏi phép chấm
+    - chấm trên chính tập đã học baseline là test-on-train.
     """
     with open(DEMO_JSON, encoding="utf-8") as f:
         rows = json.load(f)
@@ -95,7 +95,7 @@ def main():
     print(f"[*] {len(warmup)} warmup + {len(main_events)} sự kiện chấm")
     engine, gateway = _engine(), MLGateway()
 
-    for ev in warmup:  # chỉ để học baseline Welford — KHÔNG chấm
+    for ev in warmup:  # chỉ để học baseline Welford - không chấm
         engine.evaluate(ev["log"])
 
     # [lành, tấn công] × [chặn ở Tier-1, chặn ở Cổng ML, tới LLM]
@@ -163,7 +163,7 @@ def main():
     t1 = ket["lanh_tinh"]["chan_tier1"] + ket["tan_cong"]["chan_tier1"]
     mlg = ket["lanh_tinh"]["chan_cong_ml"] + ket["tan_cong"]["chan_cong_ml"]
     llm = ket["lanh_tinh"]["toi_llm"] + ket["tan_cong"]["toi_llm"]
-    # Số ĐẦU BẢNG — cái sẽ bị trích. Tính ở đây thay vì để người đọc tự cộng bốn ô trong
+    # Số đầu bảng - cái sẽ bị trích. Tính ở đây thay vì để người đọc tự cộng bốn ô trong
     # `theo_nhan`, vì mỗi lần cộng tay là một lần có thể cộng nhầm.
     out.update(
         {

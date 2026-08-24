@@ -1,6 +1,6 @@
 """
 Các component giao diện dùng lại cho Streamlit Dashboard.
-NÂNG CẤP PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
+Nâng cấp PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
 """
 
 import html as html_lib
@@ -15,13 +15,13 @@ import streamlit as st  # type: ignore
 from src.guardrails.constants import TIER_LLM, TIER_MANUAL, TIER_ML, TIER_RULE
 
 
-# ── Định dạng số theo quy ước tiếng Việt ────────────────────────────────────────
-# DẤU PHẨY là thập phân, DẤU CHẤM phân cách hàng nghìn — ngược hẳn mặc định của Python.
-# Định nghĩa MỘT LẦN ở đây (module hiển thị) rồi app.py nhập lại — một con số hiện hai
+# Định dạng số theo quy ước tiếng Việt
+# Dấu phẩy là thập phân, dấu chấm phân cách hàng nghìn - ngược hẳn mặc định của Python.
+# Định nghĩa một lần ở đây (module hiển thị) rồi app.py nhập lại - một con số hiện hai
 # kiểu trên cùng màn hình là lỗi người xem thấy ngay: hàng chỉ số từng in "99,717"
-# ngay trên bảng kết quả in "99.717" cho ĐÚNG một đại lượng.
+# ngay trên bảng kết quả in "99.717" cho đúng một đại lượng.
 def vn_num(value, nd: int = 0) -> str:
-    """Số nguyên/thực -> chuỗi kiểu Việt. `None` -> "—" (không bịa 0)."""
+    """Số nguyên/thực -> chuỗi kiểu Việt. `None` -> "-" (không bịa 0)."""
     if value is None:
         return "—"
     try:
@@ -43,15 +43,15 @@ def vn_pct(value, nd: int = 1, *, already_pct: bool = False) -> str:
     return f"{v:.{nd}f}".replace(".", ",") + "%"
 
 
-# Marker chuỗi để nhận diện phán quyết đến từ CỔNG ML Tier-1 (dùng CHUNG cho components.py
-# và app.py để phân loại nguồn NHẤT QUÁN — 1 nguồn chân lý, tránh drift giữa các nơi).
+# Marker chuỗi để nhận diện phán quyết đến từ Cổng ML Tier-1 (dùng chung cho components.py
+# và app.py để phân loại nguồn nhất quán - 1 nguồn chân lý, tránh drift giữa các nơi).
 # "Cổng ML" đã bao "Cổng ML Tier-1 (LightGBM)" (substring) nên không cần liệt kê riêng;
-# "ML Tier 2" / "Decision Tree" là nhãn LỊCH SỬ cho các bản ghi CŨ còn trong DB (phòng thủ).
+# "ML Tier 2" / "Decision Tree" là nhãn lịch sử cho các bản ghi cũ còn trong DB (phòng thủ).
 ML_GATE_MARKERS = ("Cổng ML", "ML Tier 2", "Decision Tree")
 
 
-# Khoá nhãn trong sidecar `data/*.labels.json`, xếp theo nguồn. Sidecar là ĐÁP ÁN — nó nằm
-# NGOÀI luồng, chưa bao giờ đi vào prompt; tra ở đây chỉ để analyst đối chiếu bằng mắt.
+# Khoá nhãn trong sidecar `data/*.labels.json`, xếp theo nguồn. Sidecar là đáp án - nó nằm
+# Ngoài luồng, chưa bao giờ đi vào prompt; tra ở đây chỉ để analyst đối chiếu bằng mắt.
 _GT_TECH_KEYS = ("wa_mitre", "zd_mitre", "adv_mitre", "apt_mitre_ttp")
 _GT_LABELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data")
 
@@ -60,7 +60,7 @@ _GT_LABELS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__
 def _load_ground_truth(_stamp: tuple) -> dict:
     """Gộp mọi `data/*.labels.json` thành một bảng tra gt_id -> nhãn.
 
-    `_stamp` là (đường dẫn, mtime) của từng tệp — đổi tệp thì cache tự hỏng. Gộp mọi
+    `_stamp` là (đường dẫn, mtime) của từng tệp - đổi tệp thì cache tự hỏng. Gộp mọi
     sidecar vì Dashboard không biết luồng nào đang chạy (demo.json hay demo_small.json).
     """
     merged: dict = {}
@@ -74,7 +74,7 @@ def _load_ground_truth(_stamp: tuple) -> dict:
 
 
 def get_ground_truth(gt_id: str) -> dict | None:
-    """Tra đáp án của MỘT sự kiện theo `gt_id`. Trả None nếu không có sidecar/không khớp."""
+    """Tra đáp án của một sự kiện theo `gt_id`. Trả None nếu không có sidecar/không khớp."""
     if not gt_id:
         return None
     try:
@@ -93,11 +93,11 @@ def get_ground_truth(gt_id: str) -> dict | None:
 
 
 def render_ground_truth(raw_log_str) -> None:
-    """In ĐÁP ÁN của bộ dữ liệu ngay cạnh log thô, để đối chiếu bằng mắt.
+    """In đáp án của bộ dữ liệu ngay cạnh log thô, để đối chiếu bằng mắt.
 
-    Log thô đã bị LOẠI mọi khoá nhãn trước khi vào Tier-1 (chống lộ nhãn) — chỉ `gt_id`
+    Log thô đã bị loại mọi khoá nhãn trước khi vào Tier-1 (chống lộ nhãn) - chỉ `gt_id`
     được giữ, và nó là mã băm vô nghĩa với mô hình. Đáp án nằm ở sidecar tách rời, đọc
-    tại đây và CHỈ tại đây. Không có sidecar thì im lặng, không bịa.
+    tại đây và chỉ tại đây. Không có sidecar thì im lặng, không bịa.
     """
     if not raw_log_str:
         return
@@ -167,7 +167,7 @@ def is_valid_ip(ip_str: str) -> bool:
 def _derive_tier1_attack_type(reasons: list[str]) -> str:
     """Suy ra nhãn 'kiểu tấn công' ngắn gọn từ danh sách lý do Tier-1 (chữ ký/thống kê).
 
-    Dùng cho thẻ Whitelist: IP whitelist vẫn được phân tích nên phải nêu được nó ĐANG
+    Dùng cho thẻ Whitelist: IP whitelist vẫn được phân tích nên phải nêu được nó đang
     làm kỹ thuật gì, dù không bị chặn. Trả nhãn tổng hợp (nối bằng ' + ').
     """
     labels: list[str] = []
@@ -198,14 +198,14 @@ def _derive_tier1_attack_type(reasons: list[str]) -> str:
     return " + ".join(labels)
 
 
-# ── Bộ dựng badge DÙNG CHUNG ───────────────────────────────────────────────────────
-# VÌ SAO PHẢI GOM MỘT CHỖ. Cùng logic này trước đây có BA bản chép tay: thẻ cảnh báo
+# Bộ dựng badge dùng chung
+# Vì sao phải gom một chỗ. Cùng logic này trước đây có ba bản chép tay: thẻ cảnh báo
 # (`render_alert_card`), cụm HITL trong `app.py`, và thẻ chặn Tier-1. Ba bản trôi dạt khác
-# nhau, và mỗi lần sửa một giá trị bịa lại phải đi tìm đủ ba nơi — thực tế đã có bốn giá trị
+# nhau, và mỗi lần sửa một giá trị bịa lại phải đi tìm đủ ba nơi - thực tế đã có bốn giá trị
 # bịa phải sửa hai lần ở hai tệp. Một nguồn chân lý thì không tái diễn được.
 #
-# NGUYÊN TẮC CHUNG cho mọi hàm dưới đây: **không có dữ liệu thì nói là không có**, tuyệt đối
-# không điền giá trị mặc định trông-như-thật (điểm 100.0, đủ 5 mã, TTFT 0.3s…).
+# Nguyên tắc chung cho mọi hàm dưới đây: không có dữ liệu thì nói là không có, tuyệt đối
+# không điền giá trị mặc định trông-như-thật (điểm 100.0, đủ 5 mã, TTFT 0.3s...).
 
 _BADGE_RED = "background:rgba(255,77,79,0.15);color:#ff7875;border:1px solid rgba(255,77,79,0.35);"
 _BADGE_CYAN = (
@@ -230,12 +230,12 @@ _GUARDRAIL_BOX = (
 )
 
 # Bắt cả mã ATT&CK Enterprise (T1190, T1059.007) lẫn mã ATLAS (AML.T0051). `_TECHNIQUE_ID_RE`
-# ở tầng agent CỐ Ý không bắt AML.* — ở đây thì phải bắt, vì màn hình cần hiện cả hai họ.
+# ở tầng agent cố Ý không bắt AML.* - ở đây thì phải bắt, vì màn hình cần hiện cả hai họ.
 _TECH_CODE_RE = re.compile(r"\b(AML\.T\d{4}|T\d{4}(?:\.\d{3})?)\b", re.IGNORECASE)
 
 
 def parse_mitre_technique(raw_reason: str) -> str:
-    """Bóc mã kỹ thuật từ chuỗi reason. Trả `"N/A"` khi không có — KHÔNG đoán thay."""
+    """Bóc mã kỹ thuật từ chuỗi reason. Trả `"N/A"` khi không có - không đoán thay."""
     # `[MITRE: ...]` có thể chứa ngoặc vuông lồng nhau (ví dụ "[Tự suy luận]"), nên regex
     # phải cho phép một cấp lồng thay vì dùng `[^\]]*` tham lam.
     m = re.search(r"\[MITRE:\s*((?:[^\[\]]|\[[^\[\]]*\])*)\]", raw_reason, re.IGNORECASE)
@@ -246,8 +246,8 @@ def parse_mitre_technique(raw_reason: str) -> str:
     return "N/A"
 
 
-# Dấu hiệu LÁ CHẮN NEO ĐÃ NỔ. Chuỗi này do `src/agent/nodes.py` đóng vào `reasoning`, và nó
-# CHỈ được sinh ở nhánh lá chắn TỪ CHỐI kỹ thuật (hai chỗ: log cảnh báo và tiền tố reasoning).
+# Dấu hiệu lá chắn neo đã nổ. Chuỗi này do `src/agent/nodes.py` đóng vào `reasoning`, và nó
+# chỉ được sinh ở nhánh lá chắn từ chối kỹ thuật (hai chỗ: log cảnh báo và tiền tố reasoning).
 # Không có chỗ nào trong hệ sinh chuỗi này với nghĩa "đã neo được".
 _SHIELD_MARK = "NEO BẰNG CHỨNG"
 
@@ -257,30 +257,30 @@ def build_grounding_badge(
 ) -> tuple[str, bool]:
     """Thẻ neo-bằng-chứng. Trả `(html, is_grounded)` để bên gọi dùng lại cờ.
 
-    ĐẢO DẤU ĐÃ VÁ (2026-08-17). Bản trước viết:
+    Đảo dấu đã vá (2026-08-17). Bản trước viết:
 
-        is_grounded = "NEO BẰNG CHỨNG" in raw_reason or (has_tech and ...)
+        is_grounded = "neo bằng chứng" in raw_reason or (has_tech and ...)
 
-    tức coi sự CÓ MẶT của dấu hiệu lá chắn là bằng chứng ĐÃ NEO ĐƯỢC — trong khi dấu hiệu
-    đó chỉ xuất hiện đúng lúc lá chắn **TỪ CHỐI** kỹ thuật vì nó KHÔNG có trong tài liệu đã
+    tức coi sự có mặt của dấu hiệu lá chắn là bằng chứng đã neo được - trong khi dấu hiệu
+    đó chỉ xuất hiện đúng lúc lá chắn từ chối kỹ thuật vì nó không có trong tài liệu đã
     truy xuất. Hậu quả nhìn thấy trên Dashboard: một thẻ vừa in `MITRE: N/A`, vừa in dòng
-    "[NEO BẰNG CHỨNG: kỹ thuật T1684 … KHÔNG nằm trong tài liệu đã truy xuất]", lại vừa gắn
-    badge xanh `✅ GROUNDED IN RAG`. Ba mảnh trên cùng một thẻ nói ba điều khác nhau, và
+    "[neo bằng chứng: kỹ thuật T1684 ... Không nằm trong tài liệu đã truy xuất]", lại vừa gắn
+    badge xanh `✅ GROUNDED in RAG`. Ba mảnh trên cùng một thẻ nói ba điều khác nhau, và
     badge là mảnh nói sai.
 
     Cùng họ lỗi với `evaluate_feedback_loop` từng đếm `BLOCK_IP` là *leo thang*: đọc đúng
     tín hiệu, gán ngược ý nghĩa.
 
-    BA TRẠNG THÁI, không phải hai — vì "lá chắn đã chặn" KHÁC "không có gì để quy kết":
+    Ba trạng thái, không phải hai - vì "lá chắn đã chặn" khác "không có gì để quy kết":
       * đã neo        : có kỹ thuật, lá chắn không nổ           -> xanh
       * lá chắn chặn  : model có đề xuất, lá chắn bác bỏ        -> hổ phách, đây là an toàn
-                        CHẠY ĐÚNG, không phải hỏng hóc
+                        Chạy đúng, không phải hỏng hóc
       * không quy kết : không có kỹ thuật nào và lá chắn im     -> hổ phách nhạt
     """
-    # LÁ CHẮN NEO CHỈ TỒN TẠI Ở TIER-2. Luật Tier-1 và Cổng ML không truy xuất RAG và
-    # không bao giờ phát mã kỹ thuật, nên với chúng KHÔNG có gì để neo. Bản trước vẫn dán
-    # "🛡️ DEGRADED SAFEGUARD (N/A)" lên mọi thẻ Tier-1/Cổng ML — đọc như một cơ chế an toàn
-    # đang HỎNG, trên đúng những thẻ mà cơ chế đó chưa từng tham gia. Không áp thì không nói.
+    # Lá chắn neo chỉ tồn tại Ở TIER-2. Luật Tier-1 và Cổng ML không truy xuất RAG và
+    # không bao giờ phát mã kỹ thuật, nên với chúng không có gì để neo. Bản trước vẫn dán
+    # "🛡️ DEGRADED SAFEGUARD (N/A)" lên mọi thẻ Tier-1/Cổng ML - đọc như một cơ chế an toàn
+    # đang hỏng, trên đúng những thẻ mà cơ chế đó chưa từng tham gia. Không áp thì không nói.
     if not from_llm:
         return "", False
 
@@ -304,11 +304,11 @@ def build_grounding_badge(
 def build_origin_badge(raw_reason: str, *, from_llm: bool = True) -> str:
     """Nguồn phán quyết: bộ đệm ngữ nghĩa hay suy luận thật trên GPU.
 
-    KHÔNG kèm số thời gian. Thẻ này chỉ phân biệt NGUỒN, nó không đo gì cả — bản cũ ghi
+    Không kèm số thời gian. Thẻ này chỉ phân biệt nguồn, nó không đo gì cả - bản cũ ghi
     "(TTFT 0.3s)" cho mọi lô, một con số không đến từ phép đo nào.
     """
     # Chỉ Tier-2 mới có "nguồn phán quyết" để phân biệt. Luật Tier-1 chạy trên CPU, Cổng ML
-    # là LightGBM cũng trên CPU — dán "🧠 Live GPU" lên thẻ của chúng là một tuyên bố SAI,
+    # là LightGBM cũng trên CPU - dán "🧠 Live GPU" lên thẻ của chúng là một tuyên bố sai,
     # và sai đúng vào chỗ nhạy nhất: nó ngụ ý mọi sự kiện đều tốn một lượt suy luận GPU,
     # phủ định thẳng luận điểm trung tâm "phần lớn lưu lượng không chạm tới LLM".
     if not from_llm:
@@ -321,18 +321,18 @@ def build_origin_badge(raw_reason: str, *, from_llm: bool = True) -> str:
 
 
 def build_threat_memory_badge(raw_reason: str, reputation: dict | None = None) -> str:
-    """Lịch sử uy tín IP — ƯU TIÊN bản ghi THẬT trong kho, chỉ đọc câu văn khi không có.
+    """Lịch sử uy tín IP - ưu tiên bản ghi thật trong kho, chỉ đọc câu văn khi không có.
 
     `reputation`: hàng `ip_reputation` lấy từ `ThreatMemoryStore.get_ip_reputation(ip)`.
 
-    VÌ SAO PHẢI TRUYỀN VÀO. Bản cũ CHỈ regex trên `raw_reason`, mà chuỗi "reputation score
-    of X/100" chỉ có mặt khi prompt đã nhét ngữ cảnh Threat Memory vào — tức khi IP ĐÃ có
+    Vì sao phải truyền vào. Bản cũ chỉ regex trên `raw_reason`, mà chuỗi "reputation score
+    of X/100" chỉ có mặt khi prompt đã nhét ngữ cảnh Threat Memory vào - tức khi IP đã có
     tiền sử lúc gọi LLM. Với IP lần đầu bị chặn, câu văn không có số, nên badge in "chưa có
-    dữ liệu uy tín" TRONG KHI kho đã ghi `reputation_score = 100`. Đo thật trên
+    dữ liệu uy tín" trong khi kho đã ghi `reputation_score = 100`. Đo thật trên
     `203.0.113.159`: kho có `total_blocks=2, reputation_score=100.0`, màn hình vẫn nói chưa
     có gì. Cùng một bệnh với việc phân tab bằng cách dò chuỗi.
 
-    CHỈ hiện phần biết chắc. Bản cũ hơn nữa còn mặc định `reputation = "100.0"` khi không
+    Chỉ hiện phần biết chắc. Bản cũ hơn nữa còn mặc định `reputation = "100.0"` khi không
     parse được, nên IP sạch cũng hiện Risk 100/100.
     """
     if isinstance(reputation, dict) and reputation:
@@ -340,8 +340,8 @@ def build_threat_memory_badge(raw_reason: str, reputation: dict | None = None) -
         alr = int(reputation.get("total_alerts") or 0)
         hits = int(reputation.get("blocked_hits") or 0)
         rep_v = reputation.get("reputation_score")
-        # `blocked_hits` = gói đến từ IP ĐÃ bị chặn (chặn tại chỗ). Tách hẳn khỏi số LẦN CHẶN
-        # vì chính sách là "2 ALERT -> 1 BLOCK, chặn rồi thì thôi" — gộp hai thứ vào một cột
+        # `blocked_hits` = gói đến từ IP đã bị chặn (chặn tại chỗ). Tách hẳn khỏi số lần chặn
+        # vì chính sách là "2 ALERT -> 1 BLOCK, chặn rồi thì thôi" - gộp hai thứ vào một cột
         # từng làm một IP hiện "24 lần chặn" trong khi sổ kiểm toán có 0 lệnh chặn cho nó.
         phan = []
         if blk:
@@ -384,16 +384,16 @@ def build_threat_memory_badge(raw_reason: str, reputation: dict | None = None) -
 
 
 def build_technique_codes_html(raw_reason: str) -> str:
-    """Các mã kỹ thuật NÊU TRONG phán quyết. Không có mã nào thì trả `""` (ẩn hẳn khối).
+    """Các mã kỹ thuật nêu trong phán quyết. Không có mã nào thì trả `""` (ẩn hẳn khối).
 
     Bản cũ độn `["T1190","T1595.003","T1059.007","T1083","T1046"]` cho đủ 5 rồi dán nhãn
-    "Top-5 Ứng viên RAG Truy xuất (FAISS + BM25)" — tức gán cho bộ truy xuất những mã nó chưa
+    "Top-5 Ứng viên RAG Truy xuất (FAISS + BM25)" - tức gán cho bộ truy xuất những mã nó chưa
     từng trả về. Nhãn nay nói đúng thứ đang hiện: mã đọc được từ chuỗi phán quyết.
 
-    VÁ 2026-08-17 — KHI LÁ CHẮN NEO ĐÃ NỔ, ĐÂY LÀ MÃ BỊ BÁC BỎ, KHÔNG PHẢI PHÁT HIỆN.
-    Cùng một thẻ cảnh báo từng hiện: `MITRE: N/A` ở trên, dòng "[NEO BẰNG CHỨNG: kỹ thuật
-    T1684 … KHÔNG nằm trong tài liệu]" ở giữa, rồi `🔍 Mã kỹ thuật nêu trong phán quyết (2):
-    T1684 · T1036.012` ở dưới — in bằng cùng màu xanh thông tin như mọi phát hiện hợp lệ.
+    Vá 2026-08-17 - khi lá chắn neo đã nổ, đây là mã bị bác bỏ, không phải phát hiện.
+    Cùng một thẻ cảnh báo từng hiện: `MITRE: N/A` ở trên, dòng "[neo bằng chứng: kỹ thuật
+    T1684 ... Không nằm trong tài liệu]" ở giữa, rồi `🔍 Mã kỹ thuật nêu trong phán quyết (2):
+    T1684 · T1036.012` ở dưới - in bằng cùng màu xanh thông tin như mọi phát hiện hợp lệ.
     Analyst đọc lướt sẽ ghi T1684 vào hồ sơ sự cố, đúng cái mã mà hệ vừa từ chối khẳng định.
     """
     seen: list[str] = []
@@ -431,20 +431,20 @@ _OVERRIDE_RE = re.compile(r"\[CHÍNH SÁCH:\s*model đề nghị\s+(\w+)\s*->\s*
 
 
 def build_policy_override_note(raw_reason: str) -> str:
-    """Khối nói rõ CHÍNH SÁCH ĐÃ GHI ĐÈ model. Rỗng khi hai hành động trùng nhau.
+    """Khối nói rõ chính sách đã ghi đè model. Rỗng khi hai hành động trùng nhau.
 
-    VÌ SAO CẦN. Phần biện giải của model hay kết bằng "Therefore, the action is BLOCK_IP",
+    Vì sao cần. Phần biện giải của model hay kết bằng "Therefore, the action is BLOCK_IP",
     trong khi tiêu đề thẻ ghi `[HIGH] ALERT`. Không có khối này thì thẻ tự mâu thuẫn ngay
-    trước mắt người đọc, và cách hiểu tự nhiên nhất là "màn hình hiển thị sai" — trong khi
-    sự thật là hệ ĐÃ CỐ Ý hạ cấp, và đó chính là cơ chế an toàn đáng khoe nhất.
+    trước mắt người đọc, và cách hiểu tự nhiên nhất là "màn hình hiển thị sai" - trong khi
+    sự thật là hệ đã cố Ý hạ cấp, và đó chính là cơ chế an toàn đáng khoe nhất.
 
-    Nhãn `[CHÍNH SÁCH: …]` do `src/agent/nodes.py::_policy_override_tag` ghi vào `reason`
-    từ trường `_policy_action_before` — tức đọc DỮ LIỆU đã lưu, không suy từ câu chữ model.
+    Nhãn `[chính sách: ...]` do `src/agent/nodes.py::_policy_override_tag` ghi vào `reason`
+    từ trường `_policy_action_before` - tức đọc dữ liệu đã lưu, không suy từ câu chữ model.
     """
     m = _OVERRIDE_RE.search(raw_reason or "")
     if not m:
         return ""
-    # Hai giá trị này đến từ `reason` — chuỗi mà LLM đã góp phần sinh ra, nên vẫn phải thoát
+    # Hai giá trị này đến từ `reason` - chuỗi mà LLM đã góp phần sinh ra, nên vẫn phải thoát
     # và đặt tên `safe_` đúng quy ước của tệp (xem `test_ma_mitre_khong_duoc_nhung_tho_vao_html`).
     safe_want = html_lib.escape(m.group(1))
     safe_got = html_lib.escape(m.group(2))
@@ -459,11 +459,11 @@ def build_policy_override_note(raw_reason: str) -> str:
 def build_guardrail_note(
     is_grounded: bool, mitre_tech: str, action: str, raw_reason: str = ""
 ) -> str:
-    """Ghi chú chính sách Guardrail — chỉ hiện cho ca bị ép hạ xuống `AWAIT_HITL`.
+    """Ghi chú chính sách Guardrail - chỉ hiện cho ca bị ép hạ xuống `AWAIT_HITL`.
 
     `raw_reason` để phân biệt "lá chắn đã bác một đề xuất cụ thể" với "không có gì để quy
     kết". Bản trước gộp hai ca đó vào cùng một câu "Không chắc kỹ thuật MITRE cụ thể", nên
-    analyst không đọc ra được rằng model ĐÃ đề xuất một mã và hệ đã chủ động bác nó.
+    analyst không đọc ra được rằng model đã đề xuất một mã và hệ đã chủ động bác nó.
     """
     if action.upper() != "AWAIT_HITL":
         return ""
@@ -489,13 +489,13 @@ def build_guardrail_note(
 
 
 def build_tier1_block_badge(count: int, tier1_score) -> str:
-    """Thẻ cho bảng "Chặn tức thời Tier-1" — nguồn là `config/tier1_blocks.json`.
+    """Thẻ cho bảng "Chặn tức thời Tier-1" - nguồn là `config/tier1_blocks.json`.
 
-    KHÔNG dùng `build_threat_memory_badge` ở đây: hai nguồn dữ liệu khác nhau.
+    Không dùng `build_threat_memory_badge` ở đây: hai nguồn dữ liệu khác nhau.
     - Threat Memory = kho uy tín SQLite, thang 0–100 (ngưỡng chặn 70).
-    - `tier1_score` = bộ CỘNG DỒN của rule engine, KHÔNG chặn trên (+50/+40/+30/+100/+z…).
+    - `tier1_score` = bộ cộng dồn của rule engine, không chặn trên (+50/+40/+30/+100/+z...).
 
-    Bản cũ in `Risk: {tier1_score}/100` nên hai luật cùng khớp là ra "Risk: 150/100" — một
+    Bản cũ in `Risk: {tier1_score}/100` nên hai luật cùng khớp là ra "Risk: 150/100" - một
     phần trăm bất khả thi; và in `{count} sự cố ({count} Block)`, tức cùng một biến hiện hai
     lần như thể hai con số độc lập xác nhận nhau.
     """
@@ -602,7 +602,7 @@ def render_alert_card(
     """Hiển thị một cảnh báo bảo mật từ audit_trail với giao diện SOC Premium.
 
     `reputation`: hàng `ip_reputation` của IP đích (nếu nơi gọi tra sẵn được). Truyền vào thì
-    badge Threat Memory đọc SỐ THẬT trong kho thay vì regex trên câu văn — xem
+    badge Threat Memory đọc số thật trong kho thay vì regex trên câu văn - xem
     `build_threat_memory_badge`.
     """
     timestamp = alert.get("timestamp", "")
@@ -616,13 +616,13 @@ def render_alert_card(
     target = html_lib.escape(str(alert.get("target", "N/A")))
     raw_reason = str(alert.get("reason", "N/A"))
 
-    # ── Thẻ RIÊNG cho truy cập được WHITELIST cho qua ──────────────────────────
-    # IP whitelist VẪN được Tier-1 phân tích đầy đủ (kiểu tấn công + suy luận) để
-    # analyst QUAN SÁT — hiển thị bằng thẻ XANH "cho qua". Khác thẻ tấn công ở chỗ:
-    # đã đặc cách nên KHÔNG bị chặn / không escalate LLM / không HITL. Nhờ vậy lần
+    # Thẻ riêng cho truy cập được WHITELIST cho qua
+    # IP whitelist vẫn được Tier-1 phân tích đầy đủ (kiểu tấn công + suy luận) để
+    # analyst quan sát - hiển thị bằng thẻ xanh "cho qua". Khác thẻ tấn công ở chỗ:
+    # đã đặc cách nên không bị chặn / không escalate LLM / không HITL. Nhờ vậy lần
     # chạy thứ 2 vẫn thấy được hành vi của IP whitelist thay vì bị nuốt lặng.
     if action == "WHITELIST":
-        # Lấy phân tích Tier-1 từ raw_log (tier1_reasons/score) — nguồn "kiểu tấn công + suy luận".
+        # Lấy phân tích Tier-1 từ raw_log (tier1_reasons/score) - nguồn "kiểu tấn công + suy luận".
         _wl_raw = alert.get("raw_log") if isinstance(alert, dict) else None
         _wl_reasons: list[str] = []
         _wl_score = None
@@ -703,7 +703,7 @@ def render_alert_card(
                 confidence = vn_pct(float(val_str.rstrip("%")), 2, already_pct=True)
             else:
                 val = float(val_str)
-                # 2 chữ số thập phân, ĐỒNG NHẤT với Cổng ML và với chuỗi reason mới
+                # 2 chữ số thập phân, đồng nhất với Cổng ML và với chuỗi reason mới
                 # (đã ghi sẵn dạng "40.00%"). Trước đây làm tròn về số nguyên nên bản
                 # ghi cũ/định dạng float hiển thị "95%" còn bản ghi mới "95.00%".
                 confidence = vn_pct(val, 2)
@@ -762,10 +762,10 @@ def render_alert_card(
         clean_reason = clean_reason[1:].strip()
 
     clean_reason = clean_reason.replace("\n", "<br>")
-    # CHỈ chuẩn hoá đúng cụm "Độ tin cậy: <số>%" cho khớp huy hiệu ngay phía trên (Cổng ML
-    # ghi vào sổ theo kiểu Anh "99.90%"). Cố ý KHÔNG đổi dấu thập phân toàn đoạn: phần biện
-    # giải của model có "Protocol=6", "Duration=46", "Z-Score > 3.5" — đổi đại trà là hỏng số.
-    # Đây là chuẩn hoá HIỂN THỊ; bản ghi trong audit_trail giữ nguyên, chuỗi HMAC không đổi.
+    # Chỉ chuẩn hoá đúng cụm "Độ tin cậy: <số>%" cho khớp huy hiệu ngay phía trên (Cổng ML
+    # ghi vào sổ theo kiểu Anh "99.90%"). Cố ý không đổi dấu thập phân toàn đoạn: phần biện
+    # giải của model có "Protocol=6", "Duration=46", "Z-Score > 3.5" - đổi đại trà là hỏng số.
+    # Đây là chuẩn hoá hiển thị; bản ghi trong audit_trail giữ nguyên, chuỗi HMAC không đổi.
     clean_reason = re.sub(
         r"(Độ tin cậy:\s*)(\d+)\.(\d+)(%)",
         lambda m: f"{m.group(1)}{m.group(2)},{m.group(3)}{m.group(4)}",
@@ -773,10 +773,10 @@ def render_alert_card(
     )
 
     reason_text = raw_reason
-    # NGUỒN CHÂN LÝ là cột `tier` do chính tầng ra quyết định ghi vào audit_trail. Dò chuỗi
-    # chỉ dùng cho bản ghi có TRƯỚC khi thêm cột. Huy hiệu trên thẻ là thứ analyst nhìn đầu
+    # Nguồn chân lý là cột `tier` do chính tầng ra quyết định ghi vào audit_trail. Dò chuỗi
+    # chỉ dùng cho bản ghi có trước khi thêm cột. Huy hiệu trên thẻ là thứ analyst nhìn đầu
     # tiên; để nó suy từ văn xuôi thì một sự cố Tier-2 có cụm "Tier-1" trong lý do sẽ đeo
-    # nhầm huy hiệu Tier-1 — ngay cạnh cái tab đã phân loại nó đúng.
+    # nhầm huy hiệu Tier-1 - ngay cạnh cái tab đã phân loại nó đúng.
     _tier_col = str(alert.get("tier") or "") if isinstance(alert, dict) else ""
     if _tier_col:
         is_manual = _tier_col == TIER_MANUAL
@@ -817,7 +817,7 @@ def render_alert_card(
             'border-radius:4px;margin-left:8px;">🟢 Tier-1 Filter</span>'
         )
         reasoning_title = "⚡ Tier-1 Rule/Filter Reasoning:"
-        # Tier-1 KHÔNG quy kết kỹ thuật — nói thẳng thế, đừng dựng một dòng nghe như
+        # Tier-1 không quy kết kỹ thuật - nói thẳng thế, đừng dựng một dòng nghe như
         # đã có ánh xạ. Bản cũ in "Mapping: Initial analysis from raw log telemetry".
         mitre_section_text = (
             "🎯 Quy kết MITRE ATT&CK: <code>N/A</code> — Tier-1 chấm điểm theo luật và "
@@ -830,8 +830,8 @@ def render_alert_card(
             'border-radius:4px;margin-left:8px;">⚡ Tier-1 · ML Gate</span>'
         )
         reasoning_title = "⚡ Tier-1 ML Gate Reasoning (LightGBM):"
-        # KHÔNG điền mã thay khi hệ trả N/A. Trước đây chỗ này in sẵn "T1190 - Exploit
-        # Public-Facing Application" cho MỌI ca không quy kết được — tức màn hình công bố
+        # Không điền mã thay khi hệ trả N/A. Trước đây chỗ này in sẵn "T1190 - Exploit
+        # Public-Facing Application" cho mọi ca không quy kết được - tức màn hình công bố
         # một kỹ thuật mà hệ chưa hề kết luận. N/A là kết quả thật, phải hiện đúng N/A.
         mitre_section_text = f"🎯 MITRE ATT&CK Mapping: <code>{mitre_tech}</code>"
         if mitre_tech == "N/A":
@@ -851,28 +851,28 @@ def render_alert_card(
                 "🎯 MITRE ATT&CK Mapping: <code>N/A</code> — chưa quy kết được kỹ thuật"
             )
 
-    # ── KHUYẾN NGHỊ PHẢN HỒI — LÀ CHÍNH SÁCH CỦA HỆ, KHÔNG PHẢI TRÍCH DẪN ────────────
+    # khuyến nghị phản hồi - là chính sách của hệ, không phải trích dẫn
     #
-    # LỖI ĐÃ SỬA 17/08/2026 — TRÍCH DẪN BỊA. Bốn dòng này từng in
-    #     "NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment…"
+    # Lỗi đã sửa 17/08/2026 - trích dẫn bịa. Bốn dòng này từng in
+    #     "NIST Incident Response Playbook (Section 3.2.1): Execute emergency containment..."
     # và sai ở ba tầng cùng lúc:
     #
-    #   1. Chuỗi được chọn THUẦN theo `severity_level` — một bảng tra cứng, không có một
+    #   1. Chuỗi được chọn thuần theo `severity_level` - một bảng tra cứng, không có một
     #      lượt truy xuất nào. Nhưng nó nằm ngay dưới khối quy kết, in màu như tri thức
     #      lấy từ kho, nên đọc như thể đã tra tài liệu.
     #   2. Kho NIST của chính dự án (`knowledge_base/nist_800_61r2.json`) gồm 13 playbook
-    #      khoá `NIST.IR.*` — KHÔNG có mục nào đánh số "3.2.x". Số mục đó không tồn tại
+    #      khoá `NIST.IR.*` - không có mục nào đánh số "3.2.x". Số mục đó không tồn tại
     #      trong nguồn mà hệ thống thật sự đọc.
-    #   3. Đối chiếu bản gốc SP 800-61r2 thì số mục còn SAI: §3.2 là "Detection and
+    #   3. Đối chiếu bản gốc SP 800-61r2 thì số mục còn sai: §3.2 là "Detection and
     #      Analysis" (3.2.1 Attack Vectors · 3.2.2 Signs of an Incident · 3.2.3 Sources of
     #      Precursors and Indicators). Ngăn chặn nằm ở §3.3.1 "Choosing a Containment
     #      Strategy". Thẻ ghi "Section 3.2.1: Execute emergency containment" là gán hành
     #      động ngăn chặn cho mục nói về véc-tơ tấn công.
     #
-    # Cùng họ lỗi "đúng ID sai tên" mà `verify_technique_label` đã chặn cho MITRE — chỉ
-    # khác là ở đây trích dẫn được BỊA hẳn. Một hội đồng thuộc SP 800-61r2 bắt được ngay.
+    # Cùng họ lỗi "đúng ID sai tên" mà `verify_technique_label` đã chặn cho MITRE - chỉ
+    # khác là ở đây trích dẫn được bịa hẳn. Một hội đồng thuộc SP 800-61r2 bắt được ngay.
     #
-    # Nay gọi đúng tên: đây là bảng ánh xạ mức nghiêm trọng -> hành động của HỆ. Muốn trích
+    # Nay gọi đúng tên: đây là bảng ánh xạ mức nghiêm trọng -> hành động của hệ. Muốn trích
     # dẫn thật thì phải hiển thị playbook mà bộ truy xuất trả về cho chính lô này.
     nist_playbook_text = (
         "🛡️ Khuyến nghị phản hồi (chính sách hệ thống): ghi nhận sự kiện và tiếp tục "
@@ -894,7 +894,7 @@ def render_alert_card(
             "trước khi kích hoạt luật chặn tự động."
         )
 
-    # ── Badge: dùng bộ dựng CHUNG (xem đầu tệp) để thẻ này, cụm HITL trong app.py và
+    # Badge: dùng bộ dựng chung (xem đầu tệp) để thẻ này, cụm HITL trong app.py và
     # thẻ chặn Tier-1 không còn trôi dạt khỏi nhau.
     grounding_badge, is_grounded = build_grounding_badge(raw_reason, mitre_tech, from_llm=is_llm)
     origin_badge = build_origin_badge(raw_reason, from_llm=is_llm)
@@ -903,7 +903,7 @@ def render_alert_card(
     rag_candidates_html = build_technique_codes_html(raw_reason)
     guardrail_note_html = build_guardrail_note(is_grounded, mitre_tech, action, raw_reason)
 
-    # Render HTML Card
+    # Dựng thẻ HTML
     html_content = (
         f'<div class="soc-card {css_class}">'
         f'    <div class="soc-card-header">'
@@ -926,8 +926,8 @@ def render_alert_card(
         f"    </div>"
         f'    <div class="soc-reasoning-box">'
         f'        <div class="soc-reasoning-title">{reasoning_title}</div>'
-        # Đặt TRƯỚC đoạn biện giải: người đọc phải biết "đây là lời model, không phải hành
-        # động của hệ" TRƯỚC khi đọc câu "the action is BLOCK_IP" ở cuối đoạn.
+        # Đặt trước đoạn biện giải: người đọc phải biết "đây là lời model, không phải hành
+        # động của hệ" trước khi đọc câu "the action is BLOCK_IP" ở cuối đoạn.
         f"        {override_note_html}"
         f'        <div style="margin-bottom: 8px;">{clean_reason}</div>'
         f'        <div class="soc-reasoning-section" style="color: #D3ADF7;">{mitre_section_text}</div>'
@@ -996,16 +996,16 @@ def render_alert_card(
                         help="💡 Yêu cầu vai trò L3 Manager để Block IP này.",
                     )
 
-    # LOG THÔ ĐẦU VÀO (đặc trưng luồng đã loại nhãn) — chính là dữ liệu đã đưa vào
-    # Tier-1/LLM, KHÔNG phải bản ghi quyết định. Minh bạch "cái gì đã vào hệ thống".
+    # LOG thô đầu vào (đặc trưng luồng đã loại nhãn) - chính là dữ liệu đã đưa vào
+    # Tier-1/LLM, không phải bản ghi quyết định. Minh bạch "cái gì đã vào hệ thống".
 
     # Tạo tiêu đề động cho Expander chứa Log thô
     mitre_display_title = mitre_tech if mitre_tech != "N/A" else "Không xác định"
     expander_title = f"🔍 Xem LOG THÔ ĐẦY ĐỦ (Minh chứng cho {mitre_display_title})"
 
     with st.expander(expander_title, expanded=False):
-        # Mô tả cũ ("log đặc trưng tiêu biểu … chỉ lưu log đại diện để tiết kiệm DB") là SAI:
-        # audit_trail lưu TRỌN bản ghi đã đưa vào Tier-1 (đo thật: 106 trường, gồm đủ đặc
+        # Mô tả cũ ("log đặc trưng tiêu biểu ... chỉ lưu log đại diện để tiết kiệm DB") là sai:
+        # audit_trail lưu trọn bản ghi đã đưa vào Tier-1 (đo thật: 106 trường, gồm đủ đặc
         # trưng luồng CICIDS + tier1_reasons + tier1_score). Nói đúng để còn audit tận gốc.
         st.caption(
             f"ℹ️ **Toàn bộ log thô** đã được đưa vào Tier-1 cho IP {cleaned_target} — đúng thứ "
@@ -1049,24 +1049,24 @@ def render_metrics_header(
 ):
     """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
 
-    CHỈ MỘT chỉ số phần trăm: xả tải LLM = 1 − (`escalated_to_llm` / log thô).
+    Chỉ một chỉ số phần trăm: xả tải LLM = 1 − (`escalated_to_llm` / log thô).
 
-    Tham số `noise_reduction` cũ đã BỎ. Nó là đại lượng khác — (log thô − cảnh báo gửi
-    analyst) / log thô — và luôn cao hơn ~11 điểm vì một lô nhiều log gộp thành 1 cảnh báo.
+    Tham số `noise_reduction` cũ đã bỏ. Nó là đại lượng khác - (log thô − cảnh báo gửi
+    analyst) / log thô - và luôn cao hơn ~11 điểm vì một lô nhiều log gộp thành 1 cảnh báo.
     Hai phần trăm đứng cạnh nhau chỉ khiến người đọc trích nhầm số nào cũng thấy "đúng".
 
     offload_counts: dict `offload_counts` nguyên văn từ `config/pipeline_stats.json`.
     """
-    # ---- Phễu: MỘT nguồn duy nhất, KHÔNG trần -------------------------------------------
-    # LỖI ĐÃ SỬA (đo trên lượt chạy 10k): phễu cũ ghép ba nguồn có cửa sổ lưu trữ khác nhau
+    # Phễu: Một nguồn duy nhất, không trần
+    # Lỗi đã sửa (đo trên lượt chạy 10k): phễu cũ ghép ba nguồn có cửa sổ lưu trữ khác nhau
     # rồi đặt cạnh nhau như thể cộng được:
     #     t1_count  = len(t1_blocks)   <- ring buffer `tier1_blocks.json`, UI cắt còn 12
     #     ml_count / llm_count         <- audit_trail qua all_alerts, trần 2000
-    # Ba con số cho CÙNG khái niệm "chặn" khi ấy là 50 / 140 / 4.083. Phễu vì thế vẽ Tier-1
-    # ≈ 12 bên cạnh Cổng ML hàng trăm — ĐẢO NGƯỢC câu chuyện xả tải, làm tầng gánh nặng
+    # Ba con số cho cùng khái niệm "chặn" khi ấy là 50 / 140 / 4.083. Phễu vì thế vẽ Tier-1
+    # ≈ 12 bên cạnh Cổng ML hàng trăm - đảo ngược câu chuyện xả tải, làm tầng gánh nặng
     # nhất trông như tầng yếu nhất.
     #
-    # `pipeline_stats.json` đếm TOÀN luồng, không trần -> là nguồn đúng cho phễu.
+    # `pipeline_stats.json` đếm toàn luồng, không trần -> là nguồn đúng cho phễu.
     _oc = offload_counts if isinstance(offload_counts, dict) else {}
 
     def _oc_int(key: str) -> int:
@@ -1076,11 +1076,11 @@ def render_metrics_header(
             return 0
 
     escalated_to_llm = _oc_int("escalated_to_llm")
-    # Hai thẻ giữa phễu in SỐ LỆNH CHẶN, đọc từ chính bảng `audit_trail` mà các tab nhật ký
-    # đọc — nên hai màn hình không thể lệch nhau.
+    # Hai thẻ giữa phễu in số lệnh chặn, đọc từ chính bảng `audit_trail` mà các tab nhật ký
+    # đọc - nên hai màn hình không thể lệch nhau.
     #
-    # BẢN CŨ in `ml_gate_resolved` (1.881) và `escalated_to_llm` (1.403), là số SỰ KIỆN ĐI
-    # QUA chứ không phải lệnh chặn. Đối chiếu với nhật ký (210 và 77 dòng) lệch cả chục lần,
+    # Bản cũ in `ml_gate_resolved` (1.881) và `escalated_to_llm` (1.403), là số sự kiện đi
+    # Qua chứ không phải lệnh chặn. Đối chiếu với nhật ký (210 và 77 dòng) lệch cả chục lần,
     # vì Cổng ML giải quyết phần lớn bằng nhánh DROP vốn không ghi sổ, còn phần đẩy sang
     # Tier-2 thì bị nén spam và xếp hàng chờ.
     _bt = blocks_by_tier if isinstance(blocks_by_tier, dict) else {}
@@ -1088,34 +1088,34 @@ def render_metrics_header(
     llm_count = int(_bt.get(TIER_LLM, 0) or 0)
     # Luật Tier-1 tự xử = tổng luồng trừ phần nó đẩy tiếp cho Cổng ML.
     #
-    # NHÃN PHẢI NÓI ĐÚNG NÓ ĐẾM GÌ. Trước đây thẻ ghi "Tier-1 xử lý", mà con số lại là phần
-    # LUẬT tĩnh giải quyết TRƯỚC khi Cổng ML vào cuộc. Với `tier1.ml_gate_all_events` bật —
-    # mọi sự kiện đi qua Cổng ML — con số đó tụt còn ~38% luồng, đứng ngay cạnh tiêu đề
+    # Nhãn phải nói đúng nó đếm gì. Trước đây thẻ ghi "Tier-1 xử lý", mà con số lại là phần
+    # Luật tĩnh giải quyết trước khi Cổng ML vào cuộc. Với `tier1.ml_gate_all_events` bật -
+    # mọi sự kiện đi qua Cổng ML - con số đó tụt còn ~38% luồng, đứng ngay cạnh tiêu đề
     # "Xả tải LLM 98,3%". Hai số đúng, đặt cạnh nhau thì trông như một số sai.
     t1_count = max(0, int(total_raw_logs or 0) - _oc_int("action:ESCALATE"))
 
-    # Xả tải LLM = phần KHÔNG tốn một token nào. Khác hẳn `noise_reduction` ở trên.
+    # Xả tải LLM = phần không tốn một token nào. Khác hẳn `noise_reduction` ở trên.
     #
-    # `escalated_to_llm` đếm sự kiện RỜI Cổng ML về phía Tier-2 — KHÔNG phải sự kiện thật sự
-    # tốn token. Hai chốt chặn nằm SAU bộ đếm đó và cắt phần lớn:
-    #   `tier2_skipped_flow_only` — lô chỉ có đặc trưng luồng, dừng ở ALERT (xem subscriber);
-    #   `tier2_suppressed`        — IP đang có lô chạy dở (`pending_ai`, TTL 60 giây).
-    # Bỏ qua hai khoản này thì màn hình BÁO THIẾU chính chỉ số nó dùng làm tiêu đề. Đo tại mốc
-    # 128.369 sự kiện: 1.907 rời Cổng ML nhưng 1.718 bị chặn lại, chỉ ~189 tới LLM — màn hình
+    # `escalated_to_llm` đếm sự kiện rời Cổng ML về phía Tier-2 - không phải sự kiện thật sự
+    # tốn token. Hai chốt chặn nằm sau bộ đếm đó và cắt phần lớn:
+    #   `tier2_skipped_flow_only` - lô chỉ có đặc trưng luồng, dừng ở ALERT (xem subscriber);
+    #   `tier2_suppressed`        - IP đang có lô chạy dở (`pending_ai`, TTL 60 giây).
+    # Bỏ qua hai khoản này thì màn hình báo thiếu chính chỉ số nó dùng làm tiêu đề. Đo tại mốc
+    # 128.369 sự kiện: 1.907 rời Cổng ML nhưng 1.718 bị chặn lại, chỉ ~189 tới LLM - màn hình
     # in 98,5% trong khi con số thật là 99,85%.
     llm_offload = None
     reached_llm = max(
         0, escalated_to_llm - _oc_int("tier2_skipped_flow_only") - _oc_int("tier2_suppressed")
     )
-    # CỐ Ý KHÔNG in phần "Cổng ML gánh" (= `action:ESCALATE` − `reached_llm`) lên thẻ này:
-    # đó là bộ đếm SỰ KIỆN ĐI QUA, không so được với nhật ký chặn, và từng khiến 1.881 đứng
+    # Cố Ý không in phần "Cổng ML gánh" (= `action:ESCALATE` − `reached_llm`) lên thẻ này:
+    # đó là bộ đếm sự kiện đi qua, không so được với nhật ký chặn, và từng khiến 1.881 đứng
     # cạnh một nhật ký 210 dòng. `tests/unit/test_ui_badges.py` canh đúng điều đó.
     if total_raw_logs > 0 and _oc:
         llm_offload = (1 - reached_llm / total_raw_logs) * 100
 
     if not (TIER_ML in _bt or TIER_LLM in _bt):
-        # Sổ kiểm toán chưa có bản ghi nào mang cột `tier` (dữ liệu tạo TRƯỚC lần thêm cột)
-        # -> rơi về cách suy từ câu lý do. Kém chính xác nhưng KHÔNG bịa: chỉ đếm dòng thật.
+        # Sổ kiểm toán chưa có bản ghi nào mang cột `tier` (dữ liệu tạo trước lần thêm cột)
+        # -> rơi về cách suy từ câu lý do. Kém chính xác nhưng không bịa: chỉ đếm dòng thật.
         ml_count = llm_count = 0
         if isinstance(all_alerts, list):
             for alert in all_alerts:
@@ -1130,12 +1130,12 @@ def render_metrics_header(
                     llm_count += 1
 
     if not _oc:
-        # Chưa có pipeline_stats (vd. mở Dashboard trước khi đẩy luồng) -> KHÔNG bịa số cho
-        # Tier-1, và để `llm_offload` là None (hiện "—").
+        # Chưa có pipeline_stats (vd. mở Dashboard trước khi đẩy luồng) -> không bịa số cho
+        # Tier-1, và để `llm_offload` là None (hiện "-").
         t1_count = len(t1_blocks) if isinstance(t1_blocks, list) else 0
 
-    # Tỉ lệ analyst BÁC BỎ luật do hệ đề xuất — KHÔNG phải False Positive Rate (xem chú thích
-    # tại chỗ tính trong app.py). None = chưa ai duyệt luật nào -> hiện "—", không hiện 0.0%.
+    # Tỉ lệ analyst bác bỏ luật do hệ đề xuất - không phải False Positive Rate (xem chú thích
+    # tại chỗ tính trong app.py). None = chưa ai duyệt luật nào -> hiện "-", không hiện 0.0%.
     reject_str = vn_pct(live_fpr, 1, already_pct=True)
     fpr_color = "#52c41a"  # xanh
     if live_fpr is None:
@@ -1145,8 +1145,8 @@ def render_metrics_header(
     elif live_fpr > 10.0:
         fpr_color = "#faad14"  # vàng
 
-    # CHỈ MỘT chỉ số phần trăm trên phễu: xả tải LLM = 1 − (sự kiện TỚI LLM / log thô).
-    # "Giảm nhiễu" từng đứng cạnh đây nhưng là đại lượng KHÁC (log thô − cảnh báo tới
+    # Chỉ một chỉ số phần trăm trên phễu: xả tải LLM = 1 − (sự kiện tới LLM / log thô).
+    # "Giảm nhiễu" từng đứng cạnh đây nhưng là đại lượng khác (log thô − cảnh báo tới
     # analyst) và luôn cao hơn ~11 điểm, nên đặt cạnh nhau chỉ khiến người đọc trích nhầm.
     offload_str = vn_pct(llm_offload, 1, already_pct=True)
 
@@ -1271,5 +1271,5 @@ def render_apt_events_table(events):
 
 
 def render_theme_styles(theme="dark"):
-    """Enforces pure Cyber Dark Mode across the dashboard."""
+    """Ép toàn bộ dashboard về đúng một chủ đề tối."""
     pass

@@ -1,5 +1,5 @@
 """
-Tier 1: Feedback Listener (Dynamic Rule Update Receiver)
+Nhận luật động do Tier-2 đề xuất và ghi vào system_settings.yaml.
 
 Module này lắng nghe lệnh từ LangGraph Agent (Tier 2) khi Agent phát hiện
 được một mẫu tấn công mới (Zero-day / APT). Agent sẽ tự động sinh ra
@@ -12,7 +12,7 @@ Luồng hoạt động:
   4. Tier-1 tự động áp dụng rule mới trong lần evaluate() tiếp theo
 
 Đây là cơ chế "Feedback Loop" giúp hệ thống tự tiến hóa:
-  Tier 1 (lọc) → Tier 2 (phân tích) → Feedback Loop → Tier 1 (cập nhật luật mới)
+  Tier 1 (lọc) -> Tier 2 (phân tích) -> Feedback Loop -> Tier 1 (cập nhật luật mới)
 
 *Conscious Design Decision:*
 - State Machine chỉ có 1 chiều: PENDING_APPROVAL -> ACTIVE hoặc REJECTED.
@@ -36,16 +36,16 @@ LOCK_PATH = CONFIG_PATH + ".lock"
 DEFAULT_WHITELIST_IPS = ["127.0.0.1", "10.0.0.99", "192.168.1.254"]
 
 # Cache RAM cho system_settings.yaml (đọc-only), khử theo MTIME. Dashboard gọi các getter
-# (get_active/pending/all_dynamic_rules, get_whitelisted_ips) 8-12 LẦN mỗi lượt auto-refresh
+# (get_active/pending/all_dynamic_rules, get_whitelisted_ips) 8-12 lần mỗi lượt auto-refresh
 # 3s -> trước đây parse YAML lặp lại từng lần. Ghi (approve/reject/whitelist) dùng os.replace
-# ĐỔI mtime nên lần đọc kế tự nạp lại; _save_config_atomically còn CHỦ ĐỘNG xoá cache để
+# Đổi mtime nên lần đọc kế tự nạp lại; _save_config_atomically còn chủ động xoá cache để
 # chắc chắn nhất quán trong cùng tiến trình. Cùng khuôn mẫu executor._whitelisted_ips.
 _CONFIG_CACHE: dict = {"mtime": None, "data": None}
 
 
 def _load_config_cached() -> dict:
-    """Trả về dict config đã parse (cache theo mtime). CHỈ dùng cho ĐƯỜNG ĐỌC của getter —
-    đường GHI vẫn tự đọc lại tươi từ đĩa BÊN TRONG _lock để tránh mọi tương tranh."""
+    """Trả về dict config đã parse (cache theo mtime). Chỉ dùng cho đường đọc của getter -
+    đường ghi vẫn tự đọc lại tươi từ đĩa bên trong _lock để tránh mọi tương tranh."""
     try:
         mtime = os.path.getmtime(CONFIG_PATH)
     except OSError:
@@ -63,12 +63,12 @@ def _load_config_cached() -> dict:
 
 
 def _ensure_lock_writable():
-    """Đảm bảo file .lock GHI được bởi cả host (uid 1000) lẫn container (uid 999).
+    """Đảm bảo file .lock ghi được bởi cả host (uid 1000) lẫn container (uid 999).
 
-    Docker mount config/ chung: nếu file lock cũ do UID KHÁC tạo (mode 0644) thì bên còn
-    lại KHÔNG mở ghi được -> FileLock ném Permission denied (bug reset_all không xoá nổi
-    luật động). Thư mục config/ thuộc host nên ta XOÁ lock cũ rồi tạo lại 0666. Bọc lỗi để
-    KHÔNG BAO GIỜ làm hỏng luồng import.
+    Docker mount config/ chung: nếu file lock cũ do UID khác tạo (mode 0644) thì bên còn
+    lại không mở ghi được -> FileLock ném Permission denied (bug reset_all không xoá nổi
+    luật động). Thư mục config/ thuộc host nên ta xoá lock cũ rồi tạo lại 0666. Bọc lỗi để
+    không bao giờ làm hỏng luồng import.
     """
     try:
         if os.path.exists(LOCK_PATH) and not os.access(LOCK_PATH, os.W_OK):
@@ -95,14 +95,14 @@ def _save_config_atomically(config: dict):
         with open(fd, "w") as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
         # mkstemp tạo file mode 0600 -> os.replace giữ nguyên khiến tiến trình UID khác
-        # KHÔNG dùng được config. Docker mount config/ chung cho Dashboard (container uid
-        # 999) VÀ subscriber/reset (host uid 1000): hai bên luân phiên GHI cùng file. Đặt
-        # 0666 để bên nào cũng ghi ĐÈ in-place được (nếu 0644 thì chỉ owner ghi -> bên kia
+        # không dùng được config. Docker mount config/ chung cho Dashboard (container uid
+        # 999) và subscriber/reset (host uid 1000): hai bên luân phiên ghi cùng file. Đặt
+        # 0666 để bên nào cũng ghi đè in-place được (nếu 0644 thì chỉ owner ghi -> bên kia
         # bị Permission denied, vd reset_all không xoá nổi luật động). os.replace đổi chủ sở
         # hữu mỗi lần ghi nên phải 0666 để tự chữa lành cross-UID.
         os.chmod(temp_path, 0o666)  # noqa: S103  (cross-UID Docker: host↔container cùng ghi)
         os.replace(temp_path, CONFIG_PATH)
-        # Khử cache đọc NGAY sau khi ghi: bảo đảm getter kế tiếp trong CÙNG tiến trình thấy
+        # Khử cache đọc ngay sau khi ghi: bảo đảm getter kế tiếp trong cùng tiến trình thấy
         # dữ liệu mới, không phụ thuộc độ phân giải mtime của filesystem.
         _CONFIG_CACHE["mtime"] = None
     except Exception as e:
@@ -146,33 +146,33 @@ class FeedbackListener:
         Returns:
             dict chứa thông tin rule + status
         """
-        # ĐÓNG BĂNG khi đang chạy thực nghiệm bóc tách (ablation).
+        # Đóng băng khi đang chạy thực nghiệm bóc tách (ablation).
         #
-        # LỖI ĐO ĐÃ VÁ (phát hiện 2026-07-30 lúc 00:00): `run_ablation` dựng MỘT `rule_engine`
-        # duy nhất rồi cho CẢ Config A (không LLM) lẫn Config F (đủ LLM) dùng chung. Mỗi luật
-        # do tác tử của F sinh ra được ghi vào config, và `_save_config_atomically` CHỦ ĐỘNG
-        # xoá cache (dòng ~107) nên luật có hiệu lực NGAY ở mẫu kế tiếp — kể cả với Config A.
+        # Lỗi đo đã vá (phát hiện 2026-07-30 lúc 00:00): `run_ablation` dựng một `rule_engine`
+        # duy nhất rồi cho cả Config A (không LLM) lẫn Config F (đủ LLM) dùng chung. Mỗi luật
+        # do tác tử của F sinh ra được ghi vào config, và `_save_config_atomically` chủ động
+        # xoá cache (dòng ~107) nên luật có hiệu lực ngay ở mẫu kế tiếp - kể cả với Config A.
         #
-        # Hệ quả: Config A, vốn là kịch bản "giả sử KHÔNG có Tầng 2", lại được hưởng chính
+        # Hệ quả: Config A, vốn là kịch bản "giả sử không có Tầng 2", lại được hưởng chính
         # những luật mà chỉ Tầng 2 mới tạo ra nổi. Baseline bị treatment nâng đỡ, nên delta
-        # A->F NÓI GIẢM đóng góp thật của Tầng 2. Quan sát được: luật động phình 745 -> 1.498
+        # A->F nói giảm đóng góp thật của Tầng 2. Quan sát được: luật động phình 745 -> 1.498
         # trong một lượt chạy, tức lượt sau xuất phát từ trạng thái khác lượt trước và
-        # benchmark KHÔNG tái lập được.
+        # benchmark không tái lập được.
         #
         # Đóng băng chứ không xoá: tập luật đã được người duyệt vẫn còn hiệu lực cho cả hai
-        # cấu hình như nhau, chỉ chặn việc SINH THÊM giữa lượt đo. Vòng phản hồi vẫn chạy
+        # cấu hình như nhau, chỉ chặn việc sinh thêm giữa lượt đo. Vòng phản hồi vẫn chạy
         # bình thường ở chế độ vận hành thật (biến này không đặt).
-        # PHẠM VI ĐÓNG BĂNG: CHỈ luật ACTIVE. Phiếu chờ duyệt vẫn phải đi qua.
+        # Phạm VI đóng băng: Chỉ luật ACTIVE. Phiếu chờ duyệt vẫn phải đi qua.
         #
-        # LỖI GHÉP NHẦM ĐÃ SỬA. Bản trước chặn MỌI lượt gọi, mà `node_human_in_the_loop` dùng
+        # Lỗi ghép nhầm đã sửa. Bản trước chặn mọi lượt gọi, mà `node_human_in_the_loop` dùng
         # đúng hàm này để đẩy phiếu cho analyst (`status` mặc định = PENDING_APPROVAL). Hệ quả:
-        # bật cờ lên là **toàn bộ hàng đợi HITL biến mất** — Tier-2 vẫn kết luận "cần con người
+        # bật cờ lên là toàn bộ hàng đợi HITL biến mất - Tier-2 vẫn kết luận "cần con người
         # xem", vẫn ghi vào sổ kiểm toán, nhưng không phiếu nào tới bàn analyst. Đo ở lượt chạy
         # 11/08/2026: sổ có 39 bản ghi AWAIT_HITL trong khi thẻ "Chờ duyệt (HITL)" đứng ở 0 và
-        # tab phê duyệt trống trơn. Vòng lặp người-trong-vòng — một đóng góp của luận văn — im
+        # tab phê duyệt trống trơn. Vòng lặp người-trong-vòng - một đóng góp của luận văn - im
         # lặng biến mất chỉ vì một biến môi trường đặt cho mục đích hoàn toàn khác.
         #
-        # Lý do đóng băng (bên dưới) chỉ đúng với luật ACTIVE: `reload_dynamic_rules` CHỈ nạp
+        # Lý do đóng băng (bên dưới) chỉ đúng với luật ACTIVE: `reload_dynamic_rules` chỉ nạp
         # luật đã duyệt, nên phiếu PENDING không thể đổi hành vi của bất kỳ cấu hình ablation
         # nào. Chặn chúng là chặn quá tay.
         if os.getenv("SENTINEL_FREEZE_DYNAMIC_RULES") == "1" and status == "ACTIVE":
@@ -182,7 +182,7 @@ class FeedbackListener:
                 "rule": {"field": field, "pattern": pattern, "score": score},
             }
 
-        # Validate dynamic rule using FeedbackValidator
+        # Kiểm luật động bằng FeedbackValidator
         validator = FeedbackValidator()
         is_valid, errors = validator.validate_rule(field, pattern, score)
         if not is_valid:
@@ -203,8 +203,8 @@ class FeedbackListener:
             "field": field,
             "pattern": pattern,
             "score": score,
-            # Dùng giờ CỤC BỘ (naive) để KHỚP với timestamp audit_trail do executor ghi
-            # (cùng tiến trình subscriber) — tránh lệch 7h giữa "Tạo lúc" (HITL) và giờ cảnh báo.
+            # Dùng giờ cục bộ (naive) để khớp với timestamp audit_trail do executor ghi
+            # (cùng tiến trình subscriber) - tránh lệch 7h giữa "Tạo lúc" (HITL) và giờ cảnh báo.
             "created_at": datetime.now().isoformat(timespec="seconds"),
             "source": source,
             "reason": reason,
@@ -307,10 +307,10 @@ class FeedbackListener:
 
     def approve_rule(self, pattern: str, field: str | None = None) -> bool:
         ok = self.update_rule_status(pattern, "ACTIVE", field, is_hitl_approved=True)
-        # ĐỒNG BỘ block ↔ whitelist (LOẠI TRỪ LẪN NHAU · "hành động sau cùng thắng"):
-        # kích hoạt CHẶN một Source IP thì phải GỠ nó khỏi whitelist. Nếu không, whitelist
-        # (ưu tiên CAO NHẤT ở Tier-1) sẽ khiến luật chặn vừa duyệt trở nên VÔ HIỆU — IP nằm
-        # cả 2 danh sách nên Tier-1 vẫn cho qua. Đây là việc của HỆ THỐNG, không phụ thuộc UI.
+        # Đồng bộ block ↔ whitelist (loại trừ lẫn nhau · "hành động sau cùng thắng"):
+        # kích hoạt chặn một Source IP thì phải gỡ nó khỏi whitelist. Nếu không, whitelist
+        # (ưu tiên cao nhất ở Tier-1) sẽ khiến luật chặn vừa duyệt trở nên vô hiệu - IP nằm
+        # cả 2 danh sách nên Tier-1 vẫn cho qua. Đây là việc của hệ thống, không phụ thuộc UI.
         if ok and field == "Source IP" and pattern in self.get_whitelisted_ips():
             self.remove_from_whitelist(pattern)
             logger.info(
@@ -341,7 +341,7 @@ class FeedbackListener:
     def reset_whitelist_to_defaults(self) -> bool:
         """Đặt whitelist về mặc định (dùng khi reset demo). Trả True nếu thành công.
 
-        Whitelist là trạng thái do HỆ THỐNG quản lý -> mọi nơi (UI Reset, reset_all) gọi
+        Whitelist là trạng thái do hệ thống quản lý -> mọi nơi (UI Reset, reset_all) gọi
         method này thay vì tự sửa YAML, để đồng bộ & bền với cross-UID (0666 + lock).
         """
         try:
@@ -418,7 +418,7 @@ class FeedbackListener:
     def get_whitelisted_ips(self) -> list:
         """Lấy danh sách các IP đang được Whitelist."""
         try:
-            # list(...) trả BẢN SAO -> caller không thể lỡ tay mutate list nằm trong cache.
+            # list(...) trả bản sao -> caller không thể lỡ tay mutate list nằm trong cache.
             return list(_load_config_cached().get("tier1", {}).get("whitelist_ips", []) or [])
         except Exception:
             return []

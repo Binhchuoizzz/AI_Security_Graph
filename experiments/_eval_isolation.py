@@ -1,6 +1,6 @@
-"""Cách ly script ĐO khỏi trạng thái PRODUCTION (snapshot → chạy → khôi phục).
+"""Cách ly script đo khỏi trạng thái PRODUCTION (snapshot -> chạy -> khôi phục).
 
-VÌ SAO CẦN (sự cố 2026-07-15): chạy `agent_app.invoke()` trong một script eval KHÔNG
+Vì sao cần (sự cố 2026-07-15): chạy `agent_app.invoke()` trong một script eval không
 phải là thao tác chỉ-đọc. `node_action_executor` ghi vào 4 kho trạng thái:
 
   - `block_ip()`                        -> config/audit_trail.db + Redis `blacklist:*`
@@ -8,17 +8,17 @@ phải là thao tác chỉ-đọc. `node_action_executor` ghi vào 4 kho trạng
   - `threat_memory.record_incident()`   -> config/threat_memory.db (ip_reputation)
   - `raise_alert()`                     -> config/audit_trail.db
 
-Cả 4 đều QUAY LẠI NUÔI Tier-1 (L2 luật động, Tầng 3.5 uy tín IP, blacklist). Nghĩa là
-phép đo TỰ LÀM NHIỄM chính nó: chạy eval xong, lần đo SAU sẽ escalate ít hơn vì Tier-1
+Cả 4 đều quay lại nuôi Tier-1 (L2 luật động, Tầng 3.5 uy tín IP, blacklist). Nghĩa là
+phép đo tự làm nhiễm chính nó: chạy eval xong, lần đo sau sẽ escalate ít hơn vì Tier-1
 đã "nhớ mặt" các IP do chính lần đo trước tạo ra. Đo được trực tiếp: `collect_escalated()`
-ra 651 ca (14/07, có luật tích luỹ) so với 823 ca (15/07, sau reset_all) trên CÙNG dữ liệu.
+ra 651 ca (14/07, có luật tích luỹ) so với 823 ca (15/07, sau reset_all) trên cùng dữ liệu.
 
-CÁCH TIẾP CẬN: snapshot 4 kho trước khi chạy, khôi phục nguyên trạng sau khi chạy. Ưu
-điểm so với việc vô hiệu hoá (no-op) các side effect: eval vẫn chạy ĐÚNG code path thật
-— tức vẫn đo cái thật — chỉ là không để lại dấu vết.
+Cách tiếp cận: snapshot 4 kho trước khi chạy, khôi phục nguyên trạng sau khi chạy. Ưu
+điểm so với việc vô hiệu hoá (no-op) các side effect: eval vẫn chạy đúng code path thật
+- tức vẫn đo cái thật - chỉ là không để lại dấu vết.
 
-LƯU Ý VỀ TÁI LẬP: cách ly chỉ đảm bảo eval không làm bẩn hệ thống. Muốn số liệu TÁI LẬP
-được thì còn phải chạy từ trạng thái SẠCH đã biết -> chạy `scripts/reset_all.py` trước.
+Lưu Ý về tái lập: cách ly chỉ đảm bảo eval không làm bẩn hệ thống. Muốn số liệu tái lập
+được thì còn phải chạy từ trạng thái sạch đã biết -> chạy `scripts/reset_all.py` trước.
 
 Dùng:
     from experiments._eval_isolation import isolated_state
@@ -38,7 +38,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.agent.threat_memory import MEMORY_DB_PATH  # noqa: E402
 from src.response.executor import DB_PATH as AUDIT_DB_PATH  # noqa: E402
 
-# Secret chỉ sống trong .env — nạp trước khi đọc REDIS_URL (module dùng standalone).
+# Secret chỉ sống trong .env - nạp trước khi đọc REDIS_URL (module dùng standalone).
 load_dotenv()
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -65,7 +65,7 @@ def _restore_files(saved: dict[str, str]) -> None:
     for path, backup in saved.items():
         try:
             shutil.copy2(backup, path)
-        except Exception as exc:  # noqa: BLE001 — khôi phục best-effort, báo to để biết
+        except Exception as exc:  # noqa: BLE001 - khôi phục best-effort, báo to để biết
             print(f"[!] CÁCH LY: không khôi phục được {path}: {exc}")
 
 
@@ -81,7 +81,7 @@ def _snapshot_blacklist() -> set[str] | None:
 
 
 def _restore_blacklist(before: set[str] | None) -> None:
-    """Xoá đúng các key blacklist mà eval vừa TẠO THÊM (không đụng key có sẵn)."""
+    """Xoá đúng các key blacklist mà eval vừa tạo thêm (không đụng key có sẵn)."""
     if before is None:
         return
     try:
@@ -99,7 +99,7 @@ def _restore_blacklist(before: set[str] | None) -> None:
 
 @contextmanager
 def isolated_state(enabled: bool = True):
-    """Chạy khối lệnh mà KHÔNG để lại thay đổi ở audit_trail / threat_memory / luật động
+    """Chạy khối lệnh mà không để lại thay đổi ở audit_trail / threat_memory / luật động
     / Redis blacklist.
 
     enabled=False -> không làm gì (khi cố ý muốn giữ side effect, vd chạy demo thật).

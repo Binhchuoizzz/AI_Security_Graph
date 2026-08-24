@@ -19,7 +19,6 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | `_eval_isolation.py` | Snapshot/khôi phục 4 kho trạng thái quanh script eval có side effect → phép đo không tự làm nhiễm chính nó. |
 | `build_golden_baseline.py` | Dựng golden baseline benign (loại trừ flow trùng benchmark) cho hiệu chỉnh Welford. |
 | `e2e_test_runner.py` | Smoke-test end-to-end offline — không trích số. |
-| `statistical_tests.py` | McNemar + Mann-Whitney U trên kết quả ablation đã lưu. |
 
 > **Kết quả KHÔNG còn lưu (dọn 22/08/2026).** Năm phép đo dưới đây vẫn chạy được, nhưng tệp
 > `.json` của chúng đã bị xoá vì **luận văn không còn trích số nào từ đó** sau lần viết lại
@@ -62,7 +61,6 @@ là phần bảo vệ luận văn trước phản biện hội đồng.
 | `measure_latency_baseline.py` | Claim độ trễ chủ đạo (hai tầng vs LLM-only) | `latency_benchmark.json` | ✓ |
 | `run_llm_robustness.py` | *"LLM tất định? đổi seed có đổi kết luận? chết thì sao? tốn bao nhiêu?"* — determinism + **variance đa seed** + suy biến + **chi phí tài nguyên** | `llm_robustness_results.json` | ✓ |
 | `audit_tier_capability.py` | Ma trận năng lực 3 tầng trên các họ tấn công | `tier_capability_audit.json` | ✓ |
-| `export_judge_sample.py` | *"Ai kiểm định chính trọng tài LLM?"* — xuất mẫu cho người chấm → Cohen's κ | `judge_agreement_results.json` — **CHƯA CHẠY**, tệp chưa tồn tại và luận văn không trích κ | ✗ (cần **người**) |
 
 ## 4. Luồng ONLINE / demo (chứng minh vận hành, không trích số)
 

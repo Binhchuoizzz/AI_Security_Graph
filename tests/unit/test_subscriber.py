@@ -1,11 +1,11 @@
 """
-Unit tests cho Subscriber — CHỐNG LỘ NHÃN dataset vào prompt LLM (label leakage).
+Unit tests cho Subscriber - chống lộ nhãn dataset vào prompt LLM (label leakage).
 
-Bối cảnh: luồng gộp online (`experiments.unified_dataset.enrich` → scripts
+Bối cảnh: luồng gộp online (`experiments.unified_dataset.enrich` -> scripts
 build_datatest/demo) mang metadata
 nhãn (gt_*/apt_*/zd_*) để subscriber ghi APT emergent và collector đối chiếu hậu
-kiểm. Nhưng TRƯỚC khi batch ESCALATE được đưa lên Agent/LLM, mọi khóa nhãn phải
-bị loại — nếu không prompt sẽ chứa sẵn "đáp án" (gt_expected_action, zd_mitre...)
+kiểm. Nhưng trước khi batch ESCALATE được đưa lên Agent/LLM, mọi khóa nhãn phải
+bị loại - nếu không prompt sẽ chứa sẵn "đáp án" (gt_expected_action, zd_mitre...)
 và demo online mất giá trị khoa học.
 """
 
@@ -23,8 +23,8 @@ from src.streaming.subscriber import (
 
 
 class TestBlacklistMemory:
-    """TRÍ NHỚ Tier-1: IP trong blacklist (đã bị chặn gần đây) -> chặn thẳng lần sau,
-    KHÔNG leo thang Tier-2 lại. Whitelist & log đang BLOCK được giữ nguyên."""
+    """trí nhớ Tier-1: IP trong blacklist (đã bị chặn gần đây) -> chặn thẳng lần sau,
+    không leo thang Tier-2 lại. Whitelist & log đang BLOCK được giữ nguyên."""
 
     def test_blacklisted_benign_flow_forced_block(self):
         log = {"tier1_action": "DROP", "tier1_reasons": []}
@@ -33,12 +33,12 @@ class TestBlacklistMemory:
         assert any("TRÍ NHỚ" in r for r in log["tier1_reasons"])
 
     def test_blacklisted_escalate_downgraded_to_block_no_llm(self):
-        """Đang định ESCALATE (tốn LLM) nhưng IP đã bị chặn -> ép BLOCK, KHÔNG leo thang."""
+        """Đang định ESCALATE (tốn LLM) nhưng IP đã bị chặn -> ép BLOCK, không leo thang."""
         log = {"tier1_action": "ESCALATE"}
         assert _apply_blacklist_memory("ESCALATE", log, is_blacklisted=True) == "BLOCK_IP"
 
     def test_whitelisted_not_overridden(self):
-        """Whitelist ưu tiên cao hơn blacklist -> KHÔNG bị ép BLOCK."""
+        """Whitelist ưu tiên cao hơn blacklist -> không bị ép BLOCK."""
         log = {"tier1_action": "WHITELIST_DROP", "is_whitelisted": True}
         assert (
             _apply_blacklist_memory("WHITELIST_DROP", log, is_blacklisted=True) == "WHITELIST_DROP"
@@ -56,7 +56,7 @@ class TestBlacklistMemory:
 
 class TestStripDatasetLabels:
     def test_removes_every_dataset_label_key(self):
-        """Mọi khóa trong strip-set phải biến mất; trường hệ thống phải GIỮ."""
+        """Mọi khóa trong strip-set phải biến mất; trường hệ thống phải giữ."""
         log: dict[str, object] = {k: "leak" for k in _DATASET_LABEL_KEYS}
         log.update(
             {
@@ -65,8 +65,8 @@ class TestStripDatasetLabels:
                 "tier1_action": "ESCALATE",
                 "tier1_score": 55,
                 "tier1_reasons": ["APT chain emergent: 2 ngày"],
-                "gt_id": "GT-001",  # định danh mờ — giữ để đối chiếu hậu kiểm
-                "apt_emergent": True,  # enrichment HỆ THỐNG tự suy ra — giữ
+                "gt_id": "GT-001",  # định danh mờ - giữ để đối chiếu hậu kiểm
+                "apt_emergent": True,  # enrichment hệ thống tự suy ra - giữ
                 "apt_phases": "Recon,Lateral",
                 "log_source": "queue_waf",
             }
@@ -91,9 +91,9 @@ class TestStripDatasetLabels:
     def test_answer_bearing_keys_are_stripped(self):
         """Các khóa mang 'đáp án' bắt buộc bị loại.
 
-        Kiểm qua VỊ TỪ `_is_dataset_label_key()`, không qua tập phẳng: cơ chế lọc nay là
-        QUY TẮC TIỀN TỐ chứ không phải danh sách đen liệt kê tay. Đổi cách kiểm không phải
-        nới lỏng — chính danh sách đen mới là thứ đã hở, vì mỗi nguồn dữ liệu thêm sau lại
+        Kiểm qua vị từ `_is_dataset_label_key()`, không qua tập phẳng: cơ chế lọc nay là
+        Quy tắc tiền tố chứ không phải danh sách đen liệt kê tay. Đổi cách kiểm không phải
+        nới lỏng - chính danh sách đen mới là thứ đã hở, vì mỗi nguồn dữ liệu thêm sau lại
         cần một dòng mới mà không gì báo động khi quên.
         """
         for k in (
@@ -105,10 +105,10 @@ class TestStripDatasetLabels:
             "apt_is_attack",
             "apt_mitre_ttp",
             "zd_mitre",
-            "gz_mitre",  # từng LỌT: vùng xám thêm sau khi danh sách đen ra đời
-            "adv_id",  # từng LỌT: chỉ vô hại tình cờ vì một lỗi làm nó luôn rỗng
+            "gz_mitre",  # từng lọt: vùng xám thêm sau khi danh sách đen ra đời
+            "adv_id",  # từng lọt: chỉ vô hại tình cờ vì một lỗi làm nó luôn rỗng
             "adv_source",
-            "unified_source",  # từng LỌT: tự khai 'zeroday'/'adversarial'/'grayzone'
+            "unified_source",  # từng lọt: tự khai 'zeroday'/'adversarial'/'grayzone'
         ):
             assert _is_dataset_label_key(k), f"khóa mang đáp án '{k}' KHÔNG bị loại"
 
@@ -119,15 +119,15 @@ class TestStripDatasetLabels:
 
 
 def test_online_enrich_labels_fully_covered_by_strip_set():
-    """HỢP ĐỒNG CHỐNG REGRESSION giữa publisher online và subscriber:
+    """hợp đồng chống REGRESSION giữa publisher online và subscriber:
 
-    Mọi khóa mà `enrich()` THÊM vào log phải bị `_is_dataset_label_key()` loại. Nếu sau
-    này enrich thêm khóa nhãn mới mà quy tắc lọc không phủ -> test này ĐỎ, chặn việc lộ
+    Mọi khóa mà `enrich()` thêm vào log phải bị `_is_dataset_label_key()` loại. Nếu sau
+    này enrich thêm khóa nhãn mới mà quy tắc lọc không phủ -> test này đỏ, chặn việc lộ
     đáp án âm thầm.
     """
     from experiments.unified_dataset import enrich
 
-    # `unified_source` TỪNG nằm trong danh sách "provenance vô hại" này — và đó chính là
+    # `unified_source` từng nằm trong danh sách "provenance vô hại" này - và đó chính là
     # lỗ hổng: giá trị của nó là 'zeroday' / 'adversarial' / 'grayzone', tức tự khai đáp án
     # cho LLM. Nay nó bị loại, nên danh sách miễn trừ rỗng.
     PROVENANCE_OK: set[str] = set()
@@ -164,10 +164,10 @@ def test_online_enrich_labels_fully_covered_by_strip_set():
         )
 
 
-# ── PHÂN BỔ GIẢM TẢI ─────────────────────────────────────────────────────────
-# Bộ đếm này là bằng chứng DUY NHẤT trả lời "đẩy lần 2 có nhẹ hơn lần 1 không, nhờ cơ chế
-# nào" — sự kiện bị chặn ở Tier-1 KHÔNG sinh dòng tracer nào nên hậu kiểm không có đường
-# khác. Nó phân loại bằng CHUỖI lý do, mà chuỗi thì dễ bị sửa lời cho 'dễ đọc' rồi lặng lẽ
+# phân bổ giảm tải
+# Bộ đếm này là bằng chứng duy nhất trả lời "đẩy lần 2 có nhẹ hơn lần 1 không, nhờ cơ chế
+# nào" - sự kiện bị chặn ở Tier-1 không sinh dòng tracer nào nên hậu kiểm không có đường
+# khác. Nó phân loại bằng chuỗi lý do, mà chuỗi thì dễ bị sửa lời cho 'dễ đọc' rồi lặng lẽ
 # rơi hết về `t1_other`. Các test dưới đây chốt giao ước đó lại.
 
 
@@ -194,7 +194,7 @@ def test_classify_offload_mechanism_nhan_dien_dung_tung_co_che(reason, expected)
 
 
 def test_classify_offload_uu_tien_tri_nho_hon_dau_hieu_noi_dung():
-    """Một sự kiện thường mang NHIỀU lý do. Nhãn CHÍNH phải quy cho cơ chế THỰC SỰ quyết
+    """Một sự kiện thường mang nhiều lý do. Nhãn chính phải quy cho cơ chế thực sự quyết
     định: hai lớp trí nhớ ghi đè action nên phải thắng."""
     log = {
         "tier1_reasons": [
@@ -207,9 +207,9 @@ def test_classify_offload_uu_tien_tri_nho_hon_dau_hieu_noi_dung():
 
 
 def test_classify_offload_giu_DU_moi_co_che_da_khai_hoa():
-    """HỒI QUY (đo trên 2 lượt đẩy thật): bản một-nhãn khiến chữ ký WAF báo 337 -> 0 và trí
+    """hồi quy (đo trên 2 lượt đẩy thật): bản một-nhãn khiến chữ ký WAF báo 337 -> 0 và trí
     nhớ blacklist 106 -> 0 ở lượt warm, chỉ vì nhãn 'danh tiếng' đứng trước và che hết. Bảng
-    cơ chế khi đó KHÔNG so được giữa các lượt — đúng bảng dùng để trả lời RQ1."""
+    cơ chế khi đó không so được giữa các lượt - đúng bảng dùng để trả lời RQ1."""
     log = {
         "tier1_reasons": [
             "IP có tiền sử NGUY HIỂM (điểm danh tiếng 100 ≥ 70) → chặn tự động",
@@ -230,8 +230,8 @@ def test_classify_offload_khong_no_khi_thieu_du_lieu():
 
 
 def test_moi_dau_hieu_offload_deu_con_ton_tai_trong_rule_engine():
-    """CHỐNG TRÔI CHỮ: nếu ai đó sửa lời một lý do trong rule_engine/subscriber mà quên bảng
-    dấu hiệu, bộ đếm sẽ âm thầm dồn hết về `t1_other` và báo cáo giảm tải thành vô nghĩa —
+    """chống trôi chữ: nếu ai đó sửa lời một lý do trong rule_engine/subscriber mà quên bảng
+    dấu hiệu, bộ đếm sẽ âm thầm dồn hết về `t1_other` và báo cáo giảm tải thành vô nghĩa -
     không có gì đỏ lên để báo. Test này bắt đúng ca đó."""
     from pathlib import Path
 
@@ -243,13 +243,13 @@ def test_moi_dau_hieu_offload_deu_con_ton_tai_trong_rule_engine():
 
 
 def test_cong_bang_chung_ung_dung_bat_duoc_bang_bien_moi_truong(monkeypatch):
-    """`SENTINEL_TIER2_APP_EVIDENCE_ONLY=1` phải bật cổng mà KHÔNG cần sửa tệp cấu hình.
+    """`SENTINEL_TIER2_APP_EVIDENCE_ONLY=1` phải bật cổng mà không cần sửa tệp cấu hình.
 
-    VÌ SAO CẦN TEST. Buổi demo chạy cấu hình vận hành (Tier-2 chỉ nhận lô có bằng chứng tầng
+    Vì sao cần TEST. Buổi demo chạy cấu hình vận hành (Tier-2 chỉ nhận lô có bằng chứng tầng
     ứng dụng) trong khi `config/system_settings.yaml` đã commit phải giữ nguyên cấu hình mà
-    mọi số Tier-2 của luận văn đã đo trên đó. Nếu ai đó gộp hai thứ lại — đặt cờ thành `true`
-    rồi commit — thì lần chạy benchmark kế tiếp ra một bộ số khác và không có gì đỏ lên.
-    Test này khoá cả hai chiều: biến bật được cổng, và tệp cấu hình vẫn để cả ba cờ TẮT.
+    mọi số Tier-2 của luận văn đã đo trên đó. Nếu ai đó gộp hai thứ lại - đặt cờ thành `true`
+    rồi commit - thì lần chạy benchmark kế tiếp ra một bộ số khác và không có gì đỏ lên.
+    Test này khoá cả hai chiều: biến bật được cổng, và tệp cấu hình vẫn để cả ba cờ tắt.
     """
     import importlib
 

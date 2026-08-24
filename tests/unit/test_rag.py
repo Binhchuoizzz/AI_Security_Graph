@@ -4,7 +4,7 @@ from src.rag.graph_builder import KnowledgeGraphBuilder
 
 
 def test_knowledge_graph_builder_initializes_without_crashing():
-    # It should initialize and handle missing Neo4j gracefully
+    # Khởi tạo được và chịu được khi thiếu Neo4j
     builder = KnowledgeGraphBuilder()
     assert builder is not None
     builder.close()

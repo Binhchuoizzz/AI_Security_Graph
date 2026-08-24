@@ -1,25 +1,25 @@
-"""Mở rộng & sửa `knowledge_base/mitre_attack.json` từ ATT&CK STIX CHÍNH THỨC.
+"""Mở rộng & sửa `knowledge_base/mitre_attack.json` từ ATT&CK STIX chính thức.
 
-VÌ SAO. Đối chiếu (`scripts/verify_kb_against_mitre.py`) cho thấy KB chỉ phủ **99/189 =
-52,4%** số kỹ thuật mà ATT&CK nói là phát hiện được bằng telemetry MẠNG — đúng lớp bằng
+Vì sao. Đối chiếu (`scripts/verify_kb_against_mitre.py`) cho thấy KB chỉ phủ **99/189 =
+52,4%** số kỹ thuật mà ATT&CK nói là phát hiện được bằng telemetry mạng - đúng lớp bằng
 chứng mà đồ án này làm việc. 90 kỹ thuật thiếu dồn vào chính những nhóm một SOC mạng quan
 tâm nhất: Command & Control (19), Exfiltration (9)... Thiếu `T1048.*` (Exfiltration Over
-Non-C2 Protocol) hay `T1001.*` (Data Obfuscation) nghĩa là RAG KHÔNG THỂ trả đúng dù LLM có
-suy luận tốt đến đâu — kỹ thuật đó không tồn tại trong kho để mà truy xuất.
+Non-C2 Protocol) hay `T1001.*` (Data Obfuscation) nghĩa là RAG không thể trả đúng dù LLM có
+suy luận tốt đến đâu - kỹ thuật đó không tồn tại trong kho để mà truy xuất.
 
-Ngoài ra KB còn 42 mã MITRE ĐÃ KHAI TỬ và 2 tên sai.
+Ngoài ra KB còn 42 mã MITRE đã khai tử và 2 tên sai.
 
-KHÔNG BỊA MỘT CHỮ NÀO. Mọi trường đều lấy từ bó STIX:
+Không bịa một chữ nào. Mọi trường đều lấy từ bó STIX:
   - id / name / description / tactic  -> attack-pattern
   - detection_indicators              -> mô tả của x-mitre-analytic mà MITRE gắn cho kỹ thuật
   - log_patterns                      -> tên log source trong chính analytic đó
-  - response_actions                  -> ĐỂ TRỐNG (đây là nội dung do dự án soạn, không có
+  - response_actions                  -> để trống (đây là nội dung do dự án soạn, không có
                                         trong STIX; thà trống còn hơn tự nghĩ ra)
 
 Chạy:
     .venv/bin/python scripts/expand_kb_from_mitre.py --stix <đường dẫn> --dry-run
     .venv/bin/python scripts/expand_kb_from_mitre.py --stix <đường dẫn> --apply
-Sau khi --apply PHẢI dựng lại chỉ mục FAISS + checksum (script sẽ nhắc).
+Sau khi --apply phải dựng lại chỉ mục FAISS + checksum (script sẽ nhắc).
 """
 
 import argparse
@@ -38,7 +38,7 @@ KB_PATH = os.path.join(ROOT, "knowledge_base", "mitre_attack.json")
 STIX_URL = (
     "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json"
 )
-# Tiền tố log source được coi là TELEMETRY MẠNG — đúng lớp bằng chứng của hệ thống này.
+# Tiền tố log source được coi là TELEMETRY mạng - đúng lớp bằng chứng của hệ thống này.
 NET_PREFIXES = (
     "nsm:",
     "networkdevice:",
@@ -59,9 +59,9 @@ def _is_net_source(name: str) -> bool:
 def safe_desc(text: str) -> str:
     """Mô tả sạch: thoát các thẻ dạng HTML thành `&lt;...&gt;`.
 
-    VÌ SAO. Mô tả chính thức của `T1027.017` (SVG Smuggling) có câu "...can legitimately
-    include `<script>` tags...". Đó là câu MÔ TẢ, nhưng bộ lọc chống-injection lúc truy xuất
-    khớp đúng mẫu `<script>` và cắt xén chính tài liệu KB hợp lệ — đúng lớp lỗi mà
+    Vì sao. Mô tả chính thức của `T1027.017` (SVG Smuggling) có câu "...can legitimately
+    include `<script>` tags...". Đó là câu mô tả, nhưng bộ lọc chống-injection lúc truy xuất
+    khớp đúng mẫu `<script>` và cắt xén chính tài liệu KB hợp lệ - đúng lớp lỗi mà
     `test_knowledge_base_survives_retrieve_sanitization` sinh ra để bắt (và đã bắt được).
     Thoát dấu ngoặc giữ nguyên nghĩa cho cả người lẫn LLM, mà không kích hoạt bộ lọc.
     """
@@ -89,20 +89,20 @@ def load_stix(path: str | None) -> dict:
 
 
 def answer_key_ids() -> set[str]:
-    """Mọi mã ATT&CK được các tập dữ liệu dùng làm ĐÁP ÁN.
+    """Mọi mã ATT&CK được các tập dữ liệu dùng làm đáp án.
 
-    VÌ SAO CẦN. Bộ lọc `net_refs` bên dưới chỉ nạp kỹ thuật mà MITRE có cấp *analytic dùng
-    nguồn mạng*. Kỹ thuật thuộc `Reconnaissance` thường KHÔNG có analytic nào (MITRE coi đó
-    là hoạt động PRE, quan sát từ phía nạn nhân) nên bị bỏ qua — trong đó có `T1595.003`
-    (Wordlist Scanning), chính là họ tấn công LỚN NHẤT của CSIC 2010 (dò tệp sao lưu + duyệt
+    Vì sao cần. Bộ lọc `net_refs` bên dưới chỉ nạp kỹ thuật mà MITRE có cấp *analytic dùng
+    nguồn mạng*. Kỹ thuật thuộc `Reconnaissance` thường không có analytic nào (MITRE coi đó
+    là hoạt động PRE, quan sát từ phía nạn nhân) nên bị bỏ qua - trong đó có `T1595.003`
+    (Wordlist Scanning), chính là họ tấn công lớn nhất của CSIC 2010 (dò tệp sao lưu + duyệt
     ép = 349/689 = 51% số mẫu CSIC suy được kỹ thuật).
 
-    Hệ quả đo được: mã đó KHÔNG có trong kho -> RAG không thể trả ra -> lá chắn neo bằng
+    Hệ quả đo được: mã đó không có trong kho -> RAG không thể trả ra -> lá chắn neo bằng
     chứng ép AWAIT_HITL 100% số lô đó, và trần chính xác của cả hệ bị chặn cứng vì một lỗ
-    hổng của KHO chứ không phải vì mô hình suy luận kém.
+    hổng của kho chứ không phải vì mô hình suy luận kém.
 
-    Đây KHÔNG phải "học tủ": nội dung mục vẫn lấy nguyên từ STIX chính thức, và kho có 432
-    mục trong khi chỉ 36 mã từng là đáp án — thêm một mục không hề chỉ điểm đáp án nào.
+    Đây không phải "học tủ": nội dung mục vẫn lấy nguyên từ STIX chính thức, và kho có 432
+    mục trong khi chỉ 36 mã từng là đáp án - thêm một mục không hề chỉ điểm đáp án nào.
     Ngược lại, để trống là làm sai lệch phép đo theo hướng có lợi cho... không ai cả.
     """
     ids: set[str] = set()
@@ -146,7 +146,7 @@ def main() -> int:
     analytics = {o["id"]: o for o in objs if o.get("type") == "x-mitre-analytic"}
     strategies = {o["id"]: o for o in objs if o.get("type") == "x-mitre-detection-strategy"}
 
-    # detection-strategy -> attack-pattern
+    # Đi từ detection-strategy sang attack-pattern
     det_of: dict[str, list] = {}
     revoked_by: dict[str, str] = {}
     for r in objs:
@@ -158,11 +158,11 @@ def main() -> int:
             revoked_by[r.get("source_ref", "")] = r.get("target_ref", "")
 
     def evidence(ap_ref: str, *, net_only: bool = True) -> tuple[list[str], list[str]]:
-        """(mô tả cách phát hiện, tên log source) lấy từ analytic CHÍNH THỨC của MITRE.
+        """(mô tả cách phát hiện, tên log source) lấy từ analytic chính thức của MITRE.
 
-        `net_only=True`  -> chỉ analytic dùng nguồn MẠNG; đây là bộ lọc quyết định kỹ thuật
+        `net_only=True`  -> chỉ analytic dùng nguồn mạng; đây là bộ lọc quyết định kỹ thuật
                             nào được coi là "phát hiện được bằng telemetry mạng".
-        `net_only=False` -> MỌI analytic. Dùng cho việc LẤP mô tả phát hiện của các mục đã có
+        `net_only=False` -> mọi analytic. Dùng cho việc lấp mô tả phát hiện của các mục đã có
                             trong kho: kể cả analytic viết cho nguồn endpoint thì từ vựng
                             quan sát được của nó vẫn là từ vựng ATT&CK chính thức về kỹ thuật
                             đó, và đó chính là thứ bộ truy xuất cần để khớp.
@@ -191,7 +191,7 @@ def main() -> int:
     def net_evidence(ap_ref: str) -> tuple[list[str], list[str]]:
         return evidence(ap_ref, net_only=True)
 
-    # Tập kỹ thuật phát hiện được bằng telemetry MẠNG.
+    # Tập kỹ thuật phát hiện được bằng telemetry mạng.
     net_refs = {ref for ref in det_of if net_evidence(ref)[1]}
 
     # ...cộng thêm những mã mà DATASET dùng làm đáp án (xem `answer_key_ids`). Chúng có thể
@@ -210,13 +210,13 @@ def main() -> int:
         raw = json.load(f)
     is_list = isinstance(raw, list)
     items = raw if is_list else list(raw.values())[0]
-    # Ảnh chụp TRƯỚC mọi thay đổi. Bản trước ghi sao lưu ở CUỐI hàm, nhưng `items` đã bị sửa
-    # tại chỗ từ trước đó nên tệp .bak lưu đúng trạng thái ĐÃ sửa — tức là không khôi phục
+    # Ảnh chụp trước mọi thay đổi. Bản trước ghi sao lưu ở cuối hàm, nhưng `items` đã bị sửa
+    # tại chỗ từ trước đó nên tệp .bak lưu đúng trạng thái đã sửa - tức là không khôi phục
     # được gì. Lỗi chỉ lộ ra khi thật sự cần khôi phục.
     snapshot = copy.deepcopy(raw)
     by_id = {str(x.get("id", "")).upper(): x for x in items}
 
-    # Chuẩn hoá mô tả cho MỌI mục (kể cả mục cũ) -> tự chữa lành, chạy lại bao nhiêu lần cũng
+    # Chuẩn hoá mô tả cho mọi mục (kể cả mục cũ) -> tự chữa lành, chạy lại bao nhiêu lần cũng
     # ra cùng kết quả.
     escaped = 0
     for x in items:
@@ -228,8 +228,8 @@ def main() -> int:
 
     added, renamed, retired = [], [], []
 
-    # ── 0. Chuẩn hoá tên tactic ──
-    # KB đang có CẢ "Command and Control" (17 mục) LẪN "Command And Control" (22 mục) — hai
+    # 0. Chuẩn hoá tên tactic
+    # KB đang có cả "Command and Control" (17 mục) lẫn "Command And Control" (22 mục) - hai
     # chuỗi khác nhau cho cùng một tactic, do các đợt bổ sung khác nhau viết hoa khác nhau.
     # Bất kỳ chỗ nào nhóm/lọc theo tactic đều thấy nó tách làm đôi. Lấy đúng chính tả của
     # STIX làm chuẩn (`phase2tac`), so khớp không phân biệt hoa thường.
@@ -242,7 +242,7 @@ def main() -> int:
             x["tactic"] = want
             fixed_tac += 1
 
-    # ── 1. Thêm kỹ thuật MẠNG còn thiếu ──
+    # 1. Thêm kỹ thuật mạng còn thiếu
     for ref in sorted(net_refs, key=lambda r: _tid(live[r]) or ""):
         o = live[ref]
         tid = _tid(o)
@@ -267,26 +267,26 @@ def main() -> int:
                 ),
                 "detection_indicators": inds + [tid],
                 "log_patterns": srcs,
-                # CỐ Ý để trống: STIX không có "hành động ứng phó", tự viết là bịa.
+                # Cố Ý để trống: STIX không có "hành động ứng phó", tự viết là bịa.
                 "response_actions": [],
             }
         )
         added.append((tid, o.get("name", ""), tac))
 
-    # ── 1b. LẤP mô tả phát hiện cho các mục THOÁI HOÁ ──
+    # 1b. Lấp mô tả phát hiện cho các mục thoái hoá
     #
-    # LỖI THẬT, ĐO ĐƯỢC. 251/433 mục (58%) có `detection_indicators` chỉ lặp lại chính tên và
-    # mã của nó — ví dụ T1190 là `['Exploit Public-Facing Application', 'T1190']` và
+    # Lỗi thật, đo được. 251/433 mục (58%) có `detection_indicators` chỉ lặp lại chính tên và
+    # mã của nó - ví dụ T1190 là `['Exploit Public-Facing Application', 'T1190']` và
     # `log_patterns` là `['malicious activity detected matching T1190']`. Không một từ nào về
     # SQL injection, XSS, path traversal. Hệ quả đo được trên chỉ mục thật: truy vấn
-    # "SQL injection UNION SELECT in HTTP query parameter" KHÔNG trả về T1190 trong top-5
+    # "SQL injection UNION SELECT in HTTP query parameter" không trả về T1190 trong top-5
     # (nó trả T1572, T1132, T1055.011...). Tức là kỹ thuật quan trọng nhất của toàn bộ tập
-    # dữ liệu web KHÔNG THỂ được truy xuất, nên LLM không có cách nào trả lời đúng và lá chắn
-    # neo bằng chứng ép AWAIT_HITL — một trần bị chặn bởi KHO, không phải bởi mô hình.
+    # dữ liệu web không thể được truy xuất, nên LLM không có cách nào trả lời đúng và lá chắn
+    # neo bằng chứng ép AWAIT_HITL - một trần bị chặn bởi kho, không phải bởi mô hình.
     #
-    # Lấp bằng mô tả analytic CHÍNH THỨC của MITRE (`net_only=False` — kể cả analytic viết cho
+    # Lấp bằng mô tả analytic chính thức của MITRE (`net_only=False` - kể cả analytic viết cho
     # nguồn endpoint, vì từ vựng quan sát được của nó vẫn là mô tả chuẩn về kỹ thuật đó).
-    # KHÔNG bịa một chữ nào, và KHÔNG đụng vào mục đã có chỉ báo do dự án tự soạn tử tế.
+    # Không bịa một chữ nào, và không đụng vào mục đã có chỉ báo do dự án tự soạn tử tế.
     def _is_degenerate(x: dict) -> bool:
         name = str(x.get("name", "")).strip().lower()
         tid_l = str(x.get("id", "")).strip().lower()
@@ -314,7 +314,7 @@ def main() -> int:
             x["log_patterns"] = srcs
         backfilled.append(x["id"])
 
-    # ── 2. Sửa tên sai (chỉ khi KHÔNG phải quy ước "Cha: Con" mà mã nguồn dựa vào) ──
+    # 2. Sửa tên sai (chỉ khi không phải quy ước "Cha: Con" mà mã nguồn dựa vào)
     for tid, x in by_id.items():
         ref = next((r for r, o in live.items() if _tid(o) == tid), None)
         if not ref:
@@ -326,7 +326,7 @@ def main() -> int:
         renamed.append((tid, cur, official))
         x["name"] = official
 
-    # ── 3. Đánh dấu mã đã khai tử + trỏ sang mã kế nhiệm ──
+    # 3. Đánh dấu mã đã khai tử + trỏ sang mã kế nhiệm
     dead_ids = {}
     for o in objs:
         if o.get("type") == "attack-pattern" and (o.get("revoked") or o.get("x_mitre_deprecated")):
@@ -371,10 +371,10 @@ def main() -> int:
     with open(KB_PATH, "w") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
     print(f"[+] Đã ghi {KB_PATH}")
-    # Lệnh dưới đây phải chạy ĐÚNG ba bước theo ĐÚNG thứ tự — bản trước ghi sai cả hai dòng
+    # Lệnh dưới đây phải chạy đúng ba bước theo đúng thứ tự - bản trước ghi sai cả hai dòng
     # (`build_faiss_index` không tồn tại; và `sha256sum knowledge_base/*.json` ghi tên có tiền
     # tố thư mục + bỏ mất 6 mục index, làm `build_all_indexes` từ chối chạy vì "MISSING").
-    # `build_all_indexes` TỰ kiểm toàn vẹn KB trước khi dựng, nên phải niêm phong nguồn TRƯỚC,
+    # `build_all_indexes` tự kiểm toàn vẹn KB trước khi dựng, nên phải niêm phong nguồn trước,
     # dựng index, rồi niêm phong lại để bao gồm chính các tệp index vừa sinh.
     print(
         "\n[!] BẮT BUỘC làm tiếp, nếu không chỉ mục sẽ lệch khỏi KB:\n"

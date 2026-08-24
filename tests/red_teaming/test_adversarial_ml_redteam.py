@@ -1,6 +1,5 @@
 """
-Automated AI Red Teaming: Adversarial ML Evasion Benchmark
-==========================================================
+Red team tự động: đo khả năng kháng né tránh của Cổng ML
 Kiểm thử tính năng Anti-Evasion / Out-of-Distribution Guardrail của Tier 1 ML Gateway
 trước các mẫu tấn công làm trễ/gây nhiễu đặc trưng (Feature Perturbation).
 """

@@ -1,11 +1,9 @@
 #!/bin/bash
-# =============================================================================
 # SENTINEL — Dọn artifact TẠM (an toàn cho dữ liệu luận văn).
 #
 # AN TOÀN: script này CHỈ xóa thứ tái tạo được / không được Git theo dõi.
 # Nó KHÔNG xóa experiments/results/*.json hay plots/*.png — đó là DỮ LIỆU THỰC
 # NGHIỆM đã commit (LFS). Muốn xóa kết quả thật, làm thủ công + ý thức rõ.
-# =============================================================================
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1

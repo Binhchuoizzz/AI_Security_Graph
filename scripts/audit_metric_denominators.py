@@ -1,26 +1,26 @@
-"""Kiểm MẪU SỐ của mọi chỉ số: N mẫu có thật sự cho N phép đo ĐỘC LẬP không?
+"""Kiểm mẫu số của mọi chỉ số: N mẫu có thật sự cho N phép đo độc lập không?
 
-VÌ SAO CÓ TỆP NÀY (06/08/2026). Cách rà cũ chỉ kiểm "script chạy đúng tệp, đọc đúng khoá
-JSON". Nó bỏ lọt cả một HỌ lỗi mà hai ca dưới đây là ví dụ, và cả hai đều suýt vào luận văn:
+Vì sao có tệp này (06/08/2026). Cách rà cũ chỉ kiểm "script chạy đúng tệp, đọc đúng khoá
+JSON". Nó bỏ lọt cả một họ lỗi mà hai ca dưới đây là ví dụ, và cả hai đều suýt vào luận văn:
 
-  1. TRẦN SO NHẦM DÂN SỐ. `evaluate_rag_retrieval.py` chạy trên toàn `ground_truth` (1.305
+  1. Trần so nhầm dân số. `evaluate_rag_retrieval.py` chạy trên toàn `ground_truth` (1.305
      truy vấn, đa số NetFlow thuần) cho Recall@3 = 0,385, rồi con số đó được viện dẫn làm
-     "TRẦN" của chỉ số quy kết 80,0% vốn chấm trên lát `payload` (243 truy vấn). Hai mẫu số
+     "trần" của chỉ số quy kết 80,0% vốn chấm trên lát `payload` (243 truy vấn). Hai mẫu số
      khác nhau. Đọc lên nghe như mâu thuẫn trong khi không hề mâu thuẫn.
 
-  2. MẪU SỐ BỊ CACHE GỘP. `evaluate_adversarial --mode pipeline --category field_injection`
+  2. Mẫu số bị CACHE gộp. `evaluate_adversarial --mode pipeline --category field_injection`
      báo "100/100 kháng được, đều cả 4 vị trí trường". Nhưng khoá cache lớp-2 dựng từ
-     `message+payload+uri` và BỎ SÓT `user_agent`, nên 23 mẫu tiêm vào User-Agent chỉ sinh 2
+     `message+payload+uri` và bỏ sót `user_agent`, nên 23 mẫu tiêm vào User-Agent chỉ sinh 2
      dấu vân => 2 phán quyết LLM phát lại 21 lần. Cột đó là 2 phép đo, không phải 23.
 
-Cả hai đều VÔ HÌNH với phép rà theo tệp/khoá. Chúng chỉ lộ ra khi hỏi đúng một câu: mẫu số
-danh nghĩa và số phép đo ĐỘC LẬP có bằng nhau không.
+Cả hai đều vô hình với phép rà theo tệp/khoá. Chúng chỉ lộ ra khi hỏi đúng một câu: mẫu số
+danh nghĩa và số phép đo độc lập có bằng nhau không.
 
-BA PHÉP KIỂM:
-  A. TRÙNG DÂN SỐ — các chỉ số tự nhận so được với nhau (trần/đối chứng) phải cùng mẫu số.
-  B. ĐỘC LẬP — với chỉ số chạy qua Tier-2, đếm dấu vân cache khác nhau trên đúng tập đầu
+Ba phép kiểm:
+  A. Trùng dân số - các chỉ số tự nhận so được với nhau (trần/đối chứng) phải cùng mẫu số.
+  B. Độc lập - với chỉ số chạy qua Tier-2, đếm dấu vân cache khác nhau trên đúng tập đầu
      vào của nó; ít hơn mẫu số nghĩa là tỉ lệ bị thổi phồng bởi bản sao.
-  C. BÃO HOÀ — chỉ số mà MỌI mẫu cho cùng một kết quả thì không phân giải được gì; báo kèm
+  C. Bão hoà - chỉ số mà mọi mẫu cho cùng một kết quả thì không phân giải được gì; báo kèm
      cận trên CI để thấy n nhỏ tới mức nào.
 
 Chạy:  .venv/bin/python scripts/audit_metric_denominators.py
@@ -54,7 +54,7 @@ def load(name: str):
         return json.load(fh)
 
 
-# ── A. TRÙNG DÂN SỐ ───────────────────────────────────────────────────────────
+# A. Trùng dân số
 def kiem_trung_dan_so() -> None:
     print("\n── A. Chỉ số tự nhận so được với nhau có CÙNG mẫu số không ──")
     rrf, e2e = (
@@ -74,7 +74,7 @@ def kiem_trung_dan_so() -> None:
             f"{rrf['n_with_technique']} vs {e2e['n_with_technique']} có kỹ thuật",
         )
 
-    # Trần truy xuất chỉ so được với quy kết khi CÙNG lát bằng chứng.
+    # Trần truy xuất chỉ so được với quy kết khi cùng lát bằng chứng.
     rag_all, rag_pl = load("rag_retrieval_results.json"), load("rag_retrieval_results_payload.json")
     if rag_all and rrf:
         note(
@@ -95,7 +95,7 @@ def kiem_trung_dan_so() -> None:
             f"{rrf['n_with_technique']} mẫu — trần {'đứng trên' if r3 >= acc else '🔴 THẤP HƠN'} kết quả",
         )
 
-    # Lớp tĩnh và Tier-2 KHÔNG được trích thay cho nhau: khác dân số theo thiết kế.
+    # Lớp tĩnh và Tier-2 không được trích thay cho nhau: khác dân số theo thiết kế.
     stat, pipe = load("robustness_results.json"), load("adversarial_pipeline_results.json")
     if stat and pipe:
         note(
@@ -107,7 +107,7 @@ def kiem_trung_dan_so() -> None:
         )
 
 
-# ── B. ĐỘC LẬP ────────────────────────────────────────────────────────────────
+# B. Độc lập
 def kiem_doc_lap() -> None:
     print("\n── B. N mẫu có cho N phép đo ĐỘC LẬP không (cache gộp?) ──")
     from experiments.evaluate_adversarial import (
@@ -176,7 +176,7 @@ def kiem_doc_lap() -> None:
         )
 
 
-# ── C. BÃO HOÀ ────────────────────────────────────────────────────────────────
+# C. Bão hoà
 def kiem_bao_hoa() -> None:
     print("\n── C. Chỉ số có bão hoà ở một giá trị duy nhất không ──")
     from experiments.metrics_core import wilson_ci
@@ -250,7 +250,7 @@ def main() -> int:
             {
                 "tong_phep_kiem": len(findings),
                 "so_co": n_co,
-                # KHÔNG có `metric_valid`: cờ ở đây không phải lỗi, mà là điều kiện đọc số.
+                # Không có `metric_valid`: cờ ở đây không phải lỗi, mà là điều kiện đọc số.
                 # Gắn nhãn pass/fail sẽ khuyến khích làm cho hết cờ thay vì nêu điều kiện.
                 "ghi_chu": (
                     "Mỗi CỜ là một điều kiện PHẢI nêu kèm khi trích con số tương ứng, "

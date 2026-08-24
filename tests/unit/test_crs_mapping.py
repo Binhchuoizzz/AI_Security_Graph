@@ -1,7 +1,7 @@
-"""Bảo đảm ánh xạ chữ ký WAF → OWASP CRS KHÔNG BAO GIỜ trôi khỏi code thật.
+"""Bảo đảm ánh xạ chữ ký WAF -> OWASP CRS không bao giờ trôi khỏi code thật.
 
 Ánh xạ này là câu trả lời cho phản biện "luật do các anh tự nghĩ ra". Nếu ai đó thêm một
-họ chữ ký mà quên ánh xạ, bảng sẽ âm thầm không còn phủ hết — test này bắt ngay.
+họ chữ ký mà quên ánh xạ, bảng sẽ âm thầm không còn phủ hết - test này bắt ngay.
 """
 
 from src.tier1_filter.crs_mapping import (
@@ -13,13 +13,13 @@ from src.tier1_filter.rule_engine import _WAF_PATTERNS
 
 
 def test_every_signature_family_has_a_mapping():
-    """MỌI họ chữ ký trong rule_engine PHẢI có mục ánh xạ — không sót cái nào."""
+    """mọi họ chữ ký trong rule_engine phải có mục ánh xạ - không sót cái nào."""
     missing = sorted(set(_WAF_PATTERNS) - set(CRS_MAPPING))
     assert not missing, f"Họ chữ ký thiếu ánh xạ CRS: {missing}"
 
 
 def test_no_orphan_mapping_entries():
-    """Không có mục ánh xạ cho họ chữ ký ĐÃ BỊ XOÁ (bảng không được phình rác)."""
+    """Không có mục ánh xạ cho họ chữ ký đã bị xoá (bảng không được phình rác)."""
     orphans = sorted(set(CRS_MAPPING) - set(_WAF_PATTERNS))
     assert not orphans, f"Ánh xạ trỏ tới họ không còn tồn tại: {orphans}"
 
@@ -33,7 +33,7 @@ def test_crs_files_follow_official_naming():
 
 
 def test_out_of_scope_entries_name_an_alternative_framework():
-    """Họ nằm ngoài CRS PHẢI nêu khung thay thế — không được để trống rồi lờ đi."""
+    """Họ nằm ngoài CRS phải nêu khung thay thế - không được để trống rồi lờ đi."""
     for family, ref in CRS_MAPPING.items():
         if ref.crs_file != OUT_OF_CRS_SCOPE:
             continue
@@ -43,28 +43,26 @@ def test_out_of_scope_entries_name_an_alternative_framework():
 
 
 def test_every_entry_explains_itself():
-    """Mỗi ánh xạ phải có ghi chú lý do — bảng không lời giải thích thì không kiểm chứng được."""
+    """Mỗi ánh xạ phải có ghi chú lý do - bảng không lời giải thích thì không kiểm chứng được."""
     for family, ref in CRS_MAPPING.items():
         assert ref.note.strip(), f"{family}: thiếu ghi chú lý do ánh xạ"
 
 
 def test_coverage_summary_is_consistent():
-    """Con số trích vào luận văn phải ĐẾM TỪ BẢNG, không nhập tay."""
+    """Con số trích vào luận văn phải đếm từ bảng, không nhập tay."""
     s = coverage_summary()
     assert s["total"] == len(_WAF_PATTERNS)
     assert s["mapped_to_crs"] + s["beyond_crs_scope"] == s["total"]
     assert s["mapped_to_crs"] > 0 and s["distinct_crs_files"] > 0
 
 
-# ==============================================================================
-# ÂM TÍNH GIẢ: DÙNG web shell đã trồng sẵn (khác với TRỒNG nó)
-# ==============================================================================
+# Âm tính giả: Dùng web shell đã trồng sẵn (khác với trồng nó)
 #
 # Lỗi thật đo được trên luồng demo: mẫu WEB-WEB-029 (`POST /uploads/s.php`, thân `cmd=id`)
-# được Tier-1 chấm 0 điểm, 0 lý do -> hành động DROP. Vì DROP nên nó KHÔNG lên Tier-2 nữa:
-# một cuộc tấn công đi lọt TOÀN BỘ hệ thống mà không để lại dấu vết nào. Nguyên nhân: các
-# nhánh cũ của chữ ký "Web Shell / Code Execution" chỉ bắt lúc shell được TRỒNG (payload
-# chứa `<?php`, `eval(`, `system(`...), còn lúc kẻ tấn công GỌI shell đã nằm sẵn thì thân
+# được Tier-1 chấm 0 điểm, 0 lý do -> hành động DROP. Vì DROP nên nó không lên Tier-2 nữa:
+# một cuộc tấn công đi lọt toàn bộ hệ thống mà không để lại dấu vết nào. Nguyên nhân: các
+# nhánh cũ của chữ ký "Web Shell / Code Execution" chỉ bắt lúc shell được trồng (payload
+# chứa `<?php`, `eval(`, `system(`...), còn lúc kẻ tấn công gọi shell đã nằm sẵn thì thân
 # yêu cầu không có một ký tự mã nào.
 
 
@@ -81,13 +79,13 @@ def test_interacting_with_a_planted_web_shell_is_detected():
     ):
         assert pat.search(uri), f"web shell đi lọt: {uri}"
 
-    # Vẫn phải bắt dạng TRỒNG shell như trước.
+    # Vẫn phải bắt dạng trồng shell như trước.
     for planted in ("<?php system($_GET['c']); ?>", "eval(base64_decode($_POST['x']))"):
         assert pat.search(planted), f"mất khả năng bắt cũ: {planted}"
 
 
 def test_web_shell_rule_does_not_fire_on_benign_static_assets():
-    """Chữ ký chỉ nhắm tệp THỰC THI ĐƯỢC trong thư mục tải lên — không phải mọi /uploads/."""
+    """Chữ ký chỉ nhắm tệp thực thi được trong thư mục tải lên - không phải mọi /uploads/."""
     from src.tier1_filter.rule_engine import _WAF_PATTERNS
 
     pat = _WAF_PATTERNS["Web Shell / Code Execution"]

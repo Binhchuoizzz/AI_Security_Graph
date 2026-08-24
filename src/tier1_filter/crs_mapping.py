@@ -1,22 +1,22 @@
-"""Ánh xạ chữ ký WAF của Tier-1 sang phân loại CHUẨN CÔNG NGHIỆP.
+"""Ánh xạ chữ ký WAF của Tier-1 sang phân loại chuẩn công nghiệp.
 
-MỤC ĐÍCH (câu hỏi phản biện): "29 họ chữ ký này do các anh tự nghĩ ra, lấy gì bảo đảm nó
+Mục đích (câu hỏi phản biện): "29 họ chữ ký này do các anh tự nghĩ ra, lấy gì bảo đảm nó
 phủ đúng thứ cần phủ?" Bảng dưới neo từng họ vào hai khung tham chiếu công khai:
 
-  * **OWASP CRS 3.3** — bộ luật WAF chuẩn công nghiệp, tổ chức theo file `REQUEST-9xx-*`.
-    Tên file là định danh ỔN ĐỊNH của CRS 3.x (không phải số hiệu luật riêng lẻ, vốn thay
-    đổi giữa các bản vá — cố ý neo ở mức FILE để không trích dẫn số hiệu không kiểm chứng).
-  * **OWASP Top 10:2021** — phân loại rủi ro ứng dụng web.
+  * OWASP CRS 3.3 - bộ luật WAF chuẩn công nghiệp, tổ chức theo file `REQUEST-9xx-*`.
+    Tên file là định danh ổn định của CRS 3.x (không phải số hiệu luật riêng lẻ, vốn thay
+    đổi giữa các bản vá - cố ý neo ở mức FILE để không trích dẫn số hiệu không kiểm chứng).
+  * OWASP Top 10:2021 - phân loại rủi ro ứng dụng web.
 
-TRUNG THỰC VỀ PHẠM VI: một số họ chữ ký **không có** đối ứng trong CRS, và đó KHÔNG phải
-thiếu sót của CRS — CRS là bộ luật cho **giao dịch HTTP**, còn các họ đó là hành vi
+Trung thực về phạm VI: một số họ chữ ký không có đối ứng trong CRS, và đó không phải
+thiếu sót của CRS - CRS là bộ luật cho giao dịch HTTP, còn các họ đó là hành vi
 endpoint/mạng (ransomware, đào tiền, đánh cắp credential AD, LOLBin, reverse shell, rò rỉ
-ra dịch vụ ngoài). Khung đối ứng cho chúng là **Sigma** (luật phát hiện trên log endpoint)
-và MITRE ATT&CK. Việc ghi rõ điều này chính là bằng chứng bộ chữ ký phủ RỘNG HƠN phạm vi
+ra dịch vụ ngoài). Khung đối ứng cho chúng là Sigma (luật phát hiện trên log endpoint)
+và MITRE ATT&CK. Việc ghi rõ điều này chính là bằng chứng bộ chữ ký phủ rộng hơn phạm vi
 một WAF, chứ không phải bịa ra danh mục cho đủ.
 
-Xem thêm: `tests/unit/test_crs_mapping.py` bắt buộc MỌI họ trong `_WAF_PATTERNS` phải có
-mục ở đây — thêm chữ ký mà quên ánh xạ thì CI đỏ, không trôi được.
+Xem thêm: `tests/unit/test_crs_mapping.py` bắt buộc mọi họ trong `_WAF_PATTERNS` phải có
+mục ở đây - thêm chữ ký mà quên ánh xạ thì CI đỏ, không trôi được.
 """
 
 from typing import NamedTuple
@@ -24,7 +24,7 @@ from typing import NamedTuple
 CRS_VERSION = "OWASP CRS 3.3"
 TOP10_VERSION = "OWASP Top 10:2021"
 
-# Giá trị dùng khi một họ nằm NGOÀI phạm vi CRS (không phải tấn công tầng HTTP).
+# Giá trị dùng khi một họ nằm ngoài phạm vi CRS (không phải tấn công tầng HTTP).
 OUT_OF_CRS_SCOPE = "—"
 
 
@@ -36,9 +36,9 @@ class CrsRef(NamedTuple):
     note: str  # vì sao ánh xạ như vậy / khung thay thế nếu ngoài CRS
 
 
-# Khoá PHẢI khớp CHÍNH XÁC khoá trong `rule_engine._WAF_PATTERNS`.
+# Khoá phải khớp chính xác khoá trong `rule_engine._WAF_PATTERNS`.
 CRS_MAPPING: dict[str, CrsRef] = {
-    # ── Tấn công tiêm nhiễm tầng ứng dụng (CRS phủ trực tiếp) ────────────────────
+    # Tấn công tiêm nhiễm tầng ứng dụng (CRS phủ trực tiếp)
     "SQL Injection (SQLi)": CrsRef(
         "REQUEST-942-APPLICATION-ATTACK-SQLI", "A03 Injection", "Đối ứng trực tiếp."
     ),
@@ -139,7 +139,7 @@ CRS_MAPPING: dict[str, CrsRef] = {
     "Scanner / Attack Tooling": CrsRef(
         "REQUEST-913-SCANNER-DETECTION", "A05 Security Misconfiguration", "Đối ứng trực tiếp."
     ),
-    # ── NGOÀI phạm vi CRS: hành vi endpoint/mạng, khung đối ứng là Sigma ─────────
+    # ngoài phạm vi CRS: hành vi endpoint/mạng, khung đối ứng là Sigma
     "Reverse Shell": CrsRef(
         OUT_OF_CRS_SCOPE,
         "A03 Injection (hậu quả)",

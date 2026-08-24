@@ -1,24 +1,24 @@
 """
-Guardrails: Chính sách Độ-tin-cậy THỐNG NHẤT (Unified Confidence Policy)
+Guardrails: Chính sách Độ-tin-cậy thống nhất (Unified Confidence Policy)
 
-MỘT nguồn sự thật cho ngưỡng quyết định của cả Cổng ML (Tier-1) và LLM Agent (Tier-2).
-Hai tầng DÙNG CHUNG thang điểm độ-tin-cậy tấn công C ∈ [0,1], chỉ khác tập HÀNH ĐỘNG
+Một nguồn sự thật cho ngưỡng quyết định của cả Cổng ML (Tier-1) và LLM Agent (Tier-2).
+Hai tầng dùng chung thang điểm độ-tin-cậy tấn công C ∈ [0,1], chỉ khác tập hành động
 đầu-cuối mà mỗi tầng được phép ra.
 
-── Cổng ML (Tier-1) — 4 dải (theo yêu cầu):
+ Cổng ML (Tier-1) - 4 dải (theo yêu cầu):
     C >= 0.85            -> BLOCK    (chặn ngay)
     0.65 <= C < 0.85     -> ESCALATE (đưa lên LLM phân tích sâu)
     0.40 <= C < 0.65     -> ALERT    (low-priority; IP tái phạm -> tự BLOCK)
     C < 0.40             -> PASS/DROP (audit log, dừng ở Tier-1)
 
-── LLM (Tier-2) — tầng phán quyết cuối (KHÔNG escalate tiếp; vùng mơ hồ -> người):
+ LLM (Tier-2) - tầng phán quyết cuối (không escalate tiếp; vùng mơ hồ -> người):
     C >= 0.85            -> BLOCK
     0.65 <= C < 0.85     -> ALERT    (IP tái phạm -> tự BLOCK)
     C < 0.65             -> AWAIT_HITL (không đủ chắc -> chuyển người)
-    LLM phán log SẠCH    -> DROP     (bất kể C)
+    LLM phán log sạch    -> DROP     (bất kể C)
 
-Mặc định nằm TRONG code (checkout sạch vẫn chạy); có thể override tuỳ chọn qua khối
-`decision_policy:` trong config/system_settings.yaml (KHÔNG commit file config đó).
+Mặc định nằm trong code (checkout sạch vẫn chạy); có thể override tuỳ chọn qua khối
+`decision_policy:` trong config/system_settings.yaml (không commit file config đó).
 """
 
 from __future__ import annotations
@@ -30,40 +30,40 @@ import yaml  # type: ignore
 
 logger = logging.getLogger(__name__)
 
-# ── Cổng ML (Tier-1) — 4 dải ─────────────────────────────────────────────────
+# Cổng ML (Tier-1) - 4 dải
 ML_BLOCK_CONF: float = 0.85  # >= -> BLOCK
 ML_ESCALATE_CONF: float = 0.65  # [0.65, 0.85) -> ESCALATE (LLM)
 ML_ALERT_CONF: float = 0.40  # [0.40, 0.65) -> ALERT ; < 0.40 -> PASS/DROP
 
-# ── LLM (Tier-2) — chốt BLOCK trùng ML để nhất quán ──────────────────────────
+# LLM (Tier-2) - chốt BLOCK trùng ML để nhất quán
 LLM_BLOCK_CONF: float = 0.85  # >= -> BLOCK
 LLM_ALERT_CONF: float = 0.65  # [0.65, 0.85) -> ALERT ; < 0.65 -> AWAIT_HITL
 
-# Ngưỡng để một CẢNH BÁO được tính vào bộ đếm TÁI PHẠM (repeat-offender).
-# ĐO THẬT trên demo 5.000 sự kiện: dải ALERT yếu của Cổng ML (0.40–0.65) chỉ chính xác
+# Ngưỡng để một cảnh báo được tính vào bộ đếm tái phạm (repeat-offender).
+# Đo thật trên demo 5.000 sự kiện: dải ALERT yếu của Cổng ML (0.40–0.65) chỉ chính xác
 # 5,21%; nạp tín hiệu đó vào luật "ALERT trước đó -> tự BLOCK" đã biến nhiễu thành lệnh
-# chặn — luật tái phạm khi ấy đúng 0/10 (chặn nhầm 10 IP LÀNH TÍNH, không bắt được ca nào).
-# Nay chỉ cảnh báo ĐỦ MẠNH (>= ngưỡng này) mới được tính. Trùng biên ML_ESCALATE_CONF vì
-# đó chính là ranh giới "đáng hành động" của hệ: ALERT của LLM luôn >= 0.65 nên KHÔNG bị
+# chặn - luật tái phạm khi ấy đúng 0/10 (chặn nhầm 10 IP lành tính, không bắt được ca nào).
+# Nay chỉ cảnh báo đủ mạnh (>= ngưỡng này) mới được tính. Trùng biên ML_ESCALATE_CONF vì
+# đó chính là ranh giới "đáng hành động" của hệ: ALERT của LLM luôn >= 0.65 nên không bị
 # ảnh hưởng; chỉ dải ALERT yếu của Cổng ML bị loại khỏi bộ đếm.
 REPEAT_OFFENDER_MIN_CONF: float = ML_ESCALATE_CONF
 
-# ── LÝ DO chuyển người xử lý (mã máy đọc được) ───────────────────────────────
-# VÌ SAO CẦN. Trước đây lý do một lô rơi vào AWAIT_HITL chỉ tồn tại dưới dạng tiền tố văn
-# xuôi trong `reasoning` ("[NEO BẰNG CHỨNG: ...]", "[CẢNH BÁO: ...]"). Muốn biết "hàng đợi
-# HITL gồm những gì" phải khớp chuỗi tiếng Việt — không thống kê được, không đưa vào luận
+# lý do chuyển người xử lý (mã máy đọc được)
+# Vì sao cần. Trước đây lý do một lô rơi vào AWAIT_HITL chỉ tồn tại dưới dạng tiền tố văn
+# xuôi trong `reasoning` ("[neo bằng chứng: ...]", "[cảnh báo: ...]"). Muốn biết "hàng đợi
+# HITL gồm những gì" phải khớp chuỗi tiếng Việt - không thống kê được, không đưa vào luận
 # văn được, và analyst nhìn hàng đợi cũng không phân loại được việc nào cần làm trước.
 #
-# Bốn nhóm dưới đây KHÁC NHAU VỀ BẢN CHẤT và cần xử lý khác nhau:
-#   - `technique_not_in_rag`   : kho tri thức THIẾU kỹ thuật đó -> việc cần làm là BỔ SUNG KHO
+# Bốn nhóm dưới đây khác nhau về bản chất và cần xử lý khác nhau:
+#   - `technique_not_in_rag`   : kho tri thức thiếu kỹ thuật đó -> việc cần làm là bổ sung kho
 #   - `technique_unmappable`   : có tài liệu nhưng không khớp chắc -> analyst quyết
 #   - `low_confidence`         : bằng chứng yếu (thường là NetFlow thuần) -> cần thêm telemetry
-#   - `llm_output_unreadable`  : model TRẢ LỜI nhưng JSON hỏng -> việc của kỹ sư (prompt/schema)
-#   - `llm_unavailable`        : model KHÔNG trả lời (mất kết nối/quá hạn) -> việc của vận hành
+#   - `llm_output_unreadable`  : model trả lời nhưng JSON hỏng -> việc của kỹ sư (prompt/schema)
+#   - `llm_unavailable`        : model không trả lời (mất kết nối/quá hạn) -> việc của vận hành
 #
 # Hai mã cuối từng gộp làm một, và câu mô tả chung đổ lỗi cho "Invalid JSON or timeout". Đo
 # ngày 2026-08-03: container LLM restart, 10 lần `APIConnectionError`, 3 bản ghi AWAIT_HITL
-# hiện lên Dashboard với lý do nhắc `max_tokens` — analyst đọc xong sẽ đi truy định dạng
+# hiện lên Dashboard với lý do nhắc `max_tokens` - analyst đọc xong sẽ đi truy định dạng
 # prompt trong khi việc cần làm chỉ là bật lại dịch vụ. Hai nguyên nhân, hai cách sửa.
 HITL_REASONS: dict[str, str] = {
     "technique_not_in_rag": "Suggested technique not present in retrieved context",
@@ -75,25 +75,25 @@ HITL_REASONS: dict[str, str] = {
     "port_only_c2": "Non-standard port as sole evidence without C2 indicators",
     "social_engineering_suspected": "Suspected prompt injection or downgrade attempt",
     "tier1_hitl_threshold": "Tier-1 reached human review threshold",
-    # ── thêm 2026-08-17 ──
+    # thêm 2026-08-17
     "flow_only_no_payload": "Flow-only batch: no payload/URI/User-Agent to attribute from",
     "context_truncated": "Prompt exceeded context window; evidence was cut and no injection found",
     "unverified_llm_claim": "Model claims threat but no signature corroborates it — human arbitrates",
     "unspecified": "NO REASON RECORDED — this is a defect, every deferral must state why",
 }
 
-# ── PHÂN LOẠI ĐỂ AUDIT ────────────────────────────────────────────────────────────
-# Mỗi mã thuộc ĐÚNG MỘT nhóm. Nhóm trả lời câu "ai phải xử lý phiếu này":
+# phân loại để AUDIT
+# Mỗi mã thuộc đúng một nhóm. Nhóm trả lời câu "ai phải xử lý phiếu này":
 #
-#   EVIDENCE    hệ KHÔNG ĐỦ DỮ LIỆU để kết luận  -> analyst thu thêm telemetry
-#   ATTRIBUTION hệ có dữ liệu nhưng KHÔNG QUY KẾT ĐƯỢC kỹ thuật -> analyst tra thủ công
-#   SAFETY      hệ NGHI BỊ THAO TÚNG hoặc chạm ngưỡng an toàn   -> analyst xét đối kháng
-#   INFRA       hỏng hạ tầng / hợp đồng đầu ra    -> KỸ SƯ, không phải analyst
-#   UNKNOWN     không ghi lý do — LUÔN PHẢI BẰNG 0, có mặt ở đây là lỗi
+#   EVIDENCE    hệ không đủ dữ liệu để kết luận  -> analyst thu thêm telemetry
+#   ATTRIBUTION hệ có dữ liệu nhưng không quy kết được kỹ thuật -> analyst tra thủ công
+#   SAFETY      hệ nghi bị thao túng hoặc chạm ngưỡng an toàn   -> analyst xét đối kháng
+#   INFRA       hỏng hạ tầng / hợp đồng đầu ra    -> kỹ sư, không phải analyst
+#   UNKNOWN     không ghi lý do - luôn phải bằng 0, có mặt ở đây là lỗi
 #
 # Vì sao tách INFRA khỏi ba nhóm kia: một phiếu `llm_unavailable` nằm lẫn trong hàng đợi
 # phân tích sẽ khiến analyst đi đọc log tấn công, trong khi việc cần làm là bật lại dịch vụ.
-# Đếm gộp cả hai vào một con số "tải HITL" cũng làm hỏng chỉ số — phần INFRA không phản ánh
+# Đếm gộp cả hai vào một con số "tải HITL" cũng làm hỏng chỉ số - phần INFRA không phản ánh
 # độ khó của lưu lượng.
 HITL_CATEGORIES: dict[str, str] = {
     "flow_only_no_payload": "EVIDENCE",
@@ -101,8 +101,8 @@ HITL_CATEGORIES: dict[str, str] = {
     "context_truncated": "EVIDENCE",
     "llm_abstained": "EVIDENCE",
     "port_only_c2": "EVIDENCE",
-    # Model nói "tấn công", không chữ ký nào xác nhận. Đây KHÔNG phải thiếu dữ liệu (lô có
-    # đủ payload) mà là BẤT ĐỒNG giữa model và bằng chứng — analyst phân xử, nên xếp SAFETY.
+    # Model nói "tấn công", không chữ ký nào xác nhận. Đây không phải thiếu dữ liệu (lô có
+    # đủ payload) mà là bất đồng giữa model và bằng chứng - analyst phân xử, nên xếp SAFETY.
     "unverified_llm_claim": "SAFETY",
     "technique_not_in_rag": "ATTRIBUTION",
     "technique_unmappable": "ATTRIBUTION",
@@ -115,7 +115,7 @@ HITL_CATEGORIES: dict[str, str] = {
 
 
 def hitl_reason_text(code: str) -> str:
-    """English description of HITL reason code."""
+    """Diễn giải tiếng Anh cho mã lý do HITL."""
     return HITL_REASONS.get(code, code)
 
 
@@ -170,7 +170,7 @@ def classify_llm(is_threat: bool, confidence: float) -> str:
     """LLM: (có phải đe doạ?, độ tin cậy) -> BLOCK_IP | ALERT | AWAIT_HITL | DROP.
 
     - is_threat=False (LLM phán log sạch) -> DROP bất kể confidence.
-    - is_threat=True -> confidence LÁI action: >=0.85 BLOCK · 0.65–0.85 ALERT ·
+    - is_threat=True -> confidence lái action: >=0.85 BLOCK · 0.65–0.85 ALERT ·
       < 0.65 AWAIT_HITL (không đủ chắc -> người)."""
     if not is_threat:
         return "DROP"

@@ -1,6 +1,4 @@
-"""
-Guardrails: Configurable Feedback Loop Validator (Zero-Trust Rules & IP Checks)
-"""
+"""Kiểm luật động trước khi nhận: zero-trust cho mẫu luật và địa chỉ IP."""
 
 import ipaddress
 import logging
@@ -85,7 +83,7 @@ class FeedbackValidator:
                     # Nếu là regex hoặc signature khác, cho phép qua
                     pass
 
-        # Validate regex syntax cho non-IP fields
+        # Kiểm cú pháp regex cho trường không phải IP
         if norm_field in ["URI", "User-Agent"]:
             try:
                 re.compile(pattern_str)
@@ -101,10 +99,10 @@ class FeedbackValidator:
     def validate_whitelist_ip(self, ip_str: str) -> tuple[bool, list[str]]:
         """Xác thực IP whitelist mới.
 
-        Analyst được whitelist MỘT HOST cụ thể ở BẤT KỲ dải nào (nội bộ, TEST-NET, hay
-        public như DAPT) — đây là quyết định có chủ đích cho mọi luồng demo/vận hành.
-        CHỈ CẤM thứ thực sự nguy hiểm (Zero-Trust): wildcard toàn Internet và dải CIDR quá
-        lớn (nuốt cả vùng địa chỉ). Whitelist host cụ thể là hợp lệ; whitelist cả DẢI thì không.
+        Analyst được whitelist một HOST cụ thể ở bất kỳ dải nào (nội bộ, TEST-NET, hay
+        public như DAPT) - đây là quyết định có chủ đích cho mọi luồng demo/vận hành.
+        Chỉ cấm thứ thực sự nguy hiểm (Zero-Trust): wildcard toàn Internet và dải CIDR quá
+        lớn (nuốt cả vùng địa chỉ). Whitelist host cụ thể là hợp lệ; whitelist cả dải thì không.
         """
         errors = []
         ip_str = ip_str.strip()

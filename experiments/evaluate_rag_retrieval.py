@@ -1,35 +1,35 @@
-"""SENTINEL — Chất lượng TRUY XUẤT của Dual-RAG (offline, KHÔNG cần LLM).
+"""SENTINEL - Chất lượng truy xuất của Dual-RAG (offline, không cần LLM).
 
-CÂU HỎI FILE NÀY TRẢ LỜI: khi Tier-2 hỏi kho tri thức, tài liệu ĐÚNG có nằm trong ba đoạn
-mà prompt thực sự nạp không — và nếu có thì ở hạng mấy?
+Câu hỏi FILE này trả lời: khi Tier-2 hỏi kho tri thức, tài liệu đúng có nằm trong ba đoạn
+mà prompt thực sự nạp không - và nếu có thì ở hạng mấy?
 
-VÌ SAO CẦN MỘT PHÉP ĐO RIÊNG. Trước đây chất lượng truy xuất chỉ được suy ra GIÁN TIẾP từ
+Vì sao cần một phép đo riêng. Trước đây chất lượng truy xuất chỉ được suy ra gián tiếp từ
 điểm "Context Precision" do một LLM trọng tài chấm. Con số đó trộn ba nguyên nhân vào một:
 bộ truy xuất lấy sai, tác tử dùng ngữ cảnh vụng, hay trọng tài chấm lệch. Khi điểm thấp,
-không có cách nào biết phải sửa cái nào. Ở đây ta đo THẲNG bộ truy xuất bằng chỉ số chuẩn
+không có cách nào biết phải sửa cái nào. Ở đây ta đo thẳng bộ truy xuất bằng chỉ số chuẩn
 của ngành truy xuất thông tin (Recall@k · MRR · nDCG@k), đối chiếu với nhãn
 `expected_mitre_technique` có sẵn trong `ground_truth.json`.
 
 Đây cũng là phép đo trực tiếp đầu tiên cho hai thứ vốn được tuyên bố mà chưa từng đo:
-  * RAG LAI (FAISS dày + BM25 thưa, hợp nhất bằng RRF k=60) — so được với từng nhánh riêng;
-  * việc TÁCH HAI TRUY VẤN (truy vấn kỹ thuật thuần tiếng Anh, không payload) so với cách
+  * RAG LAI (FAISS dày + BM25 thưa, hợp nhất bằng RRF k=60) - so được với từng nhánh riêng;
+  * việc tách hai truy vấn (truy vấn kỹ thuật thuần tiếng Anh, không payload) so với cách
     cũ nối payload thô vào cùng chuỗi.
 
-TRẦN PHỦ KHO. Nếu KB không có kỹ thuật cần tìm thì bộ truy xuất KHÔNG THỂ trả nó ra. Script
-tự tính `kb_coverage_ceiling` và báo cả hai con số: recall thô, và recall TRÊN PHẦN KHẢ THI.
-Trích con số thứ hai mới đúng — và trung thực hơn hẳn.
+Trần phủ kho. Nếu KB không có kỹ thuật cần tìm thì bộ truy xuất không thể trả nó ra. Script
+tự tính `kb_coverage_ceiling` và báo cả hai con số: recall thô, và recall trên phần khả thi.
+Trích con số thứ hai mới đúng - và trung thực hơn hẳn.
 
-PHÁT HIỆN CẦN BIẾT TRƯỚC KHI ĐỌC SỐ — có một TRẦN CẤU TRÚC ngoài trần phủ kho. Trên tập
-điều kiện-hoá-theo-leo-thang, phần lớn sự kiện là NetFlow THUẦN: không payload, không chữ
+Phát hiện cần biết trước khi đọc số - có một trần cấu trúc ngoài trần phủ kho. Trên tập
+điều kiện-hoá-theo-leo-thang, phần lớn sự kiện là NetFlow thuần: không payload, không chữ
 ký, và lý do leo thang duy nhất là một dị biệt Welford kiểu "Total Fwd Packets lệch 4,1
 sigma". Nhãn kỳ vọng của những ca đó lại là `T1110` (Brute Force) hay `T1499` (Endpoint
-DoS) — tức những kỹ thuật chỉ định nghĩa được qua HÀNH VI LẶP LẠI TRÊN NHIỀU LUỒNG, trong
-khi truy vấn chỉ có MỘT luồng. Nói cách khác, thông tin cần thiết không nằm trong đầu vào.
+DoS) - tức những kỹ thuật chỉ định nghĩa được qua hành VI lặp lại trên nhiều luồng, trong
+khi truy vấn chỉ có một luồng. Nói cách khác, thông tin cần thiết không nằm trong đầu vào.
 
-Vì vậy `Recall@10` cao mà `Recall@3` thấp KHÔNG có nghĩa bộ truy xuất hỏng: tài liệu đúng
+Vì vậy `Recall@10` cao mà `Recall@3` thấp không có nghĩa bộ truy xuất hỏng: tài liệu đúng
 vẫn được lấy về, chỉ xếp dưới các kỹ thuật khác cũng khớp với mô tả "khối lượng bất
 thường". Đây chính là cơ chế đứng sau điểm Context Precision thấp của LLM-as-Judge, và nó
-là một kết quả đo được chứ không phải suy đoán. Hướng khắc phục thật nằm ở phía ĐẦU VÀO
+là một kết quả đo được chứ không phải suy đoán. Hướng khắc phục thật nằm ở phía đầu vào
 (đưa ngữ cảnh phiên/nhiều luồng vào truy vấn), không phải ở việc nhồi thêm từ khoá.
 
 Chạy:
@@ -54,7 +54,7 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 GT_PATH = os.path.join(ROOT, "experiments", "ground_truth.json")
 OUT_JSON = os.path.join(ROOT, "experiments", "results", "rag_retrieval_results.json")
 
-# Prompt chỉ nạp 3 đoạn hợp nhất đầu bảng -> phải truy xuất sâu hơn để ĐO được hạng, nhưng
+# Prompt chỉ nạp 3 đoạn hợp nhất đầu bảng -> phải truy xuất sâu hơn để đo được hạng, nhưng
 # `recall@3` mới là con số vận hành.
 TOP_K = 10
 PROMPT_TOP_K = 3
@@ -73,11 +73,11 @@ def _norm_technique(raw: str) -> str:
 
 
 def _relevant_ids(expected: str) -> set[str]:
-    """Tập id được tính là ĐÚNG cho một kỹ thuật kỳ vọng.
+    """Tập id được tính là đúng cho một kỹ thuật kỳ vọng.
 
-    Chấp nhận cả kỹ thuật CHA khi kỳ vọng là sub-technique (T1110.004 -> T1110): kho chứa
+    Chấp nhận cả kỹ thuật cha khi kỳ vọng là sub-technique (T1110.004 -> T1110): kho chứa
     cả hai mức, và trả về đúng họ kỹ thuật đã là ngữ cảnh dùng được cho tác tử. Chiều ngược
-    lại KHÔNG được chấp nhận — trả T1110.004 khi cần T1110 là thu hẹp sai.
+    lại không được chấp nhận - trả T1110.004 khi cần T1110 là thu hẹp sai.
     """
     tid = _norm_technique(expected)
     if not tid:
@@ -105,14 +105,14 @@ def run(limit: int | None = None, out: str | None = None, evidence_layer: str = 
 
     with open(GT_PATH, encoding="utf-8") as f:
         gt = json.load(f)
-    # LỌC TẦNG BẰNG CHỨNG — cùng vị từ với `eval_attack_mapper.py`, cố ý dùng chung
+    # Lọc tầng bằng chứng - cùng vị từ với `eval_attack_mapper.py`, cố ý dùng chung
     # `evidence_layer_of` chứ không chép lại điều kiện.
     #
-    # VÌ SAO CẦN. Recall@k ở đây được viện dẫn như TRẦN của chỉ số quy kết 3.a/3.b. Câu đó
-    # chỉ đúng khi hai bên chấm trên CÙNG dân số: bản mặc định chạy trên toàn `ground_truth`
+    # Vì sao cần. Recall@k ở đây được viện dẫn như trần của chỉ số quy kết 3.a/3.b. Câu đó
+    # chỉ đúng khi hai bên chấm trên cùng dân số: bản mặc định chạy trên toàn `ground_truth`
     # (đa số là NetFlow thuần, T1110/T1499 chiếm hơn nửa) còn 3.a/3.b lọc `payload`. So một
     # con số 38% của tập này với 80% của tập kia rồi gọi cái trước là "trần" là so hai mẫu
-    # số khác nhau — nghe như mâu thuẫn trong khi không hề mâu thuẫn.
+    # số khác nhau - nghe như mâu thuẫn trong khi không hề mâu thuẫn.
     if evidence_layer != "all":
         from src.agent.nodes import evidence_layer_of
 
@@ -127,22 +127,22 @@ def run(limit: int | None = None, out: str | None = None, evidence_layer: str = 
         print(f"[i] Loại {_n_authored} mẫu BIÊN SOẠN khỏi tập chấm truy xuất.")
     samples = [s for s in gt if _relevant_ids(s.get("expected_mitre_technique", ""))]
     if limit and limit < len(samples):
-        stride = len(samples) / limit  # mẫu ĐỀU trên toàn tập, không phải N mẫu đầu
+        stride = len(samples) / limit  # mẫu đều trên toàn tập, không phải N mẫu đầu
         samples = [samples[int(i * stride)] for i in range(limit)]
     print(f"[*] Mẫu có nhãn kỹ thuật: {len(samples)}")
 
     kb_ids = _kb_technique_ids()
     print(f"[*] Kho tri thức: {len(kb_ids)} mã kỹ thuật")
 
-    # Cache TẮT: cache theo mẫu sẽ làm các truy vấn trùng nhau chỉ tốn một lần truy xuất
+    # Cache tắt: cache theo mẫu sẽ làm các truy vấn trùng nhau chỉ tốn một lần truy xuất
     # thật, và ta đang đo chính bộ truy xuất chứ không đo bộ đệm.
     retriever = DualRetriever(top_k=TOP_K, use_cache=False)
 
-    # BẮT BUỘC chạy Tier-1 TRƯỚC khi dựng truy vấn — đây là thứ tự của đường THẬT
+    # Bắt buộc chạy Tier-1 trước khi dựng truy vấn - đây là thứ tự của đường thật
     # (`node_rag_context` luôn chạy sau Tier-1). `build_rag_queries()` lấy cụm từ vựng
     # MITRE tiếng Anh từ `tier1_reasons`; log thô trong `ground_truth.json` chưa qua Tier-1
     # nên trường đó rỗng, và truy vấn kỹ thuật tụt xuống còn mỗi "service + cổng".
-    # Bỏ qua bước này thì phép đo báo Recall@3 ≈ 0,10 — đo cái quy trình KHÔNG tồn tại,
+    # Bỏ qua bước này thì phép đo báo Recall@3 ≈ 0,10 - đo cái quy trình không tồn tại,
     # chứ không đo bộ truy xuất.
     engine = RuleEngine()
     # Làm ấm Welford bằng chính tập warmup benign của luồng gộp: baseline lạnh thì Z-score
@@ -164,8 +164,8 @@ def run(limit: int | None = None, out: str | None = None, evidence_layer: str = 
         relevant = _relevant_ids(s.get("expected_mitre_technique", ""))
         logs = s.get("logs") or [{}]
         evaluated = engine.evaluate(dict(logs[0]))
-        # ĐIỀU KIỆN HOÁ THEO LEO THANG, giống `evaluate_tier2_decision.py`. Sự kiện mà
-        # Tier-1 cho qua thì KHÔNG BAO GIỜ tới RAG ở đường thật, nên chấm chúng là đo một
+        # Điều kiện hoá theo leo thang, giống `evaluate_tier2_decision.py`. Sự kiện mà
+        # Tier-1 cho qua thì không bao giờ tới RAG ở đường thật, nên chấm chúng là đo một
         # quy trình không tồn tại và kéo mọi chỉ số xuống một cách vô nghĩa. Số ca bị loại
         # vẫn được báo (`n_not_escalated`) để không ai tưởng mẫu số là toàn bộ tập.
         if evaluated.get("tier1_action") not in ESCALATING_ACTIONS:
@@ -212,10 +212,10 @@ def run(limit: int | None = None, out: str | None = None, evidence_layer: str = 
     result = {
         "n_samples": len(queries),
         # Ghi thẳng vào tệp kết quả: hai lượt chạy khác `evidence_layer` cho hai con số
-        # KHÔNG thay thế nhau được, mà tên tệp mặc định thì giống hệt nhau.
+        # không thay thế nhau được, mà tên tệp mặc định thì giống hệt nhau.
         "evidence_layer": evidence_layer,
         "n_no_query": n_no_query,
-        # Kế toán mẫu số: chấm CÓ ĐIỀU KIỆN trên ca Tier-1 leo thang, đúng như đường thật.
+        # Kế toán mẫu số: chấm có điều kiện trên ca Tier-1 leo thang, đúng như đường thật.
         "n_not_escalated_excluded": n_not_escalated,
         "top_k_retrieved": TOP_K,
         "prompt_top_k": PROMPT_TOP_K,
@@ -229,13 +229,13 @@ def run(limit: int | None = None, out: str | None = None, evidence_layer: str = 
                 "thể mốc là 100%."
             ),
         },
-        # Recall thô trên TOÀN tập (gồm cả ca không thể đúng vì kho thiếu).
+        # Recall thô trên toàn tập (gồm cả ca không thể đúng vì kho thiếu).
         "overall": overall,
-        # Recall trên phần KHẢ THI — con số nên đưa vào luận văn.
+        # Recall trên phần khả thi - con số nên đưa vào luận văn.
         "achievable": achievable,
         "latency_ms_mean": round(sum(latencies) / len(latencies), 2) if latencies else 0.0,
         "per_technique": per_tech_out,
-        # Các kỹ thuật TRONG kho mà vẫn không lọt nổi top-3: đây là danh sách việc cần làm
+        # Các kỹ thuật trong kho mà vẫn không lọt nổi top-3: đây là danh sách việc cần làm
         # cho bộ truy xuất, không phải cho kho tri thức.
         "worst_in_kb": sorted(
             (
@@ -299,7 +299,7 @@ if __name__ == "__main__":
         ),
     )
     args = ap.parse_args()
-    # Tên tệp mặc định phải tự nói ra nó chấm lát nào — nếu không, lượt `payload` sẽ lặng lẽ
+    # Tên tệp mặc định phải tự nói ra nó chấm lát nào - nếu không, lượt `payload` sẽ lặng lẽ
     # ghi đè lượt `all` và cả hai con số cùng biến mất.
     _out = args.out
     if _out is None and args.evidence_layer != "all":

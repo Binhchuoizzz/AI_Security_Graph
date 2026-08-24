@@ -1,13 +1,13 @@
-"""Quét chức năng UI: gọi ĐÚNG hàm mà mỗi nút gọi, rồi KIỂM SINK tương ứng.
+"""Quét chức năng UI: gọi đúng hàm mà mỗi nút gọi, rồi kiểm SINK tương ứng.
 
-VÌ SAO KHÔNG "BẤM THỬ TRÊN TRÌNH DUYỆT". Bấm nút chỉ chứng minh Streamlit không văng
-exception; nó KHÔNG chứng minh dữ liệu đã xuống đúng nơi. Mỗi hành động ở đây chạm tới BA
+Vì sao không "bấm thử trên trình duyệt". Bấm nút chỉ chứng minh Streamlit không văng
+exception; nó không chứng minh dữ liệu đã xuống đúng nơi. Mỗi hành động ở đây chạm tới ba
 sink khác nhau (Redis blacklist · SQLite luật phản hồi · SQLite nhật ký kiểm toán có HMAC),
 và lỗi thật đã gặp trong dự án này đều là kiểu "UI báo thành công nhưng một sink im lặng
-không ghi". Nên kịch bản này gọi thẳng hàm của nút rồi ĐỌC LẠI từng sink.
+không ghi". Nên kịch bản này gọi thẳng hàm của nút rồi đọc lại từng sink.
 
-An toàn: chỉ dùng IP TEST-NET-3 (RFC 5737, 203.0.113.0/24) KHÔNG có trong tập demo, và luôn
-dọn sạch ở cuối (kể cả khi giữa chừng lỗi). Kịch bản này KHÔNG chạy benchmark.
+An toàn: chỉ dùng IP TEST-NET-3 (RFC 5737, 203.0.113.0/24) không có trong tập demo, và luôn
+dọn sạch ở cuối (kể cả khi giữa chừng lỗi). Kịch bản này không chạy benchmark.
 
 Chạy:  .venv/bin/python scripts/audit_ui_functions.py
 """
@@ -62,7 +62,7 @@ def _blacklisted(ip: str) -> bool:
 
 
 def _rule_status(ip: str) -> str | None:
-    """Đọc THẲNG từ YAML trên đĩa, KHÔNG qua getter của listener.
+    """Đọc thẳng từ YAML trên đĩa, không qua getter của listener.
 
     Kho luật phản hồi là `config/system_settings.yaml` -> `tier1.dynamic_rules` (không phải
     SQLite). Listener có cache RAM khử theo mtime; nếu đọc qua cache thì một lần ghi hỏng
@@ -117,12 +117,12 @@ def main() -> int:
 
     cleanup(fb)  # trạng thái đầu sạch
 
-    # ── 0. Điều kiện đầu ─────────────────────────────────────────────
+    # 0. Điều kiện đầu
     print("\n── 0. Điều kiện đầu ──")
     check("IP thử nghiệm chưa bị chặn", not _blacklisted(TEST_IP))
     check("IP thử nghiệm chưa whitelist", TEST_IP not in fb.get_whitelisted_ips())
 
-    # ── 1. Nút 'Kích hoạt luật chặn' (app.py L1975) ──────────────────
+    # 1. Nút 'Kích hoạt luật chặn' (app.py L1975)
     print("\n── 1. Nút 'Kích hoạt luật chặn' → 3 sink ──")
     fb.receive_new_rule(
         "Source IP", TEST_IP, score=95, source="manual_audit", reason="quét chức năng"
@@ -141,7 +141,7 @@ def main() -> int:
     )
     check("Rule Engine thấy IP trong blacklist", _blacklisted(TEST_IP))
 
-    # ── 2. Nút 'Thêm vào Whitelist' (app.py L2026) ───────────────────
+    # 2. Nút 'Thêm vào Whitelist' (app.py L2026)
     print("\n── 2. Nút 'Thêm vào Whitelist' → phải GỠ chặn ──")
     ok_wl = fb.add_to_whitelist(TEST_IP)
     unblock_ip(TEST_IP)
@@ -152,12 +152,12 @@ def main() -> int:
     st2 = _rule_status(TEST_IP)
     check("luật không còn ACTIVE khi đã whitelist", st2 != "ACTIVE", f"đọc được {st2!r}")
 
-    # ── 3. Nút 'Gỡ khỏi Whitelist' (app.py L1735) ────────────────────
+    # 3. Nút 'Gỡ khỏi Whitelist' (app.py L1735)
     print("\n── 3. Nút 'Gỡ khỏi Whitelist' ──")
     fb.remove_from_whitelist(TEST_IP)
     check("IP đã rời whitelist", TEST_IP not in fb.get_whitelisted_ips())
 
-    # ── 4. HITL: Phê duyệt / Từ chối (app.py L1312/L1351/L1867/L1889) ─
+    # 4. HITL: Phê duyệt / Từ chối (app.py L1312/L1351/L1867/L1889) ─
     print("\n── 4. HITL Phê duyệt / Từ chối ──")
     _purge_rule(TEST_IP)
     fb.receive_new_rule("Source IP", TEST_IP, score=80, source="ml_triage", reason="chờ duyệt")
@@ -176,7 +176,7 @@ def main() -> int:
     check("Từ chối → rời ACTIVE", st4 != "ACTIVE", f"đọc được {st4!r}")
     check("Từ chối → Redis đã gỡ chặn", not _blacklisted(TEST_IP))
 
-    # ── 5. Toàn vẹn nhật ký kiểm toán (sidebar, app.py L739) ─────────
+    # 5. Toàn vẹn nhật ký kiểm toán (sidebar, app.py L739)
     print("\n── 5. Nút 'Kiểm tra toàn vẹn nhật ký' (chuỗi HMAC) ──")
     valid, msg = verify_audit_trail_integrity()
     check("verify_audit_trail_integrity() = True", bool(valid), str(msg)[:70])
@@ -186,25 +186,25 @@ def main() -> int:
         "SENTINEL_LOG_SECRET nạp từ .env",
     )
 
-    # ── 6. Toàn vẹn tài liệu RAG (tab5, app.py L2080) ────────────────
+    # 6. Toàn vẹn tài liệu RAG (tab5, app.py L2080)
     print("\n── 6. Nút 'Kiểm tra toàn vẹn tài liệu RAG' ──")
     try:
         from src.rag.security import verify_document_integrity
 
-        # `faiss_index/` được SINH RA khi build KB nên hash đổi theo máy -> loại trừ, chỉ
-        # xác minh các tệp tri thức NGUỒN (đây mới là thứ RAG poisoning nhắm tới).
+        # `faiss_index/` được sinh ra khi build KB nên hash đổi theo máy -> loại trừ, chỉ
+        # xác minh các tệp tri thức nguồn (đây mới là thứ RAG poisoning nhắm tới).
         res = verify_document_integrity(exclude_generated=True)
         ok6 = bool(res.get("verified"))
         check("verify_document_integrity() hợp lệ", ok6, str(res.get("details"))[:90])
     except Exception as e:
         check("verify_document_integrity() chạy được", False, f"{type(e).__name__}: {e}")
 
-    # ── 7. RBAC: mọi nút thay đổi trạng thái phải chặn non-L3 ────────
-    # Kiểm TĨNH: đọc mã, không phải bấm thử. Nói rõ để không ai hiểu nhầm mức bảo đảm.
+    # 7. RBAC: mọi nút thay đổi trạng thái phải chặn non-L3
+    # Kiểm tĩnh: đọc mã, không phải bấm thử. Nói rõ để không ai hiểu nhầm mức bảo đảm.
     print("\n── 7. RBAC (kiểm tĩnh trên mã nguồn) ──")
-    # Rào quyền trong Streamlit nằm ở KHỐI BAO (`if is_l3:` / `if role == "L3_Manager":`
-    # bọc cả cụm nút), nên chỉ soi vài dòng quanh nút sẽ báo oan hàng loạt — bản đầu của
-    # kịch bản này đúng là đã báo oan 7 nút. Cách đúng: lần ngược CHUỖI KHỐI CHA theo thụt
+    # Rào quyền trong Streamlit nằm ở khối bao (`if is_l3:` / `if role == "L3_Manager":`
+    # bọc cả cụm nút), nên chỉ soi vài dòng quanh nút sẽ báo oan hàng loạt - bản đầu của
+    # kịch bản này đúng là đã báo oan 7 nút. Cách đúng: lần ngược chuỗi khối cha theo thụt
     # lề, y như Python xác định phạm vi.
     src_lines = open("src/ui/app.py", encoding="utf-8").read().splitlines()
     MUTATORS = (

@@ -1,8 +1,8 @@
-"""Regression: parse_llm_response phải LUÔN mang `reasoning` (không để trống thành thẻ
+"""Regression: parse_llm_response phải luôn mang `reasoning` (không để trống thành thẻ
 "No reasoning provided / tin cậy 0%" trên Dashboard) và vớt được trường từ JSON bị cắt cụt.
 
 Bug gốc: khi output LLM không parse được JSON (thường do max_tokens cắt cụt), hard-fallback
-trả dict KHÔNG có key `reasoning` -> UI hiện "No reasoning provided" + 0% + MITRE gây hiểu lầm.
+trả dict không có key `reasoning` -> UI hiện "No reasoning provided" + 0% + MITRE gây hiểu lầm.
 """
 
 from src.agent.llm_client import llm_client
@@ -34,7 +34,7 @@ def test_truncated_json_salvages_reasoning():
 
 
 def test_unparseable_fallback_has_reasoning():
-    """Output rác hoàn toàn -> fallback AWAIT_HITL nhưng PHẢI có reasoning trung thực."""
+    """Output rác hoàn toàn -> fallback AWAIT_HITL nhưng phải có reasoning trung thực."""
     d = llm_client.parse_llm_response("Sorry, I cannot help with that request.")
     assert d["action"] == "AWAIT_HITL"
     assert d["confidence"] == 0.0

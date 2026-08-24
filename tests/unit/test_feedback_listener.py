@@ -1,8 +1,8 @@
 """
-Unit tests cho FeedbackListener — vòng phản hồi Tier-2 -> Tier-1 (dynamic rules).
+Unit tests cho FeedbackListener - vòng phản hồi Tier-2 -> Tier-1 (dynamic rules).
 
 Cô lập hoàn toàn: CONFIG_PATH + FileLock được monkeypatch sang file tạm,
-KHÔNG đụng config/system_settings.yaml thật (vốn phải giữ dynamic_rules: []
+không đụng config/system_settings.yaml thật (vốn phải giữ dynamic_rules: []
 sạch trước mỗi commit).
 """
 
@@ -19,7 +19,7 @@ def tmp_config(tmp_path, monkeypatch):
     cfg.write_text(yaml.dump({"tier1": {"dynamic_rules": []}}), encoding="utf-8")
     monkeypatch.setattr(fl, "CONFIG_PATH", str(cfg))
     monkeypatch.setattr(fl, "_lock", FileLock(str(cfg) + ".lock"))
-    # Các test dưới đây kiểm tra CHÍNH cơ chế ghi luật, nên phải chạy với cơ chế đó BẬT.
+    # Các test dưới đây kiểm tra chính cơ chế ghi luật, nên phải chạy với cơ chế đó bật.
     # `SENTINEL_FREEZE_DYNAMIC_RULES=1` là cờ dùng khi chạy benchmark (chặn pytest ghi ~1.400
     # luật vào config thật); nếu để nó rò từ môi trường vào đây thì 5 test này đỏ mà nguyên
     # nhân lại nằm ngoài mã đang kiểm. Test không được phụ thuộc biến môi trường của người gọi.
@@ -28,7 +28,7 @@ def tmp_config(tmp_path, monkeypatch):
 
 
 def test_freeze_flag_blocks_active_rule_writes(tmp_config, monkeypatch):
-    """Cờ đóng băng phải chặn luật ACTIVE — đây là thứ giữ config sạch suốt lượt đo."""
+    """Cờ đóng băng phải chặn luật ACTIVE - đây là thứ giữ config sạch suốt lượt đo."""
     monkeypatch.setenv("SENTINEL_FREEZE_DYNAMIC_RULES", "1")
     res = fl.FeedbackListener().receive_new_rule(
         "Source IP", "203.0.113.77", score=100, status="ACTIVE"
@@ -38,11 +38,11 @@ def test_freeze_flag_blocks_active_rule_writes(tmp_config, monkeypatch):
 
 
 def test_freeze_flag_does_not_swallow_hitl_tickets(tmp_config, monkeypatch):
-    """Đóng băng KHÔNG được nuốt phiếu chờ duyệt — đó là hàng đợi của analyst, không phải luật.
+    """Đóng băng không được nuốt phiếu chờ duyệt - đó là hàng đợi của analyst, không phải luật.
 
-    LỖI GHÉP NHẦM ĐÃ SỬA: `node_human_in_the_loop` đẩy phiếu HITL qua chính hàm này với
+    Lỗi ghép nhầm đã sửa: `node_human_in_the_loop` đẩy phiếu HITL qua chính hàm này với
     `status` mặc định PENDING_APPROVAL. Khi cờ đóng băng chặn mọi lượt gọi, Tier-2 vẫn kết
-    luận "cần con người xem" và vẫn ghi sổ kiểm toán, nhưng KHÔNG phiếu nào tới bàn analyst.
+    luận "cần con người xem" và vẫn ghi sổ kiểm toán, nhưng không phiếu nào tới bàn analyst.
     Đo ở lượt chạy 11/08/2026: 39 bản ghi AWAIT_HITL trong sổ, thẻ "Chờ duyệt (HITL)" = 0.
 
     Phiếu PENDING không thể làm nhiễu ablation vì `reload_dynamic_rules` chỉ nạp luật ACTIVE.
@@ -73,7 +73,7 @@ class TestReceiveNewRule:
         rules = _rules(tmp_config)
         assert len(rules) == 1
         assert rules[0]["pattern"] == "203.0.113.50"
-        assert rules[0]["status"] == "PENDING_APPROVAL"  # KHÔNG tự-ACTIVE
+        assert rules[0]["status"] == "PENDING_APPROVAL"  # Không tự-ACTIVE
         assert listener.get_feedback_history()[0]["pattern"] == "203.0.113.50"
 
     def test_duplicate_rule_skipped(self, tmp_config):
@@ -89,7 +89,7 @@ class TestReceiveNewRule:
         res = listener.receive_new_rule("Source IP", "*", score=50)
         assert res["status"] == "REJECTED"
         assert res["errors"]
-        assert _rules(tmp_config) == []  # KHÔNG được ghi file
+        assert _rules(tmp_config) == []  # Không được ghi file
 
     def test_critical_infra_ip_rejected(self, tmp_config):
         """Self-DoS prevention: cấm rule nhắm vào IP hạ tầng (127.0.0.1...)."""
@@ -106,7 +106,7 @@ class TestReceiveNewRule:
 
 
 class TestBlockWhitelistMutualExclusion:
-    """block ↔ whitelist LOẠI TRỪ LẪN NHAU: kích hoạt chặn 1 Source IP thì gỡ nó khỏi
+    """block ↔ whitelist loại trừ lẫn nhau: kích hoạt chặn 1 Source IP thì gỡ nó khỏi
     whitelist (nếu không whitelist ưu tiên cao nhất ở Tier-1 sẽ vô hiệu luật chặn)."""
 
     def _write(self, cfg, rules, whitelist):
@@ -125,13 +125,13 @@ class TestBlockWhitelistMutualExclusion:
         listener = fl.FeedbackListener()
         assert listener.approve_rule(ip, "Source IP") is True
         cfg = yaml.safe_load(tmp_config.read_text())["tier1"]
-        # Luật -> ACTIVE và IP KHÔNG còn trong whitelist.
+        # Luật -> ACTIVE và IP không còn trong whitelist.
         assert cfg["dynamic_rules"][0]["status"] == "ACTIVE"
         assert ip not in cfg["whitelist_ips"]
         assert "127.0.0.1" in cfg["whitelist_ips"]  # IP khác giữ nguyên
 
     def test_approve_non_source_ip_rule_keeps_whitelist(self, tmp_config):
-        """Duyệt luật KHÔNG phải Source IP (vd URI) không đụng whitelist."""
+        """Duyệt luật không phải Source IP (vd URI) không đụng whitelist."""
         ip = "198.51.100.15"
         self._write(
             tmp_config,

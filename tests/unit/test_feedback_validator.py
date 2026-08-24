@@ -1,6 +1,4 @@
-"""
-Unit Tests for FeedbackValidator
-"""
+"""Kiểm thử đơn vị cho FeedbackValidator"""
 
 from src.guardrails.feedback_validator import FeedbackValidator
 
@@ -24,22 +22,22 @@ def test_feedback_validator_rule():
 
 def test_feedback_validator_whitelist_ip():
     validator = FeedbackValidator()
-    # Whitelist HOST cụ thể ở BẤT KỲ dải nào đều hợp lệ (mọi luồng demo/vận hành):
+    # Whitelist HOST cụ thể ở bất kỳ dải nào đều hợp lệ (mọi luồng demo/vận hành):
     for ip in ["192.168.1.200", "8.8.8.8", "198.51.100.113", "203.0.113.5", "209.147.138.11"]:
         ok, _ = validator.validate_whitelist_ip(ip)
         assert ok is True, f"host {ip} phải whitelist được"
 
-    # CHẶN wildcard toàn Internet
+    # Chặn wildcard toàn Internet
     v_wild, err_wild = validator.validate_whitelist_ip("0.0.0.0/0")
     assert v_wild is False
     assert any("wildcard" in e.lower() for e in err_wild)
 
-    # CHẶN dải CIDR quá rộng (prefix < /16)
+    # Chặn dải CIDR quá rộng (prefix < /16)
     v_big, err_big = validator.validate_whitelist_ip("8.0.0.0/8")
     assert v_big is False
     assert any("quá rộng" in e.lower() or "/16" in e for e in err_big)
 
-    # CHO phép dải nhỏ (/24) và host /32
+    # Cho phép dải nhỏ (/24) và host /32
     ok_small, _ = validator.validate_whitelist_ip("203.0.113.0/24")
     assert ok_small is True
 

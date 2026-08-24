@@ -168,3 +168,7 @@ docs/Codebase/guides/DEMO_FLOWS.md
 docs/Thesis/DOI_CHUNG_NGOAI.md
 experiments/results/_archive_pre_2026-08/
 reports/unified_stream_evaluation_report.md
+
+# Cấu hình công cụ trợ lý cục bộ — không bao giờ theo dõi
+.agents/
+.claude/

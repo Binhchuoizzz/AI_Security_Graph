@@ -1,23 +1,23 @@
-"""SENTINEL — chấm LÁ CHẮN NEO BẰNG CHỨNG từ bản ghi tracer (chỉ số 3.l).
+"""SENTINEL - chấm lá chắn neo bằng chứng từ bản ghi tracer (chỉ số 3.l).
 
-CÂU HỎI. Hệ có bao giờ KHẲNG ĐỊNH một kỹ thuật ATT&CK mà bộ truy xuất chưa từng đưa ra cho
+Câu hỏi. Hệ có bao giờ khẳng định một kỹ thuật ATT&CK mà bộ truy xuất chưa từng đưa ra cho
 chính lô đó không? Đây là định nghĩa vận hành của "ảo giác" trong phần quy kết: không phải
-"trả lời sai" (sai thì đã có 3.a/3.b đo) mà là "khẳng định một thứ KHÔNG có bằng chứng đỡ".
+"trả lời sai" (sai thì đã có 3.a/3.b đo) mà là "khẳng định một thứ không có bằng chứng đỡ".
 
-VÌ SAO PHẢI ĐO TỪ TRACER, KHÔNG PHẢI TỪ TỆP KẾT QUẢ. Tệp kết quả chỉ giữ phán quyết CUỐI —
+Vì sao phải đo từ TRACER, không phải từ tệp kết quả. Tệp kết quả chỉ giữ phán quyết cuối -
 sau khi lá chắn đã hạ cấp. Đọc mỗi phán quyết cuối thì lá chắn nào cũng "đạt 0% ảo giác",
-kể cả một lá chắn không làm gì. Bản ghi tracer giữ CẢ HAI ĐẦU (`action_before` /
+kể cả một lá chắn không làm gì. Bản ghi tracer giữ cả hai đầu (`action_before` /
 `action_after`, `llm_technique_raw` / `final_technique_id`) nên tách được hai con số khác
-hẳn nhau: bao nhiêu lần model ĐỀ XUẤT thứ không neo được, và bao nhiêu lần thứ đó LỌT ra
+hẳn nhau: bao nhiêu lần model đề xuất thứ không neo được, và bao nhiêu lần thứ đó lọt ra
 ngoài. Chỉ số thứ hai mới là `bad` phải bằng 0.
 
-HAI THƯỚC, CỐ Ý KHÔNG GỘP:
-  * `khong_neo_chat` — mã khẳng định không nằm trong danh sách ID của các tài liệu ĐÃ TRUY
-    XUẤT. Đây là thước CHẶT, và là thước script này báo cáo.
-  * Lá chắn trong `nodes.py` dùng thước RỘNG HƠN: quét regex trên TOÀN VĂN ngữ cảnh RAG, nên
-    một mã chỉ được NHẮC TỚI trong thân tài liệu khác cũng tính là có neo. Bản ghi tracer chỉ
-    lưu số ký tự của khối ngữ cảnh chứ không lưu toàn văn, nên script này KHÔNG dựng lại được
-    thước rộng. Hệ quả cần nêu thẳng: `khong_neo_chat` là CẬN TRÊN của số ca lá chắn bỏ lọt.
+Hai thước, cố Ý không gộp:
+  * `khong_neo_chat` - mã khẳng định không nằm trong danh sách ID của các tài liệu đã truy
+    Xuất. Đây là thước chặt, và là thước script này báo cáo.
+  * Lá chắn trong `nodes.py` dùng thước rộng hơn: quét regex trên toàn văn ngữ cảnh RAG, nên
+    một mã chỉ được nhắc tới trong thân tài liệu khác cũng tính là có neo. Bản ghi tracer chỉ
+    lưu số ký tự của khối ngữ cảnh chứ không lưu toàn văn, nên script này không dựng lại được
+    thước rộng. Hệ quả cần nêu thẳng: `khong_neo_chat` là cận trên của số ca lá chắn bỏ lọt.
 
 Chạy:
     .venv/bin/python experiments/score_evidence_grounding.py --trace logs/rq3/tier2_trace_3b.jsonl
@@ -40,7 +40,7 @@ def _parent(tid: str) -> str:
 
 
 def _rag_ids(rec: dict) -> set[str]:
-    """ID của các tài liệu kỹ thuật ĐÃ TRUY XUẤT cho lô (cả truy vấn kỹ thuật lẫn ngữ cảnh)."""
+    """ID của các tài liệu kỹ thuật đã truy xuất cho lô (cả truy vấn kỹ thuật lẫn ngữ cảnh)."""
     rag = rec.get("rag") or {}
     ids = set()
     for key in ("technique_mitre", "context_mitre"):
@@ -54,9 +54,9 @@ def _rag_ids(rec: dict) -> set[str]:
 def score(recs: list[dict]) -> dict:
     n = len(recs)
     n_mapper_ran = 0
-    n_asserted = 0  # lô mà hệ KHẲNG ĐỊNH một kỹ thuật ở phán quyết cuối
-    bad_exact: list[dict] = []  # khẳng định mà mã KHÔNG có trong tài liệu truy xuất
-    bad_parent: list[dict] = []  # ... kể cả nới lỏng tới kỹ thuật CHA
+    n_asserted = 0  # lô mà hệ khẳng định một kỹ thuật ở phán quyết cuối
+    bad_exact: list[dict] = []  # khẳng định mà mã không có trong tài liệu truy xuất
+    bad_parent: list[dict] = []  # ... kể cả nới lỏng tới kỹ thuật cha
     n_no_rag = 0  # lô không truy xuất được tài liệu nào -> lá chắn không có gì để đối chiếu
 
     shield_fired = 0
@@ -91,7 +91,7 @@ def score(recs: list[dict]) -> dict:
 
         tid = (fin.get("mitre_technique_id") or "").strip()
         if not tid:
-            continue  # hệ KHÔNG khẳng định kỹ thuật nào -> không thể ảo giác
+            continue  # hệ không khẳng định kỹ thuật nào -> không thể ảo giác
         n_asserted += 1
         ids = _rag_ids(r)
         if not ids:
@@ -115,12 +115,12 @@ def score(recs: list[dict]) -> dict:
         "n_ban_ghi": n,
         "n_mapper_chay": n_mapper_ran,
         "n_khang_dinh_ky_thuat": n_asserted,
-        # ── chỉ số 3.l: PHẢI bằng 0 ──
+        # chỉ số 3.l: Phải bằng 0
         "bad": len(bad_exact),
         "ty_le_ao_giac_pct": pct(len(bad_exact), n_asserted),
         "bad_ke_ca_noi_toi_ky_thuat_cha": len(bad_parent),
         "n_lo_khong_truy_xuat_duoc": n_no_rag,
-        # ── tác động THẬT của lá chắn (số này > 0 mới chứng minh lá chắn có làm việc) ──
+        # tác động thật của lá chắn (số này > 0 mới chứng minh lá chắn có làm việc)
         "la_chan_neo_kich_hoat": shield_fired,
         "la_chan_ty_le_pct": pct(shield_fired, n_mapper_ran),
         "ha_cap_hanh_dong": dict(shield_downgrades),

@@ -1,12 +1,12 @@
 """
 Trình tải tập dữ liệu CSE-CIC-IDS2018 & Xây dựng Ground Truth
 
-NGUỒN DỮ LIỆU:
+Nguồn dữ liệu:
   - CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity)
   - Tải từ AWS S3: s3://cse-cic-ids2018/Processed Traffic Data for ML Algorithms/
   - Hoặc từ HuggingFace mirror: auliraff/CIC-IDS-Collection
 
-CHIẾN LƯỢC:
+Chiến lược:
   1. Ưu tiên tải từ AWS S3 (nguồn chính thức, đầy đủ CSV)
   2. Fallback sang HuggingFace nếu AWS CLI không khả dụng
   3. Stratified Sampling: Lấy N mẫu/nhãn với random_state=42 (Reproducible)
@@ -27,9 +27,7 @@ from typing import Any
 import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 
-# ============================================================================
-# BẢN ĐỒ NHÃN (LABEL MAP): Các loại tấn công CSE-CIC-IDS2018 → MITRE ATT&CK + Hành động mong đợi
-# ============================================================================
+# Bản đồ nhãn (LABEL MAP): Các loại tấn công CSE-CIC-IDS2018 -> MITRE ATT&CK + Hành động mong đợi
 LABEL_MAP = {
     "SSH-Bruteforce": {
         "mitre": "T1110",
@@ -155,7 +153,7 @@ CSV_FILES_2018 = [
     "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",
     "Thursday-15-02-2018_TrafficForML_CICFlowMeter.csv",
     "Thursday-22-02-2018_TrafficForML_CICFlowMeter.csv",
-    # "Tuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # 3.8GB — đọc riêng theo chunk trong fetch_and_build (DDoS-LOIC-HTTP)
+    # "Tuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",  # 3.8GB - đọc riêng theo chunk trong fetch_and_build (DDoS-LOIC-HTTP)
     "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
     "Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv",
     "Wednesday-28-02-2018_TrafficForML_CICFlowMeter.csv",
@@ -299,7 +297,7 @@ def fetch_and_build(
             valid_labels = list(LABEL_MAP.keys())
             df_filtered = df_filtered[df_filtered["Label"].isin(valid_labels)]  # pyright: ignore[reportAttributeAccessIssue]
 
-            # Downsample early to prevent OOM
+            # Giảm mẫu sớm để khỏi tràn bộ nhớ
             df_filtered = df_filtered.groupby("Label").head(10000)  # pyright: ignore[reportAttributeAccessIssue]
 
             all_data.append(df_filtered)
@@ -307,7 +305,7 @@ def fetch_and_build(
         except Exception as e:
             print(f"[!] Lỗi khi xử lý file {filename}: {e}")
 
-    # Đọc CHUNKED file Tuesday-20-02 (3.8GB) để trích DDoS-LOIC-HTTP mà KHÔNG nạp
+    # Đọc CHUNKED file Tuesday-20-02 (3.8GB) để trích DDoS-LOIC-HTTP mà không nạp
     # toàn bộ vào RAM. File này bị loại khỏi vòng đọc chính do dung lượng lớn, nhưng
     # các dòng nhãn DDoS attacks-LOIC-HTTP hoàn toàn hợp lệ và là 1 lớp tấn công thật.
     big_file = os.path.join(LOCAL_RAW_DIR, "Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv")
@@ -395,7 +393,7 @@ def fetch_and_build(
     for key, val in stats.items():
         print(f"      {key}: {val}")
 
-    # Step 2: Stratified Sampling (random_state=42 for REPRODUCIBILITY)
+    # Bước 2: lấy mẫu phân tầng (random_state=42 để tái lập được)
     samples = []
     gt_counter = 1
 
@@ -504,7 +502,7 @@ def fetch_and_build(
     samples.extend(adversarial_samples)
     gt_counter += len(adversarial_samples)
 
-    # Thêm câu hỏi CÓ PAYLOAD THẬT (CSIC 2010) — phần DUY NHẤT của đề thi mà việc quy kết
+    # Thêm câu hỏi có PAYLOAD thật (CSIC 2010) - phần duy nhất của đề thi mà việc quy kết
     # kỹ thuật là trả lời được về mặt bằng chứng. Xem docstring `_generate_csic_samples`.
     csic_samples = _generate_csic_samples(gt_counter)
     samples.extend(csic_samples)
@@ -524,8 +522,8 @@ def fetch_and_build(
     print(f"  {'TOTAL':<30} {sum(dist.values()):>4} samples")
 
     # Xác minh ngưỡng số lượng mẫu tối thiểu.
-    # CHỈ áp cho lớp CICIDS — đó là phần được LẤY MẪU PHÂN TẦNG nên thiếu mẫu là dấu hiệu
-    # hỏng thật. Lớp CSIC đi theo phân bổ TỰ NHIÊN của bộ dữ liệu gốc (Path Traversal chỉ
+    # Chỉ áp cho lớp CICIDS - đó là phần được lấy mẫu phân tầng nên thiếu mẫu là dấu hiệu
+    # hỏng thật. Lớp CSIC đi theo phân bổ tự nhiên của bộ dữ liệu gốc (Path Traversal chỉ
     # chiếm 194/25.065 bản ghi bất thường), ép nó đủ 20 mẫu là bóp méo phân bổ thật.
     _csic_labels = {
         str((s.get("input") or {}).get("cicids_label", ""))
@@ -547,20 +545,20 @@ def fetch_and_build(
 def _generate_csic_samples(
     start_id: int, n_tech: int = 250, n_anom: int = 100, n_benign: int = 150
 ) -> list:
-    """Thêm câu hỏi CÓ PAYLOAD THẬT (CSIC 2010) vào "đề thi".
+    """Thêm câu hỏi có PAYLOAD thật (CSIC 2010) vào "đề thi".
 
-    VÌ SAO BẮT BUỘC. Toàn bộ 1.200 câu hỏi CICIDS của đề thi là NetFlow THUẦN: trường
-    `input.application_layer.payload_snippet` LUÔN là `None`. Nhưng đề vẫn hỏi
-    `expected_mitre_technique` và chấm — ví dụ 400 câu mang đáp án `T1499.002`. Bằng chứng
-    để suy ra kỹ thuật KHÔNG TỒN TẠI trong đầu vào, nên phần chấm QUY KẾT của đề cũ là một
-    câu hỏi không thể trả lời đúng bằng bất kỳ phương pháp nào — đó là lỗi của ĐỀ, không
+    Vì sao bắt buộc. Toàn bộ 1.200 câu hỏi CICIDS của đề thi là NetFlow thuần: trường
+    `input.application_layer.payload_snippet` luôn là `None`. Nhưng đề vẫn hỏi
+    `expected_mitre_technique` và chấm - ví dụ 400 câu mang đáp án `T1499.002`. Bằng chứng
+    để suy ra kỹ thuật không tồn tại trong đầu vào, nên phần chấm quy kết của đề cũ là một
+    câu hỏi không thể trả lời đúng bằng bất kỳ phương pháp nào - đó là lỗi của đề, không
     phải của hệ thống.
 
-    CSIC 2010 bổ sung đúng lớp bằng chứng còn thiếu: request HTTP THẬT, có payload, có mã
-    ATT&CK suy ra được bằng bộ luật ĐỘC LẬP với chữ ký Tier-1 (`scripts/build_csic_dataset`).
+    CSIC 2010 bổ sung đúng lớp bằng chứng còn thiếu: request HTTP thật, có payload, có mã
+    ATT&CK suy ra được bằng bộ luật độc lập với chữ ký Tier-1 (`scripts/build_csic_dataset`).
 
-    KHÔNG đặt `input.network_layer`: `unified_dataset.build_stream()` quét trường đó để dựng
-    phần `cicids` của luồng, nên nếu đặt thì mỗi mẫu CSIC sẽ vào luồng HAI LẦN (một qua đây,
+    Không đặt `input.network_layer`: `unified_dataset.build_stream()` quét trường đó để dựng
+    phần `cicids` của luồng, nên nếu đặt thì mỗi mẫu CSIC sẽ vào luồng hai lần (một qua đây,
     một qua `_build_csic`). Các script chấm đề đọc `logs`, không đọc `network_layer`.
     """
     path = os.path.join(
@@ -609,8 +607,8 @@ def _generate_csic_samples(
                 "id": f"GT-{gt_counter:03d}",
                 "description": f"CSIC 2010 HTTP request — {lab.get('gt_label', '')}",
                 "logs": [log],
-                # Mẫu bất thường KHÔNG suy được họ tấn công để TRỐNG mã kỹ thuật: vẫn chấm
-                # được PHÁT HIỆN, nhưng phải bị LOẠI khỏi phần chấm QUY KẾT. Thà trống còn
+                # Mẫu bất thường không suy được họ tấn công để trống mã kỹ thuật: vẫn chấm
+                # được phát hiện, nhưng phải bị loại khỏi phần chấm quy kết. Thà trống còn
                 # hơn gán bừa một mã rồi lấy nó làm đáp án.
                 "expected_mitre_technique": mitre or None,
                 "expected_action": lab.get("wa_expected_action", "LOG"),
@@ -621,7 +619,7 @@ def _generate_csic_samples(
                     "_WAF_PATTERNS của Tier-1 (tránh lập luận vòng tròn)."
                 ),
                 "input": {
-                    # CỐ Ý để trống — xem docstring.
+                    # Cố Ý để trống - xem docstring.
                     "network_layer": {},
                     "application_layer": {
                         "service": "HTTP",

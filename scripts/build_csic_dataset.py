@@ -1,23 +1,23 @@
-"""Nạp CSIC 2010 HTTP -> tập L7 THẬT cho luồng `queue_waf`.
+"""Nạp CSIC 2010 HTTP -> tập L7 thật cho luồng `queue_waf`.
 
-VÌ SAO CẦN. Đo được trên luồng hiện tại: trong 5.000 sự kiện chỉ có ~180 mang bằng chứng
-tầng ứng dụng, và 69 trong số đó là payload do TÁC GIẢ TỰ SOẠN. Mọi chỉ số "quy kết kỹ thuật"
-của đồ án vì thế đứng trên một tập tự soạn cỡ 69 mẫu — quá nhỏ và không khách quan. CSIC 2010
-là ~61.000 request HTTP THẬT đánh vào một ứng dụng thương mại điện tử thật, tấn công nằm lẫn
+Vì sao cần. Đo được trên luồng hiện tại: trong 5.000 sự kiện chỉ có ~180 mang bằng chứng
+tầng ứng dụng, và 69 trong số đó là payload do tác giả tự soạn. Mọi chỉ số "quy kết kỹ thuật"
+của đồ án vì thế đứng trên một tập tự soạn cỡ 69 mẫu - quá nhỏ và không khách quan. CSIC 2010
+là ~61.000 request HTTP thật đánh vào một ứng dụng thương mại điện tử thật, tấn công nằm lẫn
 trong lưu lượng bình thường.
 
-CẢNH BÁO PHƯƠNG PHÁP — ĐỌC TRƯỚC KHI DÙNG SỐ:
-CSIC chỉ gán nhãn `normal` / `anomalous`. Nó KHÔNG gán loại tấn công, càng không gán mã
-ATT&CK. Việc suy ra loại tấn công là một BƯỚC DIỄN GIẢI của người làm đồ án, và phải khai
+Cảnh báo phương pháp - đọc trước khi dùng số:
+CSIC chỉ gán nhãn `normal` / `anomalous`. Nó không gán loại tấn công, càng không gán mã
+ATT&CK. Việc suy ra loại tấn công là một bước diễn giải của người làm đồ án, và phải khai
 báo đúng như vậy trong luận văn.
 
-Bộ phân loại ở đây CỐ Ý viết ĐỘC LẬP với `_WAF_PATTERNS` của Tier-1. Nếu dùng chính chữ ký
+Bộ phân loại ở đây cố Ý viết độc lập với `_WAF_PATTERNS` của Tier-1. Nếu dùng chính chữ ký
 của hệ thống để sinh đáp án rồi chấm hệ thống bằng đáp án đó thì là lập luận vòng tròn: hệ
 thống sẽ đạt gần 100% và con số vô nghĩa. Mẫu dưới đây bắt nguồn từ mô tả tấn công của chính
-bộ CSIC và từ định nghĩa OWASP, KHÔNG chép từ mã nguồn dự án.
+bộ CSIC và từ định nghĩa OWASP, không chép từ mã nguồn dự án.
 
-Bản ghi KHÔNG khớp họ nào -> `wa_mitre` để TRỐNG: vẫn dùng được để chấm PHÁT HIỆN
-(tấn công/lành), nhưng bị loại khỏi phần chấm QUY KẾT KỸ THUẬT. Thà bỏ trống còn hơn gán bừa.
+Bản ghi không khớp họ nào -> `wa_mitre` để trống: vẫn dùng được để chấm phát hiện
+(tấn công/lành), nhưng bị loại khỏi phần chấm quy kết kỹ thuật. Thà bỏ trống còn hơn gán bừa.
 
 Chạy:
     .venv/bin/python scripts/build_csic_dataset.py --limit 4000
@@ -45,8 +45,8 @@ FILES = {
 }
 CACHE = os.path.join(ROOT, "data", "raw", "csic2010")
 
-# ── Bộ phân loại ĐỘC LẬP (OWASP / mô tả bộ CSIC), KHÔNG lấy từ src/tier1_filter ──
-# Thứ tự CÓ ý nghĩa: mẫu đặc hiệu đứng trước mẫu tổng quát.
+# Bộ phân loại độc lập (OWASP / mô tả bộ CSIC), không lấy từ src/tier1_filter
+# Thứ tự có ý nghĩa: mẫu đặc hiệu đứng trước mẫu tổng quát.
 FAMILIES: tuple[tuple[str, str, str], ...] = (
     (
         "SQL Injection",
@@ -79,7 +79,7 @@ FAMILIES: tuple[tuple[str, str, str], ...] = (
         "T1499.004",
         r"[A-Za-z0-9]{400,}|(?:%41){100,}",
     ),
-    # Hai họ dưới đây chiếm phần LỚN nhóm "anomalous" của CSIC. Chúng không phải tiêm nhiễm
+    # Hai họ dưới đây chiếm phần lớn nhóm "anomalous" của CSIC. Chúng không phải tiêm nhiễm
     # nhưng vẫn là tấn công thật, và ánh xạ ATT&CK bảo vệ được: dò tệp sao lưu/mã nguồn và
     # duyệt ép tới ứng dụng mẫu đều là Active Scanning bằng danh sách từ (T1595.003).
     (
@@ -97,7 +97,7 @@ _COMPILED = [(n, t, re.compile(p, re.I)) for n, t, p in FAMILIES]
 
 
 def classify(text: str) -> tuple[str, str]:
-    """(tên họ, mã ATT&CK) hoặc ('', '') nếu không khớp họ nào — KHÔNG đoán."""
+    """(tên họ, mã ATT&CK) hoặc ('', '') nếu không khớp họ nào - không đoán."""
     for name, tech, rx in _COMPILED:
         if rx.search(text):
             return name, tech
@@ -157,32 +157,32 @@ def to_event(req: dict, is_attack: bool, idx: int, rnd: random.Random) -> dict:
     uri = parsed.path + (("?" + parsed.query) if parsed.query else "")
     decoded = urllib.parse.unquote_plus(uri + " " + req.get("body", ""))
     fam, tech = classify(decoded) if is_attack else ("", "")
-    # IP nguồn: dải TEST-NET-2 (RFC 5737) để KHÔNG đụng bất kỳ IP nào của CICIDS/DAPT —
+    # IP nguồn: dải TEST-NET-2 (RFC 5737) để không đụng bất kỳ IP nào của CICIDS/DAPT -
     # trùng dải sẽ làm trí nhớ/reputation của hai tập trộn vào nhau và bẩn cả hai phép đo.
     #
-    # LỖI ĐÃ SỬA 17/08/2026 — TOÁN TỬ BA NGÔI VÔ NGHĨA + HỒ IP QUÁ HẸP. Dòng cũ là
+    # Lỗi đã sửa 17/08/2026 - toán tử ba ngôi vô nghĩa + hồ IP quá hẹp. Dòng cũ là
     #     ip = f"198.51.100.{rnd.randint(1,254)}" if is_attack else f"198.51.100.{rnd.randint(1,254)}"
-    # tức HAI NHÁNH GIỐNG HỆT NHAU: benign và tấn công bốc từ CÙNG một hồ 254 địa chỉ.
+    # tức hai nhánh giống hệt nhau: benign và tấn công bốc từ cùng một hồ 254 địa chỉ.
     #
     # Hai hậu quả, cái sau nghiêm trọng hơn nhiều:
     #
-    # (a) NHIỄM CHÉO DANH TIẾNG. Mỗi địa chỉ gánh ~142 sự kiện trộn cả lành lẫn độc, nên
+    # (a) nhiễm chéo danh tiếng. Mỗi địa chỉ gánh ~142 sự kiện trộn cả lành lẫn độc, nên
     #     chặn một IP vì payload SQLi của nó cũng chặn luôn lưu lượng lành của chính địa
     #     chỉ đó. Mọi chỉ số tính theo IP đều mất nghĩa.
     #
-    # (b) BENIGN BỊ CHẤM LÀ "FLOOD". Luật tần suất Tier-1 bắn từ sự kiện thứ BA của cùng
+    # (b) BENIGN bị chấm là "FLOOD". Luật tần suất Tier-1 bắn từ sự kiện thứ ba của cùng
     #     một IP ("Tần suất cao: 3,00 req/s, ngưỡng 1,00") -> +20 điểm -> vượt ngưỡng leo
-    #     thang 15 -> lên Tier-2. Với 142 sự kiện/IP thì gần như MỌI địa chỉ CSIC đều dính,
+    #     thang 15 -> lên Tier-2. Với 142 sự kiện/IP thì gần như mọi địa chỉ CSIC đều dính,
     #     kể cả một lượt tải `/tienda1/imagenes/nuestratierra.jpg`. Đo lượt chạy 17/08/2026:
-    #     68/90 lô Tier-2 là loại này — điểm Tier-1 đúng 20, không chữ ký nào, LLM buộc
+    #     68/90 lô Tier-2 là loại này - điểm Tier-1 đúng 20, không chữ ký nào, LLM buộc
     #     phải đoán T1571, rồi rơi vào hàng đợi người. Đó là toàn bộ lý do HITL lấn át BLOCK.
     #
-    # Sửa theo hình dạng lưu lượng THẬT chứ không nới ngưỡng: hàng nghìn client lành khác
+    # Sửa theo hình dạng lưu lượng thật chứ không nới ngưỡng: hàng nghìn client lành khác
     # nhau, còn kẻ tấn công quét từ vài địa chỉ.
-    #   * benign  -> 100.64.0.0/10 (RFC 6598, dải dùng chung của CGNAT): hồ RỘNG, mỗi client
+    #   * benign  -> 100.64.0.0/10 (RFC 6598, dải dùng chung của CGNAT): hồ rộng, mỗi client
     #     chỉ gửi vài yêu cầu nên không chạm luật tần suất. Không đụng CICIDS (192.168/16),
     #     DAPT (172.16/12) hay TEST-NET.
-    #   * tấn công -> vẫn TEST-NET-2, CỐ Ý hẹp: kẻ tấn công gửi dồn là hành vi thật, và
+    #   * tấn công -> vẫn TEST-NET-2, cố Ý hẹp: kẻ tấn công gửi dồn là hành vi thật, và
     #     điều đó khiến danh tiếng/chặn-theo-IP có ý nghĩa để đo.
     if is_attack:
         ip = f"198.51.100.{rnd.randint(130, 254)}"
@@ -190,12 +190,12 @@ def to_event(req: dict, is_attack: bool, idx: int, rnd: random.Random) -> dict:
         ip = f"100.{rnd.randint(64, 79)}.{rnd.randint(0, 255)}.{rnd.randint(1, 254)}"
     return {
         "Source IP": ip,
-        # CỔNG 80, KHÔNG PHẢI 8080. Bản cũ đóng cứng 8080 cho CẢ 36.000 bản ghi, kể cả
-        # benign. Tier-1 coi 8080 là cổng bất thường nên MỌI yêu cầu CSIC — kể cả một lượt
-        # tải ảnh `/tienda1/imagenes/nuestratierra.jpg` — đều được cộng điểm rủi ro rồi leo
+        # Cổng 80, không phải 8080. Bản cũ đóng cứng 8080 cho cả 36.000 bản ghi, kể cả
+        # benign. Tier-1 coi 8080 là cổng bất thường nên mọi yêu cầu CSIC - kể cả một lượt
+        # tải ảnh `/tienda1/imagenes/nuestratierra.jpg` - đều được cộng điểm rủi ro rồi leo
         # thang lên Tier-2. Đo lượt chạy 17/08/2026: 68/90 lô Tier-2 là loại này, tất cả
         # điểm Tier-1 đúng 20, không chữ ký nào, và LLM buộc phải đoán T1571 "Non-Standard
-        # Port" — một quy kết do CHÍNH KHÂU DỰNG DỮ LIỆU bịa ra, không có trong CSIC 2010.
+        # Port" - một quy kết do chính khâu dựng dữ liệu bịa ra, không có trong CSIC 2010.
         # CSIC 2010 là HTTP cổng 80; tín hiệu tấn công phải đến từ PAYLOAD, không từ cổng.
         "Destination Port": 80,
         "Protocol": 6,
@@ -209,7 +209,7 @@ def to_event(req: dict, is_attack: bool, idx: int, rnd: random.Random) -> dict:
         "Total Length of Bwd Packets": rnd.randint(500, 8000),
         "Flow Duration": rnd.randint(1000, 90000),
         "csic_index": idx,
-        # nhãn -> sidecar, KHÔNG nằm trong sự kiện (bộ đóng dấu sẽ tách ra)
+        # nhãn -> sidecar, không nằm trong sự kiện (bộ đóng dấu sẽ tách ra)
         "_label": {
             "unified_source": "csic",
             "expected_threat": is_attack,

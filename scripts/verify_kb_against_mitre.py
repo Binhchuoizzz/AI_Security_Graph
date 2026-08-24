@@ -1,18 +1,18 @@
-"""Đối chiếu `knowledge_base/mitre_attack.json` với ATT&CK CHÍNH THỨC của MITRE.
+"""Đối chiếu `knowledge_base/mitre_attack.json` với ATT&CK chính thức của MITRE.
 
-VÌ SAO BẮT BUỘC CÓ. `attack_mapper.canonical_technique_name()` dùng CHÍNH KB này làm "nguồn
+Vì sao bắt buộc có. `attack_mapper.canonical_technique_name()` dùng chính KB này làm "nguồn
 sự thật" để đối chiếu nhãn LLM trả về (`attack_mapper.py:454-467`). Đó là một vòng tròn: nếu
-KB chứa mã bịa hoặc mã đã bị MITRE khai tử, bộ đối chiếu sẽ xác nhận chúng là ĐÚNG và gắn
+KB chứa mã bịa hoặc mã đã bị MITRE khai tử, bộ đối chiếu sẽ xác nhận chúng là đúng và gắn
 `name_verified=True`. Lá chắn chống "đúng ID sai tên" khi ấy chỉ là trang trí.
 
-Nguồn sự thật THẬT: kho STIX chính thức
+Nguồn sự thật thật: kho STIX chính thức
     https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json
 
-Kịch bản CHỈ ĐỌC — báo cáo, không sửa gì. Bốn nhóm phát hiện:
-  1. MÃ KHÔNG TỒN TẠI   — không có trong ATT&CK, kể cả nhóm đã khai tử  -> nghi bịa
-  2. MÃ ĐÃ KHAI TỬ      — MITRE đã thu hồi/thay thế                     -> phải cập nhật
-  3. SAI TÊN            — mã đúng nhưng tên KB khác tên chính thức
-  4. SAI TACTIC         — tactic KB không khớp kill-chain phase chính thức
+Kịch bản chỉ đọc - báo cáo, không sửa gì. Bốn nhóm phát hiện:
+  1. Mã không tồn tại   - không có trong ATT&CK, kể cả nhóm đã khai tử  -> nghi bịa
+  2. Mã đã khai tử      - MITRE đã thu hồi/thay thế                     -> phải cập nhật
+  3. Sai tên            - mã đúng nhưng tên KB khác tên chính thức
+  4. Sai TACTIC         - tactic KB không khớp kill-chain phase chính thức
 
 Chạy:
     .venv/bin/python scripts/verify_kb_against_mitre.py
@@ -37,10 +37,10 @@ STIX_URL = (
 )
 
 
-# KHÔNG hard-code danh sách tactic. Bản đầu của kịch bản này ghi cứng mô hình 14 tactic
-# (có "Defense Evasion") rồi kết luận nhầm rằng 83 mục trong KB mang nhãn bịa — trong khi
+# Không hard-code danh sách tactic. Bản đầu của kịch bản này ghi cứng mô hình 14 tactic
+# (có "Defense Evasion") rồi kết luận nhầm rằng 83 mục trong KB mang nhãn bịa - trong khi
 # MITRE đã tách "Defense Evasion" thành "Stealth" + "Defense Impairment", nâng lên 15 tactic.
-# Bài học: danh mục của MITRE thay đổi theo phiên bản, nên phải ĐỌC từ chính bó STIX.
+# Bài học: danh mục của MITRE thay đổi theo phiên bản, nên phải đọc từ chính bó STIX.
 def phase_map(stix: dict) -> dict[str, str]:
     """shortname (kebab-case) -> tên tactic chính thức, lấy từ đối tượng x-mitre-tactic."""
     return {
@@ -115,9 +115,9 @@ def main() -> int:
         if tid in live:
             o = live[tid]
             name_ok = _norm(name) == _norm(o["name"])
-            # KB giữ MỘT tactic/kỹ thuật; ATT&CK cho phép nhiều -> khớp nếu nằm trong tập.
-            # So KHÔNG phân biệt hoa thường: KB viết "Command And Control", MITRE viết
-            # "Command and Control" — khác đúng một chữ 'a', không phải sai dữ liệu.
+            # KB giữ một tactic/kỹ thuật; ATT&CK cho phép nhiều -> khớp nếu nằm trong tập.
+            # So không phân biệt hoa thường: KB viết "Command And Control", MITRE viết
+            # "Command and Control" - khác đúng một chữ 'a', không phải sai dữ liệu.
             tac_ok = (not o["tactics"]) or (_norm(tac) in {_norm(t) for t in o["tactics"]})
             if not name_ok:
                 badname.append((tid, name, o["name"]))

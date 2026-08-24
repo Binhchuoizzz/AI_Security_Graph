@@ -1,27 +1,27 @@
-"""Đo khả năng CHỐNG CHỐI BỎ của chuỗi niêm phong HMAC-SHA256 trên vết kiểm toán.
+"""Đo khả năng chống chối bỏ của chuỗi niêm phong HMAC-SHA256 trên vết kiểm toán.
 
-[Luận văn Ch.4 — vế thứ hai của RQ2]
+[Luận văn Ch.4 - vế thứ hai của RQ2]
 
-VÌ SAO CÓ TỆP NÀY. RQ2 hỏi thẳng: *"chuỗi niêm phong mật mã HMAC bảo vệ tính chống chối bỏ
-của vết pháp y ra sao trước nguy cơ bị thao túng nhật ký?"* — nhưng trước đây cơ chế này chỉ
+Vì sao có tệp này. RQ2 hỏi thẳng: *"chuỗi niêm phong mật mã HMAC bảo vệ tính chống chối bỏ
+của vết pháp y ra sao trước nguy cơ bị thao túng nhật ký?"* - nhưng trước đây cơ chế này chỉ
 được chạm tới trong `tests/unit/test_executor.py`. Test đơn vị trả lời "có hoạt động không",
-KHÔNG trả lời "phát hiện được bao nhiêu phần trăm". Hội đồng hỏi con số thì không có gì đưa.
+không trả lời "phát hiện được bao nhiêu phần trăm". Hội đồng hỏi con số thì không có gì đưa.
 
-ĐO CÁI GÌ. Ba kiểu thao túng mà kẻ tấn công có quyền ghi DB sẽ thực sự làm:
+Đo cái gì. Ba kiểu thao túng mà kẻ tấn công có quyền ghi DB sẽ thực sự làm:
 
-  SỬA   — đổi nội dung một dòng (che dấu vết một lệnh chặn, đổi target sang IP khác)
-  CHÈN  — thêm một dòng ngụy tạo vào giữa chuỗi (dựng bằng chứng giả)
-  XOÁ   — gỡ hẳn một dòng (phi tang)
+  Sửa   - đổi nội dung một dòng (che dấu vết một lệnh chặn, đổi target sang IP khác)
+  Chèn  - thêm một dòng ngụy tạo vào giữa chuỗi (dựng bằng chứng giả)
+  Xoá   - gỡ hẳn một dòng (phi tang)
 
-Mỗi kiểu lặp `--trials` lần ở vị trí NGẪU NHIÊN trong chuỗi, đếm tỉ lệ bị
+Mỗi kiểu lặp `--trials` lần ở vị trí ngẫu nhiên trong chuỗi, đếm tỉ lệ bị
 `verify_audit_trail_integrity()` bắt.
 
-ĐỐI CHỨNG ÂM LÀ BẮT BUỘC. Trước mỗi lượt, bản sao chưa đụng vào phải verify SẠCH. Thiếu bước
-này thì "phát hiện 100%" là vô nghĩa — một chuỗi vốn đã gãy sẵn cũng cho đúng con số đó.
+Đối chứng âm là bắt buộc. Trước mỗi lượt, bản sao chưa đụng vào phải verify sạch. Thiếu bước
+này thì "phát hiện 100%" là vô nghĩa - một chuỗi vốn đã gãy sẵn cũng cho đúng con số đó.
 
-AN TOÀN. KHÔNG bao giờ đụng `config/audit_trail.db` thật: mỗi lượt sao ra thư mục tạm rồi
+An toàn. Không bao giờ đụng `config/audit_trail.db` thật: mỗi lượt sao ra thư mục tạm rồi
 trỏ `executor.DB_PATH` sang bản sao. Vết kiểm toán thật là bằng chứng pháp y của chính luận
-văn — làm hỏng nó thì không dựng lại được.
+văn - làm hỏng nó thì không dựng lại được.
 
 Chạy:  .venv/bin/python experiments/run_audit_tamper.py [--trials 30]
 Ra:    experiments/results/audit_tamper_results.json
@@ -51,7 +51,7 @@ def _rows(db: str) -> list[tuple]:
 
 
 def _verify(db: str) -> tuple[bool, str]:
-    """Chạy verifier THẬT trên bản sao — không viết lại logic kiểm tra ở đây.
+    """Chạy verifier thật trên bản sao - không viết lại logic kiểm tra ở đây.
 
     Viết lại sẽ kiểm một thuật toán khác với thuật toán đang chạy, và phép đo mất ý nghĩa.
     """
@@ -78,7 +78,7 @@ def tamper_modify(db: str, rng: random.Random) -> str:
 
 
 def tamper_insert(db: str, rng: random.Random) -> str:
-    """Chèn một dòng ngụy tạo KÈM integrity_hash trông hợp lệ về hình thức.
+    """Chèn một dòng ngụy tạo kèm integrity_hash trông hợp lệ về hình thức.
 
     Cố tình dùng hash sao chép từ dòng khác chứ không để rỗng: kẻ tấn công biết cột đó tồn
     tại sẽ điền một giá trị 64 ký tự hex, không bỏ trống. Phép thử phải khó đúng mức đó.
@@ -106,8 +106,8 @@ def tamper_insert(db: str, rng: random.Random) -> str:
 
 def tamper_delete(db: str, rng: random.Random) -> str:
     ids = [r[0] for r in _rows(db)]
-    # Không xoá dòng CUỐI: xoá đuôi chuỗi thì không có mắt xích nào phía sau để lộ ra chỗ
-    # gãy, và đó là một hạn chế THẬT của log-chaining, phải nói riêng chứ không trộn vào
+    # Không xoá dòng cuối: xoá đuôi chuỗi thì không có mắt xích nào phía sau để lộ ra chỗ
+    # gãy, và đó là một hạn chế thật của log-chaining, phải nói riêng chứ không trộn vào
     # tỉ lệ phát hiện chung.
     rid = rng.choice(ids[:-1]) if len(ids) > 1 else ids[0]
     with sqlite3.connect(db) as conn:
@@ -146,7 +146,7 @@ def run(trials: int = 30, seed: int = 42) -> dict:
     }
 
     with tempfile.TemporaryDirectory(prefix="audit_tamper_") as tmp:
-        # ── ĐỐI CHỨNG ÂM ────────────────────────────────────────────────────────
+        # đối chứng âm
         clean = _fresh_copy(tmp, 0)
         ok, msg = _verify(clean)
         results["negative_control"] = {"intact": bool(ok), "message": msg}
@@ -161,7 +161,7 @@ def run(trials: int = 30, seed: int = 42) -> dict:
             return results
         results["metric_valid"] = True
 
-        # ── BA KIỂU THAO TÚNG ───────────────────────────────────────────────────
+        # Ba kiểu thao túng
         for name, fn in MODES.items():
             detected = 0
             examples: list[str] = []

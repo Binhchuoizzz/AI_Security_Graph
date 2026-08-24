@@ -1,24 +1,23 @@
 """
-Ablation Study HỢP NHẤT — 6 cấu hình A–F trên 3 chế độ chạy.
-=========================================================================
+Ablation Study hợp nhất - 6 cấu hình A–F trên 3 chế độ chạy.
 Gộp 3 file cũ (run_ablation_study / run_ablation_bcde / run_ablation_balanced) vào
-MỘT entry point. Bản chất thí nghiệm + tên file kết quả GIỮ NGUYÊN (để đối chiếu số
+một entry point. Bản chất thí nghiệm + tên file kết quả giữ nguyên (để đối chiếu số
 liệu đã trích trong luận văn); đây thuần là tổ chức lại code cho gọn.
 
   --mode af        Config A (Tier-1 rule-only) vs F (SENTINEL 2 tầng đầy đủ) trên tập
                    phân tầng ground_truth + MLflow.  -> results/ablation_results.json
   --mode bcde      Config B/C/D/E (Pure LLM / Welford+LLM / +dense-RAG / +hybrid-RAG)
                    trên 300 mẫu phân tầng.           -> results/ablation_bcde_results.json
-  --mode balanced  6 cấu hình A–F trên tập CÂN BẰNG 1:1 (benign thật để gate Welford có cơ
-                   hội DROP true-negative). Cỡ mẫu SUY RA từ số benign sẵn có trong
+  --mode balanced  6 cấu hình A–F trên tập cân bằng 1:1 (benign thật để gate Welford có cơ
+                   hội DROP true-negative). Cỡ mẫu suy ra từ số benign sẵn có trong
                    ground_truth (hiện là 80+80); warmup Welford lấy từ CICIDS thô held-out.
                                                     -> results/ablation_balanced_results.json
-  --mode mlgate    Config G — GIẢM TẢI LLM bằng Cổng ML (KHÔNG cần LLM). Đo bypass-rate +
+  --mode mlgate    Config G - giảm tải LLM bằng Cổng ML (không cần LLM). Đo bypass-rate +
                    F1 Cổng ML trên phần escalate.    -> results/ablation_mlgate_results.json
   --mode all       Chạy lần lượt af -> bcde -> balanced -> mlgate.
 
-Gate Welford tính MỘT lần/mẫu, dùng chung C/D/E/F => escalation set giống hệt nhau nên
-hiệu số D-C, E-D cô lập đúng đóng góp từng tầng RAG. Verdict B-E = action THÔ do LLM trả
+Gate Welford tính một lần/mẫu, dùng chung C/D/E/F => escalation set giống hệt nhau nên
+hiệu số D-C, E-D cô lập đúng đóng góp từng tầng RAG. Verdict B-E = action thô do LLM trả
 (không áp consensus-guard của F) để đo năng lực phân loại thuần.
 
 Chạy (cần LLM server cho mọi mode trừ phần rule-only):
@@ -62,9 +61,7 @@ N_BENIGN = 150
 N_ATTACK = 150
 
 
-# =========================================================================
 # Helpers dùng chung
-# =========================================================================
 def load_ground_truth():
     with open(GROUND_TRUTH_PATH) as f:
         return json.load(f)
@@ -87,7 +84,7 @@ def stratified(dataset, limit):
 
 
 def _has_payload(sample: dict) -> bool:
-    """Mẫu có BẰNG CHỨNG TẦNG ỨNG DỤNG (message/payload) để quy kết được hay không."""
+    """Mẫu có bằng chứng tầng ứng dụng (message/payload) để quy kết được hay không."""
     for lg in sample.get("logs") or []:
         if str(lg.get("message", "")).strip() or str(lg.get("payload", "")).strip():
             return True
@@ -95,21 +92,21 @@ def _has_payload(sample: dict) -> bool:
 
 
 def attributable(dataset: list, limit: int | None) -> list:
-    """Tập con CHẤM ĐƯỢC QUY KẾT: có payload VÀ có mã ATT&CK làm đáp án.
+    """Tập con chấm được quy kết: có payload và có mã ATT&CK làm đáp án.
 
-    VÌ SAO KHÔNG DÙNG `stratified()` CHO MODE bcde. `stratified()` lấy đều theo LỚP TẤN CÔNG,
-    và các lớp đầu tệp đều là NetFlow thuần. Đo thật: với `--limit 8` thì **0/8** mẫu có
-    payload. Không có bằng chứng tầng ứng dụng thì KHÔNG CÓ GÌ để quy kết — cả bốn cấu hình
+    Vì sao không dùng `stratified()` cho MODE bcde. `stratified()` lấy đều theo lớp tấn công,
+    và các lớp đầu tệp đều là NetFlow thuần. Đo thật: với `--limit 8` thì 0/8 mẫu có
+    payload. Không có bằng chứng tầng ứng dụng thì không có gì để quy kết - cả bốn cấu hình
     cùng ra 0% theo cấu trúc, và thước đo quy kết mới cũng không phân giải được B/C/D/E,
     y hệt bệnh của bảng F1 nhị phân mà nó sinh ra để thay thế.
 
     Đây đúng là dân số mà `scripts/eval_attack_mapper.py --evidence-layer payload` dùng:
     550 mẫu có bằng chứng ứng dụng, trong đó 300 mẫu có mã ATT&CK làm đáp án.
 
-    LOẠI MẪU BIÊN SOẠN. Đo được trước khi vá: trong 300 mẫu ấy có 50 mẫu do tác giả tự viết
-    (`cicids_label == "Adversarial"`) — **16,7%** — và cả 50 cùng đáp án `T1190`, đẩy T1190
+    Loại mẫu biên soạn. Đo được trước khi vá: trong 300 mẫu ấy có 50 mẫu do tác giả tự viết
+    (`cicids_label == "Adversarial"`) - 16,7% - và cả 50 cùng đáp án `T1190`, đẩy T1190
     từ 52 lên 102 mẫu. Giữ lại thì thước đo thưởng cho việc khớp khuôn mẫu của chính tác giả
-    và cho việc thiên vị một mã duy nhất. Sau khi lọc còn **250 mẫu thật**, 5 mã phân bố
+    và cho việc thiên vị một mã duy nhất. Sau khi lọc còn 250 mẫu thật, 5 mã phân bố
     T1595.003=130 · T1190=52 · T1059.007=30 · T1071.001=26 · T1083=12.
     """
     pool = [
@@ -125,14 +122,14 @@ def attributable(dataset: list, limit: int | None) -> list:
         )
     if not limit:
         return pool
-    # Phân tầng theo LỚP trong chính tập chấm được, để không dồn hết vào một loại tấn công.
+    # Phân tầng theo lớp trong chính tập chấm được, để không dồn hết vào một loại tấn công.
     by_label: dict[str, list] = {}
     for s in pool:
         by_label.setdefault(s["input"].get("cicids_label", "unknown"), []).append(s)
     per = max(1, (limit + len(by_label) - 1) // max(len(by_label), 1))
     sel: list = []
     # Bù cho đủ `limit` sau khi chia đều: lớp ít mẫu không lấp hết suất của mình, nên chia
-    # đều xong thường THIẾU so với limit (đo được: limit=300 chỉ ra 209). Người đọc thấy
+    # đều xong thường thiếu so với limit (đo được: limit=300 chỉ ra 209). Người đọc thấy
     # `--limit 300` mà kết quả ghi n=209 sẽ tưởng có lỗi lọc.
     for _lbl, ss in by_label.items():
         sel.extend(ss[:per])
@@ -146,7 +143,7 @@ def _print_action_confusion(action_scores: dict) -> None:
     """In bảng chéo kỳ vọng × thực tế cho từng cấu hình.
 
     `score_actions()` đã dựng sẵn ma trận này nhưng trước đây nó chỉ nằm im trong JSON.
-    Đây là thứ DUY NHẤT cho biết hệ sai KIỂU GÌ — vd "hoãn HITL trong khi lẽ ra phải chặn"
+    Đây là thứ duy nhất cho biết hệ sai kiểu gì - vd "hoãn HITL trong khi lẽ ra phải chặn"
     khác hẳn "chặn nhầm log lành tính", dù cả hai chỉ làm tụt cùng một con số accuracy.
     """
     for cfg, sc in action_scores.items():
@@ -163,15 +160,15 @@ def _print_action_confusion(action_scores: dict) -> None:
 
 
 def _fresh_engine() -> RuleEngine:
-    """RuleEngine CÔ LẬP khỏi golden baseline cho Ablation.
+    """RuleEngine cô lập khỏi golden baseline cho Ablation.
 
-    Ablation là thí nghiệm ĐỐI CHỨNG (so verdict-equivalence + độ trễ theo cấu phần
-    trên tập con thiên tấn công), có warmup RIÊNG (synthetic cho af/bcde, benign
+    Ablation là thí nghiệm đối chứng (so verdict-equivalence + độ trễ theo cấu phần
+    trên tập con thiên tấn công), có warmup riêng (synthetic cho af/bcde, benign
     held-out cho balanced). Kể từ khi bật tier1.golden_baseline.enabled=true,
-    RuleEngine() tự seed 300 flow benign lúc init — điều đó sẽ LÀM NHIỄU baseline
+    RuleEngine() tự seed 300 flow benign lúc init - điều đó sẽ làm nhiễu baseline
     có kiểm soát của ablation (gate bỗng DROP true-negative, phá tính tương đương
-    phán quyết). Vì thế ablation LUÔN reset Welford về rỗng để tái lập đúng thiết
-    kế đối chứng, ĐỘC LẬP với golden (vốn là tính năng của luồng-gộp/triển khai thật)."""
+    phán quyết). Vì thế ablation luôn reset Welford về rỗng để tái lập đúng thiết
+    kế đối chứng, độc lập với golden (vốn là tính năng của luồng-gộp/triển khai thật)."""
     engine = RuleEngine()
     for _k in engine.global_stats:
         engine.global_stats[_k] = RunningStats()
@@ -220,7 +217,7 @@ def build_rag_query(logs):
 
 
 def dense_only_context(query_text):
-    """RAG chỉ-FAISS (dense-only) cho Config D — KHÔNG BM25, KHÔNG RRF."""
+    """RAG chỉ-FAISS (dense-only) cho Config D - không BM25, không RRF."""
     out = {}
     for source_key, source_name in (("mitre", "MITRE ATT&CK"), ("nist", "NIST SP 800-61r2")):
         if source_key not in retriever.faiss_indexes:
@@ -246,18 +243,18 @@ def dense_only_context(query_text):
 
 
 def hybrid_context(query_text):
-    """RAG lai (FAISS+BM25+RRF) cho Config E — qua retriever chính thức."""
+    """RAG lai (FAISS+BM25+RRF) cho Config E - qua retriever chính thức."""
     res = retriever.retrieve(query_text)
     return f"MITRE ATT&CK:\n{res.get('mitre_context', '')}\n\nNIST SP 800-61r2:\n{res.get('nist_context', '')}"
 
 
 def llm_action(logs, rag_context):
-    """Gọi LLM trên raw logs (KHÔNG guardrails encapsulation) + RAG tùy chọn.
+    """Gọi LLM trên raw logs (không guardrails encapsulation) + RAG tùy chọn.
 
-    Trả `(action, giây, meta)`. `meta` mang KỸ THUẬT LLM TỰ KHAI — bắt buộc phải có thì
-    B/C/D/E mới phân giải được: biến độc lập của bốn cấu hình này là CẤU HÌNH RAG, mà RAG
+    Trả `(action, giây, meta)`. `meta` mang kỹ thuật LLM tự khai - bắt buộc phải có thì
+    B/C/D/E mới phân giải được: biến độc lập của bốn cấu hình này là cấu hình RAG, mà RAG
     không đổi việc "có phải mối đe doạ không", nó đổi việc "quy kết kỹ thuật nào". Chấm
-    bằng F1 nhị phân nên bốn cấu hình từng ra giống nhau từng bit — thước đo sai đại lượng,
+    bằng F1 nhị phân nên bốn cấu hình từng ra giống nhau từng bit - thước đo sai đại lượng,
     không phải hệ thống không có khác biệt.
     """
     raw_logs_str = "\n".join(str(log) for log in logs)
@@ -265,7 +262,7 @@ def llm_action(logs, rag_context):
     meta: dict[str, Any] = {"technique_raw": "", "technique_id": "", "confidence": 0.0}
     t0 = time.time()
     try:
-        # ĐỒNG BỘ với Config F: ép JSON hợp lệ (json_schema) + reasoning tiếng Việt, max_tokens rộng.
+        # Đồng bộ với Config F: ép JSON hợp lệ (json_schema) + reasoning tiếng Việt, max_tokens rộng.
         raw = llm_client.invoke(
             messages=messages,
             temperature=0.1,
@@ -279,7 +276,7 @@ def llm_action(logs, rag_context):
         raw_action = str(decision.get("action", "AWAIT_HITL")).upper().strip()
         if raw_action not in VALID_ACTIONS:
             raw_action = "AWAIT_HITL"
-        # ĐỒNG BỘ CHÍNH SÁCH ĐỘ-TIN-CẬY (giống Config F / hệ triển khai): confidence LÁI action.
+        # Đồng bộ chính sách độ-tin-cậy (giống Config F / hệ triển khai): confidence lái action.
         # LLM cho là đe doạ (BLOCK_IP/ALERT) -> classify_llm theo confidence (>=0.85 BLOCK ·
         # 0.65-0.85 ALERT · <0.65 AWAIT_HITL). DROP/LOG (sạch) & AWAIT_HITL giữ nguyên.
         try:
@@ -305,26 +302,26 @@ _TECH_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b")
 def score_attribution(
     expected: list[str], claimed: list[str], grounded: list[bool], invoked: list[bool]
 ) -> dict:
-    """Chấm QUY KẾT — thước đo đúng đại lượng cho B/C/D/E (bám RQ3).
+    """Chấm quy kết - thước đo đúng đại lượng cho B/C/D/E (bám RQ3).
 
     `expected`: mã đúng theo `expected_mitre_technique` ('None' = mẫu không có mã).
     `claimed` : mã LLM tự khai.
-    `grounded`: mã đó CÓ nằm trong khối RAG đưa cho chính cấu hình ấy hay không.
-    `invoked` : cấu hình này CÓ THỰC SỰ gọi LLM cho mẫu đó hay không.
+    `grounded`: mã đó có nằm trong khối RAG đưa cho chính cấu hình ấy hay không.
+    `invoked` : cấu hình này có thực sự gọi LLM cho mẫu đó hay không.
 
-    `invoked` LÀ BẮT BUỘC, KHÔNG PHẢI TUỲ CHỌN. C/D/E chỉ gọi LLM khi Tier-1 leo thang; các
+    `invoked` là bắt buộc, không phải tuỳ chọn. C/D/E chỉ gọi LLM khi Tier-1 leo thang; các
     mẫu còn lại dừng ở phán quyết Tier-1 và không có cơ hội quy kết. Bản đầu của hàm này
-    chấm trên TOÀN BỘ mẫu nên đã trộn "Tier-1 xử lý xong, chưa hỏi LLM" vào cùng rổ với
+    chấm trên toàn bộ mẫu nên đã trộn "Tier-1 xử lý xong, chưa hỏi LLM" vào cùng rổ với
     "LLM từ chối quy kết". Đo thật trên 8 mẫu: C/D/E ra `abstain_rate = 1.0000` trong khi
-    chỉ 2/8 mẫu từng được đưa tới LLM — con số đó không mô tả hành vi nào có thật, và B
+    chỉ 2/8 mẫu từng được đưa tới LLM - con số đó không mô tả hành vi nào có thật, và B
     (luôn gọi LLM) thì không so được với chúng vì hai bên khác mẫu số.
 
-    Cùng nguyên tắc `evaluate_rag_retrieval.py` đang dùng: chấm ĐIỀU KIỆN HOÁ THEO LEO THANG,
+    Cùng nguyên tắc `evaluate_rag_retrieval.py` đang dùng: chấm điều kiện hoá theo leo thang,
     và báo luôn `n_invoked` để không ai tưởng mẫu số là toàn tập.
 
-    LƯU Ý ĐỌC SỐ: với B (LLM thuần) và C (Welford+LLM) thì khối RAG RỖNG, nên
-    `ungrounded_rate` = 1.0 THEO CẤU TRÚC, không phải phát hiện thực nghiệm. Ý nghĩa của nó
-    là: hai cấu hình đó KHÔNG THỂ chứng minh mã mình nêu — mọi quy kết chỉ dựa vào trí nhớ
+    Lưu Ý đọc số: với B (LLM thuần) và C (Welford+LLM) thì khối RAG rỗng, nên
+    `ungrounded_rate` = 1.0 theo cấu trúc, không phải phát hiện thực nghiệm. Ý nghĩa của nó
+    là: hai cấu hình đó không thể chứng minh mã mình nêu - mọi quy kết chỉ dựa vào trí nhớ
     tham số. Cặp phân giải thật sự nằm giữa D (dense) và E (lai + RRF), nơi cả hai đều có
     RAG nhưng khác cách truy xuất.
     """
@@ -381,17 +378,15 @@ def calc_fpr(y_true, y_pred):
         return 0.0
 
 
-# =========================================================================
-# MODE: af  — Config A (rule-only) vs F (SENTINEL đầy đủ) + MLflow
-# =========================================================================
+# MODE: af  - Config A (rule-only) vs F (SENTINEL đầy đủ) + MLflow
 def run_af(limit=None, out=None):
     import mlflow
 
     dataset = stratified(load_ground_truth(), limit) if limit else load_ground_truth()
     out_path = out or OUT_AF
 
-    # dict[str, Any]: chứa CẢ các khối config (dict) LẪN các khối tổng hợp thêm sau
-    # (expected_actions: list, action_scores: dict) — không đồng nhất kiểu theo thiết kế.
+    # dict[str, Any]: chứa cả các khối config (dict) lẫn các khối tổng hợp thêm sau
+    # (expected_actions: list, action_scores: dict) - không đồng nhất kiểu theo thiết kế.
     results: dict[str, Any] = {
         "Config_A": {"y_true": [], "y_pred": [], "latencies": [], "actions": []},
         "Config_F": {
@@ -411,7 +406,7 @@ def run_af(limit=None, out=None):
         mlflow.log_param("config_a", "Rule-only (No LLM)")
         mlflow.log_param("config_f", "Full SENTINEL 2-Tier")
 
-        # Hành động KỲ VỌNG của từng mẫu — dùng chung cho A và F khi chấm theo hành động.
+        # Hành động kỳ vọng của từng mẫu - dùng chung cho A và F khi chấm theo hành động.
         expected_actions: list[str] = []
 
         print(f"[*] Chay Ablation Study (A vs F) tren {len(dataset)} mau...")
@@ -425,12 +420,12 @@ def run_af(limit=None, out=None):
             logs = sample.get("logs", [])
             rule_engine.session_baseline.reset_window()
 
-            # --- Config A: chỉ luật cứng ---
+            # Config A: chỉ luật cứng
             start_time_a = time.time()
             pred_a = 0
-            # GIỮ LẠI hành động THẬT của Tier-1 (không chỉ cờ nhị phân) để chấm theo hành
-            # động. Với A, `ESCALATE` nghĩa là "cần tầng sau" mà tầng sau bị TẮT -> pipeline
-            # CHƯA phân giải; score_actions tính riêng, không coi là phát hiện.
+            # Giữ lại hành động thật của Tier-1 (không chỉ cờ nhị phân) để chấm theo hành
+            # động. Với A, `ESCALATE` nghĩa là "cần tầng sau" mà tầng sau bị tắt -> pipeline
+            # chưa phân giải; score_actions tính riêng, không coi là phát hiện.
             action_a = "LOG"
             for log in logs:
                 result = rule_engine.evaluate(log)
@@ -446,7 +441,7 @@ def run_af(limit=None, out=None):
             results["Config_A"]["actions"].append(action_a)
             expected_actions.append(sample["expected_action"])
 
-            # --- Config F: SENTINEL 2 tầng đầy đủ ---
+            # Config F: SENTINEL 2 tầng đầy đủ
             start_time_f = time.time()
             pred_f = 0
             needs_llm = False
@@ -466,9 +461,9 @@ def run_af(limit=None, out=None):
                 "narrative_summary": "",
                 "decisions": [],
                 "escalated_to_llm": needs_llm,
-                # LOG ĐẦU VÀO đại diện — bắt buộc để `evaluate_reasoning.py` chấm được
-                # NEO BẰNG CHỨNG (đối chiếu `field=value` trong lập luận với giá trị THẬT).
-                # Không có nó thì không phân biệt được model TRÍCH số từ log hay BỊA ra.
+                # LOG đầu vào đại diện - bắt buộc để `evaluate_reasoning.py` chấm được
+                # Neo bằng chứng (đối chiếu `field=value` trong lập luận với giá trị thật).
+                # Không có nó thì không phân biệt được model trích số từ log hay bịa ra.
                 "log": logs[0] if logs else {},
             }
 
@@ -488,11 +483,11 @@ def run_af(limit=None, out=None):
                     reasoning_output["decisions"] = decisions
                     if decisions:
                         action = decisions[-1].get("action", "UNKNOWN")
-                        # DI SẢN kiến trúc CŨ: field `ml_model` từng do một node ML-triage
-                        # bên trong agent gắn. Sau khi Cổng ML DỜI về Tier-1/subscriber, agent
-                        # (`agent_app`) KHÔNG còn node ML nào -> field này không bao giờ được
-                        # gắn, nên counter này LUÔN = 0 trong Config F. Phép đo giảm-tải Cổng ML
-                        # THẬT nằm ở `--mode mlgate` (Config G). Giữ lại để tương thích shape output.
+                        # Di sản kiến trúc cũ: field `ml_model` từng do một node ML-triage
+                        # bên trong agent gắn. Sau khi Cổng ML dời về Tier-1/subscriber, agent
+                        # (`agent_app`) không còn node ML nào -> field này không bao giờ được
+                        # gắn, nên counter này luôn = 0 trong Config F. Phép đo giảm-tải Cổng ML
+                        # thật nằm ở `--mode mlgate` (Config G). Giữ lại để tương thích shape output.
                         if decisions[-1].get("ml_model"):
                             ml_bypassed_count += 1
                         results["Config_F"]["actions"].append(action)
@@ -518,7 +513,7 @@ def run_af(limit=None, out=None):
                 f"Pred A: {pred_a} ({latency_a:.3f}s) | Pred F: {pred_f} ({latency_f:.3f}s)"
             )
 
-        # ── CHẤM THEO HÀNH ĐỘNG (thước đo CHÍNH) ────────────────────────────────────
+        # chấm theo hành động (thước đo chính)
         action_scores = {
             "Config_A": score_actions(expected_actions, results["Config_A"]["actions"]),
             "Config_F": score_actions(expected_actions, results["Config_F"]["actions"]),
@@ -526,9 +521,9 @@ def run_af(limit=None, out=None):
         results["expected_actions"] = expected_actions
         results["action_scores"] = action_scores
 
-        # ── CẢNH BÁO BASE-RATE gắn thẳng vào kết quả ─────────────────────────────────
-        # Tập ground_truth phân tầng thiên TẤN CÔNG rất nặng. Trên đó, một hàm
-        # `return True` cũng đạt F1 xấp xỉ base rate — nên F1 nhị phân ở chế độ này KHÔNG
+        # cảnh báo BASE-RATE gắn thẳng vào kết quả
+        # Tập ground_truth phân tầng thiên tấn công rất nặng. Trên đó, một hàm
+        # `return True` cũng đạt F1 xấp xỉ base rate - nên F1 nhị phân ở chế độ này không
         # đo được năng lực, và chính nó là nguồn gốc con số "0,967" từng bị trích như một
         # thành tích. Gắn cờ vào JSON để người đọc kết quả (và người viết luận văn) thấy
         # ngay, thay vì phải nhớ cảnh báo nằm ở một tài liệu khác.
@@ -576,7 +571,7 @@ def run_af(limit=None, out=None):
                 f"chạy `--mode balanced`."
             )
 
-        # ── BẢNG CHÉO 4 LỚP HÀNH ĐỘNG — hệ sai KIỂU GÌ, không chỉ sai bao nhiêu ──────
+        # bảng chéo 4 lớp hành động - hệ sai kiểu gì, không chỉ sai bao nhiêu
         # `score_actions` đã dựng sẵn ma trận này nhưng trước đây chỉ nằm im trong JSON.
         _print_action_confusion(action_scores)
 
@@ -644,9 +639,7 @@ def run_af(limit=None, out=None):
         print("[+] Da ghi metrics len MLflow.")
 
 
-# =========================================================================
-# MODE: bcde  — Config B/C/D/E trên 300 mẫu phân tầng
-# =========================================================================
+# MODE: bcde  - Config B/C/D/E trên 300 mẫu phân tầng
 def run_bcde(limit=300, out=None):
     out_path = out or OUT_BCDE
     dataset = attributable(load_ground_truth(), limit)
@@ -666,11 +659,11 @@ def run_bcde(limit=300, out=None):
             "latencies": [],
             "escalated": [],
             "actions": [],
-            # Hai trường mới: kỹ thuật LLM tự khai, và mã đó CÓ neo trong khối RAG của
+            # Hai trường mới: kỹ thuật LLM tự khai, và mã đó có neo trong khối RAG của
             # chính cấu hình ấy hay không. Đây là đại lượng mà B/C/D/E thực sự tác động.
             "techniques": [],
             "grounded": [],
-            # Cấu hình này CÓ gọi LLM cho mẫu đó không. C/D/E chỉ gọi khi Tier-1 leo thang;
+            # Cấu hình này có gọi LLM cho mẫu đó không. C/D/E chỉ gọi khi Tier-1 leo thang;
             # thiếu cờ này thì "chưa hỏi LLM" bị đếm chung với "LLM từ chối quy kết".
             "llm_invoked": [],
         }
@@ -688,36 +681,36 @@ def run_bcde(limit=300, out=None):
         tier1_pred = 1 if tier1_verdict in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
         query = build_rag_query(logs)
 
-        # Mặc định: gate KHÔNG escalate -> C/D/E dừng ở phán quyết Tier-1. Khởi tạo ở đây
+        # Mặc định: gate không escalate -> C/D/E dừng ở phán quyết Tier-1. Khởi tạo ở đây
         # để biến luôn bound dù đi nhánh nào (an toàn kiểu + ý nghĩa rõ khi chấm hành động).
         a_c = a_d = a_e = tier1_verdict
-        # `m_*` giữ kỹ thuật LLM khai; `ctx_*` giữ khối RAG đã đưa cho chính cấu hình đó —
-        # phải là ĐÚNG khối ấy thì "có neo hay không" mới có nghĩa. Dùng chung một khối cho
+        # `m_*` giữ kỹ thuật LLM khai; `ctx_*` giữ khối RAG đã đưa cho chính cấu hình đó -
+        # phải là đúng khối ấy thì "có neo hay không" mới có nghĩa. Dùng chung một khối cho
         # cả D và E sẽ xoá mất khác biệt giữa dense-only và lai+RRF, tức xoá luôn thứ đang đo.
         m_c = m_d = m_e = {"technique_id": ""}
         ctx_c = ctx_d = ctx_e = ""
-        a_b, l_b, m_b = llm_action(logs, "")  # B — Pure LLM (KHÔNG RAG)
-        if needs_llm:  # C — Welford + LLM (no RAG)
+        a_b, l_b, m_b = llm_action(logs, "")  # B - Pure LLM (không RAG)
+        if needs_llm:  # C - Welford + LLM (no RAG)
             a_c, l_c, m_c = llm_action(logs, "")
             p_c = to_pred(a_c)
         else:
             l_c, p_c = 0.0006, tier1_pred
-        if needs_llm:  # D — Welford + dense RAG
+        if needs_llm:  # D - Welford + dense RAG
             ctx_d = dense_only_context(query)
             a_d, l_d, m_d = llm_action(logs, ctx_d)
             p_d = to_pred(a_d)
         else:
             l_d, p_d = 0.0006, tier1_pred
-        if needs_llm:  # E — Welford + hybrid RAG (FAISS+BM25+RRF)
+        if needs_llm:  # E - Welford + hybrid RAG (FAISS+BM25+RRF)
             ctx_e = hybrid_context(query)
             a_e, l_e, m_e = llm_action(logs, ctx_e)
             p_e = to_pred(a_e)
         else:
             l_e, p_e = 0.0006, tier1_pred
 
-        # Hành động THẬT của từng config. Khi gate KHÔNG escalate, C/D/E dừng ở phán
-        # quyết Tier-1 nên hành động là `tier1_verdict` — ghi đúng như vậy để chấm theo
-        # hành động phản ánh ĐÚNG thứ pipeline thực sự làm.
+        # Hành động thật của từng config. Khi gate không escalate, C/D/E dừng ở phán
+        # quyết Tier-1 nên hành động là `tier1_verdict` - ghi đúng như vậy để chấm theo
+        # hành động phản ánh đúng thứ pipeline thực sự làm.
         expected_actions.append(sample["expected_action"])
         expected_techs.append(str(sample.get("expected_mitre_technique", "") or ""))
         for c, pred, lat, act, meta, ctx in (
@@ -745,17 +738,17 @@ def run_bcde(limit=300, out=None):
     R["expected_actions"] = expected_actions
     R["expected_techniques"] = expected_techs
     R["action_scores"] = {c: score_actions(expected_actions, R[c]["actions"]) for c in "BCDE"}
-    # THƯỚC ĐO CHÍNH của chế độ này. Biến độc lập B/C/D/E là CẤU HÌNH RAG, và RAG không đổi
-    # việc "có phải mối đe doạ không" — nó đổi việc "quy kết kỹ thuật nào". Chấm bằng F1 nhị
-    # phân là đo sai đại lượng, và đó là lý do bốn cấu hình từng ra giống nhau TỪNG BIT.
+    # Thước đo chính của chế độ này. Biến độc lập B/C/D/E là cấu hình RAG, và RAG không đổi
+    # việc "có phải mối đe doạ không" - nó đổi việc "quy kết kỹ thuật nào". Chấm bằng F1 nhị
+    # phân là đo sai đại lượng, và đó là lý do bốn cấu hình từng ra giống nhau từng BIT.
     R["attribution_scores"] = {
         c: score_attribution(
             expected_techs, R[c]["techniques"], R[c]["grounded"], R[c]["llm_invoked"]
         )
         for c in "BCDE"
     }
-    # CẢNH BÁO LỰC KIỂM ĐỊNH. C/D/E chỉ gọi LLM khi Tier-1 leo thang, và trên mẫu có payload
-    # tỉ lệ leo thang đo được chỉ ~17%. Với `--limit 12` thì C/D/E mỗi cấu hình chỉ có 2 ca —
+    # Cảnh báo lực kiểm định. C/D/E chỉ gọi LLM khi Tier-1 leo thang, và trên mẫu có payload
+    # tỉ lệ leo thang đo được chỉ ~17%. Với `--limit 12` thì C/D/E mỗi cấu hình chỉ có 2 ca -
     # không đủ để nói D khác E hay không. Ở cỡ đầy đủ (300 mẫu) sẽ được ~50 ca mỗi cấu hình.
     _min_inv = min(R["attribution_scores"][c]["n_invoked"] for c in "CDE")
     R["attribution_underpowered"] = _min_inv < 30
@@ -833,14 +826,12 @@ def run_bcde(limit=300, out=None):
         )
 
 
-# =========================================================================
-# MODE: balanced  — 6 cấu hình A–F trên tập CÂN BẰNG 150/150
-# =========================================================================
+# MODE: balanced  - 6 cấu hình A–F trên tập cân bằng 150/150
 def _raw_benign_warmup_logs(n: int, exclude: list) -> list[dict]:
-    """Nạp `n` flow benign THẬT từ CSV CICIDS thô để warmup Welford, LOẠI TRỪ mọi flow đã
+    """Nạp `n` flow benign thật từ CSV CICIDS thô để warmup Welford, loại trừ mọi flow đã
     có trong tập chấm (đối chiếu bằng chữ ký đặc trưng).
 
-    Vì sao không dùng golden baseline: `_fresh_engine()` CỐ Ý xoá Welford để ablation là
+    Vì sao không dùng golden baseline: `_fresh_engine()` cố Ý xoá Welford để ablation là
     thí nghiệm đối chứng độc lập. Vì sao không cắt đôi benign của ground_truth: chỉ có 80
     mẫu, cắt đôi thì tập chấm còn 40/40 và McNemar mất gần hết lực kiểm định. CSV thô cho
     warmup dồi dào mà vẫn held-out.
@@ -892,23 +883,23 @@ def _raw_benign_warmup_logs(n: int, exclude: list) -> list[dict]:
 
 
 def balanced_subset(dataset):
-    """Trả về (subset, warmup_logs): tập CHẤM cân bằng benign==attack + warmup held-out.
+    """Trả về (subset, warmup_logs): tập chấm cân bằng benign==attack + warmup held-out.
 
-    LỖI ĐÃ SỬA (2026-07-27): bản cũ hard-code `benign[:150]` và `benign[150:300]` trong khi
-    `ground_truth.json` chỉ có **80** mẫu benign. Hệ quả kép, cả hai đều âm thầm:
-      1. Tập "cân bằng" thực ra là 80 benign + 150 attack (35% benign) — KHÔNG cân bằng,
+    Lỗi đã sửa (2026-07-27): bản cũ hard-code `benign[:150]` và `benign[150:300]` trong khi
+    `ground_truth.json` chỉ có 80 mẫu benign. Hệ quả kép, cả hai đều âm thầm:
+      1. Tập "cân bằng" thực ra là 80 benign + 150 attack (35% benign) - không cân bằng,
          đúng thứ mà chế độ này sinh ra để tránh.
-      2. `benign[150:300]` bắt đầu NGOÀI mảng nên luôn trả [] -> warmup 0 flow, tức Welford
+      2. `benign[150:300]` bắt đầu ngoài mảng nên luôn trả [] -> warmup 0 flow, tức Welford
          chưa bao giờ ấm trong suốt ablation "cân bằng", trái với mô tả trong luận văn.
-    Nay cỡ mẫu SUY RA TỪ dữ liệu thật: chia đôi benign sẵn có thành phần CHẤM và phần
+    Nay cỡ mẫu suy ra từ dữ liệu thật: chia đôi benign sẵn có thành phần chấm và phần
     WARMUP held-out, rồi lấy đúng bấy nhiêu attack để hai lớp bằng nhau.
     """
     benign = [s for s in dataset if s["expected_action"] == "LOG"]
     attack = [s for s in dataset if s["expected_action"] in ("BLOCK_IP", "ALERT", "AWAIT_HITL")]
 
-    # Warmup ƯU TIÊN lấy từ CICIDS THÔ: held-out theo CẤU TẠO (khác nguồn dòng với
-    # ground_truth, lại còn loại trừ theo chữ ký) nên KHÔNG phải hy sinh mẫu benign của
-    # tập chấm. Chỉ khi không có CSV thô mới chia đôi benign — đánh đổi cỡ mẫu lấy warmup.
+    # Warmup ưu tiên lấy từ CICIDS thô: held-out theo cấu tạo (khác nguồn dòng với
+    # ground_truth, lại còn loại trừ theo chữ ký) nên không phải hy sinh mẫu benign của
+    # tập chấm. Chỉ khi không có CSV thô mới chia đôi benign - đánh đổi cỡ mẫu lấy warmup.
     warmup_logs = _raw_benign_warmup_logs(n=150, exclude=benign)
     if warmup_logs:
         n_benign_score = min(N_BENIGN, len(benign))
@@ -918,7 +909,7 @@ def balanced_subset(dataset):
         warmup_benign = benign[n_benign_score:]
     benign_sel = benign[:n_benign_score]
 
-    # Attack lấy PHÂN TẦNG đều theo lớp, đúng bằng số benign -> cân bằng THẬT 1:1.
+    # Attack lấy phân tầng đều theo lớp, đúng bằng số benign -> cân bằng thật 1:1.
     n_attack = min(N_ATTACK, n_benign_score)
     by_label = {}
     for s in attack:
@@ -944,7 +935,7 @@ def run_balanced(out=None):
     print(f"[*] Ablation CÂN BẰNG: {len(dataset)} mẫu ({n_b} benign + {n_a} attack)")
 
     # Chốt tính chất, không phải kiểm tra phòng thủ: nếu hai lớp lệch hoặc warmup rỗng thì
-    # con số sinh ra KHÔNG còn là thứ luận văn mô tả — thà dừng còn hơn báo cáo sai lặng lẽ.
+    # con số sinh ra không còn là thứ luận văn mô tả - thà dừng còn hơn báo cáo sai lặng lẽ.
     if n_b != n_a:
         raise SystemExit(
             f"[!] Tập 'cân bằng' bị lệch: {n_b} benign vs {n_a} attack. Kiểm tra "
@@ -973,10 +964,10 @@ def run_balanced(out=None):
         logs = sample.get("logs", [])
         rule_engine.session_baseline.reset_window()
 
-        # --- A: Tier-1 rule-only ---
+        # A: Tier-1 rule-only
         t0 = time.time()
         pred_a = 0
-        action_a = "LOG"  # giữ hành động THẬT của Tier-1 để chấm theo hành động
+        action_a = "LOG"  # giữ hành động thật của Tier-1 để chấm theo hành động
         for log in logs:
             _act = rule_engine.evaluate(log).get("tier1_action")
             if _act in ("BLOCK_IP", "ALERT", "AWAIT_HITL", "ESCALATE"):
@@ -985,16 +976,16 @@ def run_balanced(out=None):
                 break
         lat_a = time.time() - t0
 
-        # --- Gate Welford dùng chung C/D/E/F ---
+        # Gate Welford dùng chung C/D/E/F
         needs_llm, tier1_verdict = run_gate(logs, rule_engine)
         tier1_pred = 1 if tier1_verdict in ("BLOCK_IP", "ALERT", "AWAIT_HITL") else 0
         query = build_rag_query(logs)
 
         # Mặc định như trên: không escalate -> C/D/E giữ phán quyết Tier-1.
         a_c = a_d = a_e = tier1_verdict
-        # `_` nuốt phần meta (kỹ thuật LLM khai): chế độ `balanced` chấm theo HÀNH ĐỘNG trên
-        # tập cân bằng 150/150, không chấm quy kết — phần đó là việc của chế độ `bcde`.
-        a_b, l_b, _ = llm_action(logs, "")  # B — Pure LLM
+        # `_` nuốt phần meta (kỹ thuật LLM khai): chế độ `balanced` chấm theo hành động trên
+        # tập cân bằng 150/150, không chấm quy kết - phần đó là việc của chế độ `bcde`.
+        a_b, l_b, _ = llm_action(logs, "")  # B - Pure LLM
         p_b = to_pred(a_b)
 
         if needs_llm:  # C/D/E
@@ -1008,7 +999,7 @@ def run_balanced(out=None):
             l_c = l_d = l_e = 0.0006
             p_c = p_d = p_e = tier1_pred
 
-        # --- F: SENTINEL đầy đủ (agent_app + Consensus Guard) ---
+        # F: SENTINEL đầy đủ (agent_app + Consensus Guard)
         t0 = time.time()
         pred_f = 0
         action_f = tier1_verdict  # mặc định: gate không escalate -> dừng ở phán quyết Tier-1
@@ -1087,14 +1078,14 @@ def run_balanced(out=None):
 
 
 def run_mlgate(limit=None, out=None):
-    """Config G — GIẢM TẢI LLM bằng Cổng ML (chiều Performance/Efficiency, KHÔNG cần LLM).
+    """Config G - giảm tải LLM bằng Cổng ML (chiều Performance/Efficiency, không cần LLM).
 
     Mô phỏng đường thật: Tier-1 gate quyết event nào ESCALATE (đáng lẽ gọi LLM); cho phần
     escalate đó qua Cổng ML. ML tự quyết -> BYPASS = tiết kiệm 1 lượt LLM. Đo:
       - ml_bypass_rate = (escalate được ML giải quyết) / (tổng escalate)
       - F1/P/R của Cổng ML trên phần bypass
-      - độ trễ TIẾT KIỆM: không-ML mọi escalate tốn ~LLM_MS; có-ML phần bypass chỉ tốn ~ML_MS
-    Số LLM_MS/ML_MS là tham chiếu (từ latency_benchmark) chỉ để CHIẾU mức tiết kiệm — không
+      - độ trễ tiết kiệm: không-ML mọi escalate tốn ~LLM_MS; có-ML phần bypass chỉ tốn ~ML_MS
+    Số LLM_MS/ML_MS là tham chiếu (từ latency_benchmark) chỉ để chiếu mức tiết kiệm - không
     phải phép đo latency mới.
     """
     from src.tier1_filter.ml_gateway import MLGateway
@@ -1131,14 +1122,14 @@ def run_mlgate(limit=None, out=None):
     f1 = float(f1_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
     prec = float(precision_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
     rec = float(recall_score(yt, yp, zero_division=0)) if yt else 0.0  # pyright: ignore[reportArgumentType]
-    # ĐÃ GỠ `projected_latency_saved_pct` (+ ref_llm_ms/ref_ml_ms/projected_llm_calls_saved).
-    # Lý do: nó KHÔNG phải phép đo. Công thức là `bypass_rate` nhân với hai HẰNG SỐ GIẢ ĐỊNH
+    # Đã gỡ `projected_latency_saved_pct` (+ ref_llm_ms/ref_ml_ms/projected_llm_calls_saved).
+    # Lý do: nó không phải phép đo. Công thức là `bypass_rate` nhân với hai hằng số giả định
     # cứng trong mã (LLM 5000 ms, ML 0,3 ms), nên con số ~80% chỉ là cách viết lại
     # `ml_bypass_rate` dưới đơn vị thời gian. Nguy hiểm ở chỗ nó nằm ngay cạnh một con số
-    # ĐO THẬT rất giống (`latency_benchmark.json`, giảm ~83%) — người đọc không có cách nào
+    # Đo thật rất giống (`latency_benchmark.json`, giảm ~83%) - người đọc không có cách nào
     # phân biệt cái nào đo, cái nào giả định. Cần tuyên bố về độ trễ thì trích
     # `measure_latency_baseline.py`. `projected_llm_calls_saved` cũng bị gỡ vì trùng khít
-    # `n_ml_bypass` — một con số thì chỉ nên có MỘT cái tên.
+    # `n_ml_bypass` - một con số thì chỉ nên có một cái tên.
     result = {
         "dataset_size": n,
         "n_escalated_would_call_llm": n_escalated,
@@ -1173,11 +1164,11 @@ if __name__ == "__main__":
     ap.add_argument("--out", type=str, default=None, help="Ghi đè path output (chỉ khi 1 mode)")
     args = ap.parse_args()
 
-    # ĐÓNG BĂNG việc SINH luật động trong suốt lượt đo. Bắt buộc, không phải tuỳ chọn:
-    # `run_af` dùng CHUNG một `rule_engine` cho Config A và Config F, nên luật do tác tử của
-    # F sinh ra sẽ có hiệu lực ngay với A ở mẫu kế tiếp — baseline được chính treatment nâng
+    # Đóng băng việc sinh luật động trong suốt lượt đo. Bắt buộc, không phải tuỳ chọn:
+    # `run_af` dùng chung một `rule_engine` cho Config A và Config F, nên luật do tác tử của
+    # F sinh ra sẽ có hiệu lực ngay với A ở mẫu kế tiếp - baseline được chính treatment nâng
     # đỡ, và delta A->F nói giảm đóng góp của Tầng 2. Xem chú thích dài ở
-    # `feedback_listener.receive_new_rule`. Đặt TRƯỚC mọi import chạm tới engine.
+    # `feedback_listener.receive_new_rule`. Đặt trước mọi import chạm tới engine.
     os.environ["SENTINEL_FREEZE_DYNAMIC_RULES"] = "1"
     print("[*] Luật động: ĐÓNG BĂNG trong lượt đo (chống nhiễm baseline + để tái lập được).")
 

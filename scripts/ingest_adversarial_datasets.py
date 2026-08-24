@@ -8,8 +8,8 @@ EXP_DIR = "experiments/adversarial"
 DEMO_OUT = "data/demo_adversarial.json"
 
 
-# Define standard templates for simulated network traffic (for UI demo)
-# This mimics the format of data/demo_small.json
+# Khuôn lưu lượng mạng mô phỏng, chỉ dùng cho demo giao diện
+# Bám đúng định dạng của data/demo_small.json
 def generate_attack_log(payload, attack_category):
     fields = ["payload", "URI", "User-Agent"]
     selected_field = random.choice(fields)
@@ -59,7 +59,7 @@ def ingest_jackhhao():
         data = json.load(f)
 
     samples = []
-    # Take a subset if too large, but 527 is fine. Let's take 200 to keep UI demo fast
+    # Lấy 200 mẫu cho demo giao diện chạy nhanh
     random.shuffle(data)
     for i, text in enumerate(data[:200]):
         samples.append(
@@ -85,7 +85,7 @@ def ingest_advbench():
         reader = csv.DictReader(f)
         for i, row in enumerate(reader):
             if i >= 200:
-                break  # Limit to 200 for benchmark balance
+                break  # Giới hạn 200 mẫu để benchmark cân
             goal = row.get("goal", "")
             samples.append(
                 {
@@ -101,7 +101,7 @@ def ingest_advbench():
 
 
 def main():
-    # 1. Load and standardise datasets
+    # Nạp và chuẩn hoá các bộ dữ liệu
     print("Ingesting Prompt Injections (Deepset)...")
     pi_samples = ingest_deepset()
     print("Ingesting Jailbreaks (Jackhhao)...")
@@ -115,7 +115,7 @@ def main():
         "advbench_gcg": adv_samples,
     }
 
-    # 2. Write to experiments/adversarial/
+    # Ghi ra experiments/adversarial/
     demo_logs = []
     total = 0
     for category, samples in all_samples.items():
@@ -128,11 +128,11 @@ def main():
         print(f"Saved {len(samples)} to {cat_dir}/samples.json")
         total += len(samples)
 
-        # Add to demo UI dataset
+        # Bổ sung vào tập dữ liệu demo giao diện
         for s in samples:
             demo_logs.append(generate_attack_log(s["payload"], category))
 
-    # 3. Write Demo Dataset for UI
+    # Ghi tập dữ liệu demo cho giao diện
     random.shuffle(demo_logs)
     with open(DEMO_OUT, "w", encoding="utf-8") as f:
         json.dump(demo_logs, f, indent=2, ensure_ascii=False)

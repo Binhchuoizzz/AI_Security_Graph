@@ -1,5 +1,5 @@
 """
-Module Tier 1 Filter: Rule-based IDS Engine va Feedback Loop.
+Tầng 1: bộ luật chữ ký, đường nền Welford, Cổng ML và vòng phản hồi luật động.
 
 Bao gom cac thanh phan:
 - RuleEngine: Danh gia risk score dua tren luat tinh va dong (Session Baselining).

@@ -1,25 +1,24 @@
 """
-SENTINEL — Unified Streaming Evaluation (OFFLINE, tất định)
-==========================================================
-THAY THẾ phương pháp đánh giá "3 luồng tách rời" cũ (CICIDS / DAPT nạp-sẵn /
+SENTINEL - Unified Streaming Evaluation (OFFLINE, tất định)
+Thay thế phương pháp đánh giá "3 luồng tách rời" cũ (CICIDS / DAPT nạp-sẵn /
 zero-day chạy riêng), vốn có 2 nhược điểm:
-  - DAPT bị nạp TOÀN BỘ chuỗi vào Threat Memory rồi mới `check_apt_chain`
+  - DAPT bị nạp toàn bộ chuỗi vào Threat Memory rồi mới `check_apt_chain`
     -> vòng luẩn quẩn (đã báo trước đáp án), không chứng minh được năng lực
     phát hiện APT nổi lên dần.
   - Zero-day và CICIDS chạy ở hai script riêng, không phản ánh một SOC thực tế
     nơi mọi traffic trộn lẫn trên cùng một dòng thời gian.
 
-Cách làm MỚI: gộp cả 3 nguồn vào MỘT luồng sự kiện sắp theo thời gian (dựng bởi
-`experiments/unified_dataset.py`), stream TĂNG DẦN qua hệ thống THẬT (Tier-1
-RuleEngine + Welford + Threat Memory) với bộ nhớ KHỞI TẠO SẠCH. Nhờ đó:
+Cách làm mới: gộp cả 3 nguồn vào một luồng sự kiện sắp theo thời gian (dựng bởi
+`experiments/unified_dataset.py`), stream tăng dần qua hệ thống thật (Tier-1
+RuleEngine + Welford + Threat Memory) với bộ nhớ khởi tạo sạch. Nhờ đó:
   1. Phân loại (CICIDS): đo trên stream trộn thật.
-  2. APT (DAPT): bộ nhớ tích lũy TỪ stream; `check_apt_chain` chỉ bật sau khi
+  2. APT (DAPT): bộ nhớ tích lũy từ stream; `check_apt_chain` chỉ bật sau khi
      đủ sự kiện đa ngày -> phát hiện EMERGENT, đo "độ trễ phát hiện".
   3. Zero-day: outlier signature-less, rule tĩnh bỏ sót nhưng Welford bắt được,
      baseline học ngay từ traffic benign trong cùng luồng.
 
-Bộ DỰNG dữ liệu (build_stream, map_cicids...) nằm ở `unified_dataset.py` để luồng
-ONLINE (`scripts/build_datatest.py` → `scripts/demo.py`/`push_datatest.py`)
+Bộ dựng dữ liệu (build_stream, map_cicids...) nằm ở `unified_dataset.py` để luồng
+ONLINE (`scripts/build_datatest.py` -> `scripts/demo.py`/`push_datatest.py`)
 và các thí nghiệm rigor cùng dùng chung.
 
 Chạy offline (Tier-1 + Memory, tất định, không cần LLM server):
@@ -53,7 +52,7 @@ from src.tier1_filter.rule_engine import RuleEngine  # noqa: E402
 
 
 def _f1_of_pairs(pairs) -> float:
-    """F1 tính lại từ danh sách cặp (is_threat, flagged) — dùng cho bootstrap CI."""
+    """F1 tính lại từ danh sách cặp (is_threat, flagged) - dùng cho bootstrap CI."""
     tp = sum(1 for t, f in pairs if t and f)
     fp = sum(1 for t, f in pairs if not t and f)
     fn = sum(1 for t, f in pairs if t and not f)
@@ -67,15 +66,13 @@ OUT_JSON = os.path.join(ROOT, "experiments", "results", "unified_stream_results.
 REPORT_MD = os.path.join(ROOT, "reports", "unified_stream_evaluation_report.md")
 
 
-# --------------------------------------------------------------------------- #
-# Run the unified stream through the real system
-# --------------------------------------------------------------------------- #
+# Đẩy luồng gộp qua đúng hệ thống thật
 def run():
     print("=" * 70)
     print("  SENTINEL — UNIFIED STREAMING EVALUATION (1 luồng gộp, memory sạch)")
     print("=" * 70)
 
-    # Bộ nhớ THẬT nhưng dùng DB tạm + xóa sạch (không đụng production threat_memory)
+    # Bộ nhớ thật nhưng dùng DB tạm + xóa sạch (không đụng production threat_memory)
     if os.path.exists(EVAL_MEM_DB):
         os.remove(EVAL_MEM_DB)
     memory = ThreatMemoryStore(db_path=EVAL_MEM_DB)
@@ -88,14 +85,14 @@ def run():
     print(f"\n[*] Nguồn: {len(warmup)} benign (warmup) | {len(main)} sự kiện luồng chính")
     print(f"[*] DAPT: {n_chains} chuỗi | IP là APT thật (>=2 ngày tấn công): {len(apt_truth)}")
 
-    # ---- APT: ghi chuỗi TỪ luồng (phải bám đúng thứ tự sự kiện) ---------- #
+    # APT: ghi chuỗi từ luồng (phải bám đúng thứ tự sự kiện)
     apt_detected: dict = {}  # ip -> {first_event_idx, first_day, fired, ...}
     apt_event_counter: dict = defaultdict(int)
 
     def _on_dapt(ev, ev_index):
-        """Bản án APT phải NỔI LÊN DẦN: ghi sự kiện vào memory rồi mới hỏi lại."""
+        """Bản án APT phải nổi lên dần: ghi sự kiện vào memory rồi mới hỏi lại."""
         if not ev.get("is_attack"):
-            return  # benign DAPT = nền nhiễu, KHÔNG ghi vào memory APT
+            return  # benign DAPT = nền nhiễu, không ghi vào memory APT
         ip = ev["ip"]
         apt_event_counter[ip] += 1
         before = memory.check_apt_chain(ip)
@@ -110,7 +107,7 @@ def run():
         after = memory.check_apt_chain(ip)
         if ip not in apt_detected:
             apt_detected[ip] = {"first_event_idx": ev_index, "first_day": ev["day"], "fired": False}
-        # ghi lại khoảnh khắc bản án LẬT từ False -> True
+        # ghi lại khoảnh khắc bản án lật từ False -> True
         if (not before["is_apt"]) and after["is_apt"] and not apt_detected[ip]["fired"]:
             apt_detected[ip].update(
                 {
@@ -122,8 +119,8 @@ def run():
                 }
             )
 
-    # ---- Chấm luồng qua hàm DÙNG CHUNG (xem unified_dataset.score_stream) - #
-    # Warmup CHỈ học baseline, KHÔNG chấm — chấm nó rồi báo là "độ chính xác" chính là
+    # ---- Chấm luồng qua hàm dùng chung (xem unified_dataset.score_stream) - #
+    # Warmup chỉ học baseline, không chấm - chấm nó rồi báo là "độ chính xác" chính là
     # test-on-train. Toàn bộ benign trong ma trận dưới đây là held-out.
     scored = score_stream(engine, warmup, main, collect_zeroday=True, on_dapt=_on_dapt)
     warn_unhandled(scored["excluded_by_source"])
@@ -133,15 +130,15 @@ def run():
     excluded_by_source = scored["excluded_by_source"]
     zd_results = scored["zeroday"]
 
-    # ---- Metrics --------------------------------------------------------- #
+    # Metrics
     tp, fp, tn, fn = cls["tp"], cls["fp"], cls["tn"], cls["fn"]
     report = confusion_report(tp, fp, tn, fn)
     precision, recall = report["precision"], report["recall"]
     f1, accuracy = report["f1"], report["accuracy"]
 
-    # Bóc theo TỪNG lớp tấn công: recall gộp có thể che mất một lớp bị bỏ sót SẠCH.
+    # Bóc theo từng lớp tấn công: recall gộp có thể che mất một lớp bị bỏ sót sạch.
     cls_report = per_class_report(scored["records"])
-    # CI bootstrap cho F1 — chạy trên kết quả đã chấm, không tốn thêm lượt gọi nào.
+    # CI bootstrap cho F1 - chạy trên kết quả đã chấm, không tốn thêm lượt gọi nào.
     f1_ci = bootstrap_ci(
         [(r["is_threat"], r["flagged"]) for r in scored["records"]], _f1_of_pairs, seed=42
     )
@@ -155,14 +152,14 @@ def run():
 
     zd_caught = sum(1 for z in zd_results if z["caught_by_welford"])
 
-    # ---- NGĂN CHẶN MỨC IP -------------------------------------------------- #
-    # Báo TÁCH HAI NHÓM, không gộp. Lý do là tính hợp lệ của chính phép đo:
-    #   * `dapt` mang IP THẬT của DAPT2020, nơi một host bị chiếm quyền gửi CẢ lưu lượng
-    #     lành lẫn tấn công. Đây là ca KHÓ và thật — con số ở đây mới đáng đưa vào luận văn,
+    # Ngăn chặn mức IP
+    # Báo tách hai nhóm, không gộp. Lý do là tính hợp lệ của chính phép đo:
+    #   * `dapt` mang IP thật của DAPT2020, nơi một host bị chiếm quyền gửi cả lưu lượng
+    #     lành lẫn tấn công. Đây là ca khó và thật - con số ở đây mới đáng đưa vào luận văn,
     #     kèm Wilson CI vì n rất nhỏ (vài IP kẻ tấn công).
-    #   * Các nguồn còn lại có IP TỔNG HỢP (CICIDS bản ML đã bỏ địa chỉ thật). Sau khi tách
-    #     dải, một IP tổng hợp hoặc là kẻ tấn công hoặc là lành tính suốt luồng — sạch hơn
-    #     đời thật, nên số ở đây đo CƠ CHẾ (lệnh chặn có bật và có dính không) chứ không đo
+    #   * Các nguồn còn lại có IP tổng hợp (CICIDS bản ML đã bỏ địa chỉ thật). Sau khi tách
+    #     dải, một IP tổng hợp hoặc là kẻ tấn công hoặc là lành tính suốt luồng - sạch hơn
+    #     đời thật, nên số ở đây đo cơ chế (lệnh chặn có bật và có dính không) chứ không đo
     #     độ khó. Gộp hai nhóm lại sẽ để nhóm dễ pha loãng nhóm khó.
     ip_trace = scored["ip_trace"]
     containment = {
@@ -181,8 +178,8 @@ def run():
             "main_events": len(main),
             "dapt_chains": n_chains,
             "apt_truth_ips": len(apt_truth),
-            # Kế toán MINH BẠCH: `main_events` là số sự kiện ĐI QUA hệ thống, KHÁC với số
-            # sự kiện được CHẤM. Trước đây báo cáo chỉ in main_events nên đọc nhầm thành
+            # Kế toán minh bạch: `main_events` là số sự kiện đi qua hệ thống, khác với số
+            # sự kiện được chấm. Trước đây báo cáo chỉ in main_events nên đọc nhầm thành
             # cỡ mẫu của ma trận nhầm lẫn (thực tế nhỏ hơn 20 lần).
             "n_scored": tp + fp + tn + fn,
             "scored_by_source": dict(scored_by_source),
@@ -197,7 +194,7 @@ def run():
             "recall": round(recall, 4),
             "f1": round(f1, 4),
             "f1_ci95_bootstrap": list(f1_ci),
-            # MCC là chỉ số CHÍNH: bằng 0 với mọi bộ đoán-một-lớp bất kể tỉ lệ lớp, nên
+            # MCC là chỉ số chính: bằng 0 với mọi bộ đoán-một-lớp bất kể tỉ lệ lớp, nên
             # không bị base rate đánh lừa như F1/Accuracy. `accuracy` giữ để đối chiếu
             # tài liệu cũ, luôn đọc kèm `zero_r_accuracy`.
             "mcc": report["mcc"],
@@ -244,7 +241,7 @@ def _print_console(summary, apt_fired, apt_truth, zd_results):
     s = summary["stream"]
     print("\n" + "-" * 70)
     print("  [1] CLASSIFICATION (mọi nguồn flow CÓ NHÃN, trên luồng trộn)")
-    # MCC đứng MỘT MÌNH ở dòng đầu. BalAcc đã bị hạ khỏi headline: nó gần như luôn kể lại
+    # MCC đứng một mình ở dòng đầu. BalAcc đã bị hạ khỏi headline: nó gần như luôn kể lại
     # cùng một câu chuyện với MCC nhưng trên thang dễ đọc nhầm (0,5 = đoán bừa, không phải
     # 0), nên đặt cạnh nhau chỉ tạo hai con số cho một kết luận. Vẫn giữ trong JSON.
     print(f"      MCC={c['mcc']}   <- chỉ số CHÍNH")
@@ -373,7 +370,7 @@ def _write_report(summary, apt_fired, apt_truth, zd_results):
         "tỉ lệ lớp, trong khi F1 và Accuracy đều bị base rate của tập đánh lừa.\n"
     )
 
-    # --- Bóc theo lớp: recall gộp che mất lớp bị bỏ sót sạch ------------------ #
+    # Bóc theo lớp: recall gộp che mất lớp bị bỏ sót sạch
     pc = summary.get("per_class") or {}
     if pc:
         lines.append("### 1.1 Bóc theo TỪNG lớp tấn công\n")

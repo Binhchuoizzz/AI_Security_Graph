@@ -1,13 +1,13 @@
-"""Unit tests cho LỚP BẢO MẬT Cổng ML (chống né-tránh / evasion).
+"""Unit tests cho lớp bảo mật Cổng ML (chống né-tránh / evasion).
 
-Bối cảnh: Cổng ML (Tier-1, LightGBM) là bộ RA QUYẾT ĐỊNH tự động (auto BLOCK_IP). Khác
-với LLM có cả rừng guardrail, ML gate trước đây KHÔNG có phòng thủ nào — kẻ tấn công bơm
+Bối cảnh: Cổng ML (Tier-1, LightGBM) là bộ ra quyết định tự động (auto BLOCK_IP). Khác
+với LLM có cả rừng guardrail, ML gate trước đây không có phòng thủ nào - kẻ tấn công bơm
 Inf/NaN hoặc giá trị cực đoan để né ML block hoặc lật nhãn. Ba tuyến phòng thủ:
   1. Sanitize NaN/±Inf -> mean (không để scaler raise).
   2. Clamp z-score về ±CLIP_SIGMA (1 feature cực đoan không chi phối dự đoán).
   3. OOD abstain khi quá nhiều feature lệch -> trả None (escalate LLM), không tin ML.
 
-Bất biến QUAN TRỌNG: trên input SẠCH, phòng thủ KHÔNG được kích hoạt (giữ bypass rate).
+Bất biến quan trọng: trên input sạch, phòng thủ không được kích hoạt (giữ bypass rate).
 """
 
 import json
@@ -25,12 +25,12 @@ _MODEL_PATH = os.path.join(ROOT, "ml_lab", "tier_2_model.pkl")
 
 
 def _gateway_is_usable() -> bool:
-    """Điều kiện THẬT của các test này: Cổng ML có pipeline DÙNG ĐƯỢC.
+    """Điều kiện thật của các test này: Cổng ML có pipeline dùng được.
 
-    TẠI SAO KHÔNG CHỈ CHECK os.path.exists: file model có thể tồn tại nhưng KHÔNG giải
+    Tại sao không chỉ CHECK os.path.exists: file model có thể tồn tại nhưng không giải
     mã được (thiếu scikit-learn/lightgbm -> pickle.load ném ModuleNotFoundError). Khi đó
     _load_pipeline trả None và evaluate_detailed thoát sớm với sanitized=0/ood=0.0, làm
-    các test dưới fail bằng thông báo khó hiểu ('assert 0 >= 1') thay vì skip rõ ràng —
+    các test dưới fail bằng thông báo khó hiểu ('assert 0 >= 1') thay vì skip rõ ràng -
     đúng cách CI đã đỏ suốt từ 2026-07-17.
     """
     if not os.path.exists(_MODEL_PATH):
@@ -51,7 +51,7 @@ def gateway():
 
 @pytest.fixture(scope="module")
 def clean_flow():
-    """1 flow THẬT có đủ feature số từ ground_truth (map sang schema CICIDS)."""
+    """1 flow thật có đủ feature số từ ground_truth (map sang schema CICIDS)."""
     with open(GT_PATH, encoding="utf-8") as f:
         gt = json.load(f)
     sample = next(s for s in gt if s.get("input", {}).get("network_layer"))
@@ -59,7 +59,7 @@ def clean_flow():
 
 
 def test_clean_input_does_not_trigger_defenses(gateway, clean_flow):
-    """Input SẠCH: KHÔNG sanitize, KHÔNG clamp, KHÔNG abstain (giữ nguyên bypass)."""
+    """Input sạch: Không sanitize, không clamp, không abstain (giữ nguyên bypass)."""
     action, _reason, conf, sec = gateway.evaluate_detailed(clean_flow)
     assert sec["sanitized"] == 0
     assert sec["clamped"] == 0
@@ -70,13 +70,13 @@ def test_clean_input_does_not_trigger_defenses(gateway, clean_flow):
 
 
 def test_infinity_is_sanitized_not_crash(gateway, clean_flow):
-    """Bơm 'Infinity' vào feature: scaler KHÔNG raise, được sanitize, pipeline vẫn chạy."""
+    """Bơm 'Infinity' vào feature: scaler không raise, được sanitize, pipeline vẫn chạy."""
     evil = dict(clean_flow)
     evil["Flow Duration"] = "Infinity"
     action, _reason, _conf, sec = gateway.evaluate_detailed(evil)
     assert sec["sanitized"] >= 1
     assert sec["reason"] != "scale_error"  # không vỡ ở bước scale
-    # Kết quả vẫn hợp lệ (một action hoặc abstain=None), KHÔNG ném exception.
+    # Kết quả vẫn hợp lệ (một action hoặc abstain=None), không ném exception.
     assert action in ("BLOCK_IP", "ALERT", "DROP", None)
 
 
@@ -96,7 +96,7 @@ def test_single_extreme_feature_is_clamped(gateway, clean_flow):
 
 
 def test_broad_extreme_input_triggers_ood_abstain(gateway, clean_flow):
-    """Bơm cực đoan HÀNG LOẠT feature (đối kháng) -> OOD abstain -> trả None (escalate LLM)."""
+    """Bơm cực đoan hàng loạt feature (đối kháng) -> OOD abstain -> trả None (escalate LLM)."""
     evil = dict(clean_flow)
     n = 0
     for k, v in list(clean_flow.items()):
@@ -107,7 +107,7 @@ def test_broad_extreme_input_triggers_ood_abstain(gateway, clean_flow):
     action, _reason, _conf, sec = gateway.evaluate_detailed(evil)
     assert sec["ood_fraction"] > OOD_FRACTION
     assert sec["ood_abstain"] is True
-    assert action is None  # KHÔNG tin ML -> escalate LLM
+    assert action is None  # Không tin ML -> escalate LLM
 
 
 def test_clamp_sigma_bounds_are_sane():

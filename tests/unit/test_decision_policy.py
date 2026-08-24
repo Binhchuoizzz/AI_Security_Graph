@@ -1,5 +1,5 @@
 """
-Unit tests — Chính sách độ-tin-cậy THỐNG NHẤT (decision_policy).
+Unit tests - Chính sách độ-tin-cậy thống nhất (decision_policy).
 
 Kiểm 4 dải Cổng ML (C>=0.85 BLOCK · 0.65–0.85 ESCALATE · 0.40–0.65 ALERT · <0.40 DROP)
 và ánh xạ LLM (>=0.85 BLOCK · 0.65–0.85 ALERT · <0.65 AWAIT_HITL; sạch -> DROP).

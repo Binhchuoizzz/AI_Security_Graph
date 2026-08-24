@@ -1,13 +1,13 @@
 """
-RAG: Semantic Cache (Embedding Latency Optimization)
+Bộ đệm ngữ nghĩa, cắt chi phí nhúng cho truy vấn lặp.
 
-VẤN ĐỀ:
-  Mỗi sự kiện escalate đều phải: embed log → query FAISS → trả context.
+Vấn đề:
+  Mỗi sự kiện escalate đều phải: embed log -> query FAISS -> trả context.
   Embedding realtime tốn khoảng 50-200ms/query trên CPU.
   Với 100+ events/batch, nút thắt cổ chai này sẽ làm sai lệch
   Reasoning Latency ở RQ1.
 
-GIẢI PHÁP: Semantic Cache
+Giải pháp: Semantic Cache
   Cache các vector query đã từng xử lý (key = template pattern).
   Khi gặp log có cùng attack pattern (cùng template), trả kết quả
   từ cache thay vì embed + search lại.
@@ -37,13 +37,13 @@ class SemanticCache:
     Dùng OrderedDict để implement LRU eviction khi cache đầy.
     TTL đảm bảo cache không bị stale.
 
-    TRUNG THỰC VỀ TÊN GỌI: đây là cache KHỚP-CHÍNH-XÁC trên MẪU log đã khai thác, KHÔNG
+    Trung thực về tên gọi: đây là cache khớp-chính-xác trên mẫu log đã khai thác, không
     phải "semantic cache" theo nghĩa GPTCache (không có embedding, không có ngưỡng tương
     đồng vector). Hai truy vấn khác nhau về chữ nhưng cùng ý nghĩa sẽ MISS. Cái làm nên
-    hiệu quả ở đây là bước Drain3 phía trước: nó gộp hàng loạt log gần-trùng về CÙNG một
+    hiệu quả ở đây là bước Drain3 phía trước: nó gộp hàng loạt log gần-trùng về cùng một
     mẫu, nên cache bắt được lưu lượng lặp (DDoS/brute-force) dù bản thân phép so khớp là
     chính xác từng ký tự. Khi mô tả trong tài liệu/luận văn, gọi là "bộ đệm theo mẫu"
-    (template cache) — gọi là "semantic" là nói quá so với cơ chế thật.
+    (template cache) - gọi là "semantic" là nói quá so với cơ chế thật.
     """
 
     def __init__(self, max_size: int = 500, ttl_seconds: int = 1800):
@@ -56,8 +56,8 @@ class SemanticCache:
             "misses": 0,
             "evictions": 0,
         }
-        # Khóa bảo vệ OrderedDict + stats khi NHIỀU worker Tier-2 truy cập cache song
-        # song (move_to_end/popitem trên OrderedDict KHÔNG an toàn đa luồng). RLock để
+        # Khóa bảo vệ OrderedDict + stats khi nhiều worker Tier-2 truy cập cache song
+        # song (move_to_end/popitem trên OrderedDict không an toàn đa luồng). RLock để
         # get()/put() có thể gọi lồng nhau an toàn. Đơn luồng: không tranh chấp = ~0 chi phí.
         self._lock = threading.RLock()
 
@@ -69,8 +69,8 @@ class SemanticCache:
         return hashlib.sha256(query_text.encode()).hexdigest()
 
     def _evict_expired(self):
-        """Xóa entries quá TTL. GỌI KHI CACHE ĐẦY (trong put) — nếu chỉ dựa vào kiểm TTL
-        lúc get() thì entry hết hạn vẫn chiếm chỗ, và LRU sẽ đẩy ra entry CÒN HẠN thay vì
+        """Xóa entries quá TTL. Gọi khi CACHE đầy (trong put) - nếu chỉ dựa vào kiểm TTL
+        lúc get() thì entry hết hạn vẫn chiếm chỗ, và LRU sẽ đẩy ra entry còn hạn thay vì
         entry đã chết. Người gọi phải đang giữ self._lock."""
         now = time.time()
         expired_keys = [
@@ -120,7 +120,7 @@ class SemanticCache:
                 self.cache[key] = {"result": result, "timestamp": time.time()}
                 return
 
-            # Cache đầy -> dọn entry HẾT HẠN trước đã, chỉ khi vẫn chật mới hy sinh
+            # Cache đầy -> dọn entry hết hạn trước đã, chỉ khi vẫn chật mới hy sinh
             # entry còn hạn theo LRU.
             if len(self.cache) >= self.max_size:
                 self._evict_expired()
@@ -151,7 +151,7 @@ class SemanticCache:
     def clear(self):
         """Reset cache. Dùng khi chạy experiment mới.
 
-        PHẢI giữ khoá như get/put: nhiều worker Tier-2 dùng chung cache, clear() không
+        Phải giữ khoá như get/put: nhiều worker Tier-2 dùng chung cache, clear() không
         khoá mà chạy xen giữa một put() đang popitem sẽ làm hỏng OrderedDict.
         """
         with self._lock:

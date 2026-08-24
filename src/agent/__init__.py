@@ -1,5 +1,5 @@
 """
-Module Agent: LangGraph Workflow, State Management va LLM Client.
+Tác tử Tier-2: đồ thị trạng thái LangGraph, quản lý state và client LLM cục bộ.
 
 Chua toan bo logic cua Tier 2 AI Agent bao gom:
 - State: Quan ly trang thai LangGraph.

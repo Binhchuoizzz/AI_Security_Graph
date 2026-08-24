@@ -1,6 +1,4 @@
-"""
-Cấu hình dùng chung và các hằng số cho DAPT2020.
-"""
+"""Cấu hình dùng chung và các hằng số cho DAPT2020."""
 
 import pandas as pd  # type: ignore
 
