@@ -104,13 +104,14 @@ def main():
         t0 = time.time()
         model.fit(X_train_s, y_train)
         train_t = time.time() - t0
-        val_f1 = f1_score(y_val, model.predict(X_val_s), zero_division=0)
+        # zero_division=0 là hợp lệ (0/1/"warn"/nan); stub của sklearn khai nhầm là str.
+        val_f1 = f1_score(y_val, model.predict(X_val_s), zero_division=0)  # type: ignore[arg-type]
         t1 = time.time()
         y_pred = model.predict(X_test_s)
         infer_ms = (time.time() - t1) / len(X_test_s) * 1000
-        f1 = float(f1_score(y_test, y_pred, zero_division=0))
-        prec = float(precision_score(y_test, y_pred, zero_division=0))
-        rec = float(recall_score(y_test, y_pred, zero_division=0))
+        f1 = float(f1_score(y_test, y_pred, zero_division=0))  # type: ignore[arg-type]
+        prec = float(precision_score(y_test, y_pred, zero_division=0))  # type: ignore[arg-type]
+        rec = float(recall_score(y_test, y_pred, zero_division=0))  # type: ignore[arg-type]
         tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
         fpr = fp / (fp + tn) if (fp + tn) else 0.0
         row = {

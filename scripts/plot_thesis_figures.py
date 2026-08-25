@@ -15,6 +15,7 @@ Chạy:  .venv/bin/python scripts/plot_thesis_figures.py
 import json
 import os
 import sys
+from typing import Any
 
 import matplotlib
 
@@ -195,7 +196,7 @@ def _num(x, lang, nd=1):
 
 
 # Hình 3 - rào chắn tĩnh: chặn theo xuất xứ, kèm đối chứng âm
-T3 = {
+T3: dict[str, dict[str, Any]] = {
     "en": dict(
         title="Static pre-filter: block rate by provenance, against its false-flag rate",
         bars=[
@@ -264,7 +265,7 @@ def fig_guardrail(lang):
 
 
 # Hình 4 - quy kết theo kỹ thuật: trần truy xuất / RRF / toàn tuyến
-T4 = {
+T4: dict[str, dict[str, Any]] = {
     "en": dict(
         title="Attribution by technique against the retrieval ceiling",
         series=["Retrieval hit@3", "Retrieval only (no LLM)", "Full agent"],
@@ -413,7 +414,7 @@ def fig_triage(lang):
 # Hình 6 - bóc tách thành phần + chất lượng lập luận
 # Hai khối kết quả này trước đây chỉ có bảng và chữ. Vẽ ra để đọc được bằng mắt:
 # trái là đóng góp từng tầng (kèm KTC 95%), phải là bốn trục chấm lập luận.
-T6 = {
+T6: dict[str, dict[str, Any]] = {
     "en": dict(
         title_a="Ablation: action accuracy (95% CI)",
         title_b="Reasoning quality (judge, 1–5)",

@@ -173,6 +173,7 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
         latencies.append(dt)
 
     total = max(len(events), 1)
+    rag_cache = getattr(retriever, "cache", None)
     breakdown = {
         "n_events": len(events),
         "escaped_at": stage_n,
@@ -181,7 +182,7 @@ def measure_two_tier(events: list, warmup: list | None = None) -> tuple[list, di
         "mean_ms_by_stage": {
             k: round(float(np.mean(v)), 3) if v else None for k, v in stage_ms.items()
         },
-        "rag_cache": retriever.cache.get_stats() if getattr(retriever, "cache", None) else None,
+        "rag_cache": rag_cache.get_stats() if rag_cache else None,
     }
     print(
         f"  Thoát ở Tier-1: {stage_n['tier1_drop']} · Cổng ML: {stage_n['ml_gate']} · "

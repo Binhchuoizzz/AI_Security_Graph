@@ -10,6 +10,8 @@ try:
 except ImportError:
     raise ImportError("Missing dependency: pip install langgraph")
 
+from typing import cast
+
 from src.agent import trace
 from src.agent.nodes import (
     node_action_executor,
@@ -98,9 +100,12 @@ class _TracedGraph:
         # Mọi API khác (stream/get_graph/...) uỷ quyền thẳng xuống graph đã biên dịch.
         return getattr(self._app, name)
 
-    def invoke(self, state, *args, **kwargs):
+    def invoke(self, state, *args, **kwargs) -> dict:
+        # LangGraph khai `invoke` trả `GraphOutput`, nhưng lúc chạy nó trả về chính
+        # cuốn trạng thái dạng dict. Khai đúng ở đây thì bảy chỗ gọi bên ngoài `src/`
+        # (main.py và các script đo) không phải rải chú thích bỏ qua kiểu nữa.
         if not trace.enabled():
-            return self._app.invoke(state, *args, **kwargs)
+            return cast(dict, self._app.invoke(state, *args, **kwargs))
         trace.begin(state)
         try:
             out = self._app.invoke(state, *args, **kwargs)
@@ -108,7 +113,7 @@ class _TracedGraph:
             trace.flush(status="error", error=e)
             raise
         trace.flush(status="ok", final_state=out)
-        return out
+        return cast(dict, out)
 
 
 # Thực thể duy nhất agent_app để xuất ra ngoài (Singleton)

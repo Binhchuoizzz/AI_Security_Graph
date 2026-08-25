@@ -869,7 +869,8 @@ def _raw_benign_warmup_logs(n: int, exclude: list) -> list[dict]:
             if label_col is None:
                 continue
             benign_rows = df[df[label_col].astype(str).str.strip().str.lower() == "benign"]
-            for row in benign_rows.to_dict("records"):
+            # pandas-stubs không khớp overload khi DataFrame đến từ phép lọc mặt nạ.
+            for row in benign_rows.to_dict(orient="records"):  # type: ignore[call-overload]
                 if len(out) >= n:
                     break
                 log = map_cicids(row)

@@ -108,18 +108,29 @@ def format_csic_row_to_raft(csic_item: dict) -> dict:
     return {"instruction": prompt, "response": response}
 
 
+def _cell(row: pd.Series, key: str, default):
+    """Lấy một ô của hàng, ô trống thì trả mặc định.
+
+    `Series.get` vẫn khai kiểu Optional kể cả khi đã truyền mặc định, nên gom phép
+    ép về một chỗ thay vì rải chú thích bỏ qua kiểu ở từng dòng. Ô thật sự rỗng thì
+    dùng mặc định, thay vì để `int(None)` ném ngoại lệ giữa lượt dựng dữ liệu.
+    """
+    value = row.get(key, default)
+    return default if value is None else value
+
+
 def format_netflow_to_raft(row: pd.Series) -> dict:
     """Chuyển đổi 1 mẫu CIC-IDS2017 NetFlow thành định dạng RAFT."""
-    dst_port = int(row.get("Dst Port", 80))
-    proto = int(row.get("Protocol", 6))
-    label = str(row.get("Label", "BENIGN")).strip()
+    dst_port = int(_cell(row, "Dst Port", 80))
+    proto = int(_cell(row, "Protocol", 6))
+    label = str(_cell(row, "Label", "BENIGN")).strip()
 
     log_dict = {
         "Destination Port": dst_port,
         "Protocol": proto,
-        "Total Fwd Packets": int(row.get("Tot Fwd Pkts", 1)),
-        "Total Length of Fwd Packets": float(row.get("TotLen Fwd Pkts", 0.0)),
-        "Flow Duration": int(row.get("Flow Duration", 0)),
+        "Total Fwd Packets": int(_cell(row, "Tot Fwd Pkts", 1)),
+        "Total Length of Fwd Packets": float(_cell(row, "TotLen Fwd Pkts", 0.0)),
+        "Flow Duration": int(_cell(row, "Flow Duration", 0)),
         "Label": label,
     }
 
