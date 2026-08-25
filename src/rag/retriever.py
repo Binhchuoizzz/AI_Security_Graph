@@ -93,6 +93,10 @@ class DualRetriever:
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
         self.model = SentenceTransformer(EMBEDDING_MODEL)
 
+        # Cross-encoder xếp hạng lại: dựng trễ ở lần truy xuất đầu, và chỉ thử ĐÚNG MỘT LẦN.
+        self._reranker = None
+        self._reranker_failed = False
+
         # Nạp các index FAISS, BM25 và siêu dữ liệu (metadata)
         self.faiss_indexes = {}
         self.bm25_indexes = {}
@@ -250,11 +254,14 @@ class DualRetriever:
                 }
             )
 
-        # Tầng 3: xếp hạng lại bằng Cross-Encoder, trộn điểm với RRF
+        # Tầng 3: xếp hạng lại bằng Cross-Encoder, trộn điểm với RRF.
+        # Bỏ qua hẳn nếu lượt dựng đầu tiên đã hỏng (xem nhánh except bên dưới).
+        if self._reranker_failed:
+            return candidates[: self.top_k]
         try:
             from sentence_transformers import CrossEncoder  # type: ignore
 
-            if not hasattr(self, "_reranker") or self._reranker is None:
+            if self._reranker is None:
                 self._reranker = CrossEncoder(
                     "cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512
                 )
@@ -275,7 +282,17 @@ class DualRetriever:
                 )
                 candidates[: len(top_candidates)] = top_candidates
         except Exception as e:
-            logger.debug(f"[Reranker] Fallback to pure RRF: {e}")
+            # Đo được 25/08/2026: nhánh này nuốt lỗi ở mức debug nên không ai thấy, mà
+            # `hasattr` ở trên không bao giờ thành True khi khởi tạo hỏng -> mỗi lượt truy
+            # xuất lại thử dựng CrossEncoder một lần nữa (2 lần cho mỗi `retrieve` vì có
+            # cả MITRE lẫn NIST). Máy không mạng thì đó là hai lần chờ timeout vô ích.
+            # Nay ghi cờ để chỉ thử ĐÚNG MỘT LẦN cho mỗi instance, và báo ở mức warning
+            # đúng một lần để không ai đọc nhầm "có rerank" khi thực tế là không.
+            if not self._reranker_failed:
+                self._reranker_failed = True
+                logger.warning(
+                    f"[Reranker] Không dựng được cross-encoder, dùng thuần RRF cho toàn phiên: {e}"
+                )
 
         return candidates[: self.top_k]
 

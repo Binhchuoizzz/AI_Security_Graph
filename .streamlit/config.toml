@@ -6,13 +6,13 @@ textColor = "#FAFAFA"
 font = "sans serif"
 
 [server]
-enableCORS = false
+# enableCORS phải là true khi enableXsrfProtection bật: Streamlit tự ghi đè và in cảnh báo
+# mỗi lần khởi động nếu đặt false. Ghi đúng ngay từ đầu để không ai đọc nhầm là đã tắt CORS.
+enableCORS = true
 enableXsrfProtection = true
-frameAncestors = ["'none'"]
 # Tắt file-watcher: container production không cần hot-reload, đồng thời tránh việc
 # watcher dò các module vision của transformers gây log noise 'No module named torchvision'.
 fileWatcherType = "none"
 
 [logger]
 level = "warning"
-

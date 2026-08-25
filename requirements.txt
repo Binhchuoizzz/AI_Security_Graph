@@ -8,6 +8,8 @@ langchain-community>=0.3.21
 pydantic>=2.10.0
 langsmith>=0.8.0
 langchain-text-splitters>=1.1.2
+# Client tương thích OpenAI — src/agent/llm_client.py gọi llama-server qua đây.
+openai>=1.0.0
 
 # ==========================================
 # 2. RAG & KNOWLEDGE BASE (Tri thức AI)
@@ -55,10 +57,11 @@ PyYAML>=6.0.2
 pytest>=8.3.5
 redis>=5.2.1
 filelock>=3.25.2
-# NOTE: drain3==0.9.11 is NOT listed here because it pins cachetools==4.2.1
-# which conflicts with streamlit (needs cachetools>=5.5).
-# Install separately: pip install drain3==0.9.11 --no-deps && pip install jsonpickle>=1.5.1
-# drain3 works fine with modern cachetools despite its metadata constraint.
+# BẮT BUỘC cài thêm sau lệnh trên, KHÔNG bỏ qua:
+#     pip install drain3==0.9.11 --no-deps && pip install jsonpickle>=1.5.1
+# `src/guardrails/template_miner.py` import drain3 ở cấp module nên thiếu nó là Tầng 2
+# sập ngay lúc nạp. Không liệt kê drain3 ở đây được vì metadata của nó ghim
+# cachetools==4.2.1, đụng streamlit (cần >=5.5); chạy thực tế với cachetools mới vẫn đúng.
 
 # ==========================================
 # 6b. CODE QUALITY & FORMATTING (Linter / Formatter)
