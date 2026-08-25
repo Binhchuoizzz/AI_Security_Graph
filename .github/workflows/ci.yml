@@ -71,6 +71,11 @@ jobs:
         pip install "pyright==1.1.409" pytest-cov
 
     - name: Build RAG indexes
+      # Runner mới tinh nên chưa có cache mô hình nhúng; src/rag/__init__.py mặc
+      # định khoá mạng để giữ đúng cam kết chạy cục bộ, ở đây mở đúng bước tải này.
+      env:
+        HF_HUB_OFFLINE: "0"
+        TRANSFORMERS_OFFLINE: "0"
       run: |
         python -m src.rag.embedder
 
