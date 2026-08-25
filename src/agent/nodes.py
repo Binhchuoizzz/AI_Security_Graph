@@ -620,8 +620,6 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
     if not state.current_batch_logs:
         return {"current_batch_encapsulated": ""}
 
-    # 2. Xử lý và nén log qua pipeline
-    #
     # `gt_id` bị loại khỏi PROMPT, nhưng vẫn ở lại `state.current_batch_logs` cho tracer.
     # Nó là khoá nối hậu kiểm (xem `scripts/stamp_demo_ids.py`): tracer cần nó để chấm kết
     # quả với đáp án, còn LLM thì không được lợi gì từ một định danh mờ - đưa vào chỉ tổ
@@ -667,7 +665,6 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
             system_instruction_chars=len(processed_data.get("system_instruction", "")),
         )
 
-    # 3. Giám sát tràn Context Window (Context Overflow Guard)
     # Ước lượng token: 2000 tokens cơ bản của prompt + kích thước của log đóng gói
     prompt_tokens_est = 2000
     log_tokens_est = len(batch_enc) // 4
@@ -678,7 +675,6 @@ def node_guardrails(state: SentinelState) -> dict[str, Any]:
             f"[GUARDRAILS] Log volume overflow detected by ContextOverflowGuard! "
             f"Est tokens: {overflow_res['total_tokens']}/{overflow_res['max_allowed']}. Truncating logs..."
         )
-        # Giới hạn cứng logs đóng gói ở mức an toàn
         batch_enc = batch_enc[:4000] + "\n... [TRUNCATED DUE TO CONTEXT OVERFLOW]"
 
     if trace.enabled():
@@ -931,7 +927,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
                 trace.add("llm", skipped="flow_only_shortcut")
             return {"llm_decision": _dec, "current_action": "AWAIT_HITL"}
 
-    # Query Long-Term Threat Memory cho source IPs trong batch
+    # Hỏi bộ nhớ dài hạn về từng IP nguồn trong lô.
     threat_context_parts = []
     seen_ips = set()
     for log in state.current_batch_logs:
@@ -1150,14 +1146,13 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
         if trace.enabled():
             trace.add("validator", pre=_trace_verdict(decision_json))
 
-        # 2. Chạy quyết định qua LLM DECISION VALIDATOR (Enforce Enum, Shield critical, Sanitize reasoning)
         validated_decision = decision_validator.validate_decision(decision_json)
 
         if trace.enabled():
             trace.add("validator", post_validate=_trace_verdict(validated_decision))
 
-        # 2b. Lá chắn bất đồng TIER-1/TIER-2 (chống social-engineering ngữ nghĩa):
-        # Nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM hạ cấp xuống bỏ qua,
+        # Lá chắn bất đồng Tier-1/Tier-2, chống bị dụ hạ cấp bằng ngữ nghĩa:
+        # nếu Tier-1 (xác định) coi luồng là tấn công nhưng LLM hạ cấp xuống bỏ qua,
         # buộc AWAIT_HITL - Tier-1 không thể bị "nói chuyện" hạ cấp như LLM.
         tier1_flagged_attack = any(
             log.get("tier1_action") in ("BLOCK_IP", "ESCALATE", "AWAIT_HITL", "ALERT")
@@ -1398,8 +1393,7 @@ def node_llm_triage(state: SentinelState) -> dict[str, Any]:
     # Đã sanitize trong decision_validator, nhưng vẫn bảo vệ kép cho narrative summary
     new_narrative = output_sanitizer.sanitize(new_narrative)
 
-    # 3. Ghi LOG kiểm toán (Audit Trail)
-    # Lấy thông số từ Tier-1 log để đối chiếu trong ablation study
+    # Kèm thông số Tier-1 vào bản ghi kiểm toán để về sau đối chiếu ablation.
     t1_score = 0
     t1_action = "LOG"
     if state.current_batch_logs:

@@ -1,15 +1,9 @@
 #!/bin/bash
-# CSE-CIC-IDS2018 Dataset Downloader
+# Tải bộ dữ liệu CSE-CIC-IDS2018 từ AWS Open Data Registry.
+# Trang gốc: https://www.unb.ca/cic/datasets/ids-2018.html
 #
-# Source: AWS Open Data Registry
-# URL: https://www.unb.ca/cic/datasets/ids-2018.html
-#
-# REQUIREMENTS:
-#   - AWS CLI: pip install awscli
-#   - No AWS account needed (public bucket, --no-sign-request)
-#
-# OUTPUT:
-#   data/raw/cicids2018/*.csv (~8GB total)
+# Cần AWS CLI (`pip install awscli`) nhưng KHÔNG cần tài khoản: bucket công khai,
+# gọi kèm --no-sign-request. Tải về data/raw/cicids2018/*.csv, tổng khoảng 8GB.
 
 set -e
 

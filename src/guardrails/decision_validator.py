@@ -35,7 +35,7 @@ class DecisionValidator:
         """Xác thực và giảm cấp hành động nếu vi phạm các chính sách an toàn."""
         validated = dict(decision)
 
-        # 1. Ép buộc Action Enum hợp lệ
+        # Hành động lạ thì hoãn, không đoán.
         action = validated.get("action", "AWAIT_HITL")
         if action not in self.allowed_actions:
             logger.warning(
@@ -46,7 +46,6 @@ class DecisionValidator:
             validated["action"] = "AWAIT_HITL"
             action = "AWAIT_HITL"
 
-        # 2. Kiểm tra mức độ tin cậy (Confidence Gate)
         try:
             confidence = float(validated.get("confidence", 0.0))
         except (ValueError, TypeError):
@@ -62,21 +61,20 @@ class DecisionValidator:
             validated["action"] = "AWAIT_HITL"
             action = "AWAIT_HITL"
 
-        # 3. Lá chắn chống tự chặn hạ tầng (Anti-DoS Shield)
+        # Lá chắn tự-DoS: không cho phép chặn chính hạ tầng đang chạy hệ thống.
         target = str(validated.get("target", "UNKNOWN")).strip()
         if action == "BLOCK_IP":
             is_critical = False
 
-            # Hàm phụ trợ parse IP/CIDR linh hoạt chống bypass
+            # Nhận cả IP trần lẫn CIDR: kẻ tấn công hay viết "10.0.0.99/32" để lách
+            # phép so khớp chuỗi thuần.
             def parse_ip_or_network(addr_str: str):
                 addr_str = addr_str.strip()
-                # Thử parse trực tiếp IPAddress
                 try:
                     return ipaddress.ip_address(addr_str)
                 except ValueError:
                     pass
 
-                # Thử parse trực tiếp IPNetwork (CIDR)
                 try:
                     return ipaddress.ip_network(addr_str, strict=False)
                 except ValueError:
@@ -151,8 +149,7 @@ class DecisionValidator:
                 # phá lá chắn hạ tầng khi confidence>=ngưỡng block.
                 validated["_critical_shield"] = True
 
-        # 4. Làm sạch trường giải trình và thông tin (Reasoning Sanitization)
-        # Ngăn chặn các cuộc tấn công tiêm nhiễm hiển thị (XSS/SSRF qua UI)
+        # Lời biện giải do LLM sinh ra sẽ được render thẳng lên UI -> lọc XSS/SSRF.
         if "reasoning" in validated:
             validated["reasoning"] = output_sanitizer.sanitize(str(validated["reasoning"]))
         if "mitre_technique" in validated:

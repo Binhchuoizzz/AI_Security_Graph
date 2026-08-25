@@ -65,7 +65,7 @@ def run_test(test_id: str, name: str, func):
     print(f"  {icon} {r.status}: {r.detail}")
 
 
-# Ground Truth File Exists & Valid
+# Tệp đáp án có tồn tại và đúng cấu trúc
 def test_01_ground_truth(r: TestResult):
     gt_path = "experiments/ground_truth.json"
     assert os.path.exists(gt_path), f"Missing: {gt_path}"
@@ -92,7 +92,7 @@ def test_01_ground_truth(r: TestResult):
     r.passed(f"{len(data)} samples loaded, structure and expected_severity valid")
 
 
-# RAG Indexes Exist (FAISS + BM25)
+# Chỉ mục RAG đã dựng: FAISS và BM25
 def test_02_rag_indexes(r: TestResult):
     index_dir = "knowledge_base/faiss_index"
     required = [
@@ -108,7 +108,7 @@ def test_02_rag_indexes(r: TestResult):
     r.passed(f"All {len(required)} index files present")
 
 
-# DualRetriever Hybrid Search Works
+# Truy xuất lai của DualRetriever chạy được
 def test_03_dual_retriever(r: TestResult):
     from src.rag.retriever import DualRetriever
 
@@ -126,7 +126,7 @@ def test_03_dual_retriever(r: TestResult):
     )
 
 
-# Structural Sanitizer (RAG Poisoning Defense)
+# Làm sạch cấu trúc - chống đầu độc RAG
 def test_04_structural_sanitize(r: TestResult):
     from src.rag.security import structural_sanitize
 
@@ -143,7 +143,7 @@ def test_04_structural_sanitize(r: TestResult):
     r.passed("Null bytes, zero-width chars stripped; truncation works")
 
 
-# Prompt Injection Detector
+# Bộ dò chèn lệnh vào prompt
 def test_05_injection_detector(r: TestResult):
     from src.guardrails.prompt_filter import PromptInjectionDetector
 
@@ -160,7 +160,7 @@ def test_05_injection_detector(r: TestResult):
     r.passed("Injection detected + no false positive on clean log")
 
 
-# Jailbreak Detector
+# Bộ dò bẻ khoá
 def test_06_jailbreak_detector(r: TestResult):
     from src.guardrails.prompt_filter import JailbreakDetector
 
@@ -172,7 +172,7 @@ def test_06_jailbreak_detector(r: TestResult):
     r.passed("Jailbreak detected, isolation escalated to CRITICAL")
 
 
-# Delimited Data Encapsulation (Dynamic Delimiters)
+# Đóng gói dữ liệu bằng dấu phân cách động
 def test_07_encapsulation(r: TestResult):
     from src.guardrails.prompt_filter import DelimitedDataEncapsulator
 
@@ -188,7 +188,7 @@ def test_07_encapsulation(r: TestResult):
     r.passed("Dynamic delimiters + smuggling prevention verified")
 
 
-# Encoding Neutralizer
+# Bộ trung hoà mã hoá
 def test_08_encoding_neutralizer(r: TestResult):
     from src.guardrails.prompt_filter import EncodingNeutralizer
 
@@ -208,7 +208,7 @@ def test_08_encoding_neutralizer(r: TestResult):
     r.passed("URL decode + HTML script stripping working correctly")
 
 
-# Output Sanitizer (Data Exfiltration Defense)
+# Làm sạch đầu ra - chống rò rỉ dữ liệu
 def test_09_output_sanitizer(r: TestResult):
     from src.guardrails.output_sanitizer import output_sanitizer
 
@@ -224,7 +224,7 @@ def test_09_output_sanitizer(r: TestResult):
     r.passed("Markdown/HTML exfil vectors stripped from LLM output")
 
 
-# Tier 1 Rule Engine - Static Rules
+# Bộ luật tĩnh của Tier-1
 def test_10_tier1_static(r: TestResult):
     from src.tier1_filter.rule_engine import RuleEngine
 
@@ -241,7 +241,7 @@ def test_10_tier1_static(r: TestResult):
     r.passed(f"SSH port escalated (score={result['tier1_score']}), safe traffic dropped")
 
 
-# Tier 1 Session Baseline - Port Scanning Detection
+# Nền phiên của Tier-1 - bắt quét cổng
 def test_11_session_baseline(r: TestResult):
     from src.tier1_filter.rule_engine import RuleEngine
 
@@ -262,7 +262,7 @@ def test_11_session_baseline(r: TestResult):
     r.passed(f"Port scanning detected after 15 unique ports (score={result['tier1_score']})")
 
 
-# Whitelist IP Bypass
+# IP trong whitelist phải được cho qua
 def test_12_whitelist(r: TestResult):
     from src.tier1_filter.rule_engine import RuleEngine
 
@@ -274,7 +274,7 @@ def test_12_whitelist(r: TestResult):
     r.passed("Whitelisted IP correctly bypassed all rules")
 
 
-# Agent State - Structured MemoryObject
+# Trạng thái tác tử - MemoryObject có cấu trúc
 def test_13_agent_state(r: TestResult):
     from src.agent.state import SentinelState
 
@@ -298,7 +298,7 @@ def test_13_agent_state(r: TestResult):
     r.passed("IOC dedup, decisions, memory formatting, batch reset all correct")
 
 
-# Template Miner - Volume Compression
+# Đãi khuôn mẫu log - nén khối lượng
 def test_14_template_miner(r: TestResult):
     from src.guardrails.template_miner import EntropyScorer, LogTemplateMiner
 
@@ -318,7 +318,7 @@ def test_14_template_miner(r: TestResult):
     r.passed(f"Compression: {compression:.0f}x, {len(summary)} templates from 100 logs")
 
 
-# Full GuardrailsPipeline Integration
+# Chạy trọn tuyến GuardrailsPipeline
 def test_15_guardrails_pipeline(r: TestResult):
     from src.guardrails.prompt_filter import GuardrailsPipeline
 
@@ -339,7 +339,7 @@ def test_15_guardrails_pipeline(r: TestResult):
     )
 
 
-# NIST Index Size (≥60 vectors)
+# Kích thước chỉ mục NIST (>=60 vector)
 def test_16_nist_index_size(r: TestResult):
     import faiss
 
@@ -376,7 +376,7 @@ def test_16_nist_index_size(r: TestResult):
     r.passed(f"NIST index: {nist_faiss.ntotal} vectors, {phase_hits}/3 IR-phase queries matched")
 
 
-# Ground Truth Scale (≥700 samples)
+# Quy mô tập đáp án (>=700 mẫu)
 def test_17_ground_truth_scale(r: TestResult):
     with open("experiments/ground_truth.json") as f:
         gt = json.load(f)
@@ -409,7 +409,7 @@ def test_17_ground_truth_scale(r: TestResult):
     )
 
 
-# DAPT2020 APT Chain Tracking
+# Lần chuỗi APT trên DAPT2020
 def test_18_dapt_chain(r: TestResult):
     import tempfile
 
@@ -441,7 +441,7 @@ def test_18_dapt_chain(r: TestResult):
     r.passed(f"DAPT2020: {len(multi_day)} multi-day chains, check_apt_chain verified")
 
 
-# Latency Benchmark (≥60% reduction)
+# Đo độ trễ (giảm >=60%)
 def test_19_latency_benchmark(r: TestResult):
     # Kiểm tra máy chủ LLM có hoạt động trên port 5000 hoặc 8080 không
     import urllib.request
@@ -478,7 +478,7 @@ def test_19_latency_benchmark(r: TestResult):
         r.skipped("No benchmark results yet — run: python experiments/measure_latency_baseline.py")
 
 
-# rank_bm25 Import & Usage
+# Nạp và dùng rank_bm25
 def test_20_rank_bm25(r: TestResult):
     from rank_bm25 import BM25Okapi
 
@@ -507,7 +507,7 @@ def test_20_rank_bm25(r: TestResult):
     r.passed("rank_bm25 imports OK, BM25Okapi scoring verified, used in DualRetriever")
 
 
-# Unified Streaming Evaluation (merged real data, emergent APT)
+# Chấm trên luồng gộp: dữ liệu thật đã trộn, chuỗi APT nổi lên dần
 def test_21_unified_stream(r: TestResult):
     """Kiểm chứng luồng gộp (CICIDS + DAPT + zero-day) hợp lệ: data thật được
     Trộn xen kẽ, có IP APT đa-ngày thật. Smoke-test offline, không ghi file."""

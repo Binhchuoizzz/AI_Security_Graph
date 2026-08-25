@@ -141,16 +141,15 @@ class LLMClient:
         seed: int | None = DEFAULT_SEED,
     ) -> str:
         """
-        Gọi LLM với cơ chế thử lại (Retry).
+        Gọi LLM, có thử lại khi hỏng.
 
-        Args:
-            messages: Danh sách dict [{"role": "system", "content": "..."}, {"role": "user", "content": "..."}]
-            temperature: Độ sáng tạo của mô hình. 0.1 cho Phân tích Bảo mật.
-            max_tokens: Số lượng token đầu ra tối đa.
-            response_format: Định dạng đầu ra (vd: {"type": "json_object"} nếu mô hình hỗ trợ)
+        Tham số:
+            messages: danh sách dict [{"role": "system", "content": ...}, ...]
+            temperature: 0.1 cho phân tích bảo mật - cần ổn định hơn là sáng tạo.
+            max_tokens: trần token đầu ra.
+            response_format: ví dụ {"type": "json_object"} nếu mô hình hỗ trợ.
 
-        Trả về:
-            Văn bản đầu ra từ LLM.
+        Trả về văn bản thô của LLM.
         """
         retries = 0
         backoff = 2  # Bắt đầu với 2 giây chờ
@@ -319,5 +318,4 @@ class LLMClient:
             return False
 
 
-# Thực thể duy nhất (Singleton)
 llm_client = LLMClient()

@@ -26,10 +26,8 @@ from src.agent.state import SentinelState
 
 def create_agent_workflow() -> CompiledStateGraph:
     """Khởi tạo và biên dịch LangGraph cho quá trình phân tích bảo mật."""
-    # 1. Khởi tạo Graph với State Schema
     workflow = StateGraph(SentinelState)
 
-    # 2. Thêm các Trạm xử lý (Nodes)
     workflow.add_node("guardrails", node_guardrails)
     workflow.add_node("rag_context", node_rag_context)
     workflow.add_node("llm_triage", node_llm_triage)
@@ -37,17 +35,10 @@ def create_agent_workflow() -> CompiledStateGraph:
     workflow.add_node("action_executor", node_action_executor)
     workflow.add_node("human_in_the_loop", node_human_in_the_loop)
 
-    # 3. Nối các Cạnh (Edges) - Luồng chính
-    # Bắt đầu luồng bằng việc lọc qua Guardrails
     workflow.set_entry_point("guardrails")
-
-    # Guardrails xong -> RAG Context
     workflow.add_edge("guardrails", "rag_context")
-
-    # RAG lấy xong -> Gửi cho LLM Triage
     workflow.add_edge("rag_context", "llm_triage")
 
-    # 4. Nối các Cạnh Điều kiện (Conditional Edges)
     # Sau triage: nếu confidence > 0.7 và là mối-đe-doạ -> attack_mapper (làm giàu
     # MITRE có cấu trúc); ngược lại định tuyến thẳng theo action như cũ.
     workflow.add_conditional_edges(
@@ -73,11 +64,9 @@ def create_agent_workflow() -> CompiledStateGraph:
         },
     )
 
-    # 5. Kết thúc các luồng hành động
     workflow.add_edge("action_executor", END)
     workflow.add_edge("human_in_the_loop", END)
 
-    # Biên dịch (Compile) Graph
     app = workflow.compile()
 
     return app

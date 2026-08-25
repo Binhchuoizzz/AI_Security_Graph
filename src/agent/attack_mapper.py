@@ -632,10 +632,9 @@ def canonical_technique_name(technique_id: str) -> str | None:
 def verify_technique_label(technique_id: str, llm_label: str) -> tuple[str, bool]:
     """Đối chiếu nhãn free-text của LLM với tên chính thức của technique-id.
 
-    Returns:
-        (nhãn hiển thị, đã_đối_chiếu_được). Nếu id có trong nguồn sự thật thì nhãn luôn
-        được dựng lại thành "<id> - <tên chuẩn>" (kể cả khi LLM đặt đúng, để định dạng
-        đồng nhất). Nếu không, giữ nhãn LLM nhưng gắn hậu tố cảnh báo.
+    Trả về (nhãn hiển thị, đã_đối_chiếu_được). Id nào có trong nguồn sự thật thì nhãn
+    được dựng lại thành "<id> - <tên chuẩn>", kể cả khi LLM đặt đúng, cho đồng nhất
+    định dạng. Id lạ thì giữ nhãn của LLM nhưng gắn hậu tố cảnh báo.
     """
     tid = (technique_id or "").strip().upper()
     raw = (llm_label or "").strip()
@@ -951,19 +950,14 @@ def map_attack(
     llm: Any = None,
     use_llm_select: bool | None = None,
 ) -> MitreMapping:
-    """
-    Ánh xạ một kết quả phân loại sang MITRE ATT&CK có cấu trúc.
+    """Ánh xạ một kết quả phân loại sang MITRE ATT&CK có cấu trúc.
 
-    Args:
-        inp: AttackMapperInput (attack_type/confidence/payload/features).
-        retriever: DualRetriever (tái dùng singleton). None -> bỏ đường RRF.
-        llm: llm_client. None -> bỏ bước LLM chọn (vẫn dùng top-RRF/curated).
-        use_llm_select: có gọi LLM lần 2 chọn MITRE cho ca mơ hồ không. None -> đọc
-            config `tier2.attack_mapper.llm_select` (mặc định tắt); True/False -> ép rõ
-            (test/ablation).
+    `retriever` để None thì bỏ đường RRF; `llm` để None thì bỏ bước LLM chọn mà vẫn
+    lấy top-RRF hoặc bản đồ curated. `use_llm_select` quyết định có gọi LLM lần hai cho
+    ca mơ hồ hay không: None thì đọc `tier2.attack_mapper.llm_select` trong config
+    (mặc định tắt), còn True/False là ép rõ cho test và ablation.
 
-    Returns:
-        MitreMapping - schema luôn hợp lệ (pydantic validate khi khởi tạo).
+    Kết quả luôn là MitreMapping hợp lệ vì pydantic validate ngay lúc khởi tạo.
     """
     # 1) neo vào verdict của triage nếu attack_type chứa technique-id hợp lệ (triết lý A).
     anchored = _from_triage_anchor(inp)

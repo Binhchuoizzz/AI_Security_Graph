@@ -742,7 +742,6 @@ class ThreatMemoryStore:
         """
         parts = []
 
-        # 1. Danh tiếng IP (IP Reputation)
         rep = self.get_ip_reputation(source_ip)
         if rep and rep["total_incidents"] > 0:
             parts.append(
@@ -755,7 +754,7 @@ class ThreatMemoryStore:
                 f"  Last MITRE: {rep.get('last_mitre_technique', 'N/A')}"
             )
 
-        # 2. Kiểm tra thực thể nội bộ đã biết (Known Entity check)
+        # Thực thể nội bộ đã khai báo -> gợi ý báo nhầm thay vì đe doạ.
         entity = self.is_known_entity(source_ip)
         if entity:
             parts.append(
@@ -763,7 +762,6 @@ class ThreatMemoryStore:
                 f"{entity['description']}. Consider FALSE POSITIVE."
             )
 
-        # 3. Kiểm tra mẫu APT (APT check - dựa trên lịch sử incidents)
         apt = self.check_apt_pattern(source_ip)
         if apt and apt["is_apt_candidate"]:
             parts.append(
@@ -771,8 +769,8 @@ class ThreatMemoryStore:
                 f"{apt['total_incidents']} incidents. ESCALATE SEVERITY."
             )
 
-        # 3b. Chuỗi APT đa-ngày từ threat_events (cơ chế EMERGENT của luồng gộp -
-        # record_apt_event tích lũy dần; bản án bật khi đủ >=2 ngày tấn công).
+        # Chuỗi APT đa-ngày dựng dần từ threat_events: record_apt_event tích luỹ theo
+        # từng lô, bản án chỉ bật khi gom đủ từ hai ngày tấn công trở lên.
         chain = self.check_apt_chain(source_ip)
         if chain.get("is_apt"):
             # Nói rõ đây là nhãn giai đoạn của bộ dữ liệu DAPT2020, không phải tên kỹ
@@ -853,5 +851,4 @@ class ThreatMemoryStore:
             return [dict(row) for row in c.fetchall()]
 
 
-# Thực thể duy nhất (Singleton)
 threat_memory = ThreatMemoryStore()

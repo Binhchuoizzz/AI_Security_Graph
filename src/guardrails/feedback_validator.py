@@ -32,7 +32,6 @@ class FeedbackValidator:
         """
         errors = []
 
-        # 1. Chuẩn hóa và kiểm tra tên trường (Field Validation)
         norm_field = KEY_ALIASES.get(field.lower(), field)
         if norm_field not in self.get_allowed_fields():
             errors.append(
@@ -40,47 +39,41 @@ class FeedbackValidator:
                 f"Allowed fields: {self.allowed_fields}"
             )
 
-        # 2. Kiểm tra tính hợp lệ của Pattern
         pattern_str = pattern.strip()
         if not pattern_str:
             errors.append("Rule pattern cannot be empty")
             return False, errors
 
-        # 3. Kiểm tra Wildcard & Bypasses (Zero-Trust)
+        # Luật quét sạch Internet thì vô dụng mà lại chặn luôn chính mình.
         if pattern_str in ["0.0.0.0/0", "*", "any", "all", "::/0"]:
             errors.append(
                 "Wildcard rules targeting the entire internet "
                 "(e.g. '0.0.0.0/0' or '*') are forbidden"
             )
 
-        # 4. Kiểm tra an toàn cho IP và hạ tầng nếu trường liên quan đến Source IP
         if norm_field == "Source IP":
-            # Chặn hành vi chặn IP hạ tầng quan trọng (Self-DoS prevention)
             if pattern_str in ["127.0.0.1", "::1", "10.0.0.99", "localhost"]:
                 errors.append(
                     f"Forbidden to create rules affecting critical infrastructure IP: {pattern_str}"
                 )
             else:
                 try:
-                    # Thử phân tích IP hoặc Subnet
                     if "/" in pattern_str:
-                        # Dạng CIDR
                         net = ipaddress.ip_network(pattern_str, strict=False)
-                        # Tránh dải quá rộng (bảo vệ zero-trust)
+                        # /8 trở lên là hàng triệu địa chỉ - quá rộng cho một luật tự sinh.
                         if net.prefixlen < 8:
                             errors.append(
                                 f"CIDR prefix /{net.prefixlen} is too broad (must be >= /8)"
                             )
                     else:
                         ip = ipaddress.ip_address(pattern_str)
-                        # Kiểm tra xem có trùng với hạ tầng quan trọng
                         for subnet_str in self.trusted_subnets:
                             network = ipaddress.ip_network(subnet_str, strict=False)
-                            # Không cho chặn toàn bộ subnet nội bộ
+                            # Địa chỉ mạng = chặn cả subnet nội bộ chứ không phải một máy.
                             if ip == network.network_address:
                                 errors.append(f"Forbidden to match network address: {pattern_str}")
                 except ValueError:
-                    # Nếu là regex hoặc signature khác, cho phép qua
+                    # Không phải IP thì là regex/chữ ký, để nhánh dưới kiểm cú pháp.
                     pass
 
         # Kiểm cú pháp regex cho trường không phải IP
@@ -90,7 +83,6 @@ class FeedbackValidator:
             except re.error as e:
                 errors.append(f"Invalid regex syntax in pattern: {e}")
 
-        # 5. Kiểm tra Score
         if not (0 <= score <= 100):
             errors.append(f"Rule score {score} must be clamped between 0 and 100")
 

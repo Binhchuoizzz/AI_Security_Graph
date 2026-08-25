@@ -17,8 +17,7 @@ RAG_END_TAG = "</verified_knowledge_base>"
 
 # Prompt hệ thống
 
-# 1. Prompt Phân loại & Phân tích
-# Nhiệm vụ: Phân tích log đa nguồn, dùng ngữ cảnh RAG, đưa ra quyết định (BLOCK/ALERT/LOG/AWAIT_HITL)
+# Phân loại & phân tích: đọc log đa nguồn kèm ngữ cảnh RAG, chốt một hành động.
 # fmt: off
 TRIAGE_SYSTEM_PROMPT = f"""You are SENTINEL, an elite Autonomous AI Security SOC Analyst and SIEM Correlation Engine.  # noqa: S608
 Your core objective is to analyze escalated network logs from MULTIPLE security sensors (Firewall, WAF, Sysmon) and make immediate tactical decisions.
@@ -328,5 +327,5 @@ def build_triage_prompt(
     ]
 
 
-# 2. Prompt Trích xuất IOC (Dự phòng nếu muốn tách riêng trạm xử lý)
-# Hiện tại Triage Prompt đã gộp chung chức năng trích xuất IOCs.
+# Trích xuất IOC - để dành cho trường hợp muốn tách thành trạm riêng.
+# Hiện prompt phân loại ở trên đã làm luôn việc này.

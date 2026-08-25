@@ -160,7 +160,6 @@ class ActionValidator:
         return reason
 
 
-# Thực thể duy nhất (Singleton)
 _validator = ActionValidator()
 
 
@@ -279,19 +278,18 @@ def _log_to_db(action: str, target: str, reason: str, raw_log: str = "", tier: s
             conn.execute("BEGIN EXCLUSIVE")
             c = conn.cursor()
 
-            # 1. Lấy integrity_hash của dòng log cuối cùng để liên kết (chaining)
+            # Móc vào mắt xích trước; sổ rỗng thì bắt đầu từ khối khởi thuỷ.
             c.execute("SELECT integrity_hash FROM audit_trail ORDER BY id DESC LIMIT 1")
             last_row = c.fetchone()
             prev_hash = (
                 last_row[0] if last_row and last_row[0] else "genesis_block_hash_sentinel_soc"
             )
 
-            # 2. Tính toán mã băm HMAC
             secret_key = _log_secret()
             message = f"{prev_hash}|{timestamp}|{action}|{safe_target}|{safe_reason}".encode()
             current_hash = hmac.new(secret_key, message, hashlib.sha256).hexdigest()
 
-            # 3. Ghi vào database (raw_log + tier là siêu dữ liệu, ngoài phạm vi HMAC)
+            # raw_log và tier là siêu dữ liệu, nằm ngoài phạm vi HMAC.
             c.execute(
                 "INSERT INTO audit_trail "
                 "(timestamp, action, target, reason, integrity_hash, raw_log, tier) "
@@ -353,11 +351,10 @@ def unblock_ip(ip: str):
     """Gỡ chặn IP bằng cách xóa khỏi Tier-1 Redis blacklist và reset Reputation."""
     safe_ip = _validator.sanitize_target(ip)
 
-    # 1. Xoá khỏi Redis cache chặn tốc độ cao
     _remove_from_blacklist(safe_ip)
     logger.info(f" [FIREWALL MOCK] UNBLOCKED IP: {safe_ip} (removed from Redis)")
 
-    # 2. Xoá tiền sử danh tiếng xấu trong DB để tránh Tier-1 auto-block lại ngay lập tức
+    # Phải xoá cả điểm danh tiếng, không thì Tier-1 chặn lại ngay ở gói kế tiếp.
     try:
         from src.agent.threat_memory import ThreatMemoryStore
 

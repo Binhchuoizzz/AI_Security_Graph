@@ -382,12 +382,10 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
         )
         raise
 
-    # Sử dụng lại model nếu đã load, tránh load lại lần thứ 2
     if model is None:
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
         model = SentenceTransformer(EMBEDDING_MODEL)
 
-    # 1. Build Dense Index (FAISS - Tìm kiếm vector ngữ nghĩa)
     texts = [chunk["text"] for chunk in chunks]
     logger.info(f"Building Dense Embeddings ({len(texts)} chunks) for [{index_name}]...")
 
@@ -396,7 +394,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
     logger.info(f"Embeddings shape: {embeddings.shape}")
 
-    # Xây dựng FAISS index (Inner Product = cosine similarity khi được chuẩn hóa)
+    # Vector đã chuẩn hoá nên tích vô hướng chính là cosine similarity.
     index = faiss.IndexFlatIP(EMBEDDING_DIM)
     index.add(embeddings)  # type: ignore
 
@@ -405,7 +403,6 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
     faiss.write_index(index, index_path)
     logger.info(f"Saved FAISS index: {index_path} ({index.ntotal} vectors)")
 
-    # 2. Build Sparse Index (BM25 - Tìm kiếm từ khóa chính xác)
     logger.info(f"Building Sparse Index (BM25) for [{index_name}]...")
     tokenized_corpus = [log_tokenizer(text) for text in texts]
     bm25 = BM25Okapi(tokenized_corpus)

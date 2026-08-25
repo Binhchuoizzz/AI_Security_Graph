@@ -199,7 +199,7 @@ class LogTemplateMiner:
 
 
 class EntropyScorer:
-    """Shannon Entropy scorer cho log strings."""
+    """Chấm entropy Shannon cho chuỗi log."""
 
     def __init__(self, threshold: float | None = None):
         if threshold is not None:

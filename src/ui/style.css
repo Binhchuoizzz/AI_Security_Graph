@@ -1,4 +1,4 @@
-/* Modern SOC Dashboard Styles */
+/* Giao diện bảng điều khiển SENTINEL. */
 
 /* ── PHÔNG: KHÔNG tải qua mạng ─────────────────────────────────────────────
    Bản cũ mở đầu bằng `@import url('https://fonts.googleapis.com/...Inter...')`.
@@ -543,6 +543,12 @@ h3 { letter-spacing: 0.2px; }
 @media (max-width: 1100px) {
     .res-grid { grid-template-columns: 1fr; }
     .soc-label { flex-basis: 100%; }
+
+    /* st.columns dựng một hàng flex không tự xuống dòng, nên cửa sổ hẹp lại thì hàng
+       bốn thẻ chỉ số co thành bốn sợi chữ vỡ dọc chứ không chịu tách hàng. Cho phép
+       xuống dòng kèm bề ngang tối thiểu để hàng bốn tự gãy thành 2+2. */
+    [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
+    [data-testid="stColumn"] { min-width: 260px; }
 }
 
 /* Máy bảng dựng đứng / cửa sổ rất hẹp. */
@@ -557,6 +563,12 @@ h3 { letter-spacing: 0.2px; }
     .res-card { padding: 11px 12px; }
     /* Tiêu đề mục có gạch nhấn bên trái: thụt 12px trên màn hẹp là phí chỗ. */
     h2 { padding-left: 9px; border-left-width: 3px; }
+
+    /* Hẹp tới mức này thì mọi cột xuống thành một cột, kể cả cặp nút. */
+    [data-testid="stColumn"] { min-width: 100%; }
+
+    /* Hàng nút và bộ lọc: để tràn ngang là mất nút, cho xuống dòng. */
+    [data-testid="stHorizontalBlock"] { gap: 10px; }
 }
 
 /* Bảng và khối mã KHÔNG được đẩy cả trang trượt ngang — chúng tự cuộn trong khung. */

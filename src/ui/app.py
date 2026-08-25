@@ -234,7 +234,6 @@ if os.path.exists(css_path):
     with open(css_path) as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# 1. Bắt buộc đăng nhập
 require_auth()
 
 feedback_mgr = FeedbackListener()
@@ -374,7 +373,7 @@ def render_demo_overview(
     blocks_by_tier=None,
 ):
     """Tab Tổng quan Trình diễn - gom mọi thứ cần show vào một màn hình."""
-    st.markdown("## 🎬 SENTINEL — Bảng trình diễn tổng quan")
+    st.markdown("## 🎬 Bảng trình diễn tổng quan")
     st.markdown(
         "*Kiến trúc nhận thức hai tầng: **Tier-1** lọc ở tốc độ đường truyền bằng thuật toán "
         "Welford $O(1)$ + **Cổng ML** (cùng Tier-1) → **Tier-2** tác tử LangGraph (Foundation-Sec-8B-Instruct Q4\\_K\\_M qua llama.cpp) + "
@@ -426,16 +425,13 @@ def render_demo_overview(
     # lặp y nguyên hàng chỉ số ngay phía trên - cùng một màn hình, cùng một con số, in hai
     # lần cách nhau vài chục pixel. Chỉ giữ phần bổ sung cho hàng trên.
     st.markdown("### 📊 Chỉ số vận hành thời gian thực")
-    st.caption(
-        "Bổ sung cho hàng chỉ số phía trên, không lặp lại. Rê chuột vào từng thẻ để xem "
-        "nguồn số liệu."
-    )
+    st.caption("Rê chuột vào từng thẻ để xem nguồn số liệu.")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(
         "Tier-1 luật chặn" + (" ⚠️" if _t1_tu_so_dem else ""),
         vn_num(_t1_blk),
         help=(
-            "⚠️ Số này đọc từ BỘ ĐẾM LUỒNG (pipeline_stats), KHÔNG từ sổ kiểm toán: nhánh "
+            "⚠️ Số này đọc từ bộ đếm luồng (pipeline_stats), không phải từ sổ kiểm toán: nhánh "
             "BLOCK_IP của luật Tier-1 đẩy IP vào blacklist Redis + Threat Memory nhưng không "
             "ghi dòng audit nào. Vì vậy nó KHÔNG nằm trong chuỗi HMAC và không tra ngược "
             "được từng lệnh."
@@ -719,8 +715,8 @@ def render_demo_overview(
                 )
 
             st.caption(
-                "Tấn công RÕ RÀNG (chữ ký WAF/injection, cổng nhạy cảm, quét cổng) bị chặn "
-                "TỨC THỜI bằng luật xác định — không tốn LLM. **Số lần** = tổng số lần IP đó bị "
+                "Tấn công rõ ràng (chữ ký WAF/injection, cổng nhạy cảm, quét cổng) bị chặn "
+                "ngay bằng luật xác định, không tốn LLM. **Số lần** = tổng số lần IP đó bị "
                 "Tier-1 chặn (gộp mọi lần chạy); **Lần cuối** = thời điểm chặn gần nhất. Chặn này "
                 "là **tạm thời** (Redis blacklist, TTL 1 giờ, tự hết hạn)."
             )
@@ -853,12 +849,11 @@ def main_dashboard():
             from src.response.executor import DB_PATH as AUDIT_DB
 
             try:
-                # 1. Xóa audit_trail
                 with sqlite3.connect(AUDIT_DB) as conn:
                     conn.execute("DELETE FROM audit_trail")
                     conn.commit()
 
-                # 2. Xóa threat memory (bao gồm cả known_entities để seed lại)
+                # Xoá luôn known_entities rồi seed lại ngay dưới.
                 with sqlite3.connect(THREAT_DB) as conn:
                     conn.execute("DELETE FROM ip_reputation")
                     conn.execute("DELETE FROM threat_events")
@@ -866,15 +861,13 @@ def main_dashboard():
                     conn.execute("DELETE FROM known_entities")
                     conn.commit()
 
-                # 3. Seed lại default known entities
                 threat_memory._init_db()
 
-                # 4-5. Clear dynamic rules + reset whitelist qua API hệ thống (đồng bộ với
-                # reset_all; FeedbackListener bền cross-UID 0666+lock, tránh tự sửa YAML).
+                # Đi qua FeedbackListener chứ không tự sửa YAML: nó giữ 0666 + khoá tệp
+                # nên host và container ghi chung được. Giống hệt đường của reset_all.
                 feedback_mgr.clear_all_dynamic_rules()
                 feedback_mgr.reset_whitelist_to_defaults()
 
-                # 6. Reset counter log thô thật (file pipeline_stats.json)
                 try:
                     _stats_f = os.path.join(
                         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -886,7 +879,7 @@ def main_dashboard():
                 except Exception:
                     pass
 
-                # 7. Xoá file Tier-1 blocks (panel "Tier-1 đã chặn" đọc từ đây)
+                # Panel "Tier-1 đã chặn" đọc thẳng từ tệp này.
                 try:
                     _t1b = os.path.join(
                         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -898,7 +891,7 @@ def main_dashboard():
                 except Exception:
                     pass
 
-                # 8. Xoá Redis blacklist (do UI chạy cùng node nên có thể reach được)
+                # UI chạy cùng node nên với tới Redis được.
                 try:
                     import redis
 
@@ -1011,7 +1004,7 @@ def main_dashboard():
         st.markdown(glossary_html, unsafe_allow_html=True)
         st.caption(f"Lượt làm mới: {count}")
 
-    st.title("🛡️ Trung tâm Điều hành An ninh Mạng SENTINEL AI SOC")
+    st.title("🛡️ SENTINEL — Trung tâm Điều hành An ninh Mạng")
 
     # Lấy sớm danh sách ID bị giả mạo để lọc và tô màu
     try:
@@ -1758,10 +1751,10 @@ def main_dashboard():
     with tab3:
         st.subheader("Giám sát chuỗi APT và danh tiếng IP")
         st.caption(
-            "ℹ️ Phân biệt: **Điểm danh tiếng** = lịch sử vi phạm của MỘT IP (1 lần BLOCK = 30đ, "
-            "cap 100, tự giảm theo thời gian) — KHÔNG phải 'điểm APT'. **APT thật** (bảng phía dưới) "
-            "chỉ gán khi một IP xuất hiện ở **≥2 ngày KHÁC NHAU** (COUNT DISTINCT apt_day ≥ 2); "
-            "chỉ dữ liệu DAPT2020 (có apt_phase) mới vào đây — log escalate lên LLM thường KHÔNG bị tính là APT."
+            "ℹ️ **Điểm danh tiếng** là lịch sử vi phạm của một IP (mỗi lần BLOCK +30đ, trần 100, "
+            "tự giảm theo thời gian) — không phải 'điểm APT'. **APT thật** ở bảng dưới chỉ gán khi một "
+            "IP xuất hiện ở **từ hai ngày khác nhau** (COUNT DISTINCT apt_day ≥ 2), và chỉ dữ liệu "
+            "DAPT2020 (có apt_phase) mới vào được đây; log escalate lên LLM thường không tính là APT."
         )
 
         # Lấy danh sách IP nguy hiểm từ Long-term Memory. Đồng bộ WHITELIST: IP đã whitelist
@@ -1831,14 +1824,10 @@ def main_dashboard():
             st.session_state["threat_investigation_ip"] = selected_ip
 
             if selected_ip:
-                # 1. Truy vấn thông tin danh tiếng từ threat_memory
                 ip_rep = threat_memory.get_ip_reputation(selected_ip)
-                # 2. Truy vấn lịch sử cảnh báo của IP này từ audit_trail
                 ip_history = cached_get_audit_trail_for_ip(selected_ip, limit=50)
-                # 3. Truy vấn threat events của IP này từ threat_memory
                 ip_events = threat_memory.get_threat_events_for_ip(selected_ip)
 
-                # Lấy reputation score của IP
                 rep_score = 0.0
                 if ip_rep:
                     rep_score = ip_rep.get("reputation_score", 0.0)
@@ -2366,7 +2355,6 @@ def main_dashboard():
     with tab5:
         st.subheader("🔍 Lỗ hổng và tri thức đồ thị")
 
-        # 1. Nút bấm Quét Lỗ Hổng Hệ thống
         col_scan_btn, col_integrity_btn = st.columns([1, 1])
         with col_scan_btn:
             if st.button(
@@ -2385,7 +2373,6 @@ def main_dashboard():
                         st.error(f"Lỗi khi chạy quét lỗ hổng: {e}")
 
         with col_integrity_btn:
-            # 2. Gọi verify_document_integrity() kiểm định tài liệu RAG
             if st.button(
                 "🛡️ Kiểm tra tính toàn vẹn tài liệu (RAG Integrity Check)",
                 help="Xác minh SHA-256 của các tệp Knowledge Base chống RAG Poisoning",
@@ -2404,7 +2391,6 @@ def main_dashboard():
                         for detail in res.get("details", []):
                             st.write(f"- {detail}")
 
-        # 3. Đọc dữ liệu từ data/trivy-results.json để thống kê và hiển thị
         trivy_path = "data/trivy-results.json"
         has_vulns = False
         vuln_list = []
@@ -2431,7 +2417,6 @@ def main_dashboard():
             except Exception as e:
                 st.warning(f"Không thể đọc kết quả Trivy: {e}")
 
-        # 4. Thống kê KPI Lỗ hổng
         if has_vulns:
             sev_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}
             for v in vuln_list:
@@ -2511,11 +2496,9 @@ def main_dashboard():
                 st.markdown(f"**Mức độ nguy hại:** `{v['Mức độ']}`")
                 st.info(f"**Mô tả:** {v['Mô tả']}")
 
-            # 5. Vẽ biểu đồ Knowledge Graph (Neo4j Visual Tree)
             st.markdown("---")
             st.markdown("##### 🧬 Biểu đồ Tri thức Lỗ hổng (Vulnerability Knowledge Graph)")
 
-            # Xây dựng DOT code động dựa trên lỗ hổng thực tế để vẽ sơ đồ đẹp mắt
             dot_lines = [
                 "digraph G {",
                 '    bgcolor="transparent";',

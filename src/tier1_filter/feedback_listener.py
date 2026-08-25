@@ -133,18 +133,16 @@ class FeedbackListener:
         status: str = "PENDING_APPROVAL",
     ) -> dict:
         """
-        Nhận luật mới từ Agent và persist vào config.
+        Nhận luật mới từ tác tử rồi ghi bền vào config.
 
-        Args:
-            field: Tên trường trong log (ví dụ: 'Source IP', 'URI', 'User-Agent')
-            pattern: Chuỗi pattern cần match (regex hoặc substring)
-            score: Điểm risk score cộng thêm khi match (mặc định 50)
-            source: Nguồn sinh rule (để audit trail)
-            reason: Lý do tạo rule (LLM reasoning)
-            status: Trạng thái của luật (mặc định PENDING_APPROVAL)
+            field: tên trường trong log - 'Source IP', 'URI', 'User-Agent'...
+            pattern: chuỗi cần khớp, regex hoặc chuỗi con.
+            score: điểm rủi ro cộng thêm mỗi lần khớp.
+            source: nguồn sinh luật, để lần lại trong sổ kiểm toán.
+            reason: lời biện giải của LLM.
+            status: mặc định PENDING_APPROVAL, chờ người duyệt.
 
-        Returns:
-            dict chứa thông tin rule + status
+        Trả về dict mô tả luật kèm trạng thái.
         """
         # Đóng băng khi đang chạy thực nghiệm bóc tách (ablation).
         #

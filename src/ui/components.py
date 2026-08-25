@@ -1,7 +1,4 @@
-"""
-Các component giao diện dùng lại cho Streamlit Dashboard.
-Nâng cấp PREMIUM: Thiết kế chuẩn SOC/SIEM Glassmorphism hiện đại.
-"""
+"""Các thành phần giao diện dùng lại cho dashboard Streamlit."""
 
 import html as html_lib
 import json
@@ -1047,7 +1044,7 @@ def render_metrics_header(
     offload_counts=None,
     blocks_by_tier=None,
 ):
-    """Hiển thị Header KPI chuẩn SOC SIEM bằng HTML Glassmorphism.
+    """Dựng hàng chỉ số ở đầu trang.
 
     Chỉ một chỉ số phần trăm: xả tải LLM = 1 − (`escalated_to_llm` / log thô).
 

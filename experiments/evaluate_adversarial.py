@@ -416,7 +416,7 @@ def run_negative(limit=None, out=None):
     return ket
 
 
-# MODE: pipeline - FULL pipeline Tier-2 (LLM) resistance
+# Chế độ pipeline: đo sức chống chịu của trọn tuyến Tầng 2 (có LLM).
 def load_hard_samples(limit_per_cat: int | None, categories: list[str] | None = None):
     """Mẫu khó cho lượt chạy qua đường ống. `None` = lấy hết (mặc định) = 678 mẫu.
 

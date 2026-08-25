@@ -49,10 +49,9 @@ class KnowledgeGraphBuilder:
 
         logger.info("Building Knowledge Graph from Trivy results...")
         with self.driver.session() as session:
-            # 1. Xóa các nút lỗ hổng cũ để tránh trùng lặp khi quét lại
+            # Dọn nút cũ trước, không thì mỗi lượt quét lại nhân đôi đồ thị.
             session.run("MATCH (v:Vulnerability) DETACH DELETE v")
 
-            # 2. Thêm nút Thành phần Hệ thống (System Component Node)
             session.run(
                 "MERGE (c:Component {name: $name}) SET c.type = 'Application'", name="SENTINEL_SOC"
             )

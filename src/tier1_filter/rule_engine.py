@@ -972,13 +972,11 @@ class RuleEngine:
                 # HTML sẽ lọt nếu chỉ so trên chuỗi nguyên văn.
                 for cand in normalize_for_signature(val):
                     val_lc = cand.lower()
-                    # 1. Prompt Injection Patterns (substring, không phân biệt hoa/thường)
                     for raw, low in zip(
                         self.injection_patterns, self._injection_patterns_lc, strict=False
                     ):
                         if low in val_lc:
                             return f"Prompt Injection Pattern: Phát hiện '{raw}' trong '{field}'"
-                    # 2. Jailbreak Patterns
                     for raw, low in zip(
                         self.jailbreak_patterns, self._jailbreak_patterns_lc, strict=False
                     ):

@@ -103,7 +103,6 @@ def login_screen():
                 )
                 return
 
-            # 1. Kiểm tra trạng thái khóa (lockout) từ cơ sở dữ liệu
             attempts, lockout_until = get_login_attempts(clean_username)
             if time.time() < lockout_until:
                 remaining = int(lockout_until - time.time())

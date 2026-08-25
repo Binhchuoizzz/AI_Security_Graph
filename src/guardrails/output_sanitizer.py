@@ -108,21 +108,18 @@ class OutputSanitizer:
         strip_count = 0
         clean = text
 
-        # 1. Loại bỏ các ký tự ẩn tàng hình (Zero-width characters)
+        # Ký tự tàng hình và mã màu terminal: gỡ trước để không che mất mẫu bên dưới.
         clean = re.sub(r"[\u200b\u200c\u200d\ufeff\u00ad]", "", clean)
 
-        # 2. Loại bỏ các mã escape định dạng thiết bị cuối (ANSI escape codes)
         clean = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", clean)
 
-        # 3. Quét các cấu trúc Markdown/HTML nguy hiểm tĩnh trước
-        # (để bắt được Data URIs)
+        # Quét mẫu tĩnh trước thì mới bắt được Data URI trước khi giải mã sâu.
         for compiled_re, replacement in self.compiled_patterns:
             matches = compiled_re.findall(clean)
             if matches:
                 strip_count += len(matches)
                 clean = compiled_re.sub(replacement, clean)
 
-        # 4. Quét giải mã Base64/Hex sâu để phát hiện payload ẩn
         clean, b64_count = self._sanitize_base64(clean)
         clean, hex_count = self._sanitize_hex(clean)
         strip_count += b64_count + hex_count
@@ -152,5 +149,4 @@ class OutputSanitizer:
         return self._strip_count
 
 
-# Thực thể duy nhất (Singleton)
 output_sanitizer = OutputSanitizer()

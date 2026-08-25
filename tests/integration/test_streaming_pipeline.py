@@ -97,9 +97,9 @@ class TestRuleEngineIntegration:
 
         # SSH với nhiều gói tin (volumetric) sẽ bị ALERT
         assert results[0]["tier1_action"] == "ALERT"
-        # Port 80 with low packets -> DROP (since port 80 is not in sensitive_ports)
+        # Cổng 80 ít gói thì DROP - 80 không nằm trong sensitive_ports.
         assert results[1]["tier1_action"] == "DROP"
-        # Port 8080 with low packets -> DROP
+        # Cổng 8080 ít gói cũng vậy.
         assert results[2]["tier1_action"] == "DROP"
 
 

@@ -67,7 +67,7 @@ class DualRetriever:
         top_k: int = DEFAULT_TOP_K,
         use_cache: bool = True,
     ):
-        # 1. Xác thực tính toàn vẹn của Knowledge Base trước khi load (Chống RAG Poisoning)
+        # Đối chiếu toàn vẹn kho tri thức trước khi nạp - chống đầu độc RAG.
         from src.rag.security import verify_document_integrity
 
         integrity_result = verify_document_integrity()
@@ -192,7 +192,6 @@ class DualRetriever:
         total_docs = len(meta)
         fetch_k = min(self.top_k * 3, total_docs)
 
-        # 1. Tìm kiếm Vector Ngữ nghĩa (Dense Search)
         # np.asarray(..., dtype) thay cho .astype(): encode() có kiểu trả về union
         # (Tensor|ndarray) nên .astype không type-safe khi thiếu venv (CI). Runtime
         # encode trả ndarray -> np.asarray là no-op cùng kết quả, nhưng type tất định.
@@ -201,13 +200,11 @@ class DualRetriever:
         )
         dense_results = self._dense_search(query_embedding, source_key, fetch_k)
 
-        # 2. Tìm kiếm Từ khóa Chính xác (Sparse Search)
         tokenized_query = log_tokenizer(query_text)
         sparse_results = self._sparse_search(tokenized_query, source_key, fetch_k)
 
-        # 3. Thuật toán dung hòa điểm số (Reciprocal Rank Fusion - RRF)
-        # Công thức: RRF_score = w_dense / (k + rank_dense) + w_sparse / (k + rank_sparse)
-        # Sử dụng hằng số chuẩn k=60, ưu tiên Sparse (BM25) w_sparse=1.5 cho từ khoá kỹ thuật
+        # RRF: w_dense / (k + rank_dense) + w_sparse / (k + rank_sparse).
+        # k=60 là hằng số chuẩn; BM25 được ưu tiên hơn vì truy vấn ở đây giàu từ khoá kỹ thuật.
         RRF_K = 60
         W_DENSE = 1.0
         W_SPARSE = 1.5

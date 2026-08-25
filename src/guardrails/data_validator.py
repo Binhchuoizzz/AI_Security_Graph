@@ -25,23 +25,21 @@ class DataValidator:
         """Kiểm tra và làm sạch log entry đơn lẻ."""
         errors = []
 
-        # 1. Chuẩn hóa log keys trước
+        # Chuẩn hoá khoá trước, rồi mới soi tới giá trị.
         clean_log = normalize_log_keys(log_entry)
 
-        # 2. Xử lý giá trị Null/NaN thành "" trước để phù hợp với các test assertion cũ
+        # NaN/None quy về chuỗi rỗng: các assertion cũ so sánh với "", không phải None.
         for key, value in list(clean_log.items()):
             if key.startswith("_"):
                 continue
             if value is None or (isinstance(value, float) and value != value):
                 clean_log[key] = ""
 
-        # 3. Kiểm tra các trường bắt buộc (Schema Check)
         for field in self.required_fields:
             if field not in clean_log or clean_log[field] == "":
-                # Nếu trường rỗng hoặc không tồn tại, báo lỗi thiếu trường
                 errors.append(f"Missing required field: {field}")
 
-        # 4. Ép kiểu an toàn cho các trường số và kiểm tra dải giá trị
+        # Ép kiểu số: hỏng thì về 0 và ghi lỗi, không ném ngoại lệ ra ngoài.
         numeric_fields = ["Destination Port", "Total Fwd Packets", "Flow Duration", "Protocol"]
         for field in numeric_fields:
             if field in clean_log and clean_log[field] != "":
@@ -55,7 +53,6 @@ class DataValidator:
                     clean_log[field] = 0
                     errors.append(f"Invalid numeric value for '{field}', defaulted to 0")
 
-        # 5. Xác thực địa chỉ IP cụ thể (IPv4/IPv6 syntax validation)
         for ip_field in ["Source IP", "Destination IP"]:
             if ip_field in clean_log and clean_log[ip_field] != "":
                 ip_str = str(clean_log[ip_field]).strip()
@@ -64,7 +61,6 @@ class DataValidator:
                 except ValueError:
                     errors.append(f"Invalid IP address format in '{ip_field}': {ip_str}")
 
-        # 6. Xác thực dải Port cụ thể (Port range validation [0, 65535])
         if (
             "Destination Port" in clean_log
             and clean_log["Destination Port"] != ""
@@ -74,7 +70,6 @@ class DataValidator:
             if not (0 <= port <= 65535):
                 errors.append(f"Destination Port {port} is out of bounds [0, 65535]")
 
-        # 7. Xác thực dải Protocol cụ thể (Protocol validation [0, 255])
         if (
             "Protocol" in clean_log
             and clean_log["Protocol"] != ""

@@ -79,18 +79,15 @@ class RAGSanitizer:
         if not text:
             return ""
 
-        # 1. Normalize Unicode (chống Unicode homoglyph attacks)
+        # NFKC gộp các ký tự nhìn giống nhau về một dạng, chặn lối lách bằng homoglyph.
         clean = unicodedata.normalize("NFKC", text)
 
-        # 2. Xóa các ký tự điều khiển (control characters) và zero-width
-        # characters
         control_chars = (
             r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f"
             r"\u200b-\u200f\u2028-\u202f\u2060-\u206f]"
         )
         clean = re.sub(control_chars, "", clean)
 
-        # 3. Làm sạch HTML/JS tags
         clean = strip_dangerous_tags_recursive(clean)
         try:
             stripper = HTMLTagStripper()
@@ -99,13 +96,12 @@ class RAGSanitizer:
         except Exception:
             clean = strip_html_tags_fallback(clean)
 
-        # 4. Làm sạch Markdown images và links
         clean = re.sub(r"!\[[^\]]*\]\s*\([^\)]+\)", "[IMG_STRIPPED]", clean, flags=re.IGNORECASE)
         clean = re.sub(
             r"\[[^\]]*\]\s*\(https?://[^\)]+\)", "[LINK_STRIPPED]", clean, flags=re.IGNORECASE
         )
 
-        # 5. Truncate (chặn buffer overflow / context window exhaustion)
+        # Cắt độ dài sau cùng: tài liệu dài vô hạn là một cách làm tràn ngữ cảnh.
         if len(clean) > max_length:
             clean = clean[:max_length] + "... [TRUNCATED FOR SECURITY]"
 
@@ -121,10 +117,9 @@ class RAGSanitizer:
         if not text:
             return ""
 
-        # 1. Loại bỏ mọi dấu hiệu của dynamic delimiters (<<<...>>>)
+        # Xoá dấu phân cách động: tài liệu tự mang <<<...>>> là mưu chèn ranh giới giả.
         clean = re.sub(r"<<<[^>]*>>>", "[DELIMITER_STRIPPED]", text)
 
-        # 2. Phát hiện và trung hòa Prompt Injection patterns
         for pattern_re in self.injection_res:
             new_clean = pattern_re.sub(r"\g<1>[POISONOUS_INSTRUCTION_NEUTRALIZED]", clean)
             if new_clean != clean:
@@ -133,7 +128,6 @@ class RAGSanitizer:
                 )
             clean = new_clean
 
-        # 3. Phát hiện và trung hòa Jailbreak patterns
         for pattern_re in self.jailbreak_res:
             new_clean = pattern_re.sub(r"\g<1>[POISONOUS_JAILBREAK_NEUTRALIZED]", clean)
             if new_clean != clean:
@@ -154,7 +148,6 @@ class RAGSanitizer:
 
         sanitized = dict(entry)
 
-        # 1. Làm sạch các kết quả thô trong lists
         if "mitre_results" in sanitized and isinstance(sanitized["mitre_results"], list):
             sanitized["mitre_results"] = [
                 {**r, "text": self.sanitize_retrieve(r.get("text", ""))}
@@ -170,7 +163,6 @@ class RAGSanitizer:
                 for r in sanitized["nist_results"]
             ]
 
-        # 2. Làm sạch context văn bản
         if "mitre_context" in sanitized and isinstance(sanitized["mitre_context"], str):
             sanitized["mitre_context"] = self.sanitize_retrieve(sanitized["mitre_context"])
         if "nist_context" in sanitized and isinstance(sanitized["nist_context"], str):

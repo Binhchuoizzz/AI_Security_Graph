@@ -494,10 +494,11 @@ class EncodingNeutralizer:
         return decoded
 
     def _expose_obfuscated(self, text: str) -> str:
-        """Reveal base32/rot13/leetspeak/homoglyph payloads that decode to an
-        injection attempt. Guarded: only appends a marker when the *decoded*
-        variant looks malicious AND the original did not - so benign text and
-        already-flagged text are never mangled (keeps false-positive rate low)."""
+        """Lộ payload base32/rot13/leetspeak/homoglyph giải ra thành lệnh chèn.
+
+        Chỉ gắn dấu khi bản GIẢI MÃ trông độc mà bản gốc thì không, nên văn bản lành
+        và văn bản đã bị gắn cờ đều không bị đụng vào - giữ tỉ lệ báo nhầm thấp.
+        """
         if _looks_malicious(text):
             return text
         additions = []
@@ -663,13 +664,12 @@ class GuardrailsPipeline:
 
         sanitized_logs = [r["sanitized_log"] for r in results]
 
-        # 1. Nén volume logs bằng LogTemplateMiner
         miner = LogTemplateMiner()
         for log in sanitized_logs:
             miner.add_log_dict(log)
         compressed_text = miner.format_for_llm()
 
-        # 2. Lấy danh sách logs có mức entropy cao (ưu tiên giữ nguyên raw)
+        # Log entropy cao được giữ nguyên văn thay vì gộp về khuôn mẫu.
         scorer = EntropyScorer()
         high_priority_logs = []
         for log in sanitized_logs:
@@ -693,11 +693,10 @@ class GuardrailsPipeline:
             if scorer.is_high_entropy(log_str):
                 high_priority_logs.append(log_str)
 
-        # 3. Cắt tỉa logs theo token budget
         budget_manager = TokenBudgetManager()
         budgeted_text = budget_manager.fit_to_budget(compressed_text, high_priority_logs)
 
-        # 4. Xác định mức độ cách ly cao nhất của batch log
+        # Cả lô lấy mức cách ly cao nhất của một log bất kỳ trong lô.
         max_isolation = "NORMAL"
         for r in results:
             if r["isolation_level"] == "CRITICAL":
@@ -706,7 +705,7 @@ class GuardrailsPipeline:
             elif r["isolation_level"] == "HIGH":
                 max_isolation = "HIGH"
 
-        # 5. Đóng gói trong delimiter ngẫu nhiên động (nonce mới mỗi lô - xem process()).
+        # Nonce mới cho mỗi lô - xem process().
         enc = DelimitedDataEncapsulator()
         batch_encapsulated = enc.encapsulate(budgeted_text, max_isolation)
 

@@ -1,7 +1,7 @@
 # %% [markdown]
-# # ML Model Comparison (Tier 2)
-# This notebook trains and compares 5 traditional Machine Learning models to serve as the Tier 2 filter.
-# The models evaluate Flow features and predict if the flow is Benign or an Attack.
+# # So sánh mô hình ML cho Cổng ML
+# Huấn luyện năm mô hình học máy cổ điển rồi so, để chọn cái đứng ở Cổng ML.
+# Đầu vào là đặc trưng luồng, đầu ra là lành tính hay tấn công.
 
 # %%
 import os
@@ -28,7 +28,7 @@ DATA_FILE = os.path.join(ROOT, "ml_lab", "dataset_100k.csv")
 MODEL_OUT = os.path.join(ROOT, "ml_lab", "tier_2_model.pkl")
 
 # %% [markdown]
-# ## 1. Load and Prepare Dataset
+# ## 1. Nạp và chuẩn bị dữ liệu
 
 # %%
 print(f"[*] Loading dataset from {DATA_FILE}...")
@@ -37,7 +37,7 @@ df = pd.read_csv(DATA_FILE)
 # np.asarray: `.values` khai báo trả `ndarray | ExtensionArray`, mà np.bincount và
 # train_test_split(stratify=) chỉ nhận ndarray. Cột Target là số nên ép kiểu không đổi dữ liệu.
 y = np.asarray(df["Target"].values)
-# Define mapping from offline dataset to online streaming names for core features
+# Đổi tên cột đặc trưng lõi từ tên của bộ dữ liệu ngoại tuyến sang tên dùng khi chạy dòng.
 rename_map = {
     "Flow Duration": "Flow Duration",
     "Tot Fwd Pkts": "Total Fwd Packets",
@@ -68,7 +68,7 @@ exclude = [
 ]
 features = [c for c in df.columns if c not in exclude]
 
-# Ensure all features are strictly numeric and handle Infinity/NaN
+# Ép mọi đặc trưng về số, dọn Infinity và NaN.
 for c in features:
     df[c] = pd.to_numeric(df[c], errors="coerce")
 df.replace([np.inf, -np.inf], np.nan, inplace=True)
@@ -87,11 +87,11 @@ plt.title("Class Distribution (0=Benign, 1=Attack)")
 plt.show()
 
 # %% [markdown]
-# ## 2. Train/Test Split and Scaling
+# ## 2. Chia tập và chuẩn hoá thang
 
 # %%
-# --- CHIA 3 TẬP: TRAIN (70%) - VAL (10%) - TEST/THI (20%) ---
-# Đã trộn đều 4 loại dữ liệu (CICIDS, DAPT, Zero-day, Adversarial) trong data tổng
+# Chia 70% train, 10% val, 20% test. Bốn nguồn (CICIDS, DAPT, zero-day, đối kháng)
+# đã trộn đều từ trước trong tệp tổng.
 
 X_temp, X_test, y_temp, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 X_train, X_val, y_train, y_val = train_test_split(
@@ -110,7 +110,7 @@ X_val_scaled = scaler.transform(X_val)
 X_test_scaled = scaler.transform(X_test)
 
 # %% [markdown]
-# ## 3. Train and Evaluate 5 Models
+# ## 3. Huấn luyện và chấm năm mô hình
 
 # %%
 models = {
@@ -174,35 +174,8 @@ for name, model in models.items():
         best_model_name = name
         best_model_obj = model_obj
 
-# --- Ghi nhận lên MLflow ---
-# mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001"))
-# mlflow.set_experiment("Sentinel_ML_Tier2_Training")
-
-# with mlflow.start_run(run_name="ML_Tier2_Training_Run"):
-#     mlflow.log_param("dataset_size", len(X))
-#     mlflow.log_param("train_size", len(X_train))
-#     mlflow.log_param("test_size", len(X_test))
-#
-#     for r in results:
-#         m = r["Model"]
-#         # Prefix the metrics with model name for easy comparison in MLflow UI
-#         mlflow.log_metric(f"{m}_Val_F1", r["Val F1 (In-Dist)"])
-#         mlflow.log_metric(f"{m}_Test_F1", r["Test F1"])
-#         mlflow.log_metric(f"{m}_Precision", r["Test Precision"])
-#         mlflow.log_metric(f"{m}_Recall", r["Test Recall"])
-#         mlflow.log_metric(f"{m}_FPR", r["Test FPR"])
-#
-#     # We also log the best model to MLflow (assuming it's a sklearn-compatible model)
-#     # Note: If it's XGBoost or LightGBM, mlflow.sklearn.log_model works if they follow sklearn API,
-#     # but otherwise might need specific mlflow.xgboost / mlflow.lightgbm
-#     mlflow.sklearn.log_model(best_model_obj, "best_tier2_model")
-#     mlflow.log_param("best_model_name", best_model_name)
-#     mlflow.log_metric("best_test_f1", best_f1)
-#     print(f"[*] MLflow tracking completed.")
-
-
 # %% [markdown]
-# ## 4. Comparison Results & Visualization
+# ## 4. Kết quả so sánh và biểu đồ
 
 # %%
 df_res = pd.DataFrame(results).sort_values(by="Test F1", ascending=False)
@@ -236,7 +209,7 @@ plt.tight_layout()
 plt.show()
 
 # %% [markdown]
-# ## 5. Export the Best Pipeline
+# ## 5. Xuất pipeline tốt nhất
 
 # %%
 print(f"[+] Best Model: {best_model_name} (F1: {best_f1:.4f})")
