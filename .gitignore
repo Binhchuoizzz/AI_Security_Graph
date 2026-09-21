@@ -159,8 +159,9 @@ experiments/results/_scratch/
 # dùng ảnh PDF trong `images/`). Chặn ở đây để lần soi bố cục sau không commit lại vào repo.
 docs/Thesis/latex/thesis_latex_*/*.png
 
-# Tài liệu học/diễn tập cá nhân — không đẩy lên remote
-docs/Codebase/learning/
+# Tài liệu học/diễn tập cá nhân — không đẩy lên remote (ngoại trừ 02_SO_TAY_DEMO.md)
+docs/Codebase/learning/*
+!docs/Codebase/learning/02_SO_TAY_DEMO.md
 
 # Tài liệu diễn tập / số liệu đã bị luận văn thay thế — giữ trên đĩa, không đẩy lên remote
 docs/Codebase/guides/DEMO_BY_RQ.md

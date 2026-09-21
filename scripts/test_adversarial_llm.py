@@ -73,7 +73,60 @@ def main():
             else:
                 results["resisted"] += 1
 
-            print(f"  [{i + 1:3d}] [{source:25s}] LLM Action: {action:12s} -> {verdict}")
+            # Trích xuất payload tiêm nhiễm
+            injected_field = s.get("injected_field", "payload")
+            injected_val = str(log.get(injected_field, ""))[:85].replace("\n", " ")
+
+            print("\n  ------------------------------------------------------------")
+            print(f"  [MẪU {i + 1}/5] Nguồn: {source}")
+            print(f'  -> Payload tiêm ({injected_field}): "{injected_val}..."')
+            print(f"  -> Quyết định: {action:12s} | Kết quả phòng thủ: {verdict}")
+
+            # Trích xuất Top 5 RAG matches
+            import re
+
+            rag_ctx = final.get("rag_mitre_context", "") if isinstance(final, dict) else ""
+            pattern = r"---\s*Match\s*(\d+)\s*\(RRF Score:\s*([\d\.]+)\)\s*---\s*\n(?:\[SOURCE:[^\]]+\]\s*\n)?([^\n]+)"
+            matches = re.findall(pattern, rag_ctx)
+
+            print(f"  -> Top {len(matches)} Kỹ thuật MITRE được RAG truy xuất vào ngữ cảnh:")
+            rag_tech_ids = set()
+            if matches:
+                for m in matches:
+                    tech_title = m[2].strip()
+                    m_id = re.search(r"\b(T\d{4}(?:\.\d{3})?)\b", tech_title)
+                    if m_id:
+                        rag_tech_ids.add(m_id.group(1))
+                    print(f"     [Top {m[0]}] {tech_title} (RRF: {m[1]})")
+            else:
+                print("     (Không có tài liệu RAG nào được truy xuất)")
+
+            # Đối soát neo bằng chứng
+            claimed = dec.get("llm_claimed_technique") or dec.get("mitre_technique", "")
+            claimed_id_m = re.search(r"\b(AML\.T\d{4}|T\d{4}(?:\.\d{3})?)\b", str(claimed))
+            claimed_id = claimed_id_m.group(1) if claimed_id_m else ""
+
+            if claimed_id:
+                if claimed_id in rag_tech_ids:
+                    print(
+                        f"  -> Đối soát RAG: [GROUNDED] Kỹ thuật '{claimed_id}' CÓ trong Top 5 RAG."
+                    )
+                elif claimed_id.startswith("AML."):
+                    print(
+                        f"  -> Đối soát RAG: [ATLAS MATCH] Nhận diện tấn công AI '{claimed_id}' qua khung MITRE ATLAS."
+                    )
+                else:
+                    print(
+                        f"  -> Đối soát RAG: [ẢO GIÁC PHÁT HIỆN] LLM tự chém '{claimed_id}' (KHÔNG có trong Top 5 RAG)!"
+                    )
+                    print(
+                        f"     => Lá chắn Neo Bằng Chứng (Evidence Grounding) tước bỏ mã '{claimed_id}' -> ép về AWAIT_HITL."
+                    )
+
+            reason = dec.get("reasoning", "") or dec.get("reason", "")
+            if reason:
+                print(f"  -> Lý do: {str(reason)[:120]}...")
+            print("  ------------------------------------------------------------")
         except Exception as e:
             print(f"  [{i + 1:3d}] pipeline error: {e}")
 
