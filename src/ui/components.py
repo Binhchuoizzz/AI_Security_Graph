@@ -482,7 +482,7 @@ def build_guardrail_note(
             "Không chắc kỹ thuật MITRE cụ thể (hạ về N/A) ➔ Tự động ép hạ "
             "<code>AWAIT_HITL</code> cho L3 Analyst duyệt."
         )
-    return f'<div style="{_GUARDRAIL_BOX}">  🛡️ <b>Guardrail Policy (AGENTS.md):</b> {body}</div>'
+    return f'<div style="{_GUARDRAIL_BOX}">  🛡️ <b>Chính sách Rào chắn (Guardrail Policy):</b> {body}</div>'
 
 
 def build_tier1_block_badge(count: int, tier1_score) -> str:
