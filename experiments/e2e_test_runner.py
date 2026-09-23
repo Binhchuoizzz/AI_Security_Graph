@@ -355,9 +355,10 @@ def test_16_nist_index_size(r: TestResult):
 
     # Kiểm thử truy xuất theo từng pha của Incident Response (IR)
     import numpy as np
-    from sentence_transformers import SentenceTransformer
 
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    from src.rag.retriever import load_sentence_transformer
+
+    model = load_sentence_transformer("all-MiniLM-L6-v2")
 
     ir_queries = [
         ("containment strategy after detecting intrusion", "Containment"),

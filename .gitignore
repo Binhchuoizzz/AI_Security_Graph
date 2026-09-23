@@ -174,3 +174,6 @@ reports/unified_stream_evaluation_report.md
 # Cấu hình công cụ trợ lý cục bộ — không bao giờ theo dõi
 .agents/
 .claude/
+
+# Mô hình nhúng cục bộ (>80MB) — lưu trên đĩa, tự động nạp offline, không đẩy git
+knowledge_base/models/

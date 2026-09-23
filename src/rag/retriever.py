@@ -58,6 +58,77 @@ def _configured_top_k(default: int = 5) -> int:
 DEFAULT_TOP_K = _configured_top_k()
 MIN_SCORE_THRESHOLD = 0.15  # Dùng cho tìm kiếm vector FAISS
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+LOCAL_EMBEDDING_DIR = os.path.join(BASE_DIR, "knowledge_base", "models", "all-MiniLM-L6-v2")
+CROSS_ENCODER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+LOCAL_CROSS_ENCODER_DIR = os.path.join(
+    BASE_DIR, "knowledge_base", "models", "ms-marco-MiniLM-L-6-v2"
+)
+
+
+def load_cross_encoder(
+    model_name_or_path: str = CROSS_ENCODER_MODEL,
+    max_length: int = 512,
+):
+    """Nạp CrossEncoder hoàn toàn cục bộ, chống lỗi 'offline cache missing'."""
+    from sentence_transformers import CrossEncoder  # type: ignore
+
+    target = model_name_or_path
+    if (
+        model_name_or_path == CROSS_ENCODER_MODEL
+        and os.path.isdir(LOCAL_CROSS_ENCODER_DIR)
+        and os.path.isfile(os.path.join(LOCAL_CROSS_ENCODER_DIR, "config.json"))
+    ):
+        target = LOCAL_CROSS_ENCODER_DIR
+
+    return CrossEncoder(target, max_length=max_length)
+
+
+def load_sentence_transformer(
+    model_name_or_path: str = EMBEDDING_MODEL,
+):
+    """Nạp SentenceTransformer hoàn toàn cục bộ, chống lỗi 'offline cache missing'.
+
+    Thứ tự ưu tiên:
+      1. Đường dẫn thư mục cục bộ trong repo: `knowledge_base/models/all-MiniLM-L6-v2`
+         (không cần HuggingFace, không cần cache hệ thống, 100% offline).
+      2. HuggingFace cache mặc định (nếu đã tải).
+      3. Tự phục hồi: nếu cả hai đều chưa có và đang bật HF_HUB_OFFLINE=1, tạm thời
+         mở mạng để tải về cache và sao chép vào `knowledge_base/models` để vĩnh viễn không bao giờ
+         lỗi lại nữa.
+    """
+    from sentence_transformers import SentenceTransformer  # type: ignore
+
+    target = model_name_or_path
+    if model_name_or_path == EMBEDDING_MODEL and os.path.isdir(LOCAL_EMBEDDING_DIR):
+        if os.path.isfile(os.path.join(LOCAL_EMBEDDING_DIR, "config.json")):
+            target = LOCAL_EMBEDDING_DIR
+
+    try:
+        return SentenceTransformer(target)
+    except Exception as e:
+        logger.warning(
+            f"[RAG] Nạp embedding model từ '{target}' thất bại ({e}). Tự động phục hồi..."
+        )
+        orig_hf = os.environ.pop("HF_HUB_OFFLINE", None)
+        orig_tr = os.environ.pop("TRANSFORMERS_OFFLINE", None)
+        try:
+            model = SentenceTransformer(EMBEDDING_MODEL)
+            try:
+                os.makedirs(LOCAL_EMBEDDING_DIR, exist_ok=True)
+                model.save(LOCAL_EMBEDDING_DIR)
+                logger.info(f"[RAG] Đã lưu vĩnh viễn embedding model vào {LOCAL_EMBEDDING_DIR}")
+            except Exception as se:
+                logger.warning(f"[RAG] Không thể lưu bản sao cục bộ: {se}")
+            return model
+        finally:
+            if orig_hf is not None:
+                os.environ["HF_HUB_OFFLINE"] = orig_hf
+            else:
+                os.environ["HF_HUB_OFFLINE"] = "1"
+            if orig_tr is not None:
+                os.environ["TRANSFORMERS_OFFLINE"] = orig_tr
+            else:
+                os.environ["TRANSFORMERS_OFFLINE"] = "1"
 
 
 class DualRetriever:
@@ -80,7 +151,7 @@ class DualRetriever:
             from rank_bm25 import (
                 BM25Okapi,  # type: ignore  # noqa: F401  (kiểm tra dep tồn tại, fail-fast)
             )
-            from sentence_transformers import SentenceTransformer  # type: ignore
+            from sentence_transformers import SentenceTransformer  # type: ignore  # noqa: F401
         except ImportError as e:
             logger.error(f"Missing dependency: {e}")
             raise
@@ -89,9 +160,9 @@ class DualRetriever:
         self.top_k = top_k
         self.faiss = faiss
 
-        # Load mô hình embedding
+        # Load mô hình embedding cục bộ
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-        self.model = SentenceTransformer(EMBEDDING_MODEL)
+        self.model = load_sentence_transformer(EMBEDDING_MODEL)
 
         # Cross-encoder xếp hạng lại: dựng trễ ở lần truy xuất đầu, và chỉ thử ĐÚNG MỘT LẦN.
         self._reranker = None
@@ -256,12 +327,8 @@ class DualRetriever:
         if self._reranker_failed:
             return candidates[: self.top_k]
         try:
-            from sentence_transformers import CrossEncoder  # type: ignore
-
             if self._reranker is None:
-                self._reranker = CrossEncoder(
-                    "cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512
-                )
+                self._reranker = load_cross_encoder()
             top_candidates = candidates[: self.top_k * 2]
             pairs = [[query_text, c["text"]] for c in top_candidates]
             if pairs:

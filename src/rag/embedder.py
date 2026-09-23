@@ -375,7 +375,7 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
     try:
         import faiss  # type: ignore
         from rank_bm25 import BM25Okapi  # type: ignore
-        from sentence_transformers import SentenceTransformer  # type: ignore
+        from sentence_transformers import SentenceTransformer  # type: ignore  # noqa: F401
     except ImportError as e:
         logger.error(
             f"Missing dependency: {e}. Run: pip install sentence-transformers faiss-cpu rank_bm25"
@@ -384,7 +384,9 @@ def build_indexes(chunks: list[dict], index_name: str, model=None):
 
     if model is None:
         logger.info(f"Loading embedding model: {EMBEDDING_MODEL}")
-        model = SentenceTransformer(EMBEDDING_MODEL)
+        from src.rag.retriever import load_sentence_transformer
+
+        model = load_sentence_transformer(EMBEDDING_MODEL)
 
     texts = [chunk["text"] for chunk in chunks]
     logger.info(f"Building Dense Embeddings ({len(texts)} chunks) for [{index_name}]...")
@@ -474,7 +476,7 @@ def build_all_indexes():
         raise RuntimeError("Knowledge Base integrity violation detected")
 
     try:
-        from sentence_transformers import SentenceTransformer  # type: ignore
+        from sentence_transformers import SentenceTransformer  # type: ignore  # noqa: F401
     except ImportError as e:
         logger.error(f"Missing dependency: {e}")
         raise
@@ -485,7 +487,9 @@ def build_all_indexes():
 
     # Load model một lần duy nhất, dùng chung cho cả 2 indexes
     logger.info(f"Loading embedding model: {EMBEDDING_MODEL} (shared instance)")
-    shared_model = SentenceTransformer(EMBEDDING_MODEL)
+    from src.rag.retriever import load_sentence_transformer
+
+    shared_model = load_sentence_transformer(EMBEDDING_MODEL)
 
     # MITRE ATT&CK (Khung tham chiếu kỹ thuật tấn công)
     mitre_chunks = load_mitre_chunks()
