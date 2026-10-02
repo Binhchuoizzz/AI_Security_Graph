@@ -189,7 +189,7 @@ flowchart LR
      ```python
      self._nonce = secrets.token_hex(8)  # Ví dụ: 'a7b3c9f1e2d4085b'
      self.data_start = f"<<<DATA_BEGIN_{self._nonce}>>>"
-     self.data_end   = f"<<<DATA_END_{self._nonce}>>>"
+     self.data_end = f"<<<DATA_END_{self._nonce}>>>"
      ```
   2. **Khử thủ đoạn vượt rào (Delimiter Smuggling Defense):** Quét sạch mọi chuỗi có dạng `<<<...>>>` trong log thô bằng Regex trước khi bọc thẻ ([prompt_filter.py:545-547](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/guardrails/prompt_filter.py#L545-L547)), ngăn kẻ tấn công đoán mò thẻ đóng để đóng thẻ sớm.
   3. **Ràng buộc an toàn tuyệt đối trong System Instruction ([prompt_filter.py:550-560](file:///home/binhchuoiz/Projects/Thesis/AI_Security_Graph/src/guardrails/prompt_filter.py#L550-L560)):**
